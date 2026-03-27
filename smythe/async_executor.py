@@ -1,4 +1,4 @@
-"""Executor — walks the DAG and runs each node via an LLM provider."""
+"""AsyncExecutor — concurrent DAG execution via asyncio."""
 
 from __future__ import annotations
 
@@ -11,11 +11,12 @@ from smythe.registry import Registry
 from smythe.tracer import Tracer
 
 
-class Executor:
-    """Executes an assigned graph by walking it in dependency order.
+class AsyncExecutor:
+    """Executes an assigned graph with maximum concurrency.
 
-    Runs nodes serially via a Provider.  For concurrent execution
-    of independent nodes, use AsyncExecutor instead.
+    Independent nodes (those whose dependencies are all completed)
+    are launched in parallel via asyncio.gather().  The executor
+    runs in waves until every node has completed or failed.
     """
 
     def __init__(self, provider: Provider, registry: Registry, tracer: Tracer) -> None:
@@ -23,31 +24,19 @@ class Executor:
         self._registry = registry
         self._tracer = tracer
 
-    def run(self, graph: ExecutionGraph) -> ExecutionGraph:
-        """Execute every node in the graph, respecting dependency order."""
-        for node in self._walk(graph):
-            self._execute_node(node, graph)
+    async def run(self, graph: ExecutionGraph) -> ExecutionGraph:
+        """Execute every node, fanning out independent nodes concurrently."""
+        while True:
+            pending = [n for n in graph.nodes if n.status == NodeStatus.PENDING]
+            if not pending:
+                break
+            ready = [n for n in pending if graph.is_ready(n)]
+            if not ready:
+                raise RuntimeError("Deadlock: pending nodes exist but none are ready")
+            await asyncio.gather(*(self._execute_node(n, graph) for n in ready))
         return graph
 
-    def _walk(self, graph: ExecutionGraph) -> list[Node]:
-        """Topological sort of nodes by dependency order."""
-        visited: set[str] = set()
-        order: list[Node] = []
-        lookup = {n.id: n for n in graph.nodes}
-
-        def visit(node: Node) -> None:
-            if node.id in visited:
-                return
-            visited.add(node.id)
-            for dep_id in node.depends_on:
-                visit(lookup[dep_id])
-            order.append(node)
-
-        for node in graph.nodes:
-            visit(node)
-        return order
-
-    def _execute_node(self, node: Node, graph: ExecutionGraph) -> None:
+    async def _execute_node(self, node: Node, graph: ExecutionGraph) -> None:
         """Run a single node through the provider."""
         node.status = NodeStatus.RUNNING
         self._tracer.on_node_start(node)
@@ -61,8 +50,8 @@ class Executor:
             }
             system = self._build_system_prompt(agent)
             prompt = self._build_user_prompt(node, dep_results)
-            node.result = asyncio.run(
-                self._provider.complete(system, prompt, model=node.metadata.get("model", ""))
+            node.result = await self._provider.complete(
+                system, prompt, model=node.metadata.get("model", "")
             )
             node.status = NodeStatus.COMPLETED
         except Exception as exc:
