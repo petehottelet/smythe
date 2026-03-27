@@ -43,7 +43,7 @@ You define the goal; the framework negotiates the path.
 ```python
 from smythe import Swarm, Task
 
-swarm = Swarm(max_budget_usd=0.50, model="gpt-4o")
+swarm = Swarm(max_budget_usd=0.50, model="claude-mythos")
 
 task = Task(
     goal=(
@@ -79,7 +79,7 @@ result = swarm.execute(plan)
 ### Enterprise task — fork-join with adversarial review
 
 ```python
-swarm = Swarm(max_budget_usd=2.00, model="gpt-4o")
+swarm = Swarm(max_budget_usd=2.00, model="claude-mythos")
 
 task = Task(
     goal=(
