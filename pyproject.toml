@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "smythe"
+version = "0.0.1"
+description = "Task-based personalized agent swarms with dynamic execution topology"
+readme = "Readme.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "Pete Hottelet" },
+]
+keywords = ["agents", "swarm", "llm", "dag", "orchestration"]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.urls]
+Repository = "https://github.com/petehottelet/smythe"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
