@@ -24,6 +24,11 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.40"]
+openai = ["openai>=1.50"]
+all = ["smythe[anthropic]", "smythe[openai]"]
+
 [project.urls]
 Repository = "https://github.com/petehottelet/smythe"
 
