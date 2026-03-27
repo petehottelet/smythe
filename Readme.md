@@ -172,15 +172,223 @@ result = swarm.execute(plan)
 
 ---
 
+## Architecture
+
+```
+Task → Planner → ExecutionGraph (DAG) → Executor → Synthesizer → SwarmResult
+         │                                  │             │
+       Router                           Budget          Tracer
+       (optional)                       Tracker
+```
+
+### Planner tiers
+
+Smythe ships with three planner strategies, plus optional routing:
+
+| Tier | Class | Description |
+|---|---|---|
+| **Deterministic** | `DeterministicPlanner` | Pure Python DAG construction. Zero LLM cost, zero latency. Subclass and override `plan()`. |
+| **Constrained** | `ConstrainedPlanner` | LLM selects from a menu of pre-built `SubGraphTemplate`s. Dramatically smaller failure space than fully autonomous planning. |
+| **Autonomous** | `LLMPlanner` | LLM builds bespoke DAGs from scratch. Maximum flexibility. Context-preserving retries on malformed output. |
+
+Pass any planner explicitly via `Swarm(planner=...)`, or use the `PlannerRouter` for classifier-based routing:
+
+```python
+from smythe import Swarm, PlannerRouter, SimplePlanner, LLMPlanner
+
+router = PlannerRouter(
+    deterministic={"etl-pipeline": MyETLPlanner()},
+    constrained=my_constrained_planner,
+    autonomous=LLMPlanner(provider=my_provider),
+    classifier_provider=my_provider,
+)
+swarm = Swarm(router=router)
+```
+
+When no classifier provider is set, the router falls back to the autonomous planner.
+
+### Node failure policies
+
+Each node can declare how failures are handled:
+
+| Policy | Behavior |
+|---|---|
+| `HALT` (default) | Propagate the exception; stop execution. |
+| `SKIP` | Mark the node as `SKIPPED` and let dependents continue. |
+| `RETRY` | Retry up to `max_retries` times before failing. |
+
+Set policies in YAML or when constructing nodes programmatically:
+
+```yaml
+nodes:
+  - id: flaky-api
+    label: "Call external service"
+    failure_policy: retry
+    max_retries: 3
+  - id: optional-enrichment
+    label: "Nice-to-have step"
+    failure_policy: skip
+    depends_on: [flaky-api]
+```
+
+### Synthesis strategies
+
+The synthesizer merges parallel execution outputs into a single result:
+
+| Strategy | Description |
+|---|---|
+| `CONCATENATE` (default) | Join results with newlines. Zero cost. |
+| `LLM_MERGE` | Send all results to an LLM for intelligent merging. Budget-tracked and traced. |
+| `STRUCTURED` | Parse each result as JSON and shallow-merge into a single object. |
+
+```python
+from smythe import Swarm, SynthesisStrategy
+from smythe.synthesizer import Synthesizer
+
+swarm = Swarm(
+    synthesizer=Synthesizer(
+        strategy=SynthesisStrategy.LLM_MERGE,
+        provider=my_provider,
+        model="claude-mythos",
+    ),
+)
+```
+
+### Capability-aware agent assignment
+
+Nodes can declare `required_capabilities`. The registry matches agents whose capabilities are a superset of the required set, preferring the tightest match with alphabetical tie-breaking:
+
+```python
+from smythe.agent import Agent, AgentProfile
+from smythe.graph import Node
+
+agent = Agent(profile=AgentProfile(
+    name="researcher",
+    capabilities=["research", "summarize"],
+))
+registry.register(agent)
+
+node = Node(label="Research task", required_capabilities=["research"])
+registry.assign(graph)  # assigns the researcher agent
+```
+
+### Skill-based capability profiles
+
+Agent capabilities can be derived from external skill systems like [OpenClaw AgentSkills](https://docs.openclaw.ai/skills/) instead of (or in addition to) static tags. The registry hydrates each agent's capabilities at assignment time, caches the results, and falls back to static capabilities if the skill provider is unavailable.
+
+```python
+from smythe import Swarm
+from smythe.registry import Registry
+from smythe.openclaw_adapter import OpenClawSkillProvider
+from smythe.skills import DefaultCapabilityMapper, CapabilityHydrationMode
+
+registry = Registry(
+    skill_provider=OpenClawSkillProvider(),
+    capability_mapper=DefaultCapabilityMapper(
+        aliases={"search": "research", "summarize-text": "summarize"}
+    ),
+    hydration_mode=CapabilityHydrationMode.MERGE,
+    capability_cache_ttl_seconds=300,
+)
+
+swarm = Swarm(registry=registry, provider=my_provider)
+```
+
+Hydration modes:
+
+| Mode | Behavior |
+|---|---|
+| `MERGE` (default) | Union of static profile capabilities and skill-derived capabilities. |
+| `REPLACE` | Skill-derived capabilities only; static profile is ignored. |
+| `STATIC_ONLY` | Ignore the skill provider entirely. |
+
+Cache entries expire after the configured TTL. Force a refresh with `registry.refresh_agent_capabilities(agent_id)` or `registry.refresh_all_capabilities()`.
+
+### Budget enforcement
+
+Set a USD spending cap that is enforced at every execution step. Parallel execution uses a reservation protocol to prevent concurrent nodes from collectively exceeding the budget:
+
+```python
+swarm = Swarm(max_budget_usd=0.50)
+result = swarm.execute(task)
+print(result.total_cost_usd)  # actual cost
+```
+
+### YAML-defined DAGs
+
+Define execution graphs declaratively. Load and execute without writing Python:
+
+```yaml
+topology: fork_join
+nodes:
+  - id: research
+    label: "Research the topic"
+    agent:
+      name: Researcher
+      persona: "You are a thorough researcher."
+      capabilities: [research]
+  - id: summarize
+    label: "Summarize findings"
+    depends_on: [research]
+    failure_policy: retry
+    max_retries: 2
+```
+
+```python
+swarm = Swarm.from_yaml("pipeline.yaml", provider=my_provider)
+result = swarm.execute()
+```
+
+### Observability
+
+Every node execution emits structured trace spans. The planner's `PlannerMemory` persists execution outcomes as JSONL for learning-informed future planning.
+
+---
+
+## Installation
+
+```bash
+pip install -e .
+```
+
+Optional extras for LLM providers and skill integration:
+
+```bash
+pip install -e ".[anthropic]"    # Anthropic Claude models
+pip install -e ".[openai]"       # OpenAI GPT models
+pip install -e ".[openclaw]"     # OpenClaw AgentSkills integration
+pip install -e ".[all]"          # all of the above
+pip install -e ".[dev]"          # pytest, ruff, dev tooling
+```
+
+Requires Python 3.11+. Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` for the respective providers.
+
+---
+
 ## Current Status
 
-Early architecture phase. The core concepts are defined; implementation is beginning.
+The core framework is implemented and tested. **189 tests passing.**
 
-**What exists:**
-- Conceptual architecture and task graph schema (in progress)
+**What's shipped:**
+- Three-tier planner hierarchy (Deterministic, Constrained, Autonomous LLM)
+- Classifier-based planner router with deterministic fallback
+- Serial and async parallel executors with shared base class
+- Node failure policies (HALT, SKIP, RETRY)
+- Capability-aware agent assignment with deterministic tie-breaking
+- Skill-based capability hydration (OpenClaw AgentSkills adapter) with caching and fallback
+- Synthesis strategies (CONCATENATE, LLM_MERGE, STRUCTURED) with budget/trace accounting
+- Budget enforcement with reservation protocol for parallel safety
+- YAML-defined DAGs with failure policy and capabilities support
+- Context-preserving planner retries
+- Persistent execution memory (JSONL) for learning planner
+- Provider abstraction (Anthropic, OpenAI) with defensive response parsing
+- Structured observability traces
 
-**What's next (v0.1):**
-- YAML-defined task DAGs, serial/parallel dispatch, per-node agent personas, single LLM provider
+**What's next:**
+- Recursive subgraph decomposition
+- Approval gates for human-in-the-loop workflows
+- Performance history-based agent routing
+- Additional providers (Gemini, local models)
 
 ---
 

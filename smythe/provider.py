@@ -4,6 +4,20 @@ from __future__ import annotations
 
 import os
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+
+
+@dataclass
+class CompletionResult:
+    """Response from a provider call, including token usage for budget tracking."""
+
+    text: str
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
+    @property
+    def total_tokens(self) -> int:
+        return self.prompt_tokens + self.completion_tokens
 
 
 class Provider(ABC):
@@ -15,8 +29,8 @@ class Provider(ABC):
     """
 
     @abstractmethod
-    async def complete(self, system: str, prompt: str, model: str) -> str:
-        """Send a prompt to the LLM and return the text response."""
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        """Send a prompt to the LLM and return text + token usage."""
 
 
 class AnthropicProvider(Provider):
@@ -38,7 +52,12 @@ class AnthropicProvider(Provider):
             self._client = anthropic.AsyncAnthropic(api_key=self._api_key)
         return self._client
 
-    async def complete(self, system: str, prompt: str, model: str) -> str:
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        """Send a prompt to the Anthropic API and return the result.
+
+        Note: only the first text block is used; multi-block responses
+        are not concatenated.
+        """
         client = self._get_client()
         response = await client.messages.create(
             model=model,
@@ -46,7 +65,13 @@ class AnthropicProvider(Provider):
             system=system,
             messages=[{"role": "user", "content": prompt}],
         )
-        return response.content[0].text
+        text_blocks = [b for b in response.content if hasattr(b, "text")]
+        text = text_blocks[0].text if text_blocks else ""
+        return CompletionResult(
+            text=text,
+            prompt_tokens=getattr(response.usage, "input_tokens", 0),
+            completion_tokens=getattr(response.usage, "output_tokens", 0),
+        )
 
 
 class OpenAIProvider(Provider):
@@ -68,7 +93,7 @@ class OpenAIProvider(Provider):
             self._client = openai.AsyncOpenAI(api_key=self._api_key)
         return self._client
 
-    async def complete(self, system: str, prompt: str, model: str) -> str:
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         client = self._get_client()
         response = await client.chat.completions.create(
             model=model,
@@ -78,4 +103,12 @@ class OpenAIProvider(Provider):
                 {"role": "user", "content": prompt},
             ],
         )
-        return response.choices[0].message.content or ""
+        text = ""
+        if response.choices:
+            text = response.choices[0].message.content or ""
+        usage = response.usage
+        return CompletionResult(
+            text=text,
+            prompt_tokens=getattr(usage, "prompt_tokens", 0) if usage else 0,
+            completion_tokens=getattr(usage, "completion_tokens", 0) if usage else 0,
+        )
