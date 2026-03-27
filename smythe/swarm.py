@@ -50,12 +50,28 @@ class Swarm:
         self._registry = registry or Registry()
         self._synthesizer = synthesizer or Synthesizer()
 
-    def execute(self, task: Task) -> SwarmResult:
-        """Plan, assign, execute, and synthesize a task end-to-end."""
-        tracer = Tracer()
+    def plan(self, task: Task) -> ExecutionGraph:
+        """Generate and assign an execution graph without running it.
 
+        Returns the graph so you can inspect the planner's decisions
+        before committing to execution.
+        """
         graph = self._planner.plan(task)
         graph = self._registry.assign(graph)
+        return graph
+
+    def execute(self, task_or_graph: Task | ExecutionGraph) -> SwarmResult:
+        """Execute a task or a previously planned graph.
+
+        Accepts either a Task (plans and executes in one call) or an
+        ExecutionGraph returned by plan() for inspect-then-run workflows.
+        """
+        tracer = Tracer()
+
+        if isinstance(task_or_graph, Task):
+            graph = self.plan(task_or_graph)
+        else:
+            graph = task_or_graph
 
         executor = Executor(registry=self._registry, tracer=tracer)
         graph = executor.run(graph)

@@ -36,26 +36,85 @@ The system ships with robust heuristic defaults (e.g., "Research" tasks default 
 
 ## What It Looks Like
 
-Smythe focuses on intent-based execution. You define the goal; the framework negotiates the path.
+You define the goal; the framework negotiates the path.
+
+### Everyday task — fork-join
 
 ```python
 from smythe import Swarm, Task
 
-# Initialize with a hard cost-cap guardrail
-swarm = Swarm(max_budget_usd=1.00, model="gpt-4o")
+swarm = Swarm(max_budget_usd=0.50, model="gpt-4o")
 
-# Define a complex, multi-stage intent
 task = Task(
     goal=(
-        "Analyze the impact of solid-state batteries on EV range. "
-        "Compare three manufacturers and synthesize a technical report."
+        "Plan a birthday party for this Friday. I want a strawberry chiffon "
+        "cake, a venue that works for ~20 people, and invitations sent out ASAP."
     ),
-    constraints=["Must include adversarial review of manufacturer claims"]
+    constraints=[
+        "Budget under $500",
+        "Must be within 15 miles of Oakland, CA",
+    ],
 )
 
-# The Planner generates the DAG (Fork-Join -> Adversarial Review -> Synthesis)
-# then executes via the Agent Registry.
-result = swarm.execute(task)
+plan = swarm.plan(task)
+print(plan)
+# TaskGraph(topology="fork-join → serial")
+# ├─ fork (parallel):
+# │   ├─ BakeryAgent: find bakeries that do strawberry chiffon,
+# │   │   check Friday availability, compare pricing
+# │   ├─ VenueAgent: find venues for ~20 near Oakland,
+# │   │   Friday evening, under budget
+# │   └─ InspirationAgent: suggest party themes, decor ideas,
+# │       playlist recs based on constraints
+# ├─ join: rank options by price/availability/proximity
+# └─ serial (depends on join):
+#     └─ InvitationAgent: draft invitations with confirmed
+#         venue + time, format for email/text
+#
+# Estimated cost: $0.22 | Depth: 3 | Agents: 4
+
+result = swarm.execute(plan)
+```
+
+### Enterprise task — fork-join with adversarial review
+
+```python
+swarm = Swarm(max_budget_usd=2.00, model="gpt-4o")
+
+task = Task(
+    goal=(
+        "Evaluate whether Acme Corp is a viable acquisition target. "
+        "Analyze their financials, technical IP, and regulatory exposure, "
+        "then produce a diligence memo with a go/no-go recommendation."
+    ),
+    constraints=[
+        "Red-team every bullish claim before it reaches the memo",
+        "Flag any SEC or antitrust risk factors",
+        "Final output must be structured: summary, findings, risks, recommendation",
+    ],
+)
+
+plan = swarm.plan(task)
+print(plan)
+# TaskGraph(topology="fork-join → adversarial → serial")
+# ├─ fork (parallel):
+# │   ├─ FinancialAnalyst: revenue model, margins, burn rate,
+# │   │   comparable valuations
+# │   ├─ TechDiligenceAgent: assess IP portfolio, tech debt signals,
+# │   │   key-person dependencies
+# │   └─ RegulatoryAgent: SEC filing review, antitrust screen,
+# │       pending litigation scan
+# ├─ join: merge findings into draft diligence report
+# ├─ adversarial:
+# │   └─ RedTeamAgent: challenge assumptions, stress-test projections,
+# │       surface contradictions across sections
+# └─ serial (depends on adversarial):
+#     └─ MemoAgent: produce final structured memo incorporating
+#         red-team findings and risk flags
+#
+# Estimated cost: $1.74 | Depth: 4 | Agents: 5
+
+result = swarm.execute(plan)
 ```
 
 ---
