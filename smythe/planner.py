@@ -21,6 +21,6 @@ class Planner:
         or LLM-driven topology selection.
         """
         node = Node(label=task.goal)
-        graph = ExecutionGraph(topology=Topology.SERIAL, nodes=[node])
+        graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
         graph.validate()
         return graph

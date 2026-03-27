@@ -1,6 +1,6 @@
 # smythe
 
-**An open-source framework for task-based personalized agent swarms with dynamic execution topology.**
+**An open-source framework for task-based agent swarms with dynamic parallelization, routing, and execution topology.**
 
 Most agent frameworks make you decide upfront how your agents will work together. Smythe doesn't. It treats the execution graph itself as a generated artifact — letting a planner decide whether a task should run serially, in parallel, or adversarially, and when to recursively decompose work into nested subgraphs, based on the nature of the work and what's been learned from past runs.
 
@@ -72,6 +72,49 @@ print(plan)
 #         venue + time, format for email/text
 #
 # Estimated cost: $0.22 | Depth: 3 | Agents: 4
+
+result = swarm.execute(plan)
+```
+
+### Creative task — broadcast-reduce
+
+```python
+swarm = Swarm(max_budget_usd=1.50, model="gemini-3-pro-image-preview")
+
+task = Task(
+    goal=(
+        "Generate a full visual asset package for the launch of 'Solara', "
+        "a portable solar-powered phone charger. Every asset must share a "
+        "cohesive visual identity — same palette, typography, and tone."
+    ),
+    constraints=[
+        "Brand palette: warm amber, matte black, off-white",
+        "Style: clean product photography, natural light, lifestyle context",
+        "Assets needed: hero image, 3 social posts, email header, "
+        "app store screenshot, OG preview card, print ad",
+    ],
+)
+
+plan = swarm.plan(task)
+print(plan)
+# TaskGraph(topology="serial → broadcast-reduce")
+# ├─ serial:
+# │   └─ StyleDirector: establish visual brief — palette, typography,
+# │       mood references, negative-space rules
+# ├─ broadcast (parallel, 8 agents):
+# │   ├─ ImageAgent-1: hero image — 2400×1200 PNG, product on sunlit trail
+# │   ├─ ImageAgent-2: Instagram post — 1080×1080 JPG, lifestyle flat-lay
+# │   ├─ ImageAgent-3: X/Twitter banner — 1500×500 JPG, product detail
+# │   ├─ ImageAgent-4: Story/Reel card — 1080×1920 PNG, vertical lifestyle
+# │   ├─ ImageAgent-5: email header — 600×200 PNG, newsletter announcement
+# │   ├─ ImageAgent-6: App Store screenshot — 1290×2796 PNG, feature callout
+# │   ├─ ImageAgent-7: OG preview card — 1200×630 PNG, link-share thumbnail
+# │   └─ ImageAgent-8: print ad — 8.5×11" 300dpi, magazine full-page bleed
+# └─ reduce:
+#     └─ ArtDirector: curate for brand consistency, flag off-palette
+#         outputs, assemble final asset package with metadata
+#
+# Estimated cost: $1.12 | Depth: 3 | Agents: 10
 
 result = swarm.execute(plan)
 ```
