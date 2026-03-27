@@ -4,29 +4,28 @@ from __future__ import annotations
 
 import asyncio
 
-from smythe.agent import Agent
-from smythe.graph import ExecutionGraph, Node, NodeStatus
-from smythe.provider import Provider
-from smythe.registry import Registry
-from smythe.tracer import Tracer
+from smythe.executor_base import ExecutorBase
+from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
 
 
-class Executor:
+class Executor(ExecutorBase):
     """Executes an assigned graph by walking it in dependency order.
 
     Runs nodes serially via a Provider.  For concurrent execution
     of independent nodes, use AsyncExecutor instead.
     """
 
-    def __init__(self, provider: Provider, registry: Registry, tracer: Tracer) -> None:
-        self._provider = provider
-        self._registry = registry
-        self._tracer = tracer
-
     def run(self, graph: ExecutionGraph) -> ExecutionGraph:
         """Execute every node in the graph, respecting dependency order."""
+        first_error: Exception | None = None
         for node in self._walk(graph):
-            self._execute_node(node, graph)
+            try:
+                self._execute_node(node, graph)
+            except Exception as exc:
+                if first_error is None:
+                    first_error = exc
+        if first_error is not None:
+            raise first_error
         return graph
 
     def _walk(self, graph: ExecutionGraph) -> list[Node]:
@@ -48,46 +47,52 @@ class Executor:
         return order
 
     def _execute_node(self, node: Node, graph: ExecutionGraph) -> None:
-        """Run a single node through the provider."""
-        node.status = NodeStatus.RUNNING
-        self._tracer.on_node_start(node)
-
-        try:
-            agent = self._registry.get(node.agent_id) if node.agent_id else None
-            dep_results = {
-                dep_id: dep_node.result
-                for dep_id in node.depends_on
-                if (dep_node := self._node_by_id(dep_id, graph)) is not None
-            }
-            system = self._build_system_prompt(agent)
-            prompt = self._build_user_prompt(node, dep_results)
-            node.result = asyncio.run(
-                self._provider.complete(system, prompt, model=node.metadata.get("model", ""))
-            )
-            node.status = NodeStatus.COMPLETED
-        except Exception as exc:
+        """Run a single node through the provider, respecting its failure policy."""
+        if not self.deps_satisfied(node, graph):
+            if node.failure_policy == FailurePolicy.SKIP:
+                node.status = NodeStatus.SKIPPED
+                return
             node.status = NodeStatus.FAILED
-            node.result = str(exc)
-            self._tracer.on_node_error(node, exc)
-            raise
-        finally:
-            self._tracer.on_node_end(node)
+            node.result = "Upstream dependency failed"
+            raise RuntimeError(f"Node {node.id!r}: upstream dependency not satisfied")
 
-    @staticmethod
-    def _build_system_prompt(agent: Agent | None) -> str:
-        if agent and agent.profile.persona:
-            return agent.profile.persona
-        return "You are a helpful assistant completing a step in a larger task."
+        if self._budget:
+            self._budget.check(node.id)
 
-    @staticmethod
-    def _build_user_prompt(node: Node, dep_results: dict[str, str]) -> str:
-        parts = [node.label]
-        if dep_results:
-            parts.append("\n\nContext from prior steps:")
-            for dep_id, result in dep_results.items():
-                parts.append(f"\n[{dep_id}]: {result}")
-        return "\n".join(parts)
+        last_exc: Exception | None = None
+        attempts = 1 + max(node.max_retries, 0) if node.failure_policy == FailurePolicy.RETRY else 1
 
-    @staticmethod
-    def _node_by_id(node_id: str, graph: ExecutionGraph) -> Node | None:
-        return next((n for n in graph.nodes if n.id == node_id), None)
+        for attempt in range(attempts):
+            node.status = NodeStatus.RUNNING
+            self._tracer.on_node_start(node)
+
+            try:
+                agent = self._registry.get(node.agent_id) if node.agent_id else None
+                dep_results = self.gather_dep_results(node, graph)
+                system = self.build_system_prompt(agent)
+                prompt = self.build_user_prompt(node, dep_results)
+                result = asyncio.run(
+                    self._provider.complete(system, prompt, model=node.metadata.get("model", ""))
+                )
+                node.result = result.text
+
+                if self._budget:
+                    cost = self._budget.record(node.id, result)
+                    node.metadata["cost_usd"] = cost
+
+                node.status = NodeStatus.COMPLETED
+                self._tracer.on_node_end(node)
+                return
+            except Exception as exc:
+                last_exc = exc
+                self._tracer.on_node_error(node, exc)
+                self._tracer.on_node_end(node)
+
+        node.status = NodeStatus.FAILED
+        node.result = str(last_exc)
+
+        if node.failure_policy == FailurePolicy.SKIP:
+            node.status = NodeStatus.SKIPPED
+            return
+
+        raise last_exc  # type: ignore[misc]

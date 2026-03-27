@@ -25,6 +25,13 @@ class NodeStatus(Enum):
     SKIPPED = "skipped"
 
 
+class FailurePolicy(Enum):
+    """How to handle a node failure."""
+    HALT = "halt"
+    SKIP = "skip"
+    RETRY = "retry"
+
+
 @dataclass
 class Node:
     """A single step in the execution graph.
@@ -37,6 +44,9 @@ class Node:
         result: Output produced after execution.
         status: Current lifecycle state.
         metadata: Arbitrary planner/executor annotations.
+        failure_policy: How to handle failure (HALT, SKIP, or RETRY).
+        max_retries: Number of retry attempts when failure_policy is RETRY.
+        required_capabilities: Capability tags for agent assignment matching.
     """
 
     label: str
@@ -46,6 +56,9 @@ class Node:
     result: Any = None
     status: NodeStatus = NodeStatus.PENDING
     metadata: dict[str, Any] = field(default_factory=dict)
+    failure_policy: FailurePolicy = FailurePolicy.HALT
+    max_retries: int = 1
+    required_capabilities: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -55,10 +68,12 @@ class ExecutionGraph:
     Attributes:
         topology: The high-level pattern this graph follows.
         nodes: Ordered list of execution nodes.
+        estimated_cost_usd: Pre-execution cost estimate set by the planner.
     """
 
     topology: list[Topology]
     nodes: list[Node] = field(default_factory=list)
+    estimated_cost_usd: float | None = None
 
     def roots(self) -> list[Node]:
         """Nodes with no dependencies — entry points for execution."""
@@ -69,9 +84,38 @@ class ExecutionGraph:
         return [n for n in self.nodes if node_id in n.depends_on]
 
     def is_ready(self, node: Node) -> bool:
-        """True if all of a node's dependencies have completed."""
-        completed = {n.id for n in self.nodes if n.status == NodeStatus.COMPLETED}
-        return all(dep in completed for dep in node.depends_on)
+        """True if all of a node's dependencies have completed or been skipped."""
+        resolved = {
+            n.id for n in self.nodes
+            if n.status in (NodeStatus.COMPLETED, NodeStatus.SKIPPED)
+        }
+        return all(dep in resolved for dep in node.depends_on)
+
+    @property
+    def depth(self) -> int:
+        """Longest path in the DAG (number of edges on the critical path)."""
+        if not self.nodes:
+            return 0
+        lookup = {n.id: n for n in self.nodes}
+        cache: dict[str, int] = {}
+
+        def _depth(node_id: str) -> int:
+            if node_id in cache:
+                return cache[node_id]
+            node = lookup.get(node_id)
+            if node is None or not node.depends_on:
+                cache[node_id] = 0
+                return 0
+            d = 1 + max(_depth(dep) for dep in node.depends_on)
+            cache[node_id] = d
+            return d
+
+        return max(_depth(n.id) for n in self.nodes)
+
+    @property
+    def agent_count(self) -> int:
+        """Number of unique agents assigned to nodes."""
+        return len({n.agent_id for n in self.nodes if n.agent_id is not None})
 
     def validate(self) -> None:
         """Check basic DAG invariants."""
@@ -90,8 +134,6 @@ class ExecutionGraph:
         topo_order = self._topo_sort()
         root_ids = {n.id for n in self.roots()}
 
-        # Build logical sections: group parallel roots, detect join nodes,
-        # and render everything else as serial steps.
         sections: list[tuple[str, list[Node]]] = []
         parallel_roots = [n for n in topo_order if n.id in root_ids]
 
@@ -99,7 +141,6 @@ class ExecutionGraph:
             sections.append(("fork (parallel)", parallel_roots))
             remaining = [n for n in topo_order if n.id not in root_ids]
 
-            # A join node depends on all of the fork roots
             join_nodes = [
                 n for n in remaining
                 if root_ids.issubset(set(n.depends_on))
@@ -109,7 +150,6 @@ class ExecutionGraph:
             for jn in join_nodes:
                 sections.append(("join", [jn]))
 
-            # Detect adversarial section
             adversarial = [
                 n for n in non_join
                 if n.metadata.get("role") == "adversarial"
@@ -127,7 +167,6 @@ class ExecutionGraph:
                 tag = "serial" if dep_labels else ""
                 sections.append((tag + dep_labels, [node]))
 
-        # Render
         lines = [f'TaskGraph(topology="{self._topology_label()}")']
         for si, (section_label, section_nodes) in enumerate(sections):
             is_last_section = si == len(sections) - 1
@@ -144,6 +183,12 @@ class ExecutionGraph:
                     is_last_node = ni == len(section_nodes) - 1
                     node_branch = "└─" if is_last_node else "├─"
                     lines.append(f"{cont}{node_branch} {self._node_label(node)}")
+
+        if self.estimated_cost_usd is not None:
+            lines.append(
+                f"#\n# Estimated cost: ${self.estimated_cost_usd:.2f} | "
+                f"Depth: {self.depth} | Agents: {self.agent_count}"
+            )
 
         return "\n".join(lines)
 

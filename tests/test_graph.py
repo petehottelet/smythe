@@ -146,3 +146,49 @@ def test_str_compound_topology():
     assert "adversarial:" in output
     assert "RedTeamAgent: Challenge assumptions" in output
     assert "MemoAgent: Final memo" in output
+
+
+# --- depth and agent_count ---
+
+
+def test_depth_serial_chain():
+    """A→B→C has depth 2 (two edges on the longest path)."""
+    a = Node(label="A", id="a")
+    b = Node(label="B", id="b", depends_on=["a"])
+    c = Node(label="C", id="c", depends_on=["b"])
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[a, b, c])
+    assert graph.depth == 2
+
+
+def test_depth_fork_join():
+    """Parallel roots into a single join has depth 1."""
+    r1 = Node(label="R1", id="r1")
+    r2 = Node(label="R2", id="r2")
+    j = Node(label="Join", id="j", depends_on=["r1", "r2"])
+    graph = ExecutionGraph(topology=[Topology.FORK_JOIN], nodes=[r1, r2, j])
+    assert graph.depth == 1
+
+
+def test_depth_empty_graph():
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[])
+    assert graph.depth == 0
+
+
+def test_depth_single_node():
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[Node(label="A", id="a")])
+    assert graph.depth == 0
+
+
+def test_agent_count():
+    a = Node(label="A", id="a", agent_id="agent-1")
+    b = Node(label="B", id="b", agent_id="agent-2")
+    c = Node(label="C", id="c", agent_id="agent-1")
+    d = Node(label="D", id="d")
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[a, b, c, d])
+    assert graph.agent_count == 2
+
+
+def test_agent_count_no_agents():
+    a = Node(label="A", id="a")
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[a])
+    assert graph.agent_count == 0
