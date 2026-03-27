@@ -10,6 +10,6 @@ def test_default_planner_creates_serial_graph():
     task = Task(goal="Write a summary")
     graph = planner.plan(task)
 
-    assert graph.topology == Topology.SERIAL
+    assert graph.topology == [Topology.SERIAL]
     assert len(graph.nodes) == 1
     assert graph.nodes[0].label == "Write a summary"

@@ -38,7 +38,7 @@ class Swarm:
     def __init__(
         self,
         *,
-        model: str = "gpt-4o",
+        model: str = "claude-opus-4-6",
         max_budget_usd: float | None = None,
         planner: Planner | None = None,
         registry: Registry | None = None,

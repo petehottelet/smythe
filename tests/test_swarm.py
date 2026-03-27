@@ -18,7 +18,7 @@ def test_plan_returns_assigned_graph():
     graph = swarm.plan(task)
 
     assert isinstance(graph, ExecutionGraph)
-    assert graph.topology == Topology.SERIAL
+    assert graph.topology == [Topology.SERIAL]
     assert len(graph.nodes) == 1
     assert graph.nodes[0].agent_id is not None
 

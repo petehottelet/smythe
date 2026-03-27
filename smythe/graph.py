@@ -57,7 +57,7 @@ class ExecutionGraph:
         nodes: Ordered list of execution nodes.
     """
 
-    topology: Topology
+    topology: list[Topology]
     nodes: list[Node] = field(default_factory=list)
 
     def roots(self) -> list[Node]:
@@ -82,6 +82,107 @@ class ExecutionGraph:
                     raise ValueError(f"Node {node.id!r} depends on unknown node {dep!r}")
         if self._has_cycle():
             raise ValueError("Execution graph contains a cycle")
+
+    def __repr__(self) -> str:
+        return f"ExecutionGraph(topology={self.topology!r}, nodes={len(self.nodes)})"
+
+    def __str__(self) -> str:
+        topo_order = self._topo_sort()
+        root_ids = {n.id for n in self.roots()}
+
+        # Build logical sections: group parallel roots, detect join nodes,
+        # and render everything else as serial steps.
+        sections: list[tuple[str, list[Node]]] = []
+        parallel_roots = [n for n in topo_order if n.id in root_ids]
+
+        if len(parallel_roots) > 1:
+            sections.append(("fork (parallel)", parallel_roots))
+            remaining = [n for n in topo_order if n.id not in root_ids]
+
+            # A join node depends on all of the fork roots
+            join_nodes = [
+                n for n in remaining
+                if root_ids.issubset(set(n.depends_on))
+            ]
+            non_join = [n for n in remaining if n not in join_nodes]
+
+            for jn in join_nodes:
+                sections.append(("join", [jn]))
+
+            # Detect adversarial section
+            adversarial = [
+                n for n in non_join
+                if n.metadata.get("role") == "adversarial"
+            ]
+            serial = [n for n in non_join if n not in adversarial]
+
+            if adversarial:
+                sections.append(("adversarial", adversarial))
+            for sn in serial:
+                dep_labels = self._dep_label(sn)
+                sections.append((f"serial{dep_labels}", [sn]))
+        else:
+            for node in topo_order:
+                dep_labels = self._dep_label(node)
+                tag = "serial" if dep_labels else ""
+                sections.append((tag + dep_labels, [node]))
+
+        # Render
+        lines = [f'TaskGraph(topology="{self._topology_label()}")']
+        for si, (section_label, section_nodes) in enumerate(sections):
+            is_last_section = si == len(sections) - 1
+            branch = "└─" if is_last_section else "├─"
+            cont = "    " if is_last_section else "│   "
+
+            if len(section_nodes) == 1 and not section_label.startswith("fork"):
+                node = section_nodes[0]
+                prefix = f"{section_label}: " if section_label else ""
+                lines.append(f"{branch} {prefix}{self._node_label(node)}")
+            else:
+                lines.append(f"{branch} {section_label}:")
+                for ni, node in enumerate(section_nodes):
+                    is_last_node = ni == len(section_nodes) - 1
+                    node_branch = "└─" if is_last_node else "├─"
+                    lines.append(f"{cont}{node_branch} {self._node_label(node)}")
+
+        return "\n".join(lines)
+
+    def _topology_label(self) -> str:
+        """Human-readable topology, joining phases with arrows."""
+        return " \u2192 ".join(t.value.replace("_", "-") for t in self.topology)
+
+    @staticmethod
+    def _node_label(node: Node) -> str:
+        name = node.agent_id if node.agent_id else node.id
+        return f"{name}: {node.label}"
+
+    def _dep_label(self, node: Node) -> str:
+        if not node.depends_on:
+            return ""
+        dep_names: list[str] = []
+        lookup = {n.id: n for n in self.nodes}
+        for dep_id in node.depends_on:
+            dep_node = lookup.get(dep_id)
+            dep_names.append(dep_node.agent_id or dep_id if dep_node else dep_id)
+        return " (depends on " + ", ".join(dep_names) + ")"
+
+    def _topo_sort(self) -> list[Node]:
+        visited: set[str] = set()
+        order: list[Node] = []
+        lookup = {n.id: n for n in self.nodes}
+
+        def visit(node: Node) -> None:
+            if node.id in visited:
+                return
+            visited.add(node.id)
+            for dep_id in node.depends_on:
+                if dep_id in lookup:
+                    visit(lookup[dep_id])
+            order.append(node)
+
+        for node in self.nodes:
+            visit(node)
+        return order
 
     def _has_cycle(self) -> bool:
         visited: set[str] = set()

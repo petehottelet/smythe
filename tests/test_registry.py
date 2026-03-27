@@ -17,7 +17,7 @@ def test_assign_fills_unassigned_nodes():
     reg = Registry()
     a = Node(label="Step 1", id="a")
     b = Node(label="Step 2", id="b")
-    graph = ExecutionGraph(topology=Topology.SERIAL, nodes=[a, b])
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[a, b])
 
     reg.assign(graph)
 
@@ -32,7 +32,7 @@ def test_assign_preserves_existing_assignment():
     reg.register(agent)
 
     a = Node(label="Step 1", id="a", agent_id=agent.id)
-    graph = ExecutionGraph(topology=Topology.SERIAL, nodes=[a])
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[a])
 
     reg.assign(graph)
 
