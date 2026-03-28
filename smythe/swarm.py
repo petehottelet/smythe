@@ -1,4 +1,4 @@
-"""Swarm — top-level orchestrator that ties planner, registry, executor, and synthesizer."""
+"""Swarm — top-level orchestrator that ties architect, registry, executor, and synthesizer."""
 
 from __future__ import annotations
 
@@ -6,12 +6,12 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import Any
 
-from smythe.budget import BudgetTracker
+from smythe.budget import Sentinel
 from smythe.executor import Executor
 from smythe.graph import ExecutionGraph
 from smythe.memory import PlannerMemory
-from smythe.planner import LLMPlanner, Planner, SimplePlanner
-from smythe.router import PlannerRouter
+from smythe.planner import Architect, LLMArchitect, SimpleArchitect
+from smythe.router import WhiteRabbit
 from smythe.provider import AnthropicProvider, OpenAIProvider, Provider
 from smythe.registry import Registry
 from smythe.synthesizer import Synthesizer
@@ -61,13 +61,13 @@ class Swarm:
         model: str = "claude-mythos",
         max_budget_usd: float | None = None,
         provider: Provider | None = None,
-        planner: Planner | None = None,
+        architect: Architect | None = None,
         registry: Registry | None = None,
         synthesizer: Synthesizer | None = None,
         parallel: bool = False,
         planning_model: str | None = None,
         memory: PlannerMemory | None = None,
-        router: PlannerRouter | None = None,
+        router: WhiteRabbit | None = None,
     ) -> None:
         self.model = model
         self.max_budget_usd = max_budget_usd
@@ -79,10 +79,10 @@ class Swarm:
         self._yaml_graph: ExecutionGraph | None = None
         self._router = router
 
-        if planner is not None:
-            self._planner = planner
+        if architect is not None:
+            self._architect = architect
         else:
-            self._planner = LLMPlanner(
+            self._architect = LLMArchitect(
                 provider=self._provider,
                 planning_model=planning_model or model,
                 memory=memory,
@@ -91,13 +91,13 @@ class Swarm:
     def plan(self, task: Task) -> ExecutionGraph:
         """Generate and assign an execution graph without running it.
 
-        Returns the graph so you can inspect the planner's decisions
+        Returns the graph so you can inspect the architect's decisions
         before committing to execution.
         """
-        planner = self._select_planner(task)
-        graph, planner_registry = planner.plan(task)
+        architect = self._select_architect(task)
+        graph, architect_registry = architect.plan(task)
 
-        for agent in planner_registry.list_agents():
+        for agent in architect_registry.list_agents():
             self._registry.register(agent)
 
         graph = self._registry.assign(graph)
@@ -106,27 +106,27 @@ class Swarm:
 
     async def aplan(self, task: Task) -> ExecutionGraph:
         """Async variant of plan() — safe to call from a running event loop."""
-        planner = await self._aselect_planner(task)
-        graph, planner_registry = await planner.aplan(task)
+        architect = await self._aselect_architect(task)
+        graph, architect_registry = await architect.aplan(task)
 
-        for agent in planner_registry.list_agents():
+        for agent in architect_registry.list_agents():
             self._registry.register(agent)
 
         graph = self._registry.assign(graph)
         self._stamp_model(graph)
         return graph
 
-    def _select_planner(self, task: Task) -> Planner:
-        """Pick the planner — use router if set, otherwise the default."""
+    def _select_architect(self, task: Task) -> Architect:
+        """Pick the architect — use router if set, otherwise the default."""
         if self._router is not None:
             return self._router.route(task)
-        return self._planner
+        return self._architect
 
-    async def _aselect_planner(self, task: Task) -> Planner:
-        """Async planner selection — uses aroute when a router is set."""
+    async def _aselect_architect(self, task: Task) -> Architect:
+        """Async architect selection — uses aroute when a router is set."""
         if self._router is not None:
             return await self._router.aroute(task)
-        return self._planner
+        return self._architect
 
     def execute(
         self, task_or_graph: Task | ExecutionGraph | None = None,
@@ -151,7 +151,7 @@ class Swarm:
         from smythe.async_executor import AsyncExecutor
 
         tracer = Tracer()
-        budget = BudgetTracker(self.max_budget_usd)
+        budget = Sentinel(self.max_budget_usd)
 
         task = task_or_graph if isinstance(task_or_graph, Task) else None
         if task is not None:
@@ -187,7 +187,7 @@ class Swarm:
     def _execute_sync(self, task_or_graph: Task | ExecutionGraph) -> SwarmResult:
         """Serial execution using the standard Executor."""
         tracer = Tracer()
-        budget = BudgetTracker(self.max_budget_usd)
+        budget = Sentinel(self.max_budget_usd)
 
         task = task_or_graph if isinstance(task_or_graph, Task) else None
         if task is not None:
@@ -257,7 +257,7 @@ class Swarm:
             max_budget_usd=max_budget_usd,
             provider=provider,
             registry=registry,
-            planner=SimplePlanner(),
+            architect=SimpleArchitect(),
             parallel=parallel,
         )
         instance._yaml_graph = graph

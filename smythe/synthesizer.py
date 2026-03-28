@@ -8,7 +8,7 @@ import logging
 from enum import Enum
 from typing import Any
 
-from smythe.budget import BudgetTracker
+from smythe.budget import Sentinel
 from smythe.graph import ExecutionGraph, Node, NodeStatus
 from smythe.provider import Provider
 from smythe.tracer import Tracer
@@ -43,7 +43,7 @@ class Synthesizer:
         strategy: SynthesisStrategy = SynthesisStrategy.CONCATENATE,
         provider: Provider | None = None,
         model: str | None = None,
-        budget: BudgetTracker | None = None,
+        budget: Sentinel | None = None,
         tracer: Tracer | None = None,
     ) -> None:
         self._strategy = strategy
@@ -58,7 +58,7 @@ class Synthesizer:
         *,
         provider: Provider | None = None,
         model: str | None = None,
-        budget: BudgetTracker | None = None,
+        budget: Sentinel | None = None,
         tracer: Tracer | None = None,
     ) -> str:
         """Produce a single output from the completed graph."""
@@ -91,7 +91,7 @@ class Synthesizer:
         *,
         provider: Provider | None = None,
         model: str | None = None,
-        budget: BudgetTracker | None = None,
+        budget: Sentinel | None = None,
         tracer: Tracer | None = None,
     ) -> str:
         """Async variant for use inside an existing event loop."""
@@ -141,7 +141,7 @@ class Synthesizer:
         *,
         provider: Provider | None = None,
         model: str | None = None,
-        budget: BudgetTracker | None = None,
+        budget: Sentinel | None = None,
         tracer: Tracer | None = None,
     ) -> str:
         """Send all results to an LLM for intelligent synthesis."""

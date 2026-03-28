@@ -5,8 +5,6 @@ import os
 import tempfile
 from dataclasses import asdict
 
-import pytest
-
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.memory import ExecutionOutcome, PlannerMemory
 from smythe.swarm import SwarmResult

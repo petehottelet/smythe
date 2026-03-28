@@ -1,10 +1,13 @@
-"""PlannerRouter — routes tasks to the appropriate planner tier."""
+"""WhiteRabbit — routes tasks to the appropriate architect tier.
+
+Follow the white rabbit.  It knows the way.
+"""
 
 from __future__ import annotations
 
 import asyncio
 
-from smythe.planner import DeterministicPlanner, Planner, PlanningError
+from smythe.planner import Architect, ArchitectError, DeterministicArchitect
 from smythe.provider import Provider
 from smythe.task import Task
 
@@ -19,23 +22,23 @@ Do not add any other text.
 """
 
 
-class PlannerRouter:
-    """Routes tasks to the appropriate planner tier based on classification.
+class WhiteRabbit:
+    """Routes tasks to the appropriate architect tier based on classification.
 
     Supports two modes:
-    - **Explicit routing**: user passes ``planner=`` directly to Swarm.
+    - **Explicit routing**: user passes ``architect=`` directly to Swarm.
     - **Classifier routing**: a lightweight LLM call classifies the task
-      and selects the appropriate planner from the registered tiers.
+      and selects the appropriate architect from the registered tiers.
 
-    When no classifier provider is set, falls back to the autonomous planner.
+    When no classifier provider is set, falls back to the autonomous architect.
     """
 
     def __init__(
         self,
         *,
-        deterministic: dict[str, DeterministicPlanner] | None = None,
-        constrained: Planner | None = None,
-        autonomous: Planner | None = None,
+        deterministic: dict[str, DeterministicArchitect] | None = None,
+        constrained: Architect | None = None,
+        autonomous: Architect | None = None,
         classifier_provider: Provider | None = None,
         classifier_model: str = "claude-mythos",
     ) -> None:
@@ -45,13 +48,13 @@ class PlannerRouter:
         self._classifier_provider = classifier_provider
         self._classifier_model = classifier_model
 
-    def route(self, task: Task) -> Planner:
-        """Classify task and return the appropriate planner (sync)."""
+    def route(self, task: Task) -> Architect:
+        """Classify task and return the appropriate architect (sync)."""
         if self._classifier_provider is None:
             return self._fallback()
         return asyncio.run(self.aroute(task))
 
-    async def aroute(self, task: Task) -> Planner:
+    async def aroute(self, task: Task) -> Architect:
         """Async classification — awaits the classifier provider directly."""
         if self._classifier_provider is None:
             return self._fallback()
@@ -75,8 +78,8 @@ class PlannerRouter:
         lines.append("autonomous")
         return "\n".join(f"- {opt}" for opt in lines)
 
-    def _parse_classification(self, text: str) -> Planner:
-        """Map classifier output to a planner instance."""
+    def _parse_classification(self, text: str) -> Architect:
+        """Map classifier output to an architect instance."""
         cleaned = text.strip().lower()
 
         if cleaned.startswith("deterministic:"):
@@ -89,10 +92,10 @@ class PlannerRouter:
 
         return self._fallback()
 
-    def _fallback(self) -> Planner:
-        """Return the autonomous planner, or raise if none configured."""
+    def _fallback(self) -> Architect:
+        """Return the autonomous architect, or raise if none configured."""
         if self._autonomous is not None:
             return self._autonomous
-        raise PlanningError(
-            "No autonomous planner configured and classifier unavailable"
+        raise ArchitectError(
+            "No autonomous architect configured and classifier unavailable"
         )

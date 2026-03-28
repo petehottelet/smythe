@@ -1,7 +1,6 @@
 """Tests for Registry skill-hydration integration."""
 
 import time
-from unittest.mock import patch
 
 from smythe.agent import Agent, AgentProfile
 from smythe.graph import ExecutionGraph, Node, Topology

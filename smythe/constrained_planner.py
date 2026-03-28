@@ -1,4 +1,4 @@
-"""ConstrainedPlanner — LLM selects from a menu of pre-built sub-graph templates."""
+"""ConstrainedArchitect — LLM selects from a menu of pre-built sub-graph templates."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from smythe.constrained_prompts import (
     build_constrained_user_prompt,
 )
 from smythe.graph import ExecutionGraph, Node, Topology
-from smythe.planner import Planner, PlanningError
+from smythe.planner import Architect, ArchitectError
 from smythe.provider import Provider
 from smythe.registry import Registry
 from smythe.task import Task
@@ -37,12 +37,12 @@ class SubGraphTemplate:
     builder: Callable[..., tuple[list[Node], Registry]]
 
 
-class ConstrainedPlanner(Planner):
+class ConstrainedArchitect(Architect):
     """LLM selects and composes from a fixed menu of sub-graph templates.
 
     The LLM cannot invent nodes — it can only choose from pre-validated
     templates.  This dramatically shrinks the failure space compared to
-    the fully autonomous LLMPlanner.
+    the fully autonomous LLMArchitect.
 
     Composition rules:
     - Node IDs are prefixed with ``{template_name}-{instance_index}-``
@@ -100,8 +100,8 @@ class ConstrainedPlanner(Planner):
                 last_error = exc
                 continue
 
-        raise PlanningError(
-            f"ConstrainedPlanner failed after {1 + self._max_retries} attempts: "
+        raise ArchitectError(
+            f"ConstrainedArchitect failed after {1 + self._max_retries} attempts: "
             f"{last_error}"
         )
 

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from smythe.budget import BudgetTracker
+from smythe.budget import Sentinel
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, Provider
 from smythe.synthesizer import Synthesizer, SynthesisStrategy
@@ -76,7 +76,7 @@ def test_llm_merge_calls_provider():
 
 def test_llm_merge_budget_tracked():
     provider = MockSynthProvider()
-    budget = BudgetTracker(max_budget_usd=1.0)
+    budget = Sentinel(max_budget_usd=1.0)
     synth = Synthesizer(
         strategy=SynthesisStrategy.LLM_MERGE,
         provider=provider,
@@ -141,7 +141,7 @@ async def test_asynthesize_llm_merge():
 def test_llm_merge_runtime_context_no_instance_mutation():
     """Per-call runtime context should not overwrite synthesizer defaults."""
     runtime_provider = MockSynthProvider("runtime")
-    runtime_budget = BudgetTracker(max_budget_usd=1.0)
+    runtime_budget = Sentinel(max_budget_usd=1.0)
     runtime_tracer = Tracer()
     synth = Synthesizer(strategy=SynthesisStrategy.LLM_MERGE)
     graph = _make_graph("A", "B")
