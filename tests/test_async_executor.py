@@ -210,8 +210,8 @@ async def test_failure_policy_retry_exhausted():
 
 
 @pytest.mark.asyncio
-async def test_cascading_failure_message_not_deadlock():
-    """When nodes are blocked by upstream failure, the error should say so, not 'Deadlock'."""
+async def test_cascading_failure_preserves_original_exception():
+    """When nodes are blocked by upstream failure, the original error is raised."""
     provider = FailingProvider(failures=999, fail_labels={"Root"})
     executor, _ = _make_executor(provider)
 
@@ -219,7 +219,7 @@ async def test_cascading_failure_message_not_deadlock():
     b = Node(label="Child", id="b", depends_on=["a"])
     graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[a, b])
 
-    with pytest.raises(RuntimeError, match="blocked by.*failed upstream"):
+    with pytest.raises(RuntimeError, match="Simulated failure"):
         await executor.run(graph)
 
 

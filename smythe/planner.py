@@ -112,7 +112,7 @@ class LLMArchitect(Architect):
                 graph, registry = build_graph_from_dict(data)
                 graph.estimated_cost_usd = self._estimate_cost(graph)
                 return graph, registry
-            except (json.JSONDecodeError, ValueError, KeyError) as exc:
+            except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
                 last_error = exc
                 continue
 
