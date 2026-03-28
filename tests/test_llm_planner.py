@@ -1,4 +1,4 @@
-"""Tests for the LLM-driven planner."""
+"""Tests for the LLM-driven architect."""
 
 import json
 import tempfile
@@ -7,7 +7,7 @@ import pytest
 
 from smythe.graph import ExecutionGraph, Topology
 from smythe.memory import PlannerMemory
-from smythe.planner import LLMPlanner, PlanningError
+from smythe.planner import LLMArchitect, ArchitectError
 from smythe.provider import CompletionResult, Provider
 from smythe.task import Task
 
@@ -129,7 +129,7 @@ class MockPlanningProvider(Provider):
 
 def test_plan_fork_join_task():
     provider = MockPlanningProvider([FORK_JOIN_RESPONSE])
-    planner = LLMPlanner(provider=provider, planning_model="test-model")
+    planner = LLMArchitect(provider=provider, planning_model="test-model")
     task = Task(goal="Research competitors and write a report")
 
     graph, registry = planner.plan(task)
@@ -143,7 +143,7 @@ def test_plan_fork_join_task():
 
 def test_plan_serial_task():
     provider = MockPlanningProvider([SERIAL_RESPONSE])
-    planner = LLMPlanner(provider=provider, planning_model="test-model")
+    planner = LLMArchitect(provider=provider, planning_model="test-model")
     task = Task(goal="Write and proofread an introduction")
 
     graph, registry = planner.plan(task)
@@ -155,7 +155,7 @@ def test_plan_serial_task():
 
 def test_plan_adversarial_task():
     provider = MockPlanningProvider([ADVERSARIAL_RESPONSE])
-    planner = LLMPlanner(provider=provider, planning_model="test-model")
+    planner = LLMArchitect(provider=provider, planning_model="test-model")
     task = Task(goal="Evaluate acquisition target with red-team review")
 
     graph, registry = planner.plan(task)
@@ -168,7 +168,7 @@ def test_plan_adversarial_task():
 
 def test_plan_creates_agents_with_personas():
     provider = MockPlanningProvider([FORK_JOIN_RESPONSE])
-    planner = LLMPlanner(provider=provider, planning_model="test-model")
+    planner = LLMArchitect(provider=provider, planning_model="test-model")
     task = Task(goal="Research competitors")
 
     graph, registry = planner.plan(task)
@@ -186,7 +186,7 @@ def test_plan_retries_on_malformed_json():
         "this is not json",
         SERIAL_RESPONSE,
     ])
-    planner = LLMPlanner(provider=provider, planning_model="test-model", max_retries=2)
+    planner = LLMArchitect(provider=provider, planning_model="test-model", max_retries=2)
     task = Task(goal="Write something")
 
     graph, registry = planner.plan(task)
@@ -204,10 +204,10 @@ def test_plan_raises_after_max_retries():
         "still garbage",
         "yet more garbage",
     ])
-    planner = LLMPlanner(provider=provider, planning_model="test-model", max_retries=2)
+    planner = LLMArchitect(provider=provider, planning_model="test-model", max_retries=2)
     task = Task(goal="This will fail")
 
-    with pytest.raises(PlanningError, match="Failed to produce a valid plan"):
+    with pytest.raises(ArchitectError, match="Failed to produce a valid plan"):
         planner.plan(task)
 
     assert len(provider.prompts_received) == 3
@@ -216,7 +216,7 @@ def test_plan_raises_after_max_retries():
 def test_json_extraction_strips_code_fences():
     fenced = '```json\n' + SERIAL_RESPONSE + '\n```'
     provider = MockPlanningProvider([fenced])
-    planner = LLMPlanner(provider=provider, planning_model="test-model")
+    planner = LLMArchitect(provider=provider, planning_model="test-model")
     task = Task(goal="Test code fence stripping")
 
     graph, registry = planner.plan(task)
@@ -227,7 +227,7 @@ def test_json_extraction_strips_code_fences():
 def test_json_extraction_strips_bare_fences():
     fenced = '```\n' + SERIAL_RESPONSE + '\n```'
     provider = MockPlanningProvider([fenced])
-    planner = LLMPlanner(provider=provider, planning_model="test-model")
+    planner = LLMArchitect(provider=provider, planning_model="test-model")
     task = Task(goal="Test bare fence stripping")
 
     graph, registry = planner.plan(task)
@@ -237,7 +237,7 @@ def test_json_extraction_strips_bare_fences():
 
 def test_plan_includes_constraints_in_prompt():
     provider = MockPlanningProvider([SERIAL_RESPONSE])
-    planner = LLMPlanner(provider=provider, planning_model="test-model")
+    planner = LLMArchitect(provider=provider, planning_model="test-model")
     task = Task(
         goal="Plan a party",
         constraints=["Budget under $500", "Must be in Oakland"],
@@ -274,7 +274,7 @@ def test_plan_includes_history_in_prompt():
         f.write(_json.dumps(asdict(outcome)) + "\n")
 
     provider = MockPlanningProvider([FORK_JOIN_RESPONSE])
-    planner = LLMPlanner(provider=provider, planning_model="test-model", memory=memory)
+    planner = LLMArchitect(provider=provider, planning_model="test-model", memory=memory)
     task = Task(goal="Research competitors for a new product")
 
     planner.plan(task)
@@ -289,7 +289,7 @@ def test_plan_includes_history_in_prompt():
 
 def test_estimated_cost_set_on_graph():
     provider = MockPlanningProvider([FORK_JOIN_RESPONSE])
-    planner = LLMPlanner(
+    planner = LLMArchitect(
         provider=provider,
         planning_model="test-model",
         cost_per_token=0.000003,
@@ -308,7 +308,7 @@ def test_estimated_cost_set_on_graph():
 async def test_llm_planner_aplan():
     """aplan() works directly from an async context without nested event loops."""
     provider = MockPlanningProvider([FORK_JOIN_RESPONSE])
-    planner = LLMPlanner(provider=provider, planning_model="test-model")
+    planner = LLMArchitect(provider=provider, planning_model="test-model")
     task = Task(goal="Research competitors async")
 
     graph, registry = await planner.aplan(task)

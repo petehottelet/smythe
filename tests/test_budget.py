@@ -2,7 +2,7 @@
 
 import pytest
 
-from smythe.budget import BudgetExhaustedError, BudgetTracker
+from smythe.budget import SentinelAlert, Sentinel
 from smythe.executor import Executor
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, Provider
@@ -29,7 +29,7 @@ class TokenCountingMockProvider(Provider):
 
 
 def test_budget_tracks_cost():
-    tracker = BudgetTracker(max_budget_usd=10.0, cost_per_token=0.000003)
+    tracker = Sentinel(max_budget_usd=10.0, cost_per_token=0.000003)
     r1 = CompletionResult(text="hi", prompt_tokens=100, completion_tokens=50)
     r2 = CompletionResult(text="there", prompt_tokens=200, completion_tokens=100)
 
@@ -44,11 +44,11 @@ def test_budget_tracks_cost():
 
 
 def test_budget_raises_when_exhausted():
-    tracker = BudgetTracker(max_budget_usd=0.0001, cost_per_token=0.000003)
+    tracker = Sentinel(max_budget_usd=0.0001, cost_per_token=0.000003)
     r = CompletionResult(text="big", prompt_tokens=10000, completion_tokens=10000)
     tracker.record("node-1", r)
 
-    with pytest.raises(BudgetExhaustedError) as exc_info:
+    with pytest.raises(SentinelAlert) as exc_info:
         tracker.check("node-2")
 
     assert exc_info.value.node_id == "node-2"
@@ -57,7 +57,7 @@ def test_budget_raises_when_exhausted():
 
 
 def test_no_budget_means_no_limit():
-    tracker = BudgetTracker(max_budget_usd=None, cost_per_token=0.000003)
+    tracker = Sentinel(max_budget_usd=None, cost_per_token=0.000003)
     r = CompletionResult(text="huge", prompt_tokens=1_000_000, completion_tokens=1_000_000)
 
     for i in range(100):
@@ -73,7 +73,7 @@ def test_executor_halts_on_budget():
     cost_per_call = 1500 * 0.000003  # $0.0045 per node
     budget_limit = cost_per_call * 2  # exactly enough for 2 calls; check triggers before node 3
 
-    budget = BudgetTracker(max_budget_usd=budget_limit, cost_per_token=0.000003)
+    budget = Sentinel(max_budget_usd=budget_limit, cost_per_token=0.000003)
     tracer = Tracer()
     registry = Registry()
 
@@ -84,7 +84,7 @@ def test_executor_halts_on_budget():
 
     executor = Executor(provider=provider, registry=registry, tracer=tracer, budget=budget)
 
-    with pytest.raises(BudgetExhaustedError) as exc_info:
+    with pytest.raises(SentinelAlert) as exc_info:
         executor.run(graph)
 
     assert exc_info.value.node_id == "c"
@@ -95,7 +95,7 @@ def test_executor_halts_on_budget():
 
 
 def test_budget_breakdown_per_node():
-    tracker = BudgetTracker(max_budget_usd=1.0, cost_per_token=0.00001)
+    tracker = Sentinel(max_budget_usd=1.0, cost_per_token=0.00001)
     tracker.record("alpha", CompletionResult(text="a", prompt_tokens=100, completion_tokens=50))
     tracker.record("beta", CompletionResult(text="b", prompt_tokens=200, completion_tokens=100))
 
@@ -105,20 +105,20 @@ def test_budget_breakdown_per_node():
 
 
 def test_budget_exhausted_error_message():
-    err = BudgetExhaustedError(spent=0.50, limit=0.50, node_id="node-x")
+    err = SentinelAlert(spent=0.50, limit=0.50, node_id="node-x")
     assert "node-x" in str(err)
     assert "$0.50" in str(err)
 
 
 def test_budget_reserve_prevents_overspend():
     """3 nodes want to reserve; budget only allows ~2."""
-    tracker = BudgetTracker(max_budget_usd=0.012, cost_per_token=0.000003)
+    tracker = Sentinel(max_budget_usd=0.012, cost_per_token=0.000003)
     estimated_cost = 2000 * 0.000003  # $0.006 per node
 
     tracker.reserve("node-a", estimated_cost)
     tracker.reserve("node-b", estimated_cost)
 
-    with pytest.raises(BudgetExhaustedError) as exc_info:
+    with pytest.raises(SentinelAlert) as exc_info:
         tracker.reserve("node-c", estimated_cost)
 
     assert exc_info.value.node_id == "node-c"
@@ -126,7 +126,7 @@ def test_budget_reserve_prevents_overspend():
 
 def test_budget_record_replaces_reservation():
     """Actual cost should replace the estimated reservation."""
-    tracker = BudgetTracker(max_budget_usd=1.0, cost_per_token=0.000003)
+    tracker = Sentinel(max_budget_usd=1.0, cost_per_token=0.000003)
     estimated_cost = 2000 * 0.000003  # $0.006
 
     tracker.reserve("node-a", estimated_cost)
@@ -142,7 +142,7 @@ def test_budget_record_replaces_reservation():
 
 def test_budget_release_on_failure():
     """Releasing a reservation should restore the spent budget."""
-    tracker = BudgetTracker(max_budget_usd=0.01, cost_per_token=0.000003)
+    tracker = Sentinel(max_budget_usd=0.01, cost_per_token=0.000003)
     estimated = 2000 * 0.000003
 
     tracker.reserve("node-a", estimated)
@@ -157,6 +157,6 @@ def test_budget_release_on_failure():
 
 def test_budget_release_nonexistent_is_safe():
     """Releasing a node that was never reserved should be a no-op."""
-    tracker = BudgetTracker(max_budget_usd=1.0)
+    tracker = Sentinel(max_budget_usd=1.0)
     tracker.release("ghost-node")
     assert tracker.total_cost_usd == 0.0

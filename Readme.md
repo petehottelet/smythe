@@ -2,7 +2,7 @@
 
 **An open-source framework for task-based agent swarms with dynamic parallelization, routing, and execution topology.**
 
-Most agent frameworks make you decide upfront how your agents will work together. Smythe doesn't. It treats the execution graph itself as a generated artifact — letting a planner decide whether a task should run serially, in parallel, or adversarially, and when to recursively decompose work into nested subgraphs, based on the nature of the work and what's been learned from past runs.
+Most agent frameworks make you decide upfront how your agents will work together. Smythe doesn't. It treats the execution graph itself as a generated artifact — letting an Architect decide whether a task should run serially, in parallel, or adversarially, and when to recursively decompose work into nested subgraphs, based on the nature of the work and what's been learned from past runs.
 
 ---
 
@@ -21,7 +21,7 @@ Neither camp asks the more interesting question: *what if the framework could de
 ## What Smythe Does Differently
 
 **1. Execution graphs are generated, not hardcoded.**
-Each execution plan is represented as a Directed Acyclic Graph (DAG). A planner — informed by the task's structure and historical execution data — decides the topology: serial, fork-join, broadcast-reduce, or adversarial. For decomposition, the planner can recursively spawn nested subgraphs while keeping each executable graph acyclic. You can override it, but you don't have to specify it.
+Each execution plan is represented as a Directed Acyclic Graph (DAG). An Architect — informed by the task's structure and historical execution data — decides the topology: serial, fork-join, broadcast-reduce, or adversarial. For decomposition, the Architect can recursively spawn nested subgraphs while keeping each executable graph acyclic. You can override it, but you don't have to specify it.
 
 **2. Agents have persistent identities.**
 Each agent carries a capability profile, a persona, episodic memory, and a performance history across task types. Over time, the framework learns which agents are best suited to which work and routes accordingly. You're building a team, not a worker pool.
@@ -29,8 +29,8 @@ Each agent carries a capability profile, a persona, episodic memory, and a perfo
 **3. Synthesis is a first-class tier.**
 Merging parallel outputs without losing coherence is hard and almost always an afterthought. Smythe treats synthesis as a dedicated architectural layer with explicit strategies per output type — not a final prompt that hopes for the best.
 
-**4. The planner learns from cold starts.**
-The system ships with robust heuristic defaults (e.g., "Research" tasks default to fork-join). As tasks complete, execution history feeds back into the planner. A task that was over-parallelized, or where synthesis failed, teaches the planner how to optimize the next topology.
+**4. The Architect learns from cold starts.**
+The system ships with robust heuristic defaults (e.g., "Research" tasks default to fork-join). As tasks complete, execution history feeds back into the Architect. A task that was over-parallelized, or where synthesis failed, teaches the Architect how to optimize the next topology.
 
 ---
 
@@ -168,44 +168,44 @@ result = swarm.execute(plan)
 - **Composable over monolithic.** Use just the DAG engine, just the agent registry, or the full stack.
 - **Provider-agnostic.** Abstract over any LLM. Bring your own keys.
 - **Observable by default.** Every node execution emits structured traces. The feedback loop is the product.
-- **Human oversight is built in.** You can inspect what the planner decided and why before or during execution, and add approval gates for sensitive workflows.
+- **Human oversight is built in.** You can inspect what the Architect decided and why before or during execution, and add approval gates for sensitive workflows.
 
 ---
 
 ## Architecture
 
 ```
-Task → Planner → ExecutionGraph (DAG) → Executor → Synthesizer → SwarmResult
-         │                                  │             │
-       Router                           Budget          Tracer
-       (optional)                       Tracker
+Task → Architect → ExecutionGraph (DAG) → Executor → Synthesizer → SwarmResult
+          │                                   │             │
+      WhiteRabbit                          Sentinel        Tracer
+      (optional)
 ```
 
-### Planner tiers
+### Architect tiers
 
-Smythe ships with three planner strategies, plus optional routing:
+Smythe ships with three Architect strategies, plus optional routing via the WhiteRabbit:
 
 | Tier | Class | Description |
 |---|---|---|
-| **Deterministic** | `DeterministicPlanner` | Pure Python DAG construction. Zero LLM cost, zero latency. Subclass and override `plan()`. |
-| **Constrained** | `ConstrainedPlanner` | LLM selects from a menu of pre-built `SubGraphTemplate`s. Dramatically smaller failure space than fully autonomous planning. |
-| **Autonomous** | `LLMPlanner` | LLM builds bespoke DAGs from scratch. Maximum flexibility. Context-preserving retries on malformed output. |
+| **Deterministic** | `DeterministicArchitect` | Pure Python DAG construction. Zero LLM cost, zero latency. Subclass and override `plan()`. |
+| **Constrained** | `ConstrainedArchitect` | LLM selects from a menu of pre-built `SubGraphTemplate`s. Dramatically smaller failure space than fully autonomous planning. |
+| **Autonomous** | `LLMArchitect` | LLM builds bespoke DAGs from scratch. Maximum flexibility. Context-preserving retries on malformed output. |
 
-Pass any planner explicitly via `Swarm(planner=...)`, or use the `PlannerRouter` for classifier-based routing:
+Pass any Architect explicitly via `Swarm(architect=...)`, or use the `WhiteRabbit` for classifier-based routing:
 
 ```python
-from smythe import Swarm, PlannerRouter, SimplePlanner, LLMPlanner
+from smythe import Swarm, WhiteRabbit, SimpleArchitect, LLMArchitect
 
-router = PlannerRouter(
-    deterministic={"etl-pipeline": MyETLPlanner()},
-    constrained=my_constrained_planner,
-    autonomous=LLMPlanner(provider=my_provider),
+router = WhiteRabbit(
+    deterministic={"etl-pipeline": MyETLArchitect()},
+    constrained=my_constrained_architect,
+    autonomous=LLMArchitect(provider=my_provider),
     classifier_provider=my_provider,
 )
 swarm = Swarm(router=router)
 ```
 
-When no classifier provider is set, the router falls back to the autonomous planner.
+When no classifier provider is set, the WhiteRabbit falls back to the autonomous Architect.
 
 ### Node failure policies
 
@@ -341,7 +341,7 @@ result = swarm.execute()
 
 ### Observability
 
-Every node execution emits structured trace spans. The planner's `PlannerMemory` persists execution outcomes as JSONL for learning-informed future planning.
+Every node execution emits structured trace spans. The Architect's `PlannerMemory` persists execution outcomes as JSONL for learning-informed future planning.
 
 ---
 
@@ -370,8 +370,8 @@ Requires Python 3.11+. Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` for the respe
 The core framework is implemented and tested. **189 tests passing.**
 
 **What's shipped:**
-- Three-tier planner hierarchy (Deterministic, Constrained, Autonomous LLM)
-- Classifier-based planner router with deterministic fallback
+- Three-tier Architect hierarchy (Deterministic, Constrained, Autonomous LLM)
+- Classifier-based WhiteRabbit router with deterministic fallback
 - Serial and async parallel executors with shared base class
 - Node failure policies (HALT, SKIP, RETRY)
 - Capability-aware agent assignment with deterministic tie-breaking
@@ -379,8 +379,8 @@ The core framework is implemented and tested. **189 tests passing.**
 - Synthesis strategies (CONCATENATE, LLM_MERGE, STRUCTURED) with budget/trace accounting
 - Budget enforcement with reservation protocol for parallel safety
 - YAML-defined DAGs with failure policy and capabilities support
-- Context-preserving planner retries
-- Persistent execution memory (JSONL) for learning planner
+- Context-preserving Architect retries
+- Persistent execution memory (JSONL) for learning Architect
 - Provider abstraction (Anthropic, OpenAI) with defensive response parsing
 - Structured observability traces
 

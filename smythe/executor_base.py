@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from smythe.agent import Agent
-from smythe.budget import BudgetTracker
+from smythe.budget import Sentinel
 from smythe.graph import ExecutionGraph, Node, NodeStatus
 from smythe.provider import Provider
 from smythe.registry import Registry
@@ -25,7 +25,7 @@ class ExecutorBase:
         provider: Provider,
         registry: Registry,
         tracer: Tracer,
-        budget: BudgetTracker | None = None,
+        budget: Sentinel | None = None,
     ) -> None:
         self._provider = provider
         self._registry = registry

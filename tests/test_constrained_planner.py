@@ -1,13 +1,13 @@
-"""Tests for the ConstrainedPlanner."""
+"""Tests for the ConstrainedArchitect."""
 
 import json
 
 import pytest
 
 from smythe.agent import Agent, AgentProfile
-from smythe.constrained_planner import ConstrainedPlanner, SubGraphTemplate
+from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
 from smythe.graph import ExecutionGraph, Node
-from smythe.planner import PlanningError
+from smythe.planner import ArchitectError
 from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
 from smythe.task import Task
@@ -63,7 +63,7 @@ TEMPLATES = [
 def test_constrained_planner_selects_single_template():
     response = json.dumps([{"template": "research"}])
     provider = MockConstrainedProvider([response])
-    planner = ConstrainedPlanner(provider=provider, templates=TEMPLATES)
+    planner = ConstrainedArchitect(provider=provider, templates=TEMPLATES)
     task = Task(goal="Research competitors")
 
     graph, registry = planner.plan(task)
@@ -81,7 +81,7 @@ def test_constrained_planner_composes_multiple():
         {"template": "draft"},
     ])
     provider = MockConstrainedProvider([response])
-    planner = ConstrainedPlanner(provider=provider, templates=TEMPLATES)
+    planner = ConstrainedArchitect(provider=provider, templates=TEMPLATES)
     task = Task(goal="Research then write")
 
     graph, registry = planner.plan(task)
@@ -94,17 +94,17 @@ def test_constrained_planner_composes_multiple():
 def test_constrained_planner_rejects_unknown_template():
     response = json.dumps([{"template": "nonexistent"}])
     provider = MockConstrainedProvider([response])
-    planner = ConstrainedPlanner(provider=provider, templates=TEMPLATES, max_retries=0)
+    planner = ConstrainedArchitect(provider=provider, templates=TEMPLATES, max_retries=0)
     task = Task(goal="This should fail")
 
-    with pytest.raises(PlanningError, match="ConstrainedPlanner failed"):
+    with pytest.raises(ArchitectError, match="ConstrainedArchitect failed"):
         planner.plan(task)
 
 
 def test_constrained_planner_passes_params():
     response = json.dumps([{"template": "parallel-work", "params": {"num_workers": 3}}])
     provider = MockConstrainedProvider([response])
-    planner = ConstrainedPlanner(provider=provider, templates=TEMPLATES)
+    planner = ConstrainedArchitect(provider=provider, templates=TEMPLATES)
     task = Task(goal="Parallel task")
 
     graph, _ = planner.plan(task)
@@ -120,7 +120,7 @@ def test_constrained_planner_id_namespacing():
         {"template": "draft"},
     ])
     provider = MockConstrainedProvider([response])
-    planner = ConstrainedPlanner(provider=provider, templates=TEMPLATES)
+    planner = ConstrainedArchitect(provider=provider, templates=TEMPLATES)
     task = Task(goal="Draft twice")
 
     graph, _ = planner.plan(task)
@@ -134,7 +134,7 @@ def test_constrained_planner_id_namespacing():
 def test_constrained_planner_merges_registries():
     response = json.dumps([{"template": "research"}])
     provider = MockConstrainedProvider([response])
-    planner = ConstrainedPlanner(provider=provider, templates=TEMPLATES)
+    planner = ConstrainedArchitect(provider=provider, templates=TEMPLATES)
     task = Task(goal="Research")
 
     _, registry = planner.plan(task)
@@ -149,7 +149,7 @@ def test_constrained_planner_retries():
         "not json",
         json.dumps([{"template": "draft"}]),
     ])
-    planner = ConstrainedPlanner(provider=provider, templates=TEMPLATES, max_retries=2)
+    planner = ConstrainedArchitect(provider=provider, templates=TEMPLATES, max_retries=2)
     task = Task(goal="Retry test")
 
     graph, _ = planner.plan(task)
@@ -161,7 +161,7 @@ def test_constrained_planner_retries():
 def test_constrained_planner_prompt_contains_menu():
     response = json.dumps([{"template": "draft"}])
     provider = MockConstrainedProvider([response])
-    planner = ConstrainedPlanner(provider=provider, templates=TEMPLATES)
+    planner = ConstrainedArchitect(provider=provider, templates=TEMPLATES)
     task = Task(goal="Check menu")
 
     planner.plan(task)
@@ -188,7 +188,7 @@ def test_constrained_planner_does_not_mutate_reused_template_nodes():
     ]
     response = json.dumps([{"template": "reused"}])
     provider = MockConstrainedProvider([response, response])
-    planner = ConstrainedPlanner(provider=provider, templates=templates)
+    planner = ConstrainedArchitect(provider=provider, templates=templates)
     task = Task(goal="Draft")
 
     first_graph, _ = planner.plan(task)
@@ -204,7 +204,7 @@ def test_constrained_planner_catches_bad_params_type():
     bad_response = json.dumps([{"template": "parallel-work", "params": {"num_workers": "not-int"}}])
     good_response = json.dumps([{"template": "draft"}])
     provider = MockConstrainedProvider([bad_response, good_response])
-    planner = ConstrainedPlanner(provider=provider, templates=TEMPLATES, max_retries=2)
+    planner = ConstrainedArchitect(provider=provider, templates=TEMPLATES, max_retries=2)
     task = Task(goal="Bad params recovery")
 
     graph, _ = planner.plan(task)

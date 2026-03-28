@@ -1,13 +1,13 @@
 """Smythe: task-based personalized agent swarms with dynamic execution topology."""
 
-from smythe.budget import BudgetExhaustedError
-from smythe.constrained_planner import ConstrainedPlanner, SubGraphTemplate
+from smythe.budget import Sentinel, SentinelAlert
+from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
 from smythe.graph import FailurePolicy
 from smythe.loader import load_graph
 from smythe.memory import PlannerMemory
-from smythe.planner import DeterministicPlanner, LLMPlanner, PlanningError, SimplePlanner
+from smythe.planner import ArchitectError, DeterministicArchitect, LLMArchitect, SimpleArchitect
 from smythe.provider import AnthropicProvider, CompletionResult, OpenAIProvider, Provider
-from smythe.router import PlannerRouter
+from smythe.router import WhiteRabbit
 from smythe.skills import (
     CapabilityHydrationMode,
     CapabilityMapper,
@@ -21,21 +21,21 @@ from smythe.task import Task
 
 __all__ = [
     "AnthropicProvider",
-    "BudgetExhaustedError",
+    "ArchitectError",
     "CapabilityHydrationMode",
     "CapabilityMapper",
     "CompletionResult",
-    "ConstrainedPlanner",
+    "ConstrainedArchitect",
     "DefaultCapabilityMapper",
-    "DeterministicPlanner",
+    "DeterministicArchitect",
     "FailurePolicy",
-    "LLMPlanner",
+    "LLMArchitect",
     "OpenAIProvider",
     "PlannerMemory",
-    "PlannerRouter",
-    "PlanningError",
     "Provider",
-    "SimplePlanner",
+    "Sentinel",
+    "SentinelAlert",
+    "SimpleArchitect",
     "SkillProvider",
     "SkillRef",
     "SubGraphTemplate",
@@ -44,6 +44,7 @@ __all__ = [
     "Synthesizer",
     "SynthesisStrategy",
     "Task",
+    "WhiteRabbit",
     "load_graph",
 ]
 __version__ = "0.0.1"

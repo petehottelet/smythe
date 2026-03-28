@@ -7,10 +7,11 @@ import tempfile
 import pytest
 
 from smythe import Swarm, Task
-from smythe.graph import ExecutionGraph, Topology
+from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.memory import PlannerMemory
-from smythe.planner import LLMPlanner, SimplePlanner
+from smythe.planner import DeterministicArchitect, LLMArchitect, SimpleArchitect
 from smythe.provider import CompletionResult, Provider
+from smythe.router import WhiteRabbit
 
 
 class MockProvider(Provider):
@@ -51,14 +52,14 @@ class PlanningMockProvider(Provider):
 def test_swarm_construction():
     swarm = Swarm(
         max_budget_usd=1.00, model="claude-mythos",
-        provider=MockProvider(), planner=SimplePlanner(),
+        provider=MockProvider(), architect=SimpleArchitect(),
     )
     assert swarm.model == "claude-mythos"
     assert swarm.max_budget_usd == 1.00
 
 
 def test_plan_returns_assigned_graph():
-    swarm = Swarm(provider=MockProvider(), planner=SimplePlanner())
+    swarm = Swarm(provider=MockProvider(), architect=SimpleArchitect())
     task = Task(goal="Do something")
     graph = swarm.plan(task)
 
@@ -69,7 +70,7 @@ def test_plan_returns_assigned_graph():
 
 
 def test_execute_with_task():
-    swarm = Swarm(provider=MockProvider(), planner=SimplePlanner())
+    swarm = Swarm(provider=MockProvider(), architect=SimpleArchitect())
     task = Task(goal="Do something")
     result = swarm.execute(task)
 
@@ -79,7 +80,7 @@ def test_execute_with_task():
 
 
 def test_execute_with_graph():
-    swarm = Swarm(provider=MockProvider(), planner=SimplePlanner())
+    swarm = Swarm(provider=MockProvider(), architect=SimpleArchitect())
     task = Task(goal="Do something")
     graph = swarm.plan(task)
     result = swarm.execute(graph)
@@ -89,7 +90,7 @@ def test_execute_with_graph():
 
 
 def test_execute_parallel():
-    swarm = Swarm(provider=MockProvider(), planner=SimplePlanner(), parallel=True)
+    swarm = Swarm(provider=MockProvider(), architect=SimpleArchitect(), parallel=True)
     task = Task(goal="Do something in parallel")
     result = swarm.execute(task)
 
@@ -98,7 +99,7 @@ def test_execute_parallel():
 
 
 def test_model_stamped_on_nodes():
-    swarm = Swarm(model="claude-mythos", provider=MockProvider(), planner=SimplePlanner())
+    swarm = Swarm(model="claude-mythos", provider=MockProvider(), architect=SimpleArchitect())
     task = Task(goal="Check model stamping")
     graph = swarm.plan(task)
 
@@ -106,7 +107,7 @@ def test_model_stamped_on_nodes():
 
 
 def test_execute_reports_cost():
-    swarm = Swarm(provider=MockProvider(), planner=SimplePlanner(), max_budget_usd=10.0)
+    swarm = Swarm(provider=MockProvider(), architect=SimpleArchitect(), max_budget_usd=10.0)
     task = Task(goal="Check cost tracking")
     result = swarm.execute(task)
 
@@ -115,7 +116,7 @@ def test_execute_reports_cost():
 
 def test_swarm_auto_constructs_llm_planner():
     swarm = Swarm(provider=MockProvider())
-    assert isinstance(swarm._planner, LLMPlanner)
+    assert isinstance(swarm._architect, LLMArchitect)
 
 
 def test_swarm_with_llm_planner_plans_and_executes():
@@ -136,7 +137,7 @@ def test_swarm_records_outcome_to_memory():
     try:
         memory = PlannerMemory(path=path)
         swarm = Swarm(
-            provider=MockProvider(), planner=SimplePlanner(),
+            provider=MockProvider(), architect=SimpleArchitect(),
             memory=memory,
         )
         task = Task(goal="Track this execution")
@@ -157,12 +158,12 @@ def test_planning_model_separate_from_execution_model():
         model="claude-mythos",
         planning_model="claude-planning-model",
     )
-    assert isinstance(swarm._planner, LLMPlanner)
-    assert swarm._planner._planning_model == "claude-planning-model"
+    assert isinstance(swarm._architect, LLMArchitect)
+    assert swarm._architect._planning_model == "claude-planning-model"
 
 
 def test_execute_parallel_with_llm_planner():
-    """parallel=True with an LLMPlanner must not crash from nested event loops."""
+    """parallel=True with an LLMArchitect must not crash from nested event loops."""
     provider = PlanningMockProvider()
     swarm = Swarm(provider=provider, parallel=True)
     task = Task(goal="Do the thing")
@@ -200,19 +201,15 @@ nodes:
 
 def test_execute_no_args_without_yaml_raises():
     """execute() with no args and no YAML graph should raise ValueError."""
-    swarm = Swarm(provider=MockProvider(), planner=SimplePlanner())
+    swarm = Swarm(provider=MockProvider(), architect=SimpleArchitect())
     with pytest.raises(ValueError, match="No task or graph provided"):
         swarm.execute()
 
 
 # --- Router tests ---
 
-from smythe.graph import Node
-from smythe.planner import DeterministicPlanner
-from smythe.router import PlannerRouter
 
-
-class _FixedPlanner(DeterministicPlanner):
+class _FixedArchitect(DeterministicArchitect):
     """Returns a graph with a single node labelled with a tag."""
 
     def __init__(self, tag: str) -> None:
@@ -239,10 +236,10 @@ class _ClassifierMockProvider(Provider):
 
 def test_router_explicit_deterministic():
     """Router selects a deterministic planner by key."""
-    site_planner = _FixedPlanner("site")
-    router = PlannerRouter(
+    site_planner = _FixedArchitect("site")
+    router = WhiteRabbit(
         deterministic={"site-builder": site_planner},
-        autonomous=SimplePlanner(),
+        autonomous=SimpleArchitect(),
         classifier_provider=_ClassifierMockProvider("deterministic:site-builder"),
         classifier_model="test",
     )
@@ -255,10 +252,10 @@ def test_router_explicit_deterministic():
 
 def test_router_classifier_constrained():
     """Router routes to constrained planner when classifier says so."""
-    constrained = _FixedPlanner("constrained")
-    router = PlannerRouter(
+    constrained = _FixedArchitect("constrained")
+    router = WhiteRabbit(
         constrained=constrained,
-        autonomous=SimplePlanner(),
+        autonomous=SimpleArchitect(),
         classifier_provider=_ClassifierMockProvider("constrained"),
         classifier_model="test",
     )
@@ -271,8 +268,8 @@ def test_router_classifier_constrained():
 
 def test_router_fallback_to_autonomous():
     """Router falls back to autonomous when no classifier is set."""
-    autonomous = _FixedPlanner("autonomous")
-    router = PlannerRouter(autonomous=autonomous)
+    autonomous = _FixedArchitect("autonomous")
+    router = WhiteRabbit(autonomous=autonomous)
     swarm = Swarm(provider=MockProvider(), router=router)
     task = Task(goal="Ambiguous task")
     graph = swarm.plan(task)
@@ -283,7 +280,7 @@ def test_router_fallback_to_autonomous():
 @pytest.mark.asyncio
 async def test_swarm_aplan_async():
     """aplan() should work from inside an async context."""
-    swarm = Swarm(provider=MockProvider(), planner=SimplePlanner())
+    swarm = Swarm(provider=MockProvider(), architect=SimpleArchitect())
     task = Task(goal="Async plan")
     graph = await swarm.aplan(task)
 
@@ -295,7 +292,7 @@ async def test_swarm_aplan_async():
 @pytest.mark.asyncio
 async def test_execute_async_directly():
     """execute_async() should plan and execute in a fully async path."""
-    swarm = Swarm(provider=MockProvider(), planner=SimplePlanner())
+    swarm = Swarm(provider=MockProvider(), architect=SimpleArchitect())
     task = Task(goal="Async execute")
     result = await swarm.execute_async(task)
 
@@ -305,8 +302,8 @@ async def test_execute_async_directly():
 
 def test_router_unknown_classification_falls_back():
     """Unknown classifier output falls back to autonomous."""
-    autonomous = _FixedPlanner("fallback")
-    router = PlannerRouter(
+    autonomous = _FixedArchitect("fallback")
+    router = WhiteRabbit(
         autonomous=autonomous,
         classifier_provider=_ClassifierMockProvider("something-weird"),
         classifier_model="test",
