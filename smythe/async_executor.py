@@ -47,6 +47,8 @@ class AsyncExecutor(ExecutorBase):
                 break
             ready = [n for n in pending if graph.is_ready(n)]
             if not ready:
+                if first_error is not None:
+                    raise first_error
                 failed = [n for n in graph.nodes if n.status == NodeStatus.FAILED]
                 if failed:
                     raise RuntimeError(

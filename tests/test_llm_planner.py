@@ -316,3 +316,19 @@ async def test_llm_planner_aplan():
     assert isinstance(graph, ExecutionGraph)
     assert len(graph.nodes) == 3
     assert len(registry.list_agents()) == 3
+
+
+def test_plan_retries_on_type_error():
+    """TypeError from malformed LLM output should trigger a retry, not crash."""
+    malformed = json.dumps({
+        "topology": "serial",
+        "nodes": "not-a-list",
+    })
+    provider = MockPlanningProvider([malformed, SERIAL_RESPONSE])
+    planner = LLMArchitect(provider=provider, planning_model="test-model", max_retries=2)
+    task = Task(goal="Recover from TypeError")
+
+    graph, registry = planner.plan(task)
+
+    assert len(graph.nodes) == 2
+    assert len(provider.prompts_received) == 2

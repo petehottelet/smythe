@@ -79,7 +79,7 @@ result = swarm.execute(plan)
 ### Creative task — broadcast-reduce
 
 ```python
-swarm = Swarm(max_budget_usd=1.50, model="gemini-3-pro-image-preview")
+swarm = Swarm(max_budget_usd=1.50, model="gemini-3-pro-image-preview", provider=my_provider)
 
 task = Task(
     goal=(
@@ -205,7 +205,7 @@ router = WhiteRabbit(
 swarm = Swarm(router=router)
 ```
 
-When no classifier provider is set, the WhiteRabbit falls back to the autonomous Architect.
+When no classifier provider is set, the WhiteRabbit falls back to the autonomous Architect (which must be provided via `autonomous=`).
 
 ### Node failure policies
 
@@ -260,8 +260,10 @@ Nodes can declare `required_capabilities`. The registry matches agents whose cap
 
 ```python
 from smythe.agent import Agent, AgentProfile
-from smythe.graph import Node
+from smythe.graph import ExecutionGraph, Node, Topology
+from smythe.registry import Registry
 
+registry = Registry()
 agent = Agent(profile=AgentProfile(
     name="researcher",
     capabilities=["research", "summarize"],
@@ -269,6 +271,7 @@ agent = Agent(profile=AgentProfile(
 registry.register(agent)
 
 node = Node(label="Research task", required_capabilities=["research"])
+graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
 registry.assign(graph)  # assigns the researcher agent
 ```
 
@@ -367,7 +370,7 @@ Requires Python 3.11+. Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` for the respe
 
 ## Current Status
 
-The core framework is implemented and tested. **189 tests passing.**
+The core framework is implemented and tested. **191 tests passing.**
 
 **What's shipped:**
 - Three-tier Architect hierarchy (Deterministic, Constrained, Autonomous LLM)
