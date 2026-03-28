@@ -120,6 +120,11 @@ class ExecutionGraph:
     def validate(self) -> None:
         """Check basic DAG invariants."""
         ids = {n.id for n in self.nodes}
+        if len(ids) != len(self.nodes):
+            from collections import Counter
+            counts = Counter(n.id for n in self.nodes)
+            dupes = [nid for nid, cnt in counts.items() if cnt > 1]
+            raise ValueError(f"Duplicate node IDs: {dupes}")
         for node in self.nodes:
             for dep in node.depends_on:
                 if dep not in ids:

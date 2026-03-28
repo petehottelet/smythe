@@ -192,3 +192,12 @@ def test_agent_count_no_agents():
     a = Node(label="A", id="a")
     graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[a])
     assert graph.agent_count == 0
+
+
+def test_validate_rejects_duplicate_node_ids():
+    a = Node(label="First", id="dup")
+    b = Node(label="Second", id="dup")
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[a, b])
+
+    with pytest.raises(ValueError, match="Duplicate node IDs"):
+        graph.validate()
