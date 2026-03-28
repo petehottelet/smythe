@@ -1,4 +1,4 @@
-"""Planner — generates an execution graph from a task description."""
+"""Architect — generates an execution graph from a task description."""
 
 from __future__ import annotations
 
@@ -15,12 +15,12 @@ from smythe.registry import Registry
 from smythe.task import Task
 
 
-class PlanningError(Exception):
-    """Raised when the LLM planner cannot produce a valid execution graph."""
+class ArchitectError(Exception):
+    """Raised when the Architect cannot produce a valid execution graph."""
 
 
-class Planner(ABC):
-    """Base class for all planners."""
+class Architect(ABC):
+    """Base class for all architects."""
 
     @abstractmethod
     def plan(self, task: Task) -> tuple[ExecutionGraph, Registry]:
@@ -35,8 +35,8 @@ class Planner(ABC):
         return self.plan(task)
 
 
-class DeterministicPlanner(Planner):
-    """Base class for planners that build DAGs with pure Python logic.
+class DeterministicArchitect(Architect):
+    """Base class for architects that build DAGs with pure Python logic.
 
     Subclass this when you know the graph shape ahead of time and want
     zero LLM cost, zero latency, and 100% deterministic output.
@@ -48,7 +48,7 @@ class DeterministicPlanner(Planner):
         """Build a graph from pure Python — no LLM calls."""
 
 
-class SimplePlanner(DeterministicPlanner):
+class SimpleArchitect(DeterministicArchitect):
     """Produces a single-node serial graph.  Useful as a fallback
     or for tasks that don't need LLM-driven decomposition.
     """
@@ -60,10 +60,10 @@ class SimplePlanner(DeterministicPlanner):
         return graph, Registry()
 
 
-class LLMPlanner(Planner):
+class LLMArchitect(Architect):
     """Decomposes tasks into multi-node DAGs via an LLM call.
 
-    The planner sends the task to the LLM with a structured prompt
+    The Architect sends the task to the LLM with a structured prompt
     describing available topologies and the expected JSON output schema.
     The response is parsed into an ExecutionGraph with agent personas.
     """
@@ -116,7 +116,7 @@ class LLMPlanner(Planner):
                 last_error = exc
                 continue
 
-        raise PlanningError(
+        raise ArchitectError(
             f"Failed to produce a valid plan after {1 + self._max_retries} attempts: "
             f"{last_error}"
         )
@@ -124,9 +124,9 @@ class LLMPlanner(Planner):
     def _get_history(self, task: Task) -> list[dict] | None:
         if self._memory is None:
             return None
-        from smythe.memory import PlannerMemory
+        from smythe.memory import PlannerMemory as _PlannerMemory
 
-        if not isinstance(self._memory, PlannerMemory):
+        if not isinstance(self._memory, _PlannerMemory):
             return None
         outcomes = self._memory.recall(task)
         if not outcomes:

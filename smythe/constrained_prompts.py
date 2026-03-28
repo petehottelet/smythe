@@ -1,4 +1,4 @@
-"""Prompt templates for the ConstrainedPlanner."""
+"""Prompt templates for the ConstrainedArchitect."""
 
 from __future__ import annotations
 

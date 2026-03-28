@@ -7,7 +7,6 @@ import pytest
 
 from smythe.graph import ExecutionGraph, Topology
 from smythe.loader import load_graph, load_graph_from_string
-from smythe.registry import Registry
 
 
 SERIAL_YAML = """\

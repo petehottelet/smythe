@@ -1,6 +1,5 @@
 """Tests for the OpenClaw adapter (mocked SDK — no live dependency)."""
 
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest

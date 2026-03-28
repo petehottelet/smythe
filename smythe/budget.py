@@ -1,11 +1,14 @@
-"""Budget tracking — deterministic cost guardrails for execution."""
+"""Sentinel — deterministic cost guardrails for execution.
+
+The Sentinels patrol the boundaries.  They enforce the budget.
+"""
 
 from __future__ import annotations
 
 from smythe.provider import CompletionResult
 
 
-class BudgetExhaustedError(Exception):
+class SentinelAlert(Exception):
     """Raised when cumulative execution cost would exceed the budget limit."""
 
     def __init__(self, spent: float, limit: float, node_id: str) -> None:
@@ -18,7 +21,7 @@ class BudgetExhaustedError(Exception):
         )
 
 
-class BudgetTracker:
+class Sentinel:
     """Accumulates token costs per node and enforces a USD spending cap.
 
     Supports a reservation protocol for parallel execution: ``reserve()``
@@ -48,23 +51,23 @@ class BudgetTracker:
         return self._spent
 
     def check(self, node_id: str) -> None:
-        """Raise BudgetExhaustedError if the budget is already exhausted.
+        """Raise SentinelAlert if the budget is already exhausted.
 
         Used by the serial executor where reservation is unnecessary.
         """
         if self.max_budget_usd is not None and self._spent >= self.max_budget_usd:
-            raise BudgetExhaustedError(self._spent, self.max_budget_usd, node_id)
+            raise SentinelAlert(self._spent, self.max_budget_usd, node_id)
 
     def reserve(self, node_id: str, estimated_cost: float) -> None:
         """Pre-commit estimated cost before a node starts executing.
 
-        Raises BudgetExhaustedError if the reservation would exceed the
+        Raises SentinelAlert if the reservation would exceed the
         budget.  The reservation is held until ``record()`` replaces it
         with actual cost, or ``release()`` cancels it on failure.
         """
         if self.max_budget_usd is not None:
             if self._spent + estimated_cost > self.max_budget_usd:
-                raise BudgetExhaustedError(self._spent, self.max_budget_usd, node_id)
+                raise SentinelAlert(self._spent, self.max_budget_usd, node_id)
         self._reservations[node_id] = estimated_cost
         self._spent += estimated_cost
 

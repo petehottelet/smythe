@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from smythe.budget import BudgetTracker
+from smythe.budget import Sentinel
 from smythe.executor_base import ExecutorBase
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
 from smythe.provider import Provider
@@ -32,7 +32,7 @@ class AsyncExecutor(ExecutorBase):
         provider: Provider,
         registry: Registry,
         tracer: Tracer,
-        budget: BudgetTracker | None = None,
+        budget: Sentinel | None = None,
         estimated_tokens_per_node: int = DEFAULT_ESTIMATED_TOKENS,
     ) -> None:
         super().__init__(provider=provider, registry=registry, tracer=tracer, budget=budget)
