@@ -61,8 +61,15 @@ class AsyncExecutor(ExecutorBase):
                 estimated_cost = (
                     self._estimated_tokens_per_node * self._budget.cost_per_token
                 )
-                for n in ready:
-                    self._budget.reserve(n.id, estimated_cost)
+                reserved_ids: list[str] = []
+                try:
+                    for n in ready:
+                        self._budget.reserve(n.id, estimated_cost)
+                        reserved_ids.append(n.id)
+                except Exception:
+                    for rid in reserved_ids:
+                        self._budget.release(rid)
+                    raise
 
             try:
                 await asyncio.gather(*(self._execute_node(n, graph) for n in ready))

@@ -6,7 +6,7 @@ from smythe.graph import FailurePolicy
 from smythe.loader import load_graph
 from smythe.memory import PlannerMemory
 from smythe.planner import ArchitectError, DeterministicArchitect, LLMArchitect, SimpleArchitect
-from smythe.provider import AnthropicProvider, CompletionResult, OpenAIProvider, Provider
+from smythe.provider import AnthropicProvider, CompletionResult, GeminiProvider, OpenAIProvider, Provider
 from smythe.router import WhiteRabbit
 from smythe.skills import (
     CapabilityHydrationMode,
@@ -29,6 +29,7 @@ __all__ = [
     "DefaultCapabilityMapper",
     "DeterministicArchitect",
     "FailurePolicy",
+    "GeminiProvider",
     "LLMArchitect",
     "OpenAIProvider",
     "PlannerMemory",
@@ -47,4 +48,4 @@ __all__ = [
     "WhiteRabbit",
     "load_graph",
 ]
-__version__ = "0.0.1"
+__version__ = "0.1.0"

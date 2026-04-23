@@ -39,6 +39,10 @@ class Executor(ExecutorBase):
                 return
             visited.add(node.id)
             for dep_id in node.depends_on:
+                if dep_id not in lookup:
+                    raise ValueError(
+                        f"Node {node.id!r} depends on unknown node {dep_id!r}"
+                    )
                 visit(lookup[dep_id])
             order.append(node)
 

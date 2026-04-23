@@ -112,3 +112,44 @@ class OpenAIProvider(Provider):
             prompt_tokens=getattr(usage, "prompt_tokens", 0) if usage else 0,
             completion_tokens=getattr(usage, "completion_tokens", 0) if usage else 0,
         )
+
+
+class GeminiProvider(Provider):
+    """Provider backed by the Google Gen AI SDK (Gemini models)."""
+
+    def __init__(self, *, api_key: str | None = None, max_tokens: int = 4096) -> None:
+        self._api_key = api_key or os.environ.get("GOOGLE_API_KEY", "")
+        self._max_tokens = max_tokens
+        self._client = None
+
+    def _get_client(self):
+        if self._client is None:
+            try:
+                from google import genai
+            except ImportError as exc:
+                raise ImportError(
+                    "Install the gemini extra: pip install smythe[gemini]"
+                ) from exc
+            kwargs = {}
+            if self._api_key:
+                kwargs["api_key"] = self._api_key
+            self._client = genai.Client(**kwargs)
+        return self._client
+
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        client = self._get_client()
+        response = await client.aio.models.generate_content(
+            model=model,
+            contents=prompt,
+            config={
+                "system_instruction": system,
+                "max_output_tokens": self._max_tokens,
+            },
+        )
+        text = response.text or ""
+        usage = response.usage_metadata
+        return CompletionResult(
+            text=text,
+            prompt_tokens=getattr(usage, "prompt_token_count", 0) if usage else 0,
+            completion_tokens=getattr(usage, "candidates_token_count", 0) if usage else 0,
+        )

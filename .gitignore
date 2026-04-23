@@ -26,3 +26,6 @@ htmlcov/
 *~
 .DS_Store
 Thumbs.db
+
+# Local working notes (TODOs, project instructions, scratch)
+00_project_files/

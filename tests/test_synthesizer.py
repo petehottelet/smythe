@@ -4,8 +4,9 @@ import json
 
 import pytest
 
+from helpers import make_completed_graph as _make_graph
 from smythe.budget import Sentinel
-from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
+from smythe.graph import ExecutionGraph, Topology
 from smythe.provider import CompletionResult, Provider
 from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.tracer import Tracer
@@ -19,16 +20,6 @@ class MockSynthProvider(Provider):
     async def complete(self, system, prompt, model):
         self.called = True
         return CompletionResult(text=self._response, prompt_tokens=30, completion_tokens=40)
-
-
-def _make_graph(*results: str) -> ExecutionGraph:
-    nodes = []
-    for i, r in enumerate(results):
-        n = Node(id=f"n{i}", label=f"Step {i}")
-        n.status = NodeStatus.COMPLETED
-        n.result = r
-        nodes.append(n)
-    return ExecutionGraph(topology=[Topology.SERIAL], nodes=nodes)
 
 
 def test_concatenate_strategy():
@@ -157,3 +148,67 @@ def test_llm_merge_runtime_context_no_instance_mutation():
     assert synth._provider is None
     assert synth._budget is None
     assert synth._tracer is None
+
+
+def test_llm_merge_budget_exhaustion_raises():
+    """LLM_MERGE should propagate SentinelAlert when the budget is already exhausted."""
+    from smythe.budget import SentinelAlert
+
+    provider = MockSynthProvider()
+    budget = Sentinel(max_budget_usd=0.0001)
+    budget._spent = 0.0001  # simulate prior spending that exhausts the budget
+
+    synth = Synthesizer(
+        strategy=SynthesisStrategy.LLM_MERGE,
+        provider=provider,
+        budget=budget,
+    )
+    graph = _make_graph("A", "B")
+
+    with pytest.raises(SentinelAlert):
+        synth.synthesize(graph)
+
+    assert not provider.called
+
+
+@pytest.mark.asyncio
+async def test_asynthesize_llm_merge_budget_exhaustion():
+    """Async LLM_MERGE should also propagate SentinelAlert."""
+    from smythe.budget import SentinelAlert
+
+    provider = MockSynthProvider()
+    budget = Sentinel(max_budget_usd=0.0001)
+    budget._spent = 0.0001
+
+    synth = Synthesizer(
+        strategy=SynthesisStrategy.LLM_MERGE,
+        provider=provider,
+        budget=budget,
+    )
+    graph = _make_graph("X", "Y")
+
+    with pytest.raises(SentinelAlert):
+        await synth.asynthesize(graph, budget=budget)
+
+    assert not provider.called
+
+
+def test_llm_merge_provider_error_sets_failed_status():
+    """If the provider raises during LLM_MERGE, the synthesis node should be FAILED."""
+    class _ErrorProvider(Provider):
+        async def complete(self, system, prompt, model):
+            raise RuntimeError("provider crash")
+
+    tracer = Tracer()
+    synth = Synthesizer(
+        strategy=SynthesisStrategy.LLM_MERGE,
+        provider=_ErrorProvider(),
+        tracer=tracer,
+    )
+    graph = _make_graph("A")
+
+    with pytest.raises(RuntimeError, match="provider crash"):
+        synth.synthesize(graph)
+
+    error_spans = [s for s in tracer.summary() if s.get("error") is not None]
+    assert len(error_spans) == 1

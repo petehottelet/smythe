@@ -10,7 +10,7 @@ Most agent frameworks make you decide upfront how your agents will work together
 
 Today's agent frameworks fall into two camps:
 
-**Personal assistant daemons** (like OpenClaw) give you one persistent agent with many skills. Great for "do this thing for me." Not designed for complex tasks that benefit from multiple specialized agents working in coordination.
+**Personal assistant daemons** (like [OpenClaw](https://github.com/openclaw/openclaw)) give you one persistent agent with many skills. Great for "do this thing for me." Not designed for complex tasks that benefit from multiple specialized agents working in coordination.
 
 **Pipeline frameworks** (like LangGraph, CrewAI, AutoGPT) let you hardcode a topology — chain these agents together in this order. You, the developer, decide how the work gets split up. The framework just executes your decision.
 
@@ -79,7 +79,7 @@ result = swarm.execute(plan)
 ### Creative task — broadcast-reduce
 
 ```python
-swarm = Swarm(max_budget_usd=1.50, model="gemini-3-pro-image-preview", provider=my_provider)
+swarm = Swarm(max_budget_usd=1.50, model="gemini-3-pro-image-preview")
 
 task = Task(
     goal=(
@@ -346,6 +346,15 @@ result = swarm.execute()
 
 Every node execution emits structured trace spans. The Architect's `PlannerMemory` persists execution outcomes as JSONL for learning-informed future planning.
 
+### Async usage
+
+The sync APIs (`plan`, `execute`, `route`, `synthesize`) use `asyncio.run()` internally and will raise `RuntimeError` if called from within a running event loop (e.g. Jupyter notebooks, ASGI frameworks). In those environments, use the async variants instead:
+
+```python
+graph  = await swarm.aplan(task)
+result = await swarm.execute_async(task)
+```
+
 ---
 
 ## Installation
@@ -359,18 +368,19 @@ Optional extras for LLM providers and skill integration:
 ```bash
 pip install -e ".[anthropic]"    # Anthropic Claude models
 pip install -e ".[openai]"       # OpenAI GPT models
+pip install -e ".[gemini]"       # Google Gemini models
 pip install -e ".[openclaw]"     # OpenClaw AgentSkills integration
 pip install -e ".[all]"          # all of the above
 pip install -e ".[dev]"          # pytest, ruff, dev tooling
 ```
 
-Requires Python 3.11+. Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` for the respective providers.
+Requires Python 3.11+. Set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY` for the respective providers.
 
 ---
 
 ## Current Status
 
-The core framework is implemented and tested. **191 tests passing.**
+The core framework is implemented and tested. **240 tests passing.**
 
 **What's shipped:**
 - Three-tier Architect hierarchy (Deterministic, Constrained, Autonomous LLM)
@@ -384,14 +394,14 @@ The core framework is implemented and tested. **191 tests passing.**
 - YAML-defined DAGs with failure policy and capabilities support
 - Context-preserving Architect retries
 - Persistent execution memory (JSONL) for learning Architect
-- Provider abstraction (Anthropic, OpenAI) with defensive response parsing
+- Provider abstraction (Anthropic, OpenAI, Gemini) with defensive response parsing
 - Structured observability traces
 
 **What's next:**
 - Recursive subgraph decomposition
 - Approval gates for human-in-the-loop workflows
 - Performance history-based agent routing
-- Additional providers (Gemini, local models)
+- Additional providers (local models)
 
 ---
 

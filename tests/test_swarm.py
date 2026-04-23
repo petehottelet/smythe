@@ -1,52 +1,22 @@
 """Tests for the Swarm top-level orchestrator."""
 
-import json
 import os
 import tempfile
 
 import pytest
 
+from helpers import (
+    ClassifierMockProvider,
+    FixedArchitect,
+    MockProvider,
+    PlanningMockProvider,
+)
 from smythe import Swarm, Task
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.memory import PlannerMemory
-from smythe.planner import DeterministicArchitect, LLMArchitect, SimpleArchitect
+from smythe.planner import LLMArchitect, SimpleArchitect
 from smythe.provider import CompletionResult, Provider
 from smythe.router import WhiteRabbit
-
-
-class MockProvider(Provider):
-    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
-        return CompletionResult(text=f"mock: {prompt[:40]}", prompt_tokens=10, completion_tokens=5)
-
-
-SIMPLE_PLAN_JSON = json.dumps({
-    "topology": ["serial"],
-    "nodes": [
-        {
-            "id": "step-1",
-            "label": "Do the thing",
-            "depends_on": [],
-            "agent": {
-                "name": "Worker",
-                "persona": "You are a helpful worker.",
-                "capabilities": ["general"],
-            },
-        },
-    ],
-})
-
-
-class PlanningMockProvider(Provider):
-    """Returns valid plan JSON on first call, then mock text on execution calls."""
-
-    def __init__(self) -> None:
-        self._call_count = 0
-
-    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
-        self._call_count += 1
-        if self._call_count == 1:
-            return CompletionResult(text=SIMPLE_PLAN_JSON, prompt_tokens=50, completion_tokens=100)
-        return CompletionResult(text=f"mock: {prompt[:40]}", prompt_tokens=10, completion_tokens=5)
 
 
 def test_swarm_construction():
@@ -209,38 +179,13 @@ def test_execute_no_args_without_yaml_raises():
 # --- Router tests ---
 
 
-class _FixedArchitect(DeterministicArchitect):
-    """Returns a graph with a single node labelled with a tag."""
-
-    def __init__(self, tag: str) -> None:
-        self.tag = tag
-
-    def plan(self, task):
-        from smythe.graph import Topology
-        node = Node(label=f"{self.tag}: {task.goal}")
-        graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
-        graph.validate()
-        from smythe.registry import Registry
-        return graph, Registry()
-
-
-class _ClassifierMockProvider(Provider):
-    """Returns a fixed classification string."""
-
-    def __init__(self, classification: str) -> None:
-        self._classification = classification
-
-    async def complete(self, system, prompt, model):
-        return CompletionResult(text=self._classification, prompt_tokens=5, completion_tokens=2)
-
-
 def test_router_explicit_deterministic():
     """Router selects a deterministic planner by key."""
-    site_planner = _FixedArchitect("site")
+    site_planner = FixedArchitect("site")
     router = WhiteRabbit(
         deterministic={"site-builder": site_planner},
         autonomous=SimpleArchitect(),
-        classifier_provider=_ClassifierMockProvider("deterministic:site-builder"),
+        classifier_provider=ClassifierMockProvider("deterministic:site-builder"),
         classifier_model="test",
     )
     swarm = Swarm(provider=MockProvider(), router=router)
@@ -252,11 +197,11 @@ def test_router_explicit_deterministic():
 
 def test_router_classifier_constrained():
     """Router routes to constrained planner when classifier says so."""
-    constrained = _FixedArchitect("constrained")
+    constrained = FixedArchitect("constrained")
     router = WhiteRabbit(
         constrained=constrained,
         autonomous=SimpleArchitect(),
-        classifier_provider=_ClassifierMockProvider("constrained"),
+        classifier_provider=ClassifierMockProvider("constrained"),
         classifier_model="test",
     )
     swarm = Swarm(provider=MockProvider(), router=router)
@@ -268,7 +213,7 @@ def test_router_classifier_constrained():
 
 def test_router_fallback_to_autonomous():
     """Router falls back to autonomous when no classifier is set."""
-    autonomous = _FixedArchitect("autonomous")
+    autonomous = FixedArchitect("autonomous")
     router = WhiteRabbit(autonomous=autonomous)
     swarm = Swarm(provider=MockProvider(), router=router)
     task = Task(goal="Ambiguous task")
@@ -302,10 +247,10 @@ async def test_execute_async_directly():
 
 def test_router_unknown_classification_falls_back():
     """Unknown classifier output falls back to autonomous."""
-    autonomous = _FixedArchitect("fallback")
+    autonomous = FixedArchitect("fallback")
     router = WhiteRabbit(
         autonomous=autonomous,
-        classifier_provider=_ClassifierMockProvider("something-weird"),
+        classifier_provider=ClassifierMockProvider("something-weird"),
         classifier_model="test",
     )
     swarm = Swarm(provider=MockProvider(), router=router)
@@ -313,3 +258,51 @@ def test_router_unknown_classification_falls_back():
     graph = swarm.plan(task)
 
     assert "fallback:" in graph.nodes[0].label
+
+
+# --- Synthesizer model passthrough tests ---
+
+
+class _ModelCapturingProvider(Provider):
+    """Records the model string passed to each complete() call."""
+
+    def __init__(self) -> None:
+        self.models_seen: list[str] = []
+
+    async def complete(self, system, prompt, model):
+        self.models_seen.append(model)
+        return CompletionResult(text="merged", prompt_tokens=5, completion_tokens=5)
+
+
+def test_llm_merge_receives_swarm_model():
+    """LLM_MERGE synthesis should receive the swarm's model, not an empty string."""
+    from smythe.synthesizer import Synthesizer, SynthesisStrategy
+
+    capture = _ModelCapturingProvider()
+    swarm = Swarm(
+        model="claude-mythos",
+        provider=capture,
+        architect=SimpleArchitect(),
+        synthesizer=Synthesizer(strategy=SynthesisStrategy.LLM_MERGE),
+    )
+    task = Task(goal="Test merge model")
+    swarm.execute(task)
+
+    merge_model = capture.models_seen[-1]
+    assert merge_model == "claude-mythos", (
+        f"Expected synthesis to use 'claude-mythos' but got {merge_model!r}"
+    )
+
+
+# --- Graph validation tests ---
+
+
+def test_execute_validates_direct_graph():
+    """Passing an invalid graph directly to execute() should raise ValueError."""
+    swarm = Swarm(provider=MockProvider(), architect=SimpleArchitect())
+    bad_graph = ExecutionGraph(
+        topology=[Topology.SERIAL],
+        nodes=[Node(label="A", id="a", depends_on=["nonexistent"])],
+    )
+    with pytest.raises(ValueError, match="nonexistent"):
+        swarm.execute(bad_graph)
