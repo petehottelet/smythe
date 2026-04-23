@@ -5,7 +5,9 @@ import time
 
 import pytest
 
+from helpers import FailingProvider
 from smythe.async_executor import AsyncExecutor
+from smythe.budget import Sentinel, SentinelAlert
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
@@ -30,11 +32,13 @@ class SlowMockProvider(Provider):
         )
 
 
-def _make_executor(provider: Provider | None = None) -> tuple[AsyncExecutor, Tracer]:
+def _make_executor(
+    provider: Provider | None = None, budget: Sentinel | None = None,
+) -> tuple[AsyncExecutor, Tracer]:
     tracer = Tracer()
     registry = Registry()
     p = provider or SlowMockProvider(delay=0.0)
-    executor = AsyncExecutor(provider=p, registry=registry, tracer=tracer)
+    executor = AsyncExecutor(provider=p, registry=registry, tracer=tracer, budget=budget)
     return executor, tracer
 
 
@@ -118,28 +122,6 @@ async def test_deadlock_detection():
 
 
 # --- Failure policy tests ---
-
-class FailingProvider(Provider):
-    """Provider that fails a configurable number of times before succeeding.
-
-    If ``fail_labels`` is set, only prompts whose first line matches
-    one of the labels will be failed; all others succeed immediately.
-    """
-
-    def __init__(self, failures: int = 1, fail_labels: set[str] | None = None) -> None:
-        self._failures = failures
-        self._fail_labels = fail_labels
-        self._attempts: dict[str, int] = {}
-
-    async def complete(self, system, prompt, model):
-        label = prompt.split("\n")[0]
-        if self._fail_labels is not None and label not in self._fail_labels:
-            return CompletionResult(text=f"ok: {label}", prompt_tokens=5, completion_tokens=5)
-        self._attempts.setdefault(label, 0)
-        self._attempts[label] += 1
-        if self._attempts[label] <= self._failures:
-            raise RuntimeError(f"Simulated failure #{self._attempts[label]}")
-        return CompletionResult(text=f"ok: {label}", prompt_tokens=5, completion_tokens=5)
 
 
 @pytest.mark.asyncio
@@ -236,3 +218,52 @@ async def test_retry_count_means_additional_retries():
     graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
     await executor.run(graph)
     assert node.status == NodeStatus.COMPLETED
+
+
+# --- Budget reservation tests ---
+
+
+@pytest.mark.asyncio
+async def test_partial_reservation_rollback_on_budget_exceeded():
+    """When reserve() fails mid-wave, earlier reservations are rolled back."""
+    budget = Sentinel(max_budget_usd=0.010, cost_per_token=0.000003)
+
+    a = Node(label="A", id="a")
+    b = Node(label="B", id="b")
+    c = Node(label="C", id="c")
+    graph = ExecutionGraph(topology=[Topology.FORK_JOIN], nodes=[a, b, c])
+
+    executor, _ = _make_executor(
+        provider=SlowMockProvider(delay=0.0),
+        budget=budget,
+    )
+    executor._estimated_tokens_per_node = 2000
+
+    with pytest.raises(SentinelAlert):
+        await executor.run(graph)
+
+    assert budget.total_cost_usd == 0.0, (
+        f"Expected $0 after rollback but got ${budget.total_cost_usd}"
+    )
+    assert budget._reservations == {}
+
+
+@pytest.mark.asyncio
+async def test_budget_accounting_after_successful_wave():
+    """Budget tracks actual cost correctly after a parallel wave completes."""
+    budget = Sentinel(max_budget_usd=1.0, cost_per_token=0.000003)
+
+    a = Node(label="A", id="a")
+    b = Node(label="B", id="b")
+    graph = ExecutionGraph(topology=[Topology.FORK_JOIN], nodes=[a, b])
+
+    executor, _ = _make_executor(
+        provider=SlowMockProvider(delay=0.0),
+        budget=budget,
+    )
+
+    await executor.run(graph)
+
+    assert all(n.status == NodeStatus.COMPLETED for n in graph.nodes)
+    assert budget.total_cost_usd > 0
+    assert budget._reservations == {}

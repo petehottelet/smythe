@@ -12,7 +12,7 @@ from smythe.graph import ExecutionGraph
 from smythe.memory import PlannerMemory
 from smythe.planner import Architect, LLMArchitect, SimpleArchitect
 from smythe.router import WhiteRabbit
-from smythe.provider import AnthropicProvider, OpenAIProvider, Provider
+from smythe.provider import AnthropicProvider, GeminiProvider, OpenAIProvider, Provider
 from smythe.registry import Registry
 from smythe.synthesizer import Synthesizer
 from smythe.task import Task
@@ -43,6 +43,8 @@ def _auto_detect_provider(model: str) -> Provider:
         return AnthropicProvider()
     if lower.startswith(("gpt", "o1", "o3", "o4")):
         return OpenAIProvider()
+    if lower.startswith("gemini"):
+        return GeminiProvider()
     raise ValueError(
         f"Cannot auto-detect provider for model {model!r}. "
         "Pass an explicit provider= argument to Swarm()."
@@ -158,6 +160,7 @@ class Swarm:
             graph = await self.aplan(task)
         else:
             graph = task_or_graph
+            graph.validate()
 
         executor = AsyncExecutor(
             provider=self._provider, registry=self._registry, tracer=tracer,
@@ -168,6 +171,7 @@ class Swarm:
         output = await self._synthesizer.asynthesize(
             graph,
             provider=self._provider,
+            model=self.model,
             budget=budget,
             tracer=tracer,
         )
@@ -194,6 +198,7 @@ class Swarm:
             graph = self.plan(task)
         else:
             graph = task_or_graph
+            graph.validate()
 
         executor = Executor(
             provider=self._provider, registry=self._registry, tracer=tracer,
@@ -204,6 +209,7 @@ class Swarm:
         output = self._synthesizer.synthesize(
             graph,
             provider=self._provider,
+            model=self.model,
             budget=budget,
             tracer=tracer,
         )

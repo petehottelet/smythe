@@ -5,7 +5,13 @@ import os
 
 import pytest
 
-from smythe.provider import AnthropicProvider, CompletionResult, OpenAIProvider, Provider
+from smythe.provider import (
+    AnthropicProvider,
+    CompletionResult,
+    GeminiProvider,
+    OpenAIProvider,
+    Provider,
+)
 from smythe.swarm import Swarm, _auto_detect_provider
 
 
@@ -57,9 +63,14 @@ def test_auto_detect_o1():
     assert isinstance(p, OpenAIProvider)
 
 
+def test_auto_detect_gemini():
+    p = _auto_detect_provider("gemini-3-pro-image-preview")
+    assert isinstance(p, GeminiProvider)
+
+
 def test_auto_detect_unknown_raises():
     with pytest.raises(ValueError, match="Cannot auto-detect"):
-        _auto_detect_provider("gemini-3-pro")
+        _auto_detect_provider("llama-3-70b")
 
 
 def test_swarm_accepts_explicit_provider():
@@ -140,6 +151,94 @@ def test_anthropic_integration():
 def test_openai_integration():
     p = OpenAIProvider()
     result = asyncio.run(p.complete("You are a test.", "Say hello.", "gpt-4o-mini"))
+    assert isinstance(result, CompletionResult)
+    assert len(result.text) > 0
+    assert result.prompt_tokens > 0
+
+
+def test_gemini_provider_constructable():
+    p = GeminiProvider(api_key="test-key")
+    assert isinstance(p, Provider)
+
+
+def test_gemini_provider_missing_sdk():
+    """GeminiProvider raises an actionable ImportError when the SDK is missing."""
+    import unittest.mock as um
+
+    p = GeminiProvider(api_key="fake")
+    with um.patch.dict("sys.modules", {"google": None, "google.genai": None}):
+        p._client = None
+        with pytest.raises(ImportError, match="pip install smythe\\[gemini\\]"):
+            p._get_client()
+
+
+def test_gemini_provider_complete():
+    """GeminiProvider returns text and token fields from a mocked SDK."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    p = GeminiProvider(api_key="fake")
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.text = "gemini says hello"
+    mock_response.usage_metadata = MagicMock(
+        prompt_token_count=12,
+        candidates_token_count=7,
+    )
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+    p._client = mock_client
+
+    result = asyncio.run(p.complete("sys", "prompt", "gemini-3-pro"))
+    assert result.text == "gemini says hello"
+    assert result.prompt_tokens == 12
+    assert result.completion_tokens == 7
+    assert result.total_tokens == 19
+
+
+def test_gemini_provider_no_usage_metadata():
+    """GeminiProvider handles missing usage_metadata gracefully."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    p = GeminiProvider(api_key="fake")
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.text = "response"
+    mock_response.usage_metadata = None
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+    p._client = mock_client
+
+    result = asyncio.run(p.complete("sys", "prompt", "gemini-3-pro"))
+    assert result.text == "response"
+    assert result.prompt_tokens == 0
+    assert result.completion_tokens == 0
+
+
+def test_gemini_provider_empty_text():
+    """GeminiProvider handles None text in the response."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    p = GeminiProvider(api_key="fake")
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.text = None
+    mock_response.usage_metadata = MagicMock(
+        prompt_token_count=5,
+        candidates_token_count=0,
+    )
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+    p._client = mock_client
+
+    result = asyncio.run(p.complete("sys", "prompt", "gemini-3-pro"))
+    assert result.text == ""
+    assert result.prompt_tokens == 5
+
+
+@pytest.mark.skipif(
+    not os.environ.get("GOOGLE_API_KEY"),
+    reason="GOOGLE_API_KEY not set",
+)
+def test_gemini_integration():
+    p = GeminiProvider()
+    result = asyncio.run(p.complete("You are a test.", "Say hello.", "gemini-2.5-flash"))
     assert isinstance(result, CompletionResult)
     assert len(result.text) > 0
     assert result.prompt_tokens > 0
