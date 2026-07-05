@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Callable
 
 from smythe.budget import Sentinel
 from smythe.executor_base import ExecutorBase
@@ -39,8 +40,12 @@ class AsyncExecutor(ExecutorBase):
         budget: Sentinel | None = None,
         estimated_tokens_per_node: int = DEFAULT_ESTIMATED_TOKENS,
         max_concurrency: int | None = None,
+        on_node_update: Callable[[Node], None] | None = None,
     ) -> None:
-        super().__init__(provider=provider, registry=registry, tracer=tracer, budget=budget)
+        super().__init__(
+            provider=provider, registry=registry, tracer=tracer, budget=budget,
+            on_node_update=on_node_update,
+        )
         self._estimated_tokens_per_node = estimated_tokens_per_node
         if max_concurrency is not None and max_concurrency < 1:
             raise ValueError(f"max_concurrency must be >= 1, got {max_concurrency}")
@@ -121,6 +126,7 @@ class AsyncExecutor(ExecutorBase):
 
                 node.status = NodeStatus.COMPLETED
                 self._tracer.on_node_end(node)
+                self.notify_update(node)
                 return
             except Exception as exc:
                 last_exc = exc
@@ -134,7 +140,9 @@ class AsyncExecutor(ExecutorBase):
 
         if node.failure_policy == FailurePolicy.SKIP:
             node.status = NodeStatus.SKIPPED
+            self.notify_update(node)
             return
 
         node.status = NodeStatus.FAILED
+        self.notify_update(node)
         raise last_exc  # type: ignore[misc]

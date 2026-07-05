@@ -23,6 +23,14 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Added
 
+- **Durable, resumable execution** — `Swarm(checkpoint_store=...)` persists the full
+  execution state (graph, node results, agents, budget consumed) after every node.
+  `swarm.resume(execution_id)` picks up from the last completed node; finished nodes
+  are never re-executed and cost accounting continues against the original cap.
+  Ships with `FileCheckpointStore` (one JSON file per execution, atomic writes) and a
+  `CheckpointStore` ABC for custom backends. Format documented in
+  docs/checkpoint-format.md; demonstrated in examples/04_resume_after_crash.py.
+
 - **Per-node timeouts** — `Node.timeout_s` (also settable in YAML) caps the wall-clock
   time of a single execution attempt in both executors; timeouts are handled by the
   node's failure policy like any other error.

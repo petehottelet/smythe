@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, Callable
 
 from smythe.agent import Agent
 from smythe.budget import Sentinel
@@ -27,11 +27,22 @@ class ExecutorBase:
         registry: Registry,
         tracer: Tracer,
         budget: Sentinel | None = None,
+        on_node_update: Callable[[Node], None] | None = None,
     ) -> None:
         self._provider = provider
         self._registry = registry
         self._tracer = tracer
         self._budget = budget
+        self._on_node_update = on_node_update
+
+    def notify_update(self, node: Node) -> None:
+        """Invoke the node-update hook (used for checkpointing) if one is set.
+
+        Called whenever a node reaches a terminal status: COMPLETED,
+        SKIPPED, or FAILED.
+        """
+        if self._on_node_update is not None:
+            self._on_node_update(node)
 
     @staticmethod
     def build_system_prompt(agent: Agent | None) -> str:

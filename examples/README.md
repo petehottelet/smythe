@@ -12,3 +12,4 @@ python examples/01_quickstart_yaml.py
 | [01_quickstart_yaml.py](01_quickstart_yaml.py) | Load a declarative YAML DAG ([01_pipeline.yaml](01_pipeline.yaml)) with failure policies and per-node timeouts, execute it in parallel. |
 | [02_dynamic_planning.py](02_dynamic_planning.py) | The `LLMArchitect` designs the execution graph from the task itself. Inspect the plan before executing it. |
 | [03_parallel_budget.py](03_parallel_budget.py) | Eight-node broadcast under a USD budget cap with `max_concurrency=3`, plus the per-node cost breakdown. |
+| [04_resume_after_crash.py](04_resume_after_crash.py) | Durable execution: the provider dies mid-run, the checkpoint survives, and `swarm.resume()` finishes the job without re-running completed nodes. |
