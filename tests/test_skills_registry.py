@@ -98,20 +98,23 @@ def test_registry_uses_cache_until_ttl_expired():
     assert provider.call_count == 1
 
 
-def test_registry_cache_expires_after_ttl():
+def test_registry_cache_expires_after_ttl(monkeypatch):
     agent = Agent(profile=AgentProfile(name="a1", capabilities=[]))
     provider = FakeSkillProvider({agent.id: [SkillRef(name="cap")]})
 
+    fake_now = [100.0]
+    monkeypatch.setattr(time, "monotonic", lambda: fake_now[0])
+
     reg = Registry(
         skill_provider=provider,
-        capability_cache_ttl_seconds=0.05,
+        capability_cache_ttl_seconds=300.0,
     )
     reg.register(agent)
 
     reg.find_by_capabilities(["cap"])
     assert provider.call_count == 1
 
-    time.sleep(0.06)
+    fake_now[0] += 301.0
     reg.find_by_capabilities(["cap"])
     assert provider.call_count == 2
 

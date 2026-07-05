@@ -23,6 +23,10 @@ class AsyncExecutor(ExecutorBase):
     every ready node so concurrent nodes cannot collectively overshoot
     the budget.  Reservations are reconciled with actual cost on
     completion, or released on failure.
+
+    Concurrency safety: ``max_concurrency`` caps in-flight provider
+    calls across a wave, so a wide broadcast doesn't fire every call
+    at once and trip provider rate limits.  None means unlimited.
     """
 
     DEFAULT_ESTIMATED_TOKENS = 2000
@@ -34,12 +38,29 @@ class AsyncExecutor(ExecutorBase):
         tracer: Tracer,
         budget: Sentinel | None = None,
         estimated_tokens_per_node: int = DEFAULT_ESTIMATED_TOKENS,
+        max_concurrency: int | None = None,
     ) -> None:
         super().__init__(provider=provider, registry=registry, tracer=tracer, budget=budget)
         self._estimated_tokens_per_node = estimated_tokens_per_node
+        if max_concurrency is not None and max_concurrency < 1:
+            raise ValueError(f"max_concurrency must be >= 1, got {max_concurrency}")
+        self._max_concurrency = max_concurrency
 
     async def run(self, graph: ExecutionGraph) -> ExecutionGraph:
         """Execute every node, fanning out independent nodes concurrently."""
+        semaphore = (
+            asyncio.Semaphore(self._max_concurrency)
+            if self._max_concurrency is not None
+            else None
+        )
+
+        async def bounded(node: Node) -> None:
+            if semaphore is None:
+                await self._execute_node(node, graph)
+            else:
+                async with semaphore:
+                    await self._execute_node(node, graph)
+
         first_error: Exception | None = None
         while True:
             pending = [n for n in graph.nodes if n.status == NodeStatus.PENDING]
@@ -72,7 +93,7 @@ class AsyncExecutor(ExecutorBase):
                     raise
 
             try:
-                await asyncio.gather(*(self._execute_node(n, graph) for n in ready))
+                await asyncio.gather(*(bounded(n) for n in ready))
             except Exception as exc:
                 if first_error is None:
                     first_error = exc
@@ -91,13 +112,7 @@ class AsyncExecutor(ExecutorBase):
             self._tracer.on_node_start(node)
 
             try:
-                agent = self._registry.get(node.agent_id) if node.agent_id else None
-                dep_results = self.gather_dep_results(node, graph)
-                system = self.build_system_prompt(agent)
-                prompt = self.build_user_prompt(node, dep_results)
-                result = await self._provider.complete(
-                    system, prompt, model=node.metadata.get("model", "")
-                )
+                result = await self.acall_node(node, graph)
                 node.result = result.text
 
                 if self._budget:

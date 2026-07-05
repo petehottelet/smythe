@@ -47,6 +47,9 @@ class Node:
         failure_policy: How to handle failure (HALT, SKIP, or RETRY).
         max_retries: Number of retry attempts when failure_policy is RETRY.
         required_capabilities: Capability tags for agent assignment matching.
+        timeout_s: Wall-clock limit for a single execution attempt, in
+            seconds.  None (default) means no timeout.  A timed-out
+            attempt fails and is handled by the node's failure policy.
     """
 
     label: str
@@ -59,6 +62,7 @@ class Node:
     failure_policy: FailurePolicy = FailurePolicy.HALT
     max_retries: int = 1
     required_capabilities: list[str] = field(default_factory=list)
+    timeout_s: float | None = None
 
 
 @dataclass

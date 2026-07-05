@@ -77,6 +77,19 @@ def build_graph_from_dict(data: dict) -> tuple[ExecutionGraph, Registry]:
 
         max_retries = entry.get("max_retries", 1)
 
+        timeout_s = entry.get("timeout_s")
+        if timeout_s is not None:
+            if isinstance(timeout_s, bool) or not isinstance(timeout_s, (int, float)):
+                raise ValueError(
+                    f"'timeout_s' on node {node_id!r} must be a number, "
+                    f"got {type(timeout_s).__name__}"
+                )
+            if timeout_s <= 0:
+                raise ValueError(
+                    f"'timeout_s' on node {node_id!r} must be positive, got {timeout_s}"
+                )
+            timeout_s = float(timeout_s)
+
         node = Node(
             id=node_id,
             label=label,
@@ -85,6 +98,7 @@ def build_graph_from_dict(data: dict) -> tuple[ExecutionGraph, Registry]:
             failure_policy=failure_policy,
             max_retries=max_retries,
             required_capabilities=required_capabilities,
+            timeout_s=timeout_s,
         )
 
         agent_data = entry.get("agent")

@@ -1,0 +1,29 @@
+# A declarative fork-join pipeline: two parallel research tracks, one summary.
+topology: fork_join
+
+nodes:
+  - id: research
+    label: "Research the history of the transistor"
+    agent:
+      name: Researcher
+      persona: "You are a thorough technology historian."
+      capabilities: [research]
+    failure_policy: retry
+    max_retries: 2
+    timeout_s: 120
+
+  - id: key-figures
+    label: "List the key people behind the transistor and their contributions"
+    agent:
+      name: Biographer
+      persona: "You profile scientists and engineers concisely."
+      capabilities: [research]
+    timeout_s: 120
+
+  - id: summarize
+    label: "Combine the research and biographies into a 200-word summary"
+    depends_on: [research, key-figures]
+    agent:
+      name: Editor
+      persona: "You write tight, factual summaries."
+      capabilities: [summarize]

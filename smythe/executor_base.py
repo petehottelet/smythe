@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from smythe.agent import Agent
 from smythe.budget import Sentinel
 from smythe.graph import ExecutionGraph, Node, NodeStatus
-from smythe.provider import Provider
+from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
 from smythe.tracer import Tracer
 
@@ -58,6 +59,22 @@ class ExecutorBase:
             if dep is None or dep.status not in (NodeStatus.COMPLETED, NodeStatus.SKIPPED):
                 return False
         return True
+
+    async def acall_node(self, node: Node, graph: ExecutionGraph) -> CompletionResult:
+        """Build the node's prompts and call the provider, enforcing timeout_s."""
+        agent = self._registry.get(node.agent_id) if node.agent_id else None
+        dep_results = self.gather_dep_results(node, graph)
+        system = self.build_system_prompt(agent)
+        prompt = self.build_user_prompt(node, dep_results)
+        coro = self._provider.complete(system, prompt, model=node.metadata.get("model", ""))
+        if node.timeout_s is None:
+            return await coro
+        try:
+            return await asyncio.wait_for(coro, timeout=node.timeout_s)
+        except TimeoutError:
+            raise TimeoutError(
+                f"Node {node.id!r} timed out after {node.timeout_s}s"
+            ) from None
 
     def gather_dep_results(self, node: Node, graph: ExecutionGraph) -> dict[str, Any]:
         return {
