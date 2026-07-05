@@ -75,6 +75,50 @@ class Provider(ABC):
         )
 
 
+class OfflineProvider(Provider):
+    """Deterministic provider that runs entirely offline.
+
+    No API keys, no network, stable output — evaluate the full
+    framework (or run demos and CI) without spending a token:
+
+    - Planning calls (recognized by the planning system prompt) return
+      ``plan`` as JSON, so the full Architect -> executor -> synthesizer
+      pipeline runs offline.
+    - Other calls consume ``responses`` in order (the last one repeats),
+      or echo the prompt's first line when no script is given.
+    """
+
+    def __init__(
+        self,
+        *,
+        plan: dict | None = None,
+        responses: list[str] | None = None,
+        echo_prefix: str = "offline: ",
+    ) -> None:
+        self._plan = plan
+        self._responses = list(responses) if responses else []
+        self._echo_prefix = echo_prefix
+        self._cursor = 0
+        self.calls: list[str] = []  # first line of every prompt, for assertions
+
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        from smythe.prompts import PLANNING_SYSTEM_PROMPT
+
+        first_line = prompt.split("\n")[0]
+        self.calls.append(first_line)
+
+        if self._plan is not None and system == PLANNING_SYSTEM_PROMPT:
+            return CompletionResult(
+                text=json.dumps(self._plan), prompt_tokens=250, completion_tokens=400,
+            )
+        if self._responses:
+            text = self._responses[min(self._cursor, len(self._responses) - 1)]
+            self._cursor += 1
+        else:
+            text = f"{self._echo_prefix}{first_line[:60]}"
+        return CompletionResult(text=text, prompt_tokens=40, completion_tokens=60)
+
+
 class AnthropicProvider(Provider):
     """Provider backed by the Anthropic Messages API."""
 
