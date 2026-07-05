@@ -88,3 +88,10 @@ class Sentinel:
     def breakdown(self) -> dict[str, float]:
         """Per-node cost map in USD."""
         return dict(self._node_costs)
+
+    def restore(self, node_costs: dict[str, float]) -> None:
+        """Seed per-node costs from a checkpoint so a resumed execution
+        keeps counting against the same budget."""
+        for node_id, cost in node_costs.items():
+            self._node_costs[node_id] = cost
+        self._spent = sum(self._node_costs.values()) + sum(self._reservations.values())

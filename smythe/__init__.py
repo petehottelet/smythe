@@ -1,6 +1,7 @@
 """Smythe: task-based personalized agent swarms with dynamic execution topology."""
 
 from smythe.budget import Sentinel, SentinelAlert
+from smythe.checkpoint import CheckpointStore, FileCheckpointStore
 from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
 from smythe.graph import FailurePolicy
 from smythe.loader import load_graph
@@ -24,11 +25,13 @@ __all__ = [
     "ArchitectError",
     "CapabilityHydrationMode",
     "CapabilityMapper",
+    "CheckpointStore",
     "CompletionResult",
     "ConstrainedArchitect",
     "DefaultCapabilityMapper",
     "DeterministicArchitect",
     "FailurePolicy",
+    "FileCheckpointStore",
     "GeminiProvider",
     "LLMArchitect",
     "OpenAIProvider",

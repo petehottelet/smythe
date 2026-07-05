@@ -11,10 +11,11 @@ import json
 import os
 import sys
 
-# ExecutionGraph.__str__ renders with box-drawing characters; legacy
-# Windows consoles default to cp1252 and crash on them.
-if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
-    sys.stdout.reconfigure(encoding="utf-8")
+# ExecutionGraph.__str__ and the tracer render with characters that
+# legacy cp1252 Windows consoles can't encode.
+for _stream in (sys.stdout, sys.stderr):
+    if _stream.encoding and _stream.encoding.lower() not in ("utf-8", "utf8"):
+        _stream.reconfigure(encoding="utf-8")
 
 from smythe.prompts import PLANNING_SYSTEM_PROMPT
 from smythe.provider import (

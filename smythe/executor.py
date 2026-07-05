@@ -52,6 +52,9 @@ class Executor(ExecutorBase):
 
     def _execute_node(self, node: Node, graph: ExecutionGraph) -> None:
         """Run a single node through the provider, respecting its failure policy."""
+        if node.status in (NodeStatus.COMPLETED, NodeStatus.SKIPPED):
+            return  # already done — happens when resuming from a checkpoint
+
         if not self.deps_satisfied(node, graph):
             if node.failure_policy == FailurePolicy.SKIP:
                 node.status = NodeStatus.SKIPPED
@@ -80,6 +83,7 @@ class Executor(ExecutorBase):
 
                 node.status = NodeStatus.COMPLETED
                 self._tracer.on_node_end(node)
+                self.notify_update(node)
                 return
             except Exception as exc:
                 last_exc = exc
@@ -91,6 +95,8 @@ class Executor(ExecutorBase):
 
         if node.failure_policy == FailurePolicy.SKIP:
             node.status = NodeStatus.SKIPPED
+            self.notify_update(node)
             return
 
+        self.notify_update(node)
         raise last_exc  # type: ignore[misc]

@@ -320,6 +320,24 @@ result = swarm.execute(task)
 print(result.total_cost_usd)  # actual cost
 ```
 
+### Durable, resumable execution
+
+Give the Swarm a checkpoint store and it persists the full execution state — graph, node results, agents, budget consumed — after every node. If the process dies at node 47 of a long run, resume from the last completed node instead of starting over:
+
+```python
+from smythe import FileCheckpointStore, Swarm
+
+swarm = Swarm(checkpoint_store=FileCheckpointStore(), parallel=True)
+result = swarm.execute(task)          # checkpoints as it goes
+print(result.execution_id)
+
+# later — even in a new process:
+swarm = Swarm(checkpoint_store=FileCheckpointStore())
+result = swarm.resume(execution_id)   # completed nodes are not re-executed
+```
+
+Checkpoints are plain JSON (one file per execution, atomic writes) so you can inspect or repair them by hand. After a crash, `FileCheckpointStore().list_ids()` shows what's resumable. Format and resume semantics: [docs/checkpoint-format.md](docs/checkpoint-format.md).
+
 ### Concurrency limits
 
 Parallel execution caps in-flight provider calls at `max_concurrency` (default 8), so a wide broadcast doesn't fire every call at once and trip rate limits:
@@ -402,7 +420,7 @@ python examples/01_quickstart_yaml.py
 
 ## Current Status
 
-The core framework is implemented and tested. **252 tests passing.**
+The core framework is implemented and tested. **267 tests passing.**
 
 **What's shipped:**
 - Three-tier Architect hierarchy (Deterministic, Constrained, Autonomous LLM)
@@ -417,12 +435,12 @@ The core framework is implemented and tested. **252 tests passing.**
 - Context-preserving Architect retries
 - Persistent execution memory (JSONL) with recall into planning prompts
 - Per-node timeouts and bounded parallel concurrency
+- Durable execution — per-node checkpointing and `swarm.resume()` with a pluggable store
 - Provider abstraction (Anthropic, OpenAI, Gemini) with defensive response parsing
 - Structured observability traces
 - Runnable examples that work offline
 
 **What's next** (in order):
-- Durable, resumable execution — checkpoint after each node, `swarm.resume()`
 - MCP tool support — agents consume MCP servers as capability sources
 - Recursive subgraph decomposition
 - Published benchmark vs LangGraph/CrewAI, including memory-on vs memory-off numbers
