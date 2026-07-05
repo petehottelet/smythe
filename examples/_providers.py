@@ -11,12 +11,6 @@ import json
 import os
 import sys
 
-# ExecutionGraph.__str__ and the tracer render with characters that
-# legacy cp1252 Windows consoles can't encode.
-for _stream in (sys.stdout, sys.stderr):
-    if _stream.encoding and _stream.encoding.lower() not in ("utf-8", "utf8"):
-        _stream.reconfigure(encoding="utf-8")
-
 from smythe.prompts import PLANNING_SYSTEM_PROMPT
 from smythe.provider import (
     AnthropicProvider,
@@ -25,6 +19,12 @@ from smythe.provider import (
     OpenAIProvider,
     Provider,
 )
+
+# ExecutionGraph.__str__ and the tracer render with characters that
+# legacy cp1252 Windows consoles can't encode.
+for _stream in (sys.stdout, sys.stderr):
+    if _stream.encoding and _stream.encoding.lower() not in ("utf-8", "utf8"):
+        _stream.reconfigure(encoding="utf-8")
 
 DEMO_PLAN = json.dumps({
     "topology": ["fork_join"],

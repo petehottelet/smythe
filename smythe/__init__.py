@@ -19,12 +19,14 @@ from smythe.skills import (
 from smythe.swarm import Swarm, SwarmResult
 from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.task import Task
+from smythe.tools import ChatMessage, ToolCall, ToolResult, ToolSpec
 
 __all__ = [
     "AnthropicProvider",
     "ArchitectError",
     "CapabilityHydrationMode",
     "CapabilityMapper",
+    "ChatMessage",
     "CheckpointStore",
     "CompletionResult",
     "ConstrainedArchitect",
@@ -48,6 +50,9 @@ __all__ = [
     "Synthesizer",
     "SynthesisStrategy",
     "Task",
+    "ToolCall",
+    "ToolResult",
+    "ToolSpec",
     "WhiteRabbit",
     "load_graph",
 ]
