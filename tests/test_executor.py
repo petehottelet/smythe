@@ -126,3 +126,35 @@ def test_walk_invalid_dependency_raises_valueerror():
 
     with pytest.raises(ValueError, match="depends on unknown node 'ghost'"):
         executor.run(graph)
+
+
+class HangingProvider(Provider):
+    """Provider that sleeps far longer than any test timeout."""
+
+    async def complete(self, system, prompt, model):
+        import asyncio
+        await asyncio.sleep(5.0)
+        return CompletionResult(text="too late", prompt_tokens=1, completion_tokens=1)
+
+
+def test_node_timeout_fails_node_serially():
+    executor, _ = _make_executor(HangingProvider())
+
+    node = Node(label="slow", id="slow", timeout_s=0.05)
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
+
+    with pytest.raises(TimeoutError, match="'slow' timed out after 0.05s"):
+        executor.run(graph)
+
+    assert node.status == NodeStatus.FAILED
+
+
+def test_node_without_timeout_completes():
+    executor, _ = _make_executor(SuccessProvider())
+
+    node = Node(label="fine", id="fine")
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
+    executor.run(graph)
+
+    assert node.status == NodeStatus.COMPLETED
+    assert node.timeout_s is None

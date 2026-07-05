@@ -70,10 +70,12 @@ class Swarm:
         planning_model: str | None = None,
         memory: PlannerMemory | None = None,
         router: WhiteRabbit | None = None,
+        max_concurrency: int | None = 8,
     ) -> None:
         self.model = model
         self.max_budget_usd = max_budget_usd
         self.parallel = parallel
+        self.max_concurrency = max_concurrency
         self._provider = provider or _auto_detect_provider(model)
         self._memory = memory
         self._registry = registry or Registry()
@@ -164,7 +166,7 @@ class Swarm:
 
         executor = AsyncExecutor(
             provider=self._provider, registry=self._registry, tracer=tracer,
-            budget=budget,
+            budget=budget, max_concurrency=self.max_concurrency,
         )
         graph = await executor.run(graph)
 

@@ -256,3 +256,39 @@ nodes:
 """
     with pytest.raises(ValueError, match="'required_capabilities' on node 'step-1' must be a list"):
         load_graph_from_string(yaml_str)
+
+
+TIMEOUT_YAML = """\
+topology: serial
+
+nodes:
+  - id: capped
+    label: "Step with a timeout"
+    timeout_s: 30
+  - id: uncapped
+    label: "Step without one"
+    depends_on: [capped]
+"""
+
+
+def test_timeout_s_parsed_as_float():
+    graph, _ = load_graph_from_string(TIMEOUT_YAML)
+    capped = next(n for n in graph.nodes if n.id == "capped")
+    uncapped = next(n for n in graph.nodes if n.id == "uncapped")
+    assert capped.timeout_s == 30.0
+    assert isinstance(capped.timeout_s, float)
+    assert uncapped.timeout_s is None
+
+
+@pytest.mark.parametrize("bad_value", ['"thirty"', "true", "-5", "0"])
+def test_timeout_s_rejects_invalid_values(bad_value):
+    yaml_str = f"""\
+topology: serial
+
+nodes:
+  - id: bad
+    label: "Bad timeout"
+    timeout_s: {bad_value}
+"""
+    with pytest.raises(ValueError, match="timeout_s"):
+        load_graph_from_string(yaml_str)

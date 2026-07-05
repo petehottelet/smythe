@@ -267,3 +267,93 @@ async def test_budget_accounting_after_successful_wave():
     assert all(n.status == NodeStatus.COMPLETED for n in graph.nodes)
     assert budget.total_cost_usd > 0
     assert budget._reservations == {}
+
+
+class ConcurrencyTrackingProvider(Provider):
+    """Provider that records the peak number of in-flight calls."""
+
+    def __init__(self, delay: float = 0.02) -> None:
+        self._delay = delay
+        self._in_flight = 0
+        self.peak = 0
+
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        self._in_flight += 1
+        self.peak = max(self.peak, self._in_flight)
+        await asyncio.sleep(self._delay)
+        self._in_flight -= 1
+        return CompletionResult(text="ok", prompt_tokens=1, completion_tokens=1)
+
+
+@pytest.mark.asyncio
+async def test_max_concurrency_caps_in_flight_calls():
+    provider = ConcurrencyTrackingProvider()
+    tracer = Tracer()
+    executor = AsyncExecutor(
+        provider=provider, registry=Registry(), tracer=tracer, max_concurrency=2,
+    )
+
+    nodes = [Node(label=f"N{i}", id=f"n{i}") for i in range(6)]
+    graph = ExecutionGraph(topology=[Topology.FORK_JOIN], nodes=nodes)
+
+    await executor.run(graph)
+
+    assert all(n.status == NodeStatus.COMPLETED for n in graph.nodes)
+    assert provider.peak <= 2
+
+
+@pytest.mark.asyncio
+async def test_unbounded_concurrency_when_cap_is_none():
+    provider = ConcurrencyTrackingProvider()
+    tracer = Tracer()
+    executor = AsyncExecutor(
+        provider=provider, registry=Registry(), tracer=tracer, max_concurrency=None,
+    )
+
+    nodes = [Node(label=f"N{i}", id=f"n{i}") for i in range(4)]
+    graph = ExecutionGraph(topology=[Topology.FORK_JOIN], nodes=nodes)
+
+    await executor.run(graph)
+
+    assert provider.peak == 4
+
+
+def test_max_concurrency_must_be_positive():
+    with pytest.raises(ValueError, match="max_concurrency"):
+        AsyncExecutor(
+            provider=SlowMockProvider(),
+            registry=Registry(),
+            tracer=Tracer(),
+            max_concurrency=0,
+        )
+
+
+@pytest.mark.asyncio
+async def test_node_timeout_fails_node():
+    provider = SlowMockProvider(delay=5.0)
+    executor, _ = _make_executor(provider)
+
+    node = Node(label="slow", id="slow", timeout_s=0.05)
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
+
+    with pytest.raises(TimeoutError, match="'slow' timed out after 0.05s"):
+        await executor.run(graph)
+
+    assert node.status == NodeStatus.FAILED
+
+
+@pytest.mark.asyncio
+async def test_node_timeout_respects_skip_policy():
+    provider = SlowMockProvider(delay=0.2)
+    executor, _ = _make_executor(provider)
+
+    slow = Node(
+        label="slow", id="slow", timeout_s=0.05, failure_policy=FailurePolicy.SKIP,
+    )
+    downstream = Node(label="after", id="after", depends_on=["slow"])
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[slow, downstream])
+
+    await executor.run(graph)
+
+    assert slow.status == NodeStatus.SKIPPED
+    assert downstream.status == NodeStatus.COMPLETED

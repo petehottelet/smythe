@@ -2,7 +2,7 @@
 
 **An open-source framework for task-based agent swarms with dynamic parallelization, routing, and execution topology.**
 
-Most agent frameworks make you decide upfront how your agents will work together. Smythe doesn't. It treats the execution graph itself as a generated artifact — letting an Architect decide whether a task should run serially, in parallel, or adversarially, and when to recursively decompose work into nested subgraphs, based on the nature of the work and what's been learned from past runs.
+Most agent frameworks make you decide upfront how your agents will work together. Smythe doesn't. It treats the execution graph itself as a generated artifact — letting an Architect decide whether a task should run serially, in parallel, or adversarially, based on the nature of the work and what's been learned from past runs.
 
 ---
 
@@ -21,16 +21,16 @@ Neither camp asks the more interesting question: *what if the framework could de
 ## What Smythe Does Differently
 
 **1. Execution graphs are generated, not hardcoded.**
-Each execution plan is represented as a Directed Acyclic Graph (DAG). An Architect — informed by the task's structure and historical execution data — decides the topology: serial, fork-join, broadcast-reduce, or adversarial. For decomposition, the Architect can recursively spawn nested subgraphs while keeping each executable graph acyclic. You can override it, but you don't have to specify it.
+Each execution plan is represented as a Directed Acyclic Graph (DAG). An Architect — informed by the task's structure and historical execution data — decides the topology: serial, fork-join, broadcast-reduce, or adversarial. You can override it, but you don't have to specify it. (Recursive decomposition into nested subgraphs is on the roadmap — see "What's next.")
 
 **2. Agents have persistent identities.**
-Each agent carries a capability profile, a persona, episodic memory, and a performance history across task types. Over time, the framework learns which agents are best suited to which work and routes accordingly. You're building a team, not a worker pool.
+Each agent carries a capability profile and a persona, and the registry matches agents to work by capability. You're building a team, not a worker pool. (Per-agent performance history that influences routing is on the roadmap.)
 
 **3. Synthesis is a first-class tier.**
 Merging parallel outputs without losing coherence is hard and almost always an afterthought. Smythe treats synthesis as a dedicated architectural layer with explicit strategies per output type — not a final prompt that hopes for the best.
 
-**4. The Architect learns from cold starts.**
-The system ships with robust heuristic defaults (e.g., "Research" tasks default to fork-join). As tasks complete, execution history feeds back into the Architect. A task that was over-parallelized, or where synthesis failed, teaches the Architect how to optimize the next topology.
+**4. The Architect remembers past runs.**
+As tasks complete, `PlannerMemory` records each outcome (topology, cost, duration, success), and the `LLMArchitect` surfaces the most relevant past outcomes in its planning prompt for similar tasks. What ships today is that feedback wiring; quantified evidence that it improves plans — and outcome-weighted agent routing built on it — is roadmap work we intend to publish numbers for, not hand-wave.
 
 ---
 
@@ -164,11 +164,11 @@ result = swarm.execute(plan)
 
 ## Principles
 
-- **Deterministic guardrails.** Dynamic doesn't mean "out of control." Every execution is constrained by circuit breakers: max depth, token budgets, and cost-aware scheduling.
+- **Deterministic guardrails.** Dynamic doesn't mean "out of control." Every execution is constrained by circuit breakers: USD budget caps, per-node timeouts, bounded concurrency, and node failure policies.
 - **Composable over monolithic.** Use just the DAG engine, just the agent registry, or the full stack.
 - **Provider-agnostic.** Abstract over any LLM. Bring your own keys.
 - **Observable by default.** Every node execution emits structured traces. The feedback loop is the product.
-- **Human oversight is built in.** You can inspect what the Architect decided and why before or during execution, and add approval gates for sensitive workflows.
+- **Human oversight by design.** `swarm.plan(task)` returns the graph before anything runs — inspect what the Architect decided, then execute (or don't). Approval gates that pause mid-execution are on the roadmap.
 
 ---
 
@@ -225,11 +225,14 @@ nodes:
     label: "Call external service"
     failure_policy: retry
     max_retries: 3
+    timeout_s: 60
   - id: optional-enrichment
     label: "Nice-to-have step"
     failure_policy: skip
     depends_on: [flaky-api]
 ```
+
+`timeout_s` caps the wall-clock time of a single execution attempt; a timed-out attempt fails and is handled by the node's failure policy like any other error.
 
 ### Synthesis strategies
 
@@ -317,6 +320,15 @@ result = swarm.execute(task)
 print(result.total_cost_usd)  # actual cost
 ```
 
+### Concurrency limits
+
+Parallel execution caps in-flight provider calls at `max_concurrency` (default 8), so a wide broadcast doesn't fire every call at once and trip rate limits:
+
+```python
+swarm = Swarm(parallel=True, max_concurrency=3)   # at most 3 calls in flight
+swarm = Swarm(parallel=True, max_concurrency=None)  # unlimited
+```
+
 ### YAML-defined DAGs
 
 Define execution graphs declaratively. Load and execute without writing Python:
@@ -378,9 +390,19 @@ Requires Python 3.11+. Set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API
 
 ---
 
+## Examples
+
+The [examples/](examples/) directory has three runnable scripts — a YAML pipeline quickstart, dynamic LLM planning, and a budget-capped parallel run. Each works offline with a built-in demo provider, so you can see the machinery before spending a token:
+
+```bash
+python examples/01_quickstart_yaml.py
+```
+
+---
+
 ## Current Status
 
-The core framework is implemented and tested. **240 tests passing.**
+The core framework is implemented and tested. **252 tests passing.**
 
 **What's shipped:**
 - Three-tier Architect hierarchy (Deterministic, Constrained, Autonomous LLM)
@@ -393,15 +415,19 @@ The core framework is implemented and tested. **240 tests passing.**
 - Budget enforcement with reservation protocol for parallel safety
 - YAML-defined DAGs with failure policy and capabilities support
 - Context-preserving Architect retries
-- Persistent execution memory (JSONL) for learning Architect
+- Persistent execution memory (JSONL) with recall into planning prompts
+- Per-node timeouts and bounded parallel concurrency
 - Provider abstraction (Anthropic, OpenAI, Gemini) with defensive response parsing
 - Structured observability traces
+- Runnable examples that work offline
 
-**What's next:**
+**What's next** (in order):
+- Durable, resumable execution — checkpoint after each node, `swarm.resume()`
+- MCP tool support — agents consume MCP servers as capability sources
 - Recursive subgraph decomposition
+- Published benchmark vs LangGraph/CrewAI, including memory-on vs memory-off numbers
 - Approval gates for human-in-the-loop workflows
-- Performance history-based agent routing
-- Additional providers (local models)
+- Trace-based DAG inspector
 
 ---
 

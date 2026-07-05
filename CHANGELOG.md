@@ -21,6 +21,28 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
+### Added
+
+- **Per-node timeouts** — `Node.timeout_s` (also settable in YAML) caps the wall-clock
+  time of a single execution attempt in both executors; timeouts are handled by the
+  node's failure policy like any other error.
+- **Concurrency cap** — `AsyncExecutor(max_concurrency=...)` bounds in-flight provider
+  calls; exposed as `Swarm(max_concurrency=...)` with a default of 8.
+- **`examples/` directory** — three runnable scripts (YAML quickstart, dynamic LLM
+  planning, budget-capped parallel run) that work offline via a built-in demo provider.
+
+### Changed
+
+- README aligned with shipped behavior: recursive subgraph decomposition, approval
+  gates, and performance-history routing are now explicitly labeled roadmap items.
+- Executor and AsyncExecutor share a single provider-call path
+  (`ExecutorBase.acall_node`), removing duplicated prompt-building logic.
+
+### Fixed
+
+- Deflaked `test_registry_cache_expires_after_ttl` (deterministic clock instead of
+  `time.sleep`).
+
 Future work tracked in `00_project_files/TODO.md` (local only).
 
 ---

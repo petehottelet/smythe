@@ -71,13 +71,7 @@ class Executor(ExecutorBase):
             self._tracer.on_node_start(node)
 
             try:
-                agent = self._registry.get(node.agent_id) if node.agent_id else None
-                dep_results = self.gather_dep_results(node, graph)
-                system = self.build_system_prompt(agent)
-                prompt = self.build_user_prompt(node, dep_results)
-                result = asyncio.run(
-                    self._provider.complete(system, prompt, model=node.metadata.get("model", ""))
-                )
+                result = asyncio.run(self.acall_node(node, graph))
                 node.result = result.text
 
                 if self._budget:
