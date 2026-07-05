@@ -234,11 +234,22 @@ class AnthropicProvider(Provider):
 
 
 class OpenAIProvider(Provider):
-    """Provider backed by the OpenAI Chat Completions API."""
+    """Provider backed by the OpenAI Chat Completions API.
 
-    def __init__(self, *, api_key: str | None = None, max_tokens: int = 4096) -> None:
+    Pass ``base_url`` to target any OpenAI-compatible endpoint —
+    Ollama (http://localhost:11434/v1), LM Studio, vLLM, etc.
+    """
+
+    def __init__(
+        self,
+        *,
+        api_key: str | None = None,
+        max_tokens: int = 4096,
+        base_url: str | None = None,
+    ) -> None:
         self._api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
         self._max_tokens = max_tokens
+        self._base_url = base_url or os.environ.get("OPENAI_BASE_URL") or None
         self._client = None
 
     def _get_client(self):
@@ -249,7 +260,10 @@ class OpenAIProvider(Provider):
                 raise ImportError(
                     "Install the openai extra: pip install smythe[openai]"
                 ) from exc
-            self._client = openai.AsyncOpenAI(api_key=self._api_key)
+            kwargs = {"api_key": self._api_key}
+            if self._base_url:
+                kwargs["base_url"] = self._base_url
+            self._client = openai.AsyncOpenAI(**kwargs)
         return self._client
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
