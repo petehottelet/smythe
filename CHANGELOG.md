@@ -23,6 +23,19 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Added
 
+- **Provider tool contract** — neutral tool-calling types (`ToolSpec`, `ToolCall`,
+  `ToolResult`, `ChatMessage`) and `Provider.chat()`, mapped to native tool use on
+  Anthropic, OpenAI, and Gemini. First milestone of MCP tool support
+  (plans/04-mcp-tool-support.md).
+- **Graph export** — `ExecutionGraph.to_mermaid()` (with node-status styling),
+  `to_dot()`, and `to_json()` (with per-node cost).
+- **`OfflineProvider`** — deterministic, no-network provider; every example runs
+  offline and CI smoke-tests them with API keys stripped.
+- **OpenAI-compatible `base_url`** on `OpenAIProvider` (env: `OPENAI_BASE_URL`) for
+  Ollama, LM Studio, vLLM, and other compatible endpoints.
+- **Release workflow** — tag-triggered PyPI publishing via trusted publishing, plus
+  README badges and a public [ROADMAP.md](ROADMAP.md).
+
 - **Durable, resumable execution** — `Swarm(checkpoint_store=...)` persists the full
   execution state (graph, node results, agents, budget consumed) after every node.
   `swarm.resume(execution_id)` picks up from the last completed node; finished nodes

@@ -1,5 +1,9 @@
 # smythe
 
+[![CI](https://github.com/petehottelet/smythe/actions/workflows/ci.yml/badge.svg)](https://github.com/petehottelet/smythe/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 **An open-source framework for task-based agent swarms with dynamic parallelization, routing, and execution topology.**
 
 Most agent frameworks make you decide upfront how your agents will work together. Smythe doesn't. It treats the execution graph itself as a generated artifact — letting an Architect decide whether a task should run serially, in parallel, or adversarially, based on the nature of the work and what's been learned from past runs.
@@ -440,12 +444,7 @@ The core framework is implemented and tested. **267 tests passing.**
 - Structured observability traces
 - Runnable examples that work offline
 
-**What's next** (in order):
-- MCP tool support — agents consume MCP servers as capability sources
-- Recursive subgraph decomposition
-- Published benchmark vs LangGraph/CrewAI, including memory-on vs memory-off numbers
-- Approval gates for human-in-the-loop workflows
-- Trace-based DAG inspector
+**What's next:** see [ROADMAP.md](ROADMAP.md) — currently MCP tool support, then recursive decomposition, then published benchmarks.
 
 ---
 

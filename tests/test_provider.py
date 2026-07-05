@@ -486,3 +486,20 @@ def test_gemini_tool_results_matched_by_name():
     fr = contents[2]["parts"][0]["function_response"]
     assert fr["name"] == "wx__get_weather"     # id resolved back to wire name
     assert fr["response"] == {"output": "20C"}
+
+
+def test_openai_provider_accepts_base_url():
+    p = OpenAIProvider(api_key="k", base_url="http://localhost:11434/v1")
+    assert p._base_url == "http://localhost:11434/v1"
+
+
+def test_openai_provider_base_url_from_env(monkeypatch):
+    monkeypatch.setenv("OPENAI_BASE_URL", "http://localhost:1234/v1")
+    p = OpenAIProvider(api_key="k")
+    assert p._base_url == "http://localhost:1234/v1"
+
+
+def test_openai_provider_no_base_url_by_default(monkeypatch):
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    p = OpenAIProvider(api_key="k")
+    assert p._base_url is None
