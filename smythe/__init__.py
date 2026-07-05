@@ -7,7 +7,14 @@ from smythe.graph import FailurePolicy
 from smythe.loader import load_graph
 from smythe.memory import PlannerMemory
 from smythe.planner import ArchitectError, DeterministicArchitect, LLMArchitect, SimpleArchitect
-from smythe.provider import AnthropicProvider, CompletionResult, GeminiProvider, OpenAIProvider, Provider
+from smythe.provider import (
+    AnthropicProvider,
+    CompletionResult,
+    GeminiProvider,
+    OfflineProvider,
+    OpenAIProvider,
+    Provider,
+)
 from smythe.router import WhiteRabbit
 from smythe.skills import (
     CapabilityHydrationMode,
@@ -36,6 +43,7 @@ __all__ = [
     "FileCheckpointStore",
     "GeminiProvider",
     "LLMArchitect",
+    "OfflineProvider",
     "OpenAIProvider",
     "PlannerMemory",
     "Provider",

@@ -8,6 +8,11 @@ from typing import Any
 from uuid import uuid4
 
 
+def _escape_mermaid(text: str) -> str:
+    """Escape characters that break Mermaid node labels."""
+    return text.replace('"', "#quot;").replace("[", "(").replace("]", ")")
+
+
 class Topology(Enum):
     """High-level execution patterns the planner can select."""
 
@@ -135,6 +140,70 @@ class ExecutionGraph:
                     raise ValueError(f"Node {node.id!r} depends on unknown node {dep!r}")
         if self._has_cycle():
             raise ValueError("Execution graph contains a cycle")
+
+    def to_json(self) -> dict[str, Any]:
+        """Serializable snapshot of the graph: topology, nodes, statuses, costs."""
+        return {
+            "topology": [t.value for t in self.topology],
+            "estimated_cost_usd": self.estimated_cost_usd,
+            "nodes": [
+                {
+                    "id": n.id,
+                    "label": n.label,
+                    "agent_id": n.agent_id,
+                    "depends_on": list(n.depends_on),
+                    "status": n.status.value,
+                    "cost_usd": n.metadata.get("cost_usd"),
+                }
+                for n in self.nodes
+            ],
+        }
+
+    def to_mermaid(self) -> str:
+        """Render the DAG as a Mermaid flowchart (top-down).
+
+        Node statuses map to style classes so executed graphs are
+        readable at a glance; output is deterministic for snapshot tests.
+        """
+        lines = ["flowchart TD"]
+        for n in self.nodes:
+            label = _escape_mermaid(self._node_label(n))
+            lines.append(f'    {n.id}["{label}"]')
+        for n in self.nodes:
+            for dep in n.depends_on:
+                lines.append(f"    {dep} --> {n.id}")
+        status_class = {
+            NodeStatus.COMPLETED: "done",
+            NodeStatus.FAILED: "failed",
+            NodeStatus.SKIPPED: "skipped",
+            NodeStatus.RUNNING: "running",
+        }
+        styled: dict[str, list[str]] = {}
+        for n in self.nodes:
+            cls = status_class.get(n.status)
+            if cls:
+                styled.setdefault(cls, []).append(n.id)
+        if styled:
+            lines.append("    classDef done fill:#d3f9d8,stroke:#2b8a3e")
+            lines.append("    classDef failed fill:#ffe3e3,stroke:#c92a2a")
+            lines.append("    classDef skipped fill:#e9ecef,stroke:#868e96")
+            lines.append("    classDef running fill:#fff3bf,stroke:#e67700")
+            for cls in ("done", "failed", "skipped", "running"):
+                if cls in styled:
+                    lines.append(f"    class {','.join(styled[cls])} {cls}")
+        return "\n".join(lines)
+
+    def to_dot(self) -> str:
+        """Render the DAG in Graphviz DOT format."""
+        lines = ["digraph smythe {", "    rankdir=TB;"]
+        for n in self.nodes:
+            label = self._node_label(n).replace('"', '\\"')
+            lines.append(f'    "{n.id}" [label="{label}"];')
+        for n in self.nodes:
+            for dep in n.depends_on:
+                lines.append(f'    "{dep}" -> "{n.id}";')
+        lines.append("}")
+        return "\n".join(lines)
 
     def __repr__(self) -> str:
         return f"ExecutionGraph(topology={self.topology!r}, nodes={len(self.nodes)})"

@@ -1,21 +1,20 @@
 """Shared provider selection for the examples.
 
-Each example runs offline out of the box using DemoProvider, which
-returns canned responses. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or
-GOOGLE_API_KEY to run the same example against a real model.
+Each example runs offline out of the box using smythe's built-in
+OfflineProvider (via DemoProvider below, which adds a canned research
+plan). Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY to run
+the same example against a real model.
 """
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 
-from smythe.prompts import PLANNING_SYSTEM_PROMPT
 from smythe.provider import (
     AnthropicProvider,
-    CompletionResult,
     GeminiProvider,
+    OfflineProvider,
     OpenAIProvider,
     Provider,
 )
@@ -26,7 +25,7 @@ for _stream in (sys.stdout, sys.stderr):
     if _stream.encoding and _stream.encoding.lower() not in ("utf-8", "utf8"):
         _stream.reconfigure(encoding="utf-8")
 
-DEMO_PLAN = json.dumps({
+DEMO_PLAN = {
     "topology": ["fork_join"],
     "nodes": [
         {
@@ -60,23 +59,20 @@ DEMO_PLAN = json.dumps({
             },
         },
     ],
-})
+}
 
 
-class DemoProvider(Provider):
-    """Offline stand-in: canned plan JSON for planning calls, canned text otherwise."""
+class DemoProvider(OfflineProvider):
+    """OfflineProvider preloaded with the demo research plan."""
 
-    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
-        if system == PLANNING_SYSTEM_PROMPT:
-            return CompletionResult(
-                text=DEMO_PLAN, prompt_tokens=250, completion_tokens=400,
-            )
-        first_line = prompt.split("\n")[0]
-        return CompletionResult(
-            text=f"[demo output for: {first_line[:60]}]",
-            prompt_tokens=40,
-            completion_tokens=60,
-        )
+    def __init__(self) -> None:
+        super().__init__(plan=DEMO_PLAN, echo_prefix="[demo output for: ")
+
+    async def complete(self, system, prompt, model):
+        result = await super().complete(system, prompt, model)
+        if result.text.startswith(self._echo_prefix):
+            result.text += "]"
+        return result
 
 
 def pick_provider() -> tuple[Provider, str]:
@@ -87,6 +83,6 @@ def pick_provider() -> tuple[Provider, str]:
         return OpenAIProvider(), "gpt-5.2"
     if os.environ.get("GOOGLE_API_KEY"):
         return GeminiProvider(), "gemini-3-flash"
-    print("No API key found - running offline with the built-in DemoProvider.")
+    print("No API key found - running offline with smythe's built-in OfflineProvider.")
     print("Set ANTHROPIC_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY for real output.\n")
     return DemoProvider(), "demo-model"

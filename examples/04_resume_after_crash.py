@@ -24,6 +24,7 @@ class CrashyProvider(DemoProvider):
     """DemoProvider that fails exactly once on the 'analyze' node."""
 
     def __init__(self) -> None:
+        super().__init__()
         self.crashed = False
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
