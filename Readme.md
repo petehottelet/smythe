@@ -1,5 +1,6 @@
 # smythe
 
+[![PyPI](https://img.shields.io/pypi/v/smythe)](https://pypi.org/project/smythe/)
 [![CI](https://github.com/petehottelet/smythe/actions/workflows/ci.yml/badge.svg)](https://github.com/petehottelet/smythe/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -413,21 +414,29 @@ result = await swarm.execute_async(task)
 ## Installation
 
 ```bash
-pip install -e .
+pip install smythe
 ```
 
-Optional extras for LLM providers and skill integration:
+Optional extras for LLM providers and integrations:
 
 ```bash
-pip install -e ".[anthropic]"    # Anthropic Claude models
-pip install -e ".[openai]"       # OpenAI GPT models
-pip install -e ".[gemini]"       # Google Gemini models
-pip install -e ".[openclaw]"     # OpenClaw AgentSkills integration
-pip install -e ".[all]"          # all of the above
-pip install -e ".[dev]"          # pytest, ruff, dev tooling
+pip install "smythe[anthropic]"    # Anthropic Claude models
+pip install "smythe[openai]"       # OpenAI GPT models (and OpenAI-compatible endpoints)
+pip install "smythe[gemini]"       # Google Gemini models
+pip install "smythe[mcp]"          # MCP tool support
+pip install "smythe[openclaw]"     # OpenClaw AgentSkills integration
+pip install "smythe[all]"          # all of the above
 ```
 
-Requires Python 3.11+. Set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY` for the respective providers.
+Requires Python 3.11+. Set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY` for the respective providers — or use the built-in `OfflineProvider` with no keys at all.
+
+Contributing or hacking on smythe itself:
+
+```bash
+git clone https://github.com/petehottelet/smythe.git
+cd smythe
+pip install -e ".[dev]"
+```
 
 ---
 
