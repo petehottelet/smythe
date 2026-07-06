@@ -234,9 +234,14 @@ class FixtureProvider(OfflineProvider):
 
         first_line = prompt.split("\n")[0]
         self.calls.append(first_line)
-        text = FIXTURE_OUTPUTS.get(first_line)
+        # Root nodes carry the overall task above their label, so match by
+        # label containment rather than assuming the label is line one.
+        text = FIXTURE_OUTPUTS.get(first_line) or next(
+            (out for label, out in FIXTURE_OUTPUTS.items() if label in prompt),
+            None,
+        )
         if text is None:
-            raise AssertionError(f"No fixture output for node label: {first_line!r}")
+            raise AssertionError(f"No fixture output for prompt: {first_line!r}")
         return CompletionResult(
             text=text,
             prompt_tokens=len(prompt) // 4,

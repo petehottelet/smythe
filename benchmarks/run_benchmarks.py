@@ -64,6 +64,10 @@ def main() -> int:
                         help="ablation: blank the terminal deliverable note so "
                              "final nodes are not told their output is the "
                              "deliverable (for A/B comparisons)")
+    parser.add_argument("--ablate-task-context", action="store_true",
+                        help="ablation: root nodes see only their planned "
+                             "label, not the original task payload "
+                             "(for A/B comparisons)")
     parser.add_argument("--out", default=None, metavar="FILE",
                         help="write results JSON to FILE")
     args = parser.parse_args()
@@ -72,6 +76,10 @@ def main() -> int:
         import smythe.executor_base as _eb
         _eb.TERMINAL_DELIVERABLE_NOTE = ""
         print("ABLATION: terminal deliverable note disabled for this run.\n")
+    if args.ablate_task_context:
+        import smythe.executor_base as _eb2
+        _eb2.INCLUDE_TASK_CONTEXT = False
+        print("ABLATION: task context disabled for this run.\n")
 
     real = None if args.offline else real_provider()
     offline = real is None
@@ -104,6 +112,7 @@ def main() -> int:
                 record["run"] = run_index
                 record["judge_model"] = None
                 record["ablate_terminal_note"] = args.ablate_terminal_note
+                record["ablate_task_context"] = args.ablate_task_context
                 if args.judge and not offline:
                     record["quality"] = score_output(
                         provider, judge_model, bench_task.goal,

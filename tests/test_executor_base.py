@@ -104,3 +104,61 @@ def test_executor_marks_only_terminal_nodes():
     first, last = provider.prompts
     assert TERMINAL_DELIVERABLE_NOTE not in first
     assert TERMINAL_DELIVERABLE_NOTE in last
+
+
+# --- task context propagation ------------------------------------------
+
+def test_root_node_prompt_carries_task_context():
+    node = Node(label="Research the market", id="r")
+    node.metadata["task_context"] = "Evaluate the widget market\n\nConstraints:\n- be brief"
+    prompt = ExecutorBase.build_user_prompt(node, {})
+    assert prompt.startswith("Overall task:\nEvaluate the widget market")
+    assert "Your step: Research the market" in prompt
+
+
+def test_task_context_respects_ablation_toggle(monkeypatch):
+    import smythe.executor_base as eb
+
+    node = Node(label="Research", id="r")
+    node.metadata["task_context"] = "The big goal"
+    monkeypatch.setattr(eb, "INCLUDE_TASK_CONTEXT", False)
+    prompt = ExecutorBase.build_user_prompt(node, {})
+    assert prompt == "Research"
+
+
+def test_swarm_plan_stamps_task_context_on_roots_only():
+
+    from smythe import Swarm, Task
+    from smythe.provider import OfflineProvider
+
+    plan = {
+        "topology": ["fork_join"],
+        "nodes": [
+            {"id": "a", "label": "Angle A", "depends_on": [],
+             "agent": {"name": "A", "persona": "p"}},
+            {"id": "b", "label": "Angle B", "depends_on": [],
+             "agent": {"name": "B", "persona": "p"}},
+            {"id": "join", "label": "Merge", "depends_on": ["a", "b"],
+             "agent": {"name": "J", "persona": "p"}},
+        ],
+    }
+    swarm = Swarm(provider=OfflineProvider(plan=plan), model="test-model")
+    task = Task(goal="Study the gizmo market", constraints=["stay brief"])
+    graph = swarm.plan(task)
+
+    by_id = {n.id: n for n in graph.nodes}
+    assert "Study the gizmo market" in by_id["a"].metadata["task_context"]
+    assert "- stay brief" in by_id["a"].metadata["task_context"]
+    assert "task_context" in by_id["b"].metadata
+    assert "task_context" not in by_id["join"].metadata
+
+
+def test_single_node_graph_is_not_stamped():
+    from smythe import Swarm, Task
+    from smythe.planner import SimpleArchitect
+    from smythe.provider import OfflineProvider
+
+    swarm = Swarm(provider=OfflineProvider(), model="test-model",
+                  architect=SimpleArchitect())
+    graph = swarm.plan(Task(goal="Do the thing"))
+    assert "task_context" not in graph.nodes[0].metadata
