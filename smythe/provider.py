@@ -104,7 +104,16 @@ class OfflineProvider(Provider):
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         from smythe.prompts import PLANNING_SYSTEM_PROMPT
 
-        first_line = prompt.split("\n")[0]
+        # Root nodes carry the overall task above their label; echo the
+        # step label so offline output still names the work being done.
+        step_line = next(
+            (line for line in prompt.splitlines() if line.startswith("Your step: ")),
+            None,
+        )
+        first_line = (
+            step_line.removeprefix("Your step: ") if step_line
+            else prompt.split("\n")[0]
+        )
         self.calls.append(first_line)
 
         if self._plan is not None and system == PLANNING_SYSTEM_PROMPT:

@@ -129,6 +129,7 @@ class Swarm:
 
         graph = self._registry.assign(graph)
         self._stamp_model(graph)
+        self._stamp_task_context(graph, task)
         return graph
 
     async def aplan(self, task: Task) -> ExecutionGraph:
@@ -141,7 +142,28 @@ class Swarm:
 
         graph = self._registry.assign(graph)
         self._stamp_model(graph)
+        self._stamp_task_context(graph, task)
         return graph
+
+    @staticmethod
+    def _stamp_task_context(graph: ExecutionGraph, task: Task) -> None:
+        """Give root nodes the original task, not just their planned label.
+
+        The Architect sees the full task when planning, but generated
+        node labels rarely reproduce its payload (source documents,
+        code, data) - without this, root nodes work from a one-line
+        label and the material the task carries never enters the graph.
+        Downstream nodes inherit it through dependency results. Skipped
+        when the label already is the goal (single-node graphs).
+        """
+        context = task.goal
+        if task.constraints:
+            context += "\n\nConstraints:\n" + "\n".join(
+                f"- {c}" for c in task.constraints
+            )
+        for node in graph.roots():
+            if node.label.strip() != task.goal.strip():
+                node.metadata.setdefault("task_context", context)
 
     def _select_architect(self, task: Task) -> Architect:
         """Pick the architect — use router if set, otherwise the default."""

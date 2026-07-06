@@ -16,6 +16,10 @@ from smythe.tracer import Tracer
 
 DEFAULT_MAX_TOOL_ITERATIONS = 10
 
+# When False, root nodes ignore the task_context stamped by Swarm.plan()
+# and see only their planned label - exists for benchmark ablations.
+INCLUDE_TASK_CONTEXT = True
+
 # Appended to a terminal node's prompt so the deliverable survives the
 # chain: without it, final nodes tend to reference or summarize upstream
 # findings instead of reproducing them, and the specifics are lost
@@ -74,7 +78,13 @@ class ExecutorBase:
     def build_user_prompt(
         node: Node, dep_results: dict[str, Any], *, is_terminal: bool = False,
     ) -> str:
-        parts = [node.label]
+        task_context = (
+            node.metadata.get("task_context") if INCLUDE_TASK_CONTEXT else None
+        )
+        if task_context:
+            parts = [f"Overall task:\n{task_context}", f"\nYour step: {node.label}"]
+        else:
+            parts = [node.label]
         if dep_results:
             parts.append("\n\nContext from prior steps:")
             for dep_id, result in dep_results.items():
