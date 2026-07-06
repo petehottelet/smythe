@@ -5,6 +5,7 @@ from smythe.checkpoint import CheckpointStore, FileCheckpointStore
 from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
 from smythe.graph import FailurePolicy
 from smythe.loader import load_graph
+from smythe.mcp import MCPConfigError, MCPServerSpec, MCPToolRuntime
 from smythe.memory import PlannerMemory
 from smythe.planner import ArchitectError, DeterministicArchitect, LLMArchitect, SimpleArchitect
 from smythe.provider import (
@@ -51,6 +52,9 @@ __all__ = [
     "FileCheckpointStore",
     "GeminiProvider",
     "LLMArchitect",
+    "MCPConfigError",
+    "MCPServerSpec",
+    "MCPToolRuntime",
     "OfflineProvider",
     "OpenAIProvider",
     "PlannerMemory",

@@ -93,29 +93,40 @@ def graph_from_dict(data: dict[str, Any]) -> ExecutionGraph:
 
 
 def agents_to_list(registry: Registry) -> list[dict[str, Any]]:
-    return [
-        {
+    out = []
+    for agent in registry.list_agents():
+        entry: dict[str, Any] = {
             "id": agent.id,
             "name": agent.profile.name,
             "persona": agent.profile.persona,
             "capabilities": list(agent.profile.capabilities),
         }
-        for agent in registry.list_agents()
-    ]
+        if agent.profile.mcp_servers:
+            # env_passthrough stores variable NAMES only; secret values
+            # never touch the checkpoint (see smythe.mcp).
+            entry["mcp_servers"] = [s.to_dict() for s in agent.profile.mcp_servers]
+        out.append(entry)
+    return out
 
 
 def agents_from_list(data: list[dict[str, Any]]) -> list[Agent]:
-    return [
-        Agent(
+    agents = []
+    for entry in data:
+        mcp_servers = []
+        if entry.get("mcp_servers"):
+            from smythe.mcp import MCPServerSpec
+
+            mcp_servers = [MCPServerSpec.from_dict(s) for s in entry["mcp_servers"]]
+        agents.append(Agent(
             id=entry["id"],
             profile=AgentProfile(
                 name=entry.get("name", entry["id"]),
                 persona=entry.get("persona", ""),
                 capabilities=list(entry.get("capabilities", [])),
+                mcp_servers=mcp_servers,
             ),
-        )
-        for entry in data
-    ]
+        ))
+    return agents
 
 
 def task_to_dict(task: Task | None) -> dict[str, Any] | None:
