@@ -292,3 +292,30 @@ nodes:
 """
     with pytest.raises(ValueError, match="timeout_s"):
         load_graph_from_string(yaml_str)
+
+
+def test_max_tool_iterations_parsed():
+    yaml_str = """\
+topology: serial
+
+nodes:
+  - id: tooluser
+    label: "Uses tools"
+    max_tool_iterations: 5
+"""
+    graph, _ = load_graph_from_string(yaml_str)
+    assert graph.nodes[0].max_tool_iterations == 5
+
+
+@pytest.mark.parametrize("bad_value", ['"five"', "true", "0", "-1", "2.5"])
+def test_max_tool_iterations_rejects_invalid(bad_value):
+    yaml_str = f"""\
+topology: serial
+
+nodes:
+  - id: bad
+    label: "Bad"
+    max_tool_iterations: {bad_value}
+"""
+    with pytest.raises(ValueError, match="max_tool_iterations"):
+        load_graph_from_string(yaml_str)

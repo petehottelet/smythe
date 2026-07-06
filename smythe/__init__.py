@@ -26,7 +26,15 @@ from smythe.skills import (
 from smythe.swarm import Swarm, SwarmResult
 from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.task import Task
-from smythe.tools import ChatMessage, ToolCall, ToolResult, ToolSpec
+from smythe.tools import (
+    ChatMessage,
+    ToolCall,
+    ToolLoopLimitError,
+    ToolResult,
+    ToolRuntime,
+    ToolSession,
+    ToolSpec,
+)
 
 __all__ = [
     "AnthropicProvider",
@@ -59,7 +67,10 @@ __all__ = [
     "SynthesisStrategy",
     "Task",
     "ToolCall",
+    "ToolLoopLimitError",
     "ToolResult",
+    "ToolRuntime",
+    "ToolSession",
     "ToolSpec",
     "WhiteRabbit",
     "load_graph",

@@ -74,13 +74,9 @@ class Executor(ExecutorBase):
             self._tracer.on_node_start(node)
 
             try:
+                # Cost recording happens inside acall_node (per provider call).
                 result = asyncio.run(self.acall_node(node, graph))
                 node.result = result.text
-
-                if self._budget:
-                    cost = self._budget.record(node.id, result)
-                    node.metadata["cost_usd"] = cost
-
                 node.status = NodeStatus.COMPLETED
                 self._tracer.on_node_end(node)
                 self.notify_update(node)
