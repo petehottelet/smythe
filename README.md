@@ -110,7 +110,7 @@ Each agent carries a capability profile and a persona, and the registry matches 
 Merging parallel outputs without losing coherence is hard and almost always an afterthought. Smythe treats synthesis as a dedicated architectural layer with explicit strategies per output type — not a final prompt that hopes for the best.
 
 **4. The Architect remembers past runs.**
-As tasks complete, `PlannerMemory` records each outcome (topology, cost, duration, success), and the `LLMArchitect` surfaces the most relevant past outcomes in its planning prompt for similar tasks. What ships today is that feedback wiring; quantified evidence that it improves plans — and outcome-weighted agent routing built on it — is roadmap work we intend to publish numbers for, not hand-wave.
+As tasks complete, `PlannerMemory` records each outcome (topology, cost, duration, success), and the `LLMArchitect` surfaces the most relevant past outcomes in its planning prompt for similar tasks. The full loop — record → recall → prompt → different plan — is demonstrated end to end in [examples/08_learning_loop.py](examples/08_learning_loop.py) and covered by tests. Quantified evidence that it improves plans — and outcome-weighted agent routing built on it — is roadmap work we intend to publish numbers for, not hand-wave.
 
 ---
 
