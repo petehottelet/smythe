@@ -1,6 +1,6 @@
 name: acquisition-diligence
 goal: >
-  Evaluate whether Acme Corp is a viable acquisition target. Analyze their
+  Evaluate whether MetaCortex Corp is a viable acquisition target. Analyze their
   financials, technical IP, and regulatory exposure, then produce a diligence
   memo with a go/no-go recommendation.
 constraints:

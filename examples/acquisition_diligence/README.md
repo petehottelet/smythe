@@ -1,7 +1,7 @@
 # Flagship demo: acquisition diligence
 
 The showcase from the main README, end to end: you hand the Swarm one
-goal — *evaluate whether Acme Corp is a viable acquisition target* —
+goal — *evaluate whether MetaCortex Corp is a viable acquisition target* —
 and the Architect decides the execution topology. Three specialists
 fan out in parallel, an editor joins their findings, a red team
 attacks the draft, and a memo agent produces the final structured

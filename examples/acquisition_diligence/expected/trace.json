@@ -1,7 +1,7 @@
 [
   {
     "node_id": "financial",
-    "label": "Analyze Acme Corp's revenue model, margins, burn rate, and comparable valuations",
+    "label": "Analyze MetaCortex Corp's revenue model, margins, burn rate, and comparable valuations",
     "agent_id": "FinancialAnalyst",
     "status": "completed",
     "duration_ms": 0.0,
@@ -9,7 +9,7 @@
   },
   {
     "node_id": "technical",
-    "label": "Assess Acme Corp's IP portfolio, tech debt signals, and key-person dependencies",
+    "label": "Assess MetaCortex Corp's IP portfolio, tech debt signals, and key-person dependencies",
     "agent_id": "TechDiligenceAgent",
     "status": "completed",
     "duration_ms": 0.0,
@@ -17,7 +17,7 @@
   },
   {
     "node_id": "regulatory",
-    "label": "Review Acme Corp's SEC filings, antitrust exposure, and pending litigation",
+    "label": "Review MetaCortex Corp's SEC filings, antitrust exposure, and pending litigation",
     "agent_id": "RegulatoryAgent",
     "status": "completed",
     "duration_ms": 0.0,

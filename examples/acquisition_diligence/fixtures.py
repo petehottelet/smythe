@@ -15,7 +15,7 @@ DILIGENCE_PLAN = {
         {
             "id": "financial",
             "label": (
-                "Analyze Acme Corp's revenue model, margins, burn rate, "
+                "Analyze MetaCortex Corp's revenue model, margins, burn rate, "
                 "and comparable valuations"
             ),
             "depends_on": [],
@@ -31,7 +31,7 @@ DILIGENCE_PLAN = {
         {
             "id": "technical",
             "label": (
-                "Assess Acme Corp's IP portfolio, tech debt signals, "
+                "Assess MetaCortex Corp's IP portfolio, tech debt signals, "
                 "and key-person dependencies"
             ),
             "depends_on": [],
@@ -47,7 +47,7 @@ DILIGENCE_PLAN = {
         {
             "id": "regulatory",
             "label": (
-                "Review Acme Corp's SEC filings, antitrust exposure, "
+                "Review MetaCortex Corp's SEC filings, antitrust exposure, "
                 "and pending litigation"
             ),
             "depends_on": [],
@@ -118,7 +118,7 @@ FINANCIAL FINDINGS (fictional fixture data)
 - Customer concentration: top 3 customers are 38% of ARR, all on
   2-year contracts with renewal windows inside the deal timeline.
 - Comparable transactions in the segment closed at 4-6x ARR;
-  at the rumored $260M ask, Acme prices at 5.4x - the top of the band
+  at the rumored $260M ask, MetaCortex prices at 5.4x - the top of the band
   despite decelerating growth."""
 
 _TECHNICAL = """\
@@ -137,7 +137,7 @@ REGULATORY FINDINGS (fictional fixture data)
 
 - SEC: no enforcement history; S-1 was withdrawn in 2024 for market
   reasons, not disclosure problems.
-- Litigation: Novak Systems v. Acme (D. Del., pending) claims the
+- Litigation: Novak Systems v. MetaCortex (D. Del., pending) claims the
   routing engine infringes one Novak patent. Motion to dismiss denied;
   discovery underway.
 - Antitrust: combined segment share post-close is ~18% - below agency
@@ -147,7 +147,7 @@ REGULATORY FINDINGS (fictional fixture data)
 _DRAFT = """\
 DRAFT DILIGENCE REPORT
 
-Acme Corp presents as a strategic asset acquisition at a premium price.
+MetaCortex Corp presents as a strategic asset acquisition at a premium price.
 The financial profile ($48M ARR, 71% gross margin, 19 months runway) is
 sound but decelerating, and the 5.4x ARR ask prices in growth the
 current trajectory does not show. The value driver is the patented
@@ -175,10 +175,10 @@ RED-TEAM FINDINGS
    retention, the buyer pays a strategic premium for an unsecured asset."""
 
 _MEMO = """\
-ACQUISITION DILIGENCE MEMO - ACME CORP
+ACQUISITION DILIGENCE MEMO - METACORTEX CORP
 
 SUMMARY
-Acme Corp is a genuine strategic asset - a patented adaptive routing
+MetaCortex Corp is a genuine strategic asset - a patented adaptive routing
 engine inside a $48M ARR business with 71% gross margins - offered at
 5.4x ARR, the top of the comparable band. The thesis survives red-team
 review only with conditions attached; the asking price does not.
