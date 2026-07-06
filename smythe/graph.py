@@ -279,7 +279,7 @@ class ExecutionGraph:
 
     @staticmethod
     def _node_label(node: Node) -> str:
-        name = node.agent_id if node.agent_id else node.id
+        name = node.metadata.get("agent_name") or node.agent_id or node.id
         return f"{name}: {node.label}"
 
     def _dep_label(self, node: Node) -> str:
@@ -289,7 +289,12 @@ class ExecutionGraph:
         lookup = {n.id: n for n in self.nodes}
         for dep_id in node.depends_on:
             dep_node = lookup.get(dep_id)
-            dep_names.append(dep_node.agent_id or dep_id if dep_node else dep_id)
+            if dep_node:
+                dep_names.append(
+                    dep_node.metadata.get("agent_name") or dep_node.agent_id or dep_id
+                )
+            else:
+                dep_names.append(dep_id)
         return " (depends on " + ", ".join(dep_names) + ")"
 
     def _topo_sort(self) -> list[Node]:

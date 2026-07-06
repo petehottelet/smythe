@@ -119,11 +119,13 @@ class Registry:
                 match = self.find_by_capabilities(node.required_capabilities)
                 if match is not None:
                     node.agent_id = match.id
+                    node.metadata["agent_name"] = match.name
                     continue
 
             agent = Agent(profile=AgentProfile(name=f"agent-{node.id}"))
             self.register(agent)
             node.agent_id = agent.id
+            node.metadata["agent_name"] = agent.name
         return graph
 
     def _hydrate(self, agent: Agent) -> list[str]:

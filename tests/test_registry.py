@@ -128,3 +128,22 @@ def test_assign_creates_generalist_when_no_capability_match():
     assert node.agent_id is not None
     assigned = reg.get(node.agent_id)
     assert assigned is not None
+
+
+def test_assign_stamps_agent_name_for_rendering():
+    reg = Registry()
+    researcher = Agent(profile=AgentProfile(
+        name="researcher",
+        capabilities=["research"],
+    ))
+    reg.register(researcher)
+
+    matched = Node(label="Research", id="m1", required_capabilities=["research"])
+    generalist = Node(label="Anything", id="g1")
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[matched, generalist])
+    reg.assign(graph)
+
+    assert matched.metadata["agent_name"] == "researcher"
+    assert generalist.metadata["agent_name"] == "agent-g1"
+    assert "researcher: Research" in str(graph)
+    assert matched.agent_id not in str(graph)

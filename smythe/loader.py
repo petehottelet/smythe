@@ -145,6 +145,7 @@ def build_graph_from_dict(data: dict) -> tuple[ExecutionGraph, Registry]:
             agent = Agent(profile=profile)
             registry.register(agent)
             node.agent_id = agent.id
+            node.metadata["agent_name"] = agent.name
 
         nodes.append(node)
 
