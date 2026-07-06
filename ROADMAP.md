@@ -11,11 +11,12 @@ Status: pre-1.0. Minor versions may break APIs (see [CHANGELOG.md](CHANGELOG.md)
 - ✅ Graph export — `to_mermaid()`, `to_dot()`, `to_json()`
 - ✅ `OfflineProvider` — evaluate the full pipeline with no API keys; all examples run offline
 - ✅ Provider tool contract — neutral tool-calling types mapped to Anthropic, OpenAI, and Gemini native tool use
+- ✅ **MCP tool support** — agents use MCP servers (stdio + streamable HTTP) through a bounded, budget-enforced tool loop; secrets via `env_passthrough`; capability hydration and planner tool awareness; examples for filesystem, GitHub, and SaaS servers ([docs/mcp.md](docs/mcp.md))
 - ✅ OpenAI-compatible `base_url` (Ollama, LM Studio, vLLM)
 
-## Now: MCP tool support
+## Now: v0.2.0 release, then recursive decomposition
 
-Agents consume MCP servers as capability sources; tool calls appear in traces like any other node action. Design: [plans/04-mcp-tool-support.md](plans/04-mcp-tool-support.md). Remaining milestones: tool loop with budget enforcement → MCP runtime (stdio + HTTP) → capability hydration + planner tool awareness → examples (filesystem, GitHub, one SaaS).
+The v0.2 line ships to PyPI next (`pip install smythe`). Then:
 
 ## Next
 
@@ -23,7 +24,6 @@ Agents consume MCP servers as capability sources; tool calls appear in traces li
 2. **Flagship demo** — an acquisition-diligence showcase: fixture mode (no keys) and real mode, with committed graph, trace, and expected output
 3. **Benchmarks** — single-agent and fixed-pipeline baselines vs. dynamic topology (offline-runnable), then head-to-head vs. LangGraph and CrewAI; includes memory-on vs. memory-off numbers for the learning Architect
 4. **Trace inspector** — `smythe inspect`: rendered DAG, per-node prompt/response/cost/duration, and the Architect's reasoning
-5. **PyPI release** — `pip install smythe`
 
 ## Later
 

@@ -324,6 +324,25 @@ result = swarm.execute(task)
 print(result.total_cost_usd)  # actual cost
 ```
 
+### MCP tool use
+
+Agents consume [MCP](https://modelcontextprotocol.io/) servers as tool sources. Declare servers on the agent, pass a tool runtime, and nodes run a bounded tool loop — every call traced, every iteration budgeted:
+
+```python
+from smythe import MCPServerSpec, MCPToolRuntime, Swarm
+from smythe.agent import Agent, AgentProfile
+
+fs = MCPServerSpec(
+    name="fs", transport="stdio",
+    command="npx", args=("-y", "@modelcontextprotocol/server-filesystem", "./data"),
+    allowed_tools=("read_file", "list_directory"),
+)
+agent = Agent(profile=AgentProfile(name="Researcher", mcp_servers=[fs]))
+swarm = Swarm(tool_runtime=MCPToolRuntime(), ...)
+```
+
+Secrets travel by environment-variable *name* (`env_passthrough`) and never touch YAML or checkpoints. Guardrails are on by default: `max_tool_iterations`, mid-loop budget enforcement, per-call timeouts, and `timeout_s` covering the whole loop. Details and threat model: [docs/mcp.md](docs/mcp.md). Install with `pip install smythe[mcp]`.
+
 ### Durable, resumable execution
 
 Give the Swarm a checkpoint store and it persists the full execution state — graph, node results, agents, budget consumed — after every node. If the process dies at node 47 of a long run, resume from the last completed node instead of starting over:
@@ -439,12 +458,14 @@ The core framework is implemented and tested. **267 tests passing.**
 - Context-preserving Architect retries
 - Persistent execution memory (JSONL) with recall into planning prompts
 - Per-node timeouts and bounded parallel concurrency
+- MCP tool support — agents use MCP servers (stdio + HTTP) through a bounded,
+  budget-enforced tool loop, with capability hydration and planner tool awareness
 - Durable execution — per-node checkpointing and `swarm.resume()` with a pluggable store
 - Provider abstraction (Anthropic, OpenAI, Gemini) with defensive response parsing
 - Structured observability traces
 - Runnable examples that work offline
 
-**What's next:** see [ROADMAP.md](ROADMAP.md) — currently MCP tool support, then recursive decomposition, then published benchmarks.
+**What's next:** see [ROADMAP.md](ROADMAP.md) — currently recursive subgraph decomposition, then the flagship demo and published benchmarks.
 
 ---
 
