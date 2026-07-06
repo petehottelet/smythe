@@ -137,8 +137,8 @@ REGULATORY FINDINGS (fictional fixture data)
 
 - SEC: no enforcement history; S-1 was withdrawn in 2024 for market
   reasons, not disclosure problems.
-- Litigation: Novak Systems v. MetaCortex (D. Del., pending) claims the
-  routing engine infringes one Novak patent. Motion to dismiss denied;
+- Litigation: Ouroboros Corporation v. MetaCortex (D. Del., pending) claims the
+  routing engine infringes one Ouroboros patent. Motion to dismiss denied;
   discovery underway.
 - Antitrust: combined segment share post-close is ~18% - below agency
   screening thresholds, but the deal size triggers an HSR filing with a
@@ -153,7 +153,7 @@ sound but decelerating, and the 5.4x ARR ask prices in growth the
 current trajectory does not show. The value driver is the patented
 adaptive routing engine; the technical review rates it defensible but
 concentrated in two engineers with no post-close retention terms. The
-regulatory picture is clean except for the Novak patent suit, which
+regulatory picture is clean except for the Ouroboros patent suit, which
 targets the same routing engine that anchors the deal thesis, and a
 routine HSR waiting period. Draft view: attractive asset, wrong price,
 two unpriced risks (key-person, litigation)."""
@@ -167,7 +167,7 @@ RED-TEAM FINDINGS
 2. Growth deceleration (41% -> 22%) compounds customer concentration:
    if one top-3 account churns in a renewal window, ARR growth goes
    negative. The draft treats these as separate risks; they are one.
-3. The Novak suit does not merely add legal cost - it encumbers the
+3. The Ouroboros suit does not merely add legal cost - it encumbers the
    exact IP justifying the premium. A licensing outcome caps upside;
    an injunction breaks the thesis. The draft underweights this.
 4. The 5.4x multiple assumes the routing engine transfers intact, but
@@ -188,12 +188,12 @@ FINDINGS
   104% NRR, 19 months runway, top-3 customer concentration of 38%.
 - The routing engine (2 granted patents, 1 pending) is the value
   driver; two engineers author ~70% of its code with no retention terms.
-- Regulatory exposure is limited to a routine HSR filing and the Novak
+- Regulatory exposure is limited to a routine HSR filing and the Ouroboros
   patent suit - which targets the routing engine itself.
 
 RISKS (red-team confirmed)
 1. Concentration x deceleration: one top-3 churn turns growth negative.
-2. Novak litigation encumbers the premium-justifying IP; injunction
+2. Ouroboros litigation encumbers the premium-justifying IP; injunction
    scenario breaks the thesis.
 3. Key-person flight risk leaves the core asset unsecured at close.
 4. "Sticky product" claim is unsupported at 104% NRR.
@@ -203,7 +203,7 @@ Conditional GO. Proceed only if all three conditions are met:
 (a) price at or below 4.2x ARR (~$200M) reflecting decelerating growth,
 (b) signed retention packages for both core engineers as a closing
     condition, and
-(c) an indemnity escrow sized to the Novak litigation range.
+(c) an indemnity escrow sized to the Ouroboros litigation range.
 If the seller holds at 5.4x, walk away."""
 
 FIXTURE_OUTPUTS = {
