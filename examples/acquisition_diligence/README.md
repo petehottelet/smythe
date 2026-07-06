@@ -8,7 +8,7 @@ attacks the draft, and a memo agent produces the final structured
 recommendation.
 
 ```mermaid
-%%{init: {"theme":"base","themeVariables":{"fontSize":"14px","primaryColor":"#f8fafc","primaryTextColor":"#1e293b","primaryBorderColor":"#94a3b8","lineColor":"#94a3b8"},"flowchart":{"curve":"step","nodeSpacing":46,"rankSpacing":48}}}%%
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Roboto Mono, monospace","fontSize":"13px","primaryColor":"#f0fdf4","primaryTextColor":"#14532d","primaryBorderColor":"#86efac","lineColor":"#16a34a"},"flowchart":{"curve":"linear","nodeSpacing":50,"rankSpacing":55}}}%%
 flowchart TD
     financial("<b>FinancialAnalyst</b><br/>revenue model, margins, burn, comps")
     technical("<b>TechDiligenceAgent</b><br/>IP portfolio, tech debt, key-person risk")
@@ -22,15 +22,15 @@ flowchart TD
     draft --> redteam
     draft --> memo
     redteam --> memo
-    classDef specialist fill:#eef2ff,stroke:#6366f1,stroke-width:1.5px,color:#1e293b
-    classDef editor fill:#f8fafc,stroke:#94a3b8,stroke-width:1.5px,color:#1e293b
-    classDef adversarial fill:#fff1f2,stroke:#e11d48,stroke-width:1.5px,color:#1e293b
-    classDef deliverable fill:#ecfdf5,stroke:#059669,stroke-width:1.5px,color:#1e293b
+    classDef specialist fill:#f0fdf4,stroke:#86efac,stroke-width:1.5px,color:#14532d
+    classDef editor fill:#dcfce7,stroke:#4ade80,stroke-width:1.5px,color:#14532d
+    classDef adversarial fill:#bbf7d0,stroke:#22c55e,stroke-width:1.5px,color:#14532d
+    classDef deliverable fill:#15803d,stroke:#14532d,stroke-width:1.5px,color:#f0fdf4
     class financial,technical,regulatory specialist
     class draft editor
     class redteam adversarial
     class memo deliverable
-    linkStyle default stroke:#94a3b8,stroke-width:1.5px
+    linkStyle default stroke:#16a34a,stroke-width:1.5px
 ```
 
 ## Run it
