@@ -67,19 +67,29 @@ TaskGraph(topology="fork-join → adversarial → serial")
 ```
 
 ```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontSize":"14px","primaryColor":"#f8fafc","primaryTextColor":"#1e293b","primaryBorderColor":"#94a3b8","lineColor":"#94a3b8"},"flowchart":{"curve":"step","nodeSpacing":46,"rankSpacing":48}}}%%
 flowchart TD
-    financial["FinancialAnalyst: revenue model, margins, burn, comps"]
-    technical["TechDiligenceAgent: IP portfolio, tech debt, key-person risk"]
-    regulatory["RegulatoryAgent: SEC filings, antitrust, litigation"]
-    draft["DiligenceEditor: merge findings into draft report"]
-    redteam["RedTeamAgent: challenge every bullish claim"]
-    memo["MemoAgent: final memo - summary, findings, risks, recommendation"]
+    financial("<b>FinancialAnalyst</b><br/>revenue model, margins, burn, comps")
+    technical("<b>TechDiligenceAgent</b><br/>IP portfolio, tech debt, key-person risk")
+    regulatory("<b>RegulatoryAgent</b><br/>SEC filings, antitrust, litigation")
+    draft("<b>DiligenceEditor</b><br/>merge findings into draft report")
+    redteam("<b>RedTeamAgent</b><br/>challenge every bullish claim")
+    memo("<b>MemoAgent</b><br/>final memo: summary, findings, risks, recommendation")
     financial --> draft
     technical --> draft
     regulatory --> draft
     draft --> redteam
     draft --> memo
     redteam --> memo
+    classDef specialist fill:#eef2ff,stroke:#6366f1,stroke-width:1.5px,color:#1e293b
+    classDef editor fill:#f8fafc,stroke:#94a3b8,stroke-width:1.5px,color:#1e293b
+    classDef adversarial fill:#fff1f2,stroke:#e11d48,stroke-width:1.5px,color:#1e293b
+    classDef deliverable fill:#ecfdf5,stroke:#059669,stroke-width:1.5px,color:#1e293b
+    class financial,technical,regulatory specialist
+    class draft editor
+    class redteam adversarial
+    class memo deliverable
+    linkStyle default stroke:#94a3b8,stroke-width:1.5px
 ```
 
 Three specialists run in parallel under a budget cap, a red team attacks the draft, and the memo node turns the surviving claims into a conditional go/no-go recommendation. The expected graph, trace, and memo are committed in [examples/acquisition_diligence/expected/](examples/acquisition_diligence/expected/) — a test regenerates them on every CI run, so what you see there is what the code does. Full walkthrough: [examples/acquisition_diligence/](examples/acquisition_diligence/).
