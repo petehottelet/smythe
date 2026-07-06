@@ -117,10 +117,30 @@ def build_graph_from_dict(data: dict) -> tuple[ExecutionGraph, Registry]:
 
         agent_data = entry.get("agent")
         if agent_data:
+            mcp_raw = agent_data.get("mcp_servers", [])
+            if not isinstance(mcp_raw, list):
+                raise ValueError(
+                    f"'mcp_servers' on node {node_id!r} agent must be a list"
+                )
+            mcp_servers = []
+            for server_entry in mcp_raw:
+                if not isinstance(server_entry, dict):
+                    raise ValueError(
+                        f"Each mcp_servers entry on node {node_id!r} must be a mapping"
+                    )
+                from smythe.mcp import MCPConfigError, MCPServerSpec
+                try:
+                    mcp_servers.append(MCPServerSpec.from_dict(server_entry))
+                except (MCPConfigError, KeyError) as exc:
+                    raise ValueError(
+                        f"Invalid mcp_servers entry on node {node_id!r}: {exc}"
+                    ) from exc
+
             profile = AgentProfile(
                 name=agent_data.get("name", node_id),
                 persona=agent_data.get("persona", ""),
                 capabilities=agent_data.get("capabilities", []),
+                mcp_servers=mcp_servers,
             )
             agent = Agent(profile=profile)
             registry.register(agent)

@@ -32,8 +32,9 @@ anthropic = ["anthropic>=0.40"]
 openai = ["openai>=1.50"]
 gemini = ["google-genai>=1.0"]
 openclaw = ["openclaw-sdk>=0.1"]
-all = ["smythe[anthropic]", "smythe[openai]", "smythe[gemini]", "smythe[openclaw]"]
-dev = ["pytest>=8.0", "pytest-asyncio>=1.0", "pytest-cov>=5.0", "ruff>=0.8"]
+mcp = ["mcp>=1.2"]
+all = ["smythe[anthropic]", "smythe[openai]", "smythe[gemini]", "smythe[openclaw]", "smythe[mcp]"]
+dev = ["pytest>=8.0", "pytest-asyncio>=1.0", "pytest-cov>=5.0", "ruff>=0.8", "mcp>=1.2"]
 
 [project.urls]
 Homepage = "https://github.com/petehottelet/smythe"
