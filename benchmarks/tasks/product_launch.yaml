@@ -1,0 +1,15 @@
+name: product-launch
+goal: >
+  Create a launch plan for "Lumen", a $79 smart reading lamp that adjusts
+  color temperature to time of day. Cover positioning, launch channels,
+  a two-week timeline, and the top three risks with mitigations.
+constraints:
+  - "Budget is $25,000 total"
+  - "Team is two people; the plan must be executable by two people"
+  - "Include one measurable success criterion per channel"
+rubric:
+  - "Positioning is specific to the product, not generic marketing copy"
+  - "Channel choices are justified against the budget and team size"
+  - "Timeline is concrete: dated, sequenced, two weeks"
+  - "Risks are real launch risks with actionable mitigations"
+  - "Every channel has a measurable success criterion"

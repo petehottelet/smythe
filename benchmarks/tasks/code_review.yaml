@@ -1,0 +1,27 @@
+name: code-review
+goal: |
+  Review the following Python function for correctness bugs, then produce a
+  review with each issue's severity, an explanation, and a suggested fix.
+
+  ```python
+  def merge_user_settings(defaults, overrides, allowed_keys=[]):
+      """Merge override settings into defaults, keeping only allowed keys."""
+      merged = defaults
+      for key in overrides:
+          if allowed_keys and key not in allowed_keys:
+              continue
+          merged[key] = overrides[key]
+      allowed_keys.append("merged_at")
+      merged["merged_at"] = time.time()
+      return merged
+  ```
+constraints:
+  - "Every claimed bug must include a concrete failure scenario"
+  - "Distinguish definite bugs from style concerns"
+  - "Order findings by severity"
+rubric:
+  - "Catches the mutable default argument bug"
+  - "Catches that defaults is mutated (aliased, not copied)"
+  - "Catches the missing time import"
+  - "Failure scenarios are concrete, not hand-waved"
+  - "Severity ordering and bug-vs-style separation are sensible"

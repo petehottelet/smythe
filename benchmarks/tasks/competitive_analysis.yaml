@@ -1,0 +1,16 @@
+name: competitive-analysis
+goal: >
+  Analyze the competitive landscape for team password managers aimed at
+  companies with 10 to 200 employees. Map the main competitors, their
+  pricing and positioning, identify the underserved segment, and recommend
+  where a new entrant should compete.
+constraints:
+  - "Compare at least four competitors on the same dimensions"
+  - "State assumptions explicitly where data is uncertain"
+  - "Recommendation must name a segment and a wedge, not 'be better'"
+rubric:
+  - "Competitors are compared on consistent dimensions"
+  - "Pricing and positioning claims are plausible and hedged appropriately"
+  - "The underserved segment follows from the analysis, not assertion"
+  - "The wedge recommendation is specific and defensible"
+  - "Assumptions are explicit"
