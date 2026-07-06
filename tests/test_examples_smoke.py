@@ -4,6 +4,7 @@ API-key env vars are stripped so the examples exercise the
 OfflineProvider path — CI needs no credentials and spends no tokens.
 """
 
+import importlib.util
 import os
 import subprocess
 import sys
@@ -17,6 +18,11 @@ EXAMPLE_SCRIPTS = sorted(EXAMPLES_DIR.glob("0*.py"))
 # Env-gated examples print instructions and exit 0 when credentials are
 # absent; they don't produce the offline-run marker.
 GATED = {"06_mcp_github.py", "07_mcp_saas.py"}
+
+# Examples that need an optional extra; skipped when it isn't installed
+# so a plain `pip install -e .` checkout still runs the suite green.
+NEEDS_MCP = {"05_mcp_filesystem.py"}
+HAS_MCP = importlib.util.find_spec("mcp") is not None
 
 
 def _offline_env() -> dict[str, str]:
@@ -32,6 +38,8 @@ def _offline_env() -> dict[str, str]:
 
 @pytest.mark.parametrize("script", EXAMPLE_SCRIPTS, ids=lambda p: p.name)
 def test_example_runs_offline(script):
+    if script.name in NEEDS_MCP and not HAS_MCP:
+        pytest.skip("mcp extra not installed")
     proc = subprocess.run(
         [sys.executable, str(script)],
         env=_offline_env(),
