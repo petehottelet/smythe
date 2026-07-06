@@ -21,6 +21,15 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
+Future work tracked in [ROADMAP.md](ROADMAP.md).
+
+---
+
+## [0.2.0] - 2026-07-05
+
+First PyPI release. The v0.2 line makes agents real: they use tools, survive
+crashes, and everything they do is visible.
+
 ### Added
 
 - **Provider tool contract** — neutral tool-calling types (`ToolSpec`, `ToolCall`,
@@ -81,8 +90,6 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 - Deflaked `test_registry_cache_expires_after_ttl` (deterministic clock instead of
   `time.sleep`).
-
-Future work tracked in `00_project_files/TODO.md` (local only).
 
 ---
 
