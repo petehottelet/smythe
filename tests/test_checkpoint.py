@@ -94,7 +94,7 @@ def test_graph_roundtrip_preserves_every_field():
         depends_on=["n0"],
         result="the answer",
         status=NodeStatus.COMPLETED,
-        metadata={"model": "claude-mythos", "cost_usd": 0.01},
+        metadata={"model": "claude-opus-4-8", "cost_usd": 0.01},
         failure_policy=FailurePolicy.RETRY,
         max_retries=3,
         required_capabilities=["research"],
@@ -118,7 +118,7 @@ def test_graph_roundtrip_preserves_every_field():
     assert r.depends_on == ["n0"]
     assert r.result == "the answer"
     assert r.status == NodeStatus.COMPLETED
-    assert r.metadata == {"model": "claude-mythos", "cost_usd": 0.01}
+    assert r.metadata == {"model": "claude-opus-4-8", "cost_usd": 0.01}
     assert r.failure_policy == FailurePolicy.RETRY
     assert r.max_retries == 3
     assert r.required_capabilities == ["research"]

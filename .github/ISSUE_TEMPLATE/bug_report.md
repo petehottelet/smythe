@@ -37,7 +37,7 @@ What actually happened. Include the full traceback if there is one.
 - Python version (`python --version`):
 - OS:
 - Provider extras installed (anthropic / openai / gemini / openclaw / none):
-- Model name (e.g. `claude-mythos`, `gpt-4o`, `gemini-3-pro`):
+- Model name (e.g. `claude-opus-4-8`, `gpt-4o`, `gemini-3-pro`):
 
 ## Additional context
 

@@ -21,10 +21,10 @@ from smythe.router import WhiteRabbit
 
 def test_swarm_construction():
     swarm = Swarm(
-        max_budget_usd=1.00, model="claude-mythos",
+        max_budget_usd=1.00, model="claude-opus-4-8",
         provider=MockProvider(), architect=SimpleArchitect(),
     )
-    assert swarm.model == "claude-mythos"
+    assert swarm.model == "claude-opus-4-8"
     assert swarm.max_budget_usd == 1.00
 
 
@@ -69,11 +69,11 @@ def test_execute_parallel():
 
 
 def test_model_stamped_on_nodes():
-    swarm = Swarm(model="claude-mythos", provider=MockProvider(), architect=SimpleArchitect())
+    swarm = Swarm(model="claude-opus-4-8", provider=MockProvider(), architect=SimpleArchitect())
     task = Task(goal="Check model stamping")
     graph = swarm.plan(task)
 
-    assert graph.nodes[0].metadata["model"] == "claude-mythos"
+    assert graph.nodes[0].metadata["model"] == "claude-opus-4-8"
 
 
 def test_execute_reports_cost():
@@ -125,7 +125,7 @@ def test_planning_model_separate_from_execution_model():
     provider = PlanningMockProvider()
     swarm = Swarm(
         provider=provider,
-        model="claude-mythos",
+        model="claude-opus-4-8",
         planning_model="claude-planning-model",
     )
     assert isinstance(swarm._architect, LLMArchitect)
@@ -280,7 +280,7 @@ def test_llm_merge_receives_swarm_model():
 
     capture = _ModelCapturingProvider()
     swarm = Swarm(
-        model="claude-mythos",
+        model="claude-opus-4-8",
         provider=capture,
         architect=SimpleArchitect(),
         synthesizer=Synthesizer(strategy=SynthesisStrategy.LLM_MERGE),
@@ -289,8 +289,8 @@ def test_llm_merge_receives_swarm_model():
     swarm.execute(task)
 
     merge_model = capture.models_seen[-1]
-    assert merge_model == "claude-mythos", (
-        f"Expected synthesis to use 'claude-mythos' but got {merge_model!r}"
+    assert merge_model == "claude-opus-4-8", (
+        f"Expected synthesis to use 'claude-opus-4-8' but got {merge_model!r}"
     )
 
 

@@ -78,7 +78,7 @@ class DemoProvider(OfflineProvider):
 def pick_provider() -> tuple[Provider, str]:
     """Return (provider, model) — a real provider if an API key is set, else the demo."""
     if os.environ.get("ANTHROPIC_API_KEY"):
-        return AnthropicProvider(), "claude-mythos"
+        return AnthropicProvider(), "claude-opus-4-8"
     if os.environ.get("OPENAI_API_KEY"):
         return OpenAIProvider(), "gpt-5.2"
     if os.environ.get("GOOGLE_API_KEY"):

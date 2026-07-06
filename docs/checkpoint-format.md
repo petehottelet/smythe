@@ -13,7 +13,7 @@ With the default `FileCheckpointStore`, checkpoints live at `~/.smythe/checkpoin
   "status": "running | completed | failed",
   "created_at": 1751600000.0,
   "updated_at": 1751600042.5,
-  "model": "claude-mythos",
+  "model": "claude-opus-4-8",
   "task": {
     "goal": "…",
     "constraints": ["…"],
@@ -30,7 +30,7 @@ With the default `FileCheckpointStore`, checkpoints live at `~/.smythe/checkpoin
         "depends_on": [],
         "result": "…node output, null until executed…",
         "status": "completed",
-        "metadata": {"model": "claude-mythos", "cost_usd": 0.0003},
+        "metadata": {"model": "claude-opus-4-8", "cost_usd": 0.0003},
         "failure_policy": "halt",
         "max_retries": 1,
         "required_capabilities": [],
