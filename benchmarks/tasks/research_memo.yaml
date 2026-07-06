@@ -1,0 +1,15 @@
+name: research-memo
+goal: >
+  Produce a research memo on the current state of solid-state batteries for
+  consumer electronics: the leading approaches, the main manufacturing
+  obstacles, and a realistic adoption timeline.
+constraints:
+  - "Distinguish demonstrated results from vendor announcements"
+  - "Include at least one contrarian consideration"
+  - "Keep the memo under 800 words"
+rubric:
+  - "Covers multiple technical approaches, not just one"
+  - "Manufacturing obstacles are specific (materials, yield, cost)"
+  - "Timeline claims are hedged proportionally to the evidence"
+  - "Contrarian consideration is substantive, not token"
+  - "Memo is organized and within the length limit"
