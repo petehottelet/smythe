@@ -25,6 +25,44 @@ Future work tracked in [ROADMAP.md](ROADMAP.md).
 
 ---
 
+## [0.3.0] - 2026-07-05
+
+Flagship proof. The demo the README promises now exists, runs offline,
+and its expected output is committed and drift-tested. No breaking API
+changes.
+
+### Added
+
+- **Flagship demo** — `examples/acquisition_diligence/`: task intake, an
+  Architect-generated `fork-join -> adversarial -> serial` topology, three
+  parallel specialists, a red-team tier, and a final structured memo.
+  Fixture mode (default, no keys) is deterministic even under parallel
+  execution; any provider API key switches the same script to real mode.
+  The expected graph (Mermaid), trace, and memo are committed under
+  `expected/`, regenerable with `--write-artifacts`, and guarded by a
+  drift test in CI.
+
+### Fixed
+
+- **Agent names in rendered graphs** — `TaskGraph` trees, Mermaid, and DOT
+  exports labeled nodes with the assigned agent's random hex id instead of
+  its name. Assignment (loader and registry) now stamps `agent_name` into
+  node metadata and rendering prefers it; checkpointed graphs render the
+  same after resume.
+- **CI** — the workflow now installs the `dev` extra (previously it
+  hand-picked pytest packages and missed the `mcp` SDK, failing the MCP
+  example smoke test). MCP-dependent examples are skipped when the `mcp`
+  package is absent so a plain `pip install -e .` checkout tests green.
+
+### Changed
+
+- **README** — restructured around install, a 60-second quickstart, and
+  the flagship demo's real output; renamed `Readme.md` to `README.md`.
+- **Roadmap** — benchmarks now precede recursive subgraph decomposition.
+- GitHub Actions bumped to current majors (Node 20 deprecation).
+
+---
+
 ## [0.2.0] - 2026-07-05
 
 First PyPI release. The v0.2 line makes agents real: they use tools, survive
