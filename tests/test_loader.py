@@ -319,3 +319,22 @@ nodes:
 """
     with pytest.raises(ValueError, match="max_tool_iterations"):
         load_graph_from_string(yaml_str)
+
+
+def test_loader_stamps_agent_name_for_rendering():
+    yaml_str = """\
+topology: serial
+
+nodes:
+  - id: research
+    label: "Research the topic"
+    agent:
+      name: Researcher
+      persona: "You research."
+"""
+    graph, _registry = load_graph_from_string(yaml_str)
+
+    node = graph.nodes[0]
+    assert node.metadata["agent_name"] == "Researcher"
+    assert "Researcher: Research the topic" in str(graph)
+    assert node.agent_id not in graph.to_mermaid()
