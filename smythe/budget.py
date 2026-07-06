@@ -77,13 +77,31 @@ class Sentinel:
         self._spent -= reserved
 
     def record(self, node_id: str, result: CompletionResult) -> float:
-        """Record the actual cost, replacing any outstanding reservation."""
+        """Record the actual cost, replacing any outstanding reservation.
+
+        Overwrites the node's cost — use add_cost() for multi-call
+        nodes (tool loops), where costs must accumulate.
+        """
         reserved = self._reservations.pop(node_id, 0.0)
         self._spent -= reserved
         cost = result.total_tokens * self.cost_per_token
         self._node_costs[node_id] = cost
         self._spent += cost
         return cost
+
+    def add_cost(self, node_id: str, result: CompletionResult) -> float:
+        """Accumulate cost for a node across multiple provider calls.
+
+        The first call for a node also releases any outstanding
+        reservation (the estimate is superseded by actuals).  Returns
+        the node's cumulative cost.
+        """
+        reserved = self._reservations.pop(node_id, 0.0)
+        self._spent -= reserved
+        cost = result.total_tokens * self.cost_per_token
+        self._node_costs[node_id] = self._node_costs.get(node_id, 0.0) + cost
+        self._spent += cost
+        return self._node_costs[node_id]
 
     def breakdown(self) -> dict[str, float]:
         """Per-node cost map in USD."""

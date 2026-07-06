@@ -12,11 +12,20 @@ with "__" (see wire_name / display_name).
 from __future__ import annotations
 
 import re
+from abc import ABC, abstractmethod
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from smythe.agent import Agent
 
 # Strictest naming rule across the three vendors, applied to the wire form.
 _WIRE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+class ToolLoopLimitError(Exception):
+    """Raised when a node's tool loop hits max_tool_iterations."""
 
 
 def wire_name(name: str) -> str:
@@ -90,6 +99,36 @@ class ChatMessage:
     content: str = ""
     tool_calls: list[ToolCall] = field(default_factory=list)
     tool_results: list[ToolResult] = field(default_factory=list)
+
+
+class ToolSession(ABC):
+    """Open tool connections for one node execution.
+
+    Created by a ToolRuntime at loop start and closed when the node
+    finishes (including on cancellation — implementations must make
+    teardown cancellation-safe).
+    """
+
+    @property
+    @abstractmethod
+    def tools(self) -> list[ToolSpec]:
+        """The tools available to this node, already allowlist-filtered."""
+
+    @abstractmethod
+    async def call(self, tool_call: ToolCall) -> ToolResult:
+        """Execute one tool call and return its result."""
+
+
+class ToolRuntime(ABC):
+    """Factory for per-node tool sessions.
+
+    The executor opens a session for each tool-using node execution;
+    the MCP runtime (plans/04 M3) is the primary implementation.
+    """
+
+    @abstractmethod
+    def open(self, agent: Agent | None) -> AbstractAsyncContextManager[ToolSession]:
+        """Return an async context manager yielding a ToolSession for *agent*."""
 
 
 def content_to_text(parts: Any) -> str:

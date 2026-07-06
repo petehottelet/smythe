@@ -160,3 +160,34 @@ def test_budget_release_nonexistent_is_safe():
     tracker = Sentinel(max_budget_usd=1.0)
     tracker.release("ghost-node")
     assert tracker.total_cost_usd == 0.0
+
+
+def test_add_cost_accumulates_per_node():
+    from smythe.provider import CompletionResult
+
+    s = Sentinel(max_budget_usd=1.0, cost_per_token=0.000003)
+    r1 = CompletionResult(text="a", prompt_tokens=500, completion_tokens=500)
+    r2 = CompletionResult(text="b", prompt_tokens=250, completion_tokens=250)
+
+    total1 = s.add_cost("n1", r1)
+    total2 = s.add_cost("n1", r2)
+
+    assert total2 > total1
+    assert s.breakdown()["n1"] == total2
+    assert s.total_cost_usd == total2
+
+
+def test_add_cost_releases_reservation_once():
+    from smythe.provider import CompletionResult
+
+    s = Sentinel(max_budget_usd=1.0, cost_per_token=0.000003)
+    s.reserve("n1", 0.01)
+    assert s.total_cost_usd == 0.01
+
+    r = CompletionResult(text="a", prompt_tokens=500, completion_tokens=500)
+    s.add_cost("n1", r)  # replaces the reservation with actuals
+    first = s.total_cost_usd
+    assert first == s.breakdown()["n1"]
+
+    s.add_cost("n1", r)  # no reservation left to release; just accumulates
+    assert s.total_cost_usd == first * 2

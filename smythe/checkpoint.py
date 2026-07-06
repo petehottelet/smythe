@@ -54,6 +54,7 @@ def node_to_dict(node: Node) -> dict[str, Any]:
         "max_retries": node.max_retries,
         "required_capabilities": list(node.required_capabilities),
         "timeout_s": node.timeout_s,
+        "max_tool_iterations": node.max_tool_iterations,
     }
 
 
@@ -70,6 +71,7 @@ def node_from_dict(data: dict[str, Any]) -> Node:
         max_retries=data.get("max_retries", 1),
         required_capabilities=list(data.get("required_capabilities", [])),
         timeout_s=data.get("timeout_s"),
+        max_tool_iterations=data.get("max_tool_iterations"),
     )
 
 

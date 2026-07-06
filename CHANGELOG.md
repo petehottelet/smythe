@@ -27,6 +27,14 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   `ToolResult`, `ChatMessage`) and `Provider.chat()`, mapped to native tool use on
   Anthropic, OpenAI, and Gemini. First milestone of MCP tool support
   (plans/04-mcp-tool-support.md).
+- **Tool-calling loop** — nodes whose Swarm has a `tool_runtime` run a bounded
+  tool loop: `max_tool_iterations` circuit breaker (per node and per Swarm),
+  mid-loop budget enforcement, per-call trace entries, tool failures fed back to
+  the model as error results, and `timeout_s` covering the whole loop. Budget
+  recording moved into the loop via the new accumulating `Sentinel.add_cost()`;
+  `node.metadata["cost_usd"]` is now cumulative across a node's provider calls.
+  `ToolRuntime` / `ToolSession` define the interface the MCP runtime implements
+  next (plans/04 M2).
 - **Graph export** — `ExecutionGraph.to_mermaid()` (with node-status styling),
   `to_dot()`, and `to_json()` (with per-node cost).
 - **`OfflineProvider`** — deterministic, no-network provider; every example runs

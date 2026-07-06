@@ -65,6 +65,22 @@ class Tracer:
                 span.duration_ms,
             )
 
+    def on_tool_call(
+        self, node: Node, tool_name: str, duration_ms: float, is_error: bool,
+    ) -> None:
+        """Record one tool call on the active span for *node*."""
+        span = self._active.get(node.id)
+        if span:
+            span.metadata.setdefault("tool_calls", []).append({
+                "tool": tool_name,
+                "duration_ms": round(duration_ms, 1),
+                "is_error": is_error,
+            })
+        logger.debug(
+            "Tool call: %s on node %s — %.1fms%s",
+            tool_name, node.id, duration_ms, " (error)" if is_error else "",
+        )
+
     def on_node_error(self, node: Node, exc: Exception) -> None:
         span = self._active.get(node.id)
         if span:
@@ -73,8 +89,9 @@ class Tracer:
 
     def summary(self) -> list[dict[str, Any]]:
         """Return spans as plain dicts for serialization / planner feedback."""
-        return [
-            {
+        out: list[dict[str, Any]] = []
+        for s in self.spans:
+            entry: dict[str, Any] = {
                 "node_id": s.node_id,
                 "label": s.label,
                 "agent_id": s.agent_id,
@@ -82,5 +99,7 @@ class Tracer:
                 "duration_ms": round(s.duration_ms, 1),
                 "error": s.error,
             }
-            for s in self.spans
-        ]
+            if "tool_calls" in s.metadata:
+                entry["tool_calls"] = s.metadata["tool_calls"]
+            out.append(entry)
+        return out

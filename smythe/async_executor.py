@@ -6,10 +6,11 @@ import asyncio
 from typing import Callable
 
 from smythe.budget import Sentinel
-from smythe.executor_base import ExecutorBase
+from smythe.executor_base import DEFAULT_MAX_TOOL_ITERATIONS, ExecutorBase
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
 from smythe.provider import Provider
 from smythe.registry import Registry
+from smythe.tools import ToolRuntime
 from smythe.tracer import Tracer
 
 
@@ -41,10 +42,13 @@ class AsyncExecutor(ExecutorBase):
         estimated_tokens_per_node: int = DEFAULT_ESTIMATED_TOKENS,
         max_concurrency: int | None = None,
         on_node_update: Callable[[Node], None] | None = None,
+        tool_runtime: ToolRuntime | None = None,
+        max_tool_iterations: int = DEFAULT_MAX_TOOL_ITERATIONS,
     ) -> None:
         super().__init__(
             provider=provider, registry=registry, tracer=tracer, budget=budget,
-            on_node_update=on_node_update,
+            on_node_update=on_node_update, tool_runtime=tool_runtime,
+            max_tool_iterations=max_tool_iterations,
         )
         self._estimated_tokens_per_node = estimated_tokens_per_node
         if max_concurrency is not None and max_concurrency < 1:
@@ -117,13 +121,9 @@ class AsyncExecutor(ExecutorBase):
             self._tracer.on_node_start(node)
 
             try:
+                # Cost recording happens inside acall_node (per provider call).
                 result = await self.acall_node(node, graph)
                 node.result = result.text
-
-                if self._budget:
-                    cost = self._budget.record(node.id, result)
-                    node.metadata["cost_usd"] = cost
-
                 node.status = NodeStatus.COMPLETED
                 self._tracer.on_node_end(node)
                 self.notify_update(node)

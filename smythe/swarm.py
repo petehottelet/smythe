@@ -19,8 +19,10 @@ from smythe.checkpoint import (
     task_from_dict,
 )
 from smythe.executor import Executor
+from smythe.executor_base import DEFAULT_MAX_TOOL_ITERATIONS
 from smythe.graph import ExecutionGraph
 from smythe.memory import PlannerMemory
+from smythe.tools import ToolRuntime
 from smythe.planner import Architect, LLMArchitect, SimpleArchitect
 from smythe.router import WhiteRabbit
 from smythe.provider import AnthropicProvider, GeminiProvider, OpenAIProvider, Provider
@@ -86,12 +88,16 @@ class Swarm:
         router: WhiteRabbit | None = None,
         max_concurrency: int | None = 8,
         checkpoint_store: CheckpointStore | None = None,
+        tool_runtime: ToolRuntime | None = None,
+        max_tool_iterations: int = DEFAULT_MAX_TOOL_ITERATIONS,
     ) -> None:
         self.model = model
         self.max_budget_usd = max_budget_usd
         self.parallel = parallel
         self.max_concurrency = max_concurrency
+        self.max_tool_iterations = max_tool_iterations
         self._checkpoint_store = checkpoint_store
+        self._tool_runtime = tool_runtime
         self._provider = provider or _auto_detect_provider(model)
         self._memory = memory
         self._registry = registry or Registry()
@@ -189,6 +195,8 @@ class Swarm:
         executor = AsyncExecutor(
             provider=self._provider, registry=self._registry, tracer=tracer,
             budget=budget, max_concurrency=self.max_concurrency,
+            tool_runtime=self._tool_runtime,
+            max_tool_iterations=self.max_tool_iterations,
             on_node_update=self._checkpointer(
                 execution_id, graph, budget, task, created_at,
             ),
@@ -248,6 +256,8 @@ class Swarm:
         executor = Executor(
             provider=self._provider, registry=self._registry, tracer=tracer,
             budget=budget,
+            tool_runtime=self._tool_runtime,
+            max_tool_iterations=self.max_tool_iterations,
             on_node_update=self._checkpointer(
                 execution_id, graph, budget, task, created_at,
             ),
@@ -388,6 +398,8 @@ class Swarm:
         executor = AsyncExecutor(
             provider=self._provider, registry=self._registry, tracer=tracer,
             budget=budget, max_concurrency=self.max_concurrency,
+            tool_runtime=self._tool_runtime,
+            max_tool_iterations=self.max_tool_iterations,
             on_node_update=self._checkpointer(
                 execution_id, graph, budget, task, created_at,
             ),

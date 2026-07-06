@@ -90,6 +90,19 @@ def build_graph_from_dict(data: dict) -> tuple[ExecutionGraph, Registry]:
                 )
             timeout_s = float(timeout_s)
 
+        max_tool_iterations = entry.get("max_tool_iterations")
+        if max_tool_iterations is not None:
+            if isinstance(max_tool_iterations, bool) or not isinstance(max_tool_iterations, int):
+                raise ValueError(
+                    f"'max_tool_iterations' on node {node_id!r} must be an integer, "
+                    f"got {type(max_tool_iterations).__name__}"
+                )
+            if max_tool_iterations < 1:
+                raise ValueError(
+                    f"'max_tool_iterations' on node {node_id!r} must be >= 1, "
+                    f"got {max_tool_iterations}"
+                )
+
         node = Node(
             id=node_id,
             label=label,
@@ -99,6 +112,7 @@ def build_graph_from_dict(data: dict) -> tuple[ExecutionGraph, Registry]:
             max_retries=max_retries,
             required_capabilities=required_capabilities,
             timeout_s=timeout_s,
+            max_tool_iterations=max_tool_iterations,
         )
 
         agent_data = entry.get("agent")

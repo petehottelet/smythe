@@ -6,6 +6,7 @@ from smythe.checkpoint import (
     FileCheckpointStore,
     graph_from_dict,
     graph_to_dict,
+    node_from_dict,
     node_to_dict,
     reset_incomplete_nodes,
 )
@@ -264,3 +265,13 @@ def test_sync_execution_also_checkpoints(tmp_path):
     assert state["status"] == "completed"
     assert all(n["status"] == "completed" for n in state["graph"]["nodes"])
     assert state["output"] == result.output
+
+
+def test_max_tool_iterations_roundtrips_and_old_checkpoints_default():
+    node = Node(id="n", label="L", max_tool_iterations=4)
+    restored = node_from_dict(node_to_dict(node))
+    assert restored.max_tool_iterations == 4
+
+    legacy = node_to_dict(Node(id="m", label="L2"))
+    legacy.pop("max_tool_iterations")  # pre-M2 checkpoint shape
+    assert node_from_dict(legacy).max_tool_iterations is None

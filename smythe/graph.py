@@ -55,6 +55,8 @@ class Node:
         timeout_s: Wall-clock limit for a single execution attempt, in
             seconds.  None (default) means no timeout.  A timed-out
             attempt fails and is handled by the node's failure policy.
+        max_tool_iterations: Cap on tool-loop iterations for this node.
+            None (default) uses the executor-level default.
     """
 
     label: str
@@ -68,6 +70,7 @@ class Node:
     max_retries: int = 1
     required_capabilities: list[str] = field(default_factory=list)
     timeout_s: float | None = None
+    max_tool_iterations: int | None = None
 
 
 @dataclass
