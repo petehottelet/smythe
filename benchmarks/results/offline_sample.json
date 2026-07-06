@@ -10,7 +10,10 @@
     "cost_usd": 0.0003,
     "wall_ms": null,
     "output": "offline: Evaluate whether MetaCortex Corp is a viable acquisition tar",
-    "quality": null
+    "quality": null,
+    "run": 0,
+    "judge_model": null,
+    "ablate_terminal_note": false
   },
   {
     "task": "acquisition-diligence",
@@ -23,7 +26,10 @@
     "cost_usd": 0.0009,
     "wall_ms": null,
     "output": "offline: Write the final deliverable, meeting every constraint, for: ",
-    "quality": null
+    "quality": null,
+    "run": 0,
+    "judge_model": null,
+    "ablate_terminal_note": false
   },
   {
     "task": "acquisition-diligence",
@@ -36,7 +42,10 @@
     "cost_usd": 0.0009,
     "wall_ms": null,
     "output": "offline: Synthesize findings into the final deliverable",
-    "quality": null
+    "quality": null,
+    "run": 0,
+    "judge_model": null,
+    "ablate_terminal_note": false
   },
   {
     "task": "code-review",
@@ -49,7 +58,10 @@
     "cost_usd": 0.0003,
     "wall_ms": null,
     "output": "offline: Review the following Python function for correctness bugs, t",
-    "quality": null
+    "quality": null,
+    "run": 0,
+    "judge_model": null,
+    "ablate_terminal_note": false
   },
   {
     "task": "code-review",
@@ -62,7 +74,10 @@
     "cost_usd": 0.0009,
     "wall_ms": null,
     "output": "offline: Write the final deliverable, meeting every constraint, for: ",
-    "quality": null
+    "quality": null,
+    "run": 0,
+    "judge_model": null,
+    "ablate_terminal_note": false
   },
   {
     "task": "code-review",
@@ -75,7 +90,10 @@
     "cost_usd": 0.0009,
     "wall_ms": null,
     "output": "offline: Synthesize findings into the final deliverable",
-    "quality": null
+    "quality": null,
+    "run": 0,
+    "judge_model": null,
+    "ablate_terminal_note": false
   },
   {
     "task": "competitive-analysis",
@@ -88,7 +106,10 @@
     "cost_usd": 0.0003,
     "wall_ms": null,
     "output": "offline: Analyze the competitive landscape for team password managers",
-    "quality": null
+    "quality": null,
+    "run": 0,
+    "judge_model": null,
+    "ablate_terminal_note": false
   },
   {
     "task": "competitive-analysis",
@@ -101,7 +122,10 @@
     "cost_usd": 0.0009,
     "wall_ms": null,
     "output": "offline: Write the final deliverable, meeting every constraint, for: ",
-    "quality": null
+    "quality": null,
+    "run": 0,
+    "judge_model": null,
+    "ablate_terminal_note": false
   },
   {
     "task": "competitive-analysis",
@@ -114,7 +138,10 @@
     "cost_usd": 0.0009,
     "wall_ms": null,
     "output": "offline: Synthesize findings into the final deliverable",
-    "quality": null
+    "quality": null,
+    "run": 0,
+    "judge_model": null,
+    "ablate_terminal_note": false
   },
   {
     "task": "product-launch",
@@ -127,7 +154,10 @@
     "cost_usd": 0.0003,
     "wall_ms": null,
     "output": "offline: Create a launch plan for \"Lumen\", a $79 smart reading lamp t",
-    "quality": null
+    "quality": null,
+    "run": 0,
+    "judge_model": null,
+    "ablate_terminal_note": false
   },
   {
     "task": "product-launch",
@@ -140,7 +170,10 @@
     "cost_usd": 0.0009,
     "wall_ms": null,
     "output": "offline: Write the final deliverable, meeting every constraint, for: ",
-    "quality": null
+    "quality": null,
+    "run": 0,
+    "judge_model": null,
+    "ablate_terminal_note": false
   },
   {
     "task": "product-launch",
@@ -153,7 +186,10 @@
     "cost_usd": 0.0009,
     "wall_ms": null,
     "output": "offline: Synthesize findings into the final deliverable",
-    "quality": null
+    "quality": null,
+    "run": 0,
+    "judge_model": null,
+    "ablate_terminal_note": false
   },
   {
     "task": "research-memo",
@@ -166,7 +202,10 @@
     "cost_usd": 0.0003,
     "wall_ms": null,
     "output": "offline: Produce a research memo on the current state of solid-state ",
-    "quality": null
+    "quality": null,
+    "run": 0,
+    "judge_model": null,
+    "ablate_terminal_note": false
   },
   {
     "task": "research-memo",
@@ -179,7 +218,10 @@
     "cost_usd": 0.0009,
     "wall_ms": null,
     "output": "offline: Write the final deliverable, meeting every constraint, for: ",
-    "quality": null
+    "quality": null,
+    "run": 0,
+    "judge_model": null,
+    "ablate_terminal_note": false
   },
   {
     "task": "research-memo",
@@ -192,6 +234,9 @@
     "cost_usd": 0.0009,
     "wall_ms": null,
     "output": "offline: Synthesize findings into the final deliverable",
-    "quality": null
+    "quality": null,
+    "run": 0,
+    "judge_model": null,
+    "ablate_terminal_note": false
   }
 ]

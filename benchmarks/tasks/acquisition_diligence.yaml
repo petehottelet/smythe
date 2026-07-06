@@ -1,15 +1,43 @@
 name: acquisition-diligence
-goal: >
-  Evaluate whether MetaCortex Corp is a viable acquisition target. Analyze their
-  financials, technical IP, and regulatory exposure, then produce a diligence
-  memo with a go/no-go recommendation.
+goal: |
+  Evaluate whether MetaCortex Corp is a viable acquisition target using the
+  source documents below. Analyze the financials, technical IP, and
+  regulatory exposure, then produce a diligence memo with a go/no-go
+  recommendation. All companies and figures are fictional.
+
+  === SOURCE DOCUMENT 1: Financial summary (from the data room) ===
+  Revenue: $48M ARR; growth 22% YoY, down from 41% the prior year.
+  Gross margin 71%. Net revenue retention 104%.
+  Burn: $1.1M/month against $21M cash (~19 months runway).
+  Customer concentration: top 3 customers are 38% of ARR, all on 2-year
+  contracts with renewal windows in the next 9 months.
+  Seller's ask: $260M. Comparable transactions closed at 4-6x ARR.
+
+  === SOURCE DOCUMENT 2: Technical diligence notes ===
+  Core IP: adaptive routing engine - 2 granted patents, 1 pending. This
+  is the asset motivating the acquisition.
+  Architecture: aging monolith plus 2 extracted services; tech debt is
+  moderate with a budgeted paydown plan.
+  Key-person risk: 2 staff engineers author ~70% of core-engine commits;
+  neither has retention terms that survive an acquisition.
+  Security: SOC 2 Type II current, no open critical findings.
+
+  === SOURCE DOCUMENT 3: Legal docket summary ===
+  Ouroboros Corporation v. MetaCortex (D. Del., pending): claims the
+  routing engine infringes one Ouroboros patent. Motion to dismiss
+  denied; discovery underway.
+  SEC: no enforcement history; S-1 withdrawn in 2024 for market reasons.
+  Antitrust: combined segment share post-close ~18%, below screening
+  thresholds; deal size triggers an HSR filing (30-day waiting period).
 constraints:
+  - "Use only the supplied source documents; do not invent additional facts"
   - "Red-team every bullish claim before it reaches the memo"
   - "Flag any SEC or antitrust risk factors"
   - "Final output must be structured: summary, findings, risks, recommendation"
 rubric:
-  - "Identifies concrete financial risks, not generic ones"
-  - "Separates facts from assumptions"
+  - "Financial risks are grounded in the supplied numbers (growth deceleration, concentration, valuation vs comps), not generic"
+  - "The Ouroboros litigation is connected to the routing-engine IP that motivates the deal"
+  - "Key-person risk and its interaction with the IP value is identified"
   - "Bullish claims are challenged, not just restated"
   - "Recommendation is explicit and conditional where evidence is mixed"
   - "Structure follows summary / findings / risks / recommendation"

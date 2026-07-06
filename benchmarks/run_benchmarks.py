@@ -28,16 +28,21 @@ BENCH_DIR = Path(__file__).parent
 
 
 def real_provider():
-    """Return (provider, model) for the first configured API key, else None."""
+    """Return (provider, executor model, judge model) for the first
+    configured API key, else None.
+
+    The judge deliberately runs on a different model than the executor
+    to reduce self-preference bias in scoring.
+    """
     if os.environ.get("ANTHROPIC_API_KEY"):
         from smythe.provider import AnthropicProvider
-        return AnthropicProvider(), "claude-opus-4-8"
+        return AnthropicProvider(), "claude-opus-4-8", "claude-sonnet-5"
     if os.environ.get("OPENAI_API_KEY"):
         from smythe.provider import OpenAIProvider
-        return OpenAIProvider(), "gpt-5.2"
+        return OpenAIProvider(), "gpt-5.2", "gpt-5.2"
     if os.environ.get("GOOGLE_API_KEY"):
         from smythe.provider import GeminiProvider
-        return GeminiProvider(), "gemini-3-flash"
+        return GeminiProvider(), "gemini-3-flash", "gemini-3-flash"
     return None
 
 
@@ -50,9 +55,23 @@ def main() -> int:
                         help="force offline mode even if an API key is set")
     parser.add_argument("--judge", action="store_true",
                         help="score outputs against the rubric (real mode only)")
+    parser.add_argument("--judge-model", default=None, metavar="MODEL",
+                        help="override the judge model (default: a different "
+                             "model than the executor, to reduce self-preference)")
+    parser.add_argument("--runs", type=int, default=1, metavar="N",
+                        help="repeat each (task, baseline) N times")
+    parser.add_argument("--ablate-terminal-note", action="store_true",
+                        help="ablation: blank the terminal deliverable note so "
+                             "final nodes are not told their output is the "
+                             "deliverable (for A/B comparisons)")
     parser.add_argument("--out", default=None, metavar="FILE",
                         help="write results JSON to FILE")
     args = parser.parse_args()
+
+    if args.ablate_terminal_note:
+        import smythe.executor_base as _eb
+        _eb.TERMINAL_DELIVERABLE_NOTE = ""
+        print("ABLATION: terminal deliverable note disabled for this run.\n")
 
     real = None if args.offline else real_provider()
     offline = real is None
@@ -73,26 +92,45 @@ def main() -> int:
     records = []
     for bench_task in tasks:
         for baseline in baselines:
-            if offline:
-                provider, model = offline_provider(baseline), "offline-model"
-            else:
-                provider, model = real
-            record = run_one(bench_task, baseline, provider, model, offline=offline)
-            if args.judge and not offline:
-                record["quality"] = score_output(
-                    provider, model, bench_task.goal, bench_task.rubric,
-                    record["output"],
-                )
-            records.append(record)
-            print(f"  done: {bench_task.name} / {baseline}"
-                  f"  nodes={record['nodes']}  topology={record['topology']}")
+            for run_index in range(args.runs):
+                if offline:
+                    provider, model = offline_provider(baseline), "offline-model"
+                    judge_model = None
+                else:
+                    provider, model, judge_model = real
+                    judge_model = args.judge_model or judge_model
+                record = run_one(bench_task, baseline, provider, model,
+                                 offline=offline)
+                record["run"] = run_index
+                record["judge_model"] = None
+                record["ablate_terminal_note"] = args.ablate_terminal_note
+                if args.judge and not offline:
+                    record["quality"] = score_output(
+                        provider, judge_model, bench_task.goal,
+                        bench_task.rubric, record["output"],
+                    )
+                    record["judge_model"] = judge_model
+                records.append(record)
+                print(f"  done: {bench_task.name} / {baseline} run={run_index}"
+                      f"  nodes={record['nodes']}  topology={record['topology']}")
 
-    print(f"\n{'task':<24} {'baseline':<16} {'nodes':>5} {'depth':>5} "
-          f"{'cost_usd':>9} {'quality':>8}")
-    for r in records:
-        quality = r["quality"]["overall"] if r["quality"] else "-"
-        print(f"{r['task']:<24} {r['baseline']:<16} {r['nodes']:>5} {r['depth']:>5} "
-              f"{r['cost_usd']:>9.4f} {quality:>8}")
+    print(f"\n{'task':<24} {'baseline':<16} {'runs':>4} {'quality':>14} "
+          f"{'mean_cost':>10}")
+    for bench_task in tasks:
+        for baseline in baselines:
+            cell = [r for r in records
+                    if r["task"] == bench_task.name and r["baseline"] == baseline]
+            if not cell:
+                continue
+            costs = [r["cost_usd"] for r in cell]
+            scores = [r["quality"]["overall"] for r in cell if r["quality"]]
+            if scores:
+                quality = (f"{sum(scores) / len(scores):.1f} "
+                           f"[{min(scores)}-{max(scores)}]")
+            else:
+                quality = "-"
+            print(f"{bench_task.name:<24} {baseline:<16} {len(cell):>4} "
+                  f"{quality:>14} {sum(costs) / len(costs):>10.4f}")
 
     if args.out:
         out = Path(args.out)
