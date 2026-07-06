@@ -14,10 +14,17 @@ import pytest
 EXAMPLES_DIR = Path(__file__).parents[1] / "examples"
 EXAMPLE_SCRIPTS = sorted(EXAMPLES_DIR.glob("0*.py"))
 
+# Env-gated examples print instructions and exit 0 when credentials are
+# absent; they don't produce the offline-run marker.
+GATED = {"06_mcp_github.py", "07_mcp_saas.py"}
+
 
 def _offline_env() -> dict[str, str]:
     env = dict(os.environ)
-    for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY"):
+    for key in (
+        "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY",
+        "GITHUB_PERSONAL_ACCESS_TOKEN", "SMYTHE_MCP_URL",
+    ):
         env.pop(key, None)
     env["PYTHONIOENCODING"] = "utf-8"
     return env
@@ -36,7 +43,8 @@ def test_example_runs_offline(script):
         f"{script.name} failed (exit {proc.returncode}):\n"
         f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
     )
-    assert "OfflineProvider" in proc.stdout or "offline" in proc.stdout
+    if script.name not in GATED:
+        assert "OfflineProvider" in proc.stdout or "offline" in proc.stdout
 
 
 def test_examples_were_discovered():

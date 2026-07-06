@@ -27,6 +27,16 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   `ToolResult`, `ChatMessage`) and `Provider.chat()`, mapped to native tool use on
   Anthropic, OpenAI, and Gemini. First milestone of MCP tool support
   (plans/04-mcp-tool-support.md).
+- **MCP tool support** — agents consume MCP servers as tool sources
+  (`pip install smythe[mcp]`): `MCPServerSpec` (stdio + streamable HTTP) with
+  `env_passthrough` secret handling (variable names in config, values resolved
+  from the environment — never serialized), per-server `allowed_tools` with a
+  large-toolset warning, per-call timeouts, and cancellation-safe teardown.
+  `MCPSkillProvider` grounds capability-based assignment in real tools, and the
+  `LLMArchitect` planning prompt now includes an available-agents/tools
+  inventory so plans exploit the toolset. Examples: offline filesystem
+  (bundled server), GitHub (allowlisted), and generic SaaS over HTTP.
+  Docs and threat model: docs/mcp.md.
 - **Tool-calling loop** — nodes whose Swarm has a `tool_runtime` run a bounded
   tool loop: `max_tool_iterations` circuit breaker (per node and per Swarm),
   mid-loop budget enforcement, per-call trace entries, tool failures fed back to
