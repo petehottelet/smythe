@@ -1,0 +1,80 @@
+[
+  {
+    "task": "acquisition-diligence",
+    "baseline": "single_agent",
+    "model": "offline-model",
+    "offline": true,
+    "topology": "serial",
+    "nodes": 1,
+    "depth": 0,
+    "cost_usd": 0.0003,
+    "wall_ms": null,
+    "output": "offline: Evaluate whether Acme Corp is a viable acquisition target. A",
+    "quality": null
+  },
+  {
+    "task": "acquisition-diligence",
+    "baseline": "fixed_pipeline",
+    "model": "offline-model",
+    "offline": true,
+    "topology": "serial",
+    "nodes": 3,
+    "depth": 2,
+    "cost_usd": 0.0009,
+    "wall_ms": null,
+    "output": "offline: Write the final deliverable, meeting every constraint, for: ",
+    "quality": null
+  },
+  {
+    "task": "acquisition-diligence",
+    "baseline": "smythe_dynamic",
+    "model": "offline-model",
+    "offline": true,
+    "topology": "fork_join",
+    "nodes": 3,
+    "depth": 1,
+    "cost_usd": 0.0009,
+    "wall_ms": null,
+    "output": "offline: Synthesize findings into the final deliverable",
+    "quality": null
+  },
+  {
+    "task": "research-memo",
+    "baseline": "single_agent",
+    "model": "offline-model",
+    "offline": true,
+    "topology": "serial",
+    "nodes": 1,
+    "depth": 0,
+    "cost_usd": 0.0003,
+    "wall_ms": null,
+    "output": "offline: Produce a research memo on the current state of solid-state ",
+    "quality": null
+  },
+  {
+    "task": "research-memo",
+    "baseline": "fixed_pipeline",
+    "model": "offline-model",
+    "offline": true,
+    "topology": "serial",
+    "nodes": 3,
+    "depth": 2,
+    "cost_usd": 0.0009,
+    "wall_ms": null,
+    "output": "offline: Write the final deliverable, meeting every constraint, for: ",
+    "quality": null
+  },
+  {
+    "task": "research-memo",
+    "baseline": "smythe_dynamic",
+    "model": "offline-model",
+    "offline": true,
+    "topology": "fork_join",
+    "nodes": 3,
+    "depth": 1,
+    "cost_usd": 0.0009,
+    "wall_ms": null,
+    "output": "offline: Synthesize findings into the final deliverable",
+    "quality": null
+  }
+]
