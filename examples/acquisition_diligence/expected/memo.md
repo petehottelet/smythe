@@ -1,7 +1,7 @@
-ACQUISITION DILIGENCE MEMO - ACME CORP
+ACQUISITION DILIGENCE MEMO - METACORTEX CORP
 
 SUMMARY
-Acme Corp is a genuine strategic asset - a patented adaptive routing
+MetaCortex Corp is a genuine strategic asset - a patented adaptive routing
 engine inside a $48M ARR business with 71% gross margins - offered at
 5.4x ARR, the top of the comparable band. The thesis survives red-team
 review only with conditions attached; the asking price does not.

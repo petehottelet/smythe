@@ -46,7 +46,7 @@ No API key? Clone the repo and every example — including the flagship demo bel
 
 ## See it run
 
-The flagship demo hands Smythe one goal — *evaluate whether Acme Corp is a viable acquisition target* — and the Architect answers with a topology, not a transcript:
+The flagship demo hands Smythe one goal — *evaluate whether MetaCortex Corp is a viable acquisition target* — and the Architect answers with a topology, not a transcript:
 
 ```bash
 python examples/acquisition_diligence/run.py
@@ -56,9 +56,9 @@ python examples/acquisition_diligence/run.py
 === The Architect's plan ===
 TaskGraph(topology="fork-join → adversarial → serial")
 ├─ fork (parallel):
-│   ├─ FinancialAnalyst: Analyze Acme Corp's revenue model, margins, burn rate, and comparable valuations
-│   ├─ TechDiligenceAgent: Assess Acme Corp's IP portfolio, tech debt signals, and key-person dependencies
-│   └─ RegulatoryAgent: Review Acme Corp's SEC filings, antitrust exposure, and pending litigation
+│   ├─ FinancialAnalyst: Analyze MetaCortex Corp's revenue model, margins, burn rate, and comparable valuations
+│   ├─ TechDiligenceAgent: Assess MetaCortex Corp's IP portfolio, tech debt signals, and key-person dependencies
+│   └─ RegulatoryAgent: Review MetaCortex Corp's SEC filings, antitrust exposure, and pending litigation
 ├─ join: DiligenceEditor: Merge the specialist findings into a draft diligence report
 ├─ adversarial: RedTeamAgent: Challenge every bullish claim in the draft report; stress-test projections and surface contradictions
 └─ serial (depends on DiligenceEditor, RedTeamAgent): MemoAgent: Produce the final structured memo
@@ -216,7 +216,7 @@ swarm = Swarm(max_budget_usd=2.00, model="claude-opus-4-8")
 
 task = Task(
     goal=(
-        "Evaluate whether Acme Corp is a viable acquisition target. "
+        "Evaluate whether MetaCortex Corp is a viable acquisition target. "
         "Analyze their financials, technical IP, and regulatory exposure, "
         "then produce a diligence memo with a go/no-go recommendation."
     ),

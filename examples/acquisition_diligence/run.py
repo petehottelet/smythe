@@ -76,7 +76,7 @@ swarm = Swarm(provider=provider, model=model, parallel=True, max_budget_usd=2.00
 
 task = Task(
     goal=(
-        "Evaluate whether Acme Corp is a viable acquisition target. "
+        "Evaluate whether MetaCortex Corp is a viable acquisition target. "
         "Analyze their financials, technical IP, and regulatory exposure, "
         "then produce a diligence memo with a go/no-go recommendation."
     ),
