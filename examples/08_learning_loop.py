@@ -85,7 +85,7 @@ class LearningDemoProvider(OfflineProvider):
 def pick_provider():
     if os.environ.get("ANTHROPIC_API_KEY"):
         from smythe.provider import AnthropicProvider
-        return AnthropicProvider(), "claude-mythos"
+        return AnthropicProvider(), "claude-opus-4-8"
     if os.environ.get("OPENAI_API_KEY"):
         from smythe.provider import OpenAIProvider
         return OpenAIProvider(), "gpt-5.2"

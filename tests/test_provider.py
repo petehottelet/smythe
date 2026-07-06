@@ -49,7 +49,7 @@ def test_openai_provider_constructable():
 
 
 def test_auto_detect_claude():
-    p = _auto_detect_provider("claude-mythos")
+    p = _auto_detect_provider("claude-opus-4-8")
     assert isinstance(p, AnthropicProvider)
 
 

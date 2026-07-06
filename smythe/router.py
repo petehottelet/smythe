@@ -40,7 +40,7 @@ class WhiteRabbit:
         constrained: Architect | None = None,
         autonomous: Architect | None = None,
         classifier_provider: Provider | None = None,
-        classifier_model: str = "claude-mythos",
+        classifier_model: str = "claude-opus-4-8",
     ) -> None:
         self._deterministic = deterministic or {}
         self._constrained = constrained

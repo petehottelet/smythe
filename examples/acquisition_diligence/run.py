@@ -36,7 +36,7 @@ def pick_provider():
     """Return (provider, model) — a real provider if an API key is set, else fixtures."""
     if os.environ.get("ANTHROPIC_API_KEY"):
         from smythe.provider import AnthropicProvider
-        return AnthropicProvider(), "claude-mythos"
+        return AnthropicProvider(), "claude-opus-4-8"
     if os.environ.get("OPENAI_API_KEY"):
         from smythe.provider import OpenAIProvider
         return OpenAIProvider(), "gpt-5.2"

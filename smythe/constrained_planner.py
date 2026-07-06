@@ -58,7 +58,7 @@ class ConstrainedArchitect(Architect):
         self,
         provider: Provider,
         templates: list[SubGraphTemplate],
-        model: str = "claude-mythos",
+        model: str = "claude-opus-4-8",
         max_retries: int = 2,
     ) -> None:
         self._provider = provider

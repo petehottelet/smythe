@@ -24,7 +24,7 @@ With an API key set (`ANTHROPIC_API_KEY` here), you hand the Swarm a goal; the A
 ```python
 from smythe import Swarm, Task
 
-swarm = Swarm(model="claude-mythos", max_budget_usd=0.50)
+swarm = Swarm(model="claude-opus-4-8", max_budget_usd=0.50)
 
 task = Task(
     goal=(
@@ -123,7 +123,7 @@ You define the goal; the framework negotiates the path.
 ```python
 from smythe import Swarm, Task
 
-swarm = Swarm(max_budget_usd=0.50, model="claude-mythos")
+swarm = Swarm(max_budget_usd=0.50, model="claude-opus-4-8")
 
 task = Task(
     goal=(
@@ -202,7 +202,7 @@ result = swarm.execute(plan)
 ### Enterprise task — fork-join with adversarial review
 
 ```python
-swarm = Swarm(max_budget_usd=2.00, model="claude-mythos")
+swarm = Swarm(max_budget_usd=2.00, model="claude-opus-4-8")
 
 task = Task(
     goal=(
@@ -334,7 +334,7 @@ swarm = Swarm(
     synthesizer=Synthesizer(
         strategy=SynthesisStrategy.LLM_MERGE,
         provider=my_provider,
-        model="claude-mythos",
+        model="claude-opus-4-8",
     ),
 )
 ```

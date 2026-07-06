@@ -31,7 +31,7 @@ def real_provider():
     """Return (provider, model) for the first configured API key, else None."""
     if os.environ.get("ANTHROPIC_API_KEY"):
         from smythe.provider import AnthropicProvider
-        return AnthropicProvider(), "claude-mythos"
+        return AnthropicProvider(), "claude-opus-4-8"
     if os.environ.get("OPENAI_API_KEY"):
         from smythe.provider import OpenAIProvider
         return OpenAIProvider(), "gpt-5.2"
