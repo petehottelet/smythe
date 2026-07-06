@@ -63,6 +63,14 @@ class Registry:
         """Invalidate all cached capabilities, forcing re-hydration."""
         self._capability_cache.clear()
 
+    def effective_capabilities(self, agent: Agent) -> list[str]:
+        """The (possibly hydrated) capabilities used for matching.
+
+        Public view of the same data find_by_capabilities() sees —
+        used by the planner to describe available agents.
+        """
+        return list(self._hydrate(agent))
+
     def find_by_capabilities(self, required: list[str]) -> Agent | None:
         """Return the best-matching agent for the required capabilities.
 

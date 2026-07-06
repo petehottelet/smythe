@@ -291,3 +291,52 @@ def test_stdio_timeout_mid_tool_call_tears_down_cleanly():
             provider, stdio_spec(allowed_tools=("slow",), tool_timeout_s=60.0), node=node,
         )
     assert node.status == NodeStatus.FAILED
+
+
+# ---------------------------------------------------------------------------
+# MCPSkillProvider — capability hydration from MCP tools
+# ---------------------------------------------------------------------------
+
+from smythe.mcp import MCPSkillProvider  # noqa: E402
+
+
+def _hydrated_registry(agent):
+    provider = MCPSkillProvider()
+    registry = Registry(skill_provider=provider)
+    provider.attach(registry)
+    registry.register(agent)
+    return provider, registry
+
+
+def test_skill_provider_static_allowlist_drives_assignment():
+    agent = Agent(profile=AgentProfile(
+        name="tooluser",
+        mcp_servers=[stdio_spec(allowed_tools=("add", "get_env"))],
+    ))
+    _, registry = _hydrated_registry(agent)
+
+    skills = registry.effective_capabilities(agent)
+    assert "srv.add" in skills
+    assert registry.find_by_capabilities(["srv.add"]) is agent
+
+
+def test_skill_provider_unattached_returns_nothing():
+    provider = MCPSkillProvider()
+    assert provider.list_agent_skills("whoever") == []
+
+
+@pytest.mark.asyncio
+async def test_skill_provider_prefetch_discovers_unlisted_servers():
+    agent = Agent(profile=AgentProfile(
+        name="tooluser",
+        mcp_servers=[stdio_spec()],  # no allowlist -> needs live discovery
+    ))
+    provider, registry = _hydrated_registry(agent)
+
+    assert registry.find_by_capabilities(["srv.add"]) is None  # nothing yet
+
+    await provider.prefetch([agent])
+
+    caps = registry.effective_capabilities(agent)
+    assert {"srv.add", "srv.get_env", "srv.slow"} <= set(caps)
+    assert registry.find_by_capabilities(["srv.slow"]) is agent

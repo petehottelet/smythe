@@ -23,10 +23,12 @@ from dataclasses import asdict, dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
+from smythe.skills import SkillRef
 from smythe.tools import ToolCall, ToolResult, ToolRuntime, ToolSession, ToolSpec, content_to_text
 
 if TYPE_CHECKING:
     from smythe.agent import Agent
+    from smythe.registry import Registry
 
 logger = logging.getLogger("smythe.mcp")
 
@@ -280,3 +282,57 @@ class MCPToolRuntime(ToolRuntime):
                 await stack.aclose()
             except Exception:
                 logger.warning("MCP session teardown failed", exc_info=True)
+
+
+class MCPSkillProvider:
+    """SkillProvider that grounds agent capabilities in their MCP tools.
+
+    Plugs into the registry's existing hydration machinery, so the same
+    servers that power execution also drive capability-based assignment:
+
+        provider = MCPSkillProvider()
+        registry = Registry(skill_provider=provider)
+        provider.attach(registry)
+
+    Allowlisted tools contribute skills statically — no connection is
+    made.  For servers without an allowlist, ``await prefetch(agents)``
+    once to discover tools live; discovered names are cached per agent.
+    """
+
+    def __init__(self) -> None:
+        self._registry: Registry | None = None
+        self._discovered: dict[str, list[str]] = {}
+
+    def attach(self, registry: Registry) -> None:
+        self._registry = registry
+
+    def list_agent_skills(self, agent_id: str) -> list[SkillRef]:
+        agent = self._registry.get(agent_id) if self._registry else None
+        if agent is None:
+            return []
+        names: list[str] = []
+        for spec in getattr(agent.profile, "mcp_servers", []) or []:
+            if spec.allowed_tools is not None:
+                names.extend(f"{spec.name}.{t}" for t in spec.allowed_tools)
+        names.extend(self._discovered.get(agent_id, []))
+        return [SkillRef(name=n, source="mcp") for n in dict.fromkeys(names)]
+
+    async def prefetch(self, agents) -> None:
+        """Discover tools for servers that have no allowlist.
+
+        Opens a short-lived session per agent that needs discovery and
+        caches the namespaced tool names.  Call once before planning /
+        assignment when you rely on non-allowlisted servers.
+        """
+        for agent in agents:
+            specs = [
+                s for s in getattr(agent.profile, "mcp_servers", []) or []
+                if s.allowed_tools is None
+            ]
+            if not specs:
+                continue
+            runtime = MCPToolRuntime(servers=specs)
+            async with runtime.open(agent) as session:
+                self._discovered[agent.id] = [t.name for t in session.tools]
+            if self._registry is not None:
+                self._registry.refresh_agent_capabilities(agent.id)
