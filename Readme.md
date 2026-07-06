@@ -9,6 +9,81 @@
 
 Most agent frameworks make you decide upfront how your agents will work together. Smythe doesn't. It treats the execution graph itself as a generated artifact — letting an Architect decide whether a task should run serially, in parallel, or adversarially, based on the nature of the work and what's been learned from past runs.
 
+## Install
+
+```bash
+pip install smythe
+```
+
+Python 3.11+. Provider extras (`smythe[anthropic]`, `[openai]`, `[gemini]`, `[mcp]`, `[all]`) are covered under [Installation](#installation).
+
+## 60-second quickstart
+
+With an API key set (`ANTHROPIC_API_KEY` here), you hand the Swarm a goal; the Architect designs the execution graph, and you inspect it before anything runs:
+
+```python
+from smythe import Swarm, Task
+
+swarm = Swarm(model="claude-mythos", max_budget_usd=0.50)
+
+task = Task(
+    goal=(
+        "Produce a competitive brief on portable solar phone chargers: "
+        "market landscape, top competitors, and a one-page summary."
+    ),
+    constraints=["Keep the final brief under 400 words"],
+)
+
+graph = swarm.plan(task)   # the generated DAG — inspect it (or reject it)
+print(graph)
+
+result = swarm.execute(graph)
+print(result.output)
+print(f"cost: ${result.total_cost_usd:.4f}")
+```
+
+No API key? Clone the repo and every example — including the flagship demo below — runs offline against deterministic fixtures, for free.
+
+## See it run
+
+The flagship demo hands Smythe one goal — *evaluate whether Acme Corp is a viable acquisition target* — and the Architect answers with a topology, not a transcript:
+
+```bash
+python examples/acquisition_diligence/run.py
+```
+
+```text
+=== The Architect's plan ===
+TaskGraph(topology="fork-join → adversarial → serial")
+├─ fork (parallel):
+│   ├─ FinancialAnalyst: Analyze Acme Corp's revenue model, margins, burn rate, and comparable valuations
+│   ├─ TechDiligenceAgent: Assess Acme Corp's IP portfolio, tech debt signals, and key-person dependencies
+│   └─ RegulatoryAgent: Review Acme Corp's SEC filings, antitrust exposure, and pending litigation
+├─ join: DiligenceEditor: Merge the specialist findings into a draft diligence report
+├─ adversarial: RedTeamAgent: Challenge every bullish claim in the draft report; stress-test projections and surface contradictions
+└─ serial (depends on DiligenceEditor, RedTeamAgent): MemoAgent: Produce the final structured memo
+#
+# Estimated cost: $0.04 | Depth: 3 | Agents: 6
+```
+
+```mermaid
+flowchart TD
+    financial["FinancialAnalyst: revenue model, margins, burn, comps"]
+    technical["TechDiligenceAgent: IP portfolio, tech debt, key-person risk"]
+    regulatory["RegulatoryAgent: SEC filings, antitrust, litigation"]
+    draft["DiligenceEditor: merge findings into draft report"]
+    redteam["RedTeamAgent: challenge every bullish claim"]
+    memo["MemoAgent: final memo - summary, findings, risks, recommendation"]
+    financial --> draft
+    technical --> draft
+    regulatory --> draft
+    draft --> redteam
+    draft --> memo
+    redteam --> memo
+```
+
+Three specialists run in parallel under a budget cap, a red team attacks the draft, and the memo node turns the surviving claims into a conditional go/no-go recommendation. The expected graph, trace, and memo are committed in [examples/acquisition_diligence/expected/](examples/acquisition_diligence/expected/) — a test regenerates them on every CI run, so what you see there is what the code does. Full walkthrough: [examples/acquisition_diligence/](examples/acquisition_diligence/).
+
 ---
 
 ## The Problem
@@ -164,6 +239,8 @@ print(plan)
 
 result = swarm.execute(plan)
 ```
+
+This one isn't hypothetical — it's the [flagship demo](examples/acquisition_diligence/), runnable offline with the expected graph, trace, and memo committed.
 
 ---
 
@@ -442,17 +519,23 @@ pip install -e ".[dev]"
 
 ## Examples
 
-The [examples/](examples/) directory has three runnable scripts — a YAML pipeline quickstart, dynamic LLM planning, and a budget-capped parallel run. Each works offline with a built-in demo provider, so you can see the machinery before spending a token:
+The [examples/](examples/) directory has runnable scripts for every major feature — a YAML pipeline quickstart, dynamic LLM planning, a budget-capped parallel run, crash-and-resume, and MCP tool use. Each works offline with a built-in demo provider, so you can see the machinery before spending a token:
 
 ```bash
 python examples/01_quickstart_yaml.py
+```
+
+The flagship demo is [examples/acquisition_diligence/](examples/acquisition_diligence/) — the acquisition-diligence showcase from the topology example above, end to end: parallel specialists, a red-team tier, and a final structured memo, with the expected graph, trace, and memo committed so you know what success looks like:
+
+```bash
+python examples/acquisition_diligence/run.py
 ```
 
 ---
 
 ## Current Status
 
-The core framework is implemented and tested. **267 tests passing.**
+The core framework is implemented and tested. **372 tests passing.**
 
 **What's shipped:**
 - Three-tier Architect hierarchy (Deterministic, Constrained, Autonomous LLM)
@@ -473,8 +556,10 @@ The core framework is implemented and tested. **267 tests passing.**
 - Provider abstraction (Anthropic, OpenAI, Gemini) with defensive response parsing
 - Structured observability traces
 - Runnable examples that work offline
+- Flagship demo — the acquisition-diligence showcase with committed
+  expected artifacts ([examples/acquisition_diligence/](examples/acquisition_diligence/))
 
-**What's next:** see [ROADMAP.md](ROADMAP.md) — currently recursive subgraph decomposition, then the flagship demo and published benchmarks.
+**What's next:** see [ROADMAP.md](ROADMAP.md) — currently published benchmarks, then recursive subgraph decomposition and the trace inspector.
 
 ---
 
