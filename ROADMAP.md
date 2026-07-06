@@ -4,7 +4,7 @@ Where the project is going, in order. Everything here converges on one artifact:
 
 Status: pre-1.0. Minor versions may break APIs (see [CHANGELOG.md](CHANGELOG.md) for the versioning policy).
 
-## Shipped (v0.2 line, in progress)
+## Shipped (v0.2 line)
 
 - ✅ Durable, resumable execution — per-node checkpointing, `swarm.resume()`, pluggable stores ([docs](docs/checkpoint-format.md))
 - ✅ Per-node timeouts and bounded parallel concurrency
@@ -13,17 +13,18 @@ Status: pre-1.0. Minor versions may break APIs (see [CHANGELOG.md](CHANGELOG.md)
 - ✅ Provider tool contract — neutral tool-calling types mapped to Anthropic, OpenAI, and Gemini native tool use
 - ✅ **MCP tool support** — agents use MCP servers (stdio + streamable HTTP) through a bounded, budget-enforced tool loop; secrets via `env_passthrough`; capability hydration and planner tool awareness; examples for filesystem, GitHub, and SaaS servers ([docs/mcp.md](docs/mcp.md))
 - ✅ OpenAI-compatible `base_url` (Ollama, LM Studio, vLLM)
+- ✅ v0.2.0 on PyPI (`pip install smythe`)
+- ✅ **Flagship demo** — the acquisition-diligence showcase: fixture mode (no keys) and real mode, with committed graph, trace, and expected output ([examples/acquisition_diligence/](examples/acquisition_diligence/))
 
-## Now: v0.2.0 release, then recursive decomposition
+## Now: benchmarks
 
-The v0.2 line ships to PyPI next (`pip install smythe`). Then:
+The demo shows what Smythe does; benchmarks show whether it's worth it. Everything else waits behind this.
 
 ## Next
 
-1. **Recursive subgraph decomposition** — a node can resolve to a nested graph, with depth limits and shared budget/trace/failure machinery
-2. **Flagship demo** — an acquisition-diligence showcase: fixture mode (no keys) and real mode, with committed graph, trace, and expected output
-3. **Benchmarks** — single-agent and fixed-pipeline baselines vs. dynamic topology (offline-runnable), then head-to-head vs. LangGraph and CrewAI; includes memory-on vs. memory-off numbers for the learning Architect
-4. **Trace inspector** — `smythe inspect`: rendered DAG, per-node prompt/response/cost/duration, and the Architect's reasoning
+1. **Benchmarks** — single-agent and fixed-pipeline baselines vs. dynamic topology (offline-runnable), then head-to-head vs. LangGraph and CrewAI; includes memory-on vs. memory-off numbers for the learning Architect
+2. **Recursive subgraph decomposition** — a node can resolve to a nested graph, with depth limits and shared budget/trace/failure machinery
+3. **Trace inspector** — `smythe inspect`: rendered DAG, per-node prompt/response/cost/duration, and the Architect's reasoning
 
 ## Later
 

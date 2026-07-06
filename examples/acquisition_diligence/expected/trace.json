@@ -1,0 +1,50 @@
+[
+  {
+    "node_id": "financial",
+    "label": "Analyze Acme Corp's revenue model, margins, burn rate, and comparable valuations",
+    "agent_id": "FinancialAnalyst",
+    "status": "completed",
+    "duration_ms": 0.0,
+    "error": null
+  },
+  {
+    "node_id": "technical",
+    "label": "Assess Acme Corp's IP portfolio, tech debt signals, and key-person dependencies",
+    "agent_id": "TechDiligenceAgent",
+    "status": "completed",
+    "duration_ms": 0.0,
+    "error": null
+  },
+  {
+    "node_id": "regulatory",
+    "label": "Review Acme Corp's SEC filings, antitrust exposure, and pending litigation",
+    "agent_id": "RegulatoryAgent",
+    "status": "completed",
+    "duration_ms": 0.0,
+    "error": null
+  },
+  {
+    "node_id": "draft",
+    "label": "Merge the specialist findings into a draft diligence report",
+    "agent_id": "DiligenceEditor",
+    "status": "completed",
+    "duration_ms": 0.0,
+    "error": null
+  },
+  {
+    "node_id": "redteam",
+    "label": "Challenge every bullish claim in the draft report; stress-test projections and surface contradictions",
+    "agent_id": "RedTeamAgent",
+    "status": "completed",
+    "duration_ms": 0.0,
+    "error": null
+  },
+  {
+    "node_id": "memo",
+    "label": "Produce the final structured memo: summary, findings, risks, recommendation - incorporating the red-team findings",
+    "agent_id": "MemoAgent",
+    "status": "completed",
+    "duration_ms": 0.0,
+    "error": null
+  }
+]
