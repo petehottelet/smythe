@@ -9,7 +9,12 @@ from abc import ABC, abstractmethod
 
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.loader import build_graph_from_dict
-from smythe.prompts import PLANNING_SYSTEM_PROMPT, RETRY_PROMPT, build_user_prompt
+from smythe.prompts import (
+    PLANNING_SYSTEM_PROMPT,
+    RETRY_PROMPT,
+    build_agent_inventory,
+    build_user_prompt,
+)
 from smythe.provider import Provider
 from smythe.registry import Registry
 from smythe.task import Task
@@ -76,6 +81,7 @@ class LLMArchitect(Architect):
         max_retries: int = 2,
         cost_per_token: float = 0.000003,
         avg_tokens_per_node: int = 2000,
+        registry: Registry | None = None,
     ) -> None:
         self._provider = provider
         self._planning_model = planning_model
@@ -83,6 +89,9 @@ class LLMArchitect(Architect):
         self._max_retries = max_retries
         self._cost_per_token = cost_per_token
         self._avg_tokens_per_node = avg_tokens_per_node
+        # When set, the planning prompt includes an inventory of these
+        # agents (and their tools) so plans can be designed around them.
+        self._registry = registry
 
     def plan(self, task: Task) -> tuple[ExecutionGraph, Registry]:
         """Sync wrapper — safe to call outside an event loop."""
@@ -91,7 +100,8 @@ class LLMArchitect(Architect):
     async def aplan(self, task: Task) -> tuple[ExecutionGraph, Registry]:
         """Core planning loop — awaits provider calls directly."""
         history = self._get_history(task)
-        user_prompt = build_user_prompt(task, history)
+        inventory = build_agent_inventory(self._registry)
+        user_prompt = build_user_prompt(task, history, agent_inventory=inventory)
 
         last_error: Exception | None = None
         for attempt in range(1 + self._max_retries):

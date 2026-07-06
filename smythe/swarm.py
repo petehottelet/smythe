@@ -112,6 +112,7 @@ class Swarm:
                 provider=self._provider,
                 planning_model=planning_model or model,
                 memory=memory,
+                registry=self._registry,
             )
 
     def plan(self, task: Task) -> ExecutionGraph:
