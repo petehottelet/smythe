@@ -60,3 +60,47 @@ def test_deps_satisfied_no_deps():
     a = Node(label="A", id="a")
     graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[a])
     assert base.deps_satisfied(a, graph) is True
+
+
+# --- terminal deliverable note -----------------------------------------
+
+class PromptCapturingProvider(Provider):
+    def __init__(self):
+        self.prompts = []
+
+    async def complete(self, system, prompt, model):
+        self.prompts.append(prompt)
+        return CompletionResult(text="ok", prompt_tokens=1, completion_tokens=1)
+
+
+def test_terminal_node_prompt_carries_deliverable_note():
+    from smythe.executor_base import TERMINAL_DELIVERABLE_NOTE
+
+    mid = Node(label="Mid", id="mid")
+    prompt = ExecutorBase.build_user_prompt(mid, {"a": "r"}, is_terminal=False)
+    assert TERMINAL_DELIVERABLE_NOTE not in prompt
+
+    terminal = Node(label="Final", id="final")
+    prompt = ExecutorBase.build_user_prompt(terminal, {"a": "r"}, is_terminal=True)
+    assert TERMINAL_DELIVERABLE_NOTE in prompt
+
+    # A terminal node with no upstream context needs no note.
+    prompt = ExecutorBase.build_user_prompt(terminal, {}, is_terminal=True)
+    assert TERMINAL_DELIVERABLE_NOTE not in prompt
+
+
+def test_executor_marks_only_terminal_nodes():
+    from smythe.executor import Executor
+    from smythe.executor_base import TERMINAL_DELIVERABLE_NOTE
+
+    provider = PromptCapturingProvider()
+    executor = Executor(provider=provider, registry=Registry(), tracer=Tracer())
+    a = Node(label="Gather", id="a")
+    b = Node(label="Deliver", id="b", depends_on=["a"])
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[a, b])
+
+    executor.run(graph)
+
+    first, last = provider.prompts
+    assert TERMINAL_DELIVERABLE_NOTE not in first
+    assert TERMINAL_DELIVERABLE_NOTE in last

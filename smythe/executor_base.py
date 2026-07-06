@@ -16,6 +16,18 @@ from smythe.tracer import Tracer
 
 DEFAULT_MAX_TOOL_ITERATIONS = 10
 
+# Appended to a terminal node's prompt so the deliverable survives the
+# chain: without it, final nodes tend to reference or summarize upstream
+# findings instead of reproducing them, and the specifics are lost
+# (benchmarks/README.md documents the failure mode this addresses).
+TERMINAL_DELIVERABLE_NOTE = (
+    "You are the final step in this workflow: your output is the "
+    "deliverable, and the context above will not be shown alongside it. "
+    "Make your output self-contained - carry forward the concrete "
+    "findings, evidence, and specifics from the context rather than "
+    "referencing or summarizing them."
+)
+
 
 class ExecutorBase:
     """Shared infrastructure for all executor variants.
@@ -59,12 +71,16 @@ class ExecutorBase:
         return "You are a helpful assistant completing a step in a larger task."
 
     @staticmethod
-    def build_user_prompt(node: Node, dep_results: dict[str, Any]) -> str:
+    def build_user_prompt(
+        node: Node, dep_results: dict[str, Any], *, is_terminal: bool = False,
+    ) -> str:
         parts = [node.label]
         if dep_results:
             parts.append("\n\nContext from prior steps:")
             for dep_id, result in dep_results.items():
                 parts.append(f"\n[{dep_id}]: {result}")
+            if is_terminal and TERMINAL_DELIVERABLE_NOTE:
+                parts.append("\n" + TERMINAL_DELIVERABLE_NOTE)
         return "\n".join(parts)
 
     @staticmethod
@@ -101,7 +117,9 @@ class ExecutorBase:
         agent = self._registry.get(node.agent_id) if node.agent_id else None
         dep_results = self.gather_dep_results(node, graph)
         system = self.build_system_prompt(agent)
-        prompt = self.build_user_prompt(node, dep_results)
+        prompt = self.build_user_prompt(
+            node, dep_results, is_terminal=not graph.dependents(node.id),
+        )
         model = node.metadata.get("model", "")
         messages = [ChatMessage(role="user", content=prompt)]
 
