@@ -126,8 +126,9 @@ def test_task_context_respects_ablation_toggle(monkeypatch):
     assert prompt == "Research"
 
 
-def test_swarm_plan_stamps_task_context_on_roots_only():
-
+def test_swarm_plan_stamps_task_context_on_every_node():
+    # Downstream nodes need the artifact too: dependency results carry
+    # analyses of it, and a verifier that can't see the artifact hedges.
     from smythe import Swarm, Task
     from smythe.provider import OfflineProvider
 
@@ -146,11 +147,9 @@ def test_swarm_plan_stamps_task_context_on_roots_only():
     task = Task(goal="Study the gizmo market", constraints=["stay brief"])
     graph = swarm.plan(task)
 
-    by_id = {n.id: n for n in graph.nodes}
-    assert "Study the gizmo market" in by_id["a"].metadata["task_context"]
-    assert "- stay brief" in by_id["a"].metadata["task_context"]
-    assert "task_context" in by_id["b"].metadata
-    assert "task_context" not in by_id["join"].metadata
+    for node in graph.nodes:
+        assert "Study the gizmo market" in node.metadata["task_context"]
+        assert "- stay brief" in node.metadata["task_context"]
 
 
 def test_single_node_graph_is_not_stamped():
