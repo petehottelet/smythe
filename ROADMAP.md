@@ -18,11 +18,11 @@ Status: pre-1.0. Minor versions may break APIs (see [CHANGELOG.md](CHANGELOG.md)
 
 ## Now: benchmarks
 
-The demo shows what Smythe does; benchmarks show whether it's worth it. Everything else waits behind this.
+The demo shows what Smythe does; benchmarks show whether it's worth it. The harness and first self-baseline numbers are published in [benchmarks/](benchmarks/) — including the losses, which already paid for themselves by exposing (and fixing) two real executor bugs. Everything else waits behind this.
 
 ## Next
 
-1. **Benchmarks** — single-agent and fixed-pipeline baselines vs. dynamic topology (offline-runnable), then head-to-head vs. LangGraph and CrewAI; includes memory-on vs. memory-off numbers for the learning Architect
+1. **Benchmarks, continued** — memory-on vs. memory-off numbers for the learning Architect, then head-to-head vs. LangGraph and CrewAI
 2. **Recursive subgraph decomposition** — a node can resolve to a nested graph, with depth limits and shared budget/trace/failure machinery
 3. **Trace inspector** — `smythe inspect`: rendered DAG, per-node prompt/response/cost/duration, and the Architect's reasoning
 
