@@ -173,7 +173,7 @@ swarm = Swarm(max_budget_usd=1.50, model="gemini-3-pro-image-preview")
 
 task = Task(
     goal=(
-        "Generate a full visual asset package for the launch of 'Solara', "
+        "Generate a full visual asset package for the launch of 'Osiris', "
         "a portable solar-powered phone charger. Every asset must share a "
         "cohesive visual identity — same palette, typography, and tone."
     ),

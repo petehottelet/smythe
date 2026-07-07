@@ -28,7 +28,7 @@ from smythe.tools import ToolCall
 
 # --- a scratch directory with something worth finding -----------------
 data_dir = Path(tempfile.mkdtemp(prefix="smythe-mcp-demo-"))
-(data_dir / "notes.txt").write_text("The launch code is PEACHES.\n", encoding="utf-8")
+(data_dir / "notes.txt").write_text("The launch code is TRINITY.\n", encoding="utf-8")
 (data_dir / "readme.md").write_text("Nothing to see here.\n", encoding="utf-8")
 
 SERVER = MCPServerSpec(
