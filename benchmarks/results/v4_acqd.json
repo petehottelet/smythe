@@ -1,0 +1,416 @@
+[
+  {
+    "task": "acquisition-diligence",
+    "baseline": "single_agent",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 1,
+    "depth": 0,
+    "cost_usd": 0.006543,
+    "wall_ms": 24641.8,
+    "output": "# DILIGENCE MEMO: MetaCortex Corp Acquisition\n\n**Recommendation: CONDITIONAL GO \u2014 proceed only with material price reduction and specific structural protections. As presented at the $260M ask, this is a NO-GO.**\n\n---\n\n## 1. Financial Assessment\n\n**Valuation gap is the headline issue.**\n- Seller's ask ($260M) implies **~5.4x ARR** ($48M) \u2014 within the 4\u20136x comp range, but at the *upper* end for a company with *decelerating* growth.\n- Growth halved: 41% \u2192 22% YoY. Buyers pay premium multiples for acceleration, not deceleration. On a 4x floor, fair value is closer to **$190M**; a mid-range 5x = $240M is defensible only if growth risks are mitigated.\n\n**Quality of revenue \u2014 mixed.**\n- Gross margin 71% is healthy for SaaS.\n- NRR of 104% is positive but thin \u2014 leaves little organic expansion cushion to offset any logo churn.\n- **Customer concentration is a serious risk:** top 3 = 38% of ARR, *all* renewing within 9 months, *all* on 2-year contracts. A single non-renewal could cut ARR by double digits and invalidate the growth story.\n\n**Runway is adequate but not comfortable.**\n- 19 months at $1.1M/month burn. Sufficient to close and stabilize, but not a distressed seller \u2014 limits leverage unless renewals slip.\n\n---\n\n## 2. Technical / IP Assessment\n\n**The acquisition thesis rests on the routing engine \u2014 which is precisely the contested asset.**\n- 2 granted patents + 1 pending is a real moat *if defensible* (see legal).\n- **Key-person risk is acute and unmitigated:** 2 engineers author ~70% of core-engine commits with *no surviving retention terms*. If they walk post-close, we are buying patents we cannot maintain or extend. This is a deal-defining issue.\n- Architecture: aging monolith with moderate, budgeted tech debt \u2014 manageable, not a blocker.\n- Security: SOC 2 Type II current, no critical findings \u2014 clean.\n\n---\n\n## 3. Regulatory / Legal Assessment\n\n- **Ouroboros patent litigation (D. Del.) is the gating risk.** Motion to dismiss *denied* and discovery underway means the court found the claim non-frivolous. Because the disputed patent covers *the very IP we are buying*, an adverse ruling could impair or eliminate the acquisition's core value. This must be quantified before close.\n- **HSR filing required** (deal size trigger): plan for the 30-day waiting period. Antitrust substance is clean \u2014 18% combined share is well below screening thresholds.\n- SEC: no enforcement history; withdrawn S-1 (2024, market reasons) is not a red flag.\n\n---\n\n## 4. Net Assessment\n\n| Factor | Verdict |\n|---|---|\n| Valuation vs. growth | Overpriced at ask |\n| Revenue concentration | High risk (9-mo renewals) |\n| Core IP value | High \u2014 but legally clouded |\n| Key-person risk | Critical, unmitigated |\n| Litigation | Deal-gating |\n| Antitrust/security | Clean |\n\nThe strategic logic (routing-engine IP) is sound, but the two pillars supporting that IP \u2014 its *legal defensibility* and its *human maintainers* \u2014 are both compromised.\n\n---\n\n## 5. Conditions for a GO\n\nProceed **only if** all of the following are secured:\n\n1. **Price reset to $190\u2013210M** (\u22644.5x ARR) reflecting growth deceleration and litigation risk.\n2. **Ouroboros indemnity / escrow:** hold back 15\u201320% of consideration pending litigation resolution, plus seller IP-infringement indemnification. Obtain independent patent-invalidity/non-infringement opinion before signing.\n3. **Golden-handcuff retention** for the 2 key engineers (multi-year vesting + non-compete) as a **closing condition**.\n4. **Renewal protections:** condition part of consideration on top-3 customer renewals, or structure an earnout tied to retained ARR.\n5. **HSR filing** initiated at signing; build the 30-day period into timeline.\n\n**If price cannot be reset and the Ouroboros exposure cannot be indemnified/escrowed, the recommendation is NO-GO** \u2014 we would be paying a premium for contested IP we may not be able to keep or use.\n\n*All figures fictional; prepared for internal diligence purposes.*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Financial risks grounded in supplied numbers",
+          "score": 9
+        },
+        {
+          "criterion": "Ouroboros litigation connected to routing-engine IP",
+          "score": 9
+        },
+        {
+          "criterion": "Key-person risk and interaction with IP value",
+          "score": 9
+        },
+        {
+          "criterion": "Bullish claims challenged, not just restated",
+          "score": 8
+        },
+        {
+          "criterion": "Recommendation explicit and conditional where evidence mixed",
+          "score": 9
+        },
+        {
+          "criterion": "Structure follows summary/findings/risks/recommendation",
+          "score": 7
+        }
+      ],
+      "overall": 8,
+      "weaknesses": "Lacks a distinct upfront executive summary section, slightly blending summary into recommendation header."
+    },
+    "run": 0,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "acquisition-diligence",
+    "baseline": "single_agent",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 1,
+    "depth": 0,
+    "cost_usd": 0.006936,
+    "wall_ms": 24724.1,
+    "output": "# Acquisition Diligence Memo: MetaCortex Corp\n\n**Recommendation: CONDITIONAL GO** \u2014 proceed to a term sheet contingent on price adjustment and resolution of specific closing conditions detailed below. Do not close at the current ask or without the risk mitigations.\n\n---\n\n## 1. Financial Assessment\n\n| Metric | Value | Read |\n|---|---|---|\n| ARR | $48M | Solid base |\n| Growth | 22% YoY (down from 41%) | **Decelerating sharply** |\n| Gross margin | 71% | Healthy for software |\n| NRR | 104% | Positive but thin; modest expansion |\n| Burn / Runway | $1.1M/mo, ~19 mo | Adequate, not urgent |\n\n**Valuation gap.** Seller's ask of $260M implies ~5.4x ARR \u2014 within the 4\u20136x comp range on its face, but at the *top* of the range for a business whose growth has nearly *halved* and whose NRR (104%) signals limited organic expansion. Decelerating businesses should price at the low end. Fair value is closer to **4x ARR (~$190M)**, potentially lower given the risk profile below.\n\n**Key financial risk \u2014 customer concentration.** Top 3 customers = 38% of ARR, all with renewal windows in the next 9 months. This is the single largest financial exposure: loss of one anchor account materially impairs the thesis right as the deal closes.\n\n---\n\n## 2. Technical / IP Assessment\n\n- **Core asset (routing engine):** 2 granted patents + 1 pending. This IP *is* the deal thesis \u2014 but it is also the subject of active litigation (see \u00a73). The value of the acquisition is directly contingent on IP defensibility.\n- **Architecture:** Aging monolith + 2 extracted services; moderate tech debt with a funded paydown plan. Manageable, not disqualifying.\n- **Key-person risk \u2014 HIGH.** Two staff engineers author ~70% of core-engine commits and have **no retention terms surviving the acquisition.** For an acqui-target where the IP is the point, losing these two engineers could hollow out the acquired value.\n- **Security:** SOC 2 Type II current, no critical findings. Clean.\n\n---\n\n## 3. Regulatory / Legal Assessment\n\n- **Ouroboros patent litigation (D. Del.):** Directly targets the routing engine \u2014 the exact asset motivating the deal. Motion to dismiss **denied**, discovery underway. This is a **material, unresolved contingent liability** that goes to the core value proposition. An adverse outcome could impair or enjoin the very IP being purchased.\n- **SEC:** Clean history. Withdrawn S-1 (2024, market reasons) is not a red flag.\n- **Antitrust:** ~18% combined segment share is below screening thresholds. HSR filing required (30-day waiting period) \u2014 a timing item, not a substantive obstacle.\n\n---\n\n## 4. Consolidated Risk Table\n\n| Risk | Severity | Mitigation |\n|---|---|---|\n| Ouroboros IP litigation | **Critical** | Special indemnity / escrow; reps & warranties; price haircut |\n| Key-person attrition | **High** | Retention packages + earnouts as closing condition |\n| Customer concentration / near-term renewals | **High** | Renewal-status reps; earnout tied to retention |\n| Overpricing vs. decelerating growth | **Medium-High** | Negotiate to ~4x ARR |\n| Tech debt | **Low-Medium** | Diligence the paydown plan cost |\n| HSR waiting period | **Low** | Standard timeline management |\n\n---\n\n## 5. Recommendation & Conditions\n\n**CONDITIONAL GO.** The core IP is strategically attractive and the fundamentals (margin, security, runway) are sound, but the ask overvalues a decelerating business and three high-severity risks converge on the *exact asset* being purchased. Proceed only with:\n\n1. **Price reset toward ~4x ARR (~$190M)**, with structure shifting risk to the seller.\n2. **IP litigation ring-fence:** substantial escrow/holdback and a specific seller indemnity covering the Ouroboros matter; make favorable litigation posture a closing condition or price-adjustment trigger.\n3. **Retention lock-up** for the 2 key engineers (equity + cash, multi-year vesting) as a hard closing condition.\n4. **Customer-renewal protection:** reps on renewal status plus an earnout tied to top-3 retention over the renewal window.\n5. Complete HSR filing; observe the 30-day period (no substantive concern).\n\n**Walk-away triggers:** seller refuses IP indemnity/escrow; key engineers decline retention; adverse dispositive ruling in Ouroboros before close; seller holds firm at $260M.\n\n*All figures and entities herein are fictional and used for evaluation purposes only.*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Financial risks grounded in supplied numbers",
+          "score": 9
+        },
+        {
+          "criterion": "Ouroboros litigation connected to routing-engine IP",
+          "score": 9
+        },
+        {
+          "criterion": "Key-person risk and interaction with IP value",
+          "score": 9
+        },
+        {
+          "criterion": "Bullish claims challenged, not just restated",
+          "score": 8
+        },
+        {
+          "criterion": "Recommendation explicit and conditional where evidence mixed",
+          "score": 9
+        },
+        {
+          "criterion": "Structure follows summary/findings/risks/recommendation",
+          "score": 7
+        }
+      ],
+      "overall": 8,
+      "weaknesses": "Lacks a distinct executive summary section, slightly conflating summary with findings."
+    },
+    "run": 1,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "acquisition-diligence",
+    "baseline": "single_agent",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 1,
+    "depth": 0,
+    "cost_usd": 0.007824,
+    "wall_ms": 29641.7,
+    "output": "# ACQUISITION DILIGENCE MEMO\n\n**Target:** MetaCortex Corp\n**Subject:** Viability assessment and go/no-go recommendation\n**Prepared from:** Data room financials, technical diligence notes, legal docket summary\n*(All figures fictional)*\n\n---\n\n## EXECUTIVE SUMMARY\n\n**Recommendation: CONDITIONAL GO \u2014 proceed to definitive negotiation, but only at a reduced price and contingent on resolving the patent litigation and key-person risk.**\n\nThe core strategic rationale (the adaptive routing engine) is sound, but the single asset motivating the deal is simultaneously exposed to active infringement litigation *and* concentrated in two unretained engineers. The seller's $260M ask is above the comp range and not supported by the financials. A deal is viable at a corrected valuation with structural protections; at full ask with unresolved IP risk, it is not.\n\n---\n\n## 1. FINANCIAL ANALYSIS\n\n| Metric | Value | Read |\n|---|---|---|\n| ARR | $48M | Solid base |\n| Growth | 22% YoY (was 41%) | **Decelerating sharply \u2014 nearly halved** |\n| Gross margin | 71% | Healthy for software |\n| Net revenue retention | 104% | Weak; barely expanding, little upsell |\n| Burn / runway | $1.1M/mo, ~19 mo | Adequate but finite |\n| Customer concentration | Top 3 = 38% ARR, renewals in <9 mo | **High risk** |\n\n**Valuation check:** Ask of $260M \u2248 **5.4x ARR**, within the 4\u20136x comp band on its face. But comps reward growth; a business decelerating to 22% with 104% NRR belongs at the *low* end (4x = ~$192M), not mid-to-high. **The ask is ~$40\u201370M rich.**\n\n**Key concern:** 38% of ARR renews inside 9 months \u2014 before or around close. A single top-3 loss materially impairs the thesis. Renewal status must be diligenced and price-protected.\n\n---\n\n## 2. TECHNICAL / IP ANALYSIS\n\n- **Core asset:** Adaptive routing engine \u2014 2 granted patents + 1 pending. This *is* the deal.\n- **Architecture:** Aging monolith + 2 extracted services; moderate, budgeted tech debt \u2014 **acceptable**.\n- **Security:** SOC 2 Type II current, no critical findings \u2014 **clean**.\n- **Key-person risk (CRITICAL):** 2 staff engineers wrote ~70% of core-engine commits with **no surviving retention terms.** The primary asset walks out the door on day one absent action.\n\n**Assessment:** The IP is real and defensible on paper, but its value is inseparable from two people who are not locked in. This is the second-largest risk in the deal.\n\n---\n\n## 3. REGULATORY / LEGAL EXPOSURE\n\n| Item | Status | Severity |\n|---|---|---|\n| **Ouroboros v. MetaCortex** (D. Del.) | Patent infringement on the routing engine; **motion to dismiss DENIED**, discovery underway | **HIGH** |\n| SEC | No enforcement; S-1 withdrawn 2024 (market reasons) | Low |\n| Antitrust | ~18% combined share, below thresholds; HSR filing + 30-day wait required | Low / procedural |\n\n**Key concern:** The litigation targets *the exact asset being acquired.* A denied motion to dismiss means the court found the claim non-frivolous. An adverse outcome (injunction or damages) could impair or eliminate the core IP value. This risk transfers to the acquirer at close.\n\nAntitrust is a non-issue substantively; HSR is a routine 30-day timing item.\n\n---\n\n## 4. CONSOLIDATED RISK REGISTER\n\n| Risk | Impact | Mitigation |\n|---|---|---|\n| Ouroboros patent suit | Could nullify core IP | Escrow/holdback, indemnity, seller retains liability, or price for loss scenario |\n| Key-engineer flight | Loss of asset expertise | Retention packages / earnouts as closing condition |\n| Top-3 renewal cliff (<9 mo) | ~38% ARR at risk | Reps on renewal pipeline; price adjustment tied to renewals |\n| Growth deceleration + 104% NRR | Overvaluation | Price to 4x, not 5.4x |\n| HSR waiting period | Timing | Standard filing |\n\n---\n\n## 5. RECOMMENDATION \u2014 CONDITIONAL GO\n\nProceed, subject to **all** of the following as closing conditions:\n\n1. **Price reset** to the low-to-mid comp range (~$190\u2013210M), reflecting decelerating growth and mediocre NRR.\n2. **Litigation protection:** substantial holdback/escrow (recommend $30\u201350M) and full seller indemnity for Ouroboros outcomes; obtain outside IP counsel opinion on infringement and validity before signing.\n3. **Key-person retention:** binding retention/earnout agreements with the two core engineers as a condition precedent to close. **No retention, no deal.**\n4. **Customer diligence:** confirm renewal posture of top-3 accounts; add price adjustment or MAC-style protection tied to those renewals.\n5. **HSR filing** initiated on signing.\n\n**If items 2 and 3 cannot be secured, the recommendation flips to NO-GO** \u2014 because the deal thesis rests entirely on an IP asset that is both legally contested and personnel-dependent, and without those protections the acquirer buys the risk without the certainty of the asset.\n\n---\n*Prepared for internal deal committee review. Based solely on the three source documents provided; assumes further confirmatory diligence.*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Financial risks grounded in supplied numbers",
+          "score": 9
+        },
+        {
+          "criterion": "Ouroboros litigation connected to routing-engine IP",
+          "score": 9
+        },
+        {
+          "criterion": "Key-person risk and interaction with IP value identified",
+          "score": 9
+        },
+        {
+          "criterion": "Bullish claims challenged, not just restated",
+          "score": 8
+        },
+        {
+          "criterion": "Recommendation explicit and conditional where evidence mixed",
+          "score": 9
+        },
+        {
+          "criterion": "Structure follows summary/findings/risks/recommendation",
+          "score": 9
+        }
+      ],
+      "overall": 9,
+      "weaknesses": "Minor: valuation math is slightly imprecise (5.4x claim) and could push harder on NRR/renewal overlap timing risk."
+    },
+    "run": 2,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "acquisition-diligence",
+    "baseline": "fixed_pipeline",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 3,
+    "depth": 2,
+    "cost_usd": 0.056781,
+    "wall_ms": 123593.6,
+    "output": "# DILIGENCE MEMO \u2014 Project MetaCortex\n\n**To:** Investment Committee\n**Re:** Proposed acquisition of MetaCortex Corp \u2014 viability assessment and go/no-go recommendation\n**Basis:** Data-room financial summary, technical diligence notes, legal docket summary\n**Note:** All companies and figures are fictional. Analysis is limited strictly to supplied source documents; unresolved items are flagged as open questions rather than assumed.\n\n---\n\n## 1. Summary\n\nMetaCortex is a $48M ARR software company whose adaptive routing engine \u2014 protected by 2 granted patents and 1 pending \u2014 is the sole stated motivation for this acquisition. The seller asks **$260M (~5.4x ARR)**, at the top of the 4\u20136x comparable band.\n\nThe recommendation is **CONDITIONAL NO-GO at the $260M ask.** The deal thesis is undermined at its center: the asset being purchased is (a) the subject of active patent litigation that has survived a motion to dismiss, (b) dependent on two engineers who author ~70% of core-engine commits and have no retention terms surviving the acquisition, and (c) priced at a premium multiple that decelerating fundamentals do not support. These three risks are not independent \u2014 they converge on the same asset within the same ~9-month window, so a single adverse event amplifies the others.\n\nA **conditional GO** is defensible only if the deal is repriced and restructured around escrow, binding retention, and secured renewals (Section 4).\n\n---\n\n## 2. Findings\n\n### 2.1 Financial\n- **Scale & profitability:** $48M ARR, 71% gross margin \u2014 a healthy margin profile on its face.\n- **Growth is decelerating sharply:** 22% YoY, down from 41% the prior year \u2014 growth has roughly halved in one year. This is the clearest negative trend in the financials and is inconsistent with a top-of-band multiple.\n- **Retention is thin:** Net revenue retention of 104% is only marginally expansionary and does not, on its own, signal strong account health.\n- **Runway:** $1.1M/month burn against $21M cash \u2248 19 months. No near-term distress, but the 2024 S-1 withdrawal (\"market reasons\") indicates a blocked public-exit path and thus real, if quiet, seller motivation.\n- **Valuation gap:** Ask of $260M is ~5.4x ARR. Fundamentals (deceleration, thin NRR, litigation and key-person overhang) argue for the bottom of the 4\u20136x band, ~4x \u2248 **$192M \u2014 a ~$70M gap.**\n\n### 2.2 Technical / IP\n- **Core asset:** adaptive routing engine, 2 granted patents + 1 pending \u2014 the acquisition rationale.\n- **Key-person concentration:** ~70% of core-engine commits authored by 2 staff engineers; **neither has retention terms surviving the acquisition.** The asset's maintainability and defensibility live in two heads, not solely in the codebase.\n- **Architecture:** aging monolith plus 2 extracted services; moderate tech debt with a *budgeted* paydown plan (intent, not completed work).\n- **Security:** SOC 2 Type II current, no open critical findings \u2014 a genuine clean point.\n\n### 2.3 Regulatory / Legal\n- **Patent litigation (Ouroboros v. MetaCortex, D. Del., pending):** alleges the routing engine infringes an Ouroboros patent. **Motion to dismiss denied; discovery underway** \u2014 a court has found the infringement claim plausible enough to proceed. This directly attacks the asset being bought.\n- **SEC:** no enforcement history. S-1 withdrawn in 2024 for \"market reasons.\" No direct regulatory risk, but the euphemism warrants confirmation that no undisclosed diligence findings drove the withdrawal.\n- **Antitrust:** combined post-close segment share ~18%, below screening thresholds \u2014 substantive antitrust risk is low. Deal size triggers an **HSR filing with a 30-day waiting period** \u2014 a timing gate on the closing schedule, not a thesis risk.\n\n---\n\n## 3. Risks (ranked)\n\n### Tier 1 \u2014 Deal-breaking unless mitigated\n\n**R1. Active patent litigation against the core asset.** The suit targets the exact IP motivating the deal, and MTD denial is materially adverse. Adverse outcomes span damages (bounded/escrowable), forced licensing (recurring margin drag), to injunction (catastrophic \u2014 could enjoin the purchased product). *Red-team:* the company's \"2 granted patents\" provide no reassurance \u2014 grant \u2260 freedom-to-operate, and the suit concerns infringement of *someone else's* patent, an orthogonal question.\n\n**R2. Key-person risk with no surviving retention.** Two engineers hold ~70% of core-engine knowledge and are free to walk at close. This compounds R1: if litigation forces a design-around, the only people who can execute it may have left. Golden-handcuff retention raises effective deal cost and cannot guarantee genuine engagement.\n\n### Tier 2 \u2014 Material; pressure on price and structure\n\n**R3. Valuation\u2013fundamentals mismatch.** ~5.4x ask against a profile that supports ~4x; ~$70M gap. Seller has no cash-crunch leverage (19-month runway) but is exit-blocked (withdrawn S-1). Buyer leverage is narrative (litigation + key-person overhang), not distress.\n\n**R4. Growth deceleration (41% \u2192 22%).** Halving in one year. Cause is unknown \u2014 saturation, competitive loss, or litigation chilling sales \u2014 and the cause materially changes terminal value.\n\n**R5. Customer concentration + renewal cliff.** Top 3 customers = 38% of ARR (~$18.2M), all on 2-year contracts renewing within 9 months \u2014 overlapping deal close and the HSR window. Loss of even one logo re-rates the valuation; forcing renewals amid ownership-change uncertainty is itself destabilizing.\n\n### Tier 3 \u2014 Procedural / lower severity\n\n**R6. HSR 30-day waiting period** \u2014 timing gate only; substantive antitrust risk low (~18% < thresholds). **Flagged as required regulatory step.**\n**R7. Tech debt** \u2014 moderate with a budgeted plan; execution risk remains and is threatened by R2.\n**R8. Withdrawn S-1 (\"market reasons\")** \u2014 no SEC enforcement history and no direct regulatory risk, **but flagged** for confirmation that no undisclosed findings drove the withdrawal.\n\n### Risk interaction (the compounding problem)\nIndividually survivable, these risks are **correlated**: the core IP is simultaneously legally contested (R1), humanly fragile (R2), and richly priced (R3). Three cliffs cluster in ~9 months \u2014 renewals (R5), discovery outcomes (R1), and post-close attrition exposure (R2) \u2014 overlapping the HSR waiting period (R6). This is a concentrated bet on one asset holding together on three fronts at once, not a diversified risk portfolio.\n\n---\n\n## 4. Recommendation\n\n**CONDITIONAL NO-GO at the $260M ask.** At the current price and structure, risk-adjusted value falls well below the ask, and the acquisition thesis is undermined at its center.\n\n**A conditional GO becomes defensible only if all of the following are met:**\n\n1. **Reprice toward the low end (~4x \u2248 $192M)** to reflect growth deceleration and concentrated asset risk.\n2. **Ring-fence Ouroboros exposure** via escrow / indemnity / holdback sized to a credible worst-case (including design-around and licensing scenarios).\n3. **Binding key-engineer retention** for the two staff engineers as a closing condition.\n4. **Secure or condition on top-3 customer renewals** before close.\n\n**Blocking open questions \u2014 no GO recommendation without answers:**\n1. Ouroboros suit: damages range, injunction probability, and estimated design-around / licensing cost.\n2. Clean chain-of-title and inventor-assignment confirmation for the 2 granted patents.\n3. Retention economics and the two key engineers' willingness to sign post-close terms.\n\n**Value-affecting open questions \u2014 needed to price correctly:**\n4. NRR composition \u2014 is 104% masking gross churn offset by top-account expansion?\n5. Logo vs. dollar churn; health and renewal probability of the top-3 contracts.\n6. Root cause of growth deceleration (saturation vs. competition vs. litigation chill).\n7. GAAP vs. cash basis for burn and margin figures.\n8. True driver behind the 2024 S-1 withdrawal.\n\n**Bottom line:** Do not proceed at $260M. Re-engage only on a repriced, restructured basis that transfers the litigation and key-person risk off the buyer's balance sheet and secures the revenue base \u2014 and only after the three blocking questions are answered.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Financial risks grounded in supplied numbers",
+          "score": 9
+        },
+        {
+          "criterion": "Ouroboros litigation connected to routing-engine IP",
+          "score": 9
+        },
+        {
+          "criterion": "Key-person risk interaction with IP value",
+          "score": 9
+        },
+        {
+          "criterion": "Bullish claims challenged, not just restated",
+          "score": 8
+        },
+        {
+          "criterion": "Recommendation explicit and conditional where evidence mixed",
+          "score": 9
+        },
+        {
+          "criterion": "Structure follows summary/findings/risks/recommendation",
+          "score": 9
+        }
+      ],
+      "overall": 9,
+      "weaknesses": "Slightly over-engineered with excessive numbering and repetition, but substantively strong and precise throughout."
+    },
+    "run": 0,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "acquisition-diligence",
+    "baseline": "fixed_pipeline",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 3,
+    "depth": 2,
+    "cost_usd": 0.052653,
+    "wall_ms": 114799.4,
+    "output": "# Diligence Memo: Proposed Acquisition of MetaCortex Corp\n\n**Prepared for:** Investment Committee\n**Re:** Go/No-Go recommendation on MetaCortex Corp acquisition ($260M ask)\n**Basis:** Data-room financials, technical diligence notes, legal docket summary\n**Note:** All companies and figures herein are fictional. Every bullish claim below has been red-teamed; caveats are stated inline.\n\n---\n\n## 1. Summary\n\nMetaCortex is a $48M ARR software company whose acquisition is motivated by a single asset: its **adaptive routing engine** (2 granted patents, 1 pending). The seller asks $260M, roughly **5.4x ARR**, at the high end of the 4\u20136x comparable range.\n\nThe core problem is a **correlated risk cluster**: the entire premium above financial comps rests on the routing engine \u2014 and that engine is simultaneously (a) the subject of active patent litigation (*Ouroboros v. MetaCortex*, motion to dismiss **denied**, now in discovery) and (b) personnel-fragile (two unretained staff engineers author ~70% of core-engine commits). You would be paying *up* precisely for the asset most exposed to loss.\n\nThe recommendation is a **Conditional / Structured Go** \u2014 proceed only if three deal-critical conditions are met. If the patent read or engineer retention returns unfavorable, this **flips to No-Go**, because the premium loses its justification.\n\n---\n\n## 2. Findings\n\n### Financials\n- **$48M ARR**, but growth has **decelerated from 41% to 22% YoY** \u2014 a material slowdown that undercuts a premium multiple.\n- **Gross margin 71%** \u2014 genuinely healthy.\n- **Net revenue retention 104%** \u2014 positive but thin; red-team flag: this could be price increases masking logo churn. Composition unverified.\n- **Runway ~19 months** ($1.1M/month burn against $21M cash) \u2014 adequate, not urgent.\n- **Ask $260M \u2248 5.4x ARR**, versus comps of 4\u20136x (low comp \u2248 $192M). The **~$68M gap between $192M and $260M is effectively the dollar value of the risks the buyer is being asked to absorb.**\n- **Customer concentration:** top 3 = 38% of ARR (~$18M), all on 2-year contracts with **renewal windows in the next 9 months** \u2014 exposed during the diligence-to-close window.\n\n### Technical / IP\n- **Core IP:** adaptive routing engine \u2014 2 granted patents, 1 pending. This is the thesis.\n- **Architecture:** aging monolith plus 2 extracted services; tech debt described as \"moderate\" with a \"budgeted paydown plan.\" Red-team flag: seller-framed, **unverified**.\n- **Key-person risk:** 2 staff engineers wrote ~70% of core-engine commits; **neither has retention terms surviving the acquisition.**\n- **Security:** SOC 2 Type II current, no open critical findings \u2014 a clean positive.\n\n### Regulatory / Legal\n- **Patent litigation:** *Ouroboros v. MetaCortex* (D. Del.). Ouroboros claims the routing engine infringes one of its patents. **Motion to dismiss denied; discovery underway** \u2014 meaning the court found the claim non-frivolous. This is the single risk that can zero out the deal rationale (injunction = engine goes dark).\n- **SEC:** No enforcement history. **S-1 withdrawn in 2024 for \"market reasons\"** \u2014 red-team flag: the stated reason is unverified and could be a proxy signal for the litigation or weakening demand. No enforcement exposure identified, but the withdrawal rationale must be confirmed.\n- **Antitrust:** Combined post-close segment share **~18%, below screening thresholds**. Deal size **triggers an HSR filing (30-day waiting period)** \u2014 a procedural timeline gate, not a substantive block.\n\n---\n\n## 3. Risks (ranked)\n\n| # | Risk | Severity | Likelihood | Hits Thesis? |\n|---|---|---|---|---|\n| R1 | Ouroboros patent suit impairs core IP (injunction risk) | High | Elevated \u2014 MTD denied | **Directly** |\n| R2 | Key-person flight (2 unretained engineers, 70% of commits) | High | Elevated on change-of-control | **Directly** |\n| R3 | Overpay \u2014 5.4x on decelerating ARR | High | Certain at ask | Indirectly |\n| R4 | Customer concentration + near-term renewals (38% / 9 mo) | Med-High | Moderate | Indirectly |\n| R5 | Growth deceleration (41%\u219222%) + thin NRR (104%) | Medium | Occurring | Indirectly |\n| R6 | Tech debt / integration cost (unverified \"moderate\") | Medium | Moderate | No |\n| R7 | S-1 withdrawn \"market reasons\" \u2014 possible hidden signal | Med (informational) | Unknown | Possibly |\n| R8 | HSR 30-day waiting period | Low | Certain | No |\n\n### The compounding-risk finding (most important)\nR1, R2, and R3 are **not independent** \u2014 they share one root: the premium is priced on the routing engine, which is both litigated and personnel-fragile. **Failure modes stack rather than offset.** Worst case: adverse patent ruling \u2192 engineer morale/flight \u2192 top-3 customer loses confidence at renewal \u2014 a plausible cascade, not three separate coin-flips. This correlation is the central analytical conclusion of the diligence.\n\n### Regulatory flags (per mandate)\n- **SEC:** No enforcement history \u2014 clean. But the S-1 withdrawal rationale is unconfirmed and should be treated as an open signal, not a settled fact.\n- **Antitrust:** Sub-threshold at ~18% share; no substantive concern. **HSR filing required \u2014 build the 30-day waiting period into the close schedule.**\n\n---\n\n## 4. Recommendation: Conditional / Structured Go\n\nA clean \"Go\" is not supportable \u2014 the thesis-critical risks (R1, R2) are unresolved and unquantified. A clean \"No-Go\" is premature \u2014 the negatives are largely *structurable*, and the positives (71% margin, clean SOC 2, sub-threshold antitrust, 19-month runway) are real.\n\n**Proceed only if all three deal-critical conditions are satisfied:**\n\n1. **Ouroboros exposure is neutralized.** Obtain outside patent-counsel opinion on infringement likelihood, remedy sought (injunction vs. damages), and settlement range \u2014 **or** secure full litigation indemnity from the seller (escrow/holdback sized to the injunction scenario).\n2. **Engineer retention is signed.** Both staff engineers execute post-close retention packages before close. If retention is uncertain, model and price the asset *without* them.\n3. **Price/structure shifts contingent value to the seller.** Move off the $260M ask toward the low-comp anchor (~$192M / 4x), with the difference held in **indemnity escrow, holdback, and/or an earn-out tied to top-3 renewals.** The ~$68M premium over low-comp must be earned by the seller absorbing the risks it reflects.\n\n**Explicit flip trigger:** If Condition 1 (patent read/indemnity) or Condition 2 (retention) returns unfavorable, **this recommendation becomes No-Go.** The conditions are not cosmetic \u2014 an adverse outcome on either removes the justification for any premium, and without the engine and its authors there is no thesis.\n\n### Additional items to resolve (price/structure, not deal-critical)\n- Renewal probability for the top-3 customers (~$18M ARR at risk in 9 months).\n- True reason for the S-1 withdrawal.\n- NRR composition \u2014 confirm 104% is not price increases masking logo churn.\n- Independent validation of tech-debt scope and paydown cost.\n\n### Procedural\n- File HSR; build the 30-day waiting period into the close timeline.\n\n**Bottom line:** The asset is attractive but the price is asking the buyer to absorb a stack of correlated, thesis-critical risks concentrated in the one thing being bought. Proceed only on structured terms that push that risk back to the seller and only after patent and retention conditions clear. Absent those, decline.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Financial risks grounded in supplied numbers",
+          "score": 9
+        },
+        {
+          "criterion": "Ouroboros litigation connected to routing-engine IP",
+          "score": 10
+        },
+        {
+          "criterion": "Key-person risk and interaction with IP value",
+          "score": 10
+        },
+        {
+          "criterion": "Bullish claims challenged, not just restated",
+          "score": 9
+        },
+        {
+          "criterion": "Recommendation explicit and conditional where mixed",
+          "score": 10
+        },
+        {
+          "criterion": "Structure follows summary/findings/risks/recommendation",
+          "score": 9
+        }
+      ],
+      "overall": 9,
+      "weaknesses": "Minor redundancy and slightly dense formatting, but substantively rigorous with no notable gaps."
+    },
+    "run": 1,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "acquisition-diligence",
+    "baseline": "fixed_pipeline",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 3,
+    "depth": 2,
+    "cost_usd": 0.060054,
+    "wall_ms": 135459.9,
+    "output": "# Acquisition Diligence Memo \u2014 MetaCortex Corp\n\n**Prepared for:** Investment / Deal Committee\n**Re:** Proposed acquisition of MetaCortex Corp (seller's ask: $260M)\n**Classification:** Confidential \u2014 Diligence Work Product\n**Note:** All companies and figures herein are fictional.\n\n---\n\n## 1. Executive Summary\n\nMetaCortex is a $48M-ARR software company whose acquisition thesis rests entirely on a single asset: its **adaptive routing engine** (2 granted patents, 1 pending). That same asset carries the deal's two most severe risks \u2014 **active patent litigation** directed at the engine and **critical key-person dependency** on two unretained engineers. This is a concentrated, not diversified, risk profile: the upside and the principal downside are the same asset, and they cannot be separated in the transaction.\n\nThe genuine positives \u2014 clean SOC 2 Type II, no SEC enforcement history, low substantive antitrust risk, net revenue retention above 100%, and an ask within the comparable 4\u20136x ARR range \u2014 are real but **peripheral**. None offsets a failure on the two central risks.\n\n**Recommendation: CONDITIONAL GO \u2014 leaning NO-GO.** The deal is defensible only if **both** of two conditions are met before close: (1) enforceable retention of the two core engineers as a condition precedent, and (2) transfer of *Ouroboros* litigation exposure to the seller via escrow/indemnity, **or** a price discount from the ~5.4x ask to compensate for self-insured exposure. **If either condition fails, the recommendation is NO-GO.**\n\n---\n\n## 2. Findings\n\n### 2.1 Financials\n- **ARR:** $48M, growing 22% YoY \u2014 a material deceleration from 41% the prior year.\n- **Margins / retention:** Gross margin 71%; net revenue retention 104% (positive but thin \u2014 expansion barely outpaces churn).\n- **Cash position:** $1.1M/month burn against $21M cash \u2192 ~19 months runway.\n- **Customer concentration:** Top 3 customers = 38% of ARR, all on 2-year contracts with renewal windows inside the next **9 months**.\n- **Valuation:** Seller asks $260M \u2248 **5.4x ARR**, at the high end of the 4\u20136x comparable range.\n\n### 2.2 Technical / IP\n- **Core IP:** Adaptive routing engine \u2014 2 granted patents, 1 pending. This is the sole stated motivation for the acquisition.\n- **Architecture:** Aging monolith plus 2 extracted services; tech debt moderate with a budgeted paydown plan (funding/timeline unverified).\n- **Key-person risk:** 2 staff engineers author ~70% of core-engine commits; **neither has retention terms surviving an acquisition.**\n- **Security:** SOC 2 Type II current, no open critical findings \u2014 clean.\n\n### 2.3 Regulatory / Legal\n- **Patent litigation:** *Ouroboros Corp v. MetaCortex* (D. Del., pending). Alleges the routing engine infringes an Ouroboros patent. **Motion to dismiss was denied; discovery is underway** \u2014 meaning the claim survived early judicial scrutiny and is live.\n- **SEC:** No enforcement history. **S-1 withdrawn in 2024, reportedly for \"market reasons\"** \u2014 reason unverified.\n- **Antitrust:** Combined post-close segment share ~18%, below screening thresholds (low substantive risk). Deal size triggers an **HSR filing with a 30-day waiting period** (procedural, but consumes calendar).\n\n---\n\n## 3. Risks (Red-Teamed)\n\nEach bullish claim below has been stress-tested rather than accepted at face value.\n\n| Risk | Severity | Resolvable pre-close? | Disposition |\n|---|---|---|---|\n| **Ouroboros patent suit** (MTD denied, aimed at core asset) | Critical | Only *partially* \u2014 merits opinion + escrow/indemnity possible; **outcome not controllable** | Price/indemnify or walk |\n| **Key-person (2 engineers, no retention)** | Critical | Yes \u2014 retention negotiable as condition of close | Deal-critical condition precedent |\n| **Customer renewal cliff** (38% ARR, <9 mo) | High | Partially \u2014 terms/signals knowable; renewals not guaranteed | Reprice / structure earnout |\n| **Growth deceleration** (41% \u2192 22%) | High | Partially \u2014 cohort/new-logo data would explain cause | Valuation input |\n| **Valuation at high end (~5.4x)** | Med-High | Yes \u2014 buyer-controlled | Negotiation lever |\n| **S-1 withdrawal, unverified reason** | Medium | Yes \u2014 data-room request | Diligence gate |\n| **Tech debt / paydown funding** | Medium | Yes \u2014 verify budget/plan | Integration cost input |\n| **HSR 30-day wait** | Low (procedural) | Yes | Timeline/cost only |\n\n**Red-team of the \"positives\":**\n- *\"Ask is within comp range.\"* True only if the risk-laden thesis holds. A 5.4x multiple prices the IP as clean and durable; the litigation and key-person exposures directly contradict that premise.\n- *\"NRR is healthy.\"* At 104% it is **thin** \u2014 a small increase in churn or a single anchor-customer loss could push it below 100%.\n- *\"No SEC enforcement.\"* True, but it coexists with an **unexplained withdrawn IPO**. Do not let the clean items launder the unverified disclosure question.\n- *\"SOC 2 clean / low antitrust risk.\"* Genuine, but peripheral \u2014 neither touches the core thesis.\n\n**Risk interactions (where problems compound):**\n- **Litigation \u00d7 Valuation:** An adverse Ouroboros outcome (injunction or forced licensing) could impair the very cash flows underwriting the 5.4x multiple \u2014 a simultaneous hit to both asset and price.\n- **Key-person \u00d7 Litigation:** The two core engineers are also the most likely fact witnesses / defense knowledge-holders in the patent suit. Their departure would degrade the IP *and* weaken litigation defense at once.\n- **Renewal cliff \u00d7 Growth deceleration:** If decelerating growth reflects weakening new-logo acquisition, a lost anchor customer cannot be quickly backfilled \u2014 the two risks reinforce each other.\n- **Runway \u00d7 Deal timeline:** A protracted close (diligence + HSR + negotiation) eats runway and pushes the target toward the renewal cliff before the deal lands, weakening the inherited position.\n\n**Synthesis:** These risks are *positively correlated*. The realistic stress scenario is not \"one thing goes wrong\" but a **clustered failure** \u2014 the engineers leave, the suit turns adverse, and an anchor renewal slips \u2014 because the same underlying fragility (dependence on one engine and its two authors) drives all three.\n\n**Regulatory flags (per mandate):**\n- **SEC:** No enforcement history, but the **2024 S-1 withdrawal reason is unverified** and must be independently confirmed before close.\n- **Antitrust:** Substantive risk is low (~18% share, below thresholds), but the deal **requires an HSR filing (30-day waiting period)** that must be mapped against the 9-month renewal cliff.\n\n---\n\n## 4. Open Questions (Prioritized by Decision-Weight)\n\n**Tier 1 \u2014 Deal-breakers if unanswered or adverse:**\n1. Will the two core engineers sign retention terms that survive close? *(No \u2192 thesis is unfunded regardless of price.)*\n2. What is the merits / damages / injunction exposure in *Ouroboros*, and will the seller stand behind it via escrow or indemnity? *(Unresolved \u2192 unquantifiable core-asset liability.)*\n3. What are the actual renewal terms and signals for the top-3 customers? *(38% of ARR at stake within the runway window.)*\n\n**Tier 2 \u2014 Determine price and structure:**\n4. New-logo vs. expansion revenue split and churn detail (explains the 41% \u2192 22% deceleration; distinguishes \"maturing\" from \"stalling\").\n5. Verified reason for the 2024 S-1 withdrawal.\n6. Funded status, cost, and timeline of the tech-debt paydown.\n\n**Tier 3 \u2014 Process / planning:**\n7. HSR filing prep and 30-day timeline mapped against the renewal cliff.\n8. Independent patent-validity opinion on the 2 granted patents (tests thesis durability even absent litigation).\n\n---\n\n## 5. Recommendation\n\n**CONDITIONAL GO \u2014 leaning NO-GO.**\n\nThe deal is defensible **only if both** of the following are secured:\n\n1. **Enforceable retention** for the two core engineers, executed as a **hard condition precedent to close.** Key-person risk is fixable through structure \u2014 but only if made a gating condition, not a post-close aspiration.\n\n2. **Litigation exposure transferred to the seller** via escrow/indemnity, **OR** a **price discount from ~5.4x** sufficient to compensate the buyer for self-insuring the *Ouroboros* exposure. Litigation risk can be *contained* \u2014 never eliminated; a filed, MTD-surviving patent suit does not disappear, so its cost must be explicitly allocated.\n\n**Decision rule:**\n- **If both conditions are met** \u2192 proceed to a repriced, restructured offer (below the 5.4x ask, with retention CPs and litigation escrow/indemnity), executing quickly enough to preserve the target's position ahead of the renewal cliff and runway erosion.\n- **If either condition fails** \u2192 **NO-GO.** With the two critical risks unmitigated and positively correlated, the clustered downside becomes the base case: a premium paid for contested patents plus a codebase the buyer cannot readily maintain. The peripheral positives (SOC 2, low antitrust risk, no SEC enforcement, NRR >100%, ask within range) do not offset this.\n\n**Bottom line:** Do not let a clean security posture and a headline multiple \"within range\" obscure the structural reality \u2014 the asset you are buying is the asset most at risk, and you cannot purchase one without the other.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Financial risks grounded in supplied numbers",
+          "score": 9
+        },
+        {
+          "criterion": "Ouroboros litigation connected to routing-engine IP",
+          "score": 10
+        },
+        {
+          "criterion": "Key-person risk and interaction with IP value",
+          "score": 10
+        },
+        {
+          "criterion": "Bullish claims challenged, not just restated",
+          "score": 9
+        },
+        {
+          "criterion": "Recommendation explicit and conditional where evidence mixed",
+          "score": 9
+        },
+        {
+          "criterion": "Structure follows summary/findings/risks/recommendation",
+          "score": 8
+        }
+      ],
+      "overall": 9,
+      "weaknesses": "Slightly verbose with added structure (open questions, decision-weight tiers) beyond the requested memo format, though this doesn't undermine substance."
+    },
+    "run": 2,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "acquisition-diligence",
+    "baseline": "smythe_dynamic",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "fork_join -> adversarial -> serial",
+    "nodes": 6,
+    "depth": 3,
+    "cost_usd": 0.098259,
+    "wall_ms": 188860.8,
+    "output": "# Investment Committee Memo \u2014 Project MetaCortex\n\n**Re:** Proposed acquisition of MetaCortex Corp at a $260M ask\n**Prepared for:** Investment Committee\n**Purpose:** Go/no-go recommendation based on data-room financials, technical diligence, and legal docket review\n*All figures are drawn solely from the supplied source documents. Company and figures are fictional.*\n\n---\n\n## SUMMARY\n\nMetaCortex Corp is a $48M ARR software business whose principal attraction is a proprietary adaptive routing engine (2 granted patents, 1 pending). The seller asks $260M (~5.4x ARR), inside the 4\u20136x comparable range.\n\nThat headline masks a deal whose entire thesis rests on an asset that is (a) the subject of an active patent-infringement suit that has already survived a motion to dismiss, and (b) authored ~70% by two engineers who have no retention obligations surviving a close. The two largest risks in the transaction \u2014 a possible injunction against the thesis asset and the loss of the only people who understand it \u2014 are correlated and mutually reinforcing. Growth has halved year-over-year, net retention is thin, and the core financials are unaudited and seller-supplied.\n\n**Verdict: NO-GO at the current ask and structure.** The deal is only reconsiderable if a specific set of conditions precedent (below) are met, at a materially reset price.\n\n---\n\n## FINDINGS\n\n**Financial profile (unaudited, seller-supplied):**\n- $48M ARR; growth decelerated from 41% to 22% YoY \u2014 a halving in a single year, with no pipeline, bookings, or cohort data supplied to establish a floor.\n- Gross margin 71%. Net revenue retention 104% \u2014 expansion barely outrunning churn; long-tail retention (ex\u2013top 3) is unknown and could be below 100%.\n- Burn $1.1M/month against $21M cash \u2192 ~19 months runway, which erodes further under litigation defense costs.\n- Customer concentration: top 3 = 38% of ARR, all on 2-year contracts with renewal windows inside the next 9 months \u2014 i.e., inside the diligence period, and while the litigation is public.\n\n**Technical / IP:**\n- Core asset: adaptive routing engine \u2014 2 granted patents, 1 pending. This is the sole strategic rationale for the deal.\n- Architecture: aging monolith plus 2 extracted services (an incomplete migration); tech debt described as \"moderate\" with a \"budgeted paydown plan\" \u2014 both seller characterizations, unverified by independent code review and unfunded-tested against the $1.1M/month burn.\n- Key-person concentration: 2 staff engineers author ~70% of core-engine commits; neither has retention terms surviving an acquisition.\n- Security: SOC 2 Type II current, no open critical findings \u2014 genuine but scope-limited to security controls; it attests nothing about IP validity, code portability, or key-person risk.\n\n**Legal / regulatory:**\n- *Ouroboros Corporation v. MetaCortex* (D. Del., pending): alleges the routing engine infringes an Ouroboros patent. **Motion to dismiss DENIED; discovery underway** \u2014 a court has already found the infringement theory plausible enough to proceed. No damages model, injunction-probability estimate, or FTO/invalidity opinion exists.\n- SEC: no enforcement history; S-1 withdrawn in 2024, characterized by the seller as \"for market reasons\" \u2014 unverified.\n- Antitrust: seller-reported combined segment share ~18%, below screening thresholds; deal size triggers a mandatory HSR filing (30-day minimum waiting period).\n\n---\n\n## RISKS (red-team caveats)\n\n1. **The thesis asset may be enjoined (a zero scenario, not a haircut).** The buyer would pay $260M principally for an engine a federal court may enjoin. The MTD denial means this is not a nuisance suit. Contingent liability is entirely unquantified.\n\n2. **Reverse-invalidation.** If discovery shows the Ouroboros patent is prior art, MetaCortex's own \"defensible\" patents could be narrowed or invalidated in the same proceeding \u2014 moat and liability collapsing together.\n\n3. **Non-transferability of the primary asset.** ~70% of core-engine commits sit with two unretained engineers. If they leave at close, the buyer owns code it may not fully understand or extend.\n\n4. **Correlated failure \u2014 the two worst risks are the same two people.** These engineers are almost certainly the litigation's key fact witnesses. Their departure would simultaneously gut product continuity, remove the defense's technical memory, and advantage Ouroboros. The litigation itself raises their incentive to leave (deposition exposure, uncertainty).\n\n5. **Decelerating growth with no proven floor.** 41%\u219222% is a trend, not noise. 104% NRR is weak for a top-of-range multiple. Figures are unaudited.\n\n6. **Renewal exposure inside the window.** Top-3 customers (38% of ARR) renew within 9 months, while litigation is public knowledge.\n\n7. **SEC-adjacent flag.** \"Market reasons\" for the 2024 S-1 withdrawal is unverified and self-serving. Withdrawals also follow SEC comment letters on revenue recognition \u2014 directly relevant given the unaudited ARR. Must be confirmed against the SEC comment-letter file.\n\n8. **Antitrust definition risk.** The ~18% share relies on the *seller's* market definition. A narrower product/geographic market \u2014 which the FTC/DOJ, not the seller, defines \u2014 could push share past thresholds and trigger a Second Request. HSR is mandatory; gun-jumping discipline (no pre-close integration or sensitive-info sharing) applies.\n\n9. **Valuation.** On fundamentals (decelerating growth, 104% NRR, 38% concentration), MetaCortex prices near the ~4x floor \u2248 **$192M \u2014 roughly $70M below ask** \u2014 and that floor is a *pre-litigation, pre-key-person* number. Risk-adjusted value sits below $192M, with material probability mass near zero if the injunction lands. The ask embeds durable growth, unencumbered IP, and a transferable asset simultaneously \u2014 none supported.\n\n---\n\n## RECOMMENDATION\n\n**NO-GO at the $260M ask and current structure.**\n\nThe controlling risks \u2014 a denied motion to dismiss against the thesis asset, and ~70% engine authorship in two unretained (and likely soon-departing witness) engineers \u2014 are unquantified, correlated, and fatal to the deal as presented. The price asks the buyer to pay the best case on every axis at once.\n\nThe transaction becomes reconsiderable **only** if all of the following conditions precedent are satisfied:\n\n1. **Enforceable retention** for both core engineers, surviving close and structured to withstand litigation-driven attrition.\n2. **Independent FTO / invalidity opinion** on the Ouroboros suit, with a damages model and injunction-probability estimate, plus full litigation-file review.\n3. **Price reset to the ~4x/$192M floor**, less a holdback/escrow sized to worst-case damages and injunction exposure.\n4. **Verification of the S-1 withdrawal reason** via the SEC comment-letter file; any rev-rec/accounting driver undermines the financials and is itself disqualifying.\n5. **Independent audit** of ARR, NRR, and revenue recognition (excluding one-time/services revenue), plus long-tail (ex\u2013top 3) retention data and renewal-risk assessment for the top-3 accounts.\n6. **Antitrust market-definition check** not reliant on the seller's numbers, with HSR timing and gun-jumping controls built into the process.\n\nAbsent all six, the committee should decline and not counter.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Financial risks grounded in supplied numbers",
+          "score": 9
+        },
+        {
+          "criterion": "Ouroboros litigation connected to routing-engine IP",
+          "score": 10
+        },
+        {
+          "criterion": "Key-person risk and interaction with IP value identified",
+          "score": 10
+        },
+        {
+          "criterion": "Bullish claims challenged, not just restated",
+          "score": 9
+        },
+        {
+          "criterion": "Recommendation explicit and conditional where evidence mixed",
+          "score": 10
+        },
+        {
+          "criterion": "Structure follows summary/findings/risks/recommendation",
+          "score": 10
+        }
+      ],
+      "overall": 9,
+      "weaknesses": "Some minor speculative additions (e.g., SEC comment-letter theory, engineers as fact witnesses) go slightly beyond the source documents, though clearly labeled as inference."
+    },
+    "run": 0,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "acquisition-diligence",
+    "baseline": "smythe_dynamic",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "fork_join -> adversarial -> serial",
+    "nodes": 6,
+    "depth": 3,
+    "cost_usd": 0.102165,
+    "wall_ms": 199579.0,
+    "output": "# ACQUISITION DILIGENCE MEMO \u2014 MetaCortex Corp\n\n**To:** Investment Committee\n**From:** Deal Partner, Diligence\n**Re:** Proposed acquisition of MetaCortex Corp \u2014 Go/No-Go\n**Basis:** Data-room financial summary, technical diligence notes, legal docket summary (fictional figures)\n\n---\n\n## 1. SUMMARY\n\nMetaCortex is a $48M ARR software company whose sole strategic attraction is its adaptive routing engine (2 granted patents, 1 pending). The seller asks $260M (5.4x ARR), within the 4\u20136x comparable-transaction band. On the surface the company shows positive net revenue retention (104%), a current SOC 2 Type II, sub-threshold antitrust share (~18%), and no SEC enforcement history.\n\nOn examination, **every headline positive inverts or narrows to the point of being non-load-bearing.** The core asset is the subject of active patent-infringement litigation (Ouroboros Corp., D. Del.) in which the motion to dismiss has already been denied and discovery is underway. The engine's institutional knowledge is concentrated in two engineers with no retention terms surviving a change of control \u2014 the same two people who are the central fact witnesses in that litigation. Revenue quality is masked by concentration and a forward renewal cliff. The seller is attempting to exit before the discovery record and any dispositive ruling are complete.\n\n**Recommendation: NO-GO at any price until two gating conditions resolve** \u2014 (a) an independent patent opinion on the Ouroboros exposure, and (b) the outcome of the top-3 customer renewals. Price is not the primary lever; information sequencing is. Any valuation quoted before these resolve is a guess at the value of a contested asset from the wrong comparable set.\n\n---\n\n## 2. FINDINGS\n\n### 2.1 Financials \u2014 quality is worse than the headline metrics\n- **Revenue/growth:** $48M ARR, 71% gross margin. Growth decelerated from 41% to 22% YoY \u2014 a ~46% collapse in growth *rate* in a single year. Two data points that halve give no evidence the deceleration has bottomed; the next print could plausibly be sub-15%.\n- **The 22% figure is trailing and predates the risk.** It captures a period when all top-3 contracts were still in force. It structurally cannot reflect the renewal cliff that is about to materialize.\n- **NRR of 104% is a blended average that hides the accounts that matter.** With top-3 customers at 38% of ARR, a modest 4-point net expansion is most plausibly carried by the long tail while the concentrated accounts sit flat-to-contracting. 104% is therefore not a cushion \u2014 it tells us the least about the accounts most likely to move.\n- **Pricing power is near-zero.** 104% NRR going into a renegotiation with customers who know they are 38% of revenue is the worst possible negotiating profile. Renewal \u2260 renewal-at-price; nothing in the documents establishes renewal terms, pricing, or churn history on these accounts.\n- **Runway is a peacetime number.** $21M cash at $1.1M/month = ~19 months \u2014 but only in the no-shock case. A top-3 non-renewal cuts ARR while burn holds, worsening the math. Litigation costs do not appear to be in the disclosed burn line.\n\n### 2.2 Technical IP \u2014 the moat and the lawsuit are the same object\n- **The core asset is under active infringement litigation.** The 2 granted patents are *offensive* assets \u2014 they protect against competitors copying MetaCortex; they do **nothing** to immunize MetaCortex against infringing Ouroboros's patent. The \"patent moat\" is irrelevant to the actual litigation threat.\n- **An adverse ruling makes the asset negative, not merely un-moated.** If Ouroboros prevails, MetaCortex owes past damages and forward royalties on the sole asset motivating the acquisition \u2014 we would be paying a premium multiple to assume someone else's damages exposure.\n- **Key-person concentration with no protection.** Two staff engineers author ~70% of core-engine commits; neither has retention terms surviving an acquisition. They can walk on announcement. The remaining team (~30% of commits) shows no demonstrated knowledge transfer.\n- **Capacity conflict.** Post-departure, MetaCortex cannot simultaneously maintain the aging monolith, execute the budgeted tech-debt paydown, and defend the litigation's technical claims. The paydown plan is premised on capacity that may evaporate at announcement.\n- **Positive but narrow:** SOC 2 Type II is current with no open critical findings. Genuinely favorable, but it says nothing about the litigation or key-person risk and must not halo the deal.\n\n### 2.3 Regulatory \u2014 see Risks; no clean bills of health\n- Antitrust screening share ~18% (below thresholds) is substantively favorable, but the deal triggers an HSR filing with a 30-day waiting period.\n- No SEC enforcement history, but the 2024 S-1 was withdrawn \"for market reasons\" \u2014 self-serving and unverified.\n\n---\n\n## 3. RISKS\n\n### 3.1 Litigation / IP (severity: critical)\n- **Ouroboros Corp. v. MetaCortex (D. Del., pending).** MTD **denied** \u2014 the court has already found the infringement claims plausible on their face; the easiest off-ramp is gone. Discovery is the danger window: engineers' commit history and design notes could establish willful infringement or copying, and this overlaps the acquisition timeline.\n- Risk-adjusted value of the core asset = (floor value \u00d7 probability of prevailing) \u2212 expected damages/royalty tail. **The documents do not permit this to be quantified \u2014 which is precisely why no defensible price exists yet.**\n\n### 3.2 Key-person / litigation overlap (severity: high)\n- The two engineers are both the technical bottleneck **and** the central fact witnesses. A post-close retention agreement protects continuity but cannot control discovery testimony; a disengaged or departing witness, freed from company loyalty, is worse than an absent one and could damage the independent-origination defense.\n\n### 3.3 Revenue concentration / renewal cliff (severity: high)\n- Top-3 = 38% of ARR, all with renewal windows in the next 9 months, no established pricing power. Non-renewal or price erosion during the window directly impairs ARR and runway.\n\n### 3.4 SEC factors (FLAGGED \u2014 unresolved, not clean)\n- No enforcement history is not a clean bill. The 2024 S-1 withdrawal reason is unverified. Sharp growth deceleration (41%\u219222%) plus revenue concentration (top-3 = 38%) are classic comment-letter triggers. **Treat as an unresolved disclosure liability.** The seller's move to a private sale while litigation is in active discovery reads as an attempt to transfer risk to the buyer at a pre-adverse-ruling price.\n\n### 3.5 Antitrust / HSR factors (FLAGGED)\n- ~18% combined segment share is below screening thresholds \u2014 substantively low antitrust risk.\n- **However, the HSR 30-day waiting period is a hard gate that overlaps the renewal window.** A top-3 renewal could fail *during* the waiting period with no ability to close and stem the bleed. Gun-jumping rules bar pre-close integration, so the buyer cannot act to protect the accounts until the gate clears.\n\n### 3.6 Valuation (severity: high)\n- 5.4x ARR is arithmetically in the 4\u20136x comp band, but this is a **category error.** We have no evidence the comps carried active infringement litigation on the core asset, unretained key-person concentration, and a forward renewal cliff. The comp band is the wrong reference class. Even a conservative 4.0\u20134.5x \"floor\" still values the routing engine as an intact, defensible asset it may not be.\n\n---\n\n## 4. RECOMMENDATION: NO-GO (conditional re-engagement)\n\n**Do not proceed at the $260M ask, and do not anchor to any price \u2014 including a discounted floor \u2014 at this time.**\n\nThe three pillars of the bull case each invert:\n- **Multiple:** in-range but drawn from the wrong risk class; no defensible price exists pre-patent-opinion.\n- **Moat:** the granted patents are irrelevant to the actual litigation threat, and the asset can go negative on an adverse ruling.\n- **NRR/growth:** 104% is a blended average masking the concentrated accounts; 22% is a trailing figure that predates the renewal cliff.\n\n**Re-engagement is contingent on two gating deliverables:**\n1. **Independent patent opinion** on the Ouroboros infringement claim and the expected damages/royalty tail, informed by the developing discovery record.\n2. **Resolution of the top-3 customer renewals** \u2014 confirmed renewal terms, pricing, and seat counts \u2014 so revenue durability can be assessed against fact rather than a blended average.\n\nSecondary conditions, relevant only if the two gates clear favorably: enforceable retention for the two core engineers with terms that survive close and cover the litigation window; independent verification of the 2024 S-1 withdrawal rationale and SEC disclosure exposure; and a valuation rebuilt from a risk-matched reference class, not the 4\u20136x comp band.\n\nUntil the patent opinion and renewal outcomes are in hand, this is a **NO-GO.** The correct lever is information sequencing, not price negotiation.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Financial risks grounded in supplied numbers",
+          "score": 9
+        },
+        {
+          "criterion": "Ouroboros litigation connected to routing-engine IP",
+          "score": 10
+        },
+        {
+          "criterion": "Key-person risk and interaction with IP value identified",
+          "score": 10
+        },
+        {
+          "criterion": "Bullish claims challenged, not just restated",
+          "score": 9
+        },
+        {
+          "criterion": "Recommendation explicit and conditional where evidence is mixed",
+          "score": 9
+        },
+        {
+          "criterion": "Structure follows summary/findings/risks/recommendation",
+          "score": 9
+        }
+      ],
+      "overall": 9,
+      "weaknesses": "Slightly overwritten with repetitive rhetorical framing that occasionally overstates certainty (e.g., 'non-load-bearing') beyond what the sparse data supports."
+    },
+    "run": 1,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "acquisition-diligence",
+    "baseline": "smythe_dynamic",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "fork_join -> adversarial -> serial",
+    "nodes": 6,
+    "depth": 3,
+    "cost_usd": 0.093702,
+    "wall_ms": 174174.9,
+    "output": "# Investment Committee Diligence Memo \u2014 Project Adaptive Routing\n## Proposed Acquisition of MetaCortex Corp\n\n**Prepared for:** Investment Committee\n**Subject:** Go/No-Go on acquisition of MetaCortex Corp at $260M ask\n**Sourcing:** Analysis confined to supplied data-room financials, technical diligence notes, and legal docket summary. All figures fictional.\n\n---\n\n## 1. Summary\n\nMetaCortex is a $48M ARR software company whose acquisition thesis rests almost entirely on one asset: its adaptive routing engine (2 granted patents, 1 pending). The seller's ask of $260M implies **~5.4x ARR \u2014 the upper half of the 4\u20136x comparable range.**\n\nOur diligence finds that the pricing is unsupported by fundamentals and that the central asset is doubly compromised: it is **under active patent-infringement litigation (motion to dismiss already denied, discovery underway)**, and the two engineers who author ~70% of core-engine commits **have no retention terms surviving the acquisition.** These two facts converge \u2014 the same engineers who could walk on day one are also the institutional witnesses needed to defend the litigation the acquisition premium is being paid to acquire.\n\nEvery bullish claim in the data room degrades under scrutiny: growth is decelerating sharply, net retention is barely positive, revenue is concentrated with an imminent renewal cliff, and stated runway is a ceiling rather than a floor.\n\n**Recommendation: NO-GO at $260M unconditional.** A conditional GO is available only if a defined set of gating conditions (reprice, engineer retention, IP indemnity, secured renewals, independent verification, regulatory clearance) are met in full.\n\n---\n\n## 2. Findings\n\n### 2.1 Financials\n- **Growth is decelerating, not growing.** YoY growth fell from 41% to 22% \u2014 a ~46% collapse in growth rate in a single year. No forward pipeline, bookings, or cohort data was supplied to suggest reacceleration. This is a maturing profile, not a growth-company profile.\n- **Net revenue retention of 104% is a weak signal, not a strong one.** Best-in-class SaaS runs 115\u2013130%+. At 104%, the installed base is essentially flat; the majority of growth is being bought via expensive new-logo acquisition. **No gross retention / churn figure was provided**, so the flattering net aggregate may mask material gross churn.\n- **Margins are mid-tier.** 71% gross margin against $1.1M/month burn indicates expensive rather than efficient growth.\n- **Runway of 19 months is nominal only.** The $1.1M/month burn figure does not reflect (a) active Ouroboros litigation/discovery costs or (b) the budgeted tech-debt paydown. Real runway is shorter; direction unknown. **Treat 19 months as a ceiling.**\n\n### 2.2 Technical IP\n- **The core asset is encumbered.** The adaptive routing engine \u2014 the sole rationale for the premium \u2014 is the exact subject of *Ouroboros Corp v. MetaCortex.* MetaCortex's own 2 granted patents defend against copying by others; they provide **no shield** against a claim that MetaCortex infringes Ouroboros. The \"1 pending\" application is not a bankable asset.\n- **Critical key-person risk.** Two staff engineers author ~70% of core-engine commits and **neither has retention terms surviving the acquisition.** At close, both can walk \u2014 taking with them both the migration roadmap and the litigation's institutional knowledge.\n- **Tech debt is seller-reported.** \"Moderate\" debt and a partial monolith\u2192services migration is the highest-risk re-platforming phase; the paydown plan depends on the very engineers who may leave. Treat as unvalidated.\n- **Security is a genuine positive.** SOC 2 Type II is current with no open critical findings.\n\n### 2.3 Regulatory / Legal\n- **Litigation is live and adverse-leaning.** Motion to dismiss was **denied** (a federal court found the claims non-frivolous enough to proceed); discovery is underway, so exposure is unquantified and expanding. Adverse outcomes range up to an injunction that could enjoin the core engine \u2014 a scenario that zeros the asset the $260M targets.\n- **SEC: no enforcement history, but not cleared.** The S-1 was withdrawn in 2024 \"for market reasons\" \u2014 a company characterization we have not independently verified. Absence of enforcement history is not the same as a clean disclosure record. Rated **low\u2013medium pending verification.**\n- **HSR filing is mandatory.** Deal size triggers a filing with a **30-day waiting period** and **gun-jumping restrictions** (no premature integration/operational control before clearance). Combined segment share of ~18% is below substantive screening thresholds, so this is a **procedural timing gate, not a substantive antitrust risk** \u2014 but it does not waive the waiting period.\n\n---\n\n## 3. Risks\n\n| # | Risk | Severity | Evidence |\n|---|------|----------|----------|\n| 1 | **Core IP under active litigation with MTD denied** \u2014 potential injunction zeros the asset | Critical | *Ouroboros v. MetaCortex,* discovery underway |\n| 2 | **Key-person flight** \u2014 2 engineers = ~70% of commits, no surviving retention; also the litigation's key witnesses | Critical | Technical diligence notes |\n| 3 | **Overpricing** \u2014 $260M \u2248 5.4x ARR (upper half); every fundamental points to the low end (~4x \u2248 $192M) | High | Financial summary + comps |\n| 4 | **Customer concentration + renewal cliff** \u2014 top 3 = 38% of ARR (~$18.2M), all renewing within 9 months, during litigation and ownership change; no LOIs supplied | High | Financial summary |\n| 5 | **Decelerating growth + weak NRR** \u2014 41%\u219222%; 104% NRR near breakeven | High | Financial summary |\n| 6 | **Understated burn / runway** \u2014 excludes litigation and tech-debt costs | Medium | Financial summary |\n| 7 | **Unvalidated tech-debt claim** \u2014 mid-migration monolith, seller-reported | Medium | Technical diligence notes |\n| 8 | **SEC disclosure record unverified** \u2014 S-1 withdrawal rationale unconfirmed | Low\u2013Medium | Legal docket summary |\n| 9 | **HSR timing gate** \u2014 mandatory 30-day wait, gun-jumping constraints | Low (procedural) | Legal docket summary |\n\n**Compounding failure point:** Risks 1 and 2 are not independent. The premium is being paid for an asset that is simultaneously under infringement litigation *and* controlled by unretained engineers who are the litigation's key witnesses. Losing them kicks out the defense and the roadmap at once.\n\n---\n\n## 4. Recommendation\n\n### NO-GO at $260M / unconditional.\n\nThe valuation prices a defensible, durable moat. Diligence establishes the opposite: a decelerating asset, barely-positive net retention, an imminent concentration cliff, overstated runway, and \u2014 decisively \u2014 a crown-jewel IP that is contested in court and controlled by two flight-risk engineers. **The buyer would be paying a ~$68M premium (above the 4x floor of ~$192M) for the deal's single biggest liability.**\n\n### Conditional GO \u2014 only if ALL of the following gating conditions are satisfied as closing conditions:\n\n1. **Reprice to ~$192M (\u22484x ARR) or below** \u2014 no fact supports the upper half of the comp range.\n2. **Engineer retention as a closing condition** \u2014 binding, multi-year retention (with meaningful lock-ups and IP-assignment confirmation) for both core-engine engineers; deal does not close without it.\n3. **Quantified and indemnified IP risk** \u2014 seller-funded escrow/indemnity sized to a realistic adverse Ouroboros outcome (including redesign/license/injunction scenarios); representations & warranties covering IP ownership and non-infringement, with survival.\n4. **Secured top-3 renewals** \u2014 signed renewals or binding commitments/LOIs from the top-3 customers (~38% of ARR) prior to close, or a purchase-price adjustment mechanism tied to renewal outcomes.\n5. **Independent technical verification** \u2014 third-party validation of the \"moderate\" tech-debt characterization and migration state; independent gross-churn/cohort data to test the 104% NRR aggregate.\n6. **SEC verification** \u2014 confirm no comment letter or disclosure dispute drove the 2024 S-1 withdrawal; reconcile prior risk-factor disclosures (including Ouroboros or precursors) with the current data room.\n7. **HSR clearance built into timeline** \u2014 file promptly, observe the 30-day waiting period, and enforce strict no-gun-jumping (no operational integration or control) until clearance.\n\n**Absent satisfaction of every condition above, the recommendation stands at NO-GO.** No optimistic reading of the supplied documents survives the stress test at the current price and terms.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Financial risks are grounded in the supplied numbers",
+          "score": 9
+        },
+        {
+          "criterion": "The Ouroboros litigation is connected to the routing-engine IP that motivates the deal",
+          "score": 10
+        },
+        {
+          "criterion": "Key-person risk and its interaction with the IP value is identified",
+          "score": 10
+        },
+        {
+          "criterion": "Bullish claims are challenged, not just restated",
+          "score": 9
+        },
+        {
+          "criterion": "Recommendation is explicit and conditional where evidence is mixed",
+          "score": 10
+        },
+        {
+          "criterion": "Structure follows summary / findings / risks / recommendation",
+          "score": 10
+        }
+      ],
+      "overall": 9,
+      "weaknesses": "Minor over-precision in some inferred figures (e.g., implied burn/runway impacts) not strictly supported by source data."
+    },
+    "run": 2,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  }
+]
