@@ -22,7 +22,7 @@ The demo shows what Smythe does; benchmarks show whether it's worth it. The harn
 
 ## Next
 
-1. **Benchmarks, continued** — memory-on vs. memory-off numbers for the learning Architect, then head-to-head vs. LangGraph and CrewAI
+1. **Benchmarks, continued** — head-to-head vs. LangGraph and CrewAI (memory-on/off numbers are published: null on a homogeneous family; a harder memory task family with planted failure modes follows)
 2. **Recursive subgraph decomposition** — a node can resolve to a nested graph, with depth limits and shared budget/trace/failure machinery
 3. **Trace inspector** — `smythe inspect`: rendered DAG, per-node prompt/response/cost/duration, and the Architect's reasoning
 
