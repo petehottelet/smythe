@@ -1,0 +1,380 @@
+[
+  {
+    "task": "research-memo",
+    "baseline": "single_agent",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 1,
+    "depth": 0,
+    "cost_usd": 0.008919,
+    "wall_ms": 44484.2,
+    "output": "# Research Memo: Solid-State Batteries for Consumer Electronics\n\n**Purpose:** Assess the current state of solid-state battery (SSB) technology, leading technical approaches, manufacturing obstacles, and a realistic adoption timeline for consumer electronics applications.\n\n**Note on scope:** This memo focuses on consumer electronics (smartphones, wearables, laptops, earbuds), which differs meaningfully from the more heavily publicized EV/automotive segment. Consumer devices favor volumetric energy density, fast charging, and safety over the cost-per-kWh and cycle-life priorities that dominate automotive.\n\n---\n\n## 1. Executive Summary\n\nSolid-state batteries replace the liquid or gel electrolyte in conventional lithium-ion cells with a solid ion-conducting material. This promises higher energy density, improved safety (reduced flammability), wider operating temperatures, and potentially faster charging. Despite two decades of R&D, mass-market SSBs for consumer electronics remain largely pre-commercial, with the exception of niche and semi-solid products. Full commercialization at scale is realistically a **2027\u20132032** phenomenon, gated primarily by manufacturing scalability rather than fundamental chemistry.\n\n---\n\n## 2. Leading Technical Approaches\n\nSolid electrolytes fall into three broad families, each with trade-offs:\n\n### 2.1 Oxide-based (ceramic) electrolytes\n- **Examples:** LLZO (garnet), LATP, LLTO.\n- **Pros:** Chemically and thermally stable, wide electrochemical window, air-stable relative to sulfides.\n- **Cons:** Brittle, hard to form thin dense layers, high sintering temperatures, poor interfacial contact with electrodes.\n- **Relevance to consumer:** Well-suited to small, thin-film cells (wearables, IoT, medical). Companies like **Ilika (Stereax)** and **Cymbet** target micro-battery applications here.\n\n### 2.2 Sulfide-based electrolytes\n- **Examples:** LGPS, argyrodites (Li\u2086PS\u2085Cl).\n- **Pros:** Highest ionic conductivity (comparable to liquid electrolytes), mechanically softer/more ductile, enabling good interfacial contact.\n- **Cons:** Sensitive to moisture (release toxic H\u2082S), require inert/dry manufacturing environments, narrower stability window.\n- **Relevance to consumer:** The favored path for high-energy cells; **Samsung SDI**, **TDK**, and others pursue sulfide chemistries. Automotive players (Toyota) also center here.\n\n### 2.3 Polymer-based electrolytes\n- **Examples:** PEO-based systems.\n- **Pros:** Flexible, easy to process using existing roll-to-roll equipment, good mechanical compliance.\n- **Cons:** Low ionic conductivity at room temperature (often require heating to ~60\u00b0C), limiting for consumer devices.\n- **Relevance to consumer:** Used in early commercial cells (Bollor\u00e9 for EVs); less ideal for pocket electronics due to thermal constraints.\n\n### 2.4 Semi-solid / hybrid (\"quasi-solid-state\")\n- A pragmatic intermediate retaining some liquid/gel electrolyte with solid components.\n- **Relevance:** This is where near-term commercial products are appearing. **TDK's CeraCharge** (small ceramic SSBs) and various \"semi-solid\" phone batteries (announced by Chinese OEMs) fall in or near this category. Lower risk, incremental gains.\n\n### 2.5 Key enabling component: the lithium-metal anode\nMost SSB energy-density gains depend on pairing the solid electrolyte with a **lithium-metal anode** (rather than graphite). Solid electrolytes are meant to suppress dendrite formation that plagues Li-metal in liquid cells. This coupling is the central value proposition\u2014and the central difficulty.\n\n---\n\n## 3. Main Manufacturing Obstacles\n\nThe consensus across the field is that the science is largely proven at lab/small scale; **scaling manufacturing economically is the bottleneck.**\n\n1. **Interfacial resistance and contact.** Solid-solid interfaces don't wet like liquids. Maintaining intimate, stable contact between electrolyte and electrodes\u2014especially through charge/discharge volume changes\u2014is difficult. Requires stack pressure in many designs, which is awkward for thin consumer form factors.\n\n2. **Dendrite suppression under fast charging.** Solid electrolytes were expected to block lithium dendrites, but dendrites can still propagate through grain boundaries and voids in ceramics, causing shorts\u2014worsened at the high charge rates consumers expect.\n\n3. **Thin, defect-free electrolyte films.** To be competitive on energy density, the solid electrolyte layer must be very thin (<20\u201350 \u00b5m) and dense/pinhole-free over large areas. Achieving this at high yield and speed is unsolved at scale, especially for brittle oxides.\n\n4. **Environmental handling (sulfides).** Sulfide processing demands dry rooms and inert atmospheres due to moisture sensitivity and H\u2082S risk, raising capital and operating costs.\n\n5. **Sintering/processing energy (oxides).** High-temperature sintering is slow, energy-intensive, and can damage electrodes.\n\n6. **Lithium-metal handling.** Li metal is highly reactive and difficult to process in thin, uniform layers at production speed.\n\n7. **Cost and supply chain.** Existing multi-billion-dollar Li-ion gigafactory infrastructure is optimized for liquid cells. SSBs require new equipment and processes; there are no mature, high-volume SSB production lines yet. Cost per cell remains far above liquid Li-ion.\n\n8. **Cycle life and durability.** Demonstrating hundreds-to-thousands of cycles with cracking/void formation controlled remains inconsistent outside the lab.\n\n---\n\n## 4. Realistic Adoption Timeline\n\nTimelines should be read skeptically\u2014the industry has repeatedly missed its own targets (\"solid-state is 5 years away\" has been said for over a decade). A grounded assessment:\n\n| Timeframe | Expected State |\n|-----------|----------------|\n| **Now \u2013 2026** | Niche/micro solid-state cells already shipping (wearables, IoT, medical implants, RFID) from Ilika, TDK, Cymbet. Semi-solid batteries appearing in some premium/regional smartphones with modest gains. |\n| **2027 \u2013 2029** | First higher-performance SSBs likely entering premium consumer devices (flagship phones, premium wearables/earbuds) in limited volumes. Energy-density and fast-charge benefits marketed as differentiators; prices high. |\n| **2030 \u2013 2032** | Broader commercialization as manufacturing matures and costs fall; SSBs become a meaningful (not dominant) share of premium/mid-tier consumer electronics. |\n| **Beyond 2032** | Potential mass-market penetration if cost parity approaches conventional Li-ion. |\n\n**Why consumer electronics may lead automotive:** Small cells require less material, tolerate higher cost-per-kWh, and can absorb premium pricing\u2014making them a more forgiving beachhead than large EV packs. Micro-batteries are already commercial. However, \"solid-state phone\" announcements should be scrutinized: many are *semi-solid* rather than true all-solid-state.\n\n---\n\n## 5. Key Uncertainties & Recommendations\n\n**Uncertainties:**\n- Terminology inflation: distinguish true all-solid-state from semi-solid marketing claims.\n- Which electrolyte chemistry wins for consumer scale (sulfide vs. oxide) is unresolved.\n- Manufacturing yield/cost curves are the decisive variable and are hard to forecast externally.\n\n**Recommendations:**\n- Track manufacturing/yield milestones and pilot-line announcements rather than lab energy-density records.\n- Distinguish \"semi-solid\" from \"all-solid-state\" in any competitive analysis.\n- Monitor micro-battery/wearable segment as the leading real-world indicator of commercialization progress.\n- Treat OEM roadmap dates with a 2\u20134 year skepticism buffer given the field's track record.\n\n---\n\n*This memo reflects the general state of the field based on established industry knowledge. Given rapid developments and frequent unverified corporate announcements, specific company claims and dates should be verified against current primary sources before decision-making.*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Covers multiple technical approaches, not just one",
+          "score": 9
+        },
+        {
+          "criterion": "Manufacturing obstacles are specific (materials, yield, cost)",
+          "score": 8
+        },
+        {
+          "criterion": "Timeline claims are hedged proportionally to the evidence",
+          "score": 8
+        },
+        {
+          "criterion": "Contrarian consideration is substantive, not token",
+          "score": 7
+        },
+        {
+          "criterion": "Memo is organized and within the length limit",
+          "score": 8
+        }
+      ],
+      "overall": 8,
+      "weaknesses": "Contrarian angle (semi-solid vs true solid-state skepticism) is solid but could push further into questioning whether SSBs are needed at all given Li-ion improvements."
+    },
+    "run": 0,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "research-memo",
+    "baseline": "single_agent",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 1,
+    "depth": 0,
+    "cost_usd": 0.008805,
+    "wall_ms": 44953.4,
+    "output": "# Research Memo: Solid-State Batteries for Consumer Electronics\n\n**Date:** Current state assessment\n**Subject:** Leading approaches, manufacturing obstacles, and realistic adoption timeline\n**Classification:** Internal research/strategy\n\n---\n\n## Executive Summary\n\nSolid-state batteries (SSBs) replace the flammable liquid electrolyte in conventional lithium-ion cells with a solid electrolyte, promising higher energy density, improved safety, and potentially faster charging. While the technology has attracted enormous investment and hype (particularly for EVs), **consumer electronics is actually the more likely first mass market** due to smaller cell sizes, higher price tolerance, and less demanding cycle-life requirements. Limited commercial products already exist. However, mass-market smartphone and laptop adoption at scale remains **several years out**, gated primarily by manufacturing yield and cost rather than fundamental science.\n\n---\n\n## 1. Leading Technical Approaches\n\nSolid electrolytes fall into three main chemistry families, each with distinct trade-offs:\n\n### 1.1 Oxide-based electrolytes\n- **Examples:** LLZO (garnet-type), LATP, LiPON (thin-film)\n- **Pros:** Excellent chemical/thermal stability, wide electrochemical window, air-stable-ish\n- **Cons:** Brittle/ceramic (hard to process into large thin sheets), high interfacial resistance, requires high-temperature sintering\n- **Relevance:** LiPON thin-film batteries are already commercialized for micro-applications (medical implants, sensors, wearables) but have low total capacity. Oxide approaches are strong candidates for small consumer cells.\n\n### 1.2 Sulfide-based electrolytes\n- **Examples:** LGPS, argyrodites (Li\u2086PS\u2085Cl)\n- **Pros:** Highest ionic conductivity (rivals liquid electrolytes), mechanically softer/more compliant (easier to form good interfaces), room-temperature processable\n- **Cons:** Reacts with moisture to release toxic H\u2082S \u2014 requires dry-room/inert manufacturing; narrower stability window\n- **Relevance:** Favored by many major players (Samsung, Toyota, Solid Power) for higher-capacity cells. Leading candidate for scale.\n\n### 1.3 Polymer-based electrolytes\n- **Examples:** PEO-based systems\n- **Pros:** Flexible, easy to manufacture with existing roll-to-roll equipment, good interfacial contact\n- **Cons:** Low room-temperature conductivity (often need heating to ~60\u00b0C), limited voltage window\n- **Relevance:** Already used at modest scale (e.g., Bollor\u00e9 in niche EV/bus applications) but heating requirement makes them poor fits for pocket-sized electronics.\n\n### 1.4 Hybrid / \"semi-solid\" approaches\nMany near-term commercial products are **not fully solid** \u2014 they use a solid or gel electrolyte with a small amount of liquid or a composite polymer-ceramic structure. This is a pragmatic bridge that captures partial benefits while easing manufacturing. Much of what reaches consumer devices first will be semi-solid.\n\n---\n\n## 2. Main Manufacturing Obstacles\n\nThe core challenges have shifted from \"does it work?\" to \"can it be made cheaply, reliably, and at scale?\"\n\n### 2.1 Interfacial engineering\n- Solid-solid contact is imperfect; maintaining low-resistance, stable interfaces between electrolyte and electrodes through thousands of charge cycles is the central technical problem.\n- **Volume changes** during cycling cause the solid interfaces to crack or delaminate (loss of contact = capacity fade).\n\n### 2.2 Lithium dendrites\n- Counterintuitively, dendrites can still form and propagate through solid electrolytes along grain boundaries and cracks, causing short circuits \u2014 undermining the safety promise if not controlled.\n\n### 2.3 Manufacturing scale & yield\n- Producing large-area, ultra-thin (tens of microns), defect-free electrolyte layers is difficult. Pinholes cause failure.\n- **Sulfides** require expensive dry/inert atmosphere handling.\n- **Oxides** require high-temperature sintering that is energy-intensive and can damage electrodes.\n- Existing gigafactory infrastructure is optimized for liquid cells; new tooling is needed.\n\n### 2.4 Cost\n- Current SSB costs are estimated well above conventional Li-ion. High-purity sulfide precursors, lithium metal anodes, and new equipment all add cost. Achieving parity requires yield improvements and scale.\n\n### 2.5 Materials supply\n- Some approaches rely on lithium metal anodes and specialized materials (e.g., germanium in LGPS) that have their own scaling/cost issues.\n\n---\n\n## 3. Key Players (Consumer Electronics-Relevant)\n\n- **Samsung SDI / Samsung Electronics** \u2014 sulfide focus; strong incentive to deploy in their own devices first.\n- **TDK** \u2014 announced solid-state (oxide) material advances aimed at small devices/wearables; a major supplier of small batteries to the electronics industry.\n- **Murata** \u2014 small solid-state cells for wearables/IoT.\n- **ProLogium (Taiwan)** \u2014 ceramic/oxide, targeting both EV and consumer.\n- **Cymbet, ITEN, Ilika** \u2014 thin-film/micro solid-state for wearables, medical, IoT (already shipping in niches).\n- **QuantumScape, Solid Power, Toyota** \u2014 primarily EV-focused but foundational technology may trickle to consumer.\n\n*Note: Apple, Samsung and other device OEMs are the ultimate demand drivers; their qualification standards will gate adoption.*\n\n---\n\n## 4. Realistic Adoption Timeline\n\n| Timeframe | Expected State |\n|-----------|----------------|\n| **Now** | Thin-film and micro solid-state cells shipping in niche high-value applications (medical implants, RFID, some wearables/sensors). Very low capacity. |\n| **Near term (1\u20133 yrs)** | Small semi-solid and solid-state cells appearing in premium wearables (earbuds, watches, rings) where size and safety justify cost. Limited volumes. |\n| **Mid term (3\u20135 yrs)** | Possible entry into premium smartphones/tablets, likely as semi-solid or partial solutions marketed on safety and charging speed. Cost still elevated; not mainstream. |\n| **Longer term (5\u20138+ yrs)** | Broader adoption in mainstream consumer electronics **if** manufacturing yield and cost curves improve as expected. Full displacement of liquid Li-ion unlikely even then \u2014 coexistence more probable. |\n\n### Why consumer electronics leads EVs\n- Smaller cells = lower absolute defect risk and easier scaling.\n- Consumers/OEMs tolerate higher $/Wh for premium devices.\n- Cycle-life demands are lower (2\u20133 year device lifespan vs. 10-15 years for EVs).\n- Wearables benefit disproportionately from form-factor flexibility and safety.\n\n---\n\n## 5. Assessment & Recommendations\n\n1. **Hype vs. reality:** Fully solid-state cells for mainstream smartphones are frequently overpromised on timeline. Expect **incremental / hybrid** rollout, not a sudden switchover.\n2. **Watch wearables first:** The earliest meaningful commercial signal will come from earbuds, smartwatches, and medical devices \u2014 not phones.\n3. **Track sulfide manufacturing announcements** (Samsung, TDK) as the leading indicator for scale-up feasibility.\n4. **Cost parity, not chemistry, is the gating factor.** Monitor yield and $/Wh reporting, which companies disclose reluctantly.\n5. **Maintain skepticism of specific date claims;** repeated slippage in this field is the historical norm.\n\n---\n\n## Caveats\n\nThis memo synthesizes the general state of the field based on established industry knowledge. **Specific company milestones, exact ship dates, and quantitative cost/performance figures should be verified against current primary sources** (company announcements, patent filings, and technical press) before being used in decisions, as this is a fast-moving area and I may not reflect the very latest developments. I have deliberately avoided citing precise numbers I cannot confirm.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Covers multiple technical approaches, not just one",
+          "score": 9
+        },
+        {
+          "criterion": "Manufacturing obstacles are specific (materials, yield, cost)",
+          "score": 8
+        },
+        {
+          "criterion": "Timeline claims are hedged proportionally to the evidence",
+          "score": 8
+        },
+        {
+          "criterion": "Contrarian consideration is substantive, not token",
+          "score": 7
+        },
+        {
+          "criterion": "Memo is organized and within the length limit",
+          "score": 8
+        }
+      ],
+      "overall": 8,
+      "weaknesses": "The contrarian claim that consumer electronics leads EVs is asserted with reasonable support but not rigorously tested against counterarguments, and some specific figures (e.g., cost estimates) remain vague despite claims of caution."
+    },
+    "run": 1,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "research-memo",
+    "baseline": "single_agent",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 1,
+    "depth": 0,
+    "cost_usd": 0.007461,
+    "wall_ms": 38704.8,
+    "output": "# Research Memo: Solid-State Batteries for Consumer Electronics\n\n**Date:** Current\n**Re:** State of the technology, manufacturing obstacles, and realistic adoption timeline\n\n---\n\n## Executive Summary\n\nSolid-state batteries (SSBs) replace the flammable liquid electrolyte of conventional lithium-ion cells with a solid ion-conducting material. They promise higher energy density, improved safety, and faster charging. For consumer electronics specifically, SSBs are closer to commercialization than for electric vehicles because the smaller cell sizes and lower cost sensitivity ease several manufacturing hurdles. Limited commercial deployment has already begun in niche products, but mainstream adoption in smartphones and laptops remains several years out.\n\n---\n\n## 1. Leading Technical Approaches\n\nSolid electrolytes fall into three primary chemistry families, each with distinct trade-offs:\n\n### Oxide-based (ceramic)\n- **Examples:** LLZO (garnet), LATP, LLTO\n- **Strengths:** Chemically and thermally stable, non-flammable, good against high-voltage cathodes.\n- **Weaknesses:** Brittle, hard to manufacture into thin defect-free layers, high sintering temperatures, poor interfacial contact.\n- **Relevance:** Well-suited to small-format and thin-film consumer cells.\n\n### Sulfide-based\n- **Examples:** LGPS, argyrodites (Li\u2086PS\u2085Cl)\n- **Strengths:** Highest ionic conductivity (rivaling liquids), mechanically softer (easier to press into good contact).\n- **Weaknesses:** Air-sensitive, releases toxic H\u2082S on contact with moisture, requires dry/inert manufacturing environments, narrower stability window.\n- **Relevance:** Favored for high-performance and EV cells; the moisture handling is a bigger cost problem at scale.\n\n### Polymer-based\n- **Examples:** PEO-based systems\n- **Strengths:** Flexible, easiest to manufacture with existing roll-to-roll processing, good electrode contact.\n- **Weaknesses:** Low room-temperature conductivity (often needs elevated operating temperature), limited voltage stability.\n- **Relevance:** Already used in some limited commercial applications; least demanding to produce.\n\n### Thin-film SSBs\nA distinct category deposited via vacuum sputtering (often LiPON electrolyte). Genuinely commercialized for years in micro-batteries for IoT, medical implants, RFID, and wearables. Excellent cycle life but very low total capacity and high per-Wh cost\u2014viable only for tiny devices.\n\n### Emerging designs\n- **Semi-solid / hybrid (\"solid-liquid\") cells:** Use a small amount of gel or liquid to improve interfacial contact. These are the most likely to reach consumer devices first because they relax the toughest manufacturing constraints while capturing partial benefits. Several companies market these as a transitional step.\n- **Anode-free / lithium-metal anodes:** The real energy-density payoff comes from pairing solid electrolytes with a lithium-metal anode. This is where most of the density gains (and most of the dendrite/cycle-life problems) live.\n\n---\n\n## 2. Main Manufacturing Obstacles\n\n1. **Interfacial contact and resistance.** Maintaining intimate solid-solid contact between electrolyte and electrodes\u2014during manufacturing and through charge/discharge volume changes\u2014is the central challenge. Poor contact spikes internal resistance and degrades cycle life.\n\n2. **Dendrite formation.** Lithium metal can grow filaments through grain boundaries and pores in the solid electrolyte, causing short circuits. This limits fast-charging and cycle life.\n\n3. **Producing thin, defect-free electrolyte layers at scale.** Ceramics must be made very thin (to minimize resistance and maximize energy density) yet remain crack-free and pinhole-free across large areas\u2014hard to do with brittle materials at high yield.\n\n4. **Environmental sensitivity (sulfides).** Requires costly dry rooms and inert atmospheres, driving up capital and operating expense.\n\n5. **Sintering and stack pressure.** Oxide cells often need high-temperature sintering (energy-intensive, incompatible with some electrode materials). Many designs require sustained mechanical stack pressure to maintain contact\u2014awkward to package in a slim consumer device.\n\n6. **Yield and cost.** All the above translate into low manufacturing yields and high cost per kWh, currently well above conventional Li-ion. Consumer electronics tolerate higher per-Wh costs than EVs, which helps, but not unlimited premiums.\n\n7. **Lack of established supply chains and standardized processes.** No dominant chemistry has won, so equipment, materials sourcing, and process know-how remain fragmented.\n\n---\n\n## 3. Realistic Adoption Timeline\n\n**Now \u2013 near term:**\n- Thin-film SSBs continue in micro-power niches (implants, sensors, some wearables).\n- Semi-solid/hybrid cells appear in premium, low-volume consumer devices and select smartphones, marketed on faster charging or higher capacity rather than \"true\" solid-state.\n\n**Short term (roughly 2\u20134 years):**\n- Broader deployment of hybrid and improved cells in flagship phones, premium wearables, and smaller devices where the size and cost premiums are absorbable and thermal/safety benefits are valued.\n- Continued announcements outpacing shipped products\u2014vendor claims should be discounted accordingly.\n\n**Medium term (roughly 4\u20137 years):**\n- Full solid-state (with lithium-metal anodes) begins reaching high-end consumer electronics as manufacturing yields improve and costs fall. Consumer devices likely lead EVs here due to smaller cell formats.\n\n**Long term (roughly 7+ years):**\n- Potential for mainstream adoption in mass-market consumer electronics, contingent on cost parity and proven cycle life at scale.\n\n### Assessment\nConsumer electronics is the most likely *first* mass market for meaningful solid-state technology, because the cells are small (mitigating defect-area and pressure problems) and buyers tolerate premium pricing. However, \"solid-state\" is a spectrum: hybrid/semi-solid designs will dominate early-stage products, while true all-solid, lithium-metal cells remain a multi-year effort.\n\n---\n\n## Caveats\n\n- This memo synthesizes the general state of the field; it is **not based on live data retrieval**, and specific company claims, dates, and product announcements should be verified against current sources.\n- The industry has a persistent record of over-optimistic timelines. Treat single-vendor breakthrough claims with skepticism until independently validated and shipping at volume.\n- Terminology is inconsistent across the industry (\"solid-state\" is often applied loosely to hybrid cells), which complicates comparison.\n\n**Recommended next steps:** Verify current shipping products and pilot lines from named manufacturers; obtain third-party teardown/testing data; and assess specific chemistry choices against the target device's size, cost, and thermal constraints.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Covers multiple technical approaches, not just one",
+          "score": 9
+        },
+        {
+          "criterion": "Manufacturing obstacles are specific (materials, yield, cost)",
+          "score": 8
+        },
+        {
+          "criterion": "Timeline claims are hedged proportionally to the evidence",
+          "score": 8
+        },
+        {
+          "criterion": "Contrarian consideration is substantive, not token",
+          "score": 6
+        },
+        {
+          "criterion": "Memo is organized and within the length limit",
+          "score": 8
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "The contrarian angle is mostly limited to generic skepticism about vendor hype rather than a deeper substantive challenge to the mainstream adoption narrative."
+    },
+    "run": 2,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "research-memo",
+    "baseline": "fixed_pipeline",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 3,
+    "depth": 2,
+    "cost_usd": 0.033021,
+    "wall_ms": 92713.3,
+    "output": "# Research Memo: Solid-State Batteries for Consumer Electronics\n\n**Subject:** Current state, manufacturing obstacles, and realistic adoption timeline\n**Confidence structure:** High on chemistry trade-offs and obstacles; low on specific adoption dates.\n\n---\n\n## 1. The Definitional Distinction (read this first)\n\n\"Solid-state\" is a marketing category, not a technical one. Two very different things share the label:\n\n- **Semi-solid / hybrid cells** \u2014 use a gel or partially solidified electrolyte. Manufacturable today; several products marketed as \"solid-state\" in 2024\u20132025 are almost certainly these.\n- **True all-solid-state batteries (ASSB)** \u2014 fully solid electrolyte, typically paired with a lithium-metal anode. This is the technology that promises major gains \u2014 and it is not yet in mass-produced consumer devices.\n\n**Every performance claim below should be read with its electrolyte type attached.** Treating shipped semi-solid cells as evidence of ASSB progress is the central error to avoid. Notably, we could *not* verify whether specific 2024\u20132025 consumer products branded \"solid-state\" are true ASSB or semi-solid \u2014 a material gap in the public record.\n\n---\n\n## 2. Leading Approaches \u2014 No Dominant Chemistry\n\nThe absence of a clear winner is itself a signal of immaturity. Each electrolyte family trades one problem for another:\n\n| Approach | Advantage | Core liability |\n|---|---|---|\n| **Sulfides** | Best ionic conductivity | Release toxic H\u2082S; require costly dry-room handling |\n| **Oxides** | Chemically stable | Brittle; need high-temperature sintering; poor interfacial contact |\n| **Polymers** | Most manufacturable | Must be heated to conduct \u2014 a non-starter for pocket devices |\n\nThe headline energy-density gains come from the **lithium-metal anode**, but that same choice is the *source* of dendrite growth and large volume changes during cycling. The benefit and the obstacle are one design decision. There is no \"keep the density, solve the dendrites\" path.\n\n---\n\n## 3. Demonstrated Results vs. Vendor Announcements\n\n**Demonstrated (peer-reviewed lab data):** validated pouch cells showing high energy density and promising cycle life under controlled conditions.\n\n**Unverifiable (press releases):** most headline claims from QuantumScape, Solid Power, Factorial, and others. The dangerous middle category is **\"samples shipped to customers\"** \u2014 this sounds like progress but reveals nothing about yield, cell size at scale, or cycle life under real-world conditions.\n\nThe gap between a validated lab pouch cell and a manufacturable product is large and, critically, **unquantified** \u2014 neither the vendors nor the public literature let us size it honestly.\n\n---\n\n## 4. Main Manufacturing Obstacles\n\n1. **Stack pressure.** Many ASSB designs need multi-MPa external clamping to maintain electrode contact. This is tolerable in an EV pack but likely fatal to a slim phone. **Open question: has any ASSB run without external stack pressure at room temperature in a consumer form factor?** We have no evidence it has.\n2. **Ceramic-layer yield.** Producing thin, defect-free electrolyte layers at scale is the primary cost driver \u2014 and the most closely guarded, least-verifiable metric in the industry.\n3. **EV-to-consumer transfer risk.** Most R&D targets EVs. Extrapolating that progress to consumer devices is an *inference*, not a finding; form-factor constraints (thinness, no clamping) may not transfer.\n\n---\n\n## 5. The Contrarian Case (given real weight)\n\n**Consumer electronics may never be the right market for ASSB.** The safety and energy-density advantages matter most where liquid-electrolyte fires are catastrophic and density is mission-critical \u2014 EVs and aviation. A phone battery is already \"good enough\" for most users; the marginal ASSB benefit may not justify a cost premium.\n\nMeanwhile, the incumbent is improving: **silicon-anode Li-ion** is closing the energy-density gap while staying cheaper and manufacturable now. ASSB must beat *tomorrow's* Li-ion, not today's.\n\nThe relevant risk for this segment, therefore, may not be *delay* but *irrelevance*. Supporting this: the \"always five years away\" pattern is empirically real \u2014 Toyota and others have slipped ASSB targets repeatedly across a decade. Persistent multi-year slippage is weak evidence of a structural barrier, not mere execution difficulty.\n\n---\n\n## 6. Realistic Adoption Timeline (conditional ranges, not dates)\n\n- **Now\u20132026:** Semi-solid/hybrid cells appear in premium devices, marketed as \"solid-state.\" Real, but not ASSB.\n- **2026\u20132028:** A *limited* window for true ASSB in high-margin niche consumer devices is **plausible but not guaranteed** \u2014 contingent on solving the stack-pressure and yield problems, which remain unresolved.\n- **Beyond:** Broad consumer ASSB adoption depends on cost parity with an improving Li-ion incumbent \u2014 an unmet and possibly unmeetable condition for this segment.\n\nGiven the decade-long slippage record, any specific year should be treated as aspirational.\n\n---\n\n## Bottom Line\n\nThe chemistry trade-offs and manufacturing obstacles are well-understood and hard. The timing and even the *inevitability* of ASSB in consumer electronics are not supported by current evidence. Watch for two disclosures that would change this assessment: **verified room-temperature, pressure-free consumer cells** and **credible at-scale yield data.** Until then, assume semi-solid \u2014 not solid-state \u2014 is what ships.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Covers multiple technical approaches, not just one",
+          "score": 9
+        },
+        {
+          "criterion": "Manufacturing obstacles are specific (materials, yield, cost)",
+          "score": 8
+        },
+        {
+          "criterion": "Timeline claims are hedged proportionally to the evidence",
+          "score": 9
+        },
+        {
+          "criterion": "Contrarian consideration is substantive, not token",
+          "score": 9
+        },
+        {
+          "criterion": "Memo is organized and within the length limit",
+          "score": 8
+        }
+      ],
+      "overall": 8,
+      "weaknesses": "Some claims (e.g., specific stack-pressure thresholds, vendor names) are stated with unverified specificity despite the memo's own caveats about unreliable public data."
+    },
+    "run": 0,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "research-memo",
+    "baseline": "fixed_pipeline",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 3,
+    "depth": 2,
+    "cost_usd": 0.033108,
+    "wall_ms": 99056.0,
+    "output": "# Research Memo: Solid-State Batteries for Consumer Electronics\n\n**Subject:** Current state, manufacturing obstacles, and realistic adoption timeline\n**Bottom line:** Genuine all-solid batteries are not near-term for mainstream phones and laptops. Niche and hybrid (\"semi-solid\") forms are the realistic 2026\u20132030 story. Meanwhile, a moving Li-ion baseline may erode the payoff before SSBs become manufacturable at scale.\n\n---\n\n## 1. What \"Solid-State\" Actually Means (and the definitional trap)\n\nThe single biggest source of confusion is that \"solid-state\" spans three very different things:\n\n- **True all-solid-state batteries (ASSB):** all-solid electrolyte, typically paired with a lithium-metal anode. This is the \"revolution\" \u2014 and it is not shipping in consumer devices.\n- **Semi-solid / hybrid cells:** gel or partial-solid electrolytes with residual liquid. Manufacturable sooner; delivers modest, not transformative, gains.\n- **Tiny SMD ceramic cells:** e.g., TDK's CeraCharge \u2014 a *real, shipping* solid-state product, but in the \u00b5Ah\u2013mAh range. Relevant to IoT sensors and wearables' backup power, **irrelevant to phones or laptops.**\n\nVendors routinely blur these categories, which systematically overstates progress. Any claim should be read against which category it describes.\n\n## 2. Leading Approaches \u2014 and Why None Has Won\n\n| Electrolyte | Advantage | Cost paid |\n|---|---|---|\n| **Sulfide** | Liquid-rivaling conductivity | Moisture-sensitive; releases H\u2082S; needs dry-room capex |\n| **Oxide** | Chemically stable | Brittle; high interfacial resistance; requires sintering |\n| **Polymer** | Easy to process | Poor room-temperature conductivity (needs heating) |\n| **Li-metal anode** | Higher energy density | Dendrites; reactivity; requires stack pressure |\n\nEach chemistry trades one hard problem for another. The field is **not converging** on a winner \u2014 itself a signal that mass adoption is not imminent.\n\n## 3. Demonstrated vs. Announced \u2014 Keep Them Separate\n\n- **Demonstrated:** The strongest cycling data (e.g., QuantumScape multilayer cells) is **company-reported, not independently verified, and EV-focused.** It is not a consumer-electronics proof point, and lab cells typically require several MPa of stack pressure, controlled temperature, and low current density.\n- **Announced:** Aggressive 2026\u20132027 \"solid-state phone\" dates are **vendor optimism, not forecasts.** A decade of \"five years away\" claims is weak but non-trivial evidence of *structural* rather than merely engineering barriers.\n- **A finding by absence:** There is, to date, **no shipping smartphone using a genuinely all-solid cell**, and **no independent third-party test data for any consumer-format solid-state cell.** That absence is itself worth stating.\n\n## 4. The Main Manufacturing Obstacles\n\n1. **The pressure paradox (most under-appreciated for consumer devices).** Li-metal ASSBs generally need external compression to suppress dendrites and maintain interfacial contact. EV packs can house clamping hardware; a slim, passively-cooled phone cannot. This constraint is far more binding for consumer form factors than for EVs.\n2. **Interfacial resistance and brittleness** (oxides), which worsen with thermal cycling and mechanical flexing.\n3. **Environmental handling** (sulfides): dry rooms and H\u2082S mitigation raise capex sharply.\n4. **Yield and cost, unquantified.** There are **no reliable public $/kWh or yield figures** for consumer-format pilot lines. Cost claims should therefore be treated as qualitative only.\n\n## 5. Contrarian Consideration: The Moving Baseline\n\nThe load-bearing counterpoint: **conventional Li-ion is not standing still.** Silicon-rich anodes and higher-voltage cathodes are shipping *now* and closing much of the energy-density gap SSBs promise. SSBs may finally reach manufacturability only to find the marginal advantage no longer justifies the cost and yield penalty.\n\nA related likely outcome is a **semantic victory**: \"solid-state\" phones may eventually appear, but as *hybrids* \u2014 the marketed revolution partly a labeling exercise rather than a step-change in performance.\n\n## 6. Realistic Adoption Timeline (range with conditions)\n\n- **2026\u20132028:** Continued shipment of *tiny* solid-state cells (wearables, IoT). Early *hybrid/semi-solid* cells in premium devices, marketed as \"solid-state,\" delivering incremental gains.\n- **2028\u20132030:** Possible niche premium-device adoption of more genuinely solid cells, contingent on solving pressure/yield at thin form factors.\n- **Post-2030:** Earliest defensible window for mainstream true-ASSB in phones \u2014 **and only conditional on SSBs out-running ongoing Li-ion improvement.** Success is not inevitable.\n\nTreat any date earlier than this for genuine ASSB as either hybrid technology or vendor marketing.\n\n## 7. Recommendation\n\nTrack two signals specifically: (1) **independent, third-party test data** on consumer-format cells (currently absent), and (2) whether announced products are *true ASSB or hybrids*. Discount earnings-call production dates. Frame SSBs not as a scheduled arrival but as a **conditional bet** against a rising incumbent.\n\n*Note: SSBs are real and shipping in tiny and hybrid forms \u2014 that is genuine progress, not vapor. The caution here is against the \"revolution,\" not the technology.*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Covers multiple technical approaches, not just one",
+          "score": 9
+        },
+        {
+          "criterion": "Manufacturing obstacles are specific (materials, yield, cost)",
+          "score": 8
+        },
+        {
+          "criterion": "Timeline claims are hedged proportionally to the evidence",
+          "score": 9
+        },
+        {
+          "criterion": "Contrarian consideration is substantive, not token",
+          "score": 8
+        },
+        {
+          "criterion": "Memo is organized and within the length limit",
+          "score": 9
+        }
+      ],
+      "overall": 8,
+      "weaknesses": "Cost/yield section admits data is unavailable but could push harder for even rough quantitative benchmarks or comparisons."
+    },
+    "run": 1,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "research-memo",
+    "baseline": "fixed_pipeline",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 3,
+    "depth": 2,
+    "cost_usd": 0.0336,
+    "wall_ms": 93394.8,
+    "output": "# Research Memo: Solid-State Batteries for Consumer Electronics\n\n**Purpose:** Assess the real state of solid-state batteries (SSBs) for phones, laptops, and wearables \u2014 separating demonstrated results from vendor announcements \u2014 and offer a realistic adoption timeline.\n\n---\n\n## 1. The Central Distinction: Three Different \"Solid-State\" Realities\n\nThe most common error in SSB coverage is treating \"solid-state\" as one technology. It is three, with very different maturity levels:\n\n- **Thin-film micro-cells** \u2014 *Demonstrated and shipping today.* Used in RFID tags, IoT sensors, and medical implants. Their capacity is far too low to matter for phones or laptops. Real, but irrelevant to mainstream consumer devices.\n- **Semi-solid cells** \u2014 *Shipping, but not true SSB.* These retain some liquid electrolyte and are the most likely referent behind Chinese \"solid-state phone\" marketing claims. Until independently verified, such claims should be read as semi-solid at best.\n- **True all-solid-state batteries (ASSB)** \u2014 *Not shipping in consumer formats; largely unproven at scale.* This is what the hype is about, and it is the least mature.\n\n**Any timeline is meaningless unless tagged to which of these it describes.**\n\n---\n\n## 2. Leading Approaches \u2014 and Why None Has Won\n\nThe solid electrolyte is a **trilemma, not a ladder**. No chemistry dominates, which itself signals immaturity:\n\n- **Sulfides:** best ionic conductivity, but the worst manufacturing environment (releases toxic H\u2082S, requires inert atmospheres).\n- **Oxides:** most chemically stable, but brittle, needing high-temperature sintering and delivering poor electrode contact.\n- **Polymers:** easiest to process, but require heating for adequate room-temperature performance \u2014 likely disqualifying for a device in a pocket.\n\nThe absence of a clear winner means \"solid-state wins\" is category-dependent, not a settled outcome.\n\n---\n\n## 3. Manufacturing Obstacles\n\n- **Interfacial contact / stack pressure.** Solid electrolytes need mechanical pressure to maintain contact with electrodes. Consumer devices tolerate stack pressure poorly and demand thinness \u2014 reintroducing the very contact problem that small formats were supposed to ease.\n- **Dendrites are not solved by going solid.** Lithium dendrites can still form and propagate through solid electrolytes. This undercuts the dominant safety narrative and is a technical, not merely economic, risk.\n- **Capex discontinuity.** Existing Li-ion gigafactory equipment is not fully reusable for ASSB. This raises the break-even bar and makes adoption highly sensitive to whether incumbent Li-ion keeps improving \u2014 which it is.\n\n---\n\n## 4. Demonstrated vs. Announced\n\n- **Samsung's Nature Energy paper** is genuine, high-quality *lab* science (silver-carbon anode, sulfide electrolyte). Its ~2027 production date is an **announcement**, targets **EVs**, and its consumer applicability is **inference**. Vendor \"mass production\" dates for SSB have a documented history of slipping.\n- **TDK CeraCharge** is the most consumer-relevant announcement \u2014 and the least independently confirmed. Its specs and at-scale availability remain vendor claims. Treat as a caution, not a proof point.\n- **Chinese \"solid-state phone\" claims** should be treated as marketing until independently verified; most likely describe semi-solid cells.\n\nA critical framing rule: **\"production start\" \u2260 \"volume availability,\"** and most SSB investment worldwide targets EVs. EV progress does not automatically \"trickle down\" \u2014 the economics, form factors, and pressure constraints differ.\n\n---\n\n## 5. Contrarian Consideration (Load-Bearing)\n\n**SSB may arrive with its advantage already eroded.** Silicon-anode and improved liquid-electrolyte cells are raising energy density cheaply *on mature, existing production lines*. By the time consumer ASSB is manufacturable at scale, the relevant comparison is not today's Li-ion but the best Li-ion available *then*. Comparing future SSB to current Li-ion systematically overstates the benefit.\n\nCompounding this: the **safety pitch is weaker for consumer electronics than for EVs.** Consumer Li-ion fires are rare, and space constraints are less punishing than in a car. The value proposition may not justify a cost premium. For consumer electronics specifically, *\"perpetually 5\u201310 years away and possibly leapfrogged\"* is a defensible base case \u2014 not a fringe hedge.\n\n---\n\n## 6. Realistic Adoption Timeline\n\n- **Today:** Thin-film micro-cells shipping (niche); semi-solid cells shipping (marketed, sometimes, as \"solid-state\").\n- **Late this decade to early 2030s:** True ASSB is *plausible but unproven* in mainstream phone/laptop formats. No credible **dated** roadmap for consumer ASSB exists; any consumer date is inferred, not announced.\n- **Unresolved:** Whether volume consumer ASSB is a \"**when**\" or an \"**if**\" remains genuinely open. Current evidence leans \"no\" for volume this decade.\n\n---\n\n## Bottom Line\n\nThe dominant risk is narrative, not technical. SSB is **real today only in micro-formats**, **plausible but unproven** in mainstream consumer formats late this decade to early 2030s, and **genuinely at risk of being economically leapfrogged** by cheaper improvements to Li-ion. Do not import EV-driven optimism into a consumer context where the value case is weaker, the timeline undated, and the incumbent a fast-moving target.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Covers multiple technical approaches, not just one",
+          "score": 9
+        },
+        {
+          "criterion": "Manufacturing obstacles are specific (materials, yield, cost)",
+          "score": 8
+        },
+        {
+          "criterion": "Timeline claims are hedged proportionally to the evidence",
+          "score": 9
+        },
+        {
+          "criterion": "Contrarian consideration is substantive, not token",
+          "score": 9
+        },
+        {
+          "criterion": "Memo is organized and within the length limit",
+          "score": 8
+        }
+      ],
+      "overall": 8,
+      "weaknesses": "Yield-specific manufacturing detail (e.g., defect rates, process scalability) is thinner than the cost/materials discussion."
+    },
+    "run": 2,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "research-memo",
+    "baseline": "smythe_dynamic",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "fork_join -> adversarial -> serial",
+    "nodes": 6,
+    "depth": 3,
+    "cost_usd": 0.072384,
+    "wall_ms": 140657.7,
+    "output": "# Solid-State Batteries for Consumer Electronics: State of Play\n\n## Bottom Line\n\nSolid-state batteries remain a technology in transition, not a shipping product category for high-capacity consumer electronics (CE). The gap between demonstrated lab results and vendor commercialization claims is wide, and much of what is marketed as \"solid-state\" today is not. A realistic near-term expectation is small-format entry and, more likely, quiet absorption of solid-state innovations into conventional liquid-electrolyte cells.\n\n## What Is Actually Demonstrated\n\n**Sulfide electrolyte conductivity.** Sulfide-based electrolytes with ionic conductivity rivaling liquid electrolytes have been reproducibly reported. This is the strongest \"demonstrated\" result \u2014 but with a critical caveat: bulk pellet conductivity is the *least* device-relevant metric. Real cells are dominated by interfacial resistance, not bulk transport. Vendors quote the friendly bulk number; it is not the bottleneck.\n\n**Critical current density.** Lab cells have shown critical current densities above 1 mA/cm\u00b2. These figures typically stack favorable conditions simultaneously \u2014 low areal capacity, elevated temperature, and high mechanical pressure. Fast-charging a phone requires several mA/cm\u00b2 at room temperature and low pressure *at once*, which has not been demonstrated.\n\n**Polymer electrolytes in the field.** The Bollor\u00e9 Bluecar (EV carshare) genuinely deployed polymer solid-state cells \u2014 but only by operating hot. This is an automotive case, and it is evidence *against* CE viability: it proves the polymer route needs heat that CE form factors cannot easily provide.\n\n## What Is Announced, Not Demonstrated\n\nQuantumScape and Solid Power have disclosed A-sample cells, but these are automotive-first and not CE products. The most important distinction for readers: many products marketed as \"solid-state\" are **semi-solid**, retaining liquid or gel electrolyte. This mislabeling underlies most \"solid-state shipping now\" headlines.\n\n**Evidentiary gap, stated plainly:** No full solid-state cell for high-capacity CE is in mass production at disclosed yield and cost with third-party validation. This is an absence of verification, not proof of impossibility \u2014 but the burden of proof sits with vendors, and they have not met it.\n\n## Manufacturing Obstacles\n\n1. **Interfacial stability and stack pressure.** Maintaining low-resistance contact between solid electrolyte and electrodes, especially through cycling, remains unsolved at CE-relevant conditions.\n2. **Dry-room handling.** Sulfides are moisture-sensitive, requiring dry-room processing. Dry-room *capex* does amortize per unit at scale \u2014 that is how fixed costs work. What does *not* shrink is the per-cell energy and handling overhead of moisture-controlled manufacturing; this is a persistent variable cost, not a structural fixed one.\n3. **Yield.** Consumer economics likely require yields well above 90% (an estimate, not a verified threshold). Credible high-yield data is essentially absent from public disclosure.\n\n## Adoption Timeline (with honest confidence)\n\n- **2026\u20132028: First small-format full solid-state in premium wearables/earbuds \u2014 LOW confidence.** Downgraded deliberately: if yield data is absent, we cannot hold moderate confidence in a two-year commercialization window that depends on that very yield. Claiming otherwise would be internally inconsistent.\n- **2028\u20132032: Larger-format CE (phones) \u2014 Low confidence, contingent on interfacial and yield breakthroughs.**\n- **Beyond 2032: Broader adoption possible if manufacturing matures.**\n\n## Contrarian Considerations\n\n**1. Silicon-anode Li-ion may simply win.** Incremental silicon-anode improvements in conventional liquid cells may deliver enough energy-density and safety gains to blunt the case for full solid-state in CE, where the form-factor pressures differ from automotive.\n\n**2. Definitional drift is the real forecasting risk.** The outcome is not binary. The more likely path is that incumbent liquid Li-ion *quietly absorbs* solid-state's innovations \u2014 ceramic-coated separators, sulfide additives, semi-solid gel electrolytes \u2014 capturing perhaps 80% of the safety benefit at 5% of the manufacturing disruption. In that world, \"solid-state wins\" and \"solid-state never ships\" are *both* true depending on definition. Vendors have every incentive to claim the former while shipping the latter. The threat to any forecast is not timeline slip; it is category redefinition.\n\n## Interpretation Filters for Any Vendor Claim\n\n1. **Format:** Is this a CE-relevant format, or an automotive cell repurposed as evidence?\n2. **Conditions:** Are performance numbers at room temperature and low pressure, or under stacked favorable lab conditions?\n3. **Validation:** Third-party verified, or self-reported?\n4. **Definition:** Is \"solid-state\" the *cell*, or merely a coating/additive on a fundamentally liquid cell?\n\n## Recommendation\n\nTreat CE solid-state as a monitoring target, not a procurement plan. Track interfacial resistance and room-temperature CCD at realistic areal capacity \u2014 not bulk conductivity headlines \u2014 and watch for the more probable outcome: solid-state chemistry migrating into conventional cells under a solid-state label.\n\n*(~790 words)*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Covers multiple technical approaches, not just one",
+          "score": 7
+        },
+        {
+          "criterion": "Manufacturing obstacles are specific (materials, yield, cost)",
+          "score": 7
+        },
+        {
+          "criterion": "Timeline claims are hedged proportionally to the evidence",
+          "score": 9
+        },
+        {
+          "criterion": "Contrarian consideration is substantive, not token",
+          "score": 9
+        },
+        {
+          "criterion": "Memo is organized and within the length limit",
+          "score": 9
+        }
+      ],
+      "overall": 8,
+      "weaknesses": "Oxide electrolytes and garnet-type approaches are barely mentioned, leaving coverage of technical approaches somewhat sulfide/polymer-centric."
+    },
+    "run": 0,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "research-memo",
+    "baseline": "smythe_dynamic",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "fork_join -> adversarial -> serial",
+    "nodes": 6,
+    "depth": 3,
+    "cost_usd": 0.071502,
+    "wall_ms": 141258.2,
+    "output": "# Research Memo: Solid-State Batteries for Consumer Electronics\n\n**Bottom line:** The core chemistry of solid-state batteries (SSBs) is demonstrable in the lab. Manufacturability at consumer scale is not. Nearly every \"solid-state\" consumer claim through 2026 should be treated as unverified until independent teardown confirms it.\n\n**Reading key:** [Demonstrated] = peer-reviewed or independently measured. [Announced] = vendor claim, not independently verified. [Assessment] = author's inference.\n\n---\n\n## Leading approaches\n\n**Sulfide electrolytes** (LGPS-class, argyrodites) are the front-runner on conductivity. Materials/pellet-level ionic conductivity of 10\u207b\u00b3\u201310\u207b\u00b2 S/cm has been measured, rivaling liquid electrolytes at the hero-material level [Demonstrated]. Critically, full-cell effective conductivity is meaningfully lower [Assessment], and sulfides are air/moisture-sensitive, releasing H\u2082S \u2014 a serious manufacturing liability.\n\n**Oxide electrolytes** (garnet/LLZO) are chemically stable and non-flammable but brittle, requiring high-temperature sintering that resists thin, cheap, high-throughput production [Demonstrated].\n\n**Polymer electrolytes** are the most manufacturable but have poor room-temperature conductivity. Bollor\u00e9 deployed polymer cells in EV car-sharing fleets \u2014 a genuine commercial deployment [Demonstrated] \u2014 but that program has since largely wound down commercially, so even the one polymer success story is receding rather than scaling.\n\n**Labeling caution (keep in mind for every claim below):** Many products marketed as \"solid-state\" are semi-solid or gel hybrids retaining liquid content. Most consumer \"solid-state\" announcements through 2026 will likely be definitional sleight-of-hand rather than true all-solid cells.\n\n---\n\n## Manufacturing obstacles\n\n1. **Interface resistance.** Solid-solid contact between electrolyte and electrodes is imperfect; resistance grows over cycling as contact degrades. No at-scale solution demonstrated.\n\n2. **Dendrites penetrate ceramics.** The naive safety assumption \u2014 that a rigid ceramic blocks lithium dendrites \u2014 is false. Dendrites propagate through grain boundaries and voids in ceramic electrolytes [Demonstrated]. Solid does not mean dendrite-proof.\n\n3. **Stack pressure.** Most demonstrated SSB cells require sustained external pressure of roughly 1\u201310 MPa to maintain interface contact [Demonstrated]. This is the core bottleneck. Fixturing that pressure is manageable in a lab coin cell and plausibly in a large EV pack \u2014 but extremely difficult in a thin, light, volume-constrained consumer device.\n\n**This inverts the vendor narrative.** Consumer electronics is widely pitched as the natural \"beachhead\" for SSBs because cells are small. But the pressure requirement makes CE the *harder* target than EVs, not the easier one \u2014 EV packs have room for compression hardware; a phone or earbud does not. This point undercuts the entire beachhead story and deserves the most weight.\n\n**Cost.** Analysts commonly estimate early SSB cells at a multiple of incumbent Li-ion cost per kWh [Assessment]. Precise figures from vendor-internal estimates are the least verifiable category and should not be relied on.\n\n---\n\n## Contrarian consideration\n\nThe strongest case against SSBs is that they may never be *needed* in consumer electronics. Incumbent Li-ion with increasing silicon content in the anode continues delivering incremental energy-density gains [Demonstrated]. If \"good enough\" improvements keep arriving on the cheaper, already-tooled liquid-electrolyte line, the market pull for a harder, costlier, pressure-dependent technology may never materialize \u2014 SSBs could be solved just as they become commercially irrelevant.\n\nBut this contrarian view must survive its own skepticism. Silicon-dominant anodes are not clean incrementalism: they carry their own unsolved liabilities \u2014 large volumetric expansion on cycling and consequent calendar/cycle-life penalties \u2014 that are still being actively engineered around. The incumbent path is favored, not free.\n\n---\n\n## Adoption timeline\n\n- **Through 2026:** Expect continued \"solid-state\" marketing dominated by semi-solid/hybrid cells. Treat as [Announced] absent teardown.\n- **2027\u20132028:** Plausible limited demonstration cells in niche, premium, low-volume devices [Assessment] \u2014 likely still requiring compromises on pressure or lifetime.\n- **Meaningful premium-segment penetration:** The earliest *conceivable* window is late this decade, but only if at least one of the three bottlenecks (interface, dendrite suppression, pressure) has a demonstrated at-scale solution. **None is on a demonstrated trajectory today.** Any date is therefore not a countdown but a contingency: it slips by definition for every year these problems remain unsolved. Do not treat 2029 as a floor \u2014 it is an extrapolation from vendor cadence, not from any demonstrated yield curve.\n\n---\n\n## Epistemic posture\n\nThe central thesis is sound and localized: the chemistry is demonstrable; the manufacturability is not. The specific risks to watch are hero-number conflation (pellet conductivity presented as cell performance), over-dated timelines, and pressure requirements quietly omitted from consumer specs. Before believing any consumer SSB claim, demand an independent teardown confirming (a) no liquid electrolyte and (b) no external pressure fixturing. Until then, assume the demonstrated-versus-announced gap is wider than the marketing implies.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Covers multiple technical approaches, not just one",
+          "score": 8
+        },
+        {
+          "criterion": "Manufacturing obstacles are specific (materials, yield, cost)",
+          "score": 6
+        },
+        {
+          "criterion": "Timeline claims are hedged proportionally to the evidence",
+          "score": 9
+        },
+        {
+          "criterion": "Contrarian consideration is substantive, not token",
+          "score": 8
+        },
+        {
+          "criterion": "Memo is organized and within the length limit",
+          "score": 8
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "Yield and cost specifics are thin/vague compared to the strong qualitative treatment of interface, dendrite, and pressure issues."
+    },
+    "run": 1,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "research-memo",
+    "baseline": "smythe_dynamic",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "fork_join -> adversarial -> serial",
+    "nodes": 6,
+    "depth": 3,
+    "cost_usd": 0.072351,
+    "wall_ms": 142462.5,
+    "output": "# Research Memo: Solid-State Batteries for Consumer Electronics\n\n**Bottom line:** The core chemistry of solid-state batteries (SSBs) is partly proven in the lab. The manufacturing is not. And the overwhelming majority of consumer-electronics (CE) SSB claims are announcements, not verified products. Treat any \"coming to your phone by [year]\" headline as marketing until full-cell data and yield figures are disclosed.\n\n## Leading Approaches\n\n**Sulfide electrolytes** (e.g., LGPS-family, argyrodites) attract the most investment. Their *material* ionic conductivities under ideal, freshly-pressed conditions reach roughly 1\u201312 mS/cm\u2014competitive with liquid electrolytes. Caveat: these are hero-cell material measurements, not conductivities sustained in a working full cell over cycling. Sulfides are also brittle and moisture-sensitive (releasing H\u2082S), demanding dry-room processing.\n\n**Oxide electrolytes** (e.g., garnet/LLZO) are chemically stable and safer to handle but rigid and hard to densify, requiring high-temperature sintering that complicates layer stacking and raises cost.\n\n**Polymer electrolytes** (e.g., PEO) are the most demonstrated: Bollor\u00e9 shipped PEO cells in its Autolib/Bluecar EV fleets\u2014a genuine proof-of-physics, though those deployments have largely wound down, so treat it as historical, not a live product. The catch: PEO needs elevated temperatures (~60\u00b0C) to conduct well, disqualifying it for pocket devices.\n\n**Thin-film LiPON batteries** genuinely ship today\u2014but at micro-scale only (\u00b5Ah to low-mAh), for implants and backup memory. These are not a technology on a continuum toward phone-sized cells; assuming otherwise is a category error.\n\n## Demonstrated vs. Announced\n\n- **Demonstrated (peer-reviewed or shipping):** thin-film micro-cells; PEO cells (historically, at elevated temperature); numerous lab coin/small pouch cells showing good conductivity or cycle life\u2014rarely both at once, at scale.\n- **Announced, not independently verified:** QuantumScape and Solid Power headline metrics. Note these are *automotive* programs; their (unverified) claims are not even aimed at phones. Most SSB investment targets EVs, not CE.\n\nThe consistent gap: impressive single-metric lab results versus the absence of full cells demonstrating high energy density, long cycle life, fast charge, and manufacturability *simultaneously*.\n\n## The Central Manufacturing Obstacle: Yield\n\nThe number vendors rarely disclose is **manufacturing yield**. SSBs require defect-free, intimate solid-solid interfaces across large-area layers. Problems that are manageable in a coin cell become fatal at scale:\n\n- **Dendrites** still penetrate many solid electrolytes at practical current densities.\n- **Interfacial contact** degrades as electrodes expand/contract during cycling, raising resistance.\n- **Stack pressure:** many working cells need high external pressure (often >1 MPa) to maintain contact\u2014impractical inside a phone.\n- **Defect propagation:** a single crack or void can short or kill a large-format cell, so yield collapses as area grows.\n\nSilence on yield is not proof of failure\u2014overreading absence of data is its own bias\u2014but it is the single most telling gap between lab and product.\n\n## Milestones to Watch (Not Dates)\n\nRather than a schedule\u2014every prior SSB timeline has slipped\u2014track gating conditions:\n\n1. **Published full-cell cycle life** at \u22653 Ah pouch format (not coin cells).\n2. **Disclosed manufacturing yield** on a pilot line.\n3. **Room-temperature operation at low/no stack pressure** (sub-MPa).\n\nUntil these appear together, mainstream CE adoption is not imminent. Thin-film micro-cells will continue serving niche low-energy roles regardless.\n\n## Contrarian Consideration\n\nThe skeptical case cuts both ways, so first the strongest **pro-SSB** argument: adoption may be pulled by factors *independent of energy-density economics*. Tightening safety regulation\u2014air-travel and shipping restrictions on liquid Li-ion\u2014could push SSBs into premium CE. And solid electrolytes tolerate flexible or oddly-shaped cells better than liquid ones, which matters for foldables, AR glasses, and wearables. These are real pull factors.\n\nBut they don't guarantee mainstream adoption. The incumbent keeps improving: conventional Li-ion energy density has historically gained roughly 3\u20137% per year, and that pace is now slowing\u2014but each year of delay still raises the bar SSBs must clear. Because SSBs solve a problem (marginally more range/runtime, better safety) that consumers may not pay a large premium for, they could remain a **niche premium option and never become mainstream** in CE.\n\n**Falsification condition:** this \"may never go mainstream\" claim should be abandoned if a manufacturer discloses a >90% yield line producing >3 Ah pouch cells operating at room temperature and near-ambient stack pressure. That is the evidence that would flip the analysis.\n\n## Recommendation\n\nDo not plan CE products around SSBs on a fixed timeline. Monitor the three milestones above, weighting disclosed yield most heavily. Treat vendor announcements\u2014especially EV-focused ones\u2014as directional interest, not delivery. The chemistry is promising; the factory is unproven.\n\n*(~790 words)*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Covers multiple technical approaches, not just one",
+          "score": 9
+        },
+        {
+          "criterion": "Manufacturing obstacles are specific (materials, yield, cost)",
+          "score": 8
+        },
+        {
+          "criterion": "Timeline claims are hedged proportionally to the evidence",
+          "score": 9
+        },
+        {
+          "criterion": "Contrarian consideration is substantive, not token",
+          "score": 8
+        },
+        {
+          "criterion": "Memo is organized and within the length limit",
+          "score": 9
+        }
+      ],
+      "overall": 8,
+      "weaknesses": "Cost specifics (e.g., dry-room capex, precursor costs) are thinner than yield/materials discussion."
+    },
+    "run": 2,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  }
+]

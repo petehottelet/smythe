@@ -51,48 +51,73 @@ and the rubric the judge scores against. Current set is small and will
 grow to ~5 tasks spanning analysis, research, and review work. Adding a
 task is a good first contribution — copy an existing YAML.
 
-## Results — first self-baseline run (2026-07-05)
+## Results — self-baselines and the fix loop (2026-07-06)
 
-Model: `claude-opus-4-8` for all baselines and the judge. Command:
-`python benchmarks/run_benchmarks.py --judge --out results/real_run.json`.
-Full records (outputs, per-criterion scores, judge reasoning):
-[results/real_run.json](results/real_run.json). Quality is the blind
-judge's overall score, 1–10.
+Protocol: 3 runs per cell; executor `claude-opus-4-8` for every
+baseline; judge `claude-sonnet-5` (a different model than the
+executor, to reduce self-preference). Quality is the blind judge's
+overall score (1–10), reported as mean [min–max]. Full records —
+outputs, per-criterion scores, judge reasoning — are committed under
+[results/](results/) as `v2_*`, `v3_*`, and `v4_*` (an earlier n=1,
+self-judged pilot is `real_run.json`).
+
+### The fix loop
+
+The benchmark's first job was finding out why dynamic topology lost.
+It found two executor bugs, each fixed in one commit, each fix
+measured before the next:
+
+| Dynamic-topology quality | v2: no fix | v3: roots get the task | v4: every node gets the task |
+|---|---:|---:|---:|
+| acquisition-diligence | 2.0 [1–3] | 8.3 [8–9] | **9.0 [9–9]** |
+| code-review | 1.7 [1–2] | 4.3 [3–5] | **9.0 [9–9]** |
+| competitive-analysis | 6.0 [5–7] | 5.3 [3–7] | 7.7 [7–8] |
+| product-launch | 6.0 [6–6] | 6.7 [5–8] | 7.7 [7–8] |
+| research-memo | 7.7 [7–8] | 7.0 [6–8] | 7.7 [7–8] |
+| **Mean** | **4.7** | **6.3** | **8.2** |
+
+- **Bug 1 (v2 → v3): the task payload never reached the nodes.** The
+  Architect read the full task when planning, but node execution saw
+  only the generated one-line labels — so on code-review no specialist
+  ever saw the code, and on diligence no analyst ever saw the source
+  documents. Judges described reviews that "treat every actual,
+  verifiable bug as an unconfirmed hypothetical." Fix: `Swarm.plan()`
+  stamps the task goal and constraints into root nodes.
+- **Bug 2 (v3 → v4): verifiers couldn't see the artifact either.**
+  With only roots fixed, the red-team and memo nodes received *claims
+  about* an artifact they couldn't see, and hedged everything — one
+  run demanded the source "be produced before sign-off" while it sat
+  in the task. Dependency results carry analyses of the artifact, not
+  the artifact. Fix: every node gets the task context.
+
+### Current standings (v4)
 
 | Task | Single agent | Fixed pipeline | Smythe dynamic |
 |---|---:|---:|---:|
-| acquisition-diligence | 3 ($0.005) | 4 ($0.026) | **7** ($0.055) |
-| code-review | **9** ($0.005) | **9** ($0.041) | 3 ($0.053) |
-| competitive-analysis | 7 ($0.007) | 7 ($0.041) | 5 ($0.096) |
-| product-launch | 6 ($0.005) | 7 ($0.041) | **8** ($0.058) |
-| research-memo | 8 ($0.008) | 8 ($0.049) | 8 ($0.067) |
-| **Mean** | **6.6** ($0.006) | **7.0** ($0.040) | **6.2** ($0.066) |
+| acquisition-diligence | 8.3 [8–9] ($0.007) | **9.0** ($0.057) | **9.0** ($0.098) |
+| code-review | 8.7 [8–9] ($0.005) | **9.0** ($0.047) | **9.0** ($0.073) |
+| competitive-analysis | 6.0 [6–6] ($0.006) | **8.0** ($0.043) | 7.7 ($0.159) |
+| product-launch | 6.0 [6–6] ($0.006) | **8.0** ($0.045) | 7.7 ($0.076) |
+| research-memo | 7.7 [7–8] ($0.008) | **8.0** ($0.033) | 7.7 ($0.072) |
+| **Mean** | **7.3** ($0.006) | **8.4** ($0.045) | **8.2** ($0.096) |
 
-**The honest read: dynamic topology won 2, tied 1, and lost 2 — at
-roughly 10× the cost of a single agent.** On this task set and harness,
-the headline claim is not yet supported. The per-task story is more
-useful than the mean:
+**The honest read.** After the two fixes, dynamic topology went from
+far-worst (4.7) to statistical parity with a well-built fixed pipeline
+(8.2 vs 8.4) — at roughly twice the fixed pipeline's cost and 15× the
+single agent's. The headline claim — that *generated* topology beats a
+*hardcoded* one — is not yet demonstrated on this task set: the fixed
+pipeline is a strong baseline and still edges the mean. What is
+demonstrated is the loop this harness exists for: losses were
+mechanistically diagnosed, fixed in the framework, and the recovery
+measured (code-review 1.7 → 9.0). Where dynamic still trails, the
+graphs are wider and costlier (competitive-analysis runs ~7 nodes for
+a one-artifact deliverable) — topology-size calibration is the next
+lever.
 
-- **Where it won.** Tasks whose structure matches a generated topology.
-  On acquisition-diligence the dynamic graph's adversarial tier produced
-  the only output the judge considered decision-grade (7 vs 3/4); on
-  product-launch the fork-join decomposition beat both baselines.
-- **Where it lost, and why.** Code-review collapsed (3 vs 9): the
-  harness takes the *terminal node's* output as the deliverable, and
-  after a five-node chain the final node hedged every bug as an
-  unconfirmed hypothetical — the judge noted it "treats every actual,
-  verifiable bug as an unconfirmed hypothetical." Competitive-analysis
-  failed the same way: the final node *referenced* a comparison matrix
-  from an upstream node without reproducing it. The failure mode is
-  context dilution through the node chain, not bad planning — which
-  makes synthesis/terminal-output handling the next engineering target,
-  and is exactly the kind of thing this harness exists to surface.
-
-**Caveats, all real:** one run per cell (no variance estimate); one
-judge, and the judge is the same model that produced the outputs;
-the acquisition-diligence task supplies no source documents, so every
-baseline is partly scored on how it handles a data vacuum. Treat these
-as a first calibration point, not a verdict.
+**Caveats:** three runs per cell is a variance hint, not statistics;
+one judge, same vendor as the executor; tasks were authored by this
+project. Memory-on vs memory-off and framework head-to-heads remain
+open (see Planned).
 
 ## Methodology commitments
 
