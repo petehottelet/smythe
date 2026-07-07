@@ -1,0 +1,782 @@
+[
+  {
+    "condition": "memory_off",
+    "run": 0,
+    "position": 0,
+    "product": "espresso makers",
+    "history_recalled": false,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.018894,
+    "wall_ms": 42321.2,
+    "output": "# Competitive Brief: Portable Espresso Makers\n\n## Market Overview\nThe portable espresso maker market is valued at **$300\u2013400M globally (2024)**, growing at a **~7\u20139% CAGR** through 2030. Growth drivers: outdoor recreation, remote/hybrid work, and coffee premiumization. North America and Europe lead; Asia-Pacific grows fastest. E-commerce (Amazon, brand DTC) dominates distribution, with reviews, video demos, and influencer content driving conversion.\n\n## Key Trends\n- **Manual (hand-pump) devices** remain the volume leader\u2014low cost, no battery dependence.\n- **Battery-electric, self-heating** models are the fastest-growing subsegment, targeting convenience buyers.\n- **Capsule compatibility** (Nespresso/ESE) broadens appeal to existing pod users.\n- **Pressure specs (15\u201318 bar)** and sustainability/durability are dominant marketing levers.\n\n## Customer Segments\nOutdoor enthusiasts (campers, van-lifers) and business travelers account for the largest share, prioritizing portability and speed. Coffee hobbyists drive premium purchases via extraction quality. Home convenience buyers and gift shoppers round out demand.\n\n## Price Tiers\n- **Budget ($20\u201365):** Basic manual/private-label units\n- **Mainstream ($65\u2013130):** Established manual + entry electric\u2014most contested tier\n- **Premium ($130\u2013380):** Electric, precision, multi-format, design-forward\n\n## Competitive Landscape\n\n| Brand | Type | Price | Position |\n|-------|------|-------|----------|\n| **Wacaco** | Manual pump | $65\u2013130 | Category leader; default \"manual portable\" brand |\n| **Flair** | Lever press | $99\u2013379 | Premium enthusiast; cafe-quality shots |\n| **Staresso** | Manual pump | $45\u201390 | Value Wacaco alternative; cold brew capable |\n| **Handpresso** | Pump/12V auto | $70\u2013150 | Travel/automotive niche; pod compatible |\n| **OutIn Nano** | Electric self-heating | $130\u2013170 | Tech-forward disruptor; no external hot water |\n| **AeroPress** | Adjacent brewer | $40 | Ubiquitous, cheap\u2014not true espresso |\n\n**Wacaco** owns mainstream mindshare with strong brand equity and accessories, but requires manual pumping and external hot water. **Flair** dominates on quality but is bulky, pricey, and has a steep learning curve. **OutIn** is disrupting with battery-powered self-heating\u2014its key differentiator\u2014yet remains vulnerable on cost, charging dependency, and unproven durability.\n\n## Strategic Implications\n- **White space:** Electric self-heating + genuine portability + accessible price is under-served. OutIn leads but is exposed on cost and durability proof.\n- **Battlegrounds:** Electric convenience and capsule compatibility are the primary innovation fronts.\n- **Positioning:** Winning requires sharp segment focus\u2014adventure vs. travel vs. enthusiast. Premium offers the best margin and differentiation opportunity; mainstream is the most crowded.\n\n**Bottom line:** Displace incumbents by combining one-touch electric heating with rugged, affordable portability and clear segment messaging.\n\n*(~390 words)*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 9
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 6
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 8
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 4
+        }
+      ],
+      "overall": 6,
+      "weaknesses": "Market size/CAGR and durability claims are stated as hard facts without hedging despite being clearly speculative, and the 'strategic implications' section reads more like a synthesis than a true decision-oriented one-page brief with recommendations/actions."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_off",
+    "run": 0,
+    "position": 1,
+    "product": "cold-brew makers",
+    "history_recalled": false,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.019347,
+    "wall_ms": 42616.3,
+    "output": "# Competitive Brief: Portable Cold-Brew Makers\n\n## Market Landscape\n\nPortable cold-brew makers are a fast-growing niche within the cold-brew equipment segment (~$500M\u2013$700M globally), riding category growth of roughly 8\u201312% CAGR. Demand concentrates in North America, followed by Western Europe and urban APAC (Japan, South Korea, Australia).\n\n**Key demand drivers:** commuter/on-the-go lifestyles, sustainability (reusable steel/glass replacing pods and cups), design-forward gifting appeal, and crossover into outdoor/camping use. A parallel trend\u2014rapid/nitro-assisted \"cold brew in minutes\" devices\u2014targets the friction of the traditional 12\u201324 hour steep.\n\n**Buyer segments:** urban commuters (convenience/cost), home enthusiasts (flavor/ritual), outdoor/travel users (durability), health-conscious buyers (lower acidity), and gift buyers (sub-$50, design-driven).\n\n**Pricing tiers:** Budget ($15\u2013$30) jar/bottle infusers; Mid ($30\u2013$70) insulated bottles\u2014the volume and gifting sweet spot; Premium ($70\u2013$150+) rapid/pressure systems. Amazon dominates budget-mid sales; DTC and specialty retail serve premium. Sales spike in spring/summer and holidays.\n\n## Top Competitors\n\n| Product | Price | Positioning | Edge |\n|---|---|---|---|\n| **Asobu Insulated Portable** | $40\u201350 | True travel/commuter | Vacuum insulation, leak-resistant\u2014the only genuine on-the-go player |\n| **Hario Mizudashi** | $20\u201325 | Budget entry-level | Trusted Japanese brand, simple carafe (fridge-bound) |\n| **Takeya Deluxe** | $25\u201330 | Mass-market durable | Leakproof Tritan, flash-brew; Amazon bestseller (countertop) |\n| **OXO Compact** | $30\u201340 | Premium/design | \"Rainmaker\" even saturation, UX polish (limited portability) |\n| **County Line Mason Jar** | $25\u201335 | Rustic/gift | Glass aesthetic, mesh filter (fragile) |\n| **BODUM Bean** | $25\u201335 | Minimalist design | Danish styling, silicone-wrapped glass |\n\nCompetitors cluster tightly at **$20\u201350**, leaving a differentiated premium ($60+) portable entry open.\n\n## Summary & Strategic Takeaways\n\nThe market is **fragmented**, dominated by countertop pitchers marketed as \"portable.\" Differentiation splits along two axes: budget (Hario, Takeya), design (OXO, BODUM), and true travel (Asobu, leader by default).\n\n**Whitespace opportunities:**\n- **Genuine single-serve portability** \u2014 no dominant player owns the compact, individual, insulated segment.\n- **Rapid brew** \u2014 cold brew's long steep remains largely unaddressed in portable formats.\n- **Premium materials + insulation combined** \u2014 Asobu's insulation and OXO's premium UX rarely coexist.\n\n**Recommendation:** Enter above the $50 crowd with a rugged, insulated, single-serve, fast-brewing device\u2014targeting commuters and outdoor buyers who are currently underserved by countertop products wearing \"portable\" labels.\n\n*(~395 words)*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 8
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 7
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 9
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 7
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "Market size and CAGR figures are asserted with only mild hedging and no sourcing, and some competitor product names/details may be imprecise."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_off",
+    "run": 0,
+    "position": 2,
+    "product": "milk frothers",
+    "history_recalled": false,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.01971,
+    "wall_ms": 43976.3,
+    "output": "# Competitive Brief: Portable Milk Frothers\n\n## Market Landscape\n\nThe global milk frother market is valued at **$700\u2013850M (2024)**, growing at **~6\u20137% CAGR** through 2030. Portable handheld frothers\u2014battery and USB-rechargeable wands, distinct from countertop units\u2014account for **35\u201340% of unit volume** but a smaller revenue share due to low price points.\n\n**Growth drivers:** home-barista culture, at-home coffee consumption, and multi-use positioning (matcha, protein shakes, keto drinks).\n\n**Key trends:**\n- **Rechargeable shift** \u2014 USB-C/Li-ion models displacing AA-battery units.\n- **Commoditization** \u2014 Near-identical white-label units push differentiation toward brand, warranty, and durability.\n- **Amazon concentration** \u2014 Reviews and \"Amazon's Choice\" badges drive winner-take-most dynamics.\n\n**Price tiers:** Budget ($8\u201315, AA-battery, thin margins), **Mid ($15\u201330, USB-C rechargeable\u2014the revenue sweet spot)**, and Premium ($30\u201360+, multi-whisk sets, gift bundles).\n\n**Buyers:** Coffee enthusiasts (~45%), health/fitness users (~25%), gift buyers (~15%), and casual first-timers (~15%).\n\n## Top Competitors\n\n| Player | Price | Positioning |\n|--------|-------|-------------|\n| **Zulay Kitchen** | $12\u201315 | Volume/value leader; 200k+ Amazon reviews, lifetime-warranty messaging, broad colors |\n| **PowerLix** | $13\u201318 | Direct Zulay rival; durable double-spring whisk, \"premium feel\" at budget price |\n| **Elementi** | $15\u201320 | Performance angle\u2014~19,000 RPM for denser foam |\n| **Bodum** | $20\u201330 | Design-forward, brand-trust; retail presence (Williams-Sonoma) |\n| **Subminimal NanoFoamer** | $40\u201360 | Premium enthusiast; USB-C, interchangeable NanoScreens for latte-art microfoam |\n| **HadinEEon / Maestri House** | $20\u201335 | Bridge tier; USB-rechargeable \"no-battery-hassle\" convenience |\n| **IKEA PRODUKT** | $4\u20136 | Ultra-budget impulse buy via store traffic |\n\n**Zulay owns the value tier** through its review moat. **NanoFoamer defines the premium ceiling** as the sole true feature-innovator. The mid-convenience tier (Bodum, HadinEEon, Maestri) competes on rechargeability and design.\n\n## Summary & Positioning Recommendation\n\nDifferentiation is genuinely difficult in this commoditized category. The primary competitive levers are **brand trust, rechargeability, and warranty**, and Amazon ratings are the decisive battleground.\n\nThe clearest opportunity is a **mid-tier product ($20\u201330) combining USB-C rechargeable convenience with microfoam quality**\u2014bridging Zulay's value dominance and NanoFoamer's premium performance. This whitespace targets the highest-value coffee-enthusiast and fitness segments while capturing the strongest margin-versus-volume balance.\n\nTo win, a new entrant must invest early in review velocity, lead with rechargeability as the dividing line against AA-battery incumbents, and back the product with a strong warranty.\n\n*Recommendation: validate market-size figures against a syndicated report before publication.*\n\n*(~390 words)*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 8
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 7
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 8
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 7
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "Market size and RPM/review figures are stated with false precision despite the closing hedge, and the brief conflates market landscape with competitor summary rather than being a distinct one-page document."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_off",
+    "run": 0,
+    "position": 3,
+    "product": "pour-over kettles",
+    "history_recalled": false,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.019767,
+    "wall_ms": 43513.4,
+    "output": "# Competitive Brief: Portable Pour-Over Kettles\n\n## Market Landscape\n\nPortable pour-over kettles sit within the global gooseneck kettle segment (~$500\u2013700M, growing 7\u20139% CAGR through 2029). The travel/portable subset is a fast-growing niche driven by specialty coffee culture, remote work, and outdoor recreation. North America and East Asia (Japan, Korea) lead demand; Europe skews premium and design-led.\n\n**Key trends:** electrification and precision (USB-C rechargeable, PID temperature control) migrating into portable formats; compact and collapsible designs; \u00b11\u00b0C accuracy as a marketing pillar (app features often seen as gimmicky); material premiumization (304/316 stainless, titanium for camping); and cross-use positioning across coffee, tea, camping, and travel.\n\n**Buyer segments:** specialty coffee enthusiasts (temp accuracy, pour control; premium-willing), travelers/nomads (compactness, dual voltage), campers (ruggedness, flame compatibility), office/dorm users (convenience, low cost), and gift buyers (design, brand).\n\n**Price tiers:** Entry ($15\u201340, non-electric stovetop); Mid ($40\u201390, electric with basic temp settings); Premium ($90\u2013180+, precision variable-temp, rechargeable, premium design).\n\n## Competitive Set\n\n| Player | Type | Price | Position |\n|---|---|---|---|\n| **Fellow Stagg EKG/Pro** | Electric gooseneck | $165\u2013245 | Premium design \"hero\"; best aesthetics, brand cachet \u2014 but tethered, expensive, no cordless option |\n| **Brewista Artisan** | Electric gooseneck | $85\u2013120 | Feature-rich mid-tier; weaker brand, plasticky feel |\n| **Bonavita / OXO Brew** | Electric gooseneck | $70\u2013110 | Mainstream reliable; bulky bases, dated design |\n| **TIMEMORE Fish / Barista Space** | Manual gooseneck | $35\u201370 | Affordable enthusiast entry; excellent pour, no automation |\n| **Snow Peak / Stanley camp** | Stovetop titanium/steel | $45\u201390 | Genuinely portable, rugged; no temp control, imprecise spout |\n\n## Strategic Whitespace\n\nThe market splits cleanly into **premium/tethered** (Fellow, Brewista), **value/tethered** (Bonavita, OXO), and **portable/manual** (TIMEMORE, camp kettles). No product occupies the **portable + precise + design-forward** quadrant.\n\nEnthusiast-grade temperature control almost always requires an outlet, while genuinely packable kettles sacrifice precision and pour quality. Fellow's dominance leaves clear room below $100.\n\n## Recommendation\n\nTarget the underserved intersection: a **battery/USB-C rechargeable precision kettle** with a true gooseneck spout, \u00b11\u00b0C control, and a packable form factor, priced at $80\u2013120. Differentiate against Fellow on **portability and price**, and against camp kettles on **brewing precision**. This addresses the fastest-growing buyer overlap \u2014 enthusiasts who travel \u2014 currently forced to compromise.\n\n*Word count: ~390*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 8
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 7
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 6
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 5
+        }
+      ],
+      "overall": 6,
+      "weaknesses": "Market size, CAGR, and price figures are stated as hard facts without any hedging or sourcing despite being unverifiable estimates, and the piece lacks explicit page/length constraints to confirm compliance."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_off",
+    "run": 0,
+    "position": 4,
+    "product": "coffee grinders",
+    "history_recalled": false,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.020685,
+    "wall_ms": 45678.3,
+    "output": "# Portable Coffee Grinders: Competitive Brief\n\n## Market Landscape\n\nPortable and manual grinders sit within a global coffee-grinder market of roughly **$1.0\u20131.3B (2024)**, accounting for an estimated **15\u201320% of unit volume** and growing faster than the category at **~7\u20139% CAGR through 2030**. Growth is driven by specialty coffee culture, post-2020 home-brewing, travel/outdoor lifestyles, and premiumization of the single-serve ritual.\n\n**Key trends:** portable-scale precision (steel/ceramic conical burrs); material upgrades (aircraft-grade aluminum, magnetic catch cups); rising espresso-capable demand (pairing with AeroPress/Wacaco); outdoor/EDC crossover; USB-C electric-portable hybrids; and sustainability via replaceable burrs and metal-over-plastic construction.\n\n**Buyer segments** span specialty home enthusiasts (prize burr precision), travelers (size/weight), campers (ruggedness, no power), espresso hobbyists (micro-adjustment, low retention), and gift buyers (design, price, brand story).\n\n**Price tiers:** Entry (<$30, plastic-heavy ceramic burrs); Mid ($30\u2013$80, the volume sweet spot); Premium ($80\u2013$200, machined aluminum, precision adjustment); Ultra-premium ($200+, prosumer/collector).\n\nThe market is **fragmented but consolidating** around a few premium brands. Chinese manufacturers (1Zpresso, Timemore) have disrupted the premium tier on price-performance, pressuring legacy players (Hario, Porlex). Community reviews (Reddit, YouTube) heavily influence premium purchases\u2014reputation is a moat.\n\n## Competitive Positioning\n\n| Brand | Price | Core Buyer | Edge |\n|-------|-------|-----------|------|\n| **Comandante** (C40 MK4) | $270+ | Prestige enthusiasts | Heritage build, \"status\" grinder; superb pour-over. Weak on espresso; fragile glass cup |\n| **1Zpresso** (JX-Pro/K-Ultra) | $70\u2013170 | Performance seekers | Best precision-to-price, external dial, espresso-capable. Heavier |\n| **Timemore** (Chestnut C2/C3) | $50\u201390 | Value-quality buyers | Value leader, sleek, lightweight. Less espresso-fine |\n| **Porlex** (Mini/Tall) | $50\u201370 | Minimalist travelers | Fits inside AeroPress, durable ceramic. Slow, static cling |\n| **Wacaco** (Exagrind) | $80\u2013100 | Portable-espresso users | Integrated travel-brewing ecosystem. Grinder secondary |\n| **VSSL/OXO** | $40\u2013130 | Convenience/campers | One-button operation. Inconsistent grind, battery-dependent |\n\n## Strategic Takeaways\n\n- **Premium mindshare** is concentrated: Comandante owns prestige; 1Zpresso owns performance-value; Timemore owns mid-tier value.\n- **Two unmet gaps present entry opportunities:** (1) a truly pocket-sized **electric** grinder with espresso-grade consistency; (2) a **sub-$50 grinder with premium burr performance**.\n- **Espresso capability** and **community reputation** are the fastest-moving differentiators; winning requires precision burrs, credible reviews, and metal construction.\n\n*Recommendation:* Target the underserved pocket-electric or sub-$50 premium-burr gaps, backed by influencer-driven proof of grind consistency.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 9
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 9
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 7
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 7
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 8
+        }
+      ],
+      "overall": 8,
+      "weaknesses": "The 'one-page summary' isn't clearly separated as a standalone page and blends into the competitive section rather than being a distinct decision brief."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_on",
+    "run": 0,
+    "position": 0,
+    "product": "espresso makers",
+    "history_recalled": false,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.019386,
+    "wall_ms": 45080.6,
+    "output": "# Competitive Brief: Portable Espresso Makers\n\n## Market Landscape\n\nThe portable espresso maker market is valued at **$300\u2013400M globally (2024)**, growing at a **7\u20139% CAGR**. Growth drivers include post-pandemic travel recovery, hybrid work, and the premiumization of on-the-go coffee. North America and Europe lead revenue; Asia-Pacific grows fastest.\n\nThe market splits into three tiers:\n- **Manual pump (mass market, $40\u201390):** volume leader\u2014affordable, compact, battery-free.\n- **Manual lever (enthusiast, $99\u2013400):** premium shot quality, less portable.\n- **Electric/battery (premium, $100\u2013250):** fastest-growing; self-heating, zero-effort brewing.\n\n**Core buyers** are ages 25\u201344 (millennials/older Gen Z), middle-to-upper-middle income, lifestyle-conscious frequent travelers, outdoor enthusiasts, and hybrid workers. Purchase drivers: portability, brew quality, convenience, durability, and design. **Amazon dominates distribution**, with specialty coffee, DTC, and outdoor retailers secondary.\n\n**Key trends:** (1) electrification/battery innovation as the marquee feature; (2) Nespresso-pod compatibility becoming table stakes for premium models; (3) outdoor/van-life marketing crossover; (4) design and giftability driving impulse/holiday purchases; (5) sustainability messaging; (6) crowdfunding as an entry channel.\n\n## Top Competitors\n\n**Wacaco (Nanopresso ~$65\u201375; Picopresso ~$130)** \u2014 Category leader and volume king. Broadest range across all price tiers, strongest brand recognition, and an extensive accessory ecosystem. Picopresso delivers barista-grade 18-bar pressure for enthusiasts.\n\n**Flair (NEO ~$99; PRO 2 ~$219; Flair 58 ~$400+)** \u2014 Premium lever-driven manual espresso for purists. Superior extraction and pressure control, but bulkier and aimed at home enthusiasts over travelers.\n\n**OutIn Nano (~$130\u2013150)** \u2014 Leading battery-powered, self-heating unit. One-touch extraction with no boiling required; targets road-trippers, campers, and EV/tech-forward users\u2014directly attacking the manual-effort friction point.\n\n**Staresso (~$50\u201390)** \u2014 Value-focused all-in-one with dual espresso/cold-brew functionality and built-in cup. Positioned as an affordable Wacaco alternative with strong e-commerce presence.\n\n**Handpresso (Pump ~$100; Auto 12V ~$150)** \u2014 European heritage brand strong in travel-retail and automotive niches. Loyal following but feels dated against newer entrants.\n\n## Key Takeaways\n\n1. **Wacaco owns brand and range**\u2014the default benchmark across every tier.\n2. **Battery-powered self-heating is the growth frontier**, led by OutIn, tied to the outdoor/EV lifestyle.\n3. **Core battlegrounds:** shot quality vs. portability, manual vs. powered convenience, and price.\n4. **Whitespace opportunities:** electrified units with pod compatibility, sustainability-forward design, and lifestyle branding targeting van-life and hybrid-work niches.\n\nThe market rewards clear positioning\u2014effortless convenience or enthusiast-grade quality\u2014rather than middle-ground compromise.\n\n*(~395 words)*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 9
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 5
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 8
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 4
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "Market size and CAGR figures are stated as fact without hedging, and the closing summary is still largely a bulleted list rather than a truly decision-oriented narrative."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_on",
+    "run": 0,
+    "position": 1,
+    "product": "cold-brew makers",
+    "history_recalled": true,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.019047,
+    "wall_ms": 39656.2,
+    "output": "# Competitive Brief: Portable Cold-Brew Makers\n\n## Market Snapshot\n\nThe cold-brew equipment market is valued at **$450\u2013550M globally (2024)**, with portable/personal devices making up **20\u201325% (~$110\u2013135M)**. The portable segment is growing at **10\u201312% CAGR** through 2030\u2014nearly double overall coffee-maker growth. North America leads (~40%), followed by Europe (~28%) and fast-growing Asia-Pacific (~22%).\n\n**Core buyers:** millennials and Gen Z (25\u201340), urban, digitally native, with strong crossover into outdoor recreation and remote work.\n\n**Growth drivers:** the cold-brew consumption boom (home brewing at ~$0.30/cup vs. $4\u20136 retail), cost-of-living trade-down behavior, clean-label/low-acidity health positioning, sustainability (reusable filters), and speed innovation compressing brew time from 12+ hours to minutes.\n\n**Watch-outs:** low technical barriers create a crowded, thin-margin low end; summer seasonality hurts revenue predictability; and consumer confusion between \"cold brew\" and \"iced coffee\" dilutes messaging.\n\n## Competitive Landscape\n\n| Segment | Price | Key Players |\n|---------|-------|-------------|\n| Budget/entry | $19\u2013$28 | Takeya, GoBrew |\n| Mid-premium | $29\u2013$45 | County Line, Asobu, HydroFlask |\n| Premium/design | $46\u2013$50 | OXO |\n\n**Takeya** ($24.99) is the value leader\u2014BPA-free Tritan pitcher, airtight lid, dominant Amazon reviews\u2014but bulky and not truly portable. **County Line** ($29.95) targets home-brew purists with a mason-jar-and-filter design, but glass fragility limits portability. **HydroFlask** ($44.95) leverages brand loyalty with 12+ hour insulation, though it's heavy and pricey. **OXO** ($49.99) is design-forward but countertop-oriented. Budget disruptors like **GoBrew** ($19\u201328) chase students and gym-goers with weak build quality and brand equity.\n\nOnly **Asobu** ($39.99)\u2014vacuum-insulated, leakproof, cup-holder friendly\u2014genuinely serves the commuter/travel use case.\n\n## Strategic Takeaways\n\n1. **True portability is under-served.** Most \"cold-brew makers\" are pitchers or countertop devices; only Asobu and HydroFlask address on-the-go use\u2014the clearest whitespace.\n2. **Insulation is the emerging premium differentiator**, commanding $40+ price points.\n3. **Avoid direct price competition with Takeya**, which owns value and reviews.\n\n## Recommendation\n\nEnter with a **genuinely portable device**\u2014leakproof, insulated, cup-holder-friendly\u2014priced at **$34\u2013$39**. This undercuts HydroFlask while out-featuring budget bottles, and directly attacks Asobu's under-defended niche. Reinforce with sustainability (reusable filters, BPA-free) and lifestyle-forward, \"Instagrammable\" design to capture the millennial/Gen Z commuter and outdoor buyer. If feasible, pursue rapid-brew technology as a longer-term premium differentiator.\n\n*Note: Market figures are analyst estimates; prices reflect street/MSRP and should be verified before publication.*\n\n*(~390 words)*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 6
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 7
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 7
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 8
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 6
+        }
+      ],
+      "overall": 6,
+      "weaknesses": "Some named competitors (e.g., 'GoBrew') appear fabricated or obscure and market size figures are asserted with false precision despite a hedging footnote."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_on",
+    "run": 0,
+    "position": 2,
+    "product": "milk frothers",
+    "history_recalled": true,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.019044,
+    "wall_ms": 42827.3,
+    "output": "# Competitive Brief: Portable Milk Frothers\n\n## Market at a Glance\nPortable (handheld/battery-operated) frothers sit within a ~$600\u2013750M global milk frother market, leading in units (~55\u201360%) but trailing in revenue due to low ASPs. Category growth runs **6\u20138% CAGR**, fueled by the home-barista boom, matcha/protein-shake crossover use, and e-commerce accessibility. *(Figures are directional; handheld-only revenue splits are not consistently isolated in public data.)*\n\n## Price Structure\n- **Budget ($8\u201315):** ~50% of units. Single-speed, AA battery, plastic, largely private-label.\n- **Mid ($16\u201330):** ~35% and **fastest-growing**. Multi-speed, USB-rechargeable, stainless whisk, brand-backed. The most brand-competitive zone as buyers trade up from disposable batteries.\n- **Premium ($31\u201360+):** ~15%. Multi-whisk sets, stands, ergonomic/aesthetic design, warranties.\n\n## Key Trends\n1. **USB-rechargeable shift** \u2014 displacing AA models; a top purchase driver and review differentiator.\n2. **Use-case expansion** \u2014 matcha, protein powder, dressings, bulletproof coffee broaden the buyer base.\n3. **Lifestyle/gifting** \u2014 colorways and giftability drive Q4/Mother's Day spikes.\n4. **E-commerce dependency** \u2014 Amazon dominates; review volume and TikTok/Instagram social proof decide purchases.\n\n## Competitive Field\nLow entry barriers create a crowded white-label field. Established brands anchor the mid-tier; differentiation hinges on battery type, build quality, warranty, and review moat.\n\n| Brand | Price | Power | Key Edge |\n|-------|-------|-------|----------|\n| Zulay | $12\u201315 | AA battery | Price + dominant Amazon presence |\n| PowerLix | $13\u201316 | AA battery | 19,000 RPM speed + bundled stand |\n| Bodum | $20\u201330 | Rechargeable | European heritage + design |\n| Elementi | $18\u201325 | USB-C | Rechargeable convenience, multi-whisk |\n| Aeroccino | $99+ | Electric | Heats milk (premium ecosystem) |\n\n**Segment reality:** The sub-$16 tier is commoditized, owned by Zulay (value + brand recognition) and PowerLix (performance value). Heating capability commands a premium but sacrifices true portability.\n\n## Strategic White Space\nThe clearest opening is a **premium-designed, USB-rechargeable handheld with heating at a mid price ($30\u201350)** \u2014 combining Elementi's rechargeable convenience, Bodum's aesthetics, and Aeroccino's heating without its bulk or $99+ price.\n\n## Recommendation\nEnter or compete in the **mid-tier**, not the commoditized budget zone. Lead with USB-C rechargeability, stainless build, and lifestyle-forward design. Build a review moat early on Amazon and amplify via social content. Avoid the crowded sub-$16 race, where margins and loyalty are lowest.\n\n*(~380 words)*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 8
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 7
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 8
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 7
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "Market size and CAGR figures are asserted with only a brief caveat, and specific competitor stats (e.g., PowerLix RPM) lack sourcing or hedging."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_on",
+    "run": 0,
+    "position": 3,
+    "product": "pour-over kettles",
+    "history_recalled": true,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.018936,
+    "wall_ms": 42449.1,
+    "output": "# Competitive Brief: Portable Pour-Over Kettles\n\n## Market Landscape\n\nPortable pour-over kettles sit within the ~$250\u2013350M global gooseneck segment (2024), growing 8\u201310% CAGR. The travel/portable subset grows faster (~12\u201315% CAGR), fueled by outdoor coffee culture and remote work. North America and East Asia (Japan, South Korea) lead; Europe and Australia follow.\n\n**Key trends:** camping/specialty-coffee crossover; emerging USB-C and 12V electrification; migration of precision features (PID temp control, thermometers) into portable formats; weight optimization via titanium and collapsible silicone; and lifestyle-driven minimalist branding.\n\n**Buyer segments:**\n- **Home baristas on the go** \u2014 prioritize precision; pay $60\u2013150.\n- **Ultralight backpackers** \u2014 weight-obsessed; titanium/collapsible; $40\u2013100.\n- **Car campers/van-lifers** \u2014 value durability and 12V convenience; $50\u2013120.\n- **Travelers/commuters** \u2014 want compact, spill-safe, design-forward; $30\u201380.\n\n**Core need hierarchy:** temperature precision (195\u2013205\u00b0F) \u2192 gooseneck flow control \u2192 portability \u2192 heat-source flexibility \u2192 1\u20132 cup capacity \u2192 easy cleaning.\n\n**Central tension:** precision vs. portability. Winners solve both\u2014lightweight bodies retaining gooseneck control and, increasingly, temperature feedback.\n\n## Competitive Set\n\n| Tier | Player | Price | Type | Edge |\n|------|--------|-------|------|------|\n| Premium | Fellow Stagg EKG | $165\u2013195 | Electric | \u00b11\u00b0F control, app connectivity, design leader; not travel-true (needs outlet) |\n| Mid | Brewista Artisan/Travel | $89\u2013130 | Electric compact | Temp presets, timer/ratio; less cachet |\n| Mid | Fellow Stovetop | ~$79 | Stovetop | Brand halo, works on camp stoves; no readout |\n| Value | Stanley/Snow Peak | $50\u2013110 | Camp | Rugged, packable; weak pour precision |\n| Value | Timemore/Hario Buono | $35\u201370 | Stovetop | Specialty heritage, excellent spout; no heat |\n| Value | Barista Warrior/Coffee Gator | $30\u201345 | Stovetop | Built-in thermometer, camp-friendly; inconsistent build |\n\n**Differentiation axes:** power dependency (electric precision vs. stovetop true-portability), temperature precision (digital vs. analog/none), brand positioning (specialty-lifestyle vs. rugged-outdoor vs. value), and spout geometry (table stakes; premium wins on precision).\n\n## Strategic White Space\n\nNo player owns the **battery-powered, truly travel-sized electric gooseneck with temperature control.** Current \"portable\" electrics still tether to outlets, while stovetops lack precise heating. A product marrying ultralight/packable form, gooseneck flow control, and cordless temp precision\u2014priced $90\u2013140\u2014would capture home-baristas-on-the-go and premium overlanders simultaneously, directly resolving the market's core precision-vs-portability tension.\n\n*Pricing reflects U.S. retail; varies by promotion/region.*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 9
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 5
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 7
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 6
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "The brief lacks a clearly delineated one-page summary section, relying on the white-space paragraph to serve that purpose, and some market figures are stated with precision but little explicit hedging."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_on",
+    "run": 0,
+    "position": 4,
+    "product": "coffee grinders",
+    "history_recalled": true,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.018921,
+    "wall_ms": 43179.8,
+    "output": "# Competitive Brief: Portable Coffee Grinders\n\n## Market Landscape\nPortable and manual coffee grinders represent an estimated **$280\u2013350M** subset of the ~$1.2B global grinder market, growing at **8\u201310% CAGR**\u2014faster than the category overall. Growth is fueled by specialty coffee culture, travel/outdoor lifestyle trends, and premium home-brewing habits.\n\n**Three price tiers structure the market:**\n- **Entry (under $40):** ceramic burrs, gift/first-time buyers\n- **Mid ($40\u2013100):** better consistency and adjustability; fastest-growing and most crowded\n- **Premium ($100\u2013300):** precision burrs, espresso-capable, superior build\n\n**Ranked buyer priorities (enthusiasts):** (1) grind consistency, (2) burr material & adjustability, (3) grinding speed/effort, (4) portability, (5) build quality, (6) cleaning/capacity, (7) price-to-value. Entry buyers weight price and simplicity; premium buyers weight burr engineering and espresso capability.\n\n## Competitive Set\nThe market splits into three battlegrounds:\n\n**Prestige \u2014 Comandante C40 MK4 (~$290\u2013330):** The aspirational \"endgame\" grinder. High-nitrogen hardened steel burrs, exceptional cross-method consistency, glass/wood build, collector following.\n\n**Value-Performance (the fiercest battleground):**\n- **1Zpresso (Q2 $70 \u2192 J-Max/K-Ultra $180\u2013230):** Best price-to-performance. External micro-adjustment, magnetic catch cups, fast grinding; J-Max is espresso-focused, K-Ultra an all-rounder.\n- **Timemore Chestnut C3 ($60\u2013130):** Aggressive pricing, sleek industrial design, S2C burrs, aluminum body. Fast-growing challenger delivering near-premium feel.\n- **Kingrinder K6 ($80\u2013120):** DTC disruptor matching 1Zpresso specs (external adjustment, heptagonal burrs) at lower prices; popular in forums.\n\n**Travel/Entry:**\n- **Porlex Mini II ($50\u201375):** Owns packability\u2014nests inside an AeroPress; durable stainless steel, ceramic burrs.\n- **Hario Skerton Pro ($30\u201350):** Volume/distribution leader and trusted legacy first-grinder; less consistent for espresso.\n\n## Key Dynamics\n- **Burr quality is now table stakes**\u2014steel/titanium conical burrs are expected; blade grinders are rejected.\n- **Spec parity is rising** in the mid-tier, making price the primary lever and squeezing margins for value brands.\n- **Espresso capability** (fine, stepless adjustment) is an increasingly decisive differentiator.\n- **Premiumization** pulls enthusiasts toward $100\u2013300 hand grinders, while the mid-tier grows fastest by volume.\n\n## Strategic Implications\nThe decisive battleground is the **mid-to-premium tier**, where grind consistency and burr engineering determine winners. Comandante defends prestige on quality; 1Zpresso, Timemore, and Kingrinder wage a spec-and-price war in value-performance. To compete, a brand must pair **engineering credibility** (consistency, espresso-capable adjustment) with **travel-friendly design** and a clear value or prestige position\u2014undifferentiated mid-tier entries risk being commoditized on price.\n\n*(~390 words)*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 9
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 6
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 8
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 6
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "Market size/CAGR figures and buyer priority rankings are stated as precise facts without hedging, and the brief lacks a distinctly separated, fully decision-oriented one-page summary rather than an extended landscape write-up."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_off",
+    "run": 1,
+    "position": 0,
+    "product": "espresso makers",
+    "history_recalled": false,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.019563,
+    "wall_ms": 45000.7,
+    "output": "# Competitive Brief: Portable Espresso Makers\n\n## Market Overview\n\nThe portable espresso maker segment is a fast-growing niche within the ~$5\u20137B global espresso machine market, expanding at an estimated **8\u201312% CAGR**\u2014outpacing traditional countertop machines. Growth is fueled by outdoor recreation, remote/hybrid work, and at-home coffee premiumization. *(Sizing is directional; verify against Grand View Research or Mordor Intelligence before publication.)*\n\n**Segments** span three power sources\u2014manual hand-pump, electric/rechargeable (battery-heated), and 12V car adapter\u2014across three price tiers: budget ($30\u201360), mid ($60\u2013120), and premium ($120\u2013350+). Core use cases include travel/commuting, camping/overlanding, office use, and enthusiast backup brewing.\n\n**Key trends:** (1) **Electrification**\u2014battery-heated units eliminating pre-boiled water, the strongest growth driver; (2) **pressure performance** wars (15\u201318 bar claims); (3) **capsule + ground dual-compatibility** as baseline; (4) **adventure/lifestyle branding**; (5) **sustainability** via reusable baskets.\n\n**Buyer priorities (ranked):** genuine espresso quality \u2192 portability/weight \u2192 convenience (self-heating) \u2192 durability \u2192 versatility \u2192 value. Three personas dominate: the **Commuter** (electric convenience), the **Adventurer** (rugged, no-battery reliability), and the **Enthusiast** (extraction quality above all).\n\n## Competitive Landscape\n\n| Segment | Leaders | Target Buyer |\n|---|---|---|\n| Manual pump | Wacaco, Handpresso | Travelers, campers |\n| Manual lever | Flair | Quality purists |\n| Value/hybrid | Staresso | Budget-conscious |\n| Electric/automated | OutIn | Convenience-seekers |\n\n**Wacaco (category leader)** \u2014 Broadest range: Nanopresso ($65, up to 18 bar), Picopresso ($130, purist-grade), Minipresso ($55). Strong brand and modular accessory ecosystem. *Weakness: manual pumping effort.*\n\n**Flair Espresso** \u2014 Lever-press mechanism delivers true 9-bar espresso and superior crema (NEO $100; Flair 58 $350+). Owns quality credibility. *Weakness: bulkier, more setup\u2014not grab-and-go.*\n\n**OutIn (emerging innovator)** \u2014 Nano Portable Electric ($130): rechargeable, self-heating, one-button operation, no pumping or external hot water. Owns the automation frontier. *Weakness: pricier; battery weight/charging dependency.*\n\n**Handpresso** \u2014 Premium outdoor/automotive (Wild Hybrid $120; 12V Auto line). Unique in-vehicle niche. *Weakness: narrow accessory range.*\n\n**Staresso** \u2014 Value all-in-one (Mirage/SP-200, $60\u201390) combining espresso + cold brew. *Weakness: mid-tier perceived build.*\n\n## Strategic Takeaways\n\nCompetition sorts along three axes: **portability vs. quality**, **manual effort vs. automation**, and **price ($55\u2013$350)**. Wacaco owns breadth; Flair owns quality; OutIn owns automation.\n\n**Whitespace:** Fully automated, battery-powered self-heating convenience is the fastest-growing frontier\u2014currently under-served beyond OutIn. Winning entrants must pair genuine 15+ bar extraction with true grab-and-go convenience at defensible mid-tier pricing.\n\n*(Word count: ~395)*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 9
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 6
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 8
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 7
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "The 'Strategic Takeaways' section is thin and lacks explicit recommendations or decision framing expected of a true one-page decision brief."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_off",
+    "run": 1,
+    "position": 1,
+    "product": "cold-brew makers",
+    "history_recalled": false,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.018807,
+    "wall_ms": 41394.4,
+    "output": "# Competitive Brief: Portable Cold-Brew Makers\n\n## Market Landscape\n\nPortable cold-brew makers are a hardware subset of the broader cold brew coffee market, commonly estimated at ~$500M\u2013$1B+ globally. Cold brew consumption is growing at a high single- to double-digit CAGR (~7\u201320%), driven by younger, on-the-go consumers. No authoritative figure isolates the portable-maker segment; sizing should be validated via Statista, IBISWorld, or retail category data before publication.\n\n**Key demand drivers:**\n- **Convenience:** Travel-friendly, single-serve formats for commuters, campers, office workers.\n- **Home economics:** Offsetting $5\u20137 caf\u00e9 cold-brew prices.\n- **Sustainability:** Reusable systems vs. disposable cups/pods.\n- **Lifestyle branding:** Instagram-friendly, premium design.\n\n**Segments:** commuter professionals (25\u201345, urban), outdoor/travel users, home hobbyists/gift buyers, and health-conscious low-acid drinkers.\n\n**Price bands:** Budget $15\u201330, mid-range $30\u201370, premium $70\u2013150+. Most competitors cluster at $25\u201340.\n\n## Top Competitors\n\n| Player | Price | True Portability | Core Edge |\n|--------|-------|------------------|-----------|\n| **Asobu** | Mid ($30\u201340) | **High** | Commuter-first: insulated stainless, leak-resistant, single-serve |\n| **Hydro Flask** | Premium ($45\u201355) | Medium | Brand equity + best-in-class insulation |\n| **Takeya** | Value ($25\u201335) | Low | Amazon category leader; large capacity, airtight |\n| **HyperChiller** | Value ($25\u201330) | Medium | Rapid chilling (not true cold brew) |\n| **County Line** | Value ($25\u201330) | Low | Craft glass aesthetic, gift-friendly |\n| **OXO** | Mid ($25\u201340) | Low | Design/UX, even-extraction \"rainmaker\" |\n\nMost incumbents are **fridge-based, not truly portable**. Takeya dominates on volume and price but is bulky and plastic-heavy. Hydro Flask commands a premium on brand halo, though coffee is secondary to its core line. HyperChiller trades authenticity for speed. County Line and OXO are countertop-oriented.\n\n## Summary\n\nThe category is crowded at the value/mid tier ($25\u201340) but thin on genuine portability. **The clearest market gap: a truly portable product\u2014single-serve, leakproof, insulated\u2014for the mobile professional and outdoor segments.** Asobu currently owns this niche but has limited brand recognition and narrow retail distribution, leaving room for a well-branded, well-distributed entrant.\n\nDifferentiation should pivot on three axes: **portability vs. capacity, authenticity (real cold brew vs. rapid-chill), and brand halo.** A new entrant can win by pairing Asobu-level portability with stronger branding, wider retail reach, and premium sustainability positioning.\n\n*Note: Market figures and pricing are directional estimates requiring validation against Statista/IBISWorld and current retail data before external use.*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 8
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 7
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 8
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 8
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "Market size figures and competitor pricing are asserted without sourcing despite hedges, and the competitor set is somewhat thin/generic (mostly big-box brands)."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_off",
+    "run": 1,
+    "position": 2,
+    "product": "milk frothers",
+    "history_recalled": false,
+    "topology": "fork_join -> serial",
+    "nodes": 4,
+    "cost_usd": 0.025842,
+    "wall_ms": 54432.0,
+    "output": "# Competitive Brief: Portable Milk Frothers\n\n## Market Landscape\n\nThe global milk frother market is valued at ~$650\u2013750M (2024). Portable/handheld models represent roughly 35\u201345% of unit volume\u2014an estimated $230\u2013330M segment growing at 6\u20138% CAGR through 2030. *(Portable-only figures are directional; validate with syndicated and retail scan data.)*\n\n**Growth drivers:** the durable home barista trend, USB-C rechargeables displacing battery units, multi-whisk bundling, lifestyle/design positioning, and adjacent uses (matcha, protein shakes, hot chocolate).\n\n**Price tiers:** Budget ($8\u201315, battery, single whisk); Mid ($16\u201330, rechargeable, multi-speed\u2014the volume and revenue sweet spot); Premium ($30\u201360+, multi-attachment, design-led). Buyers trading up from battery models fuel mid-tier growth.\n\n**Top buyer drivers:** reliability/durability (the leading complaint source), rechargeability, ease of cleaning, frothing power, price (elastic in budget), and accessories. Core buyers are home coffee enthusiasts, with rising matcha/wellness consumers and a seasonal Q4 gifting spike.\n\n## Competitive Set\n\n**Value leaders (Tier 1):** *Zulay Kitchen* ($10\u201313) dominates on price, color variety, and review volume\u2014the Amazon bestseller. *PowerLix* ($12\u201315) competes on performance with a 19,000 RPM motor and double-spring whisk.\n\n**Premium/design (Tier 2):** *Nespresso Aeroccino* ($99\u2013129), an electric jug-style ecosystem play\u2014not truly portable but a key upgrade competitor. *Bodum* ($18\u201322) targets aesthetic buyers with European design cues.\n\n**Innovation challengers (Tier 3):** *Elementi/Maalis* ($20\u201328) lead on USB-C rechargeability, multiple attachments, and 3-speed settings for eco-conscious users. *InstaCuppa* ($10\u201316) emphasizes multi-use versatility.\n\n| Dimension | Leader |\n|-----------|--------|\n| Price | Zulay, InstaCuppa |\n| Performance | PowerLix |\n| Design | Bodum, Nespresso |\n| Innovation | Rechargeable entrants |\n\n## Strategic Implications\n\nThe **battery-powered mid-market is crowded and commoditized**, with incumbents competing mainly on price and reviews. Differentiation is migrating toward three vectors:\n\n1. **Rechargeable/sustainable power (USB-C)**\u2014still fragmented, no dominant brand.\n2. **Multi-attachment versatility**\u2014capturing matcha and wellness demand.\n3. **Premium design finishes**\u2014defensible margin above the generic handheld crowd.\n\n**Recommendation:** Enter or reposition in the mid-tier ($16\u201330) with a rechargeable, multi-whisk, design-led product that directly counters durability complaints\u2014the category's top pain point. This captures the fastest-growing power trend while sidestepping the price war among battery incumbents.\n\n*Prices are approximate street prices; verify before publication.*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 8
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 7
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 8
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 8
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "Some competitor claims (e.g., RPM specs, dominance claims) lack sourcing or hedging despite being specific."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_off",
+    "run": 1,
+    "position": 3,
+    "product": "pour-over kettles",
+    "history_recalled": false,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.020088,
+    "wall_ms": 48610.9,
+    "output": "# Competitive Brief: Portable Pour-Over Kettles\n\n## Market Landscape\n\nThe portable/travel pour-over kettle segment sits within the broader gooseneck kettle market (~$800M\u2013$1.2B globally). The portable sub-segment is estimated at **$120\u2013180M**, growing **8\u201311% CAGR** through 2028\u2014driven by specialty coffee culture, hybrid work, outdoor crossover, and premiumization of the daily ritual.\n\n**Four buyer segments** shape demand: specialty enthusiasts (prize temp precision and gooseneck control), digital nomads (compactness, dual-voltage, durability), outdoor/camping users (flame/USB compatibility, ruggedness), and gift buyers (aesthetics, brand). Enthusiasts and travelers show the highest willingness-to-pay.\n\n**Price tiers:** Budget ($20\u201345, stovetop private-label), Mid ($45\u201390, entry electric/travel features), and Premium ($90\u2013180+, precision control, design-led). The **mid-to-premium band ($60\u2013130)** holds the fastest growth and greatest competitive intensity.\n\n**Key trends:** USB-C/battery heating (nascent frontier for true cordless portability), migration of precision temp control into portable formats, design-as-differentiator, outdoor crossover (collapsible/flame-safe), and DTC content marketing over retail.\n\n## Competitive Set\n\n| Brand | Price | Type | Portability | Precision | Core Buyer |\n|-------|-------|------|-------------|-----------|------------|\n| Fellow Stagg EKG Pro | $195 | Electric | Low | High | Home enthusiast |\n| Snow Peak Field | $100\u2013150 | Manual | High | Medium | Ultralight traveler |\n| Barista & Co | $60\u201380 | Manual | Medium | Medium | Value enthusiast |\n| Collapsible/silicone | $25\u201350 | Manual | Very high | Low | Convenience traveler |\n| Stanley Camp | $40 | Manual | Medium | Low | Camper |\n\n**Fellow Stagg EKG Pro** is the aspirational benchmark\u2014PID temp control (135\u2013212\u00b0F), app connectivity, best-in-class design\u2014but requires an outlet and isn't truly portable. **Snow Peak** wins ultralight travel via titanium build and cult cachet, but is manual-only. **Barista & Co** offers balanced value. **Collapsible entrants** maximize packability while sacrificing brewing precision. **Stanley** owns rugged camping on heritage trust.\n\n## Central Insight: The Precision\u2013Portability Gap\n\nNo competitor combines Fellow-level temperature precision with genuine off-grid portability. Fellow sacrifices portability; every portable option sacrifices precision. This is the defining whitespace.\n\n## Strategic Recommendations\n\n1. **Target the $70\u2013120 whitespace** with a genuinely packable, temperature-accurate kettle\u2014the underserved sweet spot bridging enthusiast precision and travel form factor.\n2. **Pursue battery/USB-C precision heating** as the differentiating frontier; no dominant player exists, though wattage/boil-time hurdles remain.\n3. **Lead go-to-market with DTC content**\u2014barista tutorials, UGC, community\u2014paired with design-led aesthetics to command premium margins.\n4. **Position on the combined value triad:** precision + portability + aesthetics, the axis on which purchase decisions increasingly turn.\n\n*Figures are aggregated segment estimates; validate with a paid market report before publication.*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 7
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 6
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 8
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 6
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "Lacks a clearly delineated one-page summary section and includes one generic 'competitor' category alongside real brands, while market figures are stated with more confidence than the single closing hedge justifies."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_off",
+    "run": 1,
+    "position": 4,
+    "product": "coffee grinders",
+    "history_recalled": false,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.019116,
+    "wall_ms": 42617.1,
+    "output": "# Competitive Brief: Portable Coffee Grinders\n\n## Market Landscape\n\nThe coffee grinder market (~$1.0\u20131.3B in 2024) is growing 6\u20138% CAGR through 2030. Portable/manual grinders are a 15\u201320% niche but outpacing the category, driven by specialty coffee culture and outdoor lifestyles. Premium hand grinders ($100\u2013$400) are the fastest-growing sub-segment, with double-digit YoY unit growth.\n\n**Key trends:**\n- **Premiumization** \u2014 buyers trade up for stainless/titanium conical burrs, precise adjustment, and CNC bodies.\n- **Specialty crossover** \u2014 pour-over, AeroPress, and home espresso demand compact grind consistency.\n- **Outdoor/travel positioning** \u2014 \"no electricity needed\" messaging targets campers and van-lifers.\n- **Electric-portable hybrids** \u2014 USB-rechargeable units emerging as a challenger category.\n\n**Buying drivers (ranked):** grind consistency, portability, build quality, ease of adjustment, grinding effort, price/value, and brand/reviews. Enthusiast communities (Reddit, YouTube) and third-party grind-uniformity testing disproportionately shape purchases. Amazon and DTC dominate distribution. Exploitable pain points: grinding effort, ~20\u201330g capacity limits, and grind retention.\n\n## Competitive Landscape\n\n| Tier | Brand | Price | Position |\n|---|---|---|---|\n| Luxury | Comandante C40 | $250\u2013300 | Prestige, cult following |\n| Premium | 1Zpresso, Kingrinder | $80\u2013180 | Enthusiast performance |\n| Value | Timemore C2/C3 | $40\u201370 | Price-to-performance leader |\n| Travel | Porlex Mini/Tall | $50\u201370 | AeroPress companion |\n| Entry | Hario Skerton | $30\u201350 | Mass-market gateway |\n\n**1Zpresso** \u2014 best-in-class burr geometry, fast grind, external click adjustment; heavier and pricier for casual buyers.\n**Comandante** \u2014 iconic Nitro Blade burrs and exceptional build; premium price and fiddly stepless adjustment.\n**Timemore** \u2014 aggressive pricing, solid burrs, sleek design; less refined for espresso, still building premium trust.\n**Porlex** \u2014 slim design fits inside AeroPress, durable ceramic burrs; slower, dated ergonomics.\n**Hario** \u2014 affordable and widely available; grind inconsistency and plastic-heavy build.\n**Kingrinder** \u2014 1Zpresso-like specs at lower prices; newer brand with mixed QC.\n\n**Dynamics:** The market splits between prestige (Comandante), performance-per-dollar (1Zpresso, Timemore), and budget/travel (Hario, Porlex). Chinese brands (Timemore, Kingrinder) are compressing prices and pressuring legacy players. Espresso capability is the fastest-growing differentiator.\n\n## Strategic Takeaways\n\n1. **Win on grind consistency + espresso capability** \u2014 the decisive premium differentiators.\n2. **Target the value-premium gap** \u2014 Kingrinder proves demand for near-flagship specs below $100.\n3. **Own reviews** \u2014 invest in third-party uniformity testing and enthusiast credibility.\n4. **Solve core pain points** \u2014 reduce grinding effort, expand capacity, minimize retention.\n5. **Segment messaging** \u2014 specialty (consistency), travel (compactness), outdoor (ruggedness), gifting (design/prestige).",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 9
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 6
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 7
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 7
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "The 'one-page summary' isn't clearly delineated and reads more like a bulleted strategic takeaways list than a decision memo."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_on",
+    "run": 1,
+    "position": 0,
+    "product": "espresso makers",
+    "history_recalled": false,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.019227,
+    "wall_ms": 44270.9,
+    "output": "# Competitive Brief: Portable Espresso Makers\n\n## Market Landscape\n\nThe portable espresso maker market is estimated at **$300\u2013450M globally (2024)**, growing at a **~7\u20139% CAGR** through 2030. *(Figures are directional; the segment is often bundled within broader \"coffee maker\" or \"camping gear\" data.)* Growth is fueled by outdoor recreation, travel and remote-work culture, and the premiumization of home coffee.\n\n**Key trends:** Manual hand-pump devices still dominate on price and battery-free reliability, but **rechargeable electric units with self-heating are the fastest-growing tier**. Capsule compatibility broadens appeal to non-enthusiasts, while rugged design, giftable aesthetics, and sustainability (reusable pods) increasingly drive purchases.\n\n**Pricing tiers:** Entry ($30\u201360, basic manual pumps); **Mid ($60\u2013120)\u2014the market's center of gravity**, balancing performance and portability; Premium ($120\u2013250, electric self-heating); Ultra-premium ($250+, niche). Core segments are travelers/commuters (compactness), outdoor enthusiasts (durability, no battery), home enthusiasts (shot quality), gift buyers (design), and office workers (convenience).\n\n## Competitor Snapshot\n\n| Brand | Positioning | Edge | Weakness |\n|---|---|---|---|\n| **Wacaco** (Nano/Pico/Minipresso) | Mainstream category leader | 18-bar, broad lineup, global distribution, $60\u2013130 | Labor-intensive pumping; plasticky feel |\n| **Flair** (NEO/PRO 2/58) | Enthusiast lever espresso | Superb shot quality, metal build | Bulky, slow, needs external hot water; $100\u2013350 |\n| **OutIn** (Nano) | Disruptive self-heating electric | Built-in battery heats water, USB-C, sleek DTC brand | ~$130, charging dependency, unproven durability |\n| **Handpresso** (Auto) | Automotive 12V niche | Unique car-adapter use | Aging design, weak in North America |\n| **Staresso** (Mirage/Pro) | Value manual | Low price, good crema, multi-use | Weak brand awareness, QC variability |\n\n*Nespresso is an adjacency threat\u2014pod convenience competes for the \"easy espresso\" mindset but requires power and isn't truly portable.*\n\n## Strategic Read\n\n- **Wacaco owns mainstream volume**; **Flair owns quality**; **OutIn is the self-heating innovator**; **Handpresso holds automotive**; **Staresso plays value.**\n- Differentiation clusters around power source (manual vs. electric), shot quality, and true grab-and-go convenience.\n- **The open gap: premium shot quality combined with genuine grab-and-go convenience**\u2014self-heating, no manual pumping, no external hot water. OutIn addresses convenience but not enthusiast-grade quality; Flair delivers quality but not portability.\n\n## Recommendation\n\nTarget the **$60\u2013120 mid-tier** while investing toward the **premium self-heating electric segment**, the fastest-growing tier as battery tech improves and prices fall. Win by pairing caf\u00e9-quality extraction with true one-touch portability\u2014the market's clearest unmet need.\n\n*(~390 words)*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 9
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 7
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 8
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 8
+        }
+      ],
+      "overall": 8,
+      "weaknesses": "The 'one-page summary' is really just a strategic read plus recommendation squeezed into the same brief rather than a distinct standalone decision memo."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_on",
+    "run": 1,
+    "position": 1,
+    "product": "cold-brew makers",
+    "history_recalled": true,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.019659,
+    "wall_ms": 45006.8,
+    "output": "# Competitive Brief: Portable Cold-Brew Makers\n\n## Market Landscape\n\nThe global cold-brew coffee market (~$600\u2013700M in 2023) is projected to exceed $3B by 2030, growing at a 20\u201325% CAGR\u2014one of coffee's fastest-expanding segments. Dedicated cold-brew hardware represents an estimated $500\u2013800M globally, with the **portable/personal-sized subset outpacing bulky countertop pitchers** (hardware CAGR ~10\u201315%), driven by on-the-go and single-serve demand.\n\n**Regional dynamics:** North America is the largest, most mature market; Asia-Pacific is fastest-growing (urbanization and caf\u00e9 culture in South Korea, Japan, China); Europe grows steadily on sustainability appeal.\n\n**Core buyers** are urban Millennials and Gen Z (22\u201338, mid-high income) motivated by caf\u00e9-cost savings ($4\u20136/cup), convenience, and lifestyle signaling. Secondary segments include commuters, outdoor/van-life enthusiasts, and health-conscious consumers drawn to cold brew's lower acidity.\n\n**Key trends shaping the category:**\n- **Portability**: bottle and travel-mug formats replacing pitchers; leak-proof, durable materials.\n- **Speed innovation**: nitro/vacuum devices cutting brew time from 12\u201324 hrs to minutes (premium, $100+).\n- **Sustainability**: reusable filters, BPA-free messaging.\n- **Lifestyle branding**: Instagram-friendly design and colorways.\n- **Premiumization**: buyers pay $30\u2013$80 for quality; enthusiasts pay more.\n\n## Competitive Field\n\nPricing clusters tightly around **$25\u2013$50**, with premium travel units reaching $70.\n\n| Competitor | Price | Positioning / Edge |\n|---|---|---|\n| **Hydro Flask** (crossover) | $25\u201345 | Outdoor brand loyalty; superior insulation; brews and stores in one vessel |\n| **County Line Kitchen** | $20\u201335 | Value/DIY mason-jar kits; Amazon bestseller; less truly portable |\n| **OXO Compact** | $30\u201350 | Design-forward mainstream; retail ubiquity; ergonomic |\n| **Asobu Portable Bottle** | $30\u201340 | True single-serve; integrated filter; purpose-built for travel |\n| **Takeya Deluxe** | $25\u201340 | Leak-proof, larger capacity; commuter appeal (semi-portable) |\n| **Cafflano / VacuOne** | $40\u201370 | Ultra-compact enthusiast/traveler; engineering polish commands premium |\n\n## Strategic Takeaways\n\n1. **The battleground is genuine single-serve portability** vs. \"brew at home, carry the pitcher.\" Asobu and Cafflano lead on true portability; Takeya and County Line lean semi-portable.\n\n2. **White space exists**: few brands combine strong insulation, true portability, *and* affordable pricing simultaneously\u2014an opening for a well-designed sub-$40 all-in-one.\n\n3. **Speed innovation is under-exploited** at the portable price tier; rapid-brew technology remains concentrated in premium countertop units.\n\n**Recommendation:** Target the underserved intersection of insulated, truly portable, sub-$40 devices for the Gen Z/commuter core, with lifestyle-forward branding and sustainability messaging as table stakes.\n\n*(~395 words)*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 8
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 6
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 5
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 7
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "The document lacks a clearly separated 'one-page summary' section and its self-reported word count appears inaccurate given the actual content length."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_on",
+    "run": 1,
+    "position": 2,
+    "product": "milk frothers",
+    "history_recalled": true,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.019548,
+    "wall_ms": 43683.3,
+    "output": "# Competitive Brief: Portable Milk Frothers\n\n## Market Snapshot\nThe global milk frother market is worth ~$700M\u2013$900M (2024), growing 6\u20138% CAGR. Handheld/portable frothers lead by unit volume thanks to low price points, while USB-rechargeable models are the fastest-growing sub-segment. Demand is fueled by the sustained \"barista at home\" trend\u2014lattes, matcha, and protein-shake routines. Amazon dominates discovery, with brand rankings driven heavily by review volume.\n\n## Price-Tier Map\n- **Budget ($5\u2013$15):** Unbranded/generic listings; single-speed, AA batteries.\n- **Mid ($15\u2013$35):** Branded (Zulay, PowerLix, Elementi); multi-speed, stainless whisks, stands.\n- **Premium ($35\u2013$70+):** Rechargeable, multi-attachment, design-forward (Subminimal Nanofoamer, Aeroccino-adjacent portables).\n\n## Top Competitors\n| Brand | Price | Position | Key Weakness |\n|-------|-------|----------|--------------|\n| **Zulay** | $10\u201313 | Volume/value leader; #1 Amazon presence, lifetime warranty | Single-speed, battery-only, durability at heavy use |\n| **PowerLix** | $13\u201318 | Performance-per-dollar (19,000 RPM, double-spring, stand) | AA-dependent; lower brand recognition |\n| **Bodum** | $20\u201325 | Design/lifestyle halo, retail distribution | Underpowered, motor longevity issues |\n| **Elementi/Nestpresso** | $20\u201330 | Modern USB-C rechargeable, multi-speed | Inconsistent quality across sellers |\n| **Aerolatte** | $20\u201330 | Heritage/premium originator, travel case | Dated single-speed at premium price |\n\n## Central Strategic Insight\nThe **$10\u201315 tier is a brutal price battleground** (Zulay vs. PowerLix) where brand loyalty is thin. The clearest innovation vector is **USB-C rechargeability**\u2014consumers are tiring of AA batteries, and rechargeable models command higher margins while attracting repeat buyers.\n\n## Buyer Priorities\n1. **Froth quality/microfoam consistency** \u2014 top functional demand.\n2. **Ease of cleaning** \u2014 detachable, rinseable whisk.\n3. **Durability** \u2014 motor longevity and whisk-wire breakage are recurring complaints.\n4. **Charge convenience** \u2014 rechargeable strongly preferred by repeat buyers.\n\nPersonas: home-caf\u00e9 enthusiasts (pay premium for microfoam), seasonal gift buyers (aesthetics-driven), health/lifestyle users (matcha, protein), and budget utility buyers.\n\n## Whitespace Opportunity\nA **durable, rechargeable, multi-speed frother** with premium build and strong warranty\u2014bridging Aerolatte's quality reputation with modern power and charging expectations. Exploit recurring budget-brand weaknesses: weak motor longevity, low foam density, and battery frustration. Amplify with matcha/protein crossover marketing, giftable colorways, and sustainability messaging (rechargeable vs. battery waste).\n\n**Recommendation:** Enter at the mid-premium tier ($30\u201345) with rechargeability and microfoam quality as the core claims, targeting home-caf\u00e9 enthusiasts and repeat buyers who churn out of the crowded budget segment.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 8
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 6
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 8
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 5
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "Market size and competitor stats are stated as precise facts without hedging despite being unverifiable estimates, and the summary still leans on bullet/table listicle structure rather than a fully narrative decision memo."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_on",
+    "run": 1,
+    "position": 3,
+    "product": "pour-over kettles",
+    "history_recalled": true,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.019674,
+    "wall_ms": 43258.2,
+    "output": "# Competitive Brief: Portable Pour-Over Kettles\n\n## Market Landscape\nThe gooseneck kettle market reaches ~$450\u2013550M globally (2024), growing 7\u20139% annually. The portable/compact subset (~$80\u2013110M) is expanding faster at 10\u201312% CAGR, driven by specialty-coffee adoption, the outdoor recreation boom, and home-caf\u00e9 upgrades tied to hybrid work.\n\nThe market splits into two clear buyer camps:\n- **Specialty-coffee enthusiasts** (~50% of demand): urban hobbyists prioritizing precision temperature control, pour accuracy, and design.\n- **Outdoor/travel users** (~25%): campers and van-lifers prioritizing weight, packability, and off-grid heating.\nGifters (~15%) and pros (~10%) round out demand.\n\n**Price tiers:** Entry ($20\u201345, stovetop, no temp control); Mid ($45\u201390, basic electric); Premium ($90\u2013160, precision variable control, design-forward). Distribution is Amazon/DTC-dominated, with specialty retailers driving premium discovery. North America and Western Europe lead; APAC excels on craft aesthetics.\n\n## Competitive Set\n| Brand | Price | Position |\n|---|---|---|\n| **Fellow Stagg EKG** | ~$165\u2013195 | Premium electric; \u00b11\u00b0F control, brew timer, design leader |\n| **Brewista Artisan** | ~$85\u2013110 | Mid-premium electric; Fellow alternative, strong specialty following |\n| **Timemore Fish** | ~$55\u201390 | Design-focused mid-tier, excellent pour control |\n| **Snow Peak Titanium** | ~$60\u2013120 | Ultralight backpacking premium |\n| **Stanley Camp Pour-Over** | ~$50\u201360 | Rugged outdoor value, campfire-ready |\n| **GSI Glacier** | ~$40\u201350 | Outdoor durability value |\n| **Coffee Gator / Barista & Co** | ~$30\u201350 | Budget entry gooseneck |\n\n*Pricing approximate; verify before publishing.*\n\n**Key axes:** Electric (Fellow, Brewista, Timemore) vs. stovetop/fire (Stanley, Snow Peak, GSI); true travel portability vs. semi-portable countertop; precision features separate coffee brands from rugged outdoor players.\n\n## Key Trends\n1. Electrification and precision (\u00b11\u00b0C, hold timers, app connectivity) migrating to mid-tier.\n2. Battery/USB-C cordless heating\u2014nascent but fastest-growing.\n3. Dual-use collapsible and camp-compatible designs.\n4. Aesthetic premiumization (\"countertop jewelry\").\n5. Sustainability via durable stainless steel.\n\n## Strategic Opportunity\nThe market is design- and brand-driven, not commoditized, with Fellow shaping premium expectations. The critical white space: **a genuinely packable, electric precision kettle for travel.** Today's \"portable\" SKUs are mostly compact stovetop units\u2014precision electric kettles remain countertop-bound, while packable options (Stanley, Snow Peak) sacrifice temperature control. A cordless, battery-powered kettle combining Fellow-grade precision with backpacking portability would bridge the two dominant segments and command premium pricing ($90\u2013150) in an underserved, fast-growing niche.\n\n*Recommendation: prioritize battery/USB-C precision as the differentiating entry wedge.*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 9
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 7
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 8
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 7
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "Market size figures and percentages are stated with false precision despite being unverifiable estimates, and only a brief hedge note is appended rather than integrated throughout."
+    },
+    "judge_model": "claude-sonnet-5"
+  },
+  {
+    "condition": "memory_on",
+    "run": 1,
+    "position": 4,
+    "product": "coffee grinders",
+    "history_recalled": true,
+    "topology": "fork_join -> serial",
+    "nodes": 3,
+    "cost_usd": 0.019665,
+    "wall_ms": 45905.8,
+    "output": "# Competitive Brief: Portable Coffee Grinders\n\n## Market Landscape\nThe global coffee grinder market is worth **~$1.0\u20131.3B (2024)**, growing **6\u20137% CAGR** through 2030. Portable/manual grinders form a **~$180\u2013250M subsegment (15\u201320%)** expanding faster at **8\u20139% CAGR**. Growth is fueled by specialty \"at-home barista\" culture, remote work and travel, outdoor recreation, and premiumization\u2014buyers increasingly pay **$150+** for precision manual grinders.\n\n**Key trends:** shift from ceramic to stainless/titanium-coated conical burrs; rise of USB-C rechargeable electric portables (fastest-growing niche); and enthusiast communities (Reddit, YouTube) driving credibility via grind-uniformity data. DTC and Amazon dominate channels, with Kickstarter notable for launches. North America and Europe lead revenue; Asia-Pacific grows fastest.\n\n**Buyer segments:** travelers (compactness, durability), outdoor users (battery-free ruggedness), home enthusiasts (consistency, adjustability), budget/gift buyers (price), and prosumers (espresso precision).\n\n## Competitive Field\nThe **premium manual tier ($100\u2013200)** is the most competitive, highest-margin battleground.\n\n**Premium / Benchmark:**\n- **Comandante C40 MK4** (~$275\u2013330): gold-standard grind quality, nitrogen-steel 40mm burrs, premium materials and resale value\u2014the filter/pour-over reference.\n- **1Zpresso K-Ultra/K-Max** (~$150\u2013200): 48mm burrs, external numbered adjustment, fast grinding, wide espresso-to-filter range.\n\n**Mid / Value Disruptors:**\n- **Timemore Chestnut C3/C3 ESP** (~$65\u201390): best value-for-performance, strong build, espresso-capable ESP variant.\n- **Kingrinder K6/K4** (~$90\u2013120): direct 1Zpresso challenger with 48mm burrs and external adjustment at lower prices.\n- **1Zpresso Q2** (~$70\u201390): lightest true travel grinder (~380g).\n\n**Convenience / Lifestyle:**\n- **Porlex Mini II** (~$50\u201360): AeroPress-integrated, compact but slower.\n- **Hario Skerton/Slim Pro** (~$35\u201355): legacy budget staple; consistency lags newer rivals.\n- **VSSL Java / Handground** (~$100\u2013150): rugged/outdoor and ergonomic niches.\n\n## Key Dynamic\nThe defining market shift is **value-tier disruption**: Timemore and Kingrinder deliver near-premium grind quality (large burrs, external adjustment) at 40\u201360% below Comandante/1Zpresso flagship pricing, compressing margins in the mid tier. Meanwhile Comandante retains a defensible premium halo, and 1Zpresso leads on adjustment innovation.\n\n## Strategic Implications\n- **Differentiate on burr geometry and grind consistency**\u2014the primary purchase driver among enthusiasts.\n- **External adjustment dials** are becoming table stakes above $90.\n- **Rechargeable electric portables** represent the clearest whitespace for new entrants.\n- Win credibility through **published uniformity data** and community engagement, not advertising.\n\n*(Word count: ~390)*",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Names concrete competitors, not placeholders",
+          "score": 9
+        },
+        {
+          "criterion": "Market landscape covers segments and price bands",
+          "score": 8
+        },
+        {
+          "criterion": "The one-page summary is decision-oriented, not a listicle",
+          "score": 5
+        },
+        {
+          "criterion": "Stays under the length constraint",
+          "score": 9
+        },
+        {
+          "criterion": "Claims are hedged where the evidence is thin",
+          "score": 7
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "Lacks a distinct, decision-oriented one-page summary section\u2014strategic implications are still presented as a bullet list rather than a synthesized recommendation."
+    },
+    "judge_model": "claude-sonnet-5"
+  }
+]
