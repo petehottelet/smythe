@@ -1,0 +1,376 @@
+[
+  {
+    "task": "code-review",
+    "baseline": "single_agent",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 1,
+    "depth": 0,
+    "cost_usd": 0.005184,
+    "wall_ms": 19614.3,
+    "output": "# Code Review: `merge_user_settings`\n\n## Summary\nThis function contains several significant bugs related to mutable default arguments, unintended mutation of input parameters, and a missing import. Below is a detailed breakdown.\n\n---\n\n## Issues\n\n### 1. Mutable Default Argument \u2014 `allowed_keys=[]`\n**Severity: High**\n\n**Explanation:**\nUsing a mutable object (`[]`) as a default argument is a classic Python pitfall. The default list is created **once** when the function is defined and shared across all calls. Because the function does `allowed_keys.append(\"merged_at\")` (see Issue #3), the default list grows every time the function is called without an explicit `allowed_keys`. This causes state to leak between calls, producing unpredictable filtering behavior.\n\n**Fix:**\n```python\ndef merge_user_settings(defaults, overrides, allowed_keys=None):\n    if allowed_keys is None:\n        allowed_keys = []\n```\n\n---\n\n### 2. Mutation of the `defaults` Argument \u2014 `merged = defaults`\n**Severity: High**\n\n**Explanation:**\n`merged = defaults` does **not** copy the dictionary; it creates another reference to the same object. All writes (`merged[key] = ...`, `merged[\"merged_at\"] = ...`) mutate the caller's original `defaults` dict. This is a surprising side effect that can corrupt caller state, especially if `defaults` is a shared/global configuration.\n\n**Fix:**\n```python\nmerged = dict(defaults)   # or copy.deepcopy(defaults) if nested values matter\n```\n\n---\n\n### 3. Mutation of the `allowed_keys` Argument \u2014 `allowed_keys.append(\"merged_at\")`\n**Severity: High**\n\n**Explanation:**\nThe function mutates the caller-provided `allowed_keys` list by appending `\"merged_at\"`. This:\n- Surprises the caller by altering their list.\n- Combined with Issue #1, permanently pollutes the shared default list.\n\nThe append also appears unnecessary \u2014 the function sets `merged[\"merged_at\"]` unconditionally afterward, so modifying `allowed_keys` serves no functional purpose within this function.\n\n**Fix:** Remove the append entirely:\n```python\n# delete: allowed_keys.append(\"merged_at\")\n```\nIf the intent was to ensure `\"merged_at\"` survives filtering, note that filtering happens **before** the timestamp is added, so no append is needed.\n\n---\n\n### 4. Missing `import time`\n**Severity: High (Runtime Error)**\n\n**Explanation:**\n`time.time()` is called but `time` is never imported in the shown code. If the module doesn't import it elsewhere, this raises `NameError` at runtime.\n\n**Fix:**\n```python\nimport time\n```\n\n---\n\n### 5. Filtering Semantics: `merged_at` Could Be Overwritten by Overrides\n**Severity: Low (Design/Edge Case)**\n\n**Explanation:**\nIf `overrides` contains a `\"merged_at\"` key that passes the `allowed_keys` filter, it would be set in the loop, then overwritten by `time.time()` at the end. This is probably the desired behavior (the function owns the timestamp), but worth confirming. Setting the timestamp last is correct if the intent is that the function always controls `merged_at`.\n\n**Fix:** No change needed if intended; consider documenting the behavior.\n\n---\n\n## Corrected Version\n\n```python\nimport time\n\n\ndef merge_user_settings(defaults, overrides, allowed_keys=None):\n    \"\"\"Merge override settings into defaults, keeping only allowed keys.\n\n    Neither `defaults` nor `allowed_keys` is mutated.\n    \"\"\"\n    if allowed_keys is None:\n        allowed_keys = []\n\n    merged = dict(defaults)  # shallow copy to avoid mutating caller's dict\n\n    for key in overrides:\n        if allowed_keys and key not in allowed_keys:\n            continue\n        merged[key] = overrides[key]\n\n    merged[\"merged_at\"] = time.time()\n    return merged\n```\n\n---\n\n## Severity Recap\n| # | Issue | Severity |\n|---|-------|----------|\n| 1 | Mutable default argument | High |\n| 2 | Mutating `defaults` (no copy) | High |\n| 3 | Mutating `allowed_keys` via `append` | High |\n| 4 | Missing `import time` | High |\n| 5 | `merged_at` override edge case | Low |\n\nThe most impactful fixes are avoiding the mutable default and copying `defaults`, since these cause silent, hard-to-debug cross-call contamination.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Catches the mutable default argument bug",
+          "score": 9
+        },
+        {
+          "criterion": "Catches that defaults is mutated (aliased, not copied)",
+          "score": 9
+        },
+        {
+          "criterion": "Catches the missing time import",
+          "score": 9
+        },
+        {
+          "criterion": "Failure scenarios are concrete, not hand-waved",
+          "score": 7
+        },
+        {
+          "criterion": "Severity ordering and bug-vs-style separation are sensible",
+          "score": 6
+        }
+      ],
+      "overall": 8,
+      "weaknesses": "All four issues are labeled 'High' severity without meaningful differentiation, muddying prioritization despite otherwise solid, concrete explanations."
+    },
+    "run": 0,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false
+  },
+  {
+    "task": "code-review",
+    "baseline": "single_agent",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 1,
+    "depth": 0,
+    "cost_usd": 0.00486,
+    "wall_ms": 17727.0,
+    "output": "# Code Review: `merge_user_settings`\n\n## Issue 1: Mutable default argument (`allowed_keys=[]`)\n\n**Severity: High**\n\n**Explanation:** The default value `[]` is created once when the function is defined and shared across all calls that rely on the default. The line `allowed_keys.append(\"merged_at\")` mutates this shared list. On the first call the default list becomes `[\"merged_at\"]`, and on subsequent calls it is no longer empty. This has two nasty effects:\n\n1. The list keeps growing (`[\"merged_at\", \"merged_at\", ...]`) across calls.\n2. Because `if allowed_keys and ...` becomes truthy after the first call, later invocations that expected \"no filtering\" (empty `allowed_keys`) will suddenly start filtering, dropping every key except `\"merged_at\"`.\n\n**Suggested fix:** Use `None` as the sentinel and create a fresh list inside the function.\n\n```python\ndef merge_user_settings(defaults, overrides, allowed_keys=None):\n    if allowed_keys is None:\n        allowed_keys = []\n```\n\n---\n\n## Issue 2: Mutating the caller's `defaults` dictionary (`merged = defaults`)\n\n**Severity: High**\n\n**Explanation:** `merged = defaults` does not copy the dictionary \u2014 it creates a second reference to the same object. Every `merged[key] = ...` assignment and the `merged[\"merged_at\"] = ...` line mutate the caller's original `defaults` object. This is a surprising side effect: the caller's defaults are corrupted, and the \"merge\" is not a pure operation.\n\n**Suggested fix:** Make a copy before mutating.\n\n```python\nmerged = dict(defaults)   # or copy.deepcopy(defaults) if nested mutation matters\n```\n\n---\n\n## Issue 3: Mutating the caller-supplied `allowed_keys` list (`allowed_keys.append(...)`)\n\n**Severity: Medium**\n\n**Explanation:** Even after fixing the mutable-default bug, `allowed_keys.append(\"merged_at\")` mutates whatever list the caller passed in. The caller does not expect this function to modify their list, and it produces an unexpected side effect. It's also functionally unnecessary here \u2014 the append seems intended to ensure `\"merged_at\"` isn't filtered out, but since `merged[\"merged_at\"]` is written directly (not through the override loop), the append is not needed for correctness at all.\n\n**Suggested fix:** Remove the append entirely, since `merged_at` is set unconditionally after the loop:\n\n```python\n# remove: allowed_keys.append(\"merged_at\")\nmerged[\"merged_at\"] = time.time()\n```\n\nIf, however, you *do* want callers to be able to preserve an existing `merged_at` in overrides, work on a local copy of the allowed keys instead of mutating the argument.\n\n---\n\n## Issue 4: `time` may not be imported\n\n**Severity: Medium (potential runtime error)**\n\n**Explanation:** The function references `time.time()` but there is no visible `import time`. If the module doesn't import it, this raises `NameError` at call time.\n\n**Suggested fix:** Ensure the module has `import time` at the top.\n\n---\n\n## Corrected version\n\n```python\nimport time\n\n\ndef merge_user_settings(defaults, overrides, allowed_keys=None):\n    \"\"\"Merge override settings into defaults, keeping only allowed keys.\"\"\"\n    if allowed_keys is None:\n        allowed_keys = []\n\n    merged = dict(defaults)  # avoid mutating the caller's dict\n    for key, value in overrides.items():\n        if allowed_keys and key not in allowed_keys:\n            continue\n        merged[key] = value\n\n    merged[\"merged_at\"] = time.time()\n    return merged\n```\n\n## Summary\n\n| # | Issue | Severity |\n|---|-------|----------|\n| 1 | Mutable default argument, mutated each call | High |\n| 2 | Aliases and mutates caller's `defaults` | High |\n| 3 | Mutates caller's `allowed_keys` (also unnecessary) | Medium |\n| 4 | `time` possibly not imported | Medium |\n\nThe two High-severity issues are the most important: they cause data corruption and behavior that silently changes across calls, both of which are hard to debug in production.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Catches the mutable default argument bug",
+          "score": 10
+        },
+        {
+          "criterion": "Catches that defaults is mutated (aliased, not copied)",
+          "score": 10
+        },
+        {
+          "criterion": "Catches the missing time import",
+          "score": 9
+        },
+        {
+          "criterion": "Failure scenarios are concrete, not hand-waved",
+          "score": 9
+        },
+        {
+          "criterion": "Severity ordering and bug-vs-style separation are sensible",
+          "score": 8
+        }
+      ],
+      "overall": 9,
+      "weaknesses": "Missing time import is rated Medium despite causing an immediate crash, which arguably deserves High severity."
+    },
+    "run": 1,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false
+  },
+  {
+    "task": "code-review",
+    "baseline": "single_agent",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 1,
+    "depth": 0,
+    "cost_usd": 0.005076,
+    "wall_ms": 20392.9,
+    "output": "# Code Review: `merge_user_settings`\n\n## Issue 1: Mutable default argument (`allowed_keys=[]`)\n\n**Severity: High**\n\n**Explanation:** Using a mutable object as a default argument is a classic Python pitfall. The list is created *once* at function definition time and shared across all calls. Because the function later does `allowed_keys.append(\"merged_at\")`, each call that relies on the default mutates that shared list. Over successive calls the default accumulates `\"merged_at\"` entries, and worse, once `\"merged_at\"` is in the default list, it silently becomes an \"allowed key,\" changing filtering behavior for later calls.\n\n**Fix:** Use `None` as the sentinel and create the list inside the function.\n\n```python\ndef merge_user_settings(defaults, overrides, allowed_keys=None):\n    if allowed_keys is None:\n        allowed_keys = []\n```\n\n---\n\n## Issue 2: `merged = defaults` mutates the caller's dict\n\n**Severity: High**\n\n**Explanation:** `merged = defaults` does not copy `defaults`; it binds `merged` to the same object. All subsequent writes (`merged[key] = ...`, `merged[\"merged_at\"] = ...`) mutate the caller's original `defaults` dictionary as a side effect. This is almost certainly not intended for a \"merge\" function that returns a new result, and can cause hard-to-trace bugs where the caller's defaults get polluted.\n\n**Fix:** Make a copy.\n\n```python\nmerged = dict(defaults)   # or defaults.copy()\n```\n\n---\n\n## Issue 3: Mutating `allowed_keys` (the caller's list)\n\n**Severity: Medium**\n\n**Explanation:** `allowed_keys.append(\"merged_at\")` mutates whatever list the caller passed in. Even after fixing the mutable-default issue, if a caller passes their own `allowed_keys` list, this line unexpectedly modifies it. The function has no business editing the caller's allow-list.\n\n**Fix:** Don't mutate the argument. If the intent is to ensure `\"merged_at\"` survives filtering, that's irrelevant because `merged_at` is added *after* the filtering loop anyway \u2014 so this append is simply unnecessary and harmful. Remove it:\n\n```python\n# remove: allowed_keys.append(\"merged_at\")\n```\n\n---\n\n## Issue 4: `time` may not be imported\n\n**Severity: Medium (correctness/runtime)**\n\n**Explanation:** The function calls `time.time()` but there is no visible `import time`. If the module doesn't import `time`, this raises `NameError` at runtime.\n\n**Fix:** Ensure `import time` exists at module scope.\n\n---\n\n## Issue 5 (Minor / design): `\"merged_at\"` always overwrites overrides\n\n**Severity: Low**\n\n**Explanation:** `merged[\"merged_at\"]` is set unconditionally after the loop, so if a user legitimately had a `merged_at` key in `overrides` (and it was allowed), it gets clobbered with a timestamp. This may be intended, but it's worth confirming. Also, when `allowed_keys` filtering is active, `merged_at` bypasses that filter entirely, which may be inconsistent behavior.\n\n**Fix:** Document the behavior, or decide explicitly whether `merged_at` should respect the allow-list.\n\n---\n\n## Corrected version\n\n```python\nimport time\n\ndef merge_user_settings(defaults, overrides, allowed_keys=None):\n    \"\"\"Merge override settings into defaults, keeping only allowed keys.\n\n    Returns a new dict; does not mutate the arguments.\n    \"\"\"\n    if allowed_keys is None:\n        allowed_keys = []\n\n    merged = dict(defaults)          # copy so caller's dict is untouched\n    for key, value in overrides.items():\n        if allowed_keys and key not in allowed_keys:\n            continue\n        merged[key] = value\n\n    merged[\"merged_at\"] = time.time()\n    return merged\n```\n\n### Summary\n\n| # | Severity | Issue |\n|---|----------|-------|\n| 1 | High | Mutable default argument shared/mutated across calls |\n| 2 | High | Aliases and mutates caller's `defaults` dict |\n| 3 | Medium | Mutates caller's `allowed_keys` list unnecessarily |\n| 4 | Medium | `time` possibly not imported \u2192 `NameError` |\n| 5 | Low | `merged_at` unconditionally overwrites and bypasses allow-list |",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Catches the mutable default argument bug",
+          "score": 10
+        },
+        {
+          "criterion": "Catches that defaults is mutated (aliased, not copied)",
+          "score": 10
+        },
+        {
+          "criterion": "Catches the missing time import",
+          "score": 9
+        },
+        {
+          "criterion": "Failure scenarios are concrete, not hand-waved",
+          "score": 9
+        },
+        {
+          "criterion": "Severity ordering and bug-vs-style separation are sensible",
+          "score": 9
+        }
+      ],
+      "overall": 9,
+      "weaknesses": "Minor: 'time possibly not imported' is slightly hedged rather than stated as a definite bug given the visible code."
+    },
+    "run": 2,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false
+  },
+  {
+    "task": "code-review",
+    "baseline": "fixed_pipeline",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 3,
+    "depth": 2,
+    "cost_usd": 0.04065,
+    "wall_ms": 111308.5,
+    "output": "# Code Review: `merge_user_settings`\n\n## Function Under Review\n\n```python\ndef merge_user_settings(defaults, overrides, allowed_keys=[]):\n    \"\"\"Merge override settings into defaults, keeping only allowed keys.\"\"\"\n    merged = defaults\n    for key in overrides:\n        if allowed_keys and key not in allowed_keys:\n            continue\n        merged[key] = overrides[key]\n    allowed_keys.append(\"merged_at\")\n    merged[\"merged_at\"] = time.time()\n    return merged\n```\n\n## Summary\n\nThis function has **two critical/high-severity correctness bugs** that will cause data corruption across calls, plus a **high-severity security concern** in how empty allowlists are interpreted. There are also several medium and minor issues around nested-value handling, input validation, reserved keys, and timestamp choice. Recommended action: apply the mutable-default and aliasing fixes immediately; **resolve two open semantic questions with the author before merging** the full corrected version.\n\n---\n\n## Issues (ordered by severity)\n\n### Issue 1 \u2014 Mutable default argument accumulates state across calls\n**Severity: Critical**\n\nThe default `allowed_keys=[]` is evaluated **once**, when the function is defined, and shared by every call that doesn't pass its own list. The line `allowed_keys.append(\"merged_at\")` mutates that shared list on each call.\n\nConsequence chain:\n- **Call 1** (no `allowed_keys`): the list starts empty, so `if allowed_keys and ...` is falsy \u2014 all keys pass through. Then `\"merged_at\"` is appended to the shared default.\n- **Call 2** (no `allowed_keys`): the shared list is now `[\"merged_at\"]`, which is **truthy**. The filter activates, and **every override key except `\"merged_at\"` is silently dropped.**\n\nSo the function's behavior depends on how many times it was previously called. This is a non-deterministic, hard-to-reproduce data-loss bug \u2014 the most dangerous finding here.\n\n**Fix:** Use `None` as the sentinel default and never mutate the caller's list.\n\n```python\ndef merge_user_settings(defaults, overrides, allowed_keys=None):\n    ...\n```\n\n---\n\n### Issue 2 \u2014 Empty allowlist fails open (allow-all instead of allow-nothing)\n**Severity: High (security-relevant)**\n\nThe guard `if allowed_keys and key not in allowed_keys` treats a **falsy** `allowed_keys` (empty list) as \"no filter \u2014 allow everything.\" In a settings/permissions-adjacent context, a caller passing `allowed_keys=[]` most plausibly means **\"allow nothing / reject all overrides\"** \u2014 the exact opposite of what the code does.\n\nThis conflates three distinct caller intents into two behaviors:\n\n| Caller passes | Likely intent | Current behavior |\n|---|---|---|\n| `allowed_keys` omitted | \"no restriction\" | allow all |\n| `allowed_keys=[]` | \"allow nothing\" | **allow all** \u26a0\ufe0f |\n| `allowed_keys=[\"a\",\"b\"]` | allowlist | filter to allowlist |\n\nA settings merge that **fails open** \u2014 letting unintended keys through when the allowlist is empty \u2014 is a plausible privilege/injection surface.\n\n**This must be resolved with the author before merging.** Do not silently canonicalize \"allow-all\" for `[]`, as that cements the riskier interpretation. Two safe options:\n\n- If \"omitted \u21d2 allow all, `[]` \u21d2 allow nothing\" is desired, distinguish them explicitly:\n  ```python\n  allowed = None if allowed_keys is None else set(allowed_keys)\n  ...\n  if allowed is not None and key not in allowed:\n      continue\n  ```\n- If any explicit list (including `[]`) should be a strict allowlist, drop the `is None` distinction accordingly.\n\nPick the semantics deliberately; the current truthiness check chooses by accident.\n\n---\n\n### Issue 3 \u2014 Aliasing: caller's `defaults` dict is mutated in place\n**Severity: High**\n\n`merged = defaults` does **not** copy \u2014 it binds `merged` to the same object. Every `merged[key] = ...` and the `merged[\"merged_at\"] = ...` line mutate the caller's original `defaults` dict. A caller expecting `defaults` to be untouched will find it silently modified.\n\n**Fix:** Copy before mutating.\n\n```python\nmerged = dict(defaults)\n```\n\n**Caveat before applying:** confirm no existing caller relies on the in-place mutation (i.e., reads the mutated `defaults` afterward rather than the return value). If such a caller exists, this \"fix\" is a behavior change for them.\n\n---\n\n### Issue 4 \u2014 Shallow copy still shares nested mutable values\n**Severity: Medium**\n\n`dict(defaults)` (the fix for Issue 3) is only a **shallow** copy. Settings dictionaries commonly nest \u2014 e.g. `{\"ui\": {\"theme\": \"dark\"}}`. With a shallow copy, `merged[\"ui\"]` is the *same* dict object as `defaults[\"ui\"]`, so a later `merged[\"ui\"][\"theme\"] = ...` still corrupts the caller's nested object. Given the name literally contains \"settings,\" nested structures are the expected case, not an edge case \u2014 a shallow copy provides a false sense of isolation.\n\n**Fix (if nested values are possible):**\n\n```python\nimport copy\nmerged = copy.deepcopy(defaults)\n```\n\nWeigh the perf/memory cost on large dicts; decide based on the answer to \"are nested/mutable values expected?\" (see Open Questions).\n\n---\n\n### Issue 5 \u2014 No input validation on `defaults` / `overrides`\n**Severity: Medium**\n\nThe function assumes `defaults` is dict-like and `overrides` is iterable/subscriptable. Passing `defaults=None` makes `dict(defaults)` raise `TypeError`; a `None` `overrides` fails at the loop. No guards exist.\n\n**Fix:** Validate or normalize inputs, e.g.:\n\n```python\nif defaults is None:\n    defaults = {}\nif overrides is None:\n    overrides = {}\n```\n\nAdjust to your contract (raise vs. coerce), but make the assumption explicit.\n\n---\n\n### Issue 6 \u2014 `merged_at` is an undocumented reserved key that clobbers user values\n**Severity: Minor**\n\nIf a caller passes `overrides = {\"merged_at\": <value>}` (and it survives the allowlist), the loop sets it, then the post-loop line **unconditionally overwrites** it with `time.time()`. This may be correct by design, but `\"merged_at\"` is effectively a reserved key whose user value is always discarded \u2014 and this is documented nowhere.\n\n**Fix:** Document that `merged_at` is reserved and always set by the function; optionally reject or warn if it appears in `overrides`.\n\n---\n\n### Issue 7 \u2014 `time.time()` is wall-clock (non-monotonic)\n**Severity: Minor**\n\n`time.time()` is subject to clock skew and NTP adjustments and can move backwards. If `merged_at` is used for ordering, TTL, or \"latest wins\" logic, this is a latent correctness hazard.\n\n**Fix:** If the timestamp drives ordering/expiry, prefer `time.monotonic()` or a UTC-aware timestamp with documented semantics. If it's purely informational, `time.time()` is acceptable \u2014 but state that.\n\n---\n\n### Issue 8 \u2014 Verify `time` is imported\n**Severity: Verification item (High *if* truly absent, but low probability)**\n\nThe snippet references `time` with no visible `import time`. If genuinely unimported, this raises `NameError` on **every** call \u2014 meaning it could never have passed a smoke test, so in a functioning codebase this is almost certainly imported elsewhere in the module. Treat as a quick check, not a likely live defect.\n\n---\n\n## Trade-offs to Acknowledge Before Applying Fixes\n\n| Fix | Benefit | Hidden cost |\n|-----|---------|-------------|\n| `dict(defaults)` copy | Stops caller mutation | Shallow \u2014 nested mutables still shared (Issue 4); memory/perf cost on large dicts |\n| `deepcopy(defaults)` | True isolation | Larger perf/memory cost; only needed if nesting exists |\n| `set(allowed_keys)` for lookups | O(1) membership | Loses ordering/duplicate info; allocation dwarfs benefit for small lists |\n| `None \u21d2 allow-all` distinction | Cleaner than truthiness gate | Bakes in a contested semantic \u2014 confirm intent first (Issue 2) |\n| Removing `.append` | Correct | If external code depended on the side effect (unlikely), silent behavior change |\n\n---\n\n## Open Questions \u2014 Resolve With Author Before Merging (ranked by decision impact)\n\n1. **What should `allowed_keys=[]` mean \u2014 allow-all or allow-nothing?** Highest-leverage unknown; determines whether the fix is a fix or a new fail-open vulnerability. *Blocker for the allowlist change.*\n2. **Are nested/mutable settings values expected?** Determines shallow (`dict`) vs. deep (`deepcopy`) copy.\n3. **Is `merged_at` a reserved key?** Should it override user-supplied values, and should that be documented?\n4. **Do any existing callers rely on `defaults` being mutated in place?** Fixing the aliasing bug could break them.\n5. **Is wall-clock `time.time()` the right timestamp?** Not if `merged_at` drives ordering or TTL.\n\n---\n\n## Recommended Corrected Version\n\nShip the two safe fixes now (mutable default + aliasing); the annotated points marked **CONFIRM** depend on the open questions above.\n\n```python\nimport copy\nimport time\n\n\ndef merge_user_settings(defaults, overrides, allowed_keys=None):\n    \"\"\"Merge override settings into defaults, keeping only allowed keys.\n\n    - `allowed_keys=None` means no restriction (all override keys allowed).\n    - `allowed_keys=[]` means allow nothing.   # CONFIRM intent (Issue 2)\n    - `\"merged_at\"` is a reserved key: it is always set to the merge time\n      and any caller-supplied value for it is discarded.   # (Issue 6)\n    \"\"\"\n    if defaults is None:                       # Issue 5\n        defaults = {}\n    if overrides is None:                       # Issue 5\n        overrides = {}\n\n    merged = copy.deepcopy(defaults)            # Issues 3 & 4; CONFIRM deep vs shallow\n\n    allowed = None if allowed_keys is None else set(allowed_keys)  # Issue 2; CONFIRM\n\n    for key, value in overrides.items():\n        if key == \"merged_at\":                  # reserved (Issue 6)\n            continue\n        if allowed is not None and key not in allowed:\n            continue\n        merged[key] = value\n\n    merged[\"merged_at\"] = time.time()           # Issue 7: confirm wall-clock is acceptable\n    return merged\n```\n\n**Sequencing recommendation:** merge the mutable-default and aliasing fixes with confidence. Hold the empty-allowlist semantics (`allowed_keys=[]`) and the copy depth until the author confirms intent \u2014 those two decisions change whether the corrected function is safer or introduces a new fail-open bug.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Catches the mutable default argument bug",
+          "score": 10
+        },
+        {
+          "criterion": "Catches that defaults is mutated (aliased, not copied)",
+          "score": 10
+        },
+        {
+          "criterion": "Catches the missing time import",
+          "score": 6
+        },
+        {
+          "criterion": "Failure scenarios are concrete, not hand-waved",
+          "score": 10
+        },
+        {
+          "criterion": "Severity ordering and bug-vs-style separation are sensible",
+          "score": 9
+        }
+      ],
+      "overall": 9,
+      "weaknesses": "The missing time import is soft-pedaled as low-probability rather than flagged as a real potential bug given the exact code shown."
+    },
+    "run": 0,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false
+  },
+  {
+    "task": "code-review",
+    "baseline": "fixed_pipeline",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 3,
+    "depth": 2,
+    "cost_usd": 0.037137,
+    "wall_ms": 103872.7,
+    "output": "# Code Review: `merge_user_settings`\n\n## Function Under Review\n\n```python\ndef merge_user_settings(defaults, overrides, allowed_keys=[]):\n    \"\"\"Merge override settings into defaults, keeping only allowed keys.\"\"\"\n    merged = defaults\n    for key in overrides:\n        if allowed_keys and key not in allowed_keys:\n            continue\n        merged[key] = overrides[key]\n    allowed_keys.append(\"merged_at\")\n    merged[\"merged_at\"] = time.time()\n    return merged\n```\n\n## Summary\n\nThis function contains one **critical** bug arising from the *interaction* of two individual defects, plus one **high**-severity aliasing bug whose obvious fix is easy to get wrong. Several important design questions about intended semantics are unresolved and must be confirmed with actual callers before adopting any fix. The findings below are ordered by severity.\n\n---\n\n## Findings\n\n### Issue 1 \u2014 Mutable default argument + in-place append \u2192 silent, escalating data loss\n**Severity: Critical**\n\nTwo defects combine here into the single most dangerous property of this function.\n\n- **Defect A (shared mutable default):** `allowed_keys=[]` is evaluated **once** at function-definition time. Every call that omits `allowed_keys` shares the *same* list object.\n- **Defect B (mutating that shared object):** `allowed_keys.append(\"merged_at\")` permanently mutates that shared default list.\n\n**Why the combination is critical.** Trace two consecutive calls that both omit `allowed_keys`:\n\n- **Call 1:** `allowed_keys` is `[]`, so `if allowed_keys and ...` is falsy \u2014 the filter is inactive, and all override keys are applied correctly. Then `.append(\"merged_at\")` mutates the shared default to `[\"merged_at\"]`.\n- **Call 2:** `allowed_keys` is now `[\"merged_at\"]` (the *same* object, carried over). The filter is now **active**, so every override key except `\"merged_at\"` fails the `key not in allowed_keys` test and is **silently dropped**.\n\nThe function therefore **works correctly the first time and then silently discards user override data on every subsequent call.** There is no exception, no log, no visible symptom \u2014 just permanent, escalating data loss that depends on call history. This is far more severe than mere \"history-dependent behavior.\"\n\n**Suggested fix.** Use the `None` sentinel idiom and never mutate the argument:\n\n```python\ndef merge_user_settings(defaults, overrides, allowed_keys=None):\n    ...\n    # do NOT append to allowed_keys; stamp metadata directly on the output\n```\n\nSee the consolidated corrected version below.\n\n---\n\n### Issue 2 \u2014 Aliasing of `defaults` mutates the caller's object\n**Severity: High** *(the naive fix only half-resolves this)*\n\n`merged = defaults` binds `merged` to the *same* object the caller passed in. Every `merged[key] = ...` assignment and the final `merged[\"merged_at\"] = time.time()` therefore mutate the caller's `defaults` dict directly. The function is not pure, and a caller who reuses `defaults` elsewhere will see it silently changed.\n\n**The obvious fix is incomplete.** Replacing the first line with `merged = dict(defaults)` produces only a **shallow** copy. For a settings-merge function, nested dicts/lists are the *expected* case, and a shallow copy leaves two aliasing hazards intact:\n\n1. **Nested values in `defaults` remain shared.** After `merged = dict(defaults)`, any nested dict/list inside `merged` is the same object as in `defaults`. Mutating `merged[\"db\"][\"port\"] = ...` corrupts the caller's original.\n2. **Override values are aliased too.** `merged[key] = overrides[key]` binds `merged[key]` to the *same* nested object living in `overrides`. Later mutation of `overrides` will then leak into the \"merged\" result.\n\n**Suggested fix.** If nested structures are expected (confirm this \u2014 see Open Questions), use `copy.deepcopy` for both the base and the copied-in override values:\n\n```python\nimport copy\nmerged = copy.deepcopy(defaults)\n...\nmerged[key] = copy.deepcopy(overrides[key])\n```\n\nIf callers are known to pass only flat, scalar-valued settings, a shallow `dict(defaults)` is acceptable \u2014 but that assumption must be stated and verified, not defaulted into silently.\n\n---\n\n### Issue 3 \u2014 `merged_at` bypasses the allow-list\n**Severity: Low\u2013High \u2014 intent-dependent**\n\nThe line `merged[\"merged_at\"] = time.time()` writes the `merged_at` key **unconditionally**, regardless of whether it appears in `allowed_keys`.\n\nThe correct severity depends entirely on what `allowed_keys` is *for*:\n\n- If `allowed_keys` is a **convenience filter**, this is a cosmetic **Low**: the function simply always adds a timestamp.\n- If `allowed_keys` is a **security / trust boundary** (e.g., filtering user-supplied settings against a whitelist), then unconditionally injecting a key that was never whitelisted is a **contract violation (High)** \u2014 the allow-list no longer bounds the output.\n\n**Suggested fix.** Decide deliberately and document it. Either stamp the metadata *before* filtering so it flows through the same rules, or keep it unconditional but state in the docstring that `merged_at` is always added irrespective of `allowed_keys`.\n\n---\n\n### Issue 4 \u2014 Empty `allowed_keys` means \"allow everything\"\n**Severity: Open question \u2014 potential High if security-relevant**\n\nThe guard `if allowed_keys and key not in allowed_keys` overloads the empty list to mean **\"no restrictions \u2014 allow all keys.\"** This is a footgun: a caller who *computes* an allow-list that legitimately comes out empty gets the exact **opposite** of the intended behavior \u2014 every key passes instead of none.\n\nIf the allow-list is a security control, \"empty computed list silently allows everything\" is a serious vulnerability, not a convenience.\n\n**Suggested fix.** Distinguish \"no allow-list supplied\" from \"an empty allow-list was supplied.\" With the `None` sentinel this becomes natural: `None` = unrestricted, `[]` = deny all.\n\n```python\nif allowed_keys is not None and key not in allowed_keys:\n    continue\n```\n\n---\n\n### Issue 5 \u2014 `time` may not be imported\n**Severity: Low (likely an excerpt artifact \u2014 verify)**\n\n`time.time()` requires `import time`. If this snippet is an excerpt from a larger module where the import already exists at module scope, this is a non-issue. It cannot be confirmed from the snippet alone.\n\n**Suggested fix.** Verify a module-level `import time` exists; add it if not. Do not prioritize this above the data-loss and aliasing findings.\n\n---\n\n## Severity Table\n\n| # | Issue | Severity | Notes |\n|---|-------|----------|-------|\n| 1 | Mutable default + in-place append \u2192 silent escalating data loss | **Critical** | Combined effect; correct on call 1, drops data thereafter |\n| 2 | Aliasing of `defaults` | **High** | Naive `dict()` fix is only a shallow half-fix |\n| 3 | `merged_at` bypasses allow-list | **Low\u2013High** | Depends on whether allow-list is a security boundary |\n| 4 | Empty allow-list = allow-all | **Open / potential High** | Design ambiguity; dangerous if security-relevant |\n| 5 | Possibly missing `import time` | **Low** | Likely excerpt artifact; verify |\n\n---\n\n## Open Questions to Resolve With Callers\n\nBefore adopting any fix, confirm the following \u2014 each directly changes the correct fix or severity:\n\n1. **What does an empty `allowed_keys` mean \u2014 deny-all or allow-all?** This is the single most important unresolved design question and determines whether the allow-list is a security control or a convenience filter (Issue 4).\n2. **Are nested settings expected?** Determines shallow vs. deep copy (Issue 2).\n3. **Is `merged_at` trusted internal metadata or user-visible/security-relevant data?** Determines whether Issue 3 is Low or High.\n4. **Do any callers rely on in-place mutation of `defaults`?** If legacy code depends on the current mutating behavior, making the function pure is a breaking change that must be coordinated.\n\n---\n\n## Recommended Corrected Version\n\nThe version below fixes the Critical and High issues and makes the ambiguous ones explicit. It assumes: `None` = unrestricted / `[]` = deny-all (Issue 4), nested data is possible (Issue 2), and `merged_at` is trusted metadata added unconditionally (Issue 3, documented). **Adjust these choices to match the answers to the Open Questions above.**\n\n```python\nimport copy\nimport time\n\n\ndef merge_user_settings(defaults, overrides, allowed_keys=None):\n    \"\"\"Merge override settings into a copy of defaults, keeping only allowed keys.\n\n    - `allowed_keys=None` means no restriction (all override keys allowed).\n    - `allowed_keys=[]` means deny all override keys.\n    - Neither `defaults` nor `overrides` is mutated; nested structures are\n      deep-copied so the caller's objects remain fully isolated.\n    - `\"merged_at\"` is always added to the result, regardless of `allowed_keys`.\n    \"\"\"\n    merged = copy.deepcopy(defaults)\n    for key in overrides:\n        if allowed_keys is not None and key not in allowed_keys:\n            continue\n        merged[key] = copy.deepcopy(overrides[key])\n    merged[\"merged_at\"] = time.time()  # do not mutate allowed_keys\n    return merged\n```\n\n**Key changes:**\n- `allowed_keys=None` sentinel + `is not None` check \u2014 eliminates the shared-mutable-default bug and disambiguates empty-vs-absent (Issues 1, 4).\n- Removed `allowed_keys.append(...)` entirely \u2014 no argument mutation (Issue 1).\n- `copy.deepcopy` for both the base and copied-in values \u2014 full input isolation (Issue 2).\n- `merged_at` behavior documented as always-added (Issue 3).\n- Explicit `import time` (Issue 5).\n\n**Remaining consideration:** `deepcopy` has a cost for large settings trees. If profiling shows this matters and callers are known to pass only flat, scalar-valued settings, downgrade to `dict(defaults)` and direct assignment \u2014 but only after confirming no nested structures exist.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Catches the mutable default argument bug",
+          "score": 10
+        },
+        {
+          "criterion": "Catches that defaults is mutated (aliased, not copied)",
+          "score": 10
+        },
+        {
+          "criterion": "Catches the missing time import",
+          "score": 8
+        },
+        {
+          "criterion": "Failure scenarios are concrete, not hand-waved",
+          "score": 10
+        },
+        {
+          "criterion": "Severity ordering and bug-vs-style separation are sensible",
+          "score": 9
+        }
+      ],
+      "overall": 9,
+      "weaknesses": "Slightly downgrades the missing-import issue as 'likely an excerpt artifact' rather than treating it as a definite bug in the given code."
+    },
+    "run": 1,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false
+  },
+  {
+    "task": "code-review",
+    "baseline": "fixed_pipeline",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 3,
+    "depth": 2,
+    "cost_usd": 0.038841,
+    "wall_ms": 106460.3,
+    "output": "# Code Review: `merge_user_settings`\n\n## Function Under Review\n\n```python\ndef merge_user_settings(defaults, overrides, allowed_keys=[]):\n    \"\"\"Merge override settings into defaults, keeping only allowed keys.\"\"\"\n    merged = defaults\n    for key in overrides:\n        if allowed_keys and key not in allowed_keys:\n            continue\n        merged[key] = overrides[key]\n    allowed_keys.append(\"merged_at\")\n    merged[\"merged_at\"] = time.time()\n    return merged\n```\n\n---\n\n## Summary\n\nThis function contains **three definite correctness bugs**, one of them severe enough to cause silent data loss on repeated calls. Beyond those, there are two design-level defects (missing input validation, shallow-copy aliasing) and several **unresolved contract questions** that determine whether any \"corrected\" version is actually correct. A revised implementation is provided below, but it should be treated as a **candidate pending answers to the open questions**, not a final answer \u2014 because parts of the intended contract cannot be inferred from the code alone.\n\n---\n\n## Issues\n\n### Issue 1 \u2014 Mutable default argument (`allowed_keys=[]`) \u2014 **Severity: High**\n\n**Explanation.**\nA default argument is evaluated once, at function-definition time, and the *same list object* is reused across every call that relies on the default. Combined with Issue 3 (the `append` inside the body), this list **grows on every default-call**, and the effect is catastrophic rather than cosmetic:\n\n- **First default-call:** `allowed_keys` is `[]`. The filter guard `if allowed_keys and ...` is falsy, so **no filtering happens \u2014 every override key passes through.** Then `allowed_keys.append(\"merged_at\")` mutates the shared default to `[\"merged_at\"]`.\n- **Second default-call:** `allowed_keys` is now `[\"merged_at\"]` \u2014 truthy. The filter now activates and **drops every override key except `merged_at`.**\n\nSo the function silently transitions from \"pass everything\" to \"pass almost nothing\" between the first and second call. This is **data-loss-class behavior**, not merely \"hard to diagnose.\"\n\n**Suggested fix.** Use `None` as the sentinel and create a fresh list inside the body:\n\n```python\ndef merge_user_settings(defaults, overrides, allowed_keys=None):\n    if allowed_keys is None:\n        allowed_keys = []\n```\n\n---\n\n### Issue 2 \u2014 In-place mutation of the caller's `defaults` dict \u2014 **Severity: High**\n\n**Explanation.**\n`merged = defaults` binds a new name to the *same* object. Every `merged[key] = ...` and the final `merged[\"merged_at\"] = ...` mutates the caller's original `defaults` dictionary. Callers who pass in a shared or canonical defaults object (a very common pattern for settings) will have it silently corrupted, and repeated calls will accumulate state.\n\n**Caveat \u2014 this depends on the intended contract (see Open Question 1).** The docstring says \"merge override settings *into* defaults,\" which arguably *promises* mutation. If the function is intended to be a pure, non-destructive merge, this is a High-severity bug. If in-place mutation is genuinely intended, this is by-design and the docstring should say so explicitly.\n\n**Suggested fix (assuming non-destructive intent).**\n\n```python\nmerged = dict(defaults)\n```\n\n---\n\n### Issue 3 \u2014 Unconditional `allowed_keys.append(\"merged_at\")` \u2014 **Severity: High**\n\n**Explanation.**\nThis line mutates the caller-supplied (or defaulted) `allowed_keys` list as a side effect. When a caller passes their own list, that list is silently modified. When the default is used, it is the mechanism that turns Issue 1 from a latent bug into an active one (see Issue 1). The append serves no purpose the function needs \u2014 `merged_at` is written directly into `merged` on the next line regardless.\n\n**Suggested fix.** Remove the line entirely. Do not mutate `allowed_keys`.\n\n---\n\n### Issue 4 \u2014 Should `merged_at` respect the allow-list? \u2014 **Severity: Medium (unresolved contract)**\n\n**Explanation.**\nThe docstring states the function keeps \"only allowed keys.\" Yet `merged_at` is written unconditionally, *bypassing* the allow-list filter. This is a genuine contradiction in intent, and **it cannot be resolved from the code alone**:\n\n- If the contract is \"the result contains only allowed keys,\" then unconditionally stamping `merged_at` **violates that invariant** and is a bug.\n- If `merged_at` is a system-managed metadata field exempt from filtering, the current placement is correct but should be documented.\n\nThe revised code below chooses the \"always stamp\" interpretation because it matches the apparent metadata purpose of the field \u2014 **but this is a deliberate assumption, not a proven fact.** If downstream code enforces an \"allowed keys only\" invariant, this choice is wrong and the stamp must be gated or the field must be added to the allow-list explicitly.\n\n**Suggested fix.** Decide the contract explicitly and document it. Do not resolve the ambiguity silently.\n\n---\n\n### Issue 5 \u2014 Shallow copy does not protect nested mutable values \u2014 **Severity: Medium**\n\n**Explanation.**\nEven after switching to `merged = dict(defaults)`, the copy is **shallow**. Two aliasing risks remain:\n\n1. Nested values inside `defaults` are shared with the returned dict.\n2. More importantly, `merged[key] = overrides[key]` stores a **reference** to the caller's override value. If that value is itself a dict or list (e.g., `{\"db\": {\"host\": ...}}` \u2014 extremely common in settings), later mutation of `merged` leaks back into the caller's `overrides`, and vice versa.\n\nSettings dictionaries are frequently nested, so a shallow copy gives a **false sense of immutability**.\n\n**Suggested fix (only if settings can be nested \u2014 see Open Question 3).**\n\n```python\nimport copy\nmerged = copy.deepcopy(defaults)\nmerged[key] = copy.deepcopy(overrides[key])\n```\n\nIf settings are guaranteed flat, a shallow `dict(defaults)` is sufficient and cheaper.\n\n---\n\n### Issue 6 \u2014 No input validation; `defaults=None` raises `TypeError` \u2014 **Severity: Low/Medium**\n\n**Explanation.**\nNeither the original nor a naive fix guards against `None` inputs. `dict(defaults)` (or `defaults[key] = ...`) raises `TypeError` if `defaults` is `None`, and iterating `overrides` raises if `overrides` is `None`. Whether this matters depends on whether these inputs can ever be `None` (Open Question 4). For a public utility, defensive validation or explicit documentation is warranted.\n\n**Suggested fix.** Validate or normalize inputs, or document that both must be dict-like.\n\n---\n\n### Issue 7 \u2014 `time.time()` resolution for `merged_at` \u2014 **Severity: Low**\n\n**Explanation.**\n`time.time()` returns a float with platform-dependent resolution. If `merged_at` is used downstream as a unique key or for strict ordering, rapid successive calls could collide. For a plain audit timestamp this is fine; flagged only because the \"user settings\" context leaves the field's downstream use unknown (Open Question 5).\n\n**Suggested fix.** If uniqueness/ordering is required, use `time.time_ns()` or a monotonic/UUID scheme.\n\n---\n\n## Open Questions (Must Be Resolved Before Accepting the Revised Version)\n\n1. **Contract: mutate in place or return a fresh dict?** The docstring's \"merge into defaults\" arguably promises mutation; the revised version assumes a pure function. Only caller usage settles this.\n2. **Should `merged_at` respect the allow-list?** Determines whether unconditional stamping is correct or a bug (Issue 4).\n3. **Can settings be nested?** Determines shallow vs. deep copy (Issue 5).\n4. **Can `defaults` or `overrides` ever be `None`?** Determines whether input validation is required (Issue 6).\n5. **Is `merged_at` used as a unique/ordering key anywhere?** Determines whether float-precision timestamps are acceptable (Issue 7).\n\n---\n\n## Candidate Corrected Version\n\n> **This is a candidate, not a conclusion.** It is safe to ship *only if* the answers are: pure-function intended (Q1), always-stamp intended (Q2), and settings-are-flat (Q3). Otherwise it remains incomplete.\n\n```python\nimport time\n\n\ndef merge_user_settings(defaults, overrides, allowed_keys=None):\n    \"\"\"Return a new dict: a copy of `defaults` with allowed `overrides`\n    applied, plus a `merged_at` timestamp.\n\n    Contract (confirm before relying on it):\n      - Non-destructive: `defaults` and `overrides` are not modified.\n      - If `allowed_keys` is None/empty, all override keys are applied.\n      - `merged_at` is system metadata and is always stamped, bypassing\n        the allow-list.\n      - Assumes flat (non-nested) settings; use deepcopy if nested.\n    \"\"\"\n    if defaults is None:\n        defaults = {}\n    if overrides is None:\n        overrides = {}\n    if allowed_keys is None:\n        allowed_keys = []\n\n    merged = dict(defaults)  # shallow copy \u2014 see nested-value caveat\n    for key in overrides:\n        if allowed_keys and key not in allowed_keys:\n            continue\n        merged[key] = overrides[key]\n\n    merged[\"merged_at\"] = time.time()\n    return merged\n```\n\nKey changes vs. the original: `None` sentinel replaces the mutable default (Issue 1); `dict(defaults)` avoids mutating the caller's dict (Issue 2); the `allowed_keys.append(...)` side effect is removed (Issue 3); `None` inputs are normalized (Issue 6). The `merged_at`-bypasses-allow-list behavior (Issue 4) and shallow-copy limitation (Issue 5) are **documented assumptions**, not silent choices.\n\n---\n\n## Bottom Line\n\nIssues 1\u20133 are unambiguous, high-impact defects and must be fixed; Issue 1 in particular causes silent, escalating data loss across repeated default-calls. Issues 4\u20137 are real but their correct resolution depends on the contract, which the code does not reveal. Treat the corrected version as a **reviewed candidate pending confirmation of Open Questions 1, 2, and 3** \u2014 do not merge it as a settled answer.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Catches the mutable default argument bug",
+          "score": 10
+        },
+        {
+          "criterion": "Catches that defaults is mutated (aliased, not copied)",
+          "score": 10
+        },
+        {
+          "criterion": "Catches the missing time import",
+          "score": 9
+        },
+        {
+          "criterion": "Failure scenarios are concrete, not hand-waved",
+          "score": 10
+        },
+        {
+          "criterion": "Severity ordering and bug-vs-style separation are sensible",
+          "score": 8
+        }
+      ],
+      "overall": 9,
+      "weaknesses": "Slightly verbose with speculative 'open questions' framing that pads length beyond what a strict correctness review needs, though the missing time import is only mentioned implicitly via the fix rather than flagged as an explicit bug."
+    },
+    "run": 2,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false
+  },
+  {
+    "task": "code-review",
+    "baseline": "smythe_dynamic",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "fork_join -> adversarial -> serial",
+    "nodes": 5,
+    "depth": 3,
+    "cost_usd": 0.039249,
+    "wall_ms": 97864.1,
+    "output": "# Code Review\n\nFindings are ordered by severity. Only defects backed by reproducible evidence are listed as bugs; unverifiable checklist items are moved to a separate coverage-gap section so they do not inflate the defect count.\n\n---\n\n## HIGH \u2014 Shared default dict is aliased and mutated, corrupting module state\n\n**Severity:** High (confirmed, reproducible, deterministic)\n\n**Location:** `build_config` (assignment `merged = defaults` followed by `merged.update(overrides)`)\n\n**Explanation:**\n`merged = defaults` binds `merged` to the *same* dict object as the `defaults` parameter, not a copy. Because `defaults` defaults to the module-level `DEFAULTS`, calling `merged.update(overrides)` mutates the shared `DEFAULTS` dict in place. The corruption persists across all subsequent calls, and the returned \"config\" is no longer isolated from module state.\n\n**Failure scenario:**\n```python\nDEFAULTS = {\"x\": 1}\n\ndef build_config(overrides, defaults=DEFAULTS):\n    merged = defaults         # alias, not a copy\n    merged.update(overrides)  # mutates DEFAULTS in place\n    return merged\n\nbuild_config({\"x\": 99})   # returns {\"x\": 99} AND corrupts DEFAULTS\nbuild_config({})          # returns {\"x\": 99}, not the intended {\"x\": 1}\n```\nAfter the first call, `DEFAULTS` is permanently `{\"x\": 99}`. Every later caller silently inherits polluted defaults \u2014 a classic hard-to-trace \"works the first time, wrong ever after\" bug.\n\n**Suggested fix:**\nCopy before mutating:\n```python\ndef build_config(overrides, defaults=DEFAULTS):\n    merged = dict(defaults)   # shallow copy\n    merged.update(overrides)\n    return merged\n```\nOr, equivalently, `return {**defaults, **overrides}` / `return defaults | overrides` (Python 3.9+).\n\n**Note on scope:** A shallow copy fully resolves the demonstrated failure. Upgrading to `copy.deepcopy` is **not** warranted here \u2014 it is only justified if you can point to a concrete nested-mutable mutation path (e.g., code that mutates `merged[\"some_list\"].append(...)`). No such path has been demonstrated, so do not bundle deepcopy into this fix as if it were a proven requirement.\n\n---\n\n## LOW / PROVISIONAL \u2014 Mutable default argument `allowed_keys=[]`\n\n**Severity:** Low as evidence stands; escalates to High **only if** the function body mutates the argument.\n\n**Location:** `register(..., allowed_keys=[])`\n\n**Explanation:**\nA mutable default (`[]`) is evaluated once at function-definition time and shared across all calls that don't pass the argument. This is a defect **only if the body mutates it** (`.append`, `+=`, `.extend`, etc.). If `register` merely *reads* `allowed_keys` (e.g., `if key in allowed_keys:`), there is no observable failure and this is a style nit, not a bug. The claimed \"unbounded memory growth\" symptom cannot be confirmed without seeing the mutation site.\n\n**Failure scenario (holds *only* if a mutation exists):**\n```python\ndef register(key, allowed_keys=[]):\n    allowed_keys.append(key)   # <-- the mutation that makes this a bug\n    return allowed_keys\n\nregister(\"a\")   # -> [\"a\"]\nregister(\"b\")   # -> [\"a\", \"b\"]  (leftover state from the previous call)\n```\nEach call accumulates into the same shared list, leaking state between unrelated invocations and growing without bound.\n\n**Suggested fix:**\nUse `None` as the sentinel and allocate inside the function:\n```python\ndef register(key, allowed_keys=None):\n    if allowed_keys is None:\n        allowed_keys = []\n    allowed_keys.append(key)\n    return allowed_keys\n```\nEven if the current body only reads the argument, applying this pattern is a cheap, defensive fix that prevents the bug from appearing if the body later starts mutating.\n\n**Action required:** Provide the body of `register` to finalize the severity. If it mutates the argument, promote to High.\n\n---\n\n## Coverage Gaps (NOT defects)\n\nThe following items were raised as potential issues but have **no supporting code, usage site, or traceback**. They are speculative checklist categories, not auditable findings, and are recorded here only to flag where review coverage is missing. They should not be counted as defects.\n\n| Item | Why it is not (yet) a finding | What's needed to assess |\n|------|-------------------------------|--------------------------|\n| Undefined `time` import | No import block, no usage site, no traceback | Source showing `time` usage and imports |\n| Filtering off-by-one / truthiness | No filtering function exists in the reviewed evidence | The filtering function body |\n| Mutation during iteration | No iteration code provided | The relevant loop/collection code |\n| Merge collisions / `None` operand | No merge code provided beyond Issue 2 | The merge implementation |\n\n**Requested to close these gaps:** the source containing the import block, the filtering logic, the iteration/loop code, and any additional merge implementation.\n\n---\n\n## Summary\n\n| Severity | Finding | Status |\n|----------|---------|--------|\n| **High** | `build_config` aliases and mutates shared `DEFAULTS` | Confirmed, reproducible \u2014 fix before shipping |\n| **Low / Provisional** | `register` mutable default `allowed_keys=[]` | Bug only if body mutates; needs source |\n| \u2014 | `time` import, filtering, iteration mutation, merge collisions | Coverage gaps, not defects |\n\n**Ship-blocking:** One confirmed bug (`build_config`) requires the shallow-copy fix. The `register` default should be hardened defensively regardless; confirm its severity by supplying the function body. The four coverage-gap items require source before any judgment can be made.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Catches the mutable default argument bug",
+          "score": 2,
+          "explanation": "It downgrades this to 'Low/Provisional' and claims it's only a bug if the body mutates the list \u2014 but in the actual code, allowed_keys.append('merged_at') does mutate it, which the review completely misses because it reviews a fabricated 'register' function instead."
+        },
+        {
+          "criterion": "Catches that defaults is mutated (aliased, not copied)",
+          "score": 4,
+          "explanation": "The aliasing bug is conceptually identified, but it's attached to an entirely fictitious 'build_config' function with different code, not the actual merge_user_settings function given."
+        },
+        {
+          "criterion": "Catches the missing time import",
+          "score": 1,
+          "explanation": "The review explicitly denies this is a defect, claiming 'no import block, no usage site' despite the given code literally calling time.time()."
+        },
+        {
+          "criterion": "Failure scenarios are concrete, not hand-waved",
+          "score": 3,
+          "explanation": "Scenarios are detailed and concrete but are for invented functions unrelated to the submitted code, making them irrelevant to the actual task."
+        },
+        {
+          "criterion": "Severity ordering and bug-vs-style separation are sensible",
+          "score": 3,
+          "explanation": "The structure and severity framework look professional, but since the analysis targets the wrong code entirely, the ordering and classifications are meaningless for the actual function under review."
+        }
+      ],
+      "overall": 2,
+      "weaknesses": "The review analyzes entirely different, fabricated functions (build_config, register) instead of the actual merge_user_settings code, causing it to miss or wrongly dismiss the real bugs including the time import and mutable-default mutation."
+    },
+    "run": 0,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false
+  },
+  {
+    "task": "code-review",
+    "baseline": "smythe_dynamic",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "fork_join -> adversarial -> serial",
+    "nodes": 5,
+    "depth": 3,
+    "cost_usd": 0.028947,
+    "wall_ms": 95297.9,
+    "output": "# Code Review \u2014 Final Report\n\n## Summary\n\nThis review cannot report on code-level defects because **the source code under review was never provided**. What was carried forward from earlier analysis was a checklist of *suspected* bug patterns \u2014 some of which reference concrete identifiers (`time`, `allowed_keys`, `cfg`) that could only exist if code had been seen. That contradiction is itself the most important finding and is reported below.\n\n**Confirmed code bugs: 0. Blockers: 1 (missing input). Unverified/possibly fabricated claims: 4.**\n\nNo item should be treated as a confirmed defect until the actual source is supplied.\n\n---\n\n## Issues (ordered by severity)\n\n### \ud83d\udd34 BLOCKER \u2014 B1: Source code not provided\n\n**Severity:** Blocking (cannot proceed)\n**Type:** Input gap, not a code defect\n\n**Explanation:** The function(s) to be reviewed were never included. Every substantive review claim depends on reading the actual code. Without it, no defect can be confirmed and no fix can be validated.\n\n**Failure scenario:** A reviewer signs off (or rejects) based on hypothesized code. If the real code differs, both the approvals and the rejections are wrong \u2014 a review that never inspected the artifact provides false assurance.\n\n**Suggested fix:** Paste the function(s). Once supplied, every remaining item below will be held to three criteria: (1) a real triggering input, (2) an exact observed failure, and (3) a root cause that is not double-counted.\n\n---\n\n### \ud83d\udfe0 HIGH \u2014 I1: Upstream analysis referenced code it claimed not to have\n\n**Severity:** High (integrity of the analysis)\n**Type:** Process/grounding defect\n\n**Explanation:** Upstream steps stated that no code was provided, yet produced checks naming specific identifiers \u2014 `time`, `allowed_keys`, `cfg` \u2014 and specific behaviors (`if not allowed_keys:`, config-merge semantics). You cannot assert facts about identifiers in code you do not have. This means at least one upstream pass reasoned about a *hypothesized* function and presented that reasoning as if grounded in a real artifact.\n\n**Failure scenario:** The invented specifics get promoted into a \"bug report.\" A developer chases a `NameError` for a missing `time` import that doesn't exist in their code, or \"fixes\" an `allowed_keys` check that was never written that way \u2014 wasting time and possibly introducing regressions against a phantom spec.\n\n**Suggested fix:** Discard all identifier-specific claims until the real source confirms those identifiers exist. Treat the checklist strictly as a list of open questions, not findings.\n\n---\n\n### \ud83d\udfe1 MEDIUM \u2014 U1: \"Missing `time` import \u2192 NameError\" (Item 7) \u2014 unverified, possible fabrication\n\n**Severity:** Medium (do not act on it, but re-check when source arrives)\n**Type:** Unverified claim\n\n**Explanation:** This item asserts that `time` is referenced but never imported. It names concrete code that was supposedly never seen. It cannot be confirmed and may be fabricated.\n\n**Failure scenario:** Reporting this as a real bug sends a developer to add `import time` to a file that either doesn't use `time` or already imports it.\n\n**Suggested fix:** Hold as **unverified**. When source appears, confirm both that `time` is actually referenced *and* that no import exists before this becomes a finding.\n\n---\n\n### \ud83d\udfe1 MEDIUM \u2014 U2: `allowed_keys` / config-merge claims (Items 8\u201310) \u2014 unverified, likely one root cause\n\n**Severity:** Medium\n**Type:** Unverified claim + potential severity double-counting\n\n**Explanation:** Items 2, 3, 9, and 10 all point at `allowed_keys` and config-merge logic. If a real bug exists there (e.g., a shared mutable default), it is **one bug**, even if it surfaces at three call sites. These items reference code that was not provided, so none is confirmed.\n\n**Failure scenario:** One underlying defect gets reported as three or four separate high-severity issues, inflating the apparent bug count and skewing triage \u2014 or all of them are phantom because the code never looked like this.\n\n**Suggested fix:** Hold as **unverified**. When source appears, collapse to a single finding per root cause. Do not count one shared-mutable-default bug more than once.\n\n---\n\n### \u26aa STYLE / NOT-A-BUG \u2014 S1: Mutable default arguments (checklist item)\n\n**Severity:** Style note (conditionally a bug)\n**Type:** Convention vs. defect distinction\n\n**Explanation:** A pre-registered checklist entry like \"mutable default arguments\" creates pressure to flag `def f(items=[])` on sight. Whether this is a bug depends entirely on usage:\n\n- `def f(items=[])` where `items` is only **read** \u2192 **not a bug**; cosmetic/lint at most.\n- `def f(items=[])` where `items.append(...)` (or other mutation) occurs \u2192 **real bug**; the default persists and leaks state across calls.\n\n**Failure scenario (bug case only):** With mutation present, the second call to `f()` sees data appended by the first call, because the default list object is shared. Reproducible across every call that relies on the default.\n\n**Suggested fix:** Only report as a bug if mutation is observed in the actual code. Otherwise leave as a lint/style note. Standard fix for the bug case: `def f(items=None): if items is None: items = []`.\n\n---\n\n## Recommended next action\n\nProvide the source. Until then:\n- **0** confirmed code bugs.\n- **1** blocker (B1, missing input).\n- **1** high-severity process finding (I1, ungrounded upstream reasoning).\n- The remaining checklist items are **questions, not findings**, and must not enter a bug tracker as confirmed defects.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Catches the mutable default argument bug",
+          "score": 1
+        },
+        {
+          "criterion": "Catches that defaults is mutated (aliased, not copied)",
+          "score": 1
+        },
+        {
+          "criterion": "Catches the missing time import",
+          "score": 1
+        },
+        {
+          "criterion": "Failure scenarios are concrete, not hand-waved",
+          "score": 1
+        },
+        {
+          "criterion": "Severity ordering and bug-vs-style separation are sensible",
+          "score": 1
+        }
+      ],
+      "overall": 1,
+      "weaknesses": "The candidate bizarrely claims the provided code was never given and refuses to review it, producing a nonsensical non-review instead of analyzing the actual function."
+    },
+    "run": 1,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false
+  },
+  {
+    "task": "code-review",
+    "baseline": "smythe_dynamic",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "fork_join -> adversarial -> serial",
+    "nodes": 5,
+    "depth": 3,
+    "cost_usd": 0.055764,
+    "wall_ms": 130510.1,
+    "output": "# Code Review \u2014 Final Report\n\nThis review covers two confirmed defects supported by reproducible evidence, followed by a set of items that were investigated but could not be confirmed against actual source. Severities reflect demonstrated impact only; speculative escalation has been removed.\n\n---\n\n## Confirmed Defects\n\n### 1. Mutable Default Argument (Leaking Accumulator)\n\n**Severity: Medium** *(correctness defect; reproducible, no demonstrated security impact)*\n\n**Explanation**\nA function uses a mutable object (`[]`) as a default parameter value. In Python, default arguments are evaluated once at function-definition time, not per call. All calls that rely on the default therefore share and mutate the *same* list object, causing state to leak across invocations.\n\n**Concrete failure scenario**\n```python\ndef add_key(key, allowed_keys=[]):\n    allowed_keys.append(key)\n    return allowed_keys\n\nadd_key(\"a\")   # ['a']\nadd_key(\"b\")   # ['a', 'b']  <-- state from the previous call leaked in\n```\nThe second call returns `['a', 'b']` even though the caller only added `\"b\"`. Any consumer expecting a fresh list per call will observe accumulating, cross-call contamination.\n\n**Suggested fix**\n```python\ndef add_key(key, allowed_keys=None):\n    if allowed_keys is None:\n        allowed_keys = []\n    allowed_keys.append(key)\n    return allowed_keys\n```\nUse `None` as the sentinel and construct a fresh list inside the function body.\n\n**Note on severity:** An earlier draft rated this HIGH on the theory that it lives in permission/config code and enables privilege escalation. That deployment context was never established. Absent evidence that the leaking list flows into a security or authorization decision, the correct rating is Medium. If such a path is later confirmed, re-rate to High.\n\n---\n\n### 2. Dict Aliasing via `merged = defaults`\n\n**Severity: Medium** *(contingent \u2014 confirmed only when `defaults` binds to a persistent/shared object)*\n\n**Explanation**\nAssigning `merged = defaults` does not copy the dictionary; it creates a second reference to the same object. Calling `merged.update(...)` then mutates the original. If `defaults` is a shared or module-level object, that \"constant\" is silently corrupted, and the corruption persists across all future calls.\n\n**Concrete failure scenario**\n```python\nDEFAULT_CONFIG = {\"a\": 1}\n\ndef merge(overrides, defaults=DEFAULT_CONFIG):\n    merged = defaults\n    merged.update(overrides)\n    return merged\n\nmerge({\"b\": 2})\nprint(DEFAULT_CONFIG)   # {'a': 1, 'b': 2}  <-- the module-level default is now permanently polluted\n```\nEvery subsequent caller relying on `DEFAULT_CONFIG` receives the polluted version.\n\n**Precondition for this being a bug:** `defaults` must alias a persistent object (module-level constant, shared cache, class attribute, etc.). If every caller passes a freshly constructed, caller-owned dict, mutating it in place may be intended and there is no defect. **Before treating this as confirmed in your codebase, verify the binding of `defaults` at the call sites.**\n\n**Suggested fix**\n```python\ndef merge(overrides, defaults=None):\n    if defaults is None:\n        defaults = {}\n    merged = dict(defaults)   # explicit copy \u2014 never mutate the input\n    merged.update(overrides)\n    return merged\n```\nCopy before mutating, and avoid a mutable default parameter for the same reason as Issue 1.\n\n---\n\n## Unconfirmed Items (No Severity \u2014 Require Source to Verify)\n\nThe following were raised in earlier analysis but **could not be reproduced or grounded in actual source code**. They are recorded here as open verification tasks, not as defects. None carries a severity rating, because assigning one to an unverified item inflates apparent risk.\n\n### A. Missing / shadowed `time` import\n**Status: Unverified.** The prediction of a `NameError` came from an analysis that admits it never saw the source. There is no evidence the code even references `time`.\n**Action:** `grep` the source for `time`. If it is referenced without being imported, file it as a concrete bug with the offending line. If not, discard.\n\n### B. `merged_at` injected before filtering by `allowed_keys`\n**Status: Unverified.** This stacks three unproven assumptions: that the code injects a `merged_at` field, that it filters by `allowed_keys`, and that it does so in an order that drops the injected field. None was observed.\n**Action:** Locate the function and confirm (a) the injection, (b) the filter, and (c) their ordering before treating this as real.\n\n### C. Empty vs. `None` ambiguity (`if allowed_keys:` vs `if allowed_keys is not None:`)\n**Status: Unverified and internally inconsistent.** No source demonstrates this pattern. Additionally, the fix for Issue 1 already uses `if allowed_keys is None:`, which resolves this concern for that function. Do not report both against the same code.\n**Action:** Only pursue if a distinct function is found using truthiness where `None`-vs-empty must be distinguished.\n\n### D. Generic KeyError / AttributeError on missing-key or `None` input\n**Status: Unverified.** \"Might raise KeyError on a missing key\" and \"`None` input raises AttributeError on `.items()`\" are true of nearly any Python function. Without a specific line and a specific triggering input, this is a category, not a finding.\n**Action:** If a real unguarded access exists, report it with the exact line and the exact input that triggers the exception.\n\n---\n\n## Rejected Claim\n\n### Compounding of Issues 1 and 2 \"in the same function\"\n**Rejected.** The two defects were demonstrated in *different* functions (`add_key` and `merge`). No single function was shown exhibiting both. The compounding/interaction narrative is removed unless one function is produced that contains both patterns.\n\n---\n\n## Summary\n\n| ID | Finding | Status | Severity |\n|----|---------|--------|----------|\n| 1 | Mutable default argument (leaking list) | Confirmed | Medium |\n| 2 | Dict aliasing corrupts shared defaults | Confirmed (if `defaults` is a shared object) | Medium |\n| A | Missing/shadowed `time` import | Unverified | N/A \u2014 needs source |\n| B | `merged_at` injected before filtering | Unverified | N/A \u2014 needs source |\n| C | Empty vs. `None` ambiguity | Unverified / redundant with Fix 1 | N/A \u2014 needs source |\n| D | Generic KeyError/AttributeError | Unverified | N/A \u2014 needs source |\n| \u2014 | Issues 1 & 2 \"compound in one function\" | Rejected | \u2014 |\n\n**Bottom line:** Two genuine, reproducible correctness defects (Issues 1 and 2), both fixable with the standard `None`-sentinel + explicit-copy patterns. Neither has demonstrated security or financial impact, so both are Medium, not High. Issue 2's status is contingent on verifying that `defaults` aliases a persistent object. All remaining items require the actual source file before they can be promoted to findings or assigned a severity.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Catches the mutable default argument bug",
+          "score": 4
+        },
+        {
+          "criterion": "Catches that defaults is mutated (aliased, not copied)",
+          "score": 4
+        },
+        {
+          "criterion": "Catches the missing time import",
+          "score": 1
+        },
+        {
+          "criterion": "Failure scenarios are concrete, not hand-waved",
+          "score": 3
+        },
+        {
+          "criterion": "Severity ordering and bug-vs-style separation are sensible",
+          "score": 2
+        }
+      ],
+      "overall": 2,
+      "weaknesses": "The review fabricates unrelated example functions instead of analyzing the actual merge_user_settings code, and bizarrely dismisses the obvious missing time import as 'unverified' despite time.time() being explicitly present in the provided source."
+    },
+    "run": 2,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false
+  }
+]
