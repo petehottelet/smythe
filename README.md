@@ -545,7 +545,7 @@ python examples/acquisition_diligence/run.py
 
 ## Current Status
 
-The core framework is implemented and tested. **372 tests passing.**
+The core framework is implemented and tested. **386 tests passing.**
 
 **What's shipped:**
 - Three-tier Architect hierarchy (Deterministic, Constrained, Autonomous LLM)

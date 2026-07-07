@@ -21,29 +21,45 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
+Future work tracked in [ROADMAP.md](ROADMAP.md).
+
+---
+
+## [0.4.0] - 2026-07-07
+
+Evidence. This release is what the benchmark campaign found and fixed:
+every number, loss, and null result is published in `benchmarks/`.
+No breaking API changes.
+
 ### Fixed
 
-- **Root nodes now receive the task payload.** The Architect saw the full
-  task when planning, but generated node labels rarely reproduce its
-  payload (source code, documents, data) — so specialists worked from a
-  one-line label and the material never entered the graph. `Swarm.plan()`
-  stamps the goal and constraints into root nodes; downstream nodes
-  inherit it through dependency results. Benchmarked: dynamic-topology
-  code review scored 1.7/10 without this because no node ever saw the
-  code under review.
+- **Every node now receives the task payload.** The Architect saw the
+  full task when planning, but generated node labels rarely reproduce
+  its payload (source code, documents, data) — so specialists worked
+  from a one-line label and the material never entered the graph, and
+  verifier nodes hedged claims about artifacts they couldn't see.
+  `Swarm.plan()` stamps the goal and constraints into each node's
+  metadata. Measured: dynamic-topology code review went 1.7/10 →
+  9.0/10 across this fix (roots first, then all nodes).
 - **Terminal nodes are told their output is the deliverable.** Final
   nodes tended to reference or summarize upstream findings instead of
   reproducing them, so specifics were lost from the returned result.
+- **The Architect right-sizes graphs.** Cost-aware node-count guidance
+  in the planning prompt; single-artifact tasks dropped from 5-node
+  fork-joins to 3-node serial-adversarial graphs (−45% cost on code
+  review, quality flat).
 
 ### Added
 
-- Benchmark harness hardening: `--runs N` repeats with mean/range
-  reporting, an independent judge model (different from the executor, to
-  reduce self-preference bias), ablation flags for both executor fixes,
-  and source documents for the acquisition-diligence task. First
-  self-baseline results published in `benchmarks/`.
-
-Future work tracked in [ROADMAP.md](ROADMAP.md).
+- Benchmark harness: `--runs N` repeats with mean/range reporting, an
+  independent judge model (different from the executor, to reduce
+  self-preference bias), ablation flags for the executor fixes, and
+  source documents for the acquisition-diligence task.
+- Memory A/B benchmark (`benchmarks/run_memory_ab.py`) with observable
+  recall wiring; first memory-on/off numbers published (null on a
+  homogeneous task family — see `benchmarks/README.md`).
+- Full benchmark results: the v2→v5 progression, raw records, and
+  judge reasoning committed under `benchmarks/results/`.
 
 ---
 
