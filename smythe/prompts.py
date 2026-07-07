@@ -64,7 +64,13 @@ Respond with **only** a JSON object — no prose, no markdown fences.
 2. `depends_on` lists node IDs that must complete before this node starts.  \
    The graph must be acyclic.
 3. Keep graphs shallow — depth <= 5 levels.
-4. Prefer 2–8 nodes.  A single-node graph is acceptable for trivial tasks.
+4. Right-size the graph: every node costs money and latency, so add one \
+   only when it contributes a distinct work product the deliverable needs. \
+   Tasks with a single deliverable rarely need more than 4-5 nodes. \
+   Fan out in parallel only when the branches produce genuinely \
+   independent analyses; do not split one analysis into thin slices. \
+   A single-node graph is acceptable for trivial tasks; 8 nodes is the \
+   ceiling for complex ones.
 5. Give each agent a meaningful `persona` that guides its behaviour.
 6. Assign `capabilities` tags that describe the agent's expertise.
 7. For fork-join: create parallel root nodes and a join node that depends on all of them.
