@@ -1,0 +1,384 @@
+[
+  {
+    "task": "product-launch",
+    "baseline": "single_agent",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 1,
+    "depth": 0,
+    "cost_usd": 0.00525,
+    "wall_ms": 28923.7,
+    "output": "# Lumen Launch Plan\n\n**Product:** Lumen \u2014 Smart Reading Lamp with Circadian Color Temperature\n**Price:** $79\n\n---\n\n## 1. Positioning\n\n**One-line positioning:**\n*\"Lumen automatically shifts its light to match your day \u2014 bright and focused by morning, warm and calming by night \u2014 so you read better and sleep easier.\"*\n\n**Target audience:**\n- Primary: Knowledge workers and avid readers (25\u201345) who care about focus, sleep quality, and thoughtful home design.\n- Secondary: Parents seeking healthier evening routines; wellness-minded consumers already using sleep/circadian products.\n\n**Category framing:** Position at the intersection of *smart home* and *wellness* \u2014 not just another smart bulb, but a purpose-built reading companion.\n\n**Key differentiators:**\n- **Automatic** circadian adjustment (set-and-forget vs. manual smart bulbs).\n- **Purpose-built for reading** \u2014 optimized brightness, glare-free design.\n- **Approachable price** ($79) vs. premium circadian lighting ($150+).\n\n**Proof points to develop:** Sleep-science backing on color temperature, designer-quality build, simple no-app-required setup.\n\n---\n\n## 2. Launch Channels\n\n| Channel | Role | Priority |\n|---|---|---|\n| **DTC website (Shopify)** | Primary conversion + margin control | High |\n| **Email list / waitlist** | Warm launch audience, day-1 sales | High |\n| **Instagram / TikTok (organic + paid)** | Visual demo of light shift; lifestyle appeal | High |\n| **Micro-influencers** (booktok, wellness, home) | Authentic demos, social proof | High |\n| **PR / product blogs** (Verge, Wirecutter, gadget press) | Credibility + reach | Medium |\n| **Amazon listing** | Capture search demand | Medium (launch week 2) |\n| **Reddit / niche communities** (r/gadgets, r/sleep) | Word of mouth | Low-Medium |\n\n---\n\n## 3. Two-Week Launch Timeline\n\n### Week 1 \u2014 Build & Prime\n- **Day 1\u20132:** Finalize landing page, product photography/video (showing color shift over a day), and pricing page. Set up analytics + tracking.\n- **Day 2\u20133:** Send waitlist teaser email (\"Launching in 5 days \u2014 early-bird pricing\"). Seed products to 8\u201312 micro-influencers with usage briefs.\n- **Day 3\u20134:** Prep PR: send embargoed press kit to target outlets. Draft social content calendar (demo reels, testimonials).\n- **Day 5:** \"24 hours to launch\" email + social countdown. Confirm inventory and fulfillment readiness.\n\n### Week 2 \u2014 Launch & Amplify\n- **Day 6 (Launch Day):** Site goes live. Launch email blast with early-bird discount (first 48 hrs). Post hero demo across social. Influencers publish coordinated content.\n- **Day 7:** PR embargo lifts \u2014 coverage goes live. Boost best-performing organic posts with paid spend.\n- **Day 8\u20139:** Retarget site visitors; send abandoned-cart and \"early-bird ending\" reminders.\n- **Day 10:** Launch Amazon listing to capture search-driven demand; publish user testimonials/UGC.\n- **Day 11\u201313:** Scale winning paid ads; second influencer wave; share social proof + press logos.\n- **Day 14:** Wrap-up push email; review metrics (CAC, conversion, sell-through) and plan sustained campaign.\n\n---\n\n## 4. Top Three Risks & Mitigations\n\n**Risk 1: \"Just another smart bulb\" \u2014 differentiation fails to land.**\n- *Mitigation:* Lead all creative with the automatic day-to-night shift shown visually (time-lapse video). Anchor messaging in reading + sleep benefit, not features. Emphasize no-app simplicity as contrast to fiddly smart-home products.\n\n**Risk 2: Price resistance at $79 for a single lamp.**\n- *Mitigation:* Use early-bird pricing/anchor discount to drive urgency at launch. Justify value with sleep-science proof and premium build. Offer 30-day risk-free trial to lower purchase hesitation.\n\n**Risk 3: Inventory / fulfillment can't keep pace with demand (or under-demand wastes ad spend).**\n- *Mitigation:* Set a capped early-bird quantity to match confirmed stock and create urgency. Monitor sell-through daily; throttle paid spend up or down based on real-time conversion and inventory levels. Have backorder/pre-order flow ready as a fallback.\n\n---\n\n**Success metrics:** Units sold, conversion rate, CAC vs. $79 price, email\u2192purchase rate, press pickups, and cost-per-acquisition trend across the two weeks.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Positioning specific to product",
+          "score": 8
+        },
+        {
+          "criterion": "Channel choices justified against budget and team size",
+          "score": 3
+        },
+        {
+          "criterion": "Timeline concrete, dated, sequenced, two weeks",
+          "score": 8
+        },
+        {
+          "criterion": "Risks are real with actionable mitigations",
+          "score": 8
+        },
+        {
+          "criterion": "Every channel has measurable success criterion",
+          "score": 3
+        }
+      ],
+      "overall": 5,
+      "weaknesses": "No budget or team size is ever mentioned to justify channel choices, and success metrics are lumped generically at the end rather than tied to each channel."
+    },
+    "run": 0,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "product-launch",
+    "baseline": "single_agent",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 1,
+    "depth": 0,
+    "cost_usd": 0.00492,
+    "wall_ms": 27055.3,
+    "output": "# Lumen Launch Plan\n### Smart Reading Lamp | $79 | Adaptive Color Temperature\n\n---\n\n## 1. Positioning\n\n**One-liner:** *Lumen is the reading lamp that shifts with your day\u2014warm and easy at night, crisp and focused by day\u2014so your eyes and sleep stay in sync.*\n\n**Target audience:**\n- **Primary:** Knowledge workers & avid readers, 28\u201345, who care about wellness/sleep quality and have a home office or bedside reading setup.\n- **Secondary:** Gift buyers (parents, students, remote workers).\n\n**Category framing:** Not a \"smart lamp\" for gadget lovers\u2014a **wellness-driven reading light** for people who feel screen/light fatigue.\n\n**Key differentiators:**\n| Attribute | Lumen | Typical smart lamps |\n|-----------|-------|--------------------|\n| Auto color-temp by time of day | \u2705 Automatic | Manual/app-only |\n| Price | $79 | $120\u2013200 |\n| Setup | Plug & go | App-heavy |\n\n**Core message pillars:**\n1. **Sleep-friendly** \u2014 cools blue light at night automatically.\n2. **Effortless** \u2014 adapts on its own, no fiddling.\n3. **Affordable premium** \u2014 the smart-light experience at half the price.\n\n---\n\n## 2. Launch Channels\n\n**Owned**\n- Product landing page with pre-order / early-bird pricing.\n- Email list (waitlist \u2192 launch \u2192 post-launch nurture).\n\n**Earned**\n- Outreach to sleep/wellness and home-office reviewers/newsletters.\n- PR angle: \"the lamp that respects your circadian rhythm.\"\n\n**Paid**\n- Meta/Instagram (visual demo of warm\u2192cool transition; lookalike + interest targeting on sleep, reading, WFH).\n- Google Search on \"reading lamp,\" \"warm light lamp,\" \"sleep-friendly lamp.\"\n- Short-form video (TikTok/Reels/Shorts) showing the time-lapse effect.\n\n**Marketplace**\n- Amazon listing live at launch (many buyers search there first).\n\n**Partnerships/Influencers**\n- Micro-influencers in productivity, cozy home, and sleep niches for demo content and unboxings.\n\n---\n\n## 3. Two-Week Timeline\n\n**Week 1 \u2014 Prime & Build Anticipation**\n| Day | Action |\n|-----|--------|\n| 1 | Launch waitlist page; send teaser to existing list |\n| 2 | Ship review units to press/influencers; brief them |\n| 3 | Publish \"science of light & sleep\" blog + social teasers |\n| 4 | Finalize Amazon listing; QA landing page & checkout |\n| 5 | Early-bird pre-order opens to waitlist (limited discount) |\n| 6\u20137 | Run warm-up paid ads (video demo); collect UGC |\n\n**Week 2 \u2014 Launch & Amplify**\n| Day | Action |\n|-----|--------|\n| 8 | **Public launch:** ads live, Amazon live, PR embargo lifts |\n| 9 | Influencer content goes out; retarget waitlist non-buyers |\n| 10 | Email #2 with social proof / early reviews |\n| 11 | Scale winning ad creatives; add Google Search budget |\n| 12 | Mid-launch review of metrics; kill underperformers |\n| 13 | \"Ending soon\" urgency email + last influencer push |\n| 14 | Early-bird pricing ends; recap, gather reviews, plan restock |\n\n---\n\n## 4. Top Three Risks & Mitigations\n\n**Risk 1 \u2014 \"Smart lamp\" skepticism / perceived gimmick.**\n- *Mitigation:* Lead with the sleep/eye-health benefit (not \"smart features\"). Use before/after demo video and cite circadian-light research to build credibility.\n\n**Risk 2 \u2014 Inventory stockout or overstock.**\n- *Mitigation:* Use waitlist pre-orders to gauge true demand before committing large stock; set a soft cap on early-bird units; keep a rapid restock trigger with the supplier.\n\n**Risk 3 \u2014 Weak ad economics (CAC > margin at $79).**\n- *Mitigation:* Test creatives during Week 1 warm-up before spending big; prioritize high-intent Search + retargeting; add an accessory/2-pack upsell to raise AOV and protect margin.\n\n---\n\n**Success metrics to watch:** pre-order conversion rate, CAC vs. contribution margin, landing-page conversion, review volume/rating, and sell-through vs. inventory.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Positioning specific to product",
+          "score": 7
+        },
+        {
+          "criterion": "Channel choices justified against budget and team size",
+          "score": 3
+        },
+        {
+          "criterion": "Timeline concrete, dated, sequenced, two weeks",
+          "score": 8
+        },
+        {
+          "criterion": "Risks are real with actionable mitigations",
+          "score": 8
+        },
+        {
+          "criterion": "Every channel has measurable success criterion",
+          "score": 4
+        }
+      ],
+      "overall": 6,
+      "weaknesses": "The plan never states budget or team size, so channel choices aren't actually justified against constraints, and success metrics are listed generically rather than tied to each channel."
+    },
+    "run": 1,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "product-launch",
+    "baseline": "single_agent",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 1,
+    "depth": 0,
+    "cost_usd": 0.005004,
+    "wall_ms": 26473.6,
+    "output": "# Lumen Launch Plan\n\n**Product:** Smart reading lamp, $79, auto-adjusts color temperature to time of day\n\n---\n\n## 1. Positioning\n\n**Core promise:** *\"Light that keeps your body clock in sync \u2014 automatically.\"*\n\n**Positioning statement:**\nFor focused readers and remote workers who care about sleep and eye comfort, Lumen is the reading lamp that automatically shifts from cool, alert daylight to warm, wind-down evening tones \u2014 so you never think about your lighting again.\n\n**Key differentiators:**\n- **Automatic, not manual** \u2014 competitors require app fiddling; Lumen just works on a circadian schedule.\n- **Health-adjacent, not gimmicky** \u2014 anchored to sleep quality and eye strain, not \"smart home\" novelty.\n- **Accessible premium** \u2014 $79 sits below high-end circadian lamps ($150+) but above commodity LEDs.\n\n**Target segments (priority order):**\n1. Remote workers / knowledge workers (desk-bound, screen-fatigued)\n2. Avid readers / students\n3. Wellness-oriented consumers (sleep hygiene enthusiasts)\n\n---\n\n## 2. Launch Channels\n\n| Channel | Role | Priority |\n|---|---|---|\n| **Owned email list** | Warm audience, day-one sales | High |\n| **DTC website / landing page** | Conversion hub | High |\n| **Instagram + TikTok (organic + paid)** | Visual demo of light shift, lifestyle | High |\n| **Micro-influencers** (productivity, reading, wellness niches) | Credibility + reach | High |\n| **PR / product blogs** (gadget, wellness outlets) | Third-party validation | Medium |\n| **Reddit / niche communities** (r/BuyItForLife, book clubs) | Authentic word-of-mouth | Medium |\n| **Amazon listing** | Capture search-intent buyers | Medium (later) |\n\n---\n\n## 3. Two-Week Timeline\n\n**Week 1 \u2014 Build anticipation**\n- **Day 1\u20132:** Finalize landing page, email sequence, ad creative. Confirm inventory & fulfillment.\n- **Day 3:** Seed product to 8\u201312 micro-influencers with usage guidelines and launch date embargo.\n- **Day 4:** Tease email to list (\"Something's coming\"). Begin organic social teasers (light-shift time-lapse video).\n- **Day 5\u20136:** Media outreach \u2014 send PR kit to target outlets with embargo.\n- **Day 7:** Open early-access/waitlist for existing subscribers; offer a launch-day discount lock-in.\n\n**Week 2 \u2014 Launch and amplify**\n- **Day 8 (LAUNCH):** Go live. Send launch email, publish landing page, influencers post simultaneously, PR embargo lifts.\n- **Day 9:** Turn on paid social (retargeting waitlist + lookalikes). Push best-performing creative.\n- **Day 10\u201311:** Share early reviews / UGC. Engage Reddit/community posts.\n- **Day 12:** Mid-launch email \u2014 social proof + urgency (limited launch pricing).\n- **Day 13:** Optimize ads; kill underperformers, scale winners.\n- **Day 14:** \"Launch pricing ends\" final push email + social. Recap results internally.\n\n---\n\n## 4. Top Three Risks & Mitigations\n\n**Risk 1: \"Just a lamp\" \u2014 value not obvious at $79**\nBuyers may not grasp why automatic color temperature is worth the premium.\n- *Mitigation:* Lead all creative with a side-by-side time-lapse showing the light shift; frame benefit as sleep/eye health, not features. Add a 30-day money-back guarantee to lower purchase risk.\n\n**Risk 2: Inventory / fulfillment strain from concentrated launch demand**\nA two-week spike can cause stockouts or shipping delays that damage reviews.\n- *Mitigation:* Set a clear launch quantity cap; use waitlist to forecast demand. Prepare a \"next batch\" backorder flow with transparent ship dates rather than hiding sold-out status.\n\n**Risk 3: Weak conversion if audience is cold / ads underperform**\nPaid channels may not deliver efficient CAC in a short window.\n- *Mitigation:* Anchor launch to warm owned audience (email + waitlist) for guaranteed day-one sales. Use influencer content as ad creative for authenticity, and set daily spend/CAC thresholds to cut losses fast.\n\n---\n\n**Success metrics:** Units sold, conversion rate, CAC vs. $79 price point, email open/click rates, and early review sentiment.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Positioning is specific to the product, not generic marketing copy",
+          "score": 7
+        },
+        {
+          "criterion": "Channel choices are justified against the budget and team size",
+          "score": 3
+        },
+        {
+          "criterion": "Timeline is concrete: dated, sequenced, two weeks",
+          "score": 8
+        },
+        {
+          "criterion": "Risks are real launch risks with actionable mitigations",
+          "score": 7
+        },
+        {
+          "criterion": "Every channel has a measurable success criterion",
+          "score": 3
+        }
+      ],
+      "overall": 5,
+      "weaknesses": "No budget or team-size context is given or referenced, and channel-specific success metrics are missing (only a generic global metrics list at the end)."
+    },
+    "run": 2,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "product-launch",
+    "baseline": "fixed_pipeline",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 3,
+    "depth": 2,
+    "cost_usd": 0.044949,
+    "wall_ms": 143746.8,
+    "output": "# Lumen Launch Plan\n\n**Product:** Lumen \u2014 a $79 smart reading lamp that automatically adjusts color temperature to match the time of day (warm/amber in evening, cool/bright at midday).\n\n**Team:** 2 people.\n**Budget:** $25,000.\n**Window:** 2 weeks of execution.\n\n---\n\n## 0. Prerequisites \u2014 Verify Before Spending a Dollar\n\nThis plan is executable **only if all four conditions below are true.** Each is cheap to confirm (internal knowledge + ~30 minutes of competitor research). If any fails, follow the fallback noted.\n\n| # | Must be true | How to verify | If false |\n|---|---|---|---|\n| 1 | **A usable email/waitlist exists** (our cheapest, highest-ROI conversion channel) | Check ESP/CRM for list size and engagement | Shift budget weight to paid + Product Hunt; expect lower conversion and higher CAC |\n| 2 | **Inventory is manufactured and in-hand** for fulfillment | Confirm warehouse stock + shipping SOP | Convert to a **pre-order** launch (adjust messaging, extend timeline, disclose ship dates) |\n| 3 | **\"Automatic\" adjustment is genuinely differentiated** vs. competitors (most support *scheduling*; do any adjust *automatically by default*?) | 30-min competitor audit (Hue, generic Amazon lamps) | Re-anchor the headline on a verified differentiator before launch |\n| 4 | **Unit economics are known:** gross margin, CAC ceiling, break-even | Pull COGS + fulfillment + payment costs | **Do not run paid** until a CAC ceiling exists \u2014 see \u00a75 |\n\n> **Contingency date:** If inventory or launch assets are not genuinely ready on Day 1, **push the launch date.** A rushed launch of a trust-dependent physical product with zero reviews is the highest-regret path. Speed does not beat proof for a $79 unknown brand.\n\n---\n\n## 1. Positioning\n\n**The core challenge:** At $79, Lumen sits above impulse territory for an unknown brand. Buyers pay $79+ for Philips Hue because of brand trust \u2014 Lumen has none yet. The circadian angle is real and evidence-based, but it's an **educational sell**, which requires more convincing touches. We compensate for the trust deficit with proof, guarantee, and a human founder story.\n\n**Positioning statement:**\n> *Lumen is the reading lamp that thinks about your eyes and your sleep, so you don't have to. It automatically shifts from bright, focused daylight to warm evening light as the day goes on \u2014 no apps to fiddle with, no schedules to set.*\n\n**Primary message (hero):** \"The light that adjusts itself.\" \u2014 leads on *automatic*, the differentiator (pending \u00a70.3 verification).\n\n**Secondary messages:**\n- **Effortless:** Set-and-forget; no daily app tinkering.\n- **Designed for how your eyes and body work:** warm light in the evening, cool light for daytime focus.\n- **Risk-free:** Founder-backed, 30-day money-back guarantee.\n\n**Compliance guardrail (mandatory):** Use **\"designed to support\"** and **\"aligned with your natural rhythm\"** \u2014 **never** \"improves your sleep,\" \"cures,\" or clinical claims. The sharper the health claim, the greater the legal exposure. All copy reviewed against this before publishing.\n\n**What we deliberately do NOT do:**\n- No open-ended discounting (trains buyers to wait, erodes the $79 anchor). A **time-boxed launch offer only.**\n- No competing on price with generics or on brand with Hue. We win on *automatic + effortless + guaranteed*.\n\n---\n\n## 2. Launch Channels \u2014 Exactly Three\n\nA two-person team cannot run six channels in two weeks without becoming so fragile that a single sick day or fulfillment fire collapses the launch. We run **three channels well** rather than six poorly.\n\n**RUN:**\n1. **Email / Waitlist** *(assumes \u00a70.1 true)* \u2014 highest ROI, warmest audience, cheapest conversions. Carries the launch.\n2. **Paid Social** (Meta/Instagram + short-form video) \u2014 demo-driven creative showing the light shifting warm\u2192cool. Governed by a hard CAC ceiling (\u00a75).\n3. **Product Hunt** \u2014 one-day credibility + traffic spike; free.\n\n**DROP for launch (stated trade-off, not a silent omission):**\n- **PR** \u2014 2\u20133 week lead time makes it nearly impossible in this window.\n- **Amazon** \u2014 forgoes high-intent buyers, but splits scarce ops attention. Add post-launch.\n\n*Trade-off accepted:* We forgo Amazon's purchase-intent traffic and PR's credibility halo in exchange for executable focus. This is the correct call at this capacity.\n\n**Role split:**\n- **Person A (Creative/Growth):** ad creative, email sequences, Product Hunt asset + hunter outreach, UGC coordination.\n- **Person B (Paid/Ops):** ad campaign build & daily optimization, landing page, fulfillment readiness, customer support.\n\n---\n\n## 3. The Trust Fix: Pre-Build Social Proof\n\n**The problem:** Our main conversion lever is social proof \u2014 and a new product has none. You cannot show reviews you don't have. This is addressed *before* launch, not after.\n\n**Action (Week 1):** Seed **15\u201325 review/UGC units** via pre-shipped units to micro-influencers, early testers, and founder network. Target: real photos, short video clips, and star ratings **live on the landing page and ad creative by launch day.**\n\n**Also lead with the founder story** \u2014 a human, credible face compensates for absent brand trust far better than polished-but-anonymous marketing.\n\n---\n\n## 4. Two-Week Timeline\n\nTreat these two weeks as **launch execution, not launch build.** Assets and inventory must be ready Day 1 (see \u00a70).\n\n### Week 1 \u2014 Prep & Proof\n| Day | Person A (Creative/Growth) | Person B (Paid/Ops) |\n|---|---|---|\n| **Mon** | Finalize hero message + founder story; ship UGC units to 15\u201325 seeders | Build/QA landing page; confirm inventory & fulfillment SOP |\n| **Tue** | Draft 3 ad creatives (demo video priority) + email sequence (3 emails) | Set up ad accounts, pixels, tracking; define CAC ceiling & kill-switch |\n| **Wed** | Product Hunt asset prep; recruit hunter + build day-of supporter list | Load products, test checkout end-to-end, test refund flow |\n| **Thu** | Collect + edit incoming UGC/reviews; place on landing page | Launch **small paid test** ($500\u20131K) to validate CPA before scale |\n| **Fri** | Warm-up email to waitlist (\"launching Tuesday\"); finalize creatives | Review test CPA vs. ceiling; adjust targeting/creative; confirm go/no-go |\n| **Wknd** | Buffer / slack day (protects against a single hiccup) | Buffer / slack day |\n\n### Week 2 \u2014 Launch & Optimize\n| Day | Person A | Person B |\n|---|---|---|\n| **Mon** | Final Product Hunt prep; schedule launch-day supporter pings | Pre-flight all campaigns; confirm stock levels |\n| **Tue** | **PRODUCT HUNT LAUNCH** + Email #1 (launch + time-boxed offer) | Scale paid to full budget within CAC ceiling; monitor CPA hourly |\n| **Wed** | Engage PH comments; push UGC in social | Optimize/pause underperforming ad sets |\n| **Thu** | Email #2 (social proof + guarantee reminder) | **Kill-switch check:** pause any campaign exceeding CAC ceiling |\n| **Fri** | Respond to reviews; refresh top creative | Reallocate budget to winning ad sets |\n| **Wknd** | Monitor; light engagement | Support queue; fulfillment check |\n| **Mon (wrap)** | Email #3 (last call \u2014 offer ends) | Final CAC/revenue reconciliation vs. targets |\n\n---\n\n## 5. Guardrails & Success Metrics\n\n**Before paid launches, set these numbers:**\n- **Gross margin per unit** \u2014 determines how much CAC/discount/guarantee cost the plan can absorb (a guarantee is cheap at 60% margin, ruinous at 20%).\n- **CAC ceiling** \u2014 the max acceptable cost per sale on paid. Validated by the Week 1 Thursday test.\n- **Break-even units** and a **launch success target** (units and/or revenue) \u2014 without a target, per-channel metrics are inputs with no goal.\n- **Refund/return exposure** \u2014 budget for return shipping on a guarantee-backed physical product.\n\n**Kill-switch rule:** Pause any paid campaign exceeding the CAC ceiling by mid-Week 2 rather than spending budget to zero.\n\n**Suggested budget split** *(assuming email list exists)*:\n- Paid social: **$16\u201318K** (bulk of spend, CAC-governed)\n- UGC/seeding units + micro-influencer: **$3\u20134K**\n- Contingency reserve: **$3\u20134K** (do not pre-commit)\n\n---\n\n## 6. Top Three Risks & Mitigations\n\n### Risk 1 \u2014 Demand/Conversion at $79 (HIGH probability \u00d7 HIGH impact)\nThe most likely way this launch fails *quietly*: money spent, few sales, no obvious culprit. $79 is above impulse for an unknown brand, and the circadian benefit is an educational sell requiring multiple touches.\n**Mitigations:**\n- Pre-build 15\u201325 social-proof units live at launch (\u00a73).\n- Lead with founder story + **30-day money-back guarantee** to offset zero brand trust.\n- Enforce a **hard CAC ceiling + kill-switch** (\u00a75) \u2014 never spend blindly.\n- **Time-boxed** launch offer only \u2014 protects price integrity.\n\n### Risk 2 \u2014 Two-Person Execution Fragility (HIGH probability \u00d7 MEDIUM\u2013HIGH impact)\nSix channels across two people in two weeks is unrealistic; one sick day breaks it.\n**Mitigations:**\n- Cut to **exactly 3 channels** (\u00a72) \u2014 Email, Paid Social, Product Hunt.\n- Clear role split; **weekend buffer days** built into Week 1 for slack.\n- Drop PR and Amazon entirely for the launch window.\n\n### Risk 3 \u2014 Timeline Compression (MEDIUM\u2013HIGH probability \u00d7 MEDIUM impact)\nTwo weeks is too short to *build* assets, inventory, or PH momentum from scratch.\n**Mitigations:**\n- Treat the window as **execution, not build** \u2014 everything ready Day 1.\n- Hold a **contingency date**: if inventory or assets slip, **push the launch** rather than ship a rushed, proof-less launch (\u00a70).\n- Validate CPA with a **small paid test in Week 1** before scaling.\n\n---\n\n## 7. Go / No-Go Checklist\n\nLaunch proceeds only when **all** are true:\n- [ ] Email list confirmed usable (or budget rebalanced)\n- [ ] Inventory in-hand (or converted to disclosed pre-order)\n- [ ] \"Automatic\" differentiation verified against competitors\n- [ ] Gross margin, CAC ceiling, break-even, and success target defined\n- [ ] 15\u201325 social-proof units secured and live on landing page\n- [ ] Landing page + checkout + refund flow tested end-to-end\n- [ ] Week 1 paid test CPA at or below CAC ceiling\n\nIf any box is unchecked, **hold the date.** The plan's ambition is sound; its only real danger is trying to do everything at once with too little proof and too few people.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Positioning is specific to the product, not generic marketing copy",
+          "score": 8
+        },
+        {
+          "criterion": "Channel choices are justified against the budget and team size",
+          "score": 9
+        },
+        {
+          "criterion": "Timeline is concrete: dated, sequenced, two weeks",
+          "score": 6
+        },
+        {
+          "criterion": "Risks are real launch risks with actionable mitigations",
+          "score": 9
+        },
+        {
+          "criterion": "Every channel has a measurable success criterion",
+          "score": 4
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "Timeline uses day-of-week labels instead of actual dates, and explicit measurable success criteria (e.g., target CTR, PH ranking, email conversion rate) are missing for each channel despite strong guardrail/CAC discussion."
+    },
+    "run": 0,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "product-launch",
+    "baseline": "fixed_pipeline",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 3,
+    "depth": 2,
+    "cost_usd": 0.040971,
+    "wall_ms": 123341.0,
+    "output": "# Lumen Launch Plan\n\n**Product:** Lumen \u2014 a $79 smart reading lamp that automatically adjusts color temperature to match the time of day.\n**Team & budget:** 2 people, $25,000, two-week launch window.\n\n---\n\n## 0. Go/No-Go Gates (Resolve Before Any Spend)\n\nThis plan is executable **only if** the following are confirmed. Treat each as a hard gate; do not commit budget until answered.\n\n| # | Question | Why it's a gate | Impact if unfavorable |\n|---|----------|-----------------|----------------------|\n| 1 | Is color-temperature adjustment **automatic** (not manual)? | It is the entire differentiator | If manual, positioning collapses; product is a $40-class competitor. **Re-position or delay.** |\n| 2 | What is **gross margin per unit**? | Sets the CAC ceiling and defines profitability | If margin is thin (hardware is often 40\u201360% COGS), the launch likely loses money per unit at benchmark conversion. **Redefine success as list-building.** |\n| 3 | Does an **email list** exist, and how large? | It is the cheapest, highest-ROI channel | If none, plan leans harder on paid; CAC risk rises. |\n| 4 | Is **inventory ready** and **checkout live**? | Launch fails outright otherwise | **No-go until true.** |\n| 5 | Is there any **health/sleep-claim substantiation**? | Determines both ad-approval risk and possible upside claim | If none, all copy must be benefit-only. |\n\n**Success definition (set explicitly before launch):** A two-week, $25K launch is a *spark*, not a scaled campaign. Recommended primary objective: **build a qualified customer/email base and validate CAC**, with unit profitability as a secondary target. If margin math doesn't close (see below), success = learning + list growth, not immediate profit.\n\n---\n\n## 1. Positioning\n\n**Tagline: \"Light that follows your day.\"**\n\nLumen is an **accessible-premium** reading lamp that shifts color temperature automatically \u2014 warm in the evening, cool during focus hours \u2014 so you never think about your lighting again.\n\n- **Frame the price:** \"The smart lamp that costs less than a nice dinner.\" Anchor $79 between commodity lamps ($30\u201360) and premium smart lighting ($150+).\n- **Lead with comfort and experience**, not health. No medical or sleep claims unless clinically substantiated (see Risk 2).\n\n**Audiences:**\n- **Primary \u2014 remote/knowledge workers.** Largest and most reachable via paid social and search; the \"automatic\" story sells hardest to people at a desk all day.\n- **Secondary \u2014 gift buyers.** $79 sits at a natural gift threshold.\n- **Tertiary \u2014 sleep-conscious readers.** Only addressable with compliant, non-medical language.\n\n**Positioning guardrail:** The tagline is valid **only if adjustment is automatic** (Gate 1). If manual, switch to a comfort/design angle (\"Warm light for winding down\") and lower CAC expectations.\n\n---\n\n## 2. Launch Channels\n\nPrioritized for a 2-person team. **Concentrate depth on the three controllable, measurable channels (paid social, Google, email); treat Product Hunt, influencer, and PR as bonus upside, not core dependencies.**\n\n**Core (controllable):**\n1. **Paid social (Meta/Instagram) \u2014 ~$10,000.** Primary demand engine; visual product suits the format. *Requires new-account pixel warm-up started Day 1.*\n2. **Google Search & Shopping \u2014 ~$4,000.** Captures high-intent queries (\"smart reading lamp,\" \"adjustable color temperature lamp\").\n3. **Email / owned list \u2014 near-zero cost.** Highest ROI *if a list exists* (Gate 3).\n\n**Bonus (higher variance):**\n4. **Product Hunt** \u2014 free, one-day event, prepped Week 1. \"Top 5\" is not controllable; treat any ranking as upside.\n5. **Influencer seeding \u2014 ~$3,000.** Micro-influencers plus free units; content timed to launch day.\n6. **PR / earned media** \u2014 near-zero cost, high variance.\n\n**Budget allocation ($25,000):**\n\n| Line | Amount |\n|------|--------|\n| Paid social (Meta/IG) | $10,000 |\n| Google Search/Shopping | $4,000 |\n| Influencer seeding | $3,000 |\n| Creative/content production | $3,000 |\n| Contingency | $3,500 |\n| PR / Product Hunt / tools | $1,500 |\n| **Total** | **$25,000** |\n\n**Unit-economics reality check:** At $10K paid spend, ~$1 CPC, and 2% conversion \u2192 ~200 units. At $79, that's ~$15,800 revenue on $10K spend = **~1.58x ROAS before COGS, shipping, and returns.** After hardware COGS, this likely **loses money per unit** at benchmark conversion. **Set a CAC ceiling from the confirmed margin (Gate 2), install a kill-switch on any ad set exceeding it, and judge success against the list-building objective.**\n\n---\n\n## 3. Two-Week Timeline\n\n### Week 1 \u2014 Setup & Gates\n- **Day 1 (hard gate):** Confirm inventory ready + checkout live end-to-end. Confirm automatic-adjustment (Gate 1) and margin (Gate 2). **No spend proceeds until these clear.**\n- **Day 1\u20132:** Create Meta account + install/warm pixel (allow days for approval/spend limits). Set up Google account.\n- **Day 2:** Ship influencer units + QC-checked samples to friendly reviewers first (protects against negative early reviews).\n- **Day 2\u20133:** Draft benefit-only ad copy \u2192 **legal review as a hard gate before any spend** (not a parallel task).\n- **Day 3\u20135:** Produce creative (product-in-use video, static ads, landing-page assets). **Test landing page + checkout conversion** with real transactions.\n- **Day 4\u20135:** Build Product Hunt assets; recruit a hunter.\n- **End of Week 1:** All copy legal-cleared; page tested; pixel warmed; assets ready.\n\n### Week 2 \u2014 Launch\n- **Day 8:** Product Hunt launch (morning) \u2192 Paid social live \u2192 Google live \u2192 influencer content drops \u2192 email blast to owned list.\n- **Day 9\u201312:** Daily optimization. Kill ad sets exceeding CAC ceiling; scale winners. Monitor first reviews and fulfillment.\n- **Day 13:** **Contingency day** \u2014 absorb ad disapprovals, account limits, or creative reworks.\n- **Day 14:** Review against success metrics (units, CAC/ROAS, list growth). Decide on Phase 2. **Treat Week 2 as Phase 1, not the whole story** \u2014 a hard two-week window offers no room to recover from a single bad day.\n\n---\n\n## 4. Top Three Risks & Mitigations\n\n**Risk 1 \u2014 Unconfirmed differentiator / high CAC.**\nIf adjustment is manual, or if CAC exceeds the margin ceiling, the launch loses money with no strategic upside.\n*Mitigation:* Resolve Gate 1 before locking positioning; set CAC ceiling from confirmed margin; run tight creative with a kill-switch on losing ad sets; redefine success as list-building if unit economics don't close.\n\n**Risk 2 \u2014 Health-claim ad disapproval.**\nMeta/Google can disapprove ads *and* penalize new accounts. A disapproval on launch day stalls the primary engine at its most critical moment.\n*Mitigation:* Legal review is a **hard gate before any spend.** Keep all copy benefit-focused (comfort, focus, ambiance) unless substantiation exists (Gate 5) \u2014 in which case cautious, compliant claims become a differentiator. Warm the ad account early to avoid new-account spend limits.\n\n**Risk 3 \u2014 Team bandwidth in a two-week window.**\nTwo people across multiple channels plus setup is aggressive; a single contingency day cannot absorb compounding delays.\n*Mitigation:* Concentrate on the three controllable channels; treat PH/influencer/PR as bonus; automate reporting; hold Day 13 as contingency; front-load the Day 1 go/no-go gates so failures surface before spend.\n\n---\n\n## 5. Bottom Line\nThe tactics are sound, but the plan is **contingent, not yet executable.** Before committing budget: (a) confirm automatic adjustment and per-unit margin, (b) verify inventory and checkout live, (c) treat legal review as a hard pre-spend gate, and (d) define success as list-building and CAC validation \u2014 because $25K over two weeks is a launch spark, not a profitable scaled campaign.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Positioning is specific to the product, not generic marketing copy",
+          "score": 7
+        },
+        {
+          "criterion": "Channel choices are justified against the budget and team size",
+          "score": 8
+        },
+        {
+          "criterion": "Timeline is concrete: dated, sequenced, two weeks",
+          "score": 6
+        },
+        {
+          "criterion": "Risks are real launch risks with actionable mitigations",
+          "score": 8
+        },
+        {
+          "criterion": "Every channel has a measurable success criterion",
+          "score": 5
+        },
+        {
+          "criterion": "Overall coherence and usefulness as a launch plan",
+          "score": 7
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "Timeline uses relative Day numbers instead of actual dates, and several channels (influencer, PR, Product Hunt) lack explicit measurable success metrics."
+    },
+    "run": 1,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "product-launch",
+    "baseline": "fixed_pipeline",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "serial",
+    "nodes": 3,
+    "depth": 2,
+    "cost_usd": 0.038229,
+    "wall_ms": 118137.5,
+    "output": "# Lumen Launch Plan\n### $79 Smart Reading Lamp \u2014 Automatic Color-Temperature Adjustment by Time of Day\n\n---\n\n## 0. Pre-Launch Gate (Day 0 \u2014 Must Clear Before Any Paid Spend)\n\nThis plan is executable only if four conditions are confirmed. Treat Day 0 as a hard gate. **Do not release paid budget until all four are answered.**\n\n| Gate Question | Why It's Load-Bearing | Decision Rule |\n|---|---|---|\n| **Is inventory shipping now, and how deep?** | Scaling ads into a stockout wastes spend, triggers refunds, damages reputation, and degrades ad-platform performance. | If units aren't confirmed shippable, **do not spend.** Set a \"scale ceiling\" = confirmed units on hand. |\n| **Do real specs/certifications exist?** (color-temp range, lumens, safety certs) | Positioning is only defensible if the lamp delivers a meaningful warm\u2194cool range. | No specs \u2192 positioning is a guess. Confirm before writing final copy. |\n| **Does an email list / following exist?** | Biggest swing factor on CAC. A warm list is the cheapest, safest channel. | If a real list exists, **email leads and paid amplifies** (see Channel Mix note). |\n| **Can the 2-person team produce demo video + run paid media?** | If neither can produce compelling demo video, creative failure is near-certain. | If not, contract a freelance editor within the Day 1\u20133 window or narrow scope. |\n\n**If inventory or specs are not confirmed, halt the paid launch and resolve the gate first.**\n\n---\n\n## 1. Positioning\n\n**Primary angle:** *\"Circadian lighting without the $400 price tag.\"*\nA **value-and-design** play \u2014 not a health-claim play.\n\n- **Lead with the visible benefit:** the automatic warm/cool shift, shown in video. Let the eyes do the selling.\n- **Secondary (creator/email) angle:** *\"A reading light that winds down with you.\"* A softer, lifestyle-framed sleep benefit that avoids substantiation traps.\n- **Do not** make hard melatonin or clinical sleep-outcome claims in paid copy.\n\n**The competitive tension to answer head-on:** Circadian color shift is *not novel* \u2014 it's an established category, and Xiaomi/Mi-type lamps exist at $40\u201370. Premium circadian lamps run $400+. Lumen's wedge is the **middle**: better design and simplicity than the cheap options, a fraction of the price of the premium ones. **Every creative must give a crisp, specific reason to pay $79** (design, ease of setup, build quality, or spec advantage from the confirmed specs). Without that answer, the price angle collapses.\n\n---\n\n## 2. Channel Mix\n\n**Budget: $25K. Team: 2 people. Principle: concentrate ruthlessly \u2014 do not spread thin.**\n\n| Channel | Budget | Rationale |\n|---|---|---|\n| **Meta / IG paid** (video demo) | **$14\u201316K** | Best fit for a visual product; fast, measurable, scalable. |\n| **Google Search / Shopping** | **$3\u20134K** | Captures high-intent buyers cheaply; layer in once demand is proven. |\n| **Influencer seeding** (10\u201315 micro-creators: BookTok, productivity, wellness) | **$2\u20133K** | Social proof + harvestable content. **Note:** produces content in 1\u20133 weeks \u2014 ROI likely lands *after* the two-week window. Do not count toward two-week targets. |\n| **Email / owned** | **~$0.5K tooling** | Highest ROI channel *if a list exists*. **If a real list is confirmed at the gate, re-weight budget so email leads and paid amplifies.** |\n| **Contingency** | **$3\u20134K (hold firm)** | Protects against CAC blowout. Do not raid this to chase more tests. |\n\n### The Unforgiving Math (read before spending)\n- On a $79 product, contribution margin after COGS, shipping, and fees is likely **$20\u201340/unit**.\n- A **$60 CAC loses money per sale**; a **$30 CAC leaves thin margin.**\n- ~$14\u201316K on Meta at a $40 CPA = **~350\u2013400 units** \u2014 barely enough to exit the learning phase on 1\u20132 combos.\n- **Trade-off you cannot escape:** testing many variants vs. spending enough behind one to escape the learning phase. On this budget you can't do both. **Concentrate.**\n- **Set a hard CPA ceiling** (derived from confirmed margin) and enforce daily.\n\n---\n\n## 3. Two-Week Timeline\n\n> **Caveat on the timeline:** Ad platforms need 3\u20137 days of learning data, leaving only ~5\u20137 days of optimized spend. Any slip compresses this toward zero. If the two-week deadline is *arbitrary* rather than a hard external peg (event/PR), push for a 3\u20134 week window \u2014 it dramatically improves the odds. If it's fixed, lower unit expectations accordingly.\n\n| Days | Actions |\n|---|---|\n| **1\u20133** | Confirm inventory depth & specs (gate). Produce 3\u20135 demo-video variants with 4\u20135 hook variations. Set up pixel/tracking. Write **compliant copy variants** (see Risk 3). Brief 10\u201315 micro-influencers and ship seeding units. |\n| **4\u20135** | **Soft launch:** small spend across 3\u20134 creative/audience combos. Email announce (if list exists). Confirm tracking fires correctly. |\n| **6\u20138** | Read learning-phase data. **Kill losers** against the CPA ceiling. Resist over-reacting to noise (attribution is foggy at low spend). |\n| **9\u201314** | **Scale winners** \u2014 *only up to confirmed inventory ceiling.* Layer in Google Search/Shopping. Harvest any early influencer content into paid social proof. |\n\n---\n\n## 4. Top 3 Risks + Mitigations\n\n### Risk 1 \u2014 CAC exceeds margin (the launch loses money per sale)\nMost likely failure mode given thin $20\u201340 margins and a small budget.\n- **Mitigate:** Set a hard CPA ceiling from confirmed margin. Test in small batches. Make daily kill decisions. Protect the $3\u20134K contingency \u2014 do not raid it to chase volume.\n\n### Risk 2 \u2014 Creative doesn't land (and the budget is too small to find a winner)\n- **Mitigate:** Demo-first video (the visible warm/cool shift). A/B test 4\u20135 hooks. Concentrate spend behind the leader rather than diluting across many tests. Reuse influencer content as social proof once it arrives.\n\n### Risk 3 \u2014 Ops, claims, and platform-rejection risk\nThree linked hazards that can each stall or erode the launch:\n- **Inventory:** Confirm depth before scaling; never scale spend past confirmed units.\n- **Claims / FTC risk:** Legal-review all copy. Soften wellness language. *Accept the trade-off:* softening the sleep story may reduce conversion, but it's the correct call versus substantiation exposure.\n- **Ad-account rejection:** Wellness/\"circadian/sleep\" copy can trigger Meta health-policy rejections and stall launch. **Prep compliant copy variants in advance** (Days 1\u20133) so a rejection doesn't cost launch days.\n\n---\n\n## 5. Under-Weighted Risks to Monitor (name them, watch them)\n\n- **Return rate:** Smart lamps have setup friction (app pairing, expectations). High returns erase thin margins. Prep a support/returns workflow and set clear setup expectations in copy.\n- **Attribution fog:** With small spend across multiple channels, you won't cleanly attribute results \u2014 you risk killing a working channel on noise. Weight decisions toward the primary channel (Meta) where signal is strongest.\n\n---\n\n## Bottom Line\n\nThis plan is directionally sound **if and only if** four conditions hold: (1) an existing warm audience *or* an acceptable cold CAC, (2) confirmed shippable inventory with known depth, (3) real product specs that justify the \"circadian at $79\" positioning, and (4) a team that can produce demo video. **Absent those, confidence is unearned.**\n\nThe two largest unhedged bets are that **$25K is enough to reach statistical proof** and that **two weeks is enough** given learning-phase and influencer lead times. Push back on both constraints before execution, gate all paid spend on confirmed inventory, and protect the contingency aggressively.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Positioning is specific to the product, not generic marketing copy",
+          "score": 8
+        },
+        {
+          "criterion": "Channel choices are justified against the budget and team size",
+          "score": 8
+        },
+        {
+          "criterion": "Timeline is concrete: dated, sequenced, two weeks",
+          "score": 5
+        },
+        {
+          "criterion": "Risks are real launch risks with actionable mitigations",
+          "score": 8
+        },
+        {
+          "criterion": "Every channel has a measurable success criterion",
+          "score": 4
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "Timeline uses relative 'Day X' labels rather than actual calendar dates, and channels lack explicit, distinct measurable success metrics (e.g., specific CTR/CPA/conversion targets per channel)."
+    },
+    "run": 2,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "product-launch",
+    "baseline": "smythe_dynamic",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "fork_join -> adversarial -> serial",
+    "nodes": 6,
+    "depth": 3,
+    "cost_usd": 0.068007,
+    "wall_ms": 170721.9,
+    "output": "# Lumen Launch Plan \u2014 Final\n\n**Product:** Lumen smart lamp \u00b7 **Price:** $79 \u00b7 **Budget cap:** $30,000 cash (revised) \u00b7 **Core team:** 2 people + 1 funded VA \u00b7 **Live window:** 14 days (Days 1\u201314) after a defined 5\u20137 day Week 0 prep sprint.\n\n---\n\n## 1. Positioning\n\n**One line:** *Lumen is the smart lamp that gives you studio-quality, tunable light without the app-fatigue and clutter of \"smart home\" gadgets.*\n\n- **Target buyer:** Remote workers, creators, and small-space dwellers who want better light for work/video calls but reject fussy ecosystems.\n- **Primary promise:** Better light in 5 seconds \u2014 dial, don't configure.\n- **Proof points:** Tunable warm-to-cool range, physical dial (no app required), clean design that fits a desk or shelf.\n- **Positioning against:** Cheap RGB gimmick lamps (Lumen = grown-up, functional) and expensive pro lighting (Lumen = accessible, one-tenth the footprint).\n- **Launch narrative:** A focused pre-order launch \u2014 limited early units, founder-led, honest about being new.\n\n---\n\n## 2. Success Criteria (the scoreboard)\n\nSuccess is now defined in **units and dollars first**, with channel metrics as supporting diagnostics.\n\n| Metric | Target | Definition / Notes |\n|---|---|---|\n| **Pre-orders (primary)** | **\u2265 300 units** | The single number that declares success or failure. Floor for \"keep going\": 150 units. |\n| **Net revenue** | **\u2265 $23,700** | 300 \u00d7 $79. Break-even vs. real cash (~$28\u201330k) requires this plus margin on reorder. |\n| **Blended CAC** | **\u2264 $39.50** (50% of price) | **Now a top-line guardrail, not buried in the timeline.** Kill/scale decisions key off this. |\n| Landing page CVR \u2014 **pre-order** | **\u2265 3%** | Denominator = unique visitors; numerator = **completed pre-orders** (not waitlist signups). Waitlist CVR tracked separately, not as the gate. |\n| Meta CPP | **\u2264 $40** with **\u2265 100 pre-orders from paid** | Volume floor attached so a cheap-but-tiny result can't \"pass.\" |\n| Email \u2192 pre-order | **\u2265 8%** | Only reported once waitlist size is locked in Week 0 (see open item). |\n| Influencer output | **\u2265 25 content pieces** | Pieces are the hard number. Impressions tracked as directional only (self-reported, non-auditable). |\n| PR | **\u2265 2 genuine features** | \"Feature\" = standalone or named inclusion. Roundup mentions counted separately, not toward the target. |\n\n**Dropped as a hard target:** Reddit \"5,000 referral sessions\" \u2014 unrealistic for a new brand in 14 days and untrackable (mobile in-app browsers strip referrers). Reddit is now a supporting community play, not a scored channel (see \u00a73).\n\n---\n\n## 3. Channels, Ownership & Metrics\n\n**Lane rebalance (fixes Person B overload):** Reddit is de-scoped to light-touch; the **VA is a funded, active role from Day 1** ($1,200 budgeted); PR is retained but tightly scoped. Person B no longer carries three full jobs.\n\n| Channel | Owner | What it does | Scored metric |\n|---|---|---|---|\n| **Meta ads** | Person A | Primary paid demand engine | CPP \u2264 $40, \u2265100 pre-orders |\n| **Landing page + email** | Person A | Convert traffic; nurture waitlist | Pre-order CVR \u22653%; email\u2192PO \u22658% |\n| **Retargeting** | Person A | Recover warm traffic | Folded into blended CAC |\n| **Influencer seeding** | Person B | 40 seeded units \u2192 content | \u226525 pieces |\n| **PR** | Person B | Earned features | \u22652 features |\n| **Support + fulfillment ops** | **VA (funded) + Person B oversight** | Order/support/QC reconciliation | Backlog <24h |\n| **Reddit** | Person B (light-touch) | 2 subs max, authentic participation, no AMAs | Not scored \u2014 qualitative signal |\n\n**Cross-training / real redundancy:** Person A is briefed on the influencer tracker and support macros; the VA holds documented SOPs for support + fulfillment. If Person B is out on Day 4, the lane does not stall.\n\n---\n\n## 4. Budget (Re-costed \u2014 real cash ~$28,500)\n\nThe prior \"$25k\" excluded seeded-unit COGS, fulfillment, and VA labor. Corrected below.\n\n| Line | Amount | Notes |\n|---|---|---|\n| Meta ads | $8,000 | |\n| Influencer **cash** | $6,000 | Cash payments only |\n| **Seeded-unit COGS** (40 \u00d7 ~$40) | $1,600 | **Newly counted** \u2014 real product cost, not free |\n| **Fulfillment / 3PL** (pick-pack-ship + seeding logistics) | $1,000 | **Newly counted** |\n| Landing page + demo video | $2,000 | Scrappy in-house video; if pro video needed, pull from buffer |\n| Email tooling | $500 | |\n| PR | $2,000 | Scoped to \u22652 features, not 3 |\n| Analytics/tools | $1,500 | |\n| **VA (funded, Day 1\u201314)** | $1,200 | **Newly counted** \u2014 no longer \"standby\" |\n| **Buffer** (true reserve only) | $2,000 | |\n| **Scale-the-winner** (separate) | $2,700 | **Split from buffer** \u2014 deployed only after Day 8 if a winning channel is proven |\n| **Total** | **$28,500** | Within revised $30k cap |\n\n**Key fix:** buffer and scale-the-winner are now **separate pools**. The buffer is not silently financing budget gaps.\n\n---\n\n## 5. Two-Week Timeline\n\n**Week 0 (Days \u22127 to \u22121) \u2014 Prep sprint (now explicit, ~5\u20137 days, ~$1,500 of the tooling/setup spend front-loaded):**\n- Confirm inventory + place reorder PO; QC gate passed.\n- **Lock waitlist size** (unblocks the 8% email metric).\n- Landing page + demo video live and tested.\n- Email macros + support SOPs written; VA contracted and trained.\n- Influencer list finalized; seeding units picked and ready to ship.\n- **Gate 0:** If inventory is not confirmed by Day \u22121, launch slips \u2014 window does not start until stock exists. No launching into a stockout.\n\n**Live window:**\n\n| Day | Focus |\n|---|---|\n| **1** | Landing page live to waitlist + organic. Ship seeded units. Support live. |\n| **2** | Meta ads on at controlled spend. Monitor pre-order CVR. |\n| **3** | **Gate 1:** CVR \u22653% (pre-order). Pass \u2192 scale paid. Fail \u2192 pause paid, fix funnel, extend prep 2 days (do **not** burn ad budget into a leaky page). |\n| **4** | Influencer content flowing; VA absorbs support spike; Person B runs PR pitches. |\n| **5\u20137** | Email nurture push; retargeting live; first PR follow-ups. |\n| **8** | **Gate 2 (scale decision):** Review CPP + blended CAC + pre-order pace. Deploy $2,700 scale pool **only** into the proven winning channel. |\n| **9\u201310** | Double down on winner; secure PR features. |\n| **11\u201312** | Blended CAC checkpoint vs. \u2264$39.50 guardrail. Trim any channel above it. |\n| **13** | Final email + retargeting push to waitlist non-buyers. |\n| **14** | Close pre-order window. Reconcile: units, revenue, blended CAC vs. targets. |\n\n**Gate failure is defined, not fatal:** Gate 1 fail = pause + fix, not abandon. Gate 2 fail (no channel under CAC target) = hold at organic + email only, do not deploy scale pool.\n\n---\n\n## 6. Top Three Risks & Mitigations\n\n**Risk 1 \u2014 Person B overload / single point of failure.**\n*Mitigation:* Reddit de-scoped to light-touch (2 subs, no AMAs); **VA funded and active from Day 1** to own support + fulfillment; Person A cross-trained on influencer tracker and macros. No lane depends on one person being present every day.\n\n**Risk 2 \u2014 Missing the unit/revenue target while \"passing\" proxy metrics.**\n*Mitigation:* **300 pre-orders / $23,700** is the primary scoreboard; blended-CAC guardrail (\u2264$39.50) is elevated to top-line. Channel metrics carry volume floors (e.g., Meta needs \u2265100 pre-orders, not just cheap CPP). The launch can now be honestly declared a failure.\n\n**Risk 3 \u2014 Budget blowout from previously uncounted costs.**\n*Mitigation:* Seeded-unit COGS ($1,600), fulfillment ($1,000), and VA ($1,200) are now explicit lines; real exposure re-stated at **~$28,500** within a raised $30k cap. Buffer ($2,000) and scale-the-winner ($2,700) are **separate pools** so the reserve can't be quietly spent covering gaps.\n\n---\n\n**Bottom line:** The plan now defines what winning means (units + dollars), pays for the work it actually requires, gives one person a realistic load, and specifies what happens when a gate fails. Ship it.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Positioning is specific to the product, not generic marketing copy",
+          "score": 8
+        },
+        {
+          "criterion": "Channel choices are justified against the budget and team size",
+          "score": 8
+        },
+        {
+          "criterion": "Timeline is concrete: dated, sequenced, two weeks",
+          "score": 6
+        },
+        {
+          "criterion": "Risks are real launch risks with actionable mitigations",
+          "score": 8
+        },
+        {
+          "criterion": "Every channel has a measurable success criterion",
+          "score": 8
+        }
+      ],
+      "overall": 8,
+      "weaknesses": "Timeline uses relative Day 1-14 labels rather than actual calendar dates, and the 'revised/final' framing with meta-commentary on prior flaws is unusual for a first deliverable."
+    },
+    "run": 0,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "product-launch",
+    "baseline": "smythe_dynamic",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "fork_join -> adversarial -> serial",
+    "nodes": 6,
+    "depth": 3,
+    "cost_usd": 0.073734,
+    "wall_ms": 171958.3,
+    "output": "# Lumen Launch Plan \u2014 Final\n\n**Product:** Lumen (sleep-outcome wellness product)\n**Team:** 2 people (Person A, Person B)\n**Marketing budget cap:** $25,000 (refunds paid from revenue, not this cap \u2014 see below)\n**Window:** 14-day launch cycle\n\n---\n\n## 0. Pre-Launch Lock (Resolve Before Day 1)\n\n**Blocking decision:** Confirm target age band \u2014 **28\u201345 vs. 30\u201355**. This drives ad targeting, CPL, and CAC across the entire plan. A 30\u201355 wellness/sleep audience runs higher lead costs and changes every budget assumption below. **Do not trust the budget until this is locked.**\n\n**Unit economics baseline (state explicitly):**\n- AOV: **$50**\n- COGS + shipping per unit: (fill actual) \u2014 required to validate ROAS floor\n- Assumed return rate: **10%** (high-return category: sleep outcome + gift-buyers)\n- **Refunds are paid from revenue, NOT from the $25K marketing cap.** At 500 units \u00d7 $50 \u00d7 10% = **$2,500 in refunds**, funded from sales proceeds.\n\n---\n\n## 1. Positioning\n\nLumen is positioned as the **trust-first sleep product** \u2014 backed by a 30-day outcome guarantee. Our defensible edge in launch week is credibility: verified customer proof, responsive support, and honest guarantee handling. Everything downstream (channel mix, support staffing, KPI selection) protects this trust play, because bad early reviews during peak visibility would break the core promise.\n\n---\n\n## 2. Budget Allocation (No Triple-Booking)\n\n| Line | Amount | Rule |\n|---|---|---|\n| Meta paid conversion | $10,500 | Locked to conversion (excludes lead-gen) |\n| Meta waitlist lead-gen | $1,500 | Locked to Week-1 signups |\n| Influencer seeding | (allocated) | 2 waves |\n| PR / wire distribution | (allocated) | Guaranteed syndication only |\n| Creative production | (allocated) | Two batches (see \u00a74) |\n| **Returns/QC provision** | **$2,000** | **UNTOUCHABLE \u2014 QC pre-inspection + buffer** |\n| **Scaling reserve** | **$1,000** | Day-11 push behind winning channel |\n| Contingent support VA | (from scaling reserve, if triggered) | Days 8\u201311 only |\n\n**Honest disclosure:** Day-11 scaling firepower is **~$1,000, not $3,000.** The prior \"$3K push behind the winner\" was fiction under our own worst case (returns $2K + QC $500 left only $500). We have separated an untouchable returns/QC provision from a real scaling reserve.\n\n---\n\n## 3. Channels + KPIs\n\n### Meta (Paid Conversion)\n- **Budget:** $10,500 conversion \u2192 at CAC \u2264 $40 = **~262 units** (this is the honest max).\n- **KPI \u2014 units:** **\u2265260 via Meta** (corrected from 300; the extra ~40 units are counted in email/organic/influencer, not double-claimed on Meta).\n- **KPI \u2014 CAC:** **\u2264 $40, measured as blended** (total spend \u00f7 total orders). Chosen over platform-reported due to post-iOS attribution noise. One definition, locked.\n- **KPI \u2014 ROAS:** **\u2265 profitable floor, not 2.0.** ROAS 2.0 on a $50 physical product likely loses money after COGS + shipping + 10% returns. **Set the floor at breakeven contribution margin + target margin** \u2014 compute once COGS is filled. Do not ship a vanity 2.0 floor.\n\n### Waitlist Lead-Gen (Email)\n- **Budget:** $1,500.\n- **KPI \u2014 signups:** **\u2265750** (modeled at realistic $2 CPL for a sleep/wellness audience). The prior 2,000 target implied \u2264$0.75 CPL \u2014 undefendable in this vertical. Raise this only if lead-gen spend increases.\n- **KPI \u2014 launch-week conversion:** **\u22658% of launch-email clickers** (denominator defined explicitly \u2014 not total list, not openers).\n\n### Influencer\n- **KPI \u2014 posts/UGC:** **\u226512 posts, \u22655 reusable UGC assets** (countable, kept).\n- **KPI \u2014 attributable results via trackable links/codes** (primary), not raw impressions.\n- **\"\u2265250K impressions\" = target, not committed** \u2014 impressions are self-reported and unauditable.\n- **Payment condition:** creators must supply **analytics screenshots** to be paid. No verified analytics, no payment.\n\n### PR\n- **Guaranteed KPI:** wire distribution executed \u2192 syndication pickups (controllable). Define: a wire syndication counts as a placement.\n- **Stretch target (not a committed KPI):** \u22651 DA 50+ placement. Editorial timelines run weeks, not days; a DA 50+ outlet responding to a cold pitch inside 10 days is a hope, not a schedule.\n\n### Overall Success Gate (NEW \u2014 non-negotiable)\n- **Contribution margin \u2265 $X** (set from unit economics). You can hit every throughput KPI above and still lose money at low ROAS with 10% returns. **Profitability is a launch success condition, not a footnote.**\n\n---\n\n## 4. Two-Week Timeline\n\n### Week 1 \u2014 Build (with honest creative sequencing)\n- **Day 1:** Confirm age band (blocking). Lock unit economics. Stand up support macro/FAQ system + auto-responders.\n- **Day 2:** PR wire pitch (treat DA 50+ as stretch). Launch waitlist lead-gen.\n- **Day 3\u20134:** Produce **Creative Batch 1** (concept/demo \u2014 this is NOT final).\n- **Day 5:** Assign QC to a **defined inspector with written defect criteria** (not Person B \u2014 conflict of interest and wrong skillset). Define what a \"defect\" is and who is qualified to judge it.\n- **Day 6:** Influencer Wave 1 posts go live.\n- **Day 7:** Collect \u22655 UGC assets \u2192 produce **Creative Batch 2 (UGC-refreshed).** QC pre-inspection of 20 units against criteria.\n\n### Week 2 \u2014 Launch + Optimize\n- **Day 8:** LAUNCH. Batch 2 creative live. PR embargo lift. **Support offloaded** to macros + once-daily live-reply SLA; trigger VA if volume exceeds defined threshold.\n- **Day 9\u201310:** Influencer Wave 2. Amplify creator posts. Monitor CAC/ROAS/contribution margin.\n- **Day 11:** Reallocate **$1,000 scaling reserve** to the channel beating its KPI on a profitable basis.\n- **Day 12:** Count PR placements (wire syndications guaranteed; DA 50+ tracked as stretch).\n- **Day 13\u201314:** Final KPI + **contribution-margin gate** review. Returns tracked against 10% assumption.\n\n---\n\n## 5. Top 3 Risks + Mitigations\n\n**1. Reserve/budget can't fund the promised scaling push.**\nReturns + QC could consume the reserve, and Meta is ~40 units short of a 300-unit target at $40 CAC.\n\u2192 *Mitigation:* Reserve split into untouchable $2K returns/QC + $1K real scaling. Meta target corrected to ~260 units; remaining units counted on email/organic/influencer. Refunds funded from revenue, not the cap.\n\n**2. Person B overloaded \u2192 dropped support during peak visibility.**\nSupport spike collides with PR push + creator amplification on Day 8+, threatening the trust play.\n\u2192 *Mitigation:* Pre-built macros/auto-responders (Day 1), once-daily live-reply SLA, contingent VA on Days 8\u201311 above a defined threshold. QC moved to a qualified inspector with written defect criteria.\n\n**3. Losing money while \"hitting KPIs.\"**\nEvery KPI is throughput/cost; ROAS 2.0 likely below breakeven after COGS + 10% returns.\n\u2192 *Mitigation:* Contribution-margin gate added as a launch success condition; ROAS floor set at real breakeven + margin, not a vanity 2.0.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Positioning is specific to the product, not generic marketing copy",
+          "score": 4
+        },
+        {
+          "criterion": "Channel choices are justified against the budget and team size",
+          "score": 5
+        },
+        {
+          "criterion": "Timeline is concrete: dated, sequenced, two weeks",
+          "score": 5
+        },
+        {
+          "criterion": "Risks are real launch risks with actionable mitigations",
+          "score": 7
+        },
+        {
+          "criterion": "Every channel has a measurable success criterion",
+          "score": 7
+        }
+      ],
+      "overall": 5,
+      "weaknesses": "Positioning ignores the actual product feature (color temperature adjusting to time of day) in favor of a generic 'trust-first sleep product' frame, and budget line items are left as unfilled placeholders ('(allocated)', 'fill actual') undermining concreteness."
+    },
+    "run": 1,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  },
+  {
+    "task": "product-launch",
+    "baseline": "smythe_dynamic",
+    "model": "claude-opus-4-8",
+    "offline": false,
+    "topology": "fork_join -> adversarial -> serial",
+    "nodes": 6,
+    "depth": 3,
+    "cost_usd": 0.075555,
+    "wall_ms": 177839.4,
+    "output": "# Product Launch Plan \u2014 Final (Approved for Execution)\n\n**Product:** Amber/daylight-shifting wellness lamp \u00b7 **Retail:** $79 \u00b7 **First batch:** 300\u2013400 units\n**Team:** 2 people (A = growth/creative, B = ops/partnerships/support)\n**Window:** 2 weeks live + 1 setup week (\"Week 0\")\n\n---\n\n## 0. Go/No-Go Gate (must clear before any spend beyond Week 0)\n\nThis plan is **conditionally approved**. Two items must be resolved in Week 0 before launch spend is released:\n\n1. **Landed COGS quote in hand** (see budget below). No number = no launch.\n2. **Meta demand test** (~$800) clears its threshold (defined by A).\n\n---\n\n## 1. Positioning\n\n**For** non-technical wellness buyers who want better sleep and focus **without** fiddly smart-home setup, **the lamp** automatically shifts from daylight to amber on a natural circadian curve. **Unlike** app-dependent smart bulbs, it works out of the box \u2014 plug in, and it just does the right thing.\n\n**Core promise:** \"Set it once. Sleep better.\"\n**Proof points:** automatic circadian shift, one-touch simplicity, no app required.\n\n---\n\n## 2. Channels, Metrics & KPIs\n\n**Master metric (added \u2014 this is what we actually win or lose on):**\n> **Sell-through \u2265 70% of batch within 30 days** (\u2265245 of 350 units) at a blended CAC that preserves contribution margin. Channel metrics below are diagnostics, not success itself. *You can hit every channel target and still be stuck on 100+ unsold units \u2014 this line prevents that.*\n\n| Channel | KPI | Attribution method |\n|---|---|---|\n| **Paid Social (Meta)** | Blended CAC \u2264 $35; \u2265150 units | **CAC denominator = Meta + Amazon Sponsored ad spend only** (organic excluded). Tracked via UTMs + Amazon Attribution. |\n| **Email (Klaviyo)** | \u22656% conversion on flows | Native Klaviyo tracking. Cleanest metric \u2014 treat as the reliability anchor. |\n| **Amazon** | \u226550 units; **\u22653\u20135 reviews in launch window, \u226512 reviews @ 4.3\u2605 by Day 30** | Review-request automation (Amazon \"Request a Review\"). *Revised down from 15/week \u2014 organic review rate is 1\u20133%; 15 in a week was not achievable.* |\n| **Influencer** | \u226540 attributed units; \u226512 rights-cleared assets by Day 30 | **Unique promo codes + UTM affiliate links per creator.** *Replaces self-reported \"impressions,\" which say nothing about sales.* |\n| **PR** | \u22653 placements (defined: a **named feature or dedicated review**, not a link in a roundup) | Referral traffic via UTM; count only qualifying placements. |\n\n---\n\n## 3. Two-Week Timeline\n\n### Week 0 \u2014 Setup & Gate (load rebalanced)\nPerson B's original Week 0 carried 8 workstreams \u2014 overloaded. Rebalanced:\n\n**Person A**\n- Meta demand test (~$800) + read results against gate threshold\n- Product photography ($1,000) \u2014 **owns core creative so A is not blocked waiting on UGC**\n- Build launch landing page + UTM structure\n\n**Person B**\n- Supplier negotiation \u2192 **obtain itemized landed-cost quote (gate item)**\n- 3PL signup + onboarding\n- Klaviyo flow build\n- **Contract 2\u20133 paid, guaranteed-turnaround creators** (paid up front for assets by Week 1 \u2014 do **not** rely on free-seed timing)\n\n**Shared / deferred to Week 1**\n- Free-seed influencer outreach (30 targets) \u2014 treated as *upside*, not a dependency\n- FAQ + canned responses, quick-start card, PR pitch list\n\n### Week 1 \u2014 Launch\n- **A:** Meta live (~$150/day \u00d7 5 \u2248 $750) using **owned photography + paid-creator assets** (not dependent on free-seed UGC arriving); Amazon Sponsored Products live ($3,000 across launch)\n- **B:** Collect + rights-clear paid-creator assets; send email sequence; PR follow-ups; support (twice daily)\n- Free-seed UGC folded in *as it arrives* \u2014 bonus, not critical path\n\n### Week 2 \u2014 Scale & Measure\n- **A:** Scale winning Meta creative from $2,500 reserve; optimize CAC toward \u2264$35\n- **B:** Support load will **spike here** (hardware + non-technical buyers = setup/returns questions) \u2014 hold capacity, do not assume support \"goes quiet\"\n- Mid-week: read master metric (sell-through pace) \u2192 scale or hold decision\n\n---\n\n## 4. Budget (itemized \u2014 COGS now included)\n\n| Item | Amount |\n|---|---|\n| Demand test (Meta) | $800 |\n| Product photography | $1,000 |\n| Amazon Sponsored Products | $3,000 |\n| Meta Week 1 | $750 |\n| **Paid guaranteed-turnaround creators** | $1,500 |\n| Scaled paid reserve | $2,500 |\n| 3PL setup + per-order | $1,600\u20132,000 |\n| Software (Klaviyo, PR tool, landing, misc) | $1,000 |\n| Transaction fees (~3%) | $600 |\n| **COGS \u2014 350 units @ landed ~$26** | **$9,100** |\n| Returns reserve (6%) | $1,200 |\n| **Subtotal** | **~$23,050\u201323,450** |\n\n**\u26a0\ufe0f Budget only fits under best-case COGS.** At **400 units @ $32 landed = $12,800**, COGS alone breaks the $25K cap. First hardware batches rarely hit target unit cost (tooling, samples, freight, duties). **Action:** the landed-cost quote (Week 0 gate) is binding \u2014 if it exceeds $28/unit landed, reduce batch to 300 units or raise the budget before launch. Current \"$2,500 reserve\" is earmarked for scaling paid and is **not** a true cost-overrun cushion.\n\n---\n\n## 5. Top Three Risks & Mitigations\n\n**1. COGS overrun breaks the budget (highest risk).**\nThe largest line item was previously unquoted. At $32 landed \u00d7 400 units, COGS alone is $12,800.\n\u2192 **Mitigate:** Binding landed-cost quote is a Week-0 gate. Cap first batch at 300 units if landed COGS > $28. Carve a genuine $1,500 overrun contingency separate from the scaling reserve.\n\n**2. Two-person team has zero slack; one external slip cascades.**\nSupplier, 3PL, and influencer response times are outside our control; Week 2 support will spike, not quiet down.\n\u2192 **Mitigate:** Paid guaranteed-turnaround creators (not free-seed dependency) de-risk the asset pipeline. A owns core creative so A is never blocked on UGC. Reserve Week-2 capacity for the support spike rather than assuming ~1 hr/day.\n\n**3. Hitting channel targets while stuck on unsold inventory.**\nEvery original metric was a channel proxy; none measured the actual outcome.\n\u2192 **Mitigate:** Sell-through \u226570% in 30 days is now the master go/no-go metric. Mid-Week-2 reads sell-through pace, not just channel activity, to trigger scale-or-hold.\n\n---\n\n**Approval condition:** Release launch spend only after (a) the itemized landed-cost quote confirms COGS fits the batch/budget, and (b) the Meta demand test clears its threshold.",
+    "quality": {
+      "criteria": [
+        {
+          "criterion": "Positioning is specific to the product, not generic marketing copy",
+          "score": 7
+        },
+        {
+          "criterion": "Channel choices are justified against the budget and team size",
+          "score": 7
+        },
+        {
+          "criterion": "Timeline is concrete: dated, sequenced, two weeks",
+          "score": 5
+        },
+        {
+          "criterion": "Risks are real launch risks with actionable mitigations",
+          "score": 8
+        },
+        {
+          "criterion": "Every channel has a measurable success criterion",
+          "score": 8
+        }
+      ],
+      "overall": 7,
+      "weaknesses": "Timeline lacks actual calendar dates (only Week 0/1/2 labels), reducing concreteness despite good sequencing and role assignment."
+    },
+    "run": 2,
+    "judge_model": "claude-sonnet-5",
+    "ablate_terminal_note": false,
+    "ablate_task_context": false
+  }
+]

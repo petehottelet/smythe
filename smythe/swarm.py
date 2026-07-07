@@ -147,21 +147,25 @@ class Swarm:
 
     @staticmethod
     def _stamp_task_context(graph: ExecutionGraph, task: Task) -> None:
-        """Give root nodes the original task, not just their planned label.
+        """Give every node the original task, not just its planned label.
 
         The Architect sees the full task when planning, but generated
         node labels rarely reproduce its payload (source documents,
-        code, data) - without this, root nodes work from a one-line
-        label and the material the task carries never enters the graph.
-        Downstream nodes inherit it through dependency results. Skipped
-        when the label already is the goal (single-node graphs).
+        code, data) - without this, nodes work from a one-line label
+        and the material the task carries never enters the graph.
+        Downstream nodes need it too, not only roots: dependency
+        results carry upstream *analyses* of the artifact, and a
+        reviewer or synthesizer that cannot see the artifact itself
+        hedges every claim it is asked to verify. The cost is the task
+        payload repeated per node. Skipped when the label already is
+        the goal (single-node graphs).
         """
         context = task.goal
         if task.constraints:
             context += "\n\nConstraints:\n" + "\n".join(
                 f"- {c}" for c in task.constraints
             )
-        for node in graph.roots():
+        for node in graph.nodes:
             if node.label.strip() != task.goal.strip():
                 node.metadata.setdefault("task_context", context)
 
