@@ -67,7 +67,7 @@ TaskGraph(topology="fork-join → adversarial → serial")
 ```
 
 ```mermaid
-%%{init: {"theme":"base","themeVariables":{"fontFamily":"Roboto Mono, monospace","fontSize":"13px","primaryColor":"#f0fdf4","primaryTextColor":"#14532d","primaryBorderColor":"#86efac","lineColor":"#16a34a"},"flowchart":{"curve":"linear","nodeSpacing":50,"rankSpacing":55}}}%%
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Roboto Mono, monospace","fontSize":"13px","primaryColor":"#f9fafb","primaryTextColor":"#1f2937","primaryBorderColor":"#9ca3af","lineColor":"#9ca3af"},"flowchart":{"curve":"stepAfter","nodeSpacing":50,"rankSpacing":60}}}%%
 flowchart TD
     financial("<b>FinancialAnalyst</b><br/>revenue model, margins, burn, comps")
     technical("<b>TechDiligenceAgent</b><br/>IP portfolio, tech debt, key-person risk")
@@ -81,15 +81,15 @@ flowchart TD
     draft --> redteam
     draft --> memo
     redteam --> memo
-    classDef specialist fill:#f0fdf4,stroke:#86efac,stroke-width:1.5px,color:#14532d
-    classDef editor fill:#dcfce7,stroke:#4ade80,stroke-width:1.5px,color:#14532d
-    classDef adversarial fill:#bbf7d0,stroke:#22c55e,stroke-width:1.5px,color:#14532d
-    classDef deliverable fill:#15803d,stroke:#14532d,stroke-width:1.5px,color:#f0fdf4
+    classDef specialist fill:#f9fafb,stroke:#9ca3af,stroke-width:1px,color:#1f2937
+    classDef editor fill:#f3f4f6,stroke:#6b7280,stroke-width:1px,color:#1f2937
+    classDef adversarial fill:#e5e7eb,stroke:#6b7280,stroke-width:1px,color:#1f2937
+    classDef deliverable fill:#374151,stroke:#1f2937,stroke-width:1px,color:#f9fafb
     class financial,technical,regulatory specialist
     class draft editor
     class redteam adversarial
     class memo deliverable
-    linkStyle default stroke:#16a34a,stroke-width:1.5px
+    linkStyle default stroke:#9ca3af,stroke-width:1px
 ```
 
 Three specialists run in parallel under a budget cap, a red team attacks the draft, and the memo node turns the surviving claims into a conditional go/no-go recommendation. The expected graph, trace, and memo are committed in [examples/acquisition_diligence/expected/](examples/acquisition_diligence/expected/) — a test regenerates them on every CI run, so what you see there is what the code does. Full walkthrough: [examples/acquisition_diligence/](examples/acquisition_diligence/).
