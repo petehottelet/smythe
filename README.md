@@ -67,7 +67,7 @@ TaskGraph(topology="fork-join → adversarial → serial")
 ```
 
 ```mermaid
-%%{init: {"theme":"base","themeVariables":{"fontFamily":"Roboto Mono, monospace","fontSize":"13px","primaryColor":"#f9fafb","primaryTextColor":"#1f2937","primaryBorderColor":"#9ca3af","lineColor":"#9ca3af"},"flowchart":{"curve":"stepAfter","nodeSpacing":50,"rankSpacing":60}}}%%
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Roboto Mono, monospace","fontSize":"13px","primaryColor":"#f9fafb","primaryTextColor":"#1f2937","primaryBorderColor":"#9ca3af","lineColor":"#9ca3af"},"flowchart":{"curve":"step","nodeSpacing":50,"rankSpacing":60}}}%%
 flowchart TD
     financial("<b>FinancialAnalyst</b><br/>revenue model, margins, burn, comps")
     technical("<b>TechDiligenceAgent</b><br/>IP portfolio, tech debt, key-person risk")
