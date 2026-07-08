@@ -1,6 +1,6 @@
 # Smythe examples
 
-Every example runs offline out of the box — a built-in `DemoProvider` returns canned responses so you can see the machinery (planning, fan-out, budget enforcement, synthesis) without an API key. Set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY` and the same script runs against a real model.
+Every example runs offline out of the box — a built-in `DemoProvider` returns canned responses so you can see the machinery (planning, fan-out, budget enforcement, synthesis) without an API key. Set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY` and the same script runs against a real model. Run any example from the repo root:
 
 ```bash
 pip install -e .            # from the repo root
