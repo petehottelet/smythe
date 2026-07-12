@@ -5,17 +5,17 @@
   "model": "gemini-2.5-flash-image",
   "assets_pass": "8/8",
   "brand_logo": {
-    "path": "C:\\Users\\PeteHottelet\\Projects\\smythe\\smythe_artifacts\\asset_suite\\metacortex_datacentres\\raw\\logo\\bf2a7f2d6826\\brand_logo_00.png",
+    "path": "C:\\Users\\PeteHottelet\\Projects\\smythe\\smythe_artifacts\\asset_suite\\metacortex_datacentres\\raw\\logo\\8d47689af82a\\brand_logo_00.png",
     "source": "generated",
     "cost_usd": 0.039,
-    "wall_s": 6.93
+    "wall_s": 7.45
   },
-  "generation_wall_s": 11.83,
+  "generation_wall_s": 11.31,
   "buckets_run_concurrently": 5,
-  "cost_usd": 0.3837,
+  "cost_usd": 0.3836,
   "brand_judge": {
-    "overall": 3,
-    "cost_usd": 0.032724
+    "overall": 8,
+    "cost_usd": 0.032592
   },
   "assets": [
     {
@@ -28,13 +28,13 @@
       ],
       "upscale_factor": 1.79,
       "cropped_fraction": 0.125,
+      "tagline_composited": true,
       "status": "PASS",
       "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\hero.png",
-      "brand_consistency": 4,
+      "brand_consistency": 8,
       "defects": [
-        "Typo in 'Infrastrcture'",
-        "Logo is distorted/scaled inconsistently",
-        "Logo is missing 'METACORTEX' text component in certain placements"
+        "Logo in hanging sign has slight distortion due to perspective",
+        "Logo on server racks appears as a generic variation rather than the exact crisp vector mark"
       ]
     },
     {
@@ -47,12 +47,12 @@
       ],
       "upscale_factor": 1.05,
       "cropped_fraction": 0.0,
+      "tagline_composited": true,
       "status": "PASS",
       "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\instagram.jpg",
-      "brand_consistency": 4,
+      "brand_consistency": 8,
       "defects": [
-        "Typo in 'Infrastrcture'",
-        "Logo mark is inconsistent in size and placement"
+        "Logo on rack door is slightly simplified compared to the official brand asset"
       ]
     },
     {
@@ -65,13 +65,12 @@
       ],
       "upscale_factor": 0.98,
       "cropped_fraction": 0.238,
+      "tagline_composited": true,
       "status": "PASS",
       "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\x_banner.jpg",
-      "brand_consistency": 3,
+      "brand_consistency": 9,
       "defects": [
-        "Typo in 'Datacnetres'",
-        "Typo in 'Infrastrcture'",
-        "Inconsistent logo usage (cut off)"
+        "Minor resolution degradation on the logo mark due to scale"
       ]
     },
     {
@@ -84,12 +83,13 @@
       ],
       "upscale_factor": 1.43,
       "cropped_fraction": 0.015,
+      "tagline_composited": true,
       "status": "PASS",
       "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\story.png",
-      "brand_consistency": 3,
+      "brand_consistency": 8,
       "defects": [
-        "Typo in 'Infrastrcture'",
-        "Typo in 'inteligence'"
+        "Logo on rack door lacks fine detail found in original vector",
+        "Logo on information board is slightly compressed"
       ]
     },
     {
@@ -102,12 +102,13 @@
       ],
       "upscale_factor": 0.39,
       "cropped_fraction": 0.237,
+      "tagline_composited": true,
       "status": "PASS",
       "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\email_header.png",
-      "brand_consistency": 3,
+      "brand_consistency": 7,
       "defects": [
-        "Typo in 'Datacanetres'",
-        "Typo in 'Infrastrcture'"
+        "Logo mark is significantly simplified/rendered differently",
+        "Text 'DATACENTRES' is blurred/illegible"
       ]
     },
     {
@@ -120,13 +121,12 @@
       ],
       "upscale_factor": 2.08,
       "cropped_fraction": 0.193,
+      "tagline_composited": true,
       "status": "PASS",
       "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\appstore.png",
-      "brand_consistency": 3,
+      "brand_consistency": 9,
       "defects": [
-        "Typo in 'Infrastrcture'",
-        "Typo in 'inteligence'",
-        "UI text contains gibberish/non-latin characters in labels"
+        "Text 'DATACENTRES' on the UI logo has minor kerning/rendering artifacts"
       ]
     },
     {
@@ -139,12 +139,13 @@
       ],
       "upscale_factor": 0.89,
       "cropped_fraction": 0.082,
+      "tagline_composited": true,
       "status": "PASS",
       "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\og_card.png",
-      "brand_consistency": 4,
+      "brand_consistency": 7,
       "defects": [
-        "Typo in 'Datacentres' (capitalization inconsistency)",
-        "Typo in 'Infrastrcture'"
+        "Logo on rack is blurry",
+        "Significant artifacting in white container box near logo"
       ]
     },
     {
@@ -157,12 +158,13 @@
       ],
       "upscale_factor": 2.95,
       "cropped_fraction": 0.056,
+      "tagline_composited": true,
       "status": "PASS",
       "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\print_ad.png",
-      "brand_consistency": 4,
+      "brand_consistency": 8,
       "defects": [
-        "Typo in 'Infrastrcture'",
-        "Typo in 'infarsilocture'"
+        "Duplicated logo at the bottom footer is slightly different in color shade",
+        "Building facade logo rendering lacks sharpness of the original vector"
       ]
     }
   ]
