@@ -68,6 +68,10 @@ class Node:
             attempt fails and is handled by the node's failure policy.
         max_tool_iterations: Cap on tool-loop iterations for this node.
             None (default) uses the executor-level default.
+        attach_dep_artifacts: When True, image artifacts produced by this
+            node's dependencies are attached to its prompt as multimodal
+            inputs — the node *sees* the images (vision judge /
+            art-director pattern), not just their file paths.
     """
 
     label: str
@@ -82,6 +86,7 @@ class Node:
     required_capabilities: list[str] = field(default_factory=list)
     timeout_s: float | None = None
     max_tool_iterations: int | None = None
+    attach_dep_artifacts: bool = False
 
 
 @dataclass

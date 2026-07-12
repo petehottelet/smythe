@@ -21,6 +21,20 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
+### Added
+
+- **Vision input — nodes can see images.** `ChatMessage.attachments`
+  carries `Artifact` objects mapped to each provider's native
+  multimodal format (Anthropic image blocks, OpenAI `image_url` data
+  URIs, Gemini `inline_data` parts). `Node(attach_dep_artifacts=True)`
+  feeds a node its dependencies' generated images as actual pixels, not
+  paths — the art-director/vision-judge pattern (select-from-N
+  curation). Capped at 12 images / 8 MB each; YAML and checkpoint
+  support included; `OfflineProvider` acknowledges attachments so the
+  path runs deterministically in CI. New example:
+  `examples/11_vision_judge.py` — in its first real run the judge
+  caught and rejected a candidate ad with a spelling error.
+
 Future work tracked in [ROADMAP.md](ROADMAP.md).
 
 ---
