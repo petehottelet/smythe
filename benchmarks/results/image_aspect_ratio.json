@@ -1,0 +1,68 @@
+{
+  "benchmark": "image-concurrency-sweep",
+  "mode": "LIVE",
+  "model": "gemini-2.5-flash-image",
+  "cost_per_image_usd": 0.039,
+  "images_per_run": 4,
+  "summary": [
+    {
+      "k": 4,
+      "runs": 1,
+      "wall_s_mean": 7.85,
+      "wall_s_range": [
+        7.85,
+        7.85
+      ],
+      "efficiency_mean": 0.798,
+      "throughput_mean_ipm": 30.6,
+      "cost_total_usd": 0.156
+    }
+  ],
+  "runs": [
+    {
+      "k": 4,
+      "images_requested": 4,
+      "images_completed": 4,
+      "nodes_ok": "4/4",
+      "wall_s": 7.85,
+      "sum_node_latency_s": 25.04,
+      "node_latency_s": [
+        5.59,
+        7.56,
+        5.91,
+        5.99
+      ],
+      "concurrency_factor": 3.19,
+      "efficiency_vs_ideal": 0.798,
+      "throughput_images_per_min": 30.6,
+      "cost_usd": 0.156,
+      "aspect_ratio_requested": "16:9",
+      "artifacts": {
+        "decoded": 4,
+        "total": 4,
+        "sizes": [
+          [
+            1344,
+            768
+          ],
+          [
+            1344,
+            768
+          ],
+          [
+            1344,
+            768
+          ],
+          [
+            1344,
+            768
+          ]
+        ],
+        "dhash_pairwise_min": 22,
+        "dhash_pairwise_mean": 26.5
+      },
+      "execution_id": "2b5fb389c94e46a8bd5c9ebf21869b4a",
+      "repeat": 0
+    }
+  ]
+}

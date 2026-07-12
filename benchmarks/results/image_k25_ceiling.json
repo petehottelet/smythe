@@ -1,0 +1,173 @@
+{
+  "benchmark": "image-concurrency-sweep",
+  "mode": "LIVE",
+  "model": "gemini-2.5-flash-image",
+  "cost_per_image_usd": 0.039,
+  "images_per_run": 25,
+  "summary": [
+    {
+      "k": 25,
+      "runs": 1,
+      "wall_s_mean": 10.17,
+      "wall_s_range": [
+        10.17,
+        10.17
+      ],
+      "efficiency_mean": 0.636,
+      "throughput_mean_ipm": 147.5,
+      "cost_total_usd": 0.975
+    }
+  ],
+  "runs": [
+    {
+      "k": 25,
+      "images_requested": 25,
+      "images_completed": 25,
+      "nodes_ok": "25/25",
+      "wall_s": 10.17,
+      "sum_node_latency_s": 161.65,
+      "node_latency_s": [
+        4.84,
+        5.07,
+        5.21,
+        5.54,
+        8.01,
+        6.23,
+        6.33,
+        6.36,
+        6.38,
+        6.49,
+        6.51,
+        6.5,
+        6.58,
+        6.58,
+        6.63,
+        6.64,
+        6.64,
+        6.67,
+        6.67,
+        6.68,
+        6.67,
+        6.69,
+        6.69,
+        6.71,
+        8.34
+      ],
+      "concurrency_factor": 15.89,
+      "efficiency_vs_ideal": 0.636,
+      "throughput_images_per_min": 147.5,
+      "cost_usd": 0.975,
+      "aspect_ratio_requested": null,
+      "artifacts": {
+        "decoded": 25,
+        "total": 25,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 7,
+        "dhash_pairwise_mean": 26.2
+      },
+      "execution_id": "77488fbbc80c4136bde4fd6b0bb3e109",
+      "repeat": 0
+    }
+  ]
+}
