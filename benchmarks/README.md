@@ -151,6 +151,47 @@ is the follow-up.
 one judge, same vendor as the executor; tasks were authored by this
 project. Framework head-to-heads remain open (see Planned).
 
+## Framework head-to-head: LangGraph and CrewAI (2026-07-12)
+
+The long-promised comparison ([run_framework_h2h.py](run_framework_h2h.py),
+raw records in [results/framework_h2h.json](results/framework_h2h.json)):
+the **same fixed pipeline** — identical step prompts and personas
+([harness.PIPELINE_SPECS](harness.py)) — implemented idiomatically in
+each framework, on the same 5 tasks, same executor model
+(`gpt-5.4-mini`), 3 reps, **judged blind by a different vendor**
+(Gemini), which addresses the self-preference caveat in the v5 results
+below. 60/60 runs completed, zero framework errors.
+
+| System | Quality (blind) | Tokens | Wall |
+|---|---:|---:|---:|
+| smythe (fixed pipeline) | 9.67 [8–10] | **8,372** | **29.3s** |
+| LangGraph (fixed) | 9.40 [8–10] | 8,782 | 30.8s |
+| CrewAI (fixed) | 9.87 [9–10] | 39,696 | 45.6s |
+| smythe (dynamic) | 9.27 [5–10] | 14,584 | 37.4s |
+
+**The honest read.**
+- **smythe's orchestration overhead is competitive with LangGraph** —
+  within 5% on tokens and wall time for the identical pipeline. The
+  framework adds no fat relative to the lightest mainstream option.
+- **CrewAI consumed 4.7× the tokens** (its agent scaffolding — roles,
+  backstories, internal formatting — is baked into every call) and 56%
+  more wall time, for +0.2 quality that sits inside a known confound:
+  longer outputs tend to score higher with LLM judges, and CrewAI's
+  outputs were the longest.
+- **Quality is ceiling-compressed** (everything 9–10 except one
+  outlier): the Gemini judge is lenient despite strict instructions, so
+  this table discriminates *efficiency* well and *quality* weakly.
+- **Dynamic topology still doesn't beat the fixed pipeline on
+  homogeneous text tasks** — consistent with the v5 finding, now
+  replicated under a different executor and an independent-vendor
+  judge. Its [5–10] range includes one bad generated plan; planning
+  variance is the cost of generated topology. (Where dynamic *does*
+  win — parallel image workloads, 6.6–14× wall-clock — is measured in
+  [image_benchmarks.md](image_benchmarks.md).)
+- Caveats: different executor model than the v5 self-baselines (tables
+  are not directly comparable); n=3 per cell; token counts come from
+  each framework's own accounting (sources recorded per run).
+
 ## Methodology commitments
 
 1. **Same model everywhere.** No baseline gets a better model.
@@ -171,11 +212,12 @@ honest caveats (including an observed near-duplicate pair):
 
 ## Planned
 
-- Head-to-head vs. LangGraph and CrewAI equivalents of the fixed
-  pipeline
 - A memory task family with planted failure modes, so recall has
   mistakes to correct (the current family measures null — see above)
-- An independent, non-Anthropic judge model
+- Framework head-to-head re-run on the original v5 protocol
+  (claude-opus-4-8 executor) so the tables become directly comparable
+- A judge with better score discrimination (the current independent
+  judge is ceiling-compressed at 9–10)
 - Image pipeline continuations — aspect-ratio compliance, the k>8
   ceiling, select-from-N curation, ad-suite brand consistency
   (see [image_benchmarks.md](image_benchmarks.md))
