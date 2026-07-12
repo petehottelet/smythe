@@ -84,8 +84,8 @@ even same-prompt regenerations differed materially.
 
 ## Planned next
 
-- Aspect-ratio compliance cell (`image_config` live).
-- k=16/25 to find the single-key ceiling; multi-key pooling after.
 - Select-from-N curation tier with a vision judge (quality-per-dollar
   curve), and the ad-suite brand-consistency comparison (shared brief
   vs. serial style stage vs. single agent).
+- Repeats for the k=25 cell (single run today) and k>25 if a workload
+  ever needs it.
