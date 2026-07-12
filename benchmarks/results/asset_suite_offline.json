@@ -1,0 +1,115 @@
+{
+  "benchmark": "osiris-asset-suite",
+  "mode": "offline",
+  "model": "offline",
+  "assets_pass": "8/8",
+  "generation_wall_s": 0.01,
+  "buckets_run_concurrently": 5,
+  "cost_usd": 0.0024,
+  "assets": [
+    {
+      "asset": "hero",
+      "spec": "2400x1200 PNG",
+      "aspect_bucket": "16:9",
+      "generated_size": [
+        1,
+        1
+      ],
+      "upscale_factor": 2400.0,
+      "cropped_fraction": 0.5,
+      "status": "PASS",
+      "final_path": "smythe_artifacts\\asset_suite\\final\\hero.png"
+    },
+    {
+      "asset": "instagram",
+      "spec": "1080x1080 JPEG",
+      "aspect_bucket": "1:1",
+      "generated_size": [
+        1,
+        1
+      ],
+      "upscale_factor": 1080.0,
+      "cropped_fraction": 0.0,
+      "status": "PASS",
+      "final_path": "smythe_artifacts\\asset_suite\\final\\instagram.jpg"
+    },
+    {
+      "asset": "x_banner",
+      "spec": "1500x500 JPEG",
+      "aspect_bucket": "21:9",
+      "generated_size": [
+        1,
+        1
+      ],
+      "upscale_factor": 1500.0,
+      "cropped_fraction": 0.667,
+      "status": "PASS",
+      "final_path": "smythe_artifacts\\asset_suite\\final\\x_banner.jpg"
+    },
+    {
+      "asset": "story",
+      "spec": "1080x1920 PNG",
+      "aspect_bucket": "9:16",
+      "generated_size": [
+        1,
+        1
+      ],
+      "upscale_factor": 1920.0,
+      "cropped_fraction": 0.438,
+      "status": "PASS",
+      "final_path": "smythe_artifacts\\asset_suite\\final\\story.png"
+    },
+    {
+      "asset": "email_header",
+      "spec": "600x200 PNG",
+      "aspect_bucket": "21:9",
+      "generated_size": [
+        1,
+        1
+      ],
+      "upscale_factor": 600.0,
+      "cropped_fraction": 0.667,
+      "status": "PASS",
+      "final_path": "smythe_artifacts\\asset_suite\\final\\email_header.png"
+    },
+    {
+      "asset": "appstore",
+      "spec": "1290x2796 PNG",
+      "aspect_bucket": "9:16",
+      "generated_size": [
+        1,
+        1
+      ],
+      "upscale_factor": 2796.0,
+      "cropped_fraction": 0.539,
+      "status": "PASS",
+      "final_path": "smythe_artifacts\\asset_suite\\final\\appstore.png"
+    },
+    {
+      "asset": "og_card",
+      "spec": "1200x630 PNG",
+      "aspect_bucket": "16:9",
+      "generated_size": [
+        1,
+        1
+      ],
+      "upscale_factor": 1200.0,
+      "cropped_fraction": 0.475,
+      "status": "PASS",
+      "final_path": "smythe_artifacts\\asset_suite\\final\\og_card.png"
+    },
+    {
+      "asset": "print_ad",
+      "spec": "2550x3300 PNG",
+      "aspect_bucket": "3:4",
+      "generated_size": [
+        1,
+        1
+      ],
+      "upscale_factor": 3300.0,
+      "cropped_fraction": 0.227,
+      "status": "PASS",
+      "final_path": "smythe_artifacts\\asset_suite\\final\\print_ad.png"
+    }
+  ]
+}
