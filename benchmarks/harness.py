@@ -58,6 +58,20 @@ def load_tasks(tasks_dir: str | Path) -> list[BenchmarkTask]:
     return tasks
 
 
+# The one fixed pipeline, shared verbatim by every framework in the
+# head-to-head (run_framework_h2h.py) so the comparison is about the
+# frameworks, not the prompts: (step id, label prefix, persona).
+PIPELINE_SPECS = [
+    ("research", "Research the topic and gather the relevant facts for: ",
+     "You are a thorough researcher. Gather facts, note uncertainty."),
+    ("analyze", "Analyze the research findings and identify risks, "
+     "trade-offs, and open questions for: ",
+     "You are a critical analyst. Weigh evidence, surface risks."),
+    ("write", "Write the final deliverable, meeting every constraint, for: ",
+     "You write clear, structured deliverables."),
+]
+
+
 class FixedPipelineArchitect(DeterministicArchitect):
     """The hardcoded-pipeline strawman, held fixed across all tasks.
 
@@ -67,15 +81,7 @@ class FixedPipelineArchitect(DeterministicArchitect):
 
     def plan(self, task: Task) -> tuple[ExecutionGraph, Registry]:
         registry = Registry()
-        specs = [
-            ("research", "Research the topic and gather the relevant facts for: ",
-             "You are a thorough researcher. Gather facts, note uncertainty."),
-            ("analyze", "Analyze the research findings and identify risks, "
-             "trade-offs, and open questions for: ",
-             "You are a critical analyst. Weigh evidence, surface risks."),
-            ("write", "Write the final deliverable, meeting every constraint, for: ",
-             "You write clear, structured deliverables."),
-        ]
+        specs = PIPELINE_SPECS
         nodes: list[Node] = []
         prev: str | None = None
         for node_id, label_prefix, persona in specs:

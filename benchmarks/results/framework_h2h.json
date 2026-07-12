@@ -1,0 +1,718 @@
+{
+  "benchmark": "framework-head-to-head",
+  "executor_model": "gpt-5.4-mini",
+  "judge_model": "gemini-pro-latest (different vendor than executor)",
+  "reps": 3,
+  "summary": [
+    {
+      "system": "smythe_fixed",
+      "runs_ok": 15,
+      "errors": 0,
+      "quality_mean": 9.67,
+      "quality_range": [
+        8,
+        10
+      ],
+      "tokens_mean": 8372,
+      "wall_s_mean": 29.28
+    },
+    {
+      "system": "smythe_dynamic",
+      "runs_ok": 15,
+      "errors": 0,
+      "quality_mean": 9.27,
+      "quality_range": [
+        5,
+        10
+      ],
+      "tokens_mean": 14584,
+      "wall_s_mean": 37.35
+    },
+    {
+      "system": "langgraph_fixed",
+      "runs_ok": 15,
+      "errors": 0,
+      "quality_mean": 9.4,
+      "quality_range": [
+        8,
+        10
+      ],
+      "tokens_mean": 8782,
+      "wall_s_mean": 30.76
+    },
+    {
+      "system": "crewai_fixed",
+      "runs_ok": 15,
+      "errors": 0,
+      "quality_mean": 9.87,
+      "quality_range": [
+        9,
+        10
+      ],
+      "tokens_mean": 39696,
+      "wall_s_mean": 45.64
+    }
+  ],
+  "records": [
+    {
+      "wall_s": 28.48,
+      "tokens": 9579,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "acquisition-diligence",
+      "system": "smythe_fixed",
+      "rep": 0
+    },
+    {
+      "wall_s": 28.54,
+      "tokens": 10702,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "acquisition-diligence",
+      "system": "smythe_fixed",
+      "rep": 1
+    },
+    {
+      "wall_s": 27.37,
+      "tokens": 9164,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "acquisition-diligence",
+      "system": "smythe_fixed",
+      "rep": 2
+    },
+    {
+      "wall_s": 37.33,
+      "tokens": 19830,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 6,
+      "quality": 10,
+      "error": null,
+      "task": "acquisition-diligence",
+      "system": "smythe_dynamic",
+      "rep": 0
+    },
+    {
+      "wall_s": 42.42,
+      "tokens": 12933,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 4,
+      "quality": 10,
+      "error": null,
+      "task": "acquisition-diligence",
+      "system": "smythe_dynamic",
+      "rep": 1
+    },
+    {
+      "wall_s": 37.21,
+      "tokens": 19758,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 6,
+      "quality": 10,
+      "error": null,
+      "task": "acquisition-diligence",
+      "system": "smythe_dynamic",
+      "rep": 2
+    },
+    {
+      "wall_s": 31.35,
+      "tokens": 10485,
+      "tokens_source": "usage_metadata",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "acquisition-diligence",
+      "system": "langgraph_fixed",
+      "rep": 0
+    },
+    {
+      "wall_s": 31.46,
+      "tokens": 10562,
+      "tokens_source": "usage_metadata",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "acquisition-diligence",
+      "system": "langgraph_fixed",
+      "rep": 1
+    },
+    {
+      "wall_s": 32.14,
+      "tokens": 10176,
+      "tokens_source": "usage_metadata",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "acquisition-diligence",
+      "system": "langgraph_fixed",
+      "rep": 2
+    },
+    {
+      "wall_s": 38.28,
+      "tokens": 40356,
+      "tokens_source": "crew_usage_metrics",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "acquisition-diligence",
+      "system": "crewai_fixed",
+      "rep": 0
+    },
+    {
+      "wall_s": 41.17,
+      "tokens": 41436,
+      "tokens_source": "crew_usage_metrics",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "acquisition-diligence",
+      "system": "crewai_fixed",
+      "rep": 1
+    },
+    {
+      "wall_s": 39.06,
+      "tokens": 41814,
+      "tokens_source": "crew_usage_metrics",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "acquisition-diligence",
+      "system": "crewai_fixed",
+      "rep": 2
+    },
+    {
+      "wall_s": 17.52,
+      "tokens": 6692,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "code-review",
+      "system": "smythe_fixed",
+      "rep": 0
+    },
+    {
+      "wall_s": 16.37,
+      "tokens": 5751,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "code-review",
+      "system": "smythe_fixed",
+      "rep": 1
+    },
+    {
+      "wall_s": 19.0,
+      "tokens": 5944,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 8,
+      "error": null,
+      "task": "code-review",
+      "system": "smythe_fixed",
+      "rep": 2
+    },
+    {
+      "wall_s": 21.78,
+      "tokens": 6323,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 8,
+      "error": null,
+      "task": "code-review",
+      "system": "smythe_dynamic",
+      "rep": 0
+    },
+    {
+      "wall_s": 17.99,
+      "tokens": 5548,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "code-review",
+      "system": "smythe_dynamic",
+      "rep": 1
+    },
+    {
+      "wall_s": 22.47,
+      "tokens": 6957,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "code-review",
+      "system": "smythe_dynamic",
+      "rep": 2
+    },
+    {
+      "wall_s": 21.09,
+      "tokens": 6578,
+      "tokens_source": "usage_metadata",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "code-review",
+      "system": "langgraph_fixed",
+      "rep": 0
+    },
+    {
+      "wall_s": 20.11,
+      "tokens": 6362,
+      "tokens_source": "usage_metadata",
+      "nodes": 3,
+      "quality": 8,
+      "error": null,
+      "task": "code-review",
+      "system": "langgraph_fixed",
+      "rep": 1
+    },
+    {
+      "wall_s": 19.83,
+      "tokens": 6438,
+      "tokens_source": "usage_metadata",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "code-review",
+      "system": "langgraph_fixed",
+      "rep": 2
+    },
+    {
+      "wall_s": 19.26,
+      "tokens": 20010,
+      "tokens_source": "crew_usage_metrics",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "code-review",
+      "system": "crewai_fixed",
+      "rep": 0
+    },
+    {
+      "wall_s": 28.39,
+      "tokens": 29847,
+      "tokens_source": "crew_usage_metrics",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "code-review",
+      "system": "crewai_fixed",
+      "rep": 1
+    },
+    {
+      "wall_s": 23.51,
+      "tokens": 22170,
+      "tokens_source": "crew_usage_metrics",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "code-review",
+      "system": "crewai_fixed",
+      "rep": 2
+    },
+    {
+      "wall_s": 44.91,
+      "tokens": 11133,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "competitive-analysis",
+      "system": "smythe_fixed",
+      "rep": 0
+    },
+    {
+      "wall_s": 40.73,
+      "tokens": 10653,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "competitive-analysis",
+      "system": "smythe_fixed",
+      "rep": 1
+    },
+    {
+      "wall_s": 42.28,
+      "tokens": 11339,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "competitive-analysis",
+      "system": "smythe_fixed",
+      "rep": 2
+    },
+    {
+      "wall_s": 56.89,
+      "tokens": 21220,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 6,
+      "quality": 9,
+      "error": null,
+      "task": "competitive-analysis",
+      "system": "smythe_dynamic",
+      "rep": 0
+    },
+    {
+      "wall_s": 48.54,
+      "tokens": 24839,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 8,
+      "quality": 9,
+      "error": null,
+      "task": "competitive-analysis",
+      "system": "smythe_dynamic",
+      "rep": 1
+    },
+    {
+      "wall_s": 45.7,
+      "tokens": 17692,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 6,
+      "quality": 5,
+      "error": null,
+      "task": "competitive-analysis",
+      "system": "smythe_dynamic",
+      "rep": 2
+    },
+    {
+      "wall_s": 35.17,
+      "tokens": 9433,
+      "tokens_source": "usage_metadata",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "competitive-analysis",
+      "system": "langgraph_fixed",
+      "rep": 0
+    },
+    {
+      "wall_s": 37.66,
+      "tokens": 10712,
+      "tokens_source": "usage_metadata",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "competitive-analysis",
+      "system": "langgraph_fixed",
+      "rep": 1
+    },
+    {
+      "wall_s": 40.64,
+      "tokens": 11276,
+      "tokens_source": "usage_metadata",
+      "nodes": 3,
+      "quality": 9,
+      "error": null,
+      "task": "competitive-analysis",
+      "system": "langgraph_fixed",
+      "rep": 2
+    },
+    {
+      "wall_s": 71.54,
+      "tokens": 62388,
+      "tokens_source": "crew_usage_metrics",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "competitive-analysis",
+      "system": "crewai_fixed",
+      "rep": 0
+    },
+    {
+      "wall_s": 74.81,
+      "tokens": 58149,
+      "tokens_source": "crew_usage_metrics",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "competitive-analysis",
+      "system": "crewai_fixed",
+      "rep": 1
+    },
+    {
+      "wall_s": 68.84,
+      "tokens": 57630,
+      "tokens_source": "crew_usage_metrics",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "competitive-analysis",
+      "system": "crewai_fixed",
+      "rep": 2
+    },
+    {
+      "wall_s": 35.5,
+      "tokens": 9718,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "product-launch",
+      "system": "smythe_fixed",
+      "rep": 0
+    },
+    {
+      "wall_s": 36.35,
+      "tokens": 9458,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 9,
+      "error": null,
+      "task": "product-launch",
+      "system": "smythe_fixed",
+      "rep": 1
+    },
+    {
+      "wall_s": 35.86,
+      "tokens": 8795,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 9,
+      "error": null,
+      "task": "product-launch",
+      "system": "smythe_fixed",
+      "rep": 2
+    },
+    {
+      "wall_s": 37.08,
+      "tokens": 17815,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 5,
+      "quality": 10,
+      "error": null,
+      "task": "product-launch",
+      "system": "smythe_dynamic",
+      "rep": 0
+    },
+    {
+      "wall_s": 41.01,
+      "tokens": 10960,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 4,
+      "quality": 10,
+      "error": null,
+      "task": "product-launch",
+      "system": "smythe_dynamic",
+      "rep": 1
+    },
+    {
+      "wall_s": 45.1,
+      "tokens": 11753,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 5,
+      "quality": 10,
+      "error": null,
+      "task": "product-launch",
+      "system": "smythe_dynamic",
+      "rep": 2
+    },
+    {
+      "wall_s": 41.07,
+      "tokens": 10950,
+      "tokens_source": "usage_metadata",
+      "nodes": 3,
+      "quality": 9,
+      "error": null,
+      "task": "product-launch",
+      "system": "langgraph_fixed",
+      "rep": 0
+    },
+    {
+      "wall_s": 42.65,
+      "tokens": 10705,
+      "tokens_source": "usage_metadata",
+      "nodes": 3,
+      "quality": 9,
+      "error": null,
+      "task": "product-launch",
+      "system": "langgraph_fixed",
+      "rep": 1
+    },
+    {
+      "wall_s": 43.64,
+      "tokens": 11651,
+      "tokens_source": "usage_metadata",
+      "nodes": 3,
+      "quality": 9,
+      "error": null,
+      "task": "product-launch",
+      "system": "langgraph_fixed",
+      "rep": 2
+    },
+    {
+      "wall_s": 62.71,
+      "tokens": 51501,
+      "tokens_source": "crew_usage_metrics",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "product-launch",
+      "system": "crewai_fixed",
+      "rep": 0
+    },
+    {
+      "wall_s": 65.83,
+      "tokens": 54225,
+      "tokens_source": "crew_usage_metrics",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "product-launch",
+      "system": "crewai_fixed",
+      "rep": 1
+    },
+    {
+      "wall_s": 67.59,
+      "tokens": 57825,
+      "tokens_source": "crew_usage_metrics",
+      "nodes": 3,
+      "quality": 9,
+      "error": null,
+      "task": "product-launch",
+      "system": "crewai_fixed",
+      "rep": 2
+    },
+    {
+      "wall_s": 21.53,
+      "tokens": 5416,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 9,
+      "error": null,
+      "task": "research-memo",
+      "system": "smythe_fixed",
+      "rep": 0
+    },
+    {
+      "wall_s": 21.99,
+      "tokens": 5341,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "research-memo",
+      "system": "smythe_fixed",
+      "rep": 1
+    },
+    {
+      "wall_s": 22.8,
+      "tokens": 5895,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "research-memo",
+      "system": "smythe_fixed",
+      "rep": 2
+    },
+    {
+      "wall_s": 30.44,
+      "tokens": 12479,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 6,
+      "quality": 9,
+      "error": null,
+      "task": "research-memo",
+      "system": "smythe_dynamic",
+      "rep": 0
+    },
+    {
+      "wall_s": 36.63,
+      "tokens": 14570,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 7,
+      "quality": 10,
+      "error": null,
+      "task": "research-memo",
+      "system": "smythe_dynamic",
+      "rep": 1
+    },
+    {
+      "wall_s": 39.66,
+      "tokens": 16077,
+      "tokens_source": "derived_from_blended_cost",
+      "nodes": 7,
+      "quality": 9,
+      "error": null,
+      "task": "research-memo",
+      "system": "smythe_dynamic",
+      "rep": 2
+    },
+    {
+      "wall_s": 21.64,
+      "tokens": 5528,
+      "tokens_source": "usage_metadata",
+      "nodes": 3,
+      "quality": 9,
+      "error": null,
+      "task": "research-memo",
+      "system": "langgraph_fixed",
+      "rep": 0
+    },
+    {
+      "wall_s": 21.6,
+      "tokens": 5211,
+      "tokens_source": "usage_metadata",
+      "nodes": 3,
+      "quality": 9,
+      "error": null,
+      "task": "research-memo",
+      "system": "langgraph_fixed",
+      "rep": 1
+    },
+    {
+      "wall_s": 21.39,
+      "tokens": 5666,
+      "tokens_source": "usage_metadata",
+      "nodes": 3,
+      "quality": 9,
+      "error": null,
+      "task": "research-memo",
+      "system": "langgraph_fixed",
+      "rep": 2
+    },
+    {
+      "wall_s": 26.34,
+      "tokens": 18126,
+      "tokens_source": "crew_usage_metrics",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "research-memo",
+      "system": "crewai_fixed",
+      "rep": 0
+    },
+    {
+      "wall_s": 28.22,
+      "tokens": 20583,
+      "tokens_source": "crew_usage_metrics",
+      "nodes": 3,
+      "quality": 9,
+      "error": null,
+      "task": "research-memo",
+      "system": "crewai_fixed",
+      "rep": 1
+    },
+    {
+      "wall_s": 29.1,
+      "tokens": 19380,
+      "tokens_source": "crew_usage_metrics",
+      "nodes": 3,
+      "quality": 10,
+      "error": null,
+      "task": "research-memo",
+      "system": "crewai_fixed",
+      "rep": 2
+    }
+  ]
+}
