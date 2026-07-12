@@ -174,6 +174,28 @@ doesn't fill — placement-aware compositing is the refinement.
 MetaCortex now matches Osiris despite a tagline that is 3x harder to
 render, because it no longer renders it.
 
+## Judge variance and the optimizer loop (2026-07-12)
+
+**Judge variance, measured** ([run_judge_variance.py](run_judge_variance.py),
+[results/judge_variance.json](results/judge_variance.json)): re-judging
+identical pixels 5 times gives overall **7.6 ± 0.49 (range 7–8)**,
+per-asset spread up to ±1. Consequences: single-run deltas under ~1
+point are noise; the 3/10 → 8/10 compositing fix was ~10σ.
+
+**The optimizer** ([run_optimizer.py](run_optimizer.py)) is the
+autoresearch pattern applied to this suite: an LLM proposes one
+targeted prompt-policy change per iteration, the full suite runs live,
+and the candidate is scored as the mean of 3 independent judgings
+(sd of mean ~0.28) — kept only if it beats the incumbent by >0.5
+(~2σ) AND passes the un-gameable format gates (8/8 exact specs).
+Every experiment is journaled
+([results/optimizer_journal.jsonl](results/optimizer_journal.jsonl)).
+Smoke run (~$0.90): baseline 7.67; iteration 1 proposed a sensible
+logo-prompt simplification targeting the observed fidelity defects,
+scored 7.67, and was **correctly reverted** — the keep rule held
+against noise. Iteration cost ~$0.45; a 20-iteration overnight run is
+~$9.50.
+
 ## Planned next
 
 - Select-from-N curation tier with a vision judge (quality-per-dollar
