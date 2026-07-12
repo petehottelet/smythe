@@ -1,0 +1,81 @@
+{
+  "benchmark": "image-concurrency-sweep",
+  "mode": "offline",
+  "model": "offline",
+  "cost_per_image_usd": 0,
+  "images_per_run": 4,
+  "summary": [
+    {
+      "k": 1,
+      "runs": 1,
+      "wall_s_mean": 0.08,
+      "wall_s_range": [
+        0.08,
+        0.08
+      ],
+      "efficiency_mean": 0.967,
+      "throughput_mean_ipm": 2986.7,
+      "cost_total_usd": 0.0012
+    },
+    {
+      "k": 3,
+      "runs": 1,
+      "wall_s_mean": 0.0,
+      "wall_s_range": [
+        0.0,
+        0.0
+      ],
+      "efficiency_mean": 0.626,
+      "throughput_mean_ipm": 60124.8,
+      "cost_total_usd": 0.0012
+    }
+  ],
+  "runs": [
+    {
+      "k": 1,
+      "images_requested": 4,
+      "images_completed": 4,
+      "nodes_ok": "4/4",
+      "wall_s": 0.08,
+      "sum_node_latency_s": 0.08,
+      "node_latency_s": [
+        0.0,
+        0.0,
+        0.07,
+        0.0
+      ],
+      "concurrency_factor": 0.97,
+      "efficiency_vs_ideal": 0.967,
+      "throughput_images_per_min": 2986.7,
+      "cost_usd": 0.0012,
+      "artifacts": {
+        "offline": true
+      },
+      "execution_id": "f35b80f924a44dcfbffe4fee43c836ca",
+      "repeat": 0
+    },
+    {
+      "k": 3,
+      "images_requested": 4,
+      "images_completed": 4,
+      "nodes_ok": "4/4",
+      "wall_s": 0.0,
+      "sum_node_latency_s": 0.01,
+      "node_latency_s": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "concurrency_factor": 1.88,
+      "efficiency_vs_ideal": 0.626,
+      "throughput_images_per_min": 60124.8,
+      "cost_usd": 0.0012,
+      "artifacts": {
+        "offline": true
+      },
+      "execution_id": "74e85f616e2346588d5de5ba06c06fea",
+      "repeat": 0
+    }
+  ]
+}
