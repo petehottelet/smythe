@@ -1,6 +1,15 @@
 # Checkpoint format (version 1)
 
-When a `Swarm` is constructed with a `checkpoint_store`, it persists the full execution state after planning, after every node reaches a terminal status (completed, skipped, or failed), and once more when the run finishes or fails. The state is a single JSON document per execution, so you can inspect — or repair — a checkpoint with any text editor.
+When a `Swarm` is constructed with a `checkpoint_store`, it persists the full
+execution state after planning and once more when the run finishes or fails.
+By default (`checkpoint_every_n_nodes=1`) it also saves after every node reaches
+a terminal status. Wide graphs may set a larger interval to reduce full-snapshot
+write amplification; after a process crash, at most the completed but unflushed
+tail of that batch may replay. That replay can duplicate provider spend or tool
+side effects, so intervals above one are appropriate only when the write-saving
+tradeoff is worth the recovery window and affected operations are idempotent.
+The state is a single JSON document per execution, so you can inspect—or
+repair—a checkpoint with any text editor.
 
 With the default `FileCheckpointStore`, checkpoints live at `~/.smythe/checkpoints/<execution_id>.json`. Writes are atomic (temp file + rename): a crash mid-write never corrupts the previous checkpoint.
 

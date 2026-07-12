@@ -1,7 +1,7 @@
 """Autoresearch-style optimizer for the brand asset suite.
 
-    python benchmarks/run_optimizer.py --iterations 2 --budget-usd 1.50
-    python benchmarks/run_optimizer.py --iterations 20 --budget-usd 12  # overnight
+    python benchmarks/run_optimizer.py --iterations 2 --budget-usd 2.25 --iteration-cost-ceiling-usd 0.75 --max-cost-per-call-usd 0.06
+    python benchmarks/run_optimizer.py --iterations 20 --budget-usd 16 --iteration-cost-ceiling-usd 0.75 --max-cost-per-call-usd 0.06
 
 The loop (the karpathy/autoresearch pattern, applied to prompts instead
 of train.py): an LLM proposes ONE targeted change to the brand config's
@@ -9,15 +9,19 @@ prompt policies, the full suite runs live, a vision judge scores brand
 consistency, and the change is kept only if it clears the noise floor.
 
 Grounded in measured judge variance (results/judge_variance.json:
-stdev 0.49 on identical pixels): each candidate is scored as the MEAN
-OF 3 INDEPENDENT JUDGINGS (sd of the mean ~0.28) and must beat the
-incumbent by more than KEEP_MARGIN = 0.5 (~2 sigma). Hard gates that
-cannot be sweet-talked: all 8 assets must pass format compliance, or
-the candidate is rejected regardless of score.
+stdev 0.49 on identical pixels): each candidate is scored as the mean
+of 3 independent judgings and must beat the incumbent by more than
+KEEP_MARGIN = 0.5. That margin is a heuristic guard against judge noise,
+not a confidence bound: the current experiment does not yet isolate image-
+generation variance or multiple-comparison effects. Hard gates that cannot
+be sweet-talked: all 8 assets must pass format compliance, or the candidate
+is rejected regardless of score.
 
 Every experiment is journaled to results/optimizer_journal.jsonl —
 kept or reverted, with the proposal, rationale, scores, and cost.
-Iteration cost ~= $0.45; the loop stops before exceeding --budget-usd.
+The caller must supply both an inclusive image-call ceiling and a conservative
+whole-iteration ceiling covering generation, judging, and proposal costs. The
+baseline is not started unless one full iteration fits inside --budget-usd.
 """
 
 from __future__ import annotations
@@ -34,14 +38,15 @@ from statistics import mean
 sys.path.insert(0, str(Path(__file__).parents[1]))
 sys.path.insert(0, str(Path(__file__).parent))
 
+from benchmarks.artifact_records import resolve_record_path  # noqa: E402
 from run_asset_suite import judge_assets, load_brand, main_async as run_suite  # noqa: E402
 
 from smythe.provider import GeminiProvider  # noqa: E402
 
 KEEP_MARGIN = 0.5
 JUDGINGS_PER_CANDIDATE = 3
-EST_ITERATION_COST = 0.45
 PROPOSER_MODEL = "gemini-flash-lite-latest"
+PROPOSER_COST_PER_TOKEN_USD = 0.000003
 
 TUNABLE_FIELDS = (
     "logo_lock_instruction",
@@ -84,7 +89,9 @@ def apply_proposal(brand: dict, proposal: dict) -> dict:
     return candidate
 
 
-async def propose(brand: dict, last_run: dict, history: list[dict]) -> dict:
+async def propose(
+    brand: dict, last_run: dict, history: list[dict],
+) -> tuple[dict, float]:
     current = {f: brand.get(f, "<default>") for f in TUNABLE_FIELDS}
     defects = {
         e["asset"]: e.get("defects", [])
@@ -109,23 +116,38 @@ async def propose(brand: dict, last_run: dict, history: list[dict]) -> dict:
     text = result.text.strip()
     if text.startswith("```"):
         text = text.split("```")[1].removeprefix("json").strip()
-    return json.loads(text)
+    estimated_cost = (
+        result.cost_usd
+        if result.cost_usd is not None
+        else result.total_tokens * PROPOSER_COST_PER_TOKEN_USD
+    )
+    return json.loads(text), estimated_cost
 
 
 async def score_candidate(
-    brand: dict, out: Path, *, run_index: int,
+    brand: dict, out: Path, *, run_index: int, max_cost_per_call_usd: float,
 ) -> tuple[dict, float | None, float]:
     """Run the suite once, then extra judgings for a noise-resistant mean."""
-    run = await run_suite(brand, True, out / f"iter_{run_index}", None, True)
+    run = await run_suite(
+        brand,
+        True,
+        out / f"iter_{run_index}",
+        None,
+        True,
+        max_cost_per_call_usd=max_cost_per_call_usd,
+    )
     cost = run["cost_usd"]
     scores = [run["brand_judge"]["overall"]] if run.get("brand_judge") else []
     finals = {
-        e["asset"]: e["final_path"] for e in run["assets"] if e.get("final_path")
+        e["asset"]: str(resolve_record_path(e["final_path"]))
+        for e in run["assets"]
+        if e.get("final_path")
     }
     for _ in range(JUDGINGS_PER_CANDIDATE - 1):
         verdict = await judge_assets(
             brand=brand, live=True, out=out / f"iter_{run_index}",
-            logo_path=run["brand_logo"]["path"], finals=finals,
+            logo_path=str(resolve_record_path(run["brand_logo"]["path"])),
+            finals=finals,
         )
         cost += verdict["cost_usd"]
         if verdict["overall"] is not None:
@@ -143,18 +165,24 @@ async def main_async(args) -> None:
     spent = 0.0
 
     print("[baseline] scoring incumbent config...")
-    base_run, best_score, cost = await score_candidate(brand, out, run_index=0)
+    base_run, best_score, cost = await score_candidate(
+        brand,
+        out,
+        run_index=0,
+        max_cost_per_call_usd=args.max_cost_per_call_usd,
+    )
     spent += cost
     print(f"[baseline] mean of {JUDGINGS_PER_CANDIDATE} judgings: "
           f"{best_score} (${spent:.2f} spent)")
     last_run = base_run
 
     for i in range(1, args.iterations + 1):
-        if spent + EST_ITERATION_COST > args.budget_usd:
+        if spent + args.iteration_cost_ceiling_usd > args.budget_usd:
             print(f"[stop] budget: ${spent:.2f} spent, "
                   f"next iteration would exceed ${args.budget_usd:.2f}")
             break
-        proposal = await propose(brand, last_run, history)
+        proposal, proposal_cost = await propose(brand, last_run, history)
+        spent += proposal_cost
         try:
             candidate = apply_proposal(brand, proposal)
         except (ValueError, KeyError) as exc:
@@ -162,8 +190,14 @@ async def main_async(args) -> None:
             continue
         print(f"[iter {i}] {proposal['field']}: {proposal['rationale']}")
 
-        run, score, cost = await score_candidate(candidate, out, run_index=i)
+        run, score, cost = await score_candidate(
+            candidate,
+            out,
+            run_index=i,
+            max_cost_per_call_usd=args.max_cost_per_call_usd,
+        )
         spent += cost
+        iteration_cost = proposal_cost + cost
         gates_ok = run["assets_pass"] == "8/8"
         kept = bool(
             gates_ok and score is not None and best_score is not None
@@ -178,6 +212,9 @@ async def main_async(args) -> None:
             "best_score": best_score,
             "format_gates_ok": gates_ok,
             "kept": kept,
+            "proposal_cost_usd_estimate": round(proposal_cost, 6),
+            "iteration_cost_usd": round(iteration_cost, 4),
+            "iteration_cost_ceiling_usd": args.iteration_cost_ceiling_usd,
             "spent_usd": round(spent, 4),
         }
         history.append(entry)
@@ -196,11 +233,34 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--brand", default="benchmarks/brands/metacortex.json")
     parser.add_argument("--iterations", type=int, default=2)
-    parser.add_argument("--budget-usd", type=float, default=1.50)
+    parser.add_argument("--budget-usd", type=float, required=True)
+    parser.add_argument(
+        "--iteration-cost-ceiling-usd",
+        type=float,
+        required=True,
+        help="conservative all-in ceiling for baseline or one proposal iteration",
+    )
+    parser.add_argument(
+        "--max-cost-per-call-usd",
+        type=float,
+        required=True,
+        help="verified inclusive input+output ceiling for one image request",
+    )
     parser.add_argument("--out", default="smythe_artifacts/optimizer")
     args = parser.parse_args()
     if not os.environ.get("GOOGLE_API_KEY"):
         raise SystemExit("GOOGLE_API_KEY required (the optimizer is live-only)")
+    if args.budget_usd <= 0:
+        raise SystemExit("--budget-usd must be positive")
+    if args.iteration_cost_ceiling_usd <= 0:
+        raise SystemExit("--iteration-cost-ceiling-usd must be positive")
+    if args.max_cost_per_call_usd <= 0:
+        raise SystemExit("--max-cost-per-call-usd must be positive")
+    if args.iteration_cost_ceiling_usd > args.budget_usd:
+        raise SystemExit(
+            "Refusing to start baseline: --budget-usd must cover at least one "
+            "--iteration-cost-ceiling-usd."
+        )
     asyncio.run(main_async(args))
 
 

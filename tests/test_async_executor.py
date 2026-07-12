@@ -8,6 +8,7 @@ import pytest
 from helpers import FailingProvider
 from smythe.async_executor import AsyncExecutor
 from smythe.budget import Sentinel, SentinelAlert
+from smythe.executor_base import NodeFinalizationError
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
@@ -303,6 +304,117 @@ async def test_max_concurrency_caps_in_flight_calls():
 
 
 @pytest.mark.asyncio
+async def test_max_concurrency_bounds_admitted_node_tasks():
+    """A wide graph must not create one waiting coroutine per node."""
+    gate = asyncio.Event()
+
+    class GatedProvider(Provider):
+        async def complete(self, system, prompt, model):
+            await gate.wait()
+            return CompletionResult(text="ok")
+
+    executor = AsyncExecutor(
+        provider=GatedProvider(), registry=Registry(), tracer=Tracer(),
+        max_concurrency=2,
+    )
+    graph = ExecutionGraph(
+        topology=[Topology.FORK_JOIN],
+        nodes=[Node(label=f"N{i}", id=f"n{i}") for i in range(100)],
+    )
+    run_task = asyncio.create_task(executor.run(graph))
+    try:
+        for _ in range(100):
+            admitted = [
+                task for task in asyncio.all_tasks()
+                if task.get_name().startswith("smythe-node-")
+            ]
+            running = sum(
+                node.status == NodeStatus.RUNNING for node in graph.nodes
+            )
+            if len(admitted) == 2 and running == 2:
+                break
+            await asyncio.sleep(0)
+        assert len(admitted) == 2
+        assert running == 2
+    finally:
+        gate.set()
+        await run_task
+
+
+@pytest.mark.asyncio
+async def test_halt_cancels_and_awaits_siblings_without_starting_queue():
+    sibling_started = asyncio.Event()
+    sibling_cancelled = asyncio.Event()
+    calls: list[str] = []
+
+    class HaltProvider(Provider):
+        async def complete(self, system, prompt, model):
+            label = prompt.split("\n")[0]
+            calls.append(label)
+            if label == "fail":
+                await sibling_started.wait()
+                raise RuntimeError("stop now")
+            if label == "sibling":
+                sibling_started.set()
+                try:
+                    await asyncio.sleep(60)
+                except asyncio.CancelledError:
+                    sibling_cancelled.set()
+                    raise
+            return CompletionResult(text="should not run")
+
+    nodes = [
+        Node(label="fail", id="fail"),
+        Node(label="sibling", id="sibling"),
+        Node(label="queued", id="queued"),
+    ]
+    executor = AsyncExecutor(
+        provider=HaltProvider(), registry=Registry(), tracer=Tracer(),
+        max_concurrency=2,
+    )
+
+    with pytest.raises(RuntimeError, match="stop now"):
+        await executor.run(ExecutionGraph(topology=[Topology.FORK_JOIN], nodes=nodes))
+
+    assert sibling_cancelled.is_set()
+    assert calls == ["fail", "sibling"]
+    assert nodes[0].status == NodeStatus.FAILED
+    assert nodes[1].status == NodeStatus.PENDING
+    assert nodes[2].status == NodeStatus.PENDING
+
+
+@pytest.mark.asyncio
+async def test_finalization_failure_after_billing_is_not_retried():
+    class CountingProvider(Provider):
+        def __init__(self):
+            self.calls = 0
+
+        async def complete(self, system, prompt, model):
+            self.calls += 1
+            return CompletionResult(text="paid response")
+
+    provider = CountingProvider()
+    executor = AsyncExecutor(
+        provider=provider, registry=Registry(), tracer=Tracer(), max_concurrency=1,
+    )
+    executor.finalize_node_result = lambda node, result: (_ for _ in ()).throw(
+        OSError("disk full")
+    )
+    node = Node(
+        label="Paid image", id="image",
+        failure_policy=FailurePolicy.RETRY, max_retries=3,
+    )
+
+    with pytest.raises(NodeFinalizationError, match="disk full"):
+        await executor.run(
+            ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
+        )
+
+    assert provider.calls == 1
+    assert node.status == NodeStatus.FAILED
+
+
+@pytest.mark.asyncio
 async def test_unbounded_concurrency_when_cap_is_none():
     provider = ConcurrencyTrackingProvider()
     tracer = Tracer()
@@ -407,3 +519,78 @@ def test_node_estimated_cost_overrides_hint():
     )
     _asyncio.run(executor.run(graph))
     assert node.status == NodeStatus.COMPLETED
+
+
+def test_unpriced_image_budget_fails_before_any_async_admission():
+    """A generic text-token estimate must never admit paid image calls."""
+    import asyncio as _asyncio
+
+    from smythe.budget import BudgetEstimateRequired, Sentinel
+
+    class UnpricedImageProvider(Provider):
+        def __init__(self):
+            self.calls = 0
+
+        def requires_explicit_budget_estimate(self, model: str) -> bool:
+            return True
+
+        async def complete(self, system, prompt, model):
+            self.calls += 1
+            return CompletionResult(text="img", cost_usd=0.05)
+
+    provider = UnpricedImageProvider()
+    nodes = [
+        Node(id="first", label="image 1", metadata={"model": "image-model"}),
+        Node(id="later", label="image 2", metadata={"model": "image-model"}),
+    ]
+    graph = ExecutionGraph(topology=[Topology.BROADCAST_REDUCE], nodes=nodes)
+    executor = AsyncExecutor(
+        provider=provider,
+        registry=Registry(),
+        tracer=Tracer(),
+        budget=Sentinel(max_budget_usd=1.0),
+        max_concurrency=2,
+        artifact_dir=None,
+    )
+
+    with pytest.raises(BudgetEstimateRequired):
+        _asyncio.run(executor.run(graph))
+    assert provider.calls == 0
+    assert all(node.status == NodeStatus.PENDING for node in nodes)
+
+
+def test_unbudgeted_unpriced_image_does_not_consume_text_token_estimate():
+    import asyncio as _asyncio
+
+    from smythe.budget import Sentinel
+
+    class UnpricedImageProvider(Provider):
+        def requires_explicit_budget_estimate(self, model: str) -> bool:
+            return True
+
+        async def complete(self, system, prompt, model):
+            return CompletionResult(
+                text="img",
+                prompt_tokens=100,
+                completion_tokens=900,
+                cost_usd=0.0,
+                cost_usd_unknown=True,
+            )
+
+    budget = Sentinel(max_budget_usd=None, cost_per_token=1.0)
+    node = Node(id="image", label="image", metadata={"model": "image-model"})
+    executor = AsyncExecutor(
+        provider=UnpricedImageProvider(),
+        registry=Registry(),
+        tracer=Tracer(),
+        budget=budget,
+        max_concurrency=1,
+        artifact_dir=None,
+    )
+
+    _asyncio.run(
+        executor.run(ExecutionGraph(topology=[Topology.SERIAL], nodes=[node]))
+    )
+    assert budget.total_cost_usd == 0.0
+    assert not budget.cost_is_complete
+    assert node.metadata["cost_usd_unknown"] is True

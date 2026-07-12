@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from smythe.skills import SkillRef
@@ -41,21 +42,35 @@ class OpenClawSkillProvider:
         :class:`SkillRef`.
         """
         raw_skills = self._client.skills.list(agent_id=agent_id)
+        if raw_skills is None:
+            return []
         return [self._to_skill_ref(s) for s in raw_skills]
 
     @staticmethod
     def _to_skill_ref(sdk_skill: Any) -> SkillRef:
-        """Convert an OpenClaw SDK skill object to a SkillRef."""
-        name = getattr(sdk_skill, "name", None) or str(sdk_skill)
-        version = getattr(sdk_skill, "version", None)
+        """Convert an OpenClaw SDK object or mapping to a SkillRef."""
+
+        def field(name: str, default: Any = None) -> Any:
+            if isinstance(sdk_skill, Mapping):
+                return sdk_skill.get(name, default)
+            return getattr(sdk_skill, name, default)
+
+        name = field("name") or str(sdk_skill)
+        version = field("version")
         metadata: dict[str, Any] = {}
-        if hasattr(sdk_skill, "description"):
-            metadata["description"] = sdk_skill.description
-        if hasattr(sdk_skill, "metadata"):
-            metadata["raw"] = sdk_skill.metadata
+        description = field("description")
+        if description:
+            metadata["description"] = str(description)
+        raw_metadata = field("metadata")
+        if raw_metadata is not None:
+            metadata["raw"] = (
+                dict(raw_metadata)
+                if isinstance(raw_metadata, Mapping)
+                else raw_metadata
+            )
         return SkillRef(
-            name=name,
-            version=version,
+            name=str(name),
+            version=str(version) if version is not None else None,
             source="openclaw",
             metadata=metadata,
         )

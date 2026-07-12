@@ -21,15 +21,16 @@ from statistics import mean, pstdev
 sys.path.insert(0, str(Path(__file__).parents[1]))
 sys.path.insert(0, str(Path(__file__).parent))
 
+from benchmarks.artifact_records import resolve_record_path  # noqa: E402
 from run_asset_suite import judge_assets, load_brand  # noqa: E402
 
 
 async def main_async(args) -> dict:
     prior = json.loads(Path(args.results).read_text(encoding="utf-8"))
     brand = load_brand(args.brand)
-    logo_path = prior["brand_logo"]["path"]
+    logo_path = str(resolve_record_path(prior["brand_logo"]["path"]))
     finals = {
-        e["asset"]: e["final_path"]
+        e["asset"]: str(resolve_record_path(e["final_path"]))
         for e in prior["assets"]
         if e.get("final_path")
     }

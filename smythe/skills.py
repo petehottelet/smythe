@@ -9,7 +9,7 @@ from typing import Any, Protocol, runtime_checkable
 
 @dataclass(frozen=True)
 class SkillRef:
-    """An immutable reference to an installed agent skill.
+    """A field-frozen reference to an installed agent skill.
 
     Attributes:
         name: Canonical skill identifier (e.g. ``"web-search"``).
@@ -22,6 +22,13 @@ class SkillRef:
     version: str | None = None
     source: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or not self.name.strip():
+            raise ValueError("SkillRef requires a non-empty name")
+        # Detach provider-owned dictionaries so later SDK mutations cannot
+        # silently rewrite a reference already registered with Smythe.
+        object.__setattr__(self, "metadata", dict(self.metadata))
 
 
 @runtime_checkable
@@ -59,12 +66,20 @@ class DefaultCapabilityMapper:
     """
 
     def __init__(self, aliases: dict[str, str] | None = None) -> None:
-        self._aliases = {k.lower().strip(): v for k, v in (aliases or {}).items()}
+        self._aliases: dict[str, str] = {}
+        for name, capability in (aliases or {}).items():
+            normalised_name = name.lower().strip()
+            normalised_capability = capability.lower().strip()
+            if normalised_name and normalised_capability:
+                self._aliases[normalised_name] = normalised_capability
 
     def map_skills(self, skills: list[SkillRef]) -> set[str]:
         caps: set[str] = set()
         for skill in skills:
             normalised = skill.name.lower().strip()
+            if not normalised:
+                continue
             mapped = self._aliases.get(normalised, normalised)
-            caps.add(mapped)
+            if mapped:
+                caps.add(mapped)
         return caps

@@ -1,5 +1,13 @@
 # Plan 2 — Everything Else
 
+> **Status: completed historical plan.** Reviewed 2026-07-12. The three-tier
+> architecture, shared executor core, failure policies, synthesis strategies,
+> capability-aware assignment, and documentation refresh described here have
+> shipped. The implementation later renamed `Planner` to `Architect` and
+> `PlannerRouter` to `WhiteRabbit`; code snippets below intentionally retain
+> the proposal's original vocabulary. See [CHANGELOG.md](../CHANGELOG.md) for
+> the shipped API and [ROADMAP.md](../ROADMAP.md) for active work.
+
 Architecture evolution, DX improvements, and closing gaps between the README vision and the implementation.
 
 ---
@@ -331,7 +339,7 @@ nodes:
 
 ## Phase 6: README Update
 
-Once the above phases are implemented, update `Readme.md`:
+Once the above phases are implemented, update `README.md`:
 
 1. **Current Status** section — update "What exists" to reflect actual implemented features
 2. **Architecture** — add a section showing the three-tier planner hierarchy

@@ -104,7 +104,8 @@ Three specialists run in parallel under a budget cap, a red team attacks the dra
 
 Smythe agents generate images too — in parallel, under the same budget
 machinery. These three ads were produced by one broadcast graph on
-`gemini-2.5-flash-image` for **$0.117 total, concurrently**, from
+`gemini-2.5-flash-image` for a **$0.117 recorded output estimate,
+concurrently**, from
 nothing but a shared brand brief ([examples/09_image_generation.py](examples/09_image_generation.py)):
 
 <table>
@@ -117,8 +118,9 @@ nothing but a shared brand brief ([examples/09_image_generation.py](examples/09_
 
 The performance numbers are published with the raw records, objective
 metrics only — no LLM judge: **6.6× wall-clock speedup at concurrency
-8**, and **25 images in 10.2 seconds** ($0.98) at concurrency 25, at
-identical cost to serial generation. Full protocol, results, and honest
+8**, and **25 images in 10.2 seconds** ($0.98 recorded output estimate) at
+concurrency 25, at identical generation count to the serial run. Full
+protocol, results, and honest
 caveats: [benchmarks/image_benchmarks.md](benchmarks/image_benchmarks.md).
 
 And because wide fan-out occasionally produces defects, nodes can *see*
@@ -136,9 +138,14 @@ Today's agent frameworks fall into two camps:
 
 **Personal assistant daemons** (like [OpenClaw](https://github.com/openclaw/openclaw)) give you one persistent agent with many skills. Great for "do this thing for me." Not designed for complex tasks that benefit from multiple specialized agents working in coordination.
 
-**Pipeline frameworks** (like LangGraph, CrewAI, AutoGPT) let you hardcode a topology — chain these agents together in this order. You, the developer, decide how the work gets split up. The framework just executes your decision.
+**Workflow frameworks** (like LangGraph and CrewAI) provide capable explicit
+graphs, routing, persistence, and multi-agent coordination. In their common
+usage, the developer still authors the workflow or supervisor policy. Smythe's
+focus is narrower: generate an inspectable, task-specific DAG before execution,
+then run that graph through the same budget, trace, and recovery machinery.
 
-Neither camp asks the more interesting question: *what if the framework could decide how to execute a task based on the task itself?*
+Smythe makes a different question its default: *what if the framework could
+propose how to execute each task, and let you inspect that plan before it runs?*
 
 ---
 
@@ -203,7 +210,19 @@ result = swarm.execute(plan)
 ### Creative task — broadcast-reduce
 
 ```python
-swarm = Swarm(max_budget_usd=1.50, model="gemini-3-pro-image-preview")
+from smythe.provider import GeminiProvider
+
+# Illustrative ceilings only: verify current provider pricing and load these
+# values from your production configuration.
+provider = GeminiProvider(
+    cost_per_image_usd=0.039,
+    max_cost_per_call_usd=0.06,
+)
+swarm = Swarm(
+    provider=provider,
+    max_budget_usd=1.50,
+    model="gemini-2.5-flash-image",
+)
 
 task = Task(
     goal=(
@@ -438,13 +457,30 @@ Cache entries expire after the configured TTL. Force a refresh with `registry.re
 
 ### Budget enforcement
 
-Set a USD spending cap that is enforced at every execution step. Parallel execution uses a reservation protocol to prevent concurrent nodes from collectively exceeding the budget:
+Set a USD admission policy that is checked before every execution step.
+Parallel execution reserves a conservative amount before admitting each node,
+so concurrent estimates cannot collectively exceed the configured budget:
 
 ```python
 swarm = Swarm(max_budget_usd=0.50)
 result = swarm.execute(task)
-print(result.total_cost_usd)  # actual cost
+print(result.total_cost_usd)
+print(result.cost_contains_estimates, result.cost_is_complete)
 ```
+
+For image generation and other calls that cannot be bounded from token counts,
+budgeted execution fails closed unless the provider has an inclusive
+`max_cost_per_call_usd` or the node supplies a conservative
+`metadata["estimated_cost_usd"]`. Provider pricing varies by model, dimensions,
+quality, inputs, and date; treat configured ceilings as user-maintained policy.
+If a completed call reports more than its hard reservation, Smythe records the
+incurred cost and halts before admitting more work.
+For ordinary token-priced calls, the reservation is an estimate rather than a
+provider quote; a single completed call can reconcile above the remaining
+budget, but that overrun is retained and execution stops immediately.
+`max_budget_usd` currently meters graph execution and LLM synthesis. Dynamic
+Architect and router calls happen before graph admission and are not yet
+included; production preflight should budget those planning calls separately.
 
 ### MCP tool use
 
@@ -472,7 +508,11 @@ Give the Swarm a checkpoint store and it persists the full execution state — g
 ```python
 from smythe import FileCheckpointStore, Swarm
 
-swarm = Swarm(checkpoint_store=FileCheckpointStore(), parallel=True)
+swarm = Swarm(
+    checkpoint_store=FileCheckpointStore(),
+    parallel=True,
+    checkpoint_every_n_nodes=1,  # durable default
+)
 result = swarm.execute(task)          # checkpoints as it goes
 print(result.execution_id)
 
@@ -480,6 +520,14 @@ print(result.execution_id)
 swarm = Swarm(checkpoint_store=FileCheckpointStore())
 result = swarm.resume(execution_id)   # completed nodes are not re-executed
 ```
+
+Large graphs can reduce full-snapshot write amplification with
+`checkpoint_every_n_nodes=10`. Initial, failed, and terminal states are always
+saved; after a process crash, at most the completed but unflushed tail of the
+current batch may replay. Replay can duplicate provider spend or side effects,
+so keep the durable default of `1` for expensive or non-idempotent nodes unless
+that tradeoff is explicitly acceptable. Artifact files themselves are written
+atomically.
 
 Checkpoints are plain JSON (one file per execution, atomic writes) so you can inspect or repair them by hand. After a crash, `FileCheckpointStore().list_ids()` shows what's resumable. Format and resume semantics: [docs/checkpoint-format.md](docs/checkpoint-format.md).
 
@@ -547,6 +595,7 @@ pip install "smythe[gemini]"       # Google Gemini models
 pip install "smythe[mcp]"          # MCP tool support
 pip install "smythe[openclaw]"     # OpenClaw AgentSkills integration
 pip install "smythe[all]"          # all of the above
+pip install "smythe[benchmarks]"   # dependencies for the repo's benchmark harnesses
 ```
 
 Requires Python 3.11+. Set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY` for the respective providers — or use the built-in `OfflineProvider` with no keys at all.
@@ -579,7 +628,7 @@ python examples/acquisition_diligence/run.py
 
 ## Current Status
 
-The core framework is implemented and tested. **448 tests passing.**
+The core framework is implemented and tested across Python 3.11–3.13 in CI.
 
 **What's shipped:**
 - Three-tier Architect hierarchy (Deterministic, Constrained, Autonomous LLM)
@@ -603,7 +652,8 @@ The core framework is implemented and tested. **448 tests passing.**
 - Flagship demo — the acquisition-diligence showcase with committed
   expected artifacts ([examples/acquisition_diligence/](examples/acquisition_diligence/))
 
-**What's next:** see [ROADMAP.md](ROADMAP.md) — currently published benchmarks, then recursive subgraph decomposition and the trace inspector.
+**What's next:** see [ROADMAP.md](ROADMAP.md) — production fan-out safety,
+artifact-factory productization, and an operator-focused CLI and trace inspector.
 
 ---
 

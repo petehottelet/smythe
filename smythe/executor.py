@@ -5,7 +5,8 @@ from __future__ import annotations
 import asyncio
 import time
 
-from smythe.executor_base import ExecutorBase
+from smythe.budget import BudgetEstimateRequired, SentinelAlert
+from smythe.executor_base import ExecutorBase, NodeFinalizationError
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
 
 
@@ -18,10 +19,16 @@ class Executor(ExecutorBase):
 
     def run(self, graph: ExecutionGraph) -> ExecutionGraph:
         """Execute every node in the graph, respecting dependency order."""
+        self.prepare_graph(graph)
         first_error: Exception | None = None
         for node in self._walk(graph):
             try:
                 self._execute_node(node, graph)
+            except (BudgetEstimateRequired, NodeFinalizationError, SentinelAlert):
+                # Budget admission/reconciliation failures are global safety
+                # stops, as is a post-billing finalization failure. Never let
+                # a later independent node start after one.
+                raise
             except Exception as exc:
                 if first_error is None:
                     first_error = exc
@@ -65,7 +72,7 @@ class Executor(ExecutorBase):
             raise RuntimeError(f"Node {node.id!r}: upstream dependency not satisfied")
 
         if self._budget:
-            self._budget.check(node.id)
+            self.reserve_node_budget(node)
 
         last_exc: Exception | None = None
         attempts = 1 + max(node.max_retries, 0) if node.failure_policy == FailurePolicy.RETRY else 1
@@ -80,15 +87,28 @@ class Executor(ExecutorBase):
             try:
                 # Cost recording happens inside acall_node (per provider call).
                 result = asyncio.run(self.acall_node(node, graph))
-                self.finalize_node_result(node, result)
+                try:
+                    self.finalize_node_result(node, result)
+                except Exception as exc:
+                    raise NodeFinalizationError(node.id, exc) from exc
                 node.status = NodeStatus.COMPLETED
                 self._tracer.on_node_end(node)
                 self.notify_update(node)
                 return
+            except (NodeFinalizationError, SentinelAlert) as exc:
+                self._tracer.on_node_error(node, exc)
+                self._tracer.on_node_end(node)
+                node.status = NodeStatus.FAILED
+                node.result = str(exc)
+                self.notify_update(node)
+                raise
             except Exception as exc:
                 last_exc = exc
                 self._tracer.on_node_error(node, exc)
                 self._tracer.on_node_end(node)
+
+        if self._budget:
+            self._budget.release(node.id)
 
         node.status = NodeStatus.FAILED
         node.result = str(last_exc)

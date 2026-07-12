@@ -4,6 +4,7 @@ import pytest
 
 from helpers import FailingProvider
 from smythe.executor import Executor
+from smythe.executor_base import NodeFinalizationError
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
@@ -56,6 +57,36 @@ def test_retry_succeeds_after_transient_failure():
 
     assert node.status == NodeStatus.COMPLETED
     assert "ok:" in node.result
+
+
+def test_finalization_failure_after_billing_is_not_retried():
+    class CountingProvider(SuccessProvider):
+        def __init__(self):
+            self.calls = 0
+
+        async def complete(self, system, prompt, model):
+            self.calls += 1
+            return await super().complete(system, prompt, model)
+
+    provider = CountingProvider()
+    executor, _ = _make_executor(provider)
+    executor.finalize_node_result = lambda node, result: (_ for _ in ()).throw(
+        OSError("disk full")
+    )
+    node = Node(
+        label="Paid image", id="image",
+        failure_policy=FailurePolicy.RETRY, max_retries=3,
+    )
+    later = Node(label="Must not start", id="later")
+
+    with pytest.raises(NodeFinalizationError, match="disk full"):
+        executor.run(
+            ExecutionGraph(topology=[Topology.FORK_JOIN], nodes=[node, later])
+        )
+
+    assert provider.calls == 1
+    assert node.status == NodeStatus.FAILED
+    assert later.status == NodeStatus.PENDING
 
 
 def test_retry_exhausted_raises():

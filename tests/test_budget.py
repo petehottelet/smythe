@@ -2,7 +2,12 @@
 
 import pytest
 
-from smythe.budget import SentinelAlert, Sentinel
+from smythe.budget import (
+    BudgetEstimateRequired,
+    BudgetReconciliationError,
+    SentinelAlert,
+    Sentinel,
+)
 from smythe.executor import Executor
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, Provider
@@ -46,12 +51,10 @@ def test_budget_tracks_cost():
 def test_budget_raises_when_exhausted():
     tracker = Sentinel(max_budget_usd=0.0001, cost_per_token=0.000003)
     r = CompletionResult(text="big", prompt_tokens=10000, completion_tokens=10000)
-    tracker.record("node-1", r)
+    with pytest.raises(BudgetReconciliationError) as exc_info:
+        tracker.record("node-1", r)
 
-    with pytest.raises(SentinelAlert) as exc_info:
-        tracker.check("node-2")
-
-    assert exc_info.value.node_id == "node-2"
+    assert exc_info.value.node_id == "node-1"
     assert exc_info.value.spent > 0
     assert exc_info.value.limit == 0.0001
 
@@ -218,3 +221,143 @@ def test_negative_explicit_cost_is_clamped_to_zero():
     tracker.record("n1", CompletionResult(text="x", cost_usd=0.5))
     tracker.add_cost("n1", CompletionResult(text="x", cost_usd=-0.4))
     assert tracker.total_cost_usd == pytest.approx(0.5)
+
+
+def test_reconciliation_overrun_is_recorded_and_halts():
+    """An inaccurate ceiling must be visible and stop further execution."""
+    tracker = Sentinel(max_budget_usd=1.0)
+    tracker.reserve("image", 0.05, hard_ceiling=True)
+
+    with pytest.raises(BudgetReconciliationError) as exc_info:
+        tracker.add_cost("image", CompletionResult(text="img", cost_usd=0.06))
+
+    assert exc_info.value.actual_cost == pytest.approx(0.06)
+    assert exc_info.value.reserved_cost == pytest.approx(0.05)
+    assert tracker.total_cost_usd == pytest.approx(0.06)
+    assert tracker.breakdown()["image"] == pytest.approx(0.06)
+
+
+def test_unknown_cost_consumes_explicit_reservation_conservatively():
+    tracker = Sentinel(max_budget_usd=0.10)
+    tracker.reserve("image", 0.07)
+    result = CompletionResult(text="img", cost_usd=0.0, cost_usd_unknown=True)
+
+    assert tracker.add_cost("image", result) == pytest.approx(0.07)
+    assert tracker.total_cost_usd == pytest.approx(0.07)
+    assert tracker.cost_is_complete
+    assert tracker.cost_contains_estimates
+
+
+def test_partial_charge_above_hard_ceiling_is_not_hidden():
+    tracker = Sentinel(max_budget_usd=1.0)
+    tracker.reserve("image", 0.05, hard_ceiling=True)
+    result = CompletionResult(
+        text="img",
+        cost_usd=0.10,
+        cost_usd_is_estimate=True,
+        cost_usd_unknown=True,
+    )
+
+    with pytest.raises(BudgetReconciliationError) as exc_info:
+        tracker.add_cost("image", result)
+
+    assert exc_info.value.actual_cost == pytest.approx(0.10)
+    assert tracker.total_cost_usd == pytest.approx(0.10)
+
+
+def test_unreserved_unknown_cost_is_not_fake_text_token_dollars():
+    tracker = Sentinel(max_budget_usd=None, cost_per_token=999.0)
+    result = CompletionResult(
+        text="img",
+        prompt_tokens=10,
+        completion_tokens=20,
+        cost_usd=0.0,
+        cost_usd_unknown=True,
+    )
+
+    tracker.add_cost("image", result)
+
+    assert tracker.total_cost_usd == 0.0
+    assert tracker.breakdown()["image"] == 0.0
+    assert not tracker.cost_is_complete
+    assert not tracker.cost_contains_estimates
+
+    tracker.add_cost(
+        "unknown-without-explicit",
+        CompletionResult(
+            text="img",
+            prompt_tokens=10,
+            completion_tokens=20,
+            cost_usd_unknown=True,
+        ),
+    )
+    assert tracker.breakdown()["unknown-without-explicit"] == 0.0
+
+
+def test_partial_output_estimate_is_retained_but_total_is_incomplete():
+    tracker = Sentinel(max_budget_usd=None)
+    result = CompletionResult(
+        text="img",
+        cost_usd=0.041,
+        cost_usd_is_estimate=True,
+        cost_usd_unknown=True,
+    )
+
+    tracker.add_cost("image", result)
+
+    assert tracker.total_cost_usd == pytest.approx(0.041)
+    assert not tracker.cost_is_complete
+    assert tracker.cost_contains_estimates
+
+
+def test_reservation_rejects_negative_and_duplicate_estimates():
+    tracker = Sentinel(max_budget_usd=1.0)
+    with pytest.raises(ValueError, match="non-negative"):
+        tracker.reserve("negative", -0.01)
+
+    tracker.reserve("duplicate", 0.01)
+    with pytest.raises(ValueError, match="already has"):
+        tracker.reserve("duplicate", 0.01)
+
+
+def test_sentinel_rejects_negative_budget_configuration():
+    with pytest.raises(ValueError, match="max_budget_usd"):
+        Sentinel(max_budget_usd=-0.01)
+    with pytest.raises(ValueError, match="cost_per_token"):
+        Sentinel(cost_per_token=-0.01)
+
+
+def test_restore_rejects_negative_checkpoint_cost():
+    with pytest.raises(ValueError, match="Checkpoint cost"):
+        Sentinel(max_budget_usd=1.0).restore({"tampered": -0.50})
+
+
+def test_serial_image_call_without_inclusive_ceiling_fails_before_provider():
+    class UnpricedImageProvider(Provider):
+        def __init__(self):
+            self.calls = 0
+
+        def requires_explicit_budget_estimate(self, model: str) -> bool:
+            return True
+
+        async def complete(self, system: str, prompt: str, model: str):
+            self.calls += 1
+            return CompletionResult(text="img", cost_usd=0.05)
+
+    provider = UnpricedImageProvider()
+    nodes = [
+        Node(id="image", label="generate", metadata={"model": "image-model"}),
+        Node(id="later", label="must not start", metadata={"model": "image-model"}),
+    ]
+    graph = ExecutionGraph(topology=[Topology.FORK_JOIN], nodes=nodes)
+    executor = Executor(
+        provider=provider,
+        registry=Registry(),
+        tracer=Tracer(),
+        budget=Sentinel(max_budget_usd=1.0),
+        artifact_dir=None,
+    )
+
+    with pytest.raises(BudgetEstimateRequired):
+        executor.run(graph)
+    assert provider.calls == 0

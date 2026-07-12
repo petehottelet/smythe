@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import os
 import random
 import re
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Callable
 
 from smythe.agent import Agent
-from smythe.budget import Sentinel
+from smythe.budget import BudgetEstimateRequired, Sentinel
 from smythe.graph import ExecutionGraph, Node, NodeStatus
 from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
@@ -19,6 +21,20 @@ from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntim
 from smythe.tracer import Tracer
 
 DEFAULT_MAX_TOOL_ITERATIONS = 10
+
+
+class NodeFinalizationError(RuntimeError):
+    """Raised after a billed response cannot be persisted safely.
+
+    This error is non-retryable at the executor layer: repeating the provider
+    call would buy the same output again merely because local finalization
+    failed.
+    """
+
+    def __init__(self, node_id: str, cause: Exception) -> None:
+        self.node_id = node_id
+        self.cause = cause
+        super().__init__(f"Node {node_id!r} finalization failed: {cause}")
 
 
 def _safe_filename_component(raw: str) -> str:
@@ -80,6 +96,9 @@ class ExecutorBase:
         self._tool_runtime = tool_runtime
         self._max_tool_iterations = max_tool_iterations
         self._artifact_dir = Path(artifact_dir) if artifact_dir is not None else None
+        self._prepared_graph: ExecutionGraph | None = None
+        self._node_lookup: dict[str, Node] = {}
+        self._dependent_ids: set[str] = set()
         if retry_backoff_s < 0:
             raise ValueError(f"retry_backoff_s must be >= 0, got {retry_backoff_s}")
         self._retry_backoff_s = retry_backoff_s
@@ -97,6 +116,53 @@ class ExecutorBase:
         ceiling = self._retry_backoff_s * (2 ** (attempt - 1))
         return random.uniform(0, ceiling)
 
+    def reserve_node_budget(
+        self,
+        node: Node,
+        *,
+        default_estimated_tokens: int | None = None,
+    ) -> None:
+        """Reserve a defensible pre-call cost for one node.
+
+        Node metadata wins, then the provider's model-aware estimate.  A
+        generic token fallback is allowed only for providers that declare it
+        safe.  Serial execution passes no fallback to preserve its historical
+        pre-call behavior for ordinary text providers while still reserving
+        image calls.
+        """
+        if self._budget is None:
+            return
+
+        estimate = node.metadata.get("estimated_cost_usd")
+        model = str(node.metadata.get("model", ""))
+        requires_explicit = self._provider.requires_explicit_budget_estimate(model)
+        if estimate is None:
+            estimate = self._provider.budget_estimate_usd(model)
+
+        if estimate is None and requires_explicit:
+            if self._budget.max_budget_usd is not None:
+                raise BudgetEstimateRequired(
+                    node.id, model, type(self._provider).__name__,
+                )
+            # Unlimited execution may proceed without a price, but must not
+            # consume a fake text-token reservation and report it as complete.
+            # The provider result will mark its USD cost unknown.
+            return
+
+        if estimate is not None:
+            self._budget.reserve(
+                node.id,
+                float(estimate),
+                hard_ceiling=requires_explicit,
+            )
+        elif default_estimated_tokens is not None:
+            self._budget.reserve(
+                node.id,
+                default_estimated_tokens * self._budget.cost_per_token,
+            )
+        else:
+            self._budget.check(node.id)
+
     def notify_update(self, node: Node) -> None:
         """Invoke the node-update hook (used for checkpointing) if one is set.
 
@@ -105,6 +171,32 @@ class ExecutorBase:
         """
         if self._on_node_update is not None:
             self._on_node_update(node)
+
+    def prepare_graph(self, graph: ExecutionGraph) -> None:
+        """Cache immutable graph structure used throughout an execution.
+
+        Node statuses, results, and metadata change while a graph runs, but
+        node IDs and dependency edges do not.  Building these indexes once
+        keeps wide DAGs from repeatedly scanning every node while assembling
+        dependency prompts or deciding whether a node is terminal.
+        """
+        self._prepared_graph = graph
+        self._node_lookup = {node.id: node for node in graph.nodes}
+        self._dependent_ids = {
+            dep_id for node in graph.nodes for dep_id in node.depends_on
+        }
+
+    def _ensure_graph_prepared(self, graph: ExecutionGraph) -> None:
+        if self._prepared_graph is not graph:
+            self.prepare_graph(graph)
+
+    def _cached_node_by_id(self, node_id: str, graph: ExecutionGraph) -> Node | None:
+        self._ensure_graph_prepared(graph)
+        return self._node_lookup.get(node_id)
+
+    def _is_terminal(self, node: Node, graph: ExecutionGraph) -> bool:
+        self._ensure_graph_prepared(graph)
+        return node.id not in self._dependent_ids
 
     @staticmethod
     def build_system_prompt(agent: Agent | None) -> str:
@@ -138,7 +230,7 @@ class ExecutorBase:
     def deps_satisfied(self, node: Node, graph: ExecutionGraph) -> bool:
         """True if every dependency is COMPLETED or SKIPPED."""
         for dep_id in node.depends_on:
-            dep = self.node_by_id(dep_id, graph)
+            dep = self._cached_node_by_id(dep_id, graph)
             if dep is None or dep.status not in (NodeStatus.COMPLETED, NodeStatus.SKIPPED):
                 return False
         return True
@@ -166,7 +258,7 @@ class ExecutorBase:
         dep_results = self.gather_dep_results(node, graph)
         system = self.build_system_prompt(agent)
         prompt = self.build_user_prompt(
-            node, dep_results, is_terminal=not graph.dependents(node.id),
+            node, dep_results, is_terminal=self._is_terminal(node, graph),
         )
         model = node.metadata.get("model", "")
         attachments = (
@@ -231,7 +323,12 @@ class ExecutorBase:
 
     def _record_cost(self, node: Node, result: CompletionResult) -> None:
         if self._budget:
-            node.metadata["cost_usd"] = self._budget.add_cost(node.id, result)
+            cost = self._budget.add_cost(node.id, result)
+            if result.cost_usd_unknown:
+                node.metadata["cost_usd_unknown"] = True
+            if result.cost_usd_is_estimate:
+                node.metadata["cost_usd_is_estimate"] = True
+            node.metadata["cost_usd"] = cost
 
     def finalize_node_result(self, node: Node, result: CompletionResult) -> None:
         """Store the node's text result, persisting any artifacts to disk.
@@ -263,13 +360,43 @@ class ExecutorBase:
         records = []
         for i, art in enumerate(artifacts):
             path = self._artifact_dir / f"{stem}_{i:02d}{art.suffix}"
-            path.write_bytes(art.data)
+            self._atomic_write_bytes(path, art.data)
             records.append({"path": str(path.resolve()), "mime_type": art.mime_type})
         node.metadata["artifacts"] = records
         if not result.text.strip():
             node.result = "Generated artifacts:\n" + "\n".join(
                 r["path"] for r in records
             )
+
+    @staticmethod
+    def _atomic_write_bytes(path: Path, data: bytes) -> None:
+        """Replace *path* atomically after fully writing a same-dir temp file.
+
+        Artifact generation is commonly checkpointed immediately after this
+        method returns.  Writing directly to the final path could therefore
+        leave a checkpoint pointing at a truncated file after a crash.  A
+        flushed temporary file plus ``os.replace`` gives readers either the
+        prior complete artifact or the new complete artifact, never a partial
+        write.  Same-directory placement preserves atomic rename semantics.
+        """
+        tmp_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="wb",
+                dir=path.parent,
+                prefix=f".{path.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as tmp:
+                tmp_path = Path(tmp.name)
+                tmp.write(data)
+                tmp.flush()
+                os.fsync(tmp.fileno())
+            os.replace(tmp_path, path)
+            tmp_path = None
+        finally:
+            if tmp_path is not None:
+                tmp_path.unlink(missing_ok=True)
 
     MAX_ATTACHED_IMAGES = 12
     MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024  # per image
@@ -288,7 +415,7 @@ class ExecutorBase:
 
         attachments: list[Artifact] = []
         for dep_id in node.depends_on:
-            dep = self.node_by_id(dep_id, graph)
+            dep = self._cached_node_by_id(dep_id, graph)
             if dep is None:
                 continue
             for record in dep.metadata.get("artifacts", []):
@@ -315,7 +442,7 @@ class ExecutorBase:
         """
         dep_results: dict[str, Any] = {}
         for dep_id in node.depends_on:
-            dep_node = self.node_by_id(dep_id, graph)
+            dep_node = self._cached_node_by_id(dep_id, graph)
             if dep_node is None:
                 continue
             value = dep_node.result

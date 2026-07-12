@@ -32,15 +32,23 @@ async def test_aroute_no_classifier_falls_back():
 async def test_aroute_selects_deterministic():
     """aroute() should select the correct deterministic architect by key."""
     det = FixedArchitect("det")
+    provider = ClassifierMockProvider("deterministic:my-key")
     router = WhiteRabbit(
         deterministic={"my-key": det},
         autonomous=FixedArchitect("fallback"),
-        classifier_provider=ClassifierMockProvider("deterministic:my-key"),
+        classifier_provider=provider,
         classifier_model="test",
     )
     task = Task(goal="Deterministic")
     result = await router.aroute(task)
     assert result is det
+
+    assert len(provider.calls) == 1
+    call = provider.calls[0]
+    assert "deterministic:my-key" in call.system
+    assert "autonomous" in call.system
+    assert call.prompt == "Goal: Deterministic"
+    assert call.model == "test"
 
 
 @pytest.mark.asyncio

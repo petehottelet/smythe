@@ -62,6 +62,14 @@ class CompletionResult:
     """Explicit cost for this call, when the provider can price it better
     than the Sentinel's blended token rate (e.g. per-image billing).
     None means cost is derived from token counts as usual."""
+    cost_usd_is_estimate: bool = False
+    """True when ``cost_usd`` is a conservative/configured estimate."""
+    cost_usd_unknown: bool = False
+    """True when the complete billable USD cost is unavailable.
+
+    ``cost_usd`` may still carry a useful partial/output-only estimate; callers
+    should inspect both this flag and ``cost_usd_is_estimate``.
+    """
 
     @property
     def total_tokens(self) -> int:
@@ -79,6 +87,22 @@ class Provider(ABC):
     @abstractmethod
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         """Send a prompt to the LLM and return text + token usage."""
+
+    def budget_estimate_usd(self, model: str) -> float | None:
+        """Return a conservative per-call reservation, when one is known.
+
+        Text providers normally return ``None`` and let the executor use its
+        token estimate.  Providers whose billing cannot safely use that
+        fallback should also override ``requires_explicit_budget_estimate``.
+        """
+        # Compatibility for custom providers that implemented the original
+        # property-only hint before this model-aware hook existed.
+        hint = getattr(self, "cost_estimate_per_call", None)
+        return float(hint) if hint is not None else None
+
+    def requires_explicit_budget_estimate(self, model: str) -> bool:
+        """Whether a hard-budget call must have an explicit USD ceiling."""
+        return False
 
     async def chat(
         self,
@@ -496,9 +520,11 @@ class OpenAIImageProvider(OpenAIProvider):
     This provider is intentionally separate from :class:`OpenAIProvider`:
     GPT Image models use ``images.generate`` rather than a text completion
     endpoint, and image output has its own size, quality, format, and billing
-    controls.  ``cost_per_image_usd`` is an optional caller-supplied estimate
-    for the selected model/quality/size; when omitted, the Sentinel falls back
-    to the usage-token fields returned by the API.
+    controls.  ``max_cost_per_call_usd`` is a caller-supplied inclusive ceiling
+    for the whole request (inputs and outputs).  It is required when enforcing
+    ``max_budget_usd`` because current prices vary by model, quality, size, and
+    image inputs.  ``cost_per_image_usd`` remains available as the recorded
+    per-output estimate for backwards compatibility.
     """
 
     _OUTPUT_MIME_TYPES = {
@@ -519,6 +545,7 @@ class OpenAIImageProvider(OpenAIProvider):
         moderation: str = "auto",
         n: int = 1,
         cost_per_image_usd: float | None = None,
+        max_cost_per_call_usd: float | None = None,
     ) -> None:
         super().__init__(api_key=api_key, base_url=base_url)
         if not 1 <= n <= 10:
@@ -548,6 +575,11 @@ class OpenAIImageProvider(OpenAIProvider):
             raise ValueError(
                 f"cost_per_image_usd must be non-negative, got {cost_per_image_usd}"
             )
+        if max_cost_per_call_usd is not None and max_cost_per_call_usd < 0:
+            raise ValueError(
+                "max_cost_per_call_usd must be non-negative, "
+                f"got {max_cost_per_call_usd}"
+            )
 
         self._image_size = size
         self._image_quality = quality
@@ -556,13 +588,23 @@ class OpenAIImageProvider(OpenAIProvider):
         self._image_moderation = moderation
         self._images_per_call = n
         self._cost_per_image_usd = cost_per_image_usd
+        self._max_cost_per_call_usd = max_cost_per_call_usd
 
     @property
     def cost_estimate_per_call(self) -> float | None:
-        """Reservation hint for parallel budgeting (n images x per-image price)."""
+        """Backwards-compatible reservation hint for executor integrations."""
+        if self._max_cost_per_call_usd is not None:
+            return self._max_cost_per_call_usd
         if self._cost_per_image_usd is None:
             return None
         return self._images_per_call * self._cost_per_image_usd
+
+    def budget_estimate_usd(self, model: str) -> float | None:
+        """Inclusive per-request ceiling used by Sentinel reservations."""
+        return self._max_cost_per_call_usd
+
+    def requires_explicit_budget_estimate(self, model: str) -> bool:
+        return True
 
     async def chat(
         self,
@@ -609,15 +651,31 @@ class OpenAIImageProvider(OpenAIProvider):
             raise RuntimeError("OpenAI Image API response contained no base64 image data")
 
         usage = getattr(response, "usage", None)
-        cost_usd = None
-        if self._cost_per_image_usd is not None:
+        cost_usd_is_estimate = True
+        cost_usd_unknown = False
+        if self._max_cost_per_call_usd is not None:
+            # The Image API exposes token usage, not the user's final invoice.
+            # Consume the configured whole-call ceiling conservatively.
+            cost_usd = self._max_cost_per_call_usd
+        elif self._cost_per_image_usd is not None:
             cost_usd = len(artifacts) * self._cost_per_image_usd
+            # This legacy estimate describes image output only. Input-token
+            # charges remain unknown, so the total is useful but incomplete.
+            cost_usd_unknown = True
+        else:
+            # Never pass image tokens through the text provider's blended USD
+            # rate and present that number as an image charge.
+            cost_usd = 0.0
+            cost_usd_is_estimate = False
+            cost_usd_unknown = True
         return CompletionResult(
             text=f"Generated {len(artifacts)} image artifact(s) with {model}.",
             prompt_tokens=getattr(usage, "input_tokens", 0) if usage else 0,
             completion_tokens=getattr(usage, "output_tokens", 0) if usage else 0,
             artifacts=artifacts,
             cost_usd=cost_usd,
+            cost_usd_is_estimate=cost_usd_is_estimate,
+            cost_usd_unknown=cost_usd_unknown,
         )
 
 
@@ -639,12 +697,23 @@ class GeminiProvider(Provider):
         max_tokens: int = 4096,
         response_modalities: list[str] | None = None,
         cost_per_image_usd: float | None = None,
+        max_cost_per_call_usd: float | None = None,
         image_config: dict | None = None,
     ) -> None:
         self._api_key = api_key or os.environ.get("GOOGLE_API_KEY", "")
         self._max_tokens = max_tokens
         self._response_modalities = response_modalities
+        if cost_per_image_usd is not None and cost_per_image_usd < 0:
+            raise ValueError(
+                f"cost_per_image_usd must be non-negative, got {cost_per_image_usd}"
+            )
         self._cost_per_image_usd = cost_per_image_usd
+        if max_cost_per_call_usd is not None and max_cost_per_call_usd < 0:
+            raise ValueError(
+                "max_cost_per_call_usd must be non-negative, "
+                f"got {max_cost_per_call_usd}"
+            )
+        self._max_cost_per_call_usd = max_cost_per_call_usd
         self._image_config = dict(image_config) if image_config else None
         self._client = None
 
@@ -655,7 +724,17 @@ class GeminiProvider(Provider):
         The AsyncExecutor consults this so budget reservations reflect
         per-image billing instead of the blended token estimate.
         """
+        if self._max_cost_per_call_usd is not None:
+            return self._max_cost_per_call_usd
         return self._cost_per_image_usd
+
+    def budget_estimate_usd(self, model: str) -> float | None:
+        return self._max_cost_per_call_usd
+
+    def requires_explicit_budget_estimate(self, model: str) -> bool:
+        if self._response_modalities is not None:
+            return any(str(item).upper() == "IMAGE" for item in self._response_modalities)
+        return any(hint in model.lower() for hint in ("image", "banana"))
 
     def _get_client(self):
         if self._client is None:
@@ -739,8 +818,19 @@ class GeminiProvider(Provider):
 
         artifacts = self._extract_artifacts(response)
         cost_usd = None
-        if artifacts and self._cost_per_image_usd is not None:
-            cost_usd = len(artifacts) * self._cost_per_image_usd
+        cost_usd_is_estimate = False
+        cost_usd_unknown = False
+        if artifacts:
+            cost_usd_is_estimate = True
+            if self._max_cost_per_call_usd is not None:
+                cost_usd = self._max_cost_per_call_usd
+            elif self._cost_per_image_usd is not None:
+                cost_usd = len(artifacts) * self._cost_per_image_usd
+                cost_usd_unknown = True
+            else:
+                cost_usd = 0.0
+                cost_usd_is_estimate = False
+                cost_usd_unknown = True
 
         usage = response.usage_metadata
         return CompletionResult(
@@ -751,6 +841,8 @@ class GeminiProvider(Provider):
             stop_reason="tool_use" if tool_calls else "end_turn",
             artifacts=artifacts,
             cost_usd=cost_usd,
+            cost_usd_is_estimate=cost_usd_is_estimate,
+            cost_usd_unknown=cost_usd_unknown,
         )
 
     @staticmethod

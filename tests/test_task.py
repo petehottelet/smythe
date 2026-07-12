@@ -15,6 +15,11 @@ def test_task_rejects_whitespace_goal():
         Task(goal="   ")
 
 
+def test_task_rejects_non_string_goal():
+    with pytest.raises(TypeError, match="goal must be a string"):
+        Task(goal=None)
+
+
 def test_task_minimal():
     t = Task(goal="Summarize this document")
     assert t.goal == "Summarize this document"
@@ -33,3 +38,35 @@ def test_task_with_constraints():
 def test_task_with_context():
     t = Task(goal="Translate text", context={"language": "fr"})
     assert t.context["language"] == "fr"
+
+
+def test_task_normalises_goal_and_constraints():
+    t = Task(
+        goal="  Analyze market trends  ",
+        constraints=["  Cite sources  ", "", "   "],
+    )
+
+    assert t.goal == "Analyze market trends"
+    assert t.constraints == ["Cite sources"]
+
+
+def test_task_detaches_mutable_inputs():
+    constraints = ["Cite sources"]
+    context = {"region": "US"}
+
+    task = Task(goal="Analyze market trends", constraints=constraints, context=context)
+    constraints.append("Maximum 500 words")
+    context["region"] = "EU"
+
+    assert task.constraints == ["Cite sources"]
+    assert task.context == {"region": "US"}
+
+
+def test_task_rejects_string_constraints():
+    with pytest.raises(TypeError, match="iterable of strings"):
+        Task(goal="Analyze market trends", constraints="Cite sources")
+
+
+def test_task_rejects_non_mapping_context():
+    with pytest.raises(TypeError, match="context must be a mapping"):
+        Task(goal="Analyze market trends", context=["region", "US"])

@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install ruff
-      - run: ruff check smythe/ tests/
+      - run: ruff check smythe/ tests/ benchmarks/ examples/
 
   test:
     runs-on: ubuntu-latest
@@ -46,3 +46,24 @@ jobs:
           name: coverage-xml
           path: coverage.xml
           if-no-files-found: warn
+
+  benchmark-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install offline benchmark dependencies
+        run: pip install -e ".[dev]" "pillow>=10.0"
+      - name: Exercise image concurrency harness offline
+        run: >-
+          python benchmarks/run_image_benchmarks.py
+          --k 1,3 --images 4 --repeats 1
+          --out "$RUNNER_TEMP/image.json"
+          --artifact-dir "$RUNNER_TEMP/image-artifacts"
+      - name: Exercise asset suite offline
+        run: >-
+          python benchmarks/run_asset_suite.py
+          --out "$RUNNER_TEMP/asset-artifacts"
+          --results "$RUNNER_TEMP/asset.json"

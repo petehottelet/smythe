@@ -13,9 +13,16 @@ mode runs free in any checkout). Raw records:
 
 8 distinct Golden Gate Bridge scene prompts per run, broadcast through
 `Swarm(parallel=True, max_concurrency=k)` on `gemini-2.5-flash-image`
-($0.039/image), budget-capped with the cost-aware reservation protocol,
+(historical configured output estimate: $0.039/image), budget-capped with the
+then-current cost-aware reservation protocol,
 `RETRY` failure policy with full-jitter backoff armed. 3 repeats per
 concurrency level; 72 live images total ($2.81).
+
+The published dollar cells are the configured per-output estimates recorded
+by that run, not invoice reconciliation and not inclusive of image-input
+charges. The current harness additionally requires the caller to supply an
+inclusive whole-call ceiling for fail-closed budget admission and records that
+ceiling conservatively. Verify current provider pricing before rerunning.
 
 ## Results
 
@@ -76,10 +83,11 @@ even same-prompt regenerations differed materially.
 
 - n=3 per cell: ranges shown; treat sub-second deltas as noise. Single
   day, single region, single key — no time-of-day or key variance.
-- 1024×1024 only: `image_config` aspect-ratio control shipped in the
-  framework but is not yet exercised live; format compliance at
-  requested non-square sizes is an open cell.
-- k>8 unmeasured; the rate-limit ceiling on one key is not yet found.
+- The primary k=1/3/8 sweep used 1024×1024 outputs. A separate n=4
+  follow-up established native 16:9 compliance; it is not a full
+  cross-size or cross-provider matrix.
+- The k=25 result is one ceiling-probe run, not a repeated cell. No rate
+  limit appeared, so the single-key ceiling remains unknown above 25.
 - Prompts authored by this project.
 
 ## The asset suite: 8 exact-spec launch assets (2026-07-12)
@@ -131,9 +139,9 @@ five of eight assets finished at ≤1.4× (near-native). Known defect
 class observed: small on-device brand text renders imperfectly at
 hero size — the tiny-text fidelity limit of current image models, and
 precisely the defect the vision-judge curation tier
-(`examples/11_vision_judge.py`) is built to catch. This run measured
-generation + finishing only; adding the judge as a reduce stage is the
-ad-suite consistency benchmark, next.
+(`examples/11_vision_judge.py`) is built to catch. The first exact-spec
+run measured generation + finishing only; the later measured run added
+the judge as a reduce stage, as documented immediately above.
 
 ## Two brands, one pipeline: text complexity drives consistency (2026-07-12)
 
@@ -185,16 +193,22 @@ point are noise; the 3/10 → 8/10 compositing fix was ~10σ.
 **The optimizer** ([run_optimizer.py](run_optimizer.py)) is the
 autoresearch pattern applied to this suite: an LLM proposes one
 targeted prompt-policy change per iteration, the full suite runs live,
-and the candidate is scored as the mean of 3 independent judgings
-(sd of mean ~0.28) — kept only if it beats the incumbent by >0.5
-(~2σ) AND passes the un-gameable format gates (8/8 exact specs).
+and the candidate is scored as the mean of 3 independent judgings —
+kept only if it beats the incumbent by >0.5 and passes the un-gameable
+format gates (8/8 exact specs). The repeated judgings reduce judge-side
+noise only; the margin is a heuristic, not a validated end-to-end
+confidence bound, because generation variance and repeated-comparison
+effects have not yet been measured.
 Every experiment is journaled
 ([results/optimizer_journal.jsonl](results/optimizer_journal.jsonl)).
 Smoke run (~$0.90): baseline 7.67; iteration 1 proposed a sensible
 logo-prompt simplification targeting the observed fidelity defects,
 scored 7.67, and was **correctly reverted** — the keep rule held
-against noise. Iteration cost ~$0.45; a 20-iteration overnight run is
-~$9.50.
+against noise. Those are historical output-estimate costs. The current
+optimizer requires caller-supplied image-call and all-in iteration ceilings,
+and refuses to start the baseline unless one full iteration fits inside the
+declared budget. Verify live pricing instead of treating historical numbers as
+a quote.
 
 ## Planned next
 

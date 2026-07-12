@@ -95,16 +95,18 @@ class PlannerMemory:
 
     def recall(self, task: Any, k: int = 3) -> list[ExecutionOutcome]:
         """Find the k most relevant past outcomes by keyword overlap."""
-        if not self._path.exists():
+        if isinstance(k, bool) or not isinstance(k, int) or k < 0:
+            raise ValueError(f"k must be a non-negative integer, got {k!r}")
+        if k == 0:
             return []
 
-        query_words = self._tokenize(
-            getattr(task, "goal", str(task))
-        )
+        query_words = self._tokenize(self._task_text(task))
         if not query_words:
             return []
 
         with self._lock:
+            if not self._path.exists():
+                return []
             lines = self._path.read_text(encoding="utf-8").splitlines()
 
         scored: list[tuple[float, ExecutionOutcome]] = []
@@ -121,7 +123,9 @@ class PlannerMemory:
                 })
             except (json.JSONDecodeError, TypeError, KeyError):
                 continue
-            stored_words = self._tokenize(outcome.task_goal)
+            stored_words = self._tokenize(
+                " ".join([outcome.task_goal, *outcome.task_constraints])
+            )
             overlap = len(query_words & stored_words)
             if overlap > 0:
                 scored.append((overlap, outcome))
@@ -131,8 +135,19 @@ class PlannerMemory:
 
     def clear(self) -> None:
         """Remove all stored history."""
-        if self._path.exists():
-            self._path.unlink()
+        with self._lock:
+            if self._path.exists():
+                self._path.unlink()
+
+    @staticmethod
+    def _task_text(task: Any) -> str:
+        """Return searchable task text, including hard constraints."""
+        if not hasattr(task, "goal"):
+            return str(task)
+        goal = str(task.goal)
+        constraints = getattr(task, "constraints", [])
+        constraint_text = [str(item) for item in constraints]
+        return " ".join([goal, *constraint_text])
 
     @staticmethod
     def _tokenize(text: str) -> set[str]:

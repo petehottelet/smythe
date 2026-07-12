@@ -110,6 +110,22 @@ def test_tracer_error_then_end_preserves_error():
     assert tracer.spans[0].status == "failed"
 
 
+def test_tracer_records_tool_calls_in_serializable_summary():
+    """Tool telemetry should survive span finalization and summary export."""
+    tracer = Tracer()
+    node = Node(id="tool-user", label="Search docs", status=NodeStatus.COMPLETED)
+
+    tracer.on_node_start(node)
+    tracer.on_tool_call(node, "docs.search", duration_ms=12.345, is_error=False)
+    tracer.on_tool_call(node, "docs.fetch", duration_ms=4.0, is_error=True)
+    tracer.on_node_end(node)
+
+    assert tracer.summary()[0]["tool_calls"] == [
+        {"tool": "docs.search", "duration_ms": 12.3, "is_error": False},
+        {"tool": "docs.fetch", "duration_ms": 4.0, "is_error": True},
+    ]
+
+
 def test_span_metadata_is_independent():
     """Each Span's metadata dict should be independent."""
     s1 = Span(node_id="1", label="A")

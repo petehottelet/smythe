@@ -1,5 +1,12 @@
 # Plan 1 — Bug Fixes
 
+> **Status: completed historical plan.** Reviewed 2026-07-12. These seven
+> fixes shipped in the v0.1 line and are covered by the current test suite.
+> This document preserves the implementation reasoning and its original
+> `Planner` terminology; the public API now uses `Architect`. For current
+> behavior and priorities, see [CHANGELOG.md](../CHANGELOG.md) and
+> [ROADMAP.md](../ROADMAP.md).
+
 Fix 7 concrete bugs across planner, budget, memory, provider, loader, and swarm.
 
 ---

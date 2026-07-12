@@ -87,3 +87,36 @@ def test_openclaw_adapter_empty_skills():
     refs = provider.list_agent_skills("a1")
 
     assert refs == []
+
+
+def test_openclaw_adapter_accepts_mapping_payloads():
+    from smythe.openclaw_adapter import OpenClawSkillProvider
+
+    raw_metadata = {"requires": ["browser"]}
+    client = MagicMock()
+    client.skills.list.return_value = [
+        {
+            "name": "web-search",
+            "version": 2,
+            "description": "Search the web",
+            "metadata": raw_metadata,
+        }
+    ]
+    provider = OpenClawSkillProvider(client=client)
+
+    refs = provider.list_agent_skills("a1")
+    raw_metadata["changed"] = True
+
+    assert refs[0].name == "web-search"
+    assert refs[0].version == "2"
+    assert refs[0].metadata["description"] == "Search the web"
+    assert refs[0].metadata["raw"] == {"requires": ["browser"]}
+
+
+def test_openclaw_adapter_treats_none_inventory_as_empty():
+    from smythe.openclaw_adapter import OpenClawSkillProvider
+
+    client = MagicMock()
+    client.skills.list.return_value = None
+
+    assert OpenClawSkillProvider(client=client).list_agent_skills("a1") == []

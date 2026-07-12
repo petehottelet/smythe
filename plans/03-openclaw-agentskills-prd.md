@@ -1,5 +1,12 @@
 # PRD — OpenClaw AgentSkills Capability Integration
 
+> **Status: shipped historical PRD.** Reviewed 2026-07-12. The skill provider,
+> capability mapping and hydration modes, cache/refresh controls, registry
+> assignment integration, and optional OpenClaw adapter are implemented and
+> tested. Current usage lives in [README.md](../README.md); release history is
+> in [CHANGELOG.md](../CHANGELOG.md). The requirements below remain as the
+> design and acceptance record rather than an active implementation plan.
+
 Enable Smythe to use OpenClaw AgentSkills as the source of truth for per-agent capability profiles, so planner and registry assignment decisions reflect real, installed agent skills.
 
 ---
@@ -168,7 +175,7 @@ If skill provider fails or times out:
   - optional metadata fields for skill provenance
 - `smythe/__init__.py`
   - export new integration types
-- `Readme.md`
+- `README.md`
   - add configuration and examples
 
 ---
@@ -276,4 +283,3 @@ Feature flag default:
 2. Higher exact-match rate in `find_by_capabilities()`.
 3. No increase in executor failure rate due to assignment mismatch.
 4. Negligible assignment latency overhead under cache-hit conditions.
-

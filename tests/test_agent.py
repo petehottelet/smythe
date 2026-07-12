@@ -1,6 +1,7 @@
 """Dedicated tests for Agent and AgentProfile models."""
 
 from smythe.agent import Agent, AgentProfile
+from smythe.mcp import MCPServerSpec
 
 
 def test_agent_profile_defaults():
@@ -81,3 +82,18 @@ def test_agent_profile_capabilities_independent():
     p2 = AgentProfile(name="B")
     p1.capabilities.append("coding")
     assert len(p2.capabilities) == 0
+
+
+def test_agent_profile_mcp_servers_are_preserved_and_independent():
+    """MCP tool sources belong to one profile and must not leak to another."""
+    server = MCPServerSpec(name="docs", transport="stdio", command="docs-server")
+    configured = AgentProfile(name="Researcher", mcp_servers=[server])
+    unconfigured = AgentProfile(name="Writer")
+
+    assert configured.mcp_servers == [server]
+    assert unconfigured.mcp_servers == []
+
+    configured.mcp_servers.append(
+        MCPServerSpec(name="search", transport="http", url="https://example.test/mcp")
+    )
+    assert unconfigured.mcp_servers == []
