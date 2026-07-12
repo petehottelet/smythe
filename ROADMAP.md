@@ -16,9 +16,25 @@ Status: pre-1.0. Minor versions may break APIs (see [CHANGELOG.md](CHANGELOG.md)
 - ✅ v0.2.0 on PyPI (`pip install smythe`)
 - ✅ **Flagship demo** — the acquisition-diligence showcase: fixture mode (no keys) and real mode, with committed graph, trace, and expected output ([examples/acquisition_diligence/](examples/acquisition_diligence/))
 
-## Now: benchmarks
+## Shipped (v0.5 line)
 
-The demo shows what Smythe does; benchmarks show whether it's worth it. The harness and first self-baseline numbers are published in [benchmarks/](benchmarks/) — including the losses, which already paid for themselves by exposing (and fixing) two real executor bugs. Everything else waits behind this.
+- ✅ **Multimodal artifact pipeline** — image generation (Gemini, GPT Image)
+  with per-image cost accounting, execution-scoped artifact persistence,
+  and cost-aware parallel budget reservations
+- ✅ **Vision input** — nodes see their dependencies' images
+  (`attach_dep_artifacts`); the select-from-N art-director pattern
+- ✅ **Image concurrency benchmark, published** — 6.6× wall-clock at k=8,
+  25 images in 10.2 s at k=25, objective metrics only
+  ([benchmarks/image_benchmarks.md](benchmarks/image_benchmarks.md))
+- ✅ **Repo Doctor MVP** — offline-first release-readiness auditor built
+  on smythe ([skills/repo-doctor/](skills/repo-doctor/))
+
+## Now: quality benchmarks + head-to-heads
+
+The parallel *performance* claim is demonstrated. Next to measure:
+the quality tier (select-from-N curation quality-per-dollar; ad-suite
+brand-consistency: shared brief vs. serial style stage vs. single
+agent) and the head-to-head vs. LangGraph and CrewAI.
 
 ## Next
 
