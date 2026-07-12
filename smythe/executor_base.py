@@ -169,7 +169,12 @@ class ExecutorBase:
             node, dep_results, is_terminal=not graph.dependents(node.id),
         )
         model = node.metadata.get("model", "")
-        messages = [ChatMessage(role="user", content=prompt)]
+        attachments = (
+            self.load_dep_image_artifacts(node, graph)
+            if node.attach_dep_artifacts
+            else []
+        )
+        messages = [ChatMessage(role="user", content=prompt, attachments=attachments)]
 
         if self._tool_runtime is None:
             result = await self._provider.chat(system, messages, model)
@@ -265,6 +270,41 @@ class ExecutorBase:
             node.result = "Generated artifacts:\n" + "\n".join(
                 r["path"] for r in records
             )
+
+    MAX_ATTACHED_IMAGES = 12
+    MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024  # per image
+
+    def load_dep_image_artifacts(self, node: Node, graph: ExecutionGraph) -> list:
+        """Load dependencies' image artifacts as multimodal attachments.
+
+        Used when ``node.attach_dep_artifacts`` is set — the vision-judge
+        pattern: an ArtDirector node that must *see* the images its
+        dependencies generated, not just their paths.  Missing or
+        oversized files are skipped (the path listing in the prompt
+        still names them); count is capped so a wide fan-in can't blow
+        the context window.
+        """
+        from smythe.provider import Artifact
+
+        attachments: list[Artifact] = []
+        for dep_id in node.depends_on:
+            dep = self.node_by_id(dep_id, graph)
+            if dep is None:
+                continue
+            for record in dep.metadata.get("artifacts", []):
+                if len(attachments) >= self.MAX_ATTACHED_IMAGES:
+                    return attachments
+                mime = record.get("mime_type", "")
+                if not mime.startswith("image/"):
+                    continue
+                try:
+                    data = Path(record["path"]).read_bytes()
+                except OSError:
+                    continue
+                if len(data) > self.MAX_ATTACHMENT_BYTES:
+                    continue
+                attachments.append(Artifact(data=data, mime_type=mime))
+        return attachments
 
     def gather_dep_results(self, node: Node, graph: ExecutionGraph) -> dict[str, Any]:
         """Collect dependency results for prompt building.

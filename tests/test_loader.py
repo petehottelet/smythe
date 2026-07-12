@@ -338,3 +338,36 @@ nodes:
     assert node.metadata["agent_name"] == "Researcher"
     assert "Researcher: Research the topic" in str(graph)
     assert node.agent_id not in graph.to_mermaid()
+
+
+def test_loader_parses_attach_dep_artifacts(tmp_path):
+    yaml_path = tmp_path / "g.yaml"
+    yaml_path.write_text(
+        "topology: serial\n"
+        "nodes:\n"
+        "  - id: a\n"
+        "    label: make\n"
+        "  - id: b\n"
+        "    label: judge\n"
+        "    depends_on: [a]\n"
+        "    attach_dep_artifacts: true\n",
+        encoding="utf-8",
+    )
+    graph, _ = load_graph(str(yaml_path))
+    by_id = {n.id: n for n in graph.nodes}
+    assert by_id["b"].attach_dep_artifacts is True
+    assert by_id["a"].attach_dep_artifacts is False
+
+
+def test_loader_rejects_non_bool_attach_dep_artifacts(tmp_path):
+    yaml_path = tmp_path / "bad.yaml"
+    yaml_path.write_text(
+        "topology: serial\n"
+        "nodes:\n"
+        "  - id: a\n"
+        "    label: x\n"
+        "    attach_dep_artifacts: yes please\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="attach_dep_artifacts"):
+        load_graph(str(yaml_path))

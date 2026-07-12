@@ -103,6 +103,13 @@ def build_graph_from_dict(data: dict) -> tuple[ExecutionGraph, Registry]:
                     f"got {max_tool_iterations}"
                 )
 
+        attach_dep_artifacts = entry.get("attach_dep_artifacts", False)
+        if not isinstance(attach_dep_artifacts, bool):
+            raise ValueError(
+                f"'attach_dep_artifacts' on node {node_id!r} must be a boolean, "
+                f"got {type(attach_dep_artifacts).__name__}"
+            )
+
         node = Node(
             id=node_id,
             label=label,
@@ -113,6 +120,7 @@ def build_graph_from_dict(data: dict) -> tuple[ExecutionGraph, Registry]:
             required_capabilities=required_capabilities,
             timeout_s=timeout_s,
             max_tool_iterations=max_tool_iterations,
+            attach_dep_artifacts=attach_dep_artifacts,
         )
 
         agent_data = entry.get("agent")

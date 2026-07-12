@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from smythe.agent import Agent
+    from smythe.provider import Artifact
 
 # Strictest naming rule across the three vendors, applied to the wire form.
 _WIRE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
@@ -99,6 +100,13 @@ class ChatMessage:
     content: str = ""
     tool_calls: list[ToolCall] = field(default_factory=list)
     tool_results: list[ToolResult] = field(default_factory=list)
+    attachments: list[Artifact] = field(default_factory=list)
+    """Binary inputs (images) the model should see alongside content.
+
+    Providers map these to their native multimodal formats; providers
+    that only implement complete() reject attachment-bearing messages
+    rather than silently dropping the images.
+    """
 
 
 class ToolSession(ABC):

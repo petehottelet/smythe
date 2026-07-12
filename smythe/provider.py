@@ -98,11 +98,13 @@ class Provider(ABC):
             and len(messages) == 1
             and messages[0].role == "user"
             and not messages[0].tool_results
+            and not messages[0].attachments
         ):
             return await self.complete(system, messages[0].content, model)
         raise NotImplementedError(
             f"{type(self).__name__} does not implement tool-aware chat(). "
-            "Override chat() to support tools or multi-turn messages."
+            "Override chat() to support tools, attachments, or multi-turn "
+            "messages."
         )
 
 
@@ -168,6 +170,30 @@ class OfflineProvider(Provider):
         return CompletionResult(
             text=text, prompt_tokens=40, completion_tokens=60, artifacts=artifacts,
         )
+
+    async def chat(
+        self,
+        system: str,
+        messages: list[ChatMessage],
+        model: str,
+        tools: list[ToolSpec] | None = None,
+    ) -> CompletionResult:
+        """Attachment-tolerant chat: vision nodes stay runnable offline.
+
+        Attached images are acknowledged in the deterministic text so
+        tests can assert the multimodal path was exercised.
+        """
+        if (
+            not tools
+            and len(messages) == 1
+            and messages[0].role == "user"
+            and not messages[0].tool_results
+        ):
+            result = await self.complete(system, messages[0].content, model)
+            if messages[0].attachments:
+                result.text += f" [saw {len(messages[0].attachments)} image(s)]"
+            return result
+        return await super().chat(system, messages, model, tools)
 
 
 # A valid 1x1 transparent PNG — the deterministic artifact payload for
@@ -284,6 +310,21 @@ class AnthropicProvider(Provider):
                     if tr.is_error:
                         block["is_error"] = True
                     content.append(block)
+                if m.content:
+                    content.append({"type": "text", "text": m.content})
+                api_messages.append({"role": "user", "content": content})
+            elif m.attachments:
+                content = [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": a.mime_type,
+                            "data": base64.b64encode(a.data).decode(),
+                        },
+                    }
+                    for a in m.attachments
+                ]
                 if m.content:
                     content.append({"type": "text", "text": m.content})
                 api_messages.append({"role": "user", "content": content})
@@ -426,6 +467,22 @@ class OpenAIProvider(Provider):
                     })
                 if m.content:
                     api_messages.append({"role": "user", "content": m.content})
+            elif m.attachments:
+                parts: list[dict] = [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": (
+                                f"data:{a.mime_type};base64,"
+                                f"{base64.b64encode(a.data).decode()}"
+                            ),
+                        },
+                    }
+                    for a in m.attachments
+                ]
+                if m.content:
+                    parts.append({"type": "text", "text": m.content})
+                api_messages.append({"role": "user", "content": parts})
             else:
                 api_messages.append({"role": "user", "content": m.content})
         return api_messages
@@ -755,5 +812,11 @@ class GeminiProvider(Provider):
                     parts.append({"text": m.content})
                 contents.append({"role": "user", "parts": parts})
             else:
-                contents.append({"role": "user", "parts": [{"text": m.content}]})
+                parts = [
+                    {"inline_data": {"mime_type": a.mime_type, "data": a.data}}
+                    for a in m.attachments
+                ]
+                if m.content or not parts:
+                    parts.append({"text": m.content})
+                contents.append({"role": "user", "parts": parts})
         return contents

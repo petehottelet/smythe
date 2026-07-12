@@ -323,3 +323,97 @@ def test_retry_backoff_grows_with_attempts():
         for _ in range(5):
             d = base.retry_delay_s(attempt)
             assert 0.0 <= d <= ceiling
+
+
+# ---------------------------------------------------------------------------
+# Vision judge: attach_dep_artifacts
+# ---------------------------------------------------------------------------
+
+
+class AttachmentCapturingProvider(Provider):
+    """Records the attachments of every chat() call."""
+
+    def __init__(self):
+        self.seen_attachments = []
+
+    async def complete(self, system, prompt, model):
+        return CompletionResult(text="ok")
+
+    async def chat(self, system, messages, model, tools=None):
+        self.seen_attachments.append(list(messages[0].attachments))
+        return CompletionResult(text="judged")
+
+
+def _graph_with_image_dep(tmp_path, *, attach: bool, image_bytes=b"\x89PNG-dep"):
+    img = tmp_path / "cand_00.png"
+    img.write_bytes(image_bytes)
+    dep = Node(label="make image", id="cand")
+    dep.status = NodeStatus.COMPLETED
+    dep.result = "made it"
+    dep.metadata["artifacts"] = [{"path": str(img), "mime_type": "image/png"}]
+    judge = Node(
+        label="judge it", id="judge", depends_on=["cand"],
+        attach_dep_artifacts=attach,
+    )
+    return ExecutionGraph(topology=[Topology.SERIAL], nodes=[dep, judge]), judge
+
+
+def test_judge_node_receives_dep_images_as_attachments(tmp_path):
+    from smythe.executor import Executor
+
+    graph, judge = _graph_with_image_dep(tmp_path, attach=True)
+    provider = AttachmentCapturingProvider()
+    executor = Executor(
+        provider=provider, registry=Registry(), tracer=Tracer(),
+        artifact_dir=None,
+    )
+    executor.run(graph)
+    assert judge.status == NodeStatus.COMPLETED
+    (attachments,) = provider.seen_attachments
+    assert len(attachments) == 1
+    assert attachments[0].data == b"\x89PNG-dep"
+    assert attachments[0].mime_type == "image/png"
+
+
+def test_attach_disabled_sends_no_attachments(tmp_path):
+    from smythe.executor import Executor
+
+    graph, _ = _graph_with_image_dep(tmp_path, attach=False)
+    provider = AttachmentCapturingProvider()
+    Executor(
+        provider=provider, registry=Registry(), tracer=Tracer(), artifact_dir=None,
+    ).run(graph)
+    (attachments,) = provider.seen_attachments
+    assert attachments == []
+
+
+def test_missing_and_non_image_artifacts_are_skipped(tmp_path):
+    base = _make_base_with_dir(None)
+    dep = Node(label="mixed", id="dep")
+    dep.status = NodeStatus.COMPLETED
+    ok = tmp_path / "ok.png"
+    ok.write_bytes(b"\x89PNG-ok")
+    dep.metadata["artifacts"] = [
+        {"path": str(tmp_path / "gone.png"), "mime_type": "image/png"},
+        {"path": str(ok), "mime_type": "application/pdf"},
+        {"path": str(ok), "mime_type": "image/png"},
+    ]
+    judge = Node(label="judge", id="j", depends_on=["dep"], attach_dep_artifacts=True)
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[dep, judge])
+    attachments = base.load_dep_image_artifacts(judge, graph)
+    assert len(attachments) == 1
+    assert attachments[0].data == b"\x89PNG-ok"
+
+
+def test_attachment_count_is_capped(tmp_path):
+    base = _make_base_with_dir(None)
+    img = tmp_path / "img.png"
+    img.write_bytes(b"\x89PNG")
+    dep = Node(label="many", id="dep")
+    dep.status = NodeStatus.COMPLETED
+    dep.metadata["artifacts"] = [
+        {"path": str(img), "mime_type": "image/png"}
+    ] * (base.MAX_ATTACHED_IMAGES + 5)
+    judge = Node(label="judge", id="j", depends_on=["dep"], attach_dep_artifacts=True)
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[dep, judge])
+    assert len(base.load_dep_image_artifacts(judge, graph)) == base.MAX_ATTACHED_IMAGES

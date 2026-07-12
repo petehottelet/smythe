@@ -55,6 +55,7 @@ def node_to_dict(node: Node) -> dict[str, Any]:
         "required_capabilities": list(node.required_capabilities),
         "timeout_s": node.timeout_s,
         "max_tool_iterations": node.max_tool_iterations,
+        "attach_dep_artifacts": node.attach_dep_artifacts,
     }
 
 
@@ -72,6 +73,7 @@ def node_from_dict(data: dict[str, Any]) -> Node:
         required_capabilities=list(data.get("required_capabilities", [])),
         timeout_s=data.get("timeout_s"),
         max_tool_iterations=data.get("max_tool_iterations"),
+        attach_dep_artifacts=data.get("attach_dep_artifacts", False),
     )
 
 

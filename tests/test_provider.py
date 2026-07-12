@@ -781,3 +781,54 @@ def test_gemini_explicit_modalities_still_sent_with_tools():
 def test_provider_cost_estimate_hints():
     assert GeminiProvider(api_key="k").cost_estimate_per_call is None
     assert GeminiProvider(api_key="k", cost_per_image_usd=0.04).cost_estimate_per_call == 0.04
+
+
+# ---------------------------------------------------------------------------
+# Multimodal attachments (vision input)
+# ---------------------------------------------------------------------------
+
+
+def _attachment_message(text="pick the best"):
+    return ChatMessage(
+        role="user",
+        content=text,
+        attachments=[Artifact(data=b"\x89PNG-in", mime_type="image/png")],
+    )
+
+
+def test_base_chat_rejects_attachments_for_complete_only_providers():
+    p = MockProvider()
+    with pytest.raises(NotImplementedError, match="attachments"):
+        asyncio.run(p.chat("sys", [_attachment_message()], "m"))
+
+
+def test_offline_provider_acknowledges_attachments():
+    p = OfflineProvider()
+    result = asyncio.run(p.chat("sys", [_attachment_message()], "demo"))
+    assert "[saw 1 image(s)]" in result.text
+
+
+def test_anthropic_maps_attachments_to_image_blocks():
+    msgs = AnthropicProvider._to_api_messages([_attachment_message()])
+    content = msgs[0]["content"]
+    assert content[0]["type"] == "image"
+    assert content[0]["source"]["media_type"] == "image/png"
+    import base64 as b64
+    assert b64.b64decode(content[0]["source"]["data"]) == b"\x89PNG-in"
+    assert content[1] == {"type": "text", "text": "pick the best"}
+
+
+def test_openai_maps_attachments_to_image_url_parts():
+    msgs = OpenAIProvider._to_api_messages("sys", [_attachment_message()])
+    parts = msgs[1]["content"]
+    assert parts[0]["type"] == "image_url"
+    assert parts[0]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert parts[1] == {"type": "text", "text": "pick the best"}
+
+
+def test_gemini_maps_attachments_to_inline_data_parts():
+    contents = GeminiProvider._to_api_contents([_attachment_message()])
+    parts = contents[0]["parts"]
+    assert parts[0]["inline_data"]["mime_type"] == "image/png"
+    assert parts[0]["inline_data"]["data"] == b"\x89PNG-in"
+    assert parts[1] == {"text": "pick the best"}

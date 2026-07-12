@@ -275,3 +275,13 @@ def test_max_tool_iterations_roundtrips_and_old_checkpoints_default():
     legacy = node_to_dict(Node(id="m", label="L2"))
     legacy.pop("max_tool_iterations")  # pre-M2 checkpoint shape
     assert node_from_dict(legacy).max_tool_iterations is None
+
+
+def test_attach_dep_artifacts_roundtrips():
+    from smythe.checkpoint import node_from_dict, node_to_dict
+    from smythe.graph import Node
+
+    node = Node(label="judge", id="j", attach_dep_artifacts=True)
+    restored = node_from_dict(node_to_dict(node))
+    assert restored.attach_dep_artifacts is True
+    assert node_from_dict(node_to_dict(Node(label="x"))).attach_dep_artifacts is False
