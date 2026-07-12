@@ -13,6 +13,17 @@ def _escape_mermaid(text: str) -> str:
     return text.replace('"', "#quot;").replace("[", "(").replace("]", ")")
 
 
+# House diagram style (docs/style.md): serif type, ivory nodes, hairline
+# warm-gray edges, gentle curves. Opt in via to_mermaid(theme=True).
+MERMAID_THEME = (
+    '%%{init: {"theme":"base","themeVariables":{'
+    '"fontFamily":"Georgia, \'Times New Roman\', serif","fontSize":"14px",'
+    '"primaryColor":"#faf8f1","primaryTextColor":"#23221e",'
+    '"primaryBorderColor":"#a89f8c","lineColor":"#a89f8c"},'
+    '"flowchart":{"curve":"basis","nodeSpacing":48,"rankSpacing":58}}}%%'
+)
+
+
 class Topology(Enum):
     """High-level execution patterns the planner can select."""
 
@@ -162,13 +173,17 @@ class ExecutionGraph:
             ],
         }
 
-    def to_mermaid(self) -> str:
+    def to_mermaid(self, *, theme: bool = False) -> str:
         """Render the DAG as a Mermaid flowchart (top-down).
 
         Node statuses map to style classes so executed graphs are
         readable at a glance; output is deterministic for snapshot tests.
+        With ``theme=True``, the house style header (serif type, ivory
+        nodes, hairline edges — see docs/style.md) is prepended so
+        generated diagrams match the hand-authored ones in the README.
         """
-        lines = ["flowchart TD"]
+        lines = [MERMAID_THEME] if theme else []
+        lines.append("flowchart TD")
         for n in self.nodes:
             label = _escape_mermaid(self._node_label(n))
             lines.append(f'    {n.id}["{label}"]')
@@ -187,10 +202,10 @@ class ExecutionGraph:
             if cls:
                 styled.setdefault(cls, []).append(n.id)
         if styled:
-            lines.append("    classDef done fill:#d3f9d8,stroke:#2b8a3e")
-            lines.append("    classDef failed fill:#ffe3e3,stroke:#c92a2a")
-            lines.append("    classDef skipped fill:#e9ecef,stroke:#868e96")
-            lines.append("    classDef running fill:#fff3bf,stroke:#e67700")
+            lines.append("    classDef done fill:#eef0e4,stroke:#5a7742,color:#3a4d2b")
+            lines.append("    classDef failed fill:#f3e0dd,stroke:#8c3b2e,color:#66291f")
+            lines.append("    classDef skipped fill:#eceae3,stroke:#8a8578,color:#57534a")
+            lines.append("    classDef running fill:#f5ead0,stroke:#9a7b2d,color:#5c4a1e")
             for cls in ("done", "failed", "skipped", "running"):
                 if cls in styled:
                     lines.append(f"    class {','.join(styled[cls])} {cls}")

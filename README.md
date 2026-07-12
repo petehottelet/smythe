@@ -1,9 +1,15 @@
-# smythe
+<div align="center">
+  <img src="assets/wordmark.svg" alt="SMYTHE" width="340">
 
-[![PyPI](https://img.shields.io/pypi/v/smythe)](https://pypi.org/project/smythe/)
-[![CI](https://github.com/petehottelet/smythe/actions/workflows/ci.yml/badge.svg)](https://github.com/petehottelet/smythe/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+  <p><em>Agent swarms with dynamic execution topology.</em></p>
+
+  <p>
+    <a href="https://pypi.org/project/smythe/"><img src="https://img.shields.io/pypi/v/smythe?style=flat-square&labelColor=23221e&color=9a7b2d" alt="PyPI"></a>
+    <a href="https://github.com/petehottelet/smythe/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/petehottelet/smythe/ci.yml?style=flat-square&labelColor=23221e&color=9a7b2d&label=ci" alt="CI"></a>
+    <img src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-9a7b2d?style=flat-square&labelColor=23221e" alt="Python">
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-9a7b2d?style=flat-square&labelColor=23221e" alt="License: MIT"></a>
+  </p>
+</div>
 
 **An open-source framework for task-based agent swarms with dynamic parallelization, routing, and execution topology.**
 
@@ -67,7 +73,7 @@ TaskGraph(topology="fork-join → adversarial → serial")
 ```
 
 ```mermaid
-%%{init: {"theme":"base","themeVariables":{"fontFamily":"Roboto Mono, monospace","fontSize":"13px","primaryColor":"#f9fafb","primaryTextColor":"#1f2937","primaryBorderColor":"#9ca3af","lineColor":"#9ca3af"},"flowchart":{"curve":"step","nodeSpacing":50,"rankSpacing":60}}}%%
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Georgia, 'Times New Roman', serif","fontSize":"14px","primaryColor":"#faf8f1","primaryTextColor":"#23221e","primaryBorderColor":"#a89f8c","lineColor":"#a89f8c"},"flowchart":{"curve":"basis","nodeSpacing":48,"rankSpacing":58}}}%%
 flowchart TD
     financial("<b>FinancialAnalyst</b><br/>revenue model, margins, burn, comps")
     technical("<b>TechDiligenceAgent</b><br/>IP portfolio, tech debt, key-person risk")
@@ -81,15 +87,15 @@ flowchart TD
     draft --> redteam
     draft --> memo
     redteam --> memo
-    classDef specialist fill:#f9fafb,stroke:#9ca3af,stroke-width:1px,color:#1f2937
-    classDef editor fill:#f3f4f6,stroke:#6b7280,stroke-width:1px,color:#1f2937
-    classDef adversarial fill:#e5e7eb,stroke:#6b7280,stroke-width:1px,color:#1f2937
-    classDef deliverable fill:#374151,stroke:#1f2937,stroke-width:1px,color:#f9fafb
+    classDef specialist fill:#faf8f1,stroke:#a89f8c,stroke-width:1px,color:#23221e
+    classDef editor fill:#f1ecdf,stroke:#8a8578,stroke-width:1px,color:#23221e
+    classDef adversarial fill:#f5ead0,stroke:#9a7b2d,stroke-width:1px,color:#5c4a1e
+    classDef deliverable fill:#23221e,stroke:#9a7b2d,stroke-width:1.25px,color:#f5efe0
     class financial,technical,regulatory specialist
     class draft editor
     class redteam adversarial
     class memo deliverable
-    linkStyle default stroke:#9ca3af,stroke-width:1px
+    linkStyle default stroke:#a89f8c,stroke-width:1.25px
 ```
 
 Three specialists run in parallel under a budget cap, a red team attacks the draft, and the memo node turns the surviving claims into a conditional go/no-go recommendation. The expected graph, trace, and memo are committed in [examples/acquisition_diligence/expected/](examples/acquisition_diligence/expected/) — a test regenerates them on every CI run, so what you see there is what the code does. Full walkthrough: [examples/acquisition_diligence/](examples/acquisition_diligence/).
