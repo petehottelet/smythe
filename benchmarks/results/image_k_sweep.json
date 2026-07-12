@@ -1,0 +1,623 @@
+{
+  "benchmark": "image-concurrency-sweep",
+  "mode": "LIVE",
+  "model": "gemini-2.5-flash-image",
+  "cost_per_image_usd": 0.039,
+  "images_per_run": 8,
+  "summary": [
+    {
+      "k": 1,
+      "runs": 3,
+      "wall_s_mean": 46.31,
+      "wall_s_range": [
+        45.4,
+        46.85
+      ],
+      "efficiency_mean": 1.0,
+      "throughput_mean_ipm": 10.4,
+      "cost_total_usd": 0.936
+    },
+    {
+      "k": 3,
+      "runs": 3,
+      "wall_s_mean": 16.89,
+      "wall_s_range": [
+        16.64,
+        17.05
+      ],
+      "efficiency_mean": 0.882,
+      "throughput_mean_ipm": 28.4,
+      "cost_total_usd": 0.936
+    },
+    {
+      "k": 8,
+      "runs": 3,
+      "wall_s_mean": 7.02,
+      "wall_s_range": [
+        6.28,
+        7.63
+      ],
+      "efficiency_mean": 0.805,
+      "throughput_mean_ipm": 68.8,
+      "cost_total_usd": 0.936
+    }
+  ],
+  "runs": [
+    {
+      "k": 1,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 46.67,
+      "sum_node_latency_s": 46.67,
+      "node_latency_s": [
+        7.43,
+        6.52,
+        5.27,
+        5.05,
+        6.42,
+        5.21,
+        5.58,
+        5.21
+      ],
+      "concurrency_factor": 1.0,
+      "efficiency_vs_ideal": 1.0,
+      "throughput_images_per_min": 10.3,
+      "cost_usd": 0.312,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 13,
+        "dhash_pairwise_mean": 24.4
+      },
+      "execution_id": "38500fd8490a4defbdb711c51d42006c",
+      "repeat": 0
+    },
+    {
+      "k": 1,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 46.85,
+      "sum_node_latency_s": 46.85,
+      "node_latency_s": [
+        7.04,
+        6.42,
+        5.82,
+        5.35,
+        4.86,
+        6.52,
+        5.23,
+        5.61
+      ],
+      "concurrency_factor": 1.0,
+      "efficiency_vs_ideal": 1.0,
+      "throughput_images_per_min": 10.2,
+      "cost_usd": 0.312,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 7,
+        "dhash_pairwise_mean": 25.0
+      },
+      "execution_id": "25ab660128604fe2be3af6b0b6a7fe7d",
+      "repeat": 1
+    },
+    {
+      "k": 1,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 45.4,
+      "sum_node_latency_s": 45.4,
+      "node_latency_s": [
+        5.82,
+        5.82,
+        5.52,
+        5.22,
+        5.12,
+        6.97,
+        5.39,
+        5.53
+      ],
+      "concurrency_factor": 1.0,
+      "efficiency_vs_ideal": 1.0,
+      "throughput_images_per_min": 10.6,
+      "cost_usd": 0.312,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 8,
+        "dhash_pairwise_mean": 28.0
+      },
+      "execution_id": "564d0402d9c445149d65d6ec1fc928f4",
+      "repeat": 2
+    },
+    {
+      "k": 3,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 16.97,
+      "sum_node_latency_s": 44.68,
+      "node_latency_s": [
+        5.12,
+        6.39,
+        6.31,
+        5.52,
+        5.74,
+        5.49,
+        5.27,
+        4.84
+      ],
+      "concurrency_factor": 2.63,
+      "efficiency_vs_ideal": 0.878,
+      "throughput_images_per_min": 28.3,
+      "cost_usd": 0.312,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 16,
+        "dhash_pairwise_mean": 28.7
+      },
+      "execution_id": "83a96967cbc94728a8ea095584433e69",
+      "repeat": 0
+    },
+    {
+      "k": 3,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 16.64,
+      "sum_node_latency_s": 43.8,
+      "node_latency_s": [
+        5.35,
+        5.42,
+        6.0,
+        5.41,
+        5.37,
+        5.8,
+        5.18,
+        5.27
+      ],
+      "concurrency_factor": 2.63,
+      "efficiency_vs_ideal": 0.877,
+      "throughput_images_per_min": 28.8,
+      "cost_usd": 0.312,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 12,
+        "dhash_pairwise_mean": 28.4
+      },
+      "execution_id": "6d551f0ea78a4b3a9894b5efad3c2c1a",
+      "repeat": 1
+    },
+    {
+      "k": 3,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 17.05,
+      "sum_node_latency_s": 45.5,
+      "node_latency_s": [
+        4.9,
+        5.36,
+        6.24,
+        5.12,
+        5.86,
+        6.44,
+        5.53,
+        6.04
+      ],
+      "concurrency_factor": 2.67,
+      "efficiency_vs_ideal": 0.89,
+      "throughput_images_per_min": 28.2,
+      "cost_usd": 0.312,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 20,
+        "dhash_pairwise_mean": 31.0
+      },
+      "execution_id": "82f86d2f195b4f2f986f095d8e959fcd",
+      "repeat": 2
+    },
+    {
+      "k": 8,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 7.15,
+      "sum_node_latency_s": 44.95,
+      "node_latency_s": [
+        5.16,
+        5.33,
+        5.4,
+        5.99,
+        5.42,
+        5.43,
+        5.66,
+        6.57
+      ],
+      "concurrency_factor": 6.29,
+      "efficiency_vs_ideal": 0.786,
+      "throughput_images_per_min": 67.1,
+      "cost_usd": 0.312,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 13,
+        "dhash_pairwise_mean": 27.3
+      },
+      "execution_id": "925545abd38947108e13ed138d805f16",
+      "repeat": 0
+    },
+    {
+      "k": 8,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 7.63,
+      "sum_node_latency_s": 46.42,
+      "node_latency_s": [
+        5.22,
+        5.29,
+        5.49,
+        5.52,
+        6.1,
+        5.74,
+        5.98,
+        7.07
+      ],
+      "concurrency_factor": 6.08,
+      "efficiency_vs_ideal": 0.76,
+      "throughput_images_per_min": 62.9,
+      "cost_usd": 0.312,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 12,
+        "dhash_pairwise_mean": 29.9
+      },
+      "execution_id": "1765bb9a55fb423fa7606905b0bb13dd",
+      "repeat": 1
+    },
+    {
+      "k": 8,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 6.28,
+      "sum_node_latency_s": 43.7,
+      "node_latency_s": [
+        5.02,
+        5.69,
+        5.38,
+        5.38,
+        5.41,
+        5.41,
+        5.7,
+        5.72
+      ],
+      "concurrency_factor": 6.96,
+      "efficiency_vs_ideal": 0.87,
+      "throughput_images_per_min": 76.4,
+      "cost_usd": 0.312,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 3,
+        "dhash_pairwise_mean": 25.4
+      },
+      "execution_id": "53cdc454cc7f4584adbde4545bad79e1",
+      "repeat": 2
+    }
+  ]
+}

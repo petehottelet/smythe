@@ -160,6 +160,15 @@ project. Framework head-to-heads remain open (see Planned).
 4. **Reproducible.** Committed results include the command, model,
    provider, and date; offline mechanics are byte-deterministic.
 
+## Image pipeline — concurrency sweep (2026-07-12)
+
+First results with entirely objective metrics (no LLM judge): **6.6×
+wall-clock speedup at concurrency 8** (46.3s → 7.0s for 8 images) at
+identical cost, 81–88% of ideal parallel efficiency, 72/72 images valid,
+zero rate-limit events on one paid key. Full table, protocol, and
+honest caveats (including an observed near-duplicate pair):
+[image_benchmarks.md](image_benchmarks.md).
+
 ## Planned
 
 - Head-to-head vs. LangGraph and CrewAI equivalents of the fixed
@@ -167,3 +176,6 @@ project. Framework head-to-heads remain open (see Planned).
 - A memory task family with planted failure modes, so recall has
   mistakes to correct (the current family measures null — see above)
 - An independent, non-Anthropic judge model
+- Image pipeline continuations — aspect-ratio compliance, the k>8
+  ceiling, select-from-N curation, ad-suite brand consistency
+  (see [image_benchmarks.md](image_benchmarks.md))
