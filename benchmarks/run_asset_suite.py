@@ -1,8 +1,9 @@
-"""The Osiris asset suite: 8 exact-spec launch assets from one brief.
+"""The brand asset suite: 8 exact-spec launch assets from one brand config.
 
     python benchmarks/run_asset_suite.py                    # offline mechanics
     python benchmarks/run_asset_suite.py --live             # ~$0.35 on Gemini
     python benchmarks/run_asset_suite.py --live --logo path/to/logo.png
+    python benchmarks/run_asset_suite.py --live --judge --brand benchmarks/brands/metacortex.json
 
 Brand lock: assets for a brand must share its actual mark, not eight
 independent hallucinations of one. The suite therefore confirms
@@ -55,44 +56,41 @@ for _stream in (sys.stdout, sys.stderr):
 COST_PER_IMAGE_USD = 0.039
 MODEL = "gemini-2.5-flash-image"
 
-BRIEF = (
-    "for the launch of 'Osiris', a portable solar-powered phone charger. "
-    "Brand palette: warm amber, matte black, off-white. Style: clean product "
-    "photography, natural light, lifestyle context, premium minimalist design. "
-    "Brand text where appropriate: 'OSIRIS - Power from the sun'. "
-)
-
-# (asset id, width, height, format, gemini aspect bucket, scene)
+# (asset id, width, height, format, gemini aspect bucket) — scenes come
+# from the brand config so the same spec sheet serves any brand.
 SPECS = [
-    ("hero", 2400, 1200, "PNG", "16:9",
-     "hero image: the product resting on a sunlit hiking trail"),
-    ("instagram", 1080, 1080, "JPEG", "1:1",
-     "Instagram post: lifestyle flat-lay with the product and travel gear"),
-    ("x_banner", 1500, 500, "JPEG", "21:9",
-     "X/Twitter banner: macro product detail across a wide composition"),
-    ("story", 1080, 1920, "PNG", "9:16",
-     "Story/Reel card: vertical lifestyle shot, product in hand outdoors"),
-    ("email_header", 600, 200, "PNG", "21:9",
-     "email header: slim newsletter announcement banner with negative space"),
-    ("appstore", 1290, 2796, "PNG", "9:16",
-     "App Store screenshot: the companion app UI on a phone, feature callout"),
-    ("og_card", 1200, 630, "PNG", "16:9",
-     "OG preview card: link-share thumbnail, product centered, room for title"),
-    ("print_ad", 2550, 3300, "PNG", "3:4",
-     "print ad: magazine full-page composition with generous margins"),
+    ("hero", 2400, 1200, "PNG", "16:9"),
+    ("instagram", 1080, 1080, "JPEG", "1:1"),
+    ("x_banner", 1500, 500, "JPEG", "21:9"),
+    ("story", 1080, 1920, "PNG", "9:16"),
+    ("email_header", 600, 200, "PNG", "21:9"),
+    ("appstore", 1290, 2796, "PNG", "9:16"),
+    ("og_card", 1200, 630, "PNG", "16:9"),
+    ("print_ad", 2550, 3300, "PNG", "3:4"),
 ]
 
-
-LOGO_PROMPT = (
-    "Design the official brand logo for 'Osiris', a portable solar-powered "
-    "phone charger. A flat, iconic sun-over-horizon mark with the wordmark "
-    "'OSIRIS' beneath it. Palette: warm amber mark, matte black text, "
-    "off-white background. Clean vector style, centered, no photography, "
-    "no extra text."
-)
+DEFAULT_BRAND = "benchmarks/brands/osiris.json"
 
 
-async def ensure_logo(*, live: bool, out: Path, provided: str | None) -> dict:
+def load_brand(path: str) -> dict:
+    """Load and validate a brand config (see benchmarks/brands/)."""
+    brand = json.loads(Path(path).read_text(encoding="utf-8"))
+    required = {"name", "brief", "logo_prompt", "scenes"}
+    missing = required - brand.keys()
+    if missing:
+        raise ValueError(f"Brand config {path} missing keys: {sorted(missing)}")
+    scene_ids = {spec[0] for spec in SPECS}
+    missing_scenes = scene_ids - brand["scenes"].keys()
+    if missing_scenes:
+        raise ValueError(
+            f"Brand config {path} missing scenes: {sorted(missing_scenes)}"
+        )
+    return brand
+
+
+async def ensure_logo(
+    *, brand: dict, live: bool, out: Path, provided: str | None,
+) -> dict:
     """Confirm possession of a brand logo, or create one first.
 
     Returns {"path": ..., "source": "provided"|"generated"}. A provided
@@ -114,7 +112,7 @@ async def ensure_logo(*, live: bool, out: Path, provided: str | None) -> dict:
         else OfflineProvider(artifacts_per_call=1)
     )
     node = Node(
-        id="brand_logo", label=LOGO_PROMPT,
+        id="brand_logo", label=brand["logo_prompt"],
         failure_policy=FailurePolicy.RETRY, max_retries=2,
     )
     graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
@@ -157,7 +155,7 @@ JUDGE_MODEL = "gemini-flash-lite-latest"
 
 JUDGE_PROMPT = (
     "You are the brand art director. The FIRST attached image is the "
-    "official Osiris brand logo. The following images are the finished "
+    "official {name} brand logo. The following images are the finished "
     "launch assets, in this order: {asset_ids}. For each asset, judge "
     "brand consistency against the official logo: is the exact mark "
     "reproduced (not a variant), are palette and typography on-brand, "
@@ -169,7 +167,8 @@ JUDGE_PROMPT = (
 
 
 async def judge_assets(
-    *, live: bool, out: Path, logo_path: str, finals: dict[str, str],
+    *, brand: dict, live: bool, out: Path, logo_path: str,
+    finals: dict[str, str],
 ) -> dict:
     """Reduce stage: a vision judge scores brand consistency per asset.
 
@@ -186,7 +185,9 @@ async def judge_assets(
     )
     judge = Node(
         id="brand_judge",
-        label=JUDGE_PROMPT.format(asset_ids=", ".join(finals.keys())),
+        label=JUDGE_PROMPT.format(
+            name=brand["name"], asset_ids=", ".join(finals.keys()),
+        ),
         depends_on=[intake.id],
         attach_dep_artifacts=True,
         failure_policy=FailurePolicy.RETRY,
@@ -243,7 +244,8 @@ def finish(src: Path, dst: Path, width: int, height: int, fmt: str) -> dict:
 
 
 async def run_bucket(
-    bucket: str, specs: list, *, live: bool, out: Path, logo_path: str,
+    bucket: str, specs: list, *, brand: dict, live: bool, out: Path,
+    logo_path: str,
 ) -> dict:
     provider = (
         GeminiProvider(
@@ -258,17 +260,17 @@ async def run_bucket(
         Node(
             id=asset_id,
             label=(
-                "The attached image is the official Osiris brand logo. "
-                "Reproduce this exact mark faithfully wherever the brand "
-                f"appears — never invent a different logo. Generate a {scene} "
-                f"{BRIEF}"
+                f"The attached image is the official {brand['name']} brand "
+                "logo. Reproduce this exact mark faithfully wherever the "
+                "brand appears — never invent a different logo. Generate a "
+                f"{brand['scenes'][asset_id]} {brand['brief']}"
             ),
             depends_on=[intake.id],
             attach_dep_artifacts=True,
             failure_policy=FailurePolicy.RETRY,
             max_retries=2,
         )
-        for asset_id, _, _, _, _, scene in specs
+        for asset_id, _, _, _, _ in specs
     ]
     graph = ExecutionGraph(
         topology=[Topology.BROADCAST_REDUCE], nodes=[intake, *nodes],
@@ -291,19 +293,24 @@ async def run_bucket(
 
 
 async def main_async(
-    live: bool, out: Path, provided_logo: str | None, judge: bool,
+    brand: dict, live: bool, out: Path, provided_logo: str | None, judge: bool,
 ) -> dict:
     buckets: dict[str, list] = {}
     for spec in SPECS:
         buckets.setdefault(spec[4], []).append(spec)
 
     t_logo = time.perf_counter()
-    logo = await ensure_logo(live=live, out=out, provided=provided_logo)
+    logo = await ensure_logo(
+        brand=brand, live=live, out=out, provided=provided_logo,
+    )
     logo_wall_s = time.perf_counter() - t_logo
 
     t0 = time.perf_counter()
     results = await asyncio.gather(*(
-        run_bucket(bucket, specs, live=live, out=out, logo_path=logo["path"])
+        run_bucket(
+            bucket, specs, brand=brand, live=live, out=out,
+            logo_path=logo["path"],
+        )
         for bucket, specs in buckets.items()
     ))
     generation_wall_s = time.perf_counter() - t0
@@ -317,7 +324,7 @@ async def main_async(
     final_dir = out / "final"
     final_dir.mkdir(parents=True, exist_ok=True)
     report = []
-    for asset_id, width, height, fmt, bucket, _ in SPECS:
+    for asset_id, width, height, fmt, bucket in SPECS:
         entry: dict = {
             "asset": asset_id,
             "spec": f"{width}x{height} {fmt}",
@@ -343,7 +350,8 @@ async def main_async(
             e["asset"]: e["final_path"] for e in report if e.get("final_path")
         }
         verdict = await judge_assets(
-            live=live, out=out, logo_path=logo["path"], finals=finals,
+            brand=brand, live=live, out=out, logo_path=logo["path"],
+            finals=finals,
         )
         for e in report:
             score = verdict["scores"].get(e["asset"])
@@ -353,7 +361,8 @@ async def main_async(
 
     passed = sum(1 for e in report if e["status"] == "PASS")
     return {
-        "benchmark": "osiris-asset-suite",
+        "benchmark": "brand-asset-suite",
+        "brand": brand["name"],
         "mode": "LIVE" if live else "offline",
         "model": MODEL if live else "offline",
         "assets_pass": f"{passed}/{len(SPECS)}",
@@ -374,7 +383,11 @@ async def main_async(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true")
-    parser.add_argument("--out", default="smythe_artifacts/asset_suite")
+    parser.add_argument(
+        "--brand", default=DEFAULT_BRAND,
+        help="brand config JSON (see benchmarks/brands/)",
+    )
+    parser.add_argument("--out", default=None)
     parser.add_argument("--results", default=None)
     parser.add_argument(
         "--logo", default=None,
@@ -390,7 +403,10 @@ def main() -> None:
     if args.live and not live:
         print("--live requires GOOGLE_API_KEY; falling back to offline.")
 
-    payload = asyncio.run(main_async(live, Path(args.out), args.logo, args.judge))
+    brand = load_brand(args.brand)
+    slug = brand["name"].lower().replace(" ", "_")
+    out = Path(args.out) if args.out else Path("smythe_artifacts/asset_suite") / slug
+    payload = asyncio.run(main_async(brand, live, out, args.logo, args.judge))
 
     logo = payload["brand_logo"]
     print(f"[{payload['mode']}] logo {logo['source']} ({logo['wall_s']}s), "
@@ -411,7 +427,7 @@ def main() -> None:
         print(f"  overall brand consistency: {payload['brand_judge']['overall']}/10")
 
     results_path = args.results or (
-        "benchmarks/results/asset_suite.json" if live
+        f"benchmarks/results/asset_suite_{slug}.json" if live
         else "benchmarks/results/asset_suite_offline.json"
     )
     Path(results_path).parent.mkdir(parents=True, exist_ok=True)

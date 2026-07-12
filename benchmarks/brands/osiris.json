@@ -1,0 +1,15 @@
+{
+  "name": "Osiris",
+  "brief": "for the launch of 'Osiris', a portable solar-powered phone charger. Brand palette: warm amber, matte black, off-white. Style: clean product photography, natural light, lifestyle context, premium minimalist design. Brand text where appropriate: 'OSIRIS - Power from the sun'. ",
+  "logo_prompt": "Design the official brand logo for 'Osiris', a portable solar-powered phone charger. A flat, iconic sun-over-horizon mark with the wordmark 'OSIRIS' beneath it. Palette: warm amber mark, matte black text, off-white background. Clean vector style, centered, no photography, no extra text.",
+  "scenes": {
+    "hero": "hero image: the product resting on a sunlit hiking trail",
+    "instagram": "Instagram post: lifestyle flat-lay with the product and travel gear",
+    "x_banner": "X/Twitter banner: macro product detail across a wide composition",
+    "story": "Story/Reel card: vertical lifestyle shot, product in hand outdoors",
+    "email_header": "email header: slim newsletter announcement banner with negative space",
+    "appstore": "App Store screenshot: the companion app UI on a phone, feature callout",
+    "og_card": "OG preview card: link-share thumbnail, product centered, room for title",
+    "print_ad": "print ad: magazine full-page composition with generous margins"
+  }
+}
