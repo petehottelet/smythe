@@ -100,6 +100,34 @@ flowchart TD
 
 Three specialists run in parallel under a budget cap, a red team attacks the draft, and the memo node turns the surviving claims into a conditional go/no-go recommendation. The expected graph, trace, and memo are committed in [examples/acquisition_diligence/expected/](examples/acquisition_diligence/expected/) — a test regenerates them on every CI run, so what you see there is what the code does. Full walkthrough: [examples/acquisition_diligence/](examples/acquisition_diligence/).
 
+## Parallel image generation, measured
+
+Smythe agents generate images too — in parallel, under the same budget
+machinery. These three ads were produced by one broadcast graph on
+`gemini-2.5-flash-image` for **$0.117 total, concurrently**, from
+nothing but a shared brand brief ([examples/09_image_generation.py](examples/09_image_generation.py)):
+
+<table>
+  <tr>
+    <td><img src="assets/demo_ad_banner.jpg" alt="Generated banner ad" width="270"></td>
+    <td><img src="assets/demo_ad_dunes.jpg" alt="Generated rectangle ad" width="200"></td>
+    <td><img src="assets/demo_ad_flatlay.jpg" alt="Generated social ad" width="200"></td>
+  </tr>
+</table>
+
+The performance numbers are published with the raw records, objective
+metrics only — no LLM judge: **6.6× wall-clock speedup at concurrency
+8**, and **25 images in 10.2 seconds** ($0.98) at concurrency 25, at
+identical cost to serial generation. Full protocol, results, and honest
+caveats: [benchmarks/image_benchmarks.md](benchmarks/image_benchmarks.md).
+
+And because wide fan-out occasionally produces defects, nodes can *see*
+images: an art-director node with `attach_dep_artifacts=True` receives
+its dependencies' outputs as pixels and curates them
+([examples/11_vision_judge.py](examples/11_vision_judge.py)). In its
+first live run, the judge rejected a candidate ad for a spelling
+mistake baked into the generated image.
+
 ---
 
 ## The Problem

@@ -392,9 +392,11 @@ class OpenAIProvider(Provider):
                 for t in tools
             ]
 
+        # Current OpenAI models reject the legacy max_tokens parameter;
+        # max_completion_tokens is its documented replacement.
         response = await client.chat.completions.create(
             model=model,
-            max_tokens=self._max_tokens,
+            max_completion_tokens=self._max_tokens,
             messages=self._to_api_messages(system, messages),
             **kwargs,
         )
