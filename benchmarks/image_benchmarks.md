@@ -96,6 +96,20 @@ per provider); a deterministic finishing pass (resize-to-cover +
 center-crop) produced the exact dimensions, because no image model
 emits 2400×1200 or 300-dpi print natively.
 
+**Brand lock (same day, second run — 8/8, 13.2s + 6.4s logo, $0.351):**
+assets for a brand must share its actual mark, not eight independent
+hallucinations of one. The suite now confirms possession of a brand
+logo first (`--logo path`) or generates one in a dedicated stage, and
+every asset node receives the logo pixels as a reference image
+(`attach_dep_artifacts=True` feeding the model's image-input channel).
+Verified by inspection: the generated sun-over-horizon mark reproduced
+faithfully across assets from *different* concurrent swarms — the
+consistency mechanism is the shared reference image, not shared
+sampling. Recorded in
+[results/asset_suite.json](results/asset_suite.json) under
+`brand_logo` (source: provided vs. generated, plus its own wall time
+and cost).
+
 Honesty metrics per asset: upscale factor and cropped fraction are
 recorded — print ad upscaled 2.95× and App Store 2.08× beyond native
 model resolution (the visible quality cost of oversized specs), while

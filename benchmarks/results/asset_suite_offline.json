@@ -3,9 +3,15 @@
   "mode": "offline",
   "model": "offline",
   "assets_pass": "8/8",
+  "brand_logo": {
+    "path": "C:\\Users\\PeteHottelet\\Projects\\smythe\\smythe_artifacts\\asset_suite\\raw\\logo\\26581ecf8987\\brand_logo_00.png",
+    "source": "generated",
+    "cost_usd": 0.00030000000000000003,
+    "wall_s": 0.01
+  },
   "generation_wall_s": 0.01,
   "buckets_run_concurrently": 5,
-  "cost_usd": 0.0024,
+  "cost_usd": 0.0027,
   "assets": [
     {
       "asset": "hero",
