@@ -13,7 +13,9 @@ Offline (no keys): deterministic PNGs flow through the same attachment
 path and the judge acknowledges how many images it saw.
 
 Real mode: set GOOGLE_API_KEY. Candidates use a Gemini image model; the
-judge uses a Gemini text+vision model.
+judge uses a Gemini text+vision model. The sample price ceiling is
+user-maintained; verify current pricing and set
+``GEMINI_IMAGE_MAX_COST_PER_CALL_USD`` before a live run.
 """
 
 import os
@@ -31,7 +33,16 @@ for _stream in (sys.stdout, sys.stderr):
 
 live = bool(os.environ.get("GOOGLE_API_KEY"))
 if live:
-    provider = GeminiProvider(cost_per_image_usd=0.039)
+    ceiling = os.environ.get("GEMINI_IMAGE_MAX_COST_PER_CALL_USD")
+    if not ceiling:
+        raise SystemExit(
+            "Live mode requires GEMINI_IMAGE_MAX_COST_PER_CALL_USD. Verify current "
+            "pricing and set an inclusive per-call ceiling."
+        )
+    provider = GeminiProvider(
+        cost_per_image_usd=0.039,
+        max_cost_per_call_usd=float(ceiling),
+    )
     image_model = "gemini-2.5-flash-image"
     judge_model = "gemini-flash-lite-latest"
 else:

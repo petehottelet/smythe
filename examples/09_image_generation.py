@@ -11,9 +11,10 @@ Offline (no keys): OfflineProvider attaches a deterministic 1x1 PNG per
 call, so the full artifact pipeline runs in CI for free.
 
 Real mode: set GOOGLE_API_KEY to generate actual images with a Gemini
-image model ("Nano Banana"). Image models bill per image, not per
-token — cost_per_image_usd prices each call so the Sentinel's budget
-cap stays honest.
+image model ("Nano Banana"). The example records a per-image estimate
+and separately reserves a conservative inclusive whole-call ceiling.
+Verify both values against current pricing for your selected model and set
+``GEMINI_IMAGE_MAX_COST_PER_CALL_USD``; live mode refuses to invent it.
 """
 
 import os
@@ -32,7 +33,16 @@ for _stream in (sys.stdout, sys.stderr):
         _stream.reconfigure(encoding="utf-8")
 
 if os.environ.get("GOOGLE_API_KEY"):
-    provider = GeminiProvider(cost_per_image_usd=0.039)
+    ceiling = os.environ.get("GEMINI_IMAGE_MAX_COST_PER_CALL_USD")
+    if not ceiling:
+        raise SystemExit(
+            "Live mode requires GEMINI_IMAGE_MAX_COST_PER_CALL_USD. Verify current "
+            "pricing and set an inclusive per-call ceiling."
+        )
+    provider = GeminiProvider(
+        cost_per_image_usd=0.039,
+        max_cost_per_call_usd=float(ceiling),
+    )
     model = "gemini-2.5-flash-image"
 else:
     print("No GOOGLE_API_KEY found - running offline with smythe's built-in OfflineProvider.")
@@ -59,7 +69,7 @@ swarm = Swarm(
     provider=provider,
     model=model,
     parallel=True,          # all three images generate concurrently
-    max_budget_usd=0.50,    # ~$0.04/image real cost; the cap has headroom
+    max_budget_usd=0.50,    # each call reserves the configured ceiling
     artifact_dir=artifact_dir,
 )
 

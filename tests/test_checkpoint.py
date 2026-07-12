@@ -1,5 +1,7 @@
 """Tests for checkpointing — store, serialization, and crash/resume."""
 
+import asyncio
+
 import pytest
 
 from smythe.checkpoint import (
@@ -13,6 +15,7 @@ from smythe.checkpoint import (
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, Provider
 from smythe.swarm import Swarm
+from smythe.synthesizer import Synthesizer, SynthesisStrategy
 
 
 class ScriptedProvider(Provider):
@@ -265,6 +268,114 @@ def test_sync_execution_also_checkpoints(tmp_path):
     assert state["status"] == "completed"
     assert all(n["status"] == "completed" for n in state["graph"]["nodes"])
     assert state["output"] == result.output
+
+
+def test_checkpoint_interval_batches_node_updates_but_forces_terminal_save(tmp_path):
+    class CountingStore(FileCheckpointStore):
+        def __init__(self, directory):
+            super().__init__(directory)
+            self.saves = 0
+
+        def save(self, execution_id, state):
+            self.saves += 1
+            super().save(execution_id, state)
+
+    store = CountingStore(tmp_path)
+    graph = ExecutionGraph(
+        topology=[Topology.SERIAL],
+        nodes=[
+            Node(id="a", label="A"),
+            Node(id="b", label="B", depends_on=["a"]),
+            Node(id="c", label="C", depends_on=["b"]),
+        ],
+    )
+    swarm = Swarm(
+        provider=ScriptedProvider(), model="test-model", checkpoint_store=store,
+        parallel=True, checkpoint_every_n_nodes=10,
+    )
+
+    result = swarm.execute(graph)
+
+    # One initial and one forced terminal checkpoint; no per-node rewrite.
+    assert store.saves == 2
+    assert store.load(result.execution_id)["status"] == "completed"
+
+
+def test_checkpoint_interval_must_be_positive():
+    with pytest.raises(ValueError, match="checkpoint_every_n_nodes"):
+        Swarm(provider=ScriptedProvider(), checkpoint_every_n_nodes=0)
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_synthesis_failure_is_checkpointed_and_resumable(tmp_path, parallel):
+    class FailSecondCallOnce(Provider):
+        def __init__(self):
+            self.calls = 0
+
+        async def complete(self, system, prompt, model):
+            self.calls += 1
+            if self.calls == 2:
+                raise RuntimeError("synthesis failed")
+            return CompletionResult(text=f"ok-{self.calls}")
+
+    provider = FailSecondCallOnce()
+    store = FileCheckpointStore(tmp_path)
+    swarm = Swarm(
+        provider=provider,
+        model="test-model",
+        parallel=parallel,
+        checkpoint_store=store,
+        synthesizer=Synthesizer(strategy=SynthesisStrategy.LLM_MERGE),
+    )
+    graph = ExecutionGraph(
+        topology=[Topology.SERIAL],
+        nodes=[Node(id="a", label="A")],
+    )
+
+    with pytest.raises(RuntimeError, match="synthesis failed"):
+        swarm.execute(graph)
+
+    execution_id = store.list_ids()[0]
+    failed = store.load(execution_id)
+    assert failed["status"] == "failed"
+    assert failed["graph"]["nodes"][0]["status"] == "completed"
+
+    resumed = swarm.resume(execution_id)
+    assert resumed.output == "ok-3"
+    assert store.load(execution_id)["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_external_cancellation_settles_nodes_and_checkpoints_failure(tmp_path):
+    started = asyncio.Event()
+
+    class BlockingProvider(Provider):
+        async def complete(self, system, prompt, model):
+            started.set()
+            await asyncio.Event().wait()
+
+    store = FileCheckpointStore(tmp_path)
+    swarm = Swarm(
+        provider=BlockingProvider(),
+        model="test-model",
+        parallel=True,
+        checkpoint_store=store,
+    )
+    graph = ExecutionGraph(
+        topology=[Topology.SERIAL],
+        nodes=[Node(id="a", label="A")],
+    )
+
+    execution = asyncio.create_task(swarm.execute_async(graph))
+    await started.wait()
+    execution.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await execution
+
+    execution_id = store.list_ids()[0]
+    state = store.load(execution_id)
+    assert state["status"] == "failed"
+    assert state["graph"]["nodes"][0]["status"] == "pending"
 
 
 def test_max_tool_iterations_roundtrips_and_old_checkpoints_default():

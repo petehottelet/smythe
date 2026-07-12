@@ -29,7 +29,7 @@ The project supports Python 3.11, 3.12, and 3.13.
 
 ```bash
 uv venv
-uv pip install -e ".[dev,anthropic,openai,gemini]"
+uv pip install -e ".[dev,benchmarks]"
 ```
 
 ### Alternative: `pip`
@@ -37,17 +37,18 @@ uv pip install -e ".[dev,anthropic,openai,gemini]"
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -e ".[dev,anthropic,openai,gemini]"
+pip install -e ".[dev,benchmarks]"
 ```
 
-The `dev` extra installs `pytest`, `pytest-asyncio`, and `ruff`. The provider
-extras are optional but useful if you want to exercise the real provider paths
-locally.
+The `dev` extra installs the test and lint tools. The `benchmarks` extra adds
+the provider SDKs, Pillow, LangGraph, and CrewAI needed to reproduce every
+published harness. Install individual provider extras instead when you only
+need a smaller local development environment.
 
 ## Running tests and lint
 
 ```bash
-ruff check smythe/ tests/
+ruff check smythe/ tests/ benchmarks/ examples/
 pytest tests/ -q
 ```
 

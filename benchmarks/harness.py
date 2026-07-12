@@ -58,9 +58,10 @@ def load_tasks(tasks_dir: str | Path) -> list[BenchmarkTask]:
     return tasks
 
 
-# The one fixed pipeline, shared verbatim by every framework in the
-# head-to-head (run_framework_h2h.py) so the comparison is about the
-# frameworks, not the prompts: (step id, label prefix, persona).
+# The semantic fixed-pipeline specification shared by every framework in the
+# head-to-head (run_framework_h2h.py): (step id, label prefix, persona).
+# Each framework packages these ingredients and dependency context through its
+# idiomatic API, so final wire prompts are intentionally not byte-identical.
 PIPELINE_SPECS = [
     ("research", "Research the topic and gather the relevant facts for: ",
      "You are a thorough researcher. Gather facts, note uncertainty."),

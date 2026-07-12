@@ -104,6 +104,8 @@ def test_pipeline_budget_tracking():
     result = swarm.execute(task)
 
     assert result.total_cost_usd > 0
+    assert result.cost_is_complete is True
+    assert result.cost_contains_estimates is False
 
 
 def test_pipeline_traces_all_nodes():
@@ -130,4 +132,5 @@ async def test_async_pipeline_end_to_end():
 
     assert result.output != ""
     assert result.total_cost_usd >= 0
+    assert result.cost_is_complete is True
     assert len(result.trace) >= 1

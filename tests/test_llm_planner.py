@@ -1,13 +1,14 @@
 """Tests for the LLM-driven architect."""
 
 import json
-import tempfile
+from dataclasses import asdict
+from pathlib import Path
 
 import pytest
 
 from smythe.graph import ExecutionGraph, Topology
-from smythe.memory import PlannerMemory
-from smythe.planner import LLMArchitect, ArchitectError
+from smythe.memory import ExecutionOutcome, PlannerMemory
+from smythe.planner import ArchitectError, LLMArchitect
 from smythe.provider import CompletionResult, Provider
 from smythe.task import Task
 
@@ -119,9 +120,13 @@ class MockPlanningProvider(Provider):
         self._responses = list(responses)
         self._call_index = 0
         self.prompts_received: list[str] = []
+        self.system_prompts_received: list[str] = []
+        self.models_received: list[str] = []
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         self.prompts_received.append(prompt)
+        self.system_prompts_received.append(system)
+        self.models_received.append(model)
         response = self._responses[min(self._call_index, len(self._responses) - 1)]
         self._call_index += 1
         return CompletionResult(text=response, prompt_tokens=50, completion_tokens=100)
@@ -139,6 +144,8 @@ def test_plan_fork_join_task():
     assert len(graph.nodes) == 3
     assert graph.nodes[2].id == "synthesize"
     assert set(graph.nodes[2].depends_on) == {"research-a", "research-b"}
+    assert provider.models_received == ["test-model"]
+    assert "task-decomposition planner" in provider.system_prompts_received[0].lower()
 
 
 def test_plan_serial_task():
@@ -250,15 +257,9 @@ def test_plan_includes_constraints_in_prompt():
     assert "Must be in Oakland" in prompt
 
 
-def test_plan_includes_history_in_prompt():
-    with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False, mode="w") as f:
-        path = f.name
-
-    memory = PlannerMemory(path=path)
-
-    from smythe.memory import ExecutionOutcome
-    import json as _json
-
+def test_plan_includes_history_in_prompt(tmp_path: Path):
+    """Planner memory context should be read from an isolated JSONL store."""
+    path = tmp_path / "planner-memory.jsonl"
     outcome = ExecutionOutcome(
         task_goal="Research competitors and write a report",
         task_constraints=[],
@@ -269,10 +270,9 @@ def test_plan_includes_history_in_prompt():
         success=True,
         timestamp="2025-01-01T00:00:00Z",
     )
-    with open(path, "w", encoding="utf-8") as f:
-        from dataclasses import asdict
-        f.write(_json.dumps(asdict(outcome)) + "\n")
+    path.write_text(json.dumps(asdict(outcome)) + "\n", encoding="utf-8")
 
+    memory = PlannerMemory(path=path)
     provider = MockPlanningProvider([FORK_JOIN_RESPONSE])
     planner = LLMArchitect(provider=provider, planning_model="test-model", memory=memory)
     task = Task(goal="Research competitors for a new product")
@@ -282,9 +282,6 @@ def test_plan_includes_history_in_prompt():
     prompt = provider.prompts_received[0]
     assert "past executions" in prompt.lower()
     assert "$0.15" in prompt
-
-    import os
-    os.unlink(path)
 
 
 def test_estimated_cost_set_on_graph():
@@ -332,3 +329,13 @@ def test_plan_retries_on_type_error():
 
     assert len(graph.nodes) == 2
     assert len(provider.prompts_received) == 2
+
+
+@pytest.mark.parametrize("non_object_json", ["[]", "null", '"serial"'])
+def test_plan_rejects_non_object_json(non_object_json: str):
+    """A syntactically valid JSON scalar must not be treated as a plan object."""
+    provider = MockPlanningProvider([non_object_json])
+    planner = LLMArchitect(provider=provider, planning_model="test-model", max_retries=0)
+
+    with pytest.raises(ArchitectError, match="Expected a JSON object"):
+        planner.plan(Task(goal="Reject invalid JSON shape"))

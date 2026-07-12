@@ -618,6 +618,8 @@ def test_gemini_per_image_cost():
     p = _gemini_with_response(_image_response(images=3), cost_per_image_usd=0.039)
     result = asyncio.run(p.complete("sys", "prompt", "gemini-2.5-flash-image"))
     assert result.cost_usd == pytest.approx(3 * 0.039)
+    assert result.cost_usd_is_estimate
+    assert result.cost_usd_unknown
 
 
 def test_gemini_no_explicit_cost_without_price_or_images():
@@ -626,7 +628,8 @@ def test_gemini_no_explicit_cost_without_price_or_images():
     assert result.cost_usd is None
     p2 = _gemini_with_response(_image_response(images=2))
     result2 = asyncio.run(p2.complete("sys", "prompt", "gemini-2.5-flash-image"))
-    assert result2.cost_usd is None
+    assert result2.cost_usd == 0.0
+    assert result2.cost_usd_unknown
 
 
 def test_gemini_decodes_base64_string_inline_data():
@@ -696,6 +699,8 @@ def test_openai_image_provider_extracts_artifacts_usage_and_cost():
     assert result.prompt_tokens == 11
     assert result.completion_tokens == 22
     assert result.cost_usd == pytest.approx(0.082)
+    assert result.cost_usd_is_estimate
+    assert result.cost_usd_unknown
     sent = provider._client.images.generate.call_args.kwargs
     assert sent == {
         "model": "gpt-image-2",
@@ -707,6 +712,44 @@ def test_openai_image_provider_extracts_artifacts_usage_and_cost():
         "moderation": "auto",
         "output_compression": 90,
     }
+
+
+def test_openai_image_hard_budget_requires_inclusive_call_ceiling():
+    legacy = OpenAIImageProvider(api_key="fake", n=2, cost_per_image_usd=0.041)
+    assert legacy.cost_estimate_per_call == pytest.approx(0.082)
+    # The legacy output estimate is useful for reporting but is not an
+    # inclusive input+output ceiling for hard-budget admission.
+    assert legacy.budget_estimate_usd("gpt-image-2") is None
+    assert legacy.requires_explicit_budget_estimate("gpt-image-2")
+
+    bounded = OpenAIImageProvider(
+        api_key="fake",
+        n=2,
+        cost_per_image_usd=0.041,
+        max_cost_per_call_usd=0.12,
+    )
+    assert bounded.budget_estimate_usd("gpt-image-2") == pytest.approx(0.12)
+
+
+def test_openai_image_records_ceiling_when_invoice_cost_is_unavailable():
+    provider = _openai_image_with_response(
+        _openai_image_response(images=1),
+        max_cost_per_call_usd=0.06,
+    )
+    result = asyncio.run(provider.complete("sys", "prompt", "gpt-image-2"))
+
+    assert result.cost_usd == pytest.approx(0.06)
+    assert result.cost_usd_is_estimate
+    assert not result.cost_usd_unknown
+
+
+def test_unpriced_openai_image_marks_usd_cost_unknown():
+    provider = _openai_image_with_response(_openai_image_response(images=1))
+    result = asyncio.run(provider.complete("sys", "prompt", "gpt-image-2"))
+
+    assert result.cost_usd == 0.0
+    assert result.cost_usd_unknown
+    assert not result.cost_usd_is_estimate
 
 
 def test_openai_image_provider_rejects_non_image_model_and_tools():
@@ -781,6 +824,36 @@ def test_gemini_explicit_modalities_still_sent_with_tools():
 def test_provider_cost_estimate_hints():
     assert GeminiProvider(api_key="k").cost_estimate_per_call is None
     assert GeminiProvider(api_key="k", cost_per_image_usd=0.04).cost_estimate_per_call == 0.04
+
+
+def test_gemini_hard_budget_uses_only_inclusive_call_ceiling():
+    legacy = GeminiProvider(api_key="k", cost_per_image_usd=0.04)
+    assert legacy.budget_estimate_usd("gemini-2.5-flash-image") is None
+    assert legacy.requires_explicit_budget_estimate("gemini-2.5-flash-image")
+    assert not legacy.requires_explicit_budget_estimate("gemini-3-flash")
+
+    bounded = GeminiProvider(
+        api_key="k", cost_per_image_usd=0.04, max_cost_per_call_usd=0.06,
+    )
+    assert bounded.budget_estimate_usd("gemini-2.5-flash-image") == pytest.approx(0.06)
+
+
+def test_gemini_records_ceiling_and_marks_unpriced_images_unknown():
+    bounded = _gemini_with_response(
+        _image_response(images=1), max_cost_per_call_usd=0.06,
+    )
+    bounded_result = asyncio.run(
+        bounded.complete("sys", "prompt", "gemini-2.5-flash-image")
+    )
+    assert bounded_result.cost_usd == pytest.approx(0.06)
+    assert bounded_result.cost_usd_is_estimate
+
+    unpriced = _gemini_with_response(_image_response(images=1))
+    unpriced_result = asyncio.run(
+        unpriced.complete("sys", "prompt", "gemini-2.5-flash-image")
+    )
+    assert unpriced_result.cost_usd == 0.0
+    assert unpriced_result.cost_usd_unknown
 
 
 # ---------------------------------------------------------------------------

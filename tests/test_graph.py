@@ -2,7 +2,7 @@
 
 import pytest
 
-from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
+from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
 
 
 def test_roots_returns_nodes_without_deps():
@@ -36,6 +36,15 @@ def test_is_ready_false_when_deps_pending():
     graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[a, b])
 
     assert not graph.is_ready(b)
+
+
+def test_is_ready_when_dependency_was_intentionally_skipped():
+    """SKIP failure policy resolves a dependency just like successful completion."""
+    skipped = Node(label="Optional", id="optional", status=NodeStatus.SKIPPED)
+    downstream = Node(label="Continue", id="next", depends_on=["optional"])
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[skipped, downstream])
+
+    assert graph.is_ready(downstream)
 
 
 def test_validate_detects_missing_dependency():
@@ -201,3 +210,18 @@ def test_validate_rejects_duplicate_node_ids():
 
     with pytest.raises(ValueError, match="Duplicate node IDs"):
         graph.validate()
+
+
+def test_node_execution_controls_have_safe_independent_defaults():
+    """New nodes should default to bounded retry semantics without shared lists."""
+    first = Node(label="First")
+    second = Node(label="Second")
+
+    assert first.failure_policy is FailurePolicy.HALT
+    assert first.max_retries == 1
+    assert first.timeout_s is None
+    assert first.max_tool_iterations is None
+    assert first.attach_dep_artifacts is False
+
+    first.required_capabilities.append("vision")
+    assert second.required_capabilities == []

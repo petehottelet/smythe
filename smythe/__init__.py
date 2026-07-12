@@ -1,6 +1,11 @@
 """Smythe: task-based personalized agent swarms with dynamic execution topology."""
 
-from smythe.budget import Sentinel, SentinelAlert
+from smythe.budget import (
+    BudgetEstimateRequired,
+    BudgetReconciliationError,
+    Sentinel,
+    SentinelAlert,
+)
 from smythe.checkpoint import CheckpointStore, FileCheckpointStore
 from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
 from smythe.graph import FailurePolicy
@@ -43,6 +48,8 @@ __all__ = [
     "AnthropicProvider",
     "ArchitectError",
     "Artifact",
+    "BudgetEstimateRequired",
+    "BudgetReconciliationError",
     "CapabilityHydrationMode",
     "CapabilityMapper",
     "ChatMessage",

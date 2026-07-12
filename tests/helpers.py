@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.planner import DeterministicArchitect
 from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
+from smythe.task import Task
 
 
 # ---------------------------------------------------------------------------
@@ -15,10 +17,23 @@ from smythe.registry import Registry
 # ---------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
+class ProviderCall:
+    """One captured provider invocation for prompt-contract assertions."""
+
+    system: str
+    prompt: str
+    model: str
+
+
 class MockProvider(Provider):
     """Returns a canned response that includes a truncated prompt echo."""
 
+    def __init__(self) -> None:
+        self.calls: list[ProviderCall] = []
+
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        self.calls.append(ProviderCall(system=system, prompt=prompt, model=model))
         return CompletionResult(text=f"mock: {prompt[:40]}", prompt_tokens=10, completion_tokens=5)
 
 
@@ -34,7 +49,7 @@ class FailingProvider(Provider):
         self._fail_labels = fail_labels
         self._attempts: dict[str, int] = {}
 
-    async def complete(self, system, prompt, model):
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         label = prompt.split("\n")[0]
         if self._fail_labels is not None and label not in self._fail_labels:
             return CompletionResult(text=f"ok: {label}", prompt_tokens=5, completion_tokens=5)
@@ -50,8 +65,10 @@ class ClassifierMockProvider(Provider):
 
     def __init__(self, classification: str) -> None:
         self._classification = classification
+        self.calls: list[ProviderCall] = []
 
-    async def complete(self, system, prompt, model):
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        self.calls.append(ProviderCall(system=system, prompt=prompt, model=model))
         return CompletionResult(text=self._classification, prompt_tokens=5, completion_tokens=2)
 
 
@@ -77,9 +94,11 @@ class PlanningMockProvider(Provider):
 
     def __init__(self) -> None:
         self._call_count = 0
+        self.calls: list[ProviderCall] = []
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         self._call_count += 1
+        self.calls.append(ProviderCall(system=system, prompt=prompt, model=model))
         if self._call_count == 1:
             return CompletionResult(text=SIMPLE_PLAN_JSON, prompt_tokens=50, completion_tokens=100)
         return CompletionResult(text=f"mock: {prompt[:40]}", prompt_tokens=10, completion_tokens=5)
@@ -91,7 +110,7 @@ class FixedArchitect(DeterministicArchitect):
     def __init__(self, tag: str) -> None:
         self.tag = tag
 
-    def plan(self, task):
+    def plan(self, task: Task) -> tuple[ExecutionGraph, Registry]:
         node = Node(label=f"{self.tag}: {task.goal}")
         graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
         graph.validate()
@@ -105,7 +124,7 @@ class FixedArchitect(DeterministicArchitect):
 
 def make_completed_graph(*results: str) -> ExecutionGraph:
     """Build a graph whose nodes are already COMPLETED with the given results."""
-    nodes = []
+    nodes: list[Node] = []
     for i, r in enumerate(results):
         n = Node(id=f"n{i}", label=f"Step {i}")
         n.status = NodeStatus.COMPLETED

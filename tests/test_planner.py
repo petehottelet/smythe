@@ -1,5 +1,7 @@
 """Tests for the architect hierarchy."""
 
+import pytest
+
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.planner import DeterministicArchitect, SimpleArchitect
 from smythe.registry import Registry
@@ -65,3 +67,14 @@ def test_deterministic_architect_no_provider_needed():
     task = Task(goal="No provider needed")
     graph, _ = architect.plan(task)
     assert len(graph.nodes) == 4
+
+
+@pytest.mark.asyncio
+async def test_deterministic_architect_inherits_async_adapter():
+    """Custom deterministic planners remain usable by Swarm.execute_async()."""
+    architect = _ForkJoinArchitect(num_branches=2)
+
+    graph, registry = await architect.aplan(Task(goal="Async deterministic plan"))
+
+    assert [node.id for node in graph.roots()] == ["branch-0", "branch-1"]
+    assert isinstance(registry, Registry)

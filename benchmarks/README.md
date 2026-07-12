@@ -5,10 +5,9 @@ outperforms both a single agent and a fixed pipeline** — often enough,
 and by enough, to justify the planning call. This harness exists to
 measure that honestly, including where the claim fails.
 
-> **Status: first self-baseline numbers published** (see Results below).
-> The harness also runs end-to-end offline in CI (mechanics verified,
-> deterministic, zero cost). Head-to-head framework comparisons and
-> memory-on/off numbers are still pending.
+> **Status: self-baselines, memory-on/off, image-pipeline, and framework
+> head-to-head results are published below.** The core harness also runs
+> end-to-end offline in CI (mechanics verified, deterministic, zero cost).
 
 ## The three systems
 
@@ -149,18 +148,25 @@ is the follow-up.
 
 **Caveats:** three runs per cell is a variance hint, not statistics;
 one judge, same vendor as the executor; tasks were authored by this
-project. Framework head-to-heads remain open (see Planned).
+project. The later framework head-to-head uses a cross-vendor judge,
+but its protocol differs and its table is not directly comparable.
 
 ## Framework head-to-head: LangGraph and CrewAI (2026-07-12)
 
 The long-promised comparison ([run_framework_h2h.py](run_framework_h2h.py),
 raw records in [results/framework_h2h.json](results/framework_h2h.json)):
-the **same fixed pipeline** — identical step prompts and personas
+the **same semantic fixed pipeline** — shared step goals and personas
 ([harness.PIPELINE_SPECS](harness.py)) — implemented idiomatically in
 each framework, on the same 5 tasks, same executor model
 (`gpt-5.4-mini`), 3 reps, **judged blind by a different vendor**
 (Gemini), which addresses the self-preference caveat in the v5 results
 below. 60/60 runs completed, zero framework errors.
+
+This is an **ecological framework comparison**, not a byte-identical
+prompt microbenchmark. Each implementation packages dependency context,
+messages, and framework scaffolding through its native APIs. Those
+differences are part of the measured end-to-end systems, but they prevent
+attributing every token or latency delta to scheduler overhead alone.
 
 | System | Quality (blind) | Tokens | Wall |
 |---|---:|---:|---:|
@@ -170,9 +176,10 @@ below. 60/60 runs completed, zero framework errors.
 | smythe (dynamic) | 9.27 [5–10] | 14,584 | 37.4s |
 
 **The honest read.**
-- **smythe's orchestration overhead is competitive with LangGraph** —
-  within 5% on tokens and wall time for the identical pipeline. The
-  framework adds no fat relative to the lightest mainstream option.
+- **Smythe's observed end-to-end footprint is competitive with LangGraph** —
+  within 5% on tokens and wall time for this shared semantic pipeline.
+  Because framework-native prompt packaging differs, this is not an
+  isolated measurement of orchestration overhead.
 - **CrewAI consumed 4.7× the tokens** (its agent scaffolding — roles,
   backstories, internal formatting — is baked into every call) and 56%
   more wall time, for +0.2 quality that sits inside a known confound:
@@ -198,8 +205,28 @@ below. 60/60 runs completed, zero framework errors.
 2. **Blind judging.** The judge never sees which system wrote the output.
 3. **Losses get published.** If the fixed pipeline beats dynamic
    topology on a task class, that row ships in the table.
-4. **Reproducible.** Committed results include the command, model,
-   provider, and date; offline mechanics are byte-deterministic.
+4. **Auditable and repeatable.** Harness source and raw records are committed;
+   the model and protocol are stated alongside each table, and offline
+   mechanics are deterministic. New result records also capture installed
+   dependency versions. Paid model outputs remain stochastic, so reproducing
+   the protocol does not promise identical scores or timings.
+
+Install the complete optional harness environment from a fresh checkout:
+
+```bash
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+python -m pip install -e ".[dev,benchmarks]"
+python benchmarks/run_benchmarks.py --offline
+python benchmarks/run_image_benchmarks.py
+```
+
+Offline commands consume no API credits. Paid commands require an explicit
+`--live` flag where supported; review the printed estimate before continuing.
+The `benchmarks` extra installs provider SDKs, Pillow, LangGraph, and CrewAI.
+Future result records use repo-relative POSIX artifact paths when outputs live
+inside the checkout; historical records may retain absolute producer paths.
 
 ## Image pipeline — concurrency sweep (2026-07-12)
 
@@ -218,6 +245,7 @@ honest caveats (including an observed near-duplicate pair):
   (claude-opus-4-8 executor) so the tables become directly comparable
 - A judge with better score discrimination (the current independent
   judge is ceiling-compressed at 9–10)
-- Image pipeline continuations — aspect-ratio compliance, the k>8
-  ceiling, select-from-N curation, ad-suite brand consistency
-  (see [image_benchmarks.md](image_benchmarks.md))
+- Image pipeline continuations — select-from-N quality-per-dollar,
+  repeated k=25 runs, and shared-brief vs. serial-style vs. single-agent
+  brand-consistency comparisons (see
+  [image_benchmarks.md](image_benchmarks.md))

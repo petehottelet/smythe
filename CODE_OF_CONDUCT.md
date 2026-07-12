@@ -56,6 +56,13 @@ Examples of representing our community include using an official e-mail address,
 posting via an official social media account, or acting as an appointed
 representative at an online or offline event.
 
+Automated and agent-assisted participation is in scope as well. The person or
+organization operating an account remains responsible for its issues, pull
+requests, reviews, benchmark submissions, and other automated actions. Flooding
+maintainers with low-quality generated content, fabricating measurements or
+provenance, impersonating another person, or exposing private data through an
+automated workflow is unacceptable behavior.
+
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be

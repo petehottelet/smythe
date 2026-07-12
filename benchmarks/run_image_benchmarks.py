@@ -7,14 +7,15 @@ latency, cost, decode/format compliance, pairwise dHash diversity — so
 none of it inherits LLM-judge variance.
 
     python benchmarks/run_image_benchmarks.py                     # offline mechanics
-    python benchmarks/run_image_benchmarks.py --live --k 1,3,8 --repeats 3
-    python benchmarks/run_image_benchmarks.py --live --k 8 --images 25 --repeats 1
+    python benchmarks/run_image_benchmarks.py --live --max-cost-per-call-usd 0.06 --k 1,3,8 --repeats 3
+    python benchmarks/run_image_benchmarks.py --live --max-cost-per-call-usd 0.06 --k 8 --images 25 --repeats 1
 
 Offline mode (default, no keys consumed) exercises the full harness with
 OfflineProvider's deterministic PNGs; timing in offline mode measures
 the OS scheduler, not the work, and is reported but not meaningful.
-Live mode requires GOOGLE_API_KEY and spends real money: images x
-repeats x len(k) x cost_per_image (default $0.039).
+Live mode requires GOOGLE_API_KEY and spends real money. The harness prints
+the configured whole-call reservation ceiling before running; verify it and
+current provider pricing for the selected model.
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ from statistics import mean
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
+from benchmarks.artifact_records import environment_snapshot  # noqa: E402
 from smythe import OfflineProvider, Swarm  # noqa: E402
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, Topology  # noqa: E402
 from smythe.provider import GeminiProvider  # noqa: E402
@@ -126,12 +128,15 @@ def analyze_artifacts(records: list[dict]) -> dict:
 
 def run_once(
     *, k: int, n_images: int, live: bool, model: str, out_dir: Path,
+    max_cost_per_call_usd: float = 0.0,
     aspect_ratio: str | None = None,
 ) -> dict:
     image_config = {"aspect_ratio": aspect_ratio} if aspect_ratio else None
     provider = (
         GeminiProvider(
-            cost_per_image_usd=COST_PER_IMAGE_USD, image_config=image_config,
+            cost_per_image_usd=COST_PER_IMAGE_USD,
+            max_cost_per_call_usd=max_cost_per_call_usd,
+            image_config=image_config,
         )
         if live
         else OfflineProvider(artifacts_per_call=1)
@@ -142,7 +147,7 @@ def run_once(
         model=model if live else "demo-image-model",
         parallel=True,
         max_concurrency=k,
-        max_budget_usd=max(2.0, n_images * COST_PER_IMAGE_USD * 1.5),
+        max_budget_usd=max(2.0, n_images * max_cost_per_call_usd * 1.1),
         artifact_dir=out_dir,
         retry_backoff_s=2.0,
     )
@@ -189,6 +194,15 @@ def main() -> None:
     parser.add_argument("--repeats", type=int, default=1)
     parser.add_argument("--live", action="store_true", help="spend real money")
     parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument(
+        "--max-cost-per-call-usd",
+        type=float,
+        default=None,
+        help=(
+            "required with --live: verified inclusive ceiling for one image "
+            "request, including input and output"
+        ),
+    )
     parser.add_argument("--out", default=None, help="results JSON path")
     parser.add_argument(
         "--artifact-dir", default="smythe_artifacts/image_benchmark",
@@ -202,12 +216,22 @@ def main() -> None:
     live = args.live and bool(os.environ.get("GOOGLE_API_KEY"))
     if args.live and not live:
         print("--live requires GOOGLE_API_KEY; falling back to offline.")
+    if live and args.max_cost_per_call_usd is None:
+        raise SystemExit(
+            "--live requires --max-cost-per-call-usd. Verify current provider "
+            "pricing and supply an inclusive input+output request ceiling."
+        )
+    if args.max_cost_per_call_usd is not None and args.max_cost_per_call_usd <= 0:
+        raise SystemExit("--max-cost-per-call-usd must be positive")
+    max_cost_per_call_usd = args.max_cost_per_call_usd or 0.0
     ks = [int(x) for x in args.k.split(",")]
 
-    est = len(ks) * args.repeats * args.images * COST_PER_IMAGE_USD
+    reserved_ceiling = (
+        len(ks) * args.repeats * args.images * max_cost_per_call_usd
+    )
     mode = "LIVE" if live else "offline"
     print(f"[{mode}] k={ks} images={args.images} repeats={args.repeats}"
-          + (f"  estimated cost ${est:.2f}" if live else ""))
+          + (f"  configured cost ceiling ${reserved_ceiling:.2f}" if live else ""))
 
     runs = []
     for k in ks:
@@ -215,6 +239,7 @@ def main() -> None:
             record = run_once(
                 k=k, n_images=args.images, live=live, model=args.model,
                 out_dir=Path(args.artifact_dir),
+                max_cost_per_call_usd=max_cost_per_call_usd,
                 aspect_ratio=args.aspect_ratio,
             )
             record["repeat"] = rep
@@ -248,6 +273,8 @@ def main() -> None:
         "mode": mode,
         "model": args.model if live else "offline",
         "cost_per_image_usd": COST_PER_IMAGE_USD if live else 0,
+        "max_cost_per_call_usd": max_cost_per_call_usd if live else 0,
+        "environment": environment_snapshot("smythe", "google-genai", "pillow"),
         "images_per_run": args.images,
         "summary": summary,
         "runs": runs,

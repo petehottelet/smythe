@@ -4,7 +4,10 @@
 
 Offline mode is automatic and free.  For a live run, set
 ``OPENAI_API_KEY`` in the process environment; the example intentionally
-does not read dotenv files or print credentials.
+does not read dotenv files or print credentials. The whole-request price
+ceiling is intentionally explicit: verify current provider pricing and set
+``GPT_IMAGE_MAX_COST_PER_CALL_USD`` for the selected model, size, and quality.
+Live mode refuses to start without that user-maintained ceiling.
 """
 
 import os
@@ -25,12 +28,19 @@ MODEL = "gpt-image-2-2026-04-21"
 OUTPUT_ONLY_COST_PER_IMAGE_USD = 0.041
 
 if os.environ.get("OPENAI_API_KEY"):
+    ceiling = os.environ.get("GPT_IMAGE_MAX_COST_PER_CALL_USD")
+    if not ceiling:
+        raise SystemExit(
+            "Live mode requires GPT_IMAGE_MAX_COST_PER_CALL_USD. Verify current "
+            "pricing for this model/size/quality and set an inclusive per-call ceiling."
+        )
     provider = OpenAIImageProvider(
         size="1536x1024",
         quality="medium",
         output_format="jpeg",
         output_compression=90,
         cost_per_image_usd=OUTPUT_ONLY_COST_PER_IMAGE_USD,
+        max_cost_per_call_usd=float(ceiling),
     )
     model = MODEL
 else:

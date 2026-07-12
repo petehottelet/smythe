@@ -24,6 +24,21 @@ def test_skill_ref_defaults():
     assert ref.metadata == {}
 
 
+def test_skill_ref_detaches_provider_metadata_mapping():
+    metadata = {"description": "Search"}
+
+    ref = SkillRef(name="web-search", metadata=metadata)
+    metadata["description"] = "Changed by provider"
+
+    assert ref.metadata == {"description": "Search"}
+
+
+@pytest.mark.parametrize("name", ["", "   "])
+def test_skill_ref_rejects_empty_name(name):
+    with pytest.raises(ValueError, match="non-empty name"):
+        SkillRef(name=name)
+
+
 def test_default_mapper_name_passthrough():
     mapper = DefaultCapabilityMapper()
     skills = [SkillRef(name="research"), SkillRef(name="summarize")]
@@ -45,6 +60,13 @@ def test_default_mapper_alias_mapping():
 def test_default_mapper_alias_case_insensitive():
     mapper = DefaultCapabilityMapper(aliases={"Search": "research"})
     skills = [SkillRef(name="SEARCH")]
+    assert mapper.map_skills(skills) == {"research"}
+
+
+def test_default_mapper_normalises_alias_targets():
+    mapper = DefaultCapabilityMapper(aliases={"Search": "  RESEARCH "})
+    skills = [SkillRef(name="search")]
+
     assert mapper.map_skills(skills) == {"research"}
 
 

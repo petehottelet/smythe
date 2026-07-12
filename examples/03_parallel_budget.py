@@ -32,7 +32,7 @@ swarm = Swarm(
     model=model,
     parallel=True,
     max_concurrency=3,   # at most 3 provider calls in flight
-    max_budget_usd=0.50,  # hard USD cap, enforced by reservation
+    max_budget_usd=0.50,  # pre-call admission cap with post-call reconciliation
 )
 
 result = swarm.execute(graph)

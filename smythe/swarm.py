@@ -48,6 +48,9 @@ class SwarmResult:
         graph: The executed DAG (with per-node results and statuses).
         trace: Structured spans for observability and planner feedback.
         total_cost_usd: Cumulative cost of all LLM calls during execution.
+        cost_is_complete: False when at least one call had unknown USD cost.
+        cost_contains_estimates: True when the total includes configured
+            provider estimates or conservative request ceilings.
         execution_id: Identifier for this execution; pass to
             ``swarm.resume()`` when a checkpoint store is configured.
     """
@@ -57,6 +60,8 @@ class SwarmResult:
     trace: list[dict[str, Any]] = field(default_factory=list)
     total_cost_usd: float = 0.0
     execution_id: str | None = None
+    cost_is_complete: bool = True
+    cost_contains_estimates: bool = False
 
 
 def _auto_detect_provider(model: str) -> Provider:
@@ -97,6 +102,7 @@ class Swarm:
         router: WhiteRabbit | None = None,
         max_concurrency: int | None = 8,
         checkpoint_store: CheckpointStore | None = None,
+        checkpoint_every_n_nodes: int = 1,
         tool_runtime: ToolRuntime | None = None,
         max_tool_iterations: int = DEFAULT_MAX_TOOL_ITERATIONS,
         artifact_dir: str | Path | None = "smythe_artifacts",
@@ -110,6 +116,16 @@ class Swarm:
         self.artifact_dir = artifact_dir
         self.retry_backoff_s = retry_backoff_s
         self._checkpoint_store = checkpoint_store
+        if (
+            isinstance(checkpoint_every_n_nodes, bool)
+            or not isinstance(checkpoint_every_n_nodes, int)
+            or checkpoint_every_n_nodes < 1
+        ):
+            raise ValueError(
+                "checkpoint_every_n_nodes must be >= 1, got "
+                f"{checkpoint_every_n_nodes}"
+            )
+        self.checkpoint_every_n_nodes = checkpoint_every_n_nodes
         self._tool_runtime = tool_runtime
         self._provider = provider or _auto_detect_provider(model)
         self._memory = memory
@@ -244,19 +260,18 @@ class Swarm:
         )
         try:
             graph = await executor.run(graph)
-        except Exception:
+            output = await self._synthesizer.asynthesize(
+                graph,
+                provider=self._provider,
+                model=self.model,
+                budget=budget,
+                tracer=tracer,
+            )
+        except BaseException:
             self._save_checkpoint(
                 execution_id, "failed", graph, budget, task, created_at,
             )
             raise
-
-        output = await self._synthesizer.asynthesize(
-            graph,
-            provider=self._provider,
-            model=self.model,
-            budget=budget,
-            tracer=tracer,
-        )
 
         self._save_checkpoint(
             execution_id, "completed", graph, budget, task, created_at,
@@ -268,6 +283,8 @@ class Swarm:
             graph=graph,
             trace=tracer.summary(),
             total_cost_usd=budget.total_cost_usd,
+            cost_is_complete=budget.cost_is_complete,
+            cost_contains_estimates=budget.cost_contains_estimates,
             execution_id=execution_id,
         )
 
@@ -306,19 +323,18 @@ class Swarm:
         )
         try:
             graph = executor.run(graph)
-        except Exception:
+            output = self._synthesizer.synthesize(
+                graph,
+                provider=self._provider,
+                model=self.model,
+                budget=budget,
+                tracer=tracer,
+            )
+        except BaseException:
             self._save_checkpoint(
                 execution_id, "failed", graph, budget, task, created_at,
             )
             raise
-
-        output = self._synthesizer.synthesize(
-            graph,
-            provider=self._provider,
-            model=self.model,
-            budget=budget,
-            tracer=tracer,
-        )
 
         self._save_checkpoint(
             execution_id, "completed", graph, budget, task, created_at,
@@ -330,6 +346,8 @@ class Swarm:
             graph=graph,
             trace=tracer.summary(),
             total_cost_usd=budget.total_cost_usd,
+            cost_is_complete=budget.cost_is_complete,
+            cost_contains_estimates=budget.cost_contains_estimates,
             execution_id=execution_id,
         )
 
@@ -373,11 +391,24 @@ class Swarm:
         task: Task | None,
         created_at: float,
     ):
-        """Build the per-node on_node_update hook, or None when not checkpointing."""
+        """Build the optionally batched node-update checkpoint hook.
+
+        The default interval of one preserves the strongest durability
+        guarantee.  Wide jobs can choose a larger interval to avoid rewriting
+        a multi-thousand-node graph after every completion; the initial,
+        failed, and completed checkpoints are always written separately.
+        """
         if self._checkpoint_store is None:
             return None
 
+        completed_since_save = 0
+
         def _on_node_update(_node) -> None:
+            nonlocal completed_since_save
+            completed_since_save += 1
+            if completed_since_save < self.checkpoint_every_n_nodes:
+                return
+            completed_since_save = 0
             self._save_checkpoint(
                 execution_id, "running", graph, budget, task, created_at,
             )
@@ -393,7 +424,7 @@ class Swarm:
 
         COMPLETED and SKIPPED nodes keep their recorded results and are
         not re-executed; RUNNING and FAILED nodes are reset to PENDING
-        and re-run.  Cost accounting continues against the budget cap
+        and re-run. Cost accounting continues against the budget policy
         recorded in the checkpoint.  If the checkpointed execution
         already finished, its stored result is returned without
         re-executing anything.
@@ -420,6 +451,12 @@ class Swarm:
                 graph=graph,
                 trace=[],
                 total_cost_usd=sum(state["budget"].get("node_costs", {}).values()),
+                cost_is_complete=not any(
+                    node.metadata.get("cost_usd_unknown") for node in graph.nodes
+                ),
+                cost_contains_estimates=any(
+                    node.metadata.get("cost_usd_is_estimate") for node in graph.nodes
+                ),
                 execution_id=execution_id,
             )
 
@@ -434,7 +471,17 @@ class Swarm:
         task = task_from_dict(state.get("task"))
         tracer = Tracer()
         budget = Sentinel(state.get("budget", {}).get("max_budget_usd"))
-        budget.restore(state.get("budget", {}).get("node_costs", {}))
+        budget.restore(
+            state.get("budget", {}).get("node_costs", {}),
+            unknown_cost_nodes={
+                node.id for node in graph.nodes
+                if node.metadata.get("cost_usd_unknown")
+            },
+            estimated_cost_nodes={
+                node.id for node in graph.nodes
+                if node.metadata.get("cost_usd_is_estimate")
+            },
+        )
         created_at = state.get("created_at", time.time())
 
         executor = AsyncExecutor(
@@ -450,19 +497,18 @@ class Swarm:
         )
         try:
             graph = await executor.run(graph)
-        except Exception:
+            output = await self._synthesizer.asynthesize(
+                graph,
+                provider=self._provider,
+                model=self.model,
+                budget=budget,
+                tracer=tracer,
+            )
+        except BaseException:
             self._save_checkpoint(
                 execution_id, "failed", graph, budget, task, created_at,
             )
             raise
-
-        output = await self._synthesizer.asynthesize(
-            graph,
-            provider=self._provider,
-            model=self.model,
-            budget=budget,
-            tracer=tracer,
-        )
 
         self._save_checkpoint(
             execution_id, "completed", graph, budget, task, created_at,
@@ -474,6 +520,8 @@ class Swarm:
             graph=graph,
             trace=tracer.summary(),
             total_cost_usd=budget.total_cost_usd,
+            cost_is_complete=budget.cost_is_complete,
+            cost_contains_estimates=budget.cost_contains_estimates,
             execution_id=execution_id,
         )
 

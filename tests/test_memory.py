@@ -5,6 +5,8 @@ import os
 import tempfile
 from dataclasses import asdict
 
+import pytest
+
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.memory import ExecutionOutcome, PlannerMemory
 from smythe.swarm import SwarmResult
@@ -94,6 +96,52 @@ def test_recall_returns_k_results():
     finally:
         if os.path.exists(path):
             os.unlink(path)
+
+
+def test_recall_uses_constraints_for_relevance():
+    memory, path = _make_memory()
+    try:
+        _write_outcome(
+            path,
+            _make_outcome(
+                "Create campaign",
+                task_constraints=["Include accessible alt text"],
+            ),
+        )
+        _write_outcome(
+            path,
+            _make_outcome(
+                "Create campaign",
+                task_constraints=["Optimize printed materials"],
+            ),
+        )
+
+        results = memory.recall(
+            Task(
+                goal="Create campaign",
+                constraints=["Require accessible alt text"],
+            ),
+            k=1,
+        )
+
+        assert results[0].task_constraints == ["Include accessible alt text"]
+    finally:
+        if os.path.exists(path):
+            os.unlink(path)
+
+
+def test_recall_zero_returns_no_results_without_reading_file():
+    memory = PlannerMemory(path="missing-history.jsonl")
+
+    assert memory.recall(Task(goal="Research topic"), k=0) == []
+
+
+@pytest.mark.parametrize("k", [-1, 1.5, True])
+def test_recall_rejects_invalid_result_limit(k):
+    memory = PlannerMemory(path="missing-history.jsonl")
+
+    with pytest.raises(ValueError, match="non-negative integer"):
+        memory.recall(Task(goal="Research topic"), k=k)
 
 
 def test_recall_empty_memory():

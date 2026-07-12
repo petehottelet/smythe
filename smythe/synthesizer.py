@@ -8,7 +8,7 @@ import logging
 from enum import Enum
 from typing import Any
 
-from smythe.budget import Sentinel
+from smythe.budget import BudgetEstimateRequired, Sentinel
 from smythe.graph import ExecutionGraph, Node, NodeStatus
 from smythe.provider import Provider
 from smythe.tracer import Tracer
@@ -27,6 +27,8 @@ You are a synthesis agent.  You receive outputs from multiple parallel \
 execution steps.  Your job is to merge them into a single coherent output.  \
 Preserve key information from every input.  Be concise and well-organized.
 """
+
+DEFAULT_SYNTHESIS_ESTIMATED_TOKENS = 2000
 
 
 class Synthesizer:
@@ -160,7 +162,27 @@ class Synthesizer:
         prompt = "\n\n---\n\n".join(parts)
 
         if resolved_budget:
-            resolved_budget.check("__synthesis__")
+            requires_explicit = resolved_provider.requires_explicit_budget_estimate(
+                resolved_model or ""
+            )
+            estimate = resolved_provider.budget_estimate_usd(resolved_model or "")
+            if estimate is None and requires_explicit:
+                if resolved_budget.max_budget_usd is not None:
+                    raise BudgetEstimateRequired(
+                        "__synthesis__",
+                        resolved_model or "",
+                        type(resolved_provider).__name__,
+                    )
+            elif estimate is not None:
+                resolved_budget.reserve(
+                    "__synthesis__", estimate, hard_ceiling=requires_explicit,
+                )
+            else:
+                resolved_budget.reserve(
+                    "__synthesis__",
+                    DEFAULT_SYNTHESIS_ESTIMATED_TOKENS
+                    * resolved_budget.cost_per_token,
+                )
 
         synth_node = Node(label="Synthesis merge", id="__synthesis__")
         if resolved_tracer:
@@ -178,6 +200,8 @@ class Synthesizer:
             synth_node.status = NodeStatus.COMPLETED
             return result.text
         except Exception as exc:
+            if resolved_budget:
+                resolved_budget.release("__synthesis__")
             synth_node.status = NodeStatus.FAILED
             if resolved_tracer:
                 resolved_tracer.on_node_error(synth_node, exc)

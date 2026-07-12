@@ -1,5 +1,7 @@
 """Tests for ExecutorBase shared helpers."""
 
+import os
+
 from smythe.executor_base import ExecutorBase
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, Provider
@@ -204,6 +206,28 @@ def test_finalize_persists_artifacts_and_records_paths(tmp_path):
     # node.result stays the provider text verbatim (JSON consumers rely
     # on it); paths reach dependents via gather_dep_results instead.
     assert node.result == "done"
+
+
+def test_finalize_replaces_artifact_atomically(tmp_path, monkeypatch):
+    base = _make_base_with_dir(tmp_path)
+    destination = tmp_path / "hero_00.png"
+    destination.write_bytes(b"previous-complete-image")
+    real_replace = os.replace
+    observed: dict[str, object] = {}
+
+    def inspect_replace(source, target):
+        observed["source"] = Path(source)
+        observed["old_bytes"] = Path(target).read_bytes()
+        assert Path(source).parent == Path(target).parent
+        real_replace(source, target)
+
+    monkeypatch.setattr("smythe.executor_base.os.replace", inspect_replace)
+    node = Node(label="make an image", id="hero")
+    base.finalize_node_result(node, _artifact_result())
+
+    assert observed["old_bytes"] == b"previous-complete-image"
+    assert destination.read_bytes() == b"\x89PNG-bytes"
+    assert not Path(observed["source"]).exists()
 
 
 def test_finalize_artifact_only_result_gets_listing_text(tmp_path):

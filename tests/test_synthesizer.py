@@ -171,6 +171,24 @@ def test_llm_merge_budget_exhaustion_raises():
     assert not provider.called
 
 
+def test_llm_merge_reserves_before_call():
+    """A merge whose estimate exceeds the remaining policy is never sent."""
+    from smythe.budget import SentinelAlert
+
+    provider = MockSynthProvider()
+    budget = Sentinel(max_budget_usd=0.005)
+    synth = Synthesizer(
+        strategy=SynthesisStrategy.LLM_MERGE,
+        provider=provider,
+        budget=budget,
+    )
+
+    with pytest.raises(SentinelAlert):
+        synth.synthesize(_make_graph("A", "B"))
+
+    assert not provider.called
+
+
 @pytest.mark.asyncio
 async def test_asynthesize_llm_merge_budget_exhaustion():
     """Async LLM_MERGE should also propagate SentinelAlert."""

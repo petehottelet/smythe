@@ -1,14 +1,15 @@
-"""Framework head-to-head: the same fixed pipeline in smythe, LangGraph, CrewAI.
+"""Framework head-to-head: one semantic pipeline in Smythe, LangGraph, CrewAI.
 
-    .venv-h2h/Scripts/python.exe benchmarks/run_framework_h2h.py --tasks 1 --reps 1
-    .venv-h2h/Scripts/python.exe benchmarks/run_framework_h2h.py            # full
+    python benchmarks/run_framework_h2h.py --tasks 1 --reps 1
+    python benchmarks/run_framework_h2h.py                       # full
 
-The claim under test is comparative overhead, not prompt quality: every
-framework runs the SAME research -> analyze -> write pipeline with the
-SAME step prompts and personas (harness.PIPELINE_SPECS), the SAME
-executor model, on the SAME tasks. Each framework assembles context its
-own idiomatic way — that assembly is part of what a framework is.
-smythe_dynamic (the LLMArchitect) rides along as the fourth system.
+This is an ecological comparison of idiomatic framework usage. Every
+framework receives the same task, semantic research -> analyze -> write
+specification, persona text, and executor model. Each framework packages
+those ingredients, dependency context, and its own scaffolding differently,
+so the provider-facing prompts are not byte-identical. The benchmark measures
+the resulting end-to-end system, not isolated scheduler overhead.
+``smythe_dynamic`` (the LLMArchitect) rides along as the fourth system.
 
 Protocol notes:
 - Executor: one model for every system (default gpt-5.4-mini).
@@ -37,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from harness import PIPELINE_SPECS, BenchmarkTask, load_tasks, make_swarm  # noqa: E402
 
+from benchmarks.artifact_records import environment_snapshot  # noqa: E402
 from smythe.provider import GeminiProvider, OpenAIProvider  # noqa: E402
 
 EXECUTOR_MODEL = "gpt-5.4-mini"
@@ -255,8 +257,17 @@ def main() -> None:
 
     payload = {
         "benchmark": "framework-head-to-head",
+        "comparison_type": "ecological_framework_comparison",
+        "prompt_parity": (
+            "same tasks, semantic step specifications, personas, and model; "
+            "framework-native prompt and context packaging"
+        ),
         "executor_model": EXECUTOR_MODEL,
         "judge_model": JUDGE_MODEL + " (different vendor than executor)",
+        "environment": environment_snapshot(
+            "smythe", "openai", "google-genai", "langgraph",
+            "langchain-openai", "crewai",
+        ),
         "reps": args.reps,
         "summary": summary,
         "records": records,

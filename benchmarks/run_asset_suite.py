@@ -1,7 +1,7 @@
 """The brand asset suite: 8 exact-spec launch assets from one brand config.
 
     python benchmarks/run_asset_suite.py                    # offline mechanics
-    python benchmarks/run_asset_suite.py --live             # ~$0.35 on Gemini
+    python benchmarks/run_asset_suite.py --live --max-cost-per-call-usd 0.06
     python benchmarks/run_asset_suite.py --live --logo path/to/logo.png
     python benchmarks/run_asset_suite.py --live --judge --brand benchmarks/brands/metacortex.json
 
@@ -24,7 +24,8 @@ quality cost of exceeding native model resolution.
 
 Aspect buckets run as parallel swarms concurrently (one Gemini
 image_config per provider instance), so the whole suite is still one
-parallel wave end to end.
+parallel wave end to end. Live price constants are illustrative; verify
+current model pricing before running.
 """
 
 from __future__ import annotations
@@ -39,6 +40,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
+from benchmarks.artifact_records import (  # noqa: E402
+    environment_snapshot,
+    image_mime_type,
+    portable_path,
+)
 from smythe import OfflineProvider, Swarm  # noqa: E402
 from smythe.graph import (  # noqa: E402
     ExecutionGraph,
@@ -90,6 +96,7 @@ def load_brand(path: str) -> dict:
 
 async def ensure_logo(
     *, brand: dict, live: bool, out: Path, provided: str | None,
+    max_cost_per_call_usd: float,
 ) -> dict:
     """Confirm possession of a brand logo, or create one first.
 
@@ -106,6 +113,7 @@ async def ensure_logo(
     provider = (
         GeminiProvider(
             cost_per_image_usd=COST_PER_IMAGE_USD,
+            max_cost_per_call_usd=max_cost_per_call_usd,
             image_config={"aspect_ratio": "1:1"},
         )
         if live
@@ -120,7 +128,7 @@ async def ensure_logo(
         provider=provider,
         model=MODEL if live else "demo-image-model",
         parallel=True,
-        max_budget_usd=0.25,
+        max_budget_usd=max(0.25, max_cost_per_call_usd * 1.1),
         artifact_dir=out / "raw" / "logo",
         retry_backoff_s=2.0,
     )
@@ -147,7 +155,9 @@ def logo_intake_node(logo_path: str) -> Node:
         result="Official brand logo (attached as image).",
     )
     node.status = NodeStatus.COMPLETED
-    node.metadata["artifacts"] = [{"path": logo_path, "mime_type": "image/png"}]
+    node.metadata["artifacts"] = [
+        {"path": logo_path, "mime_type": image_mime_type(logo_path)}
+    ]
     return node
 
 
@@ -181,7 +191,10 @@ async def judge_assets(
     intake = logo_intake_node(logo_path)
     intake.metadata["artifacts"] = (
         intake.metadata["artifacts"]
-        + [{"path": p, "mime_type": "image/png"} for p in finals.values()]
+        + [
+            {"path": p, "mime_type": image_mime_type(p)}
+            for p in finals.values()
+        ]
     )
     judge = Node(
         id="brand_judge",
@@ -286,11 +299,12 @@ def finish(src: Path, dst: Path, width: int, height: int, fmt: str) -> dict:
 
 async def run_bucket(
     bucket: str, specs: list, *, brand: dict, live: bool, out: Path,
-    logo_path: str,
+    logo_path: str, max_cost_per_call_usd: float,
 ) -> dict:
     provider = (
         GeminiProvider(
             cost_per_image_usd=COST_PER_IMAGE_USD,
+            max_cost_per_call_usd=max_cost_per_call_usd,
             image_config={"aspect_ratio": bucket},
         )
         if live
@@ -338,7 +352,7 @@ async def run_bucket(
         provider=provider,
         model=MODEL if live else "demo-image-model",
         parallel=True,
-        max_budget_usd=1.0,
+        max_budget_usd=max(1.0, len(specs) * max_cost_per_call_usd * 1.1),
         artifact_dir=out / "raw" / bucket.replace(":", "x"),
         retry_backoff_s=2.0,
     )
@@ -353,7 +367,21 @@ async def run_bucket(
 
 async def main_async(
     brand: dict, live: bool, out: Path, provided_logo: str | None, judge: bool,
+    max_cost_per_call_usd: float | None = None,
 ) -> dict:
+    if live and max_cost_per_call_usd is None:
+        configured = os.environ.get("GEMINI_IMAGE_MAX_COST_PER_CALL_USD")
+        if not configured:
+            raise ValueError(
+                "Live asset generation requires max_cost_per_call_usd or "
+                "GEMINI_IMAGE_MAX_COST_PER_CALL_USD. Verify current provider "
+                "pricing and supply an inclusive input+output request ceiling."
+            )
+        max_cost_per_call_usd = float(configured)
+    max_cost_per_call_usd = max_cost_per_call_usd or 0.0
+    if live and max_cost_per_call_usd <= 0:
+        raise ValueError("max_cost_per_call_usd must be positive in live mode")
+
     buckets: dict[str, list] = {}
     for spec in SPECS:
         buckets.setdefault(spec[4], []).append(spec)
@@ -361,6 +389,7 @@ async def main_async(
     t_logo = time.perf_counter()
     logo = await ensure_logo(
         brand=brand, live=live, out=out, provided=provided_logo,
+        max_cost_per_call_usd=max_cost_per_call_usd,
     )
     logo_wall_s = time.perf_counter() - t_logo
 
@@ -369,6 +398,7 @@ async def main_async(
         run_bucket(
             bucket, specs, brand=brand, live=live, out=out,
             logo_path=logo["path"],
+            max_cost_per_call_usd=max_cost_per_call_usd,
         )
         for bucket, specs in buckets.items()
     ))
@@ -421,14 +451,27 @@ async def main_async(
                 e["brand_consistency"] = score.get("brand_consistency")
                 e["defects"] = score.get("defects", [])
 
+    # Keep execution paths untouched until every consumer has read them, then
+    # make the persisted record portable across checkouts and operating systems.
+    for entry in report:
+        if entry.get("final_path"):
+            entry["final_path"] = portable_path(entry["final_path"])
+
     passed = sum(1 for e in report if e["status"] == "PASS")
     return {
         "benchmark": "brand-asset-suite",
         "brand": brand["name"],
         "mode": "LIVE" if live else "offline",
         "model": MODEL if live else "offline",
+        "cost_per_image_usd": COST_PER_IMAGE_USD if live else 0,
+        "max_cost_per_call_usd": max_cost_per_call_usd if live else 0,
+        "environment": environment_snapshot("smythe", "google-genai", "pillow"),
         "assets_pass": f"{passed}/{len(SPECS)}",
-        "brand_logo": {**logo, "wall_s": round(logo_wall_s, 2)},
+        "brand_logo": {
+            **logo,
+            "path": portable_path(logo["path"]),
+            "wall_s": round(logo_wall_s, 2),
+        },
         "generation_wall_s": round(generation_wall_s, 2),
         "buckets_run_concurrently": len(buckets),
         "cost_usd": round(
@@ -445,6 +488,15 @@ async def main_async(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true")
+    parser.add_argument(
+        "--max-cost-per-call-usd",
+        type=float,
+        default=None,
+        help=(
+            "required with --live unless GEMINI_IMAGE_MAX_COST_PER_CALL_USD is "
+            "set: verified inclusive ceiling for one image request"
+        ),
+    )
     parser.add_argument(
         "--brand", default=DEFAULT_BRAND,
         help="brand config JSON (see benchmarks/brands/)",
@@ -464,11 +516,28 @@ def main() -> None:
     live = args.live and bool(os.environ.get("GOOGLE_API_KEY"))
     if args.live and not live:
         print("--live requires GOOGLE_API_KEY; falling back to offline.")
+    if (
+        live
+        and args.max_cost_per_call_usd is None
+        and not os.environ.get("GEMINI_IMAGE_MAX_COST_PER_CALL_USD")
+    ):
+        raise SystemExit(
+            "--live requires --max-cost-per-call-usd or "
+            "GEMINI_IMAGE_MAX_COST_PER_CALL_USD. Verify current provider pricing "
+            "and supply an inclusive input+output request ceiling."
+        )
+    if args.max_cost_per_call_usd is not None and args.max_cost_per_call_usd <= 0:
+        raise SystemExit("--max-cost-per-call-usd must be positive")
 
     brand = load_brand(args.brand)
     slug = brand["name"].lower().replace(" ", "_")
     out = Path(args.out) if args.out else Path("smythe_artifacts/asset_suite") / slug
-    payload = asyncio.run(main_async(brand, live, out, args.logo, args.judge))
+    payload = asyncio.run(
+        main_async(
+            brand, live, out, args.logo, args.judge,
+            max_cost_per_call_usd=args.max_cost_per_call_usd,
+        )
+    )
 
     logo = payload["brand_logo"]
     print(f"[{payload['mode']}] logo {logo['source']} ({logo['wall_s']}s), "

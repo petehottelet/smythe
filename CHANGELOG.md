@@ -23,6 +23,48 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 Future work tracked in [ROADMAP.md](ROADMAP.md).
 
+### Added
+
+- Image providers accept `max_cost_per_call_usd`, a caller-maintained
+  inclusive whole-request ceiling. Budgeted image calls without a defensible
+  provider or node ceiling fail before the provider call with exported
+  `BudgetEstimateRequired`.
+- `SwarmResult` reports `cost_is_complete` and `cost_contains_estimates`.
+  Exported `BudgetReconciliationError` retains an incurred overrun and halts
+  immediately rather than retrying or continuing sibling admission.
+- `checkpoint_every_n_nodes` optionally batches full-graph snapshots; initial,
+  failed, and terminal states are still forced, and the unflushed tail is the
+  documented crash-replay and possible duplicate-spend granularity.
+
+### Changed
+
+- The async executor now admits at most `max_concurrency` ready nodes, uses
+  dependency indexes instead of repeated full-graph scans, and cancels and
+  awaits active siblings after a fatal failure. Queued nodes never start after
+  the failure is observed.
+- Synthesis failures now write a failed checkpoint; resuming reuses completed
+  node results and retries the synthesis stage instead of leaving a stale
+  `running` checkpoint. LLM synthesis also reserves budget before its provider
+  call.
+- Artifact finalization failures after a billed response are non-retryable, so
+  a local disk error cannot trigger a second paid generation.
+- Artifact bytes now join file checkpoints in using same-directory temporary
+  files plus atomic replacement, preventing readers from observing partial
+  writes.
+- Benchmark documentation now distinguishes the framework head-to-head's
+  ecological, framework-native protocol from a byte-identical prompt
+  microbenchmark; stale image and roadmap caveats were reconciled.
+- Added a `benchmarks` optional dependency group and portable, MIME-correct
+  artifact references for future asset-suite records. CI now runs the image
+  concurrency harness and eight-asset suite offline on every change.
+- `Task` now normalizes goals and constraints, validates caller input, and
+  detaches mutable inputs. `PlannerMemory` recall includes constraints,
+  validates result limits, and synchronizes history clearing.
+- Constrained planning serializes untrusted task and template data as JSON and
+  explicitly rejects embedded instructions. OpenClaw skill hydration now
+  accepts mapping payloads and empty inventories, while skill references and
+  capability aliases receive stricter normalization.
+
 ---
 
 ## [0.6.0] - 2026-07-12
