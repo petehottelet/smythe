@@ -153,6 +153,69 @@ def logo_intake_node(logo_path: str) -> Node:
     return node
 
 
+JUDGE_MODEL = "gemini-flash-lite-latest"
+
+JUDGE_PROMPT = (
+    "You are the brand art director. The FIRST attached image is the "
+    "official Osiris brand logo. The following images are the finished "
+    "launch assets, in this order: {asset_ids}. For each asset, judge "
+    "brand consistency against the official logo: is the exact mark "
+    "reproduced (not a variant), are palette and typography on-brand, "
+    "and are there defects (misspelled text, distorted mark, wrong "
+    "colors)? Respond with STRICT JSON only, no prose, no code fences: "
+    '{{"assets": [{{"id": "<asset id>", "brand_consistency": <1-10>, '
+    '"defects": ["..."]}}], "overall": <1-10>}}'
+)
+
+
+async def judge_assets(
+    *, live: bool, out: Path, logo_path: str, finals: dict[str, str],
+) -> dict:
+    """Reduce stage: a vision judge scores brand consistency per asset.
+
+    Closes the loop from locked-by-construction to verified-by-
+    measurement.  Returns parsed scores, or the raw text when the
+    output isn't valid JSON (recorded either way — a judge that can't
+    follow the schema is itself a finding).
+    """
+    provider = GeminiProvider() if live else OfflineProvider()
+    intake = logo_intake_node(logo_path)
+    intake.metadata["artifacts"] = (
+        intake.metadata["artifacts"]
+        + [{"path": p, "mime_type": "image/png"} for p in finals.values()]
+    )
+    judge = Node(
+        id="brand_judge",
+        label=JUDGE_PROMPT.format(asset_ids=", ".join(finals.keys())),
+        depends_on=[intake.id],
+        attach_dep_artifacts=True,
+        failure_policy=FailurePolicy.RETRY,
+        max_retries=2,
+    )
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[intake, judge])
+    swarm = Swarm(
+        provider=provider,
+        model=JUDGE_MODEL if live else "demo-model",
+        parallel=True,
+        max_budget_usd=0.25,
+        artifact_dir=out / "raw" / "judge",
+    )
+    result = await swarm.execute_async(graph)
+    raw = str(result.graph.nodes[-1].result)
+    verdict: dict = {"cost_usd": result.total_cost_usd, "raw": raw}
+    try:
+        text = raw.strip()
+        if text.startswith("```"):
+            text = text.split("```")[1].removeprefix("json").strip()
+        parsed = json.loads(text)
+        verdict["scores"] = {a["id"]: a for a in parsed.get("assets", [])}
+        verdict["overall"] = parsed.get("overall")
+    except (json.JSONDecodeError, KeyError, TypeError):
+        verdict["scores"] = {}
+        verdict["overall"] = None
+    return verdict
+
+
 def finish(src: Path, dst: Path, width: int, height: int, fmt: str) -> dict:
     """Deterministically finish a generated image to its exact spec.
 
@@ -227,7 +290,9 @@ async def run_bucket(
     return {"paths": paths, "cost": result.total_cost_usd}
 
 
-async def main_async(live: bool, out: Path, provided_logo: str | None) -> dict:
+async def main_async(
+    live: bool, out: Path, provided_logo: str | None, judge: bool,
+) -> dict:
     buckets: dict[str, list] = {}
     for spec in SPECS:
         buckets.setdefault(spec[4], []).append(spec)
@@ -272,6 +337,20 @@ async def main_async(live: bool, out: Path, provided_logo: str | None) -> dict:
         entry["final_path"] = str(dst)
         report.append(entry)
 
+    verdict = None
+    if judge:
+        finals = {
+            e["asset"]: e["final_path"] for e in report if e.get("final_path")
+        }
+        verdict = await judge_assets(
+            live=live, out=out, logo_path=logo["path"], finals=finals,
+        )
+        for e in report:
+            score = verdict["scores"].get(e["asset"])
+            if score:
+                e["brand_consistency"] = score.get("brand_consistency")
+                e["defects"] = score.get("defects", [])
+
     passed = sum(1 for e in report if e["status"] == "PASS")
     return {
         "benchmark": "osiris-asset-suite",
@@ -281,7 +360,13 @@ async def main_async(live: bool, out: Path, provided_logo: str | None) -> dict:
         "brand_logo": {**logo, "wall_s": round(logo_wall_s, 2)},
         "generation_wall_s": round(generation_wall_s, 2),
         "buckets_run_concurrently": len(buckets),
-        "cost_usd": round(total_cost, 4),
+        "cost_usd": round(
+            total_cost + (verdict.get("cost_usd", 0.0) if verdict else 0.0), 4,
+        ),
+        "brand_judge": (
+            {"overall": verdict["overall"], "cost_usd": verdict["cost_usd"]}
+            if verdict else None
+        ),
         "assets": report,
     }
 
@@ -295,13 +380,17 @@ def main() -> None:
         "--logo", default=None,
         help="path to an existing brand logo; omitted = generate one first",
     )
+    parser.add_argument(
+        "--judge", action="store_true",
+        help="score brand consistency per asset with a vision judge",
+    )
     args = parser.parse_args()
 
     live = args.live and bool(os.environ.get("GOOGLE_API_KEY"))
     if args.live and not live:
         print("--live requires GOOGLE_API_KEY; falling back to offline.")
 
-    payload = asyncio.run(main_async(live, Path(args.out), args.logo))
+    payload = asyncio.run(main_async(live, Path(args.out), args.logo, args.judge))
 
     logo = payload["brand_logo"]
     print(f"[{payload['mode']}] logo {logo['source']} ({logo['wall_s']}s), "
@@ -313,7 +402,13 @@ def main() -> None:
             f" upscale x{e.get('upscale_factor')} crop {e.get('cropped_fraction')}"
             if "upscale_factor" in e else ""
         )
+        if "brand_consistency" in e:
+            extra += f" brand {e['brand_consistency']}/10"
+            if e.get("defects"):
+                extra += f" defects: {'; '.join(e['defects'])}"
         print(f"  {e['asset']:<13} {e['spec']:<16} {e['status']}{extra}")
+    if payload.get("brand_judge") and payload["brand_judge"]["overall"] is not None:
+        print(f"  overall brand consistency: {payload['brand_judge']['overall']}/10")
 
     results_path = args.results or (
         "benchmarks/results/asset_suite.json" if live
