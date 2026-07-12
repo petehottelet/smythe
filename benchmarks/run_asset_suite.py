@@ -1,7 +1,16 @@
 """The Osiris asset suite: 8 exact-spec launch assets from one brief.
 
-    python benchmarks/run_asset_suite.py            # offline mechanics
-    python benchmarks/run_asset_suite.py --live     # ~$0.31 on Gemini
+    python benchmarks/run_asset_suite.py                    # offline mechanics
+    python benchmarks/run_asset_suite.py --live             # ~$0.35 on Gemini
+    python benchmarks/run_asset_suite.py --live --logo path/to/logo.png
+
+Brand lock: assets for a brand must share its actual mark, not eight
+independent hallucinations of one. The suite therefore confirms
+possession of a brand logo first — pass an existing file with --logo,
+or a dedicated logo node generates one — and every asset node receives
+the logo pixels as a reference image (`attach_dep_artifacts=True`
+feeding Gemini's image-input channel), locking the mark across the
+whole parallel fan-out.
 
 This is the README's broadcast-reduce example run for real, against the
 hard part: exact pixel specifications (2400x1200, 1290x2796, 300 dpi
@@ -30,7 +39,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from smythe import OfflineProvider, Swarm  # noqa: E402
-from smythe.graph import ExecutionGraph, FailurePolicy, Node, Topology  # noqa: E402
+from smythe.graph import (  # noqa: E402
+    ExecutionGraph,
+    FailurePolicy,
+    Node,
+    NodeStatus,
+    Topology,
+)
 from smythe.provider import GeminiProvider  # noqa: E402
 
 for _stream in (sys.stdout, sys.stderr):
@@ -68,6 +83,76 @@ SPECS = [
 ]
 
 
+LOGO_PROMPT = (
+    "Design the official brand logo for 'Osiris', a portable solar-powered "
+    "phone charger. A flat, iconic sun-over-horizon mark with the wordmark "
+    "'OSIRIS' beneath it. Palette: warm amber mark, matte black text, "
+    "off-white background. Clean vector style, centered, no photography, "
+    "no extra text."
+)
+
+
+async def ensure_logo(*, live: bool, out: Path, provided: str | None) -> dict:
+    """Confirm possession of a brand logo, or create one first.
+
+    Returns {"path": ..., "source": "provided"|"generated"}. A provided
+    path must exist — a typo'd --logo must not silently fall through to
+    generation and brand the whole suite with an invented mark.
+    """
+    if provided:
+        path = Path(provided)
+        if not path.is_file():
+            raise FileNotFoundError(f"--logo file not found: {provided}")
+        return {"path": str(path.resolve()), "source": "provided"}
+
+    provider = (
+        GeminiProvider(
+            cost_per_image_usd=COST_PER_IMAGE_USD,
+            image_config={"aspect_ratio": "1:1"},
+        )
+        if live
+        else OfflineProvider(artifacts_per_call=1)
+    )
+    node = Node(
+        id="brand_logo", label=LOGO_PROMPT,
+        failure_policy=FailurePolicy.RETRY, max_retries=2,
+    )
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
+    swarm = Swarm(
+        provider=provider,
+        model=MODEL if live else "demo-image-model",
+        parallel=True,
+        max_budget_usd=0.25,
+        artifact_dir=out / "raw" / "logo",
+        retry_backoff_s=2.0,
+    )
+    result = await swarm.execute_async(graph)
+    records = result.graph.nodes[0].metadata.get("artifacts", [])
+    if not records:
+        raise RuntimeError("Logo generation returned no image artifact")
+    return {
+        "path": records[0]["path"],
+        "source": "generated",
+        "cost_usd": result.total_cost_usd,
+    }
+
+
+def logo_intake_node(logo_path: str) -> Node:
+    """A pre-completed node carrying the brand logo as its artifact.
+
+    Asset nodes depend on it with ``attach_dep_artifacts=True``, so the
+    executor feeds the actual logo pixels to every generation call.
+    """
+    node = Node(
+        id="brand_logo",
+        label="Brand logo intake (asset provided to the swarm)",
+        result="Official brand logo (attached as image).",
+    )
+    node.status = NodeStatus.COMPLETED
+    node.metadata["artifacts"] = [{"path": logo_path, "mime_type": "image/png"}]
+    return node
+
+
 def finish(src: Path, dst: Path, width: int, height: int, fmt: str) -> dict:
     """Deterministically finish a generated image to its exact spec.
 
@@ -94,7 +179,9 @@ def finish(src: Path, dst: Path, width: int, height: int, fmt: str) -> dict:
     }
 
 
-async def run_bucket(bucket: str, specs: list, *, live: bool, out: Path) -> dict:
+async def run_bucket(
+    bucket: str, specs: list, *, live: bool, out: Path, logo_path: str,
+) -> dict:
     provider = (
         GeminiProvider(
             cost_per_image_usd=COST_PER_IMAGE_USD,
@@ -103,16 +190,26 @@ async def run_bucket(bucket: str, specs: list, *, live: bool, out: Path) -> dict
         if live
         else OfflineProvider(artifacts_per_call=1)
     )
+    intake = logo_intake_node(logo_path)
     nodes = [
         Node(
             id=asset_id,
-            label=f"Generate a {scene} {BRIEF}",
+            label=(
+                "The attached image is the official Osiris brand logo. "
+                "Reproduce this exact mark faithfully wherever the brand "
+                f"appears — never invent a different logo. Generate a {scene} "
+                f"{BRIEF}"
+            ),
+            depends_on=[intake.id],
+            attach_dep_artifacts=True,
             failure_policy=FailurePolicy.RETRY,
             max_retries=2,
         )
         for asset_id, _, _, _, _, scene in specs
     ]
-    graph = ExecutionGraph(topology=[Topology.BROADCAST_REDUCE], nodes=nodes)
+    graph = ExecutionGraph(
+        topology=[Topology.BROADCAST_REDUCE], nodes=[intake, *nodes],
+    )
     swarm = Swarm(
         provider=provider,
         model=MODEL if live else "demo-image-model",
@@ -130,14 +227,18 @@ async def run_bucket(bucket: str, specs: list, *, live: bool, out: Path) -> dict
     return {"paths": paths, "cost": result.total_cost_usd}
 
 
-async def main_async(live: bool, out: Path) -> dict:
+async def main_async(live: bool, out: Path, provided_logo: str | None) -> dict:
     buckets: dict[str, list] = {}
     for spec in SPECS:
         buckets.setdefault(spec[4], []).append(spec)
 
+    t_logo = time.perf_counter()
+    logo = await ensure_logo(live=live, out=out, provided=provided_logo)
+    logo_wall_s = time.perf_counter() - t_logo
+
     t0 = time.perf_counter()
     results = await asyncio.gather(*(
-        run_bucket(bucket, specs, live=live, out=out)
+        run_bucket(bucket, specs, live=live, out=out, logo_path=logo["path"])
         for bucket, specs in buckets.items()
     ))
     generation_wall_s = time.perf_counter() - t0
@@ -145,7 +246,8 @@ async def main_async(live: bool, out: Path) -> dict:
     generated: dict[str, str] = {}
     for r in results:
         generated.update(r["paths"])
-    total_cost = sum(r["cost"] for r in results)
+    generated.pop("brand_logo", None)
+    total_cost = sum(r["cost"] for r in results) + logo.get("cost_usd", 0.0)
 
     final_dir = out / "final"
     final_dir.mkdir(parents=True, exist_ok=True)
@@ -176,6 +278,7 @@ async def main_async(live: bool, out: Path) -> dict:
         "mode": "LIVE" if live else "offline",
         "model": MODEL if live else "offline",
         "assets_pass": f"{passed}/{len(SPECS)}",
+        "brand_logo": {**logo, "wall_s": round(logo_wall_s, 2)},
         "generation_wall_s": round(generation_wall_s, 2),
         "buckets_run_concurrently": len(buckets),
         "cost_usd": round(total_cost, 4),
@@ -188,15 +291,21 @@ def main() -> None:
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--out", default="smythe_artifacts/asset_suite")
     parser.add_argument("--results", default=None)
+    parser.add_argument(
+        "--logo", default=None,
+        help="path to an existing brand logo; omitted = generate one first",
+    )
     args = parser.parse_args()
 
     live = args.live and bool(os.environ.get("GOOGLE_API_KEY"))
     if args.live and not live:
         print("--live requires GOOGLE_API_KEY; falling back to offline.")
 
-    payload = asyncio.run(main_async(live, Path(args.out)))
+    payload = asyncio.run(main_async(live, Path(args.out), args.logo))
 
-    print(f"[{payload['mode']}] {payload['assets_pass']} specs met, "
+    logo = payload["brand_logo"]
+    print(f"[{payload['mode']}] logo {logo['source']} ({logo['wall_s']}s), "
+          f"{payload['assets_pass']} specs met, "
           f"generation wall {payload['generation_wall_s']}s, "
           f"cost ${payload['cost_usd']}")
     for e in payload["assets"]:
