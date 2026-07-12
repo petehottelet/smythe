@@ -110,6 +110,20 @@ sampling. Recorded in
 `brand_logo` (source: provided vs. generated, plus its own wall time
 and cost).
 
+**Measured, not eyeballed (third run — logo 6.3s, 8/8 specs in 12.1s,
+$0.384 total):** with `--judge`, a vision node receives the official
+logo plus all eight finished assets and scores brand consistency per
+asset. Result: **overall 8/10**, per-asset 7–9, with genuinely
+discriminating defect notes — it distinguished the *mark* (reproduced
+faithfully everywhere) from the *secondary typography* ("Power from
+the sun" weight/spacing drifts from the master logo), and flagged
+perspective-distorted logo renderings on physical product surfaces.
+Full pipeline: confirm-or-create logo → brand-locked parallel
+generation across 5 concurrent aspect swarms → deterministic
+exact-spec finishing → measured brand verification, in ~19 seconds
+end to end. Caveats: n=1, one judge model, scores not yet calibrated
+against human ratings.
+
 Honesty metrics per asset: upscale factor and cropped fraction are
 recorded — print ad upscaled 2.95× and App Store 2.08× beyond native
 model resolution (the visible quality cost of oversized specs), while

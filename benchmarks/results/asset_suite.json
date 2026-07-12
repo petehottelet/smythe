@@ -4,14 +4,18 @@
   "model": "gemini-2.5-flash-image",
   "assets_pass": "8/8",
   "brand_logo": {
-    "path": "C:\\Users\\PeteHottelet\\Projects\\smythe\\smythe_artifacts\\asset_suite\\raw\\logo\\574bbbab7cf1\\brand_logo_00.png",
+    "path": "C:\\Users\\PeteHottelet\\Projects\\smythe\\smythe_artifacts\\asset_suite\\raw\\logo\\7f043ce2f0c5\\brand_logo_00.png",
     "source": "generated",
     "cost_usd": 0.039,
-    "wall_s": 6.36
+    "wall_s": 6.31
   },
-  "generation_wall_s": 13.22,
+  "generation_wall_s": 12.13,
   "buckets_run_concurrently": 5,
-  "cost_usd": 0.351,
+  "cost_usd": 0.3836,
+  "brand_judge": {
+    "overall": 8,
+    "cost_usd": 0.032568
+  },
   "assets": [
     {
       "asset": "hero",
@@ -24,7 +28,12 @@
       "upscale_factor": 1.79,
       "cropped_fraction": 0.125,
       "status": "PASS",
-      "final_path": "smythe_artifacts\\asset_suite\\final\\hero.png"
+      "final_path": "smythe_artifacts\\asset_suite\\final\\hero.png",
+      "brand_consistency": 8,
+      "defects": [
+        "Logo on physical product is a slightly lower-fidelity rendering than the source vector",
+        "Sub-text 'OSIRIS - Power from the sun' added below logo on product which does not exist in official logo file"
+      ]
     },
     {
       "asset": "instagram",
@@ -37,7 +46,12 @@
       "upscale_factor": 1.05,
       "cropped_fraction": 0.0,
       "status": "PASS",
-      "final_path": "smythe_artifacts\\asset_suite\\final\\instagram.jpg"
+      "final_path": "smythe_artifacts\\asset_suite\\final\\instagram.jpg",
+      "brand_consistency": 8,
+      "defects": [
+        "Logo on product is smaller and less crisp than official mark",
+        "Sub-text added below logo"
+      ]
     },
     {
       "asset": "x_banner",
@@ -50,7 +64,12 @@
       "upscale_factor": 0.98,
       "cropped_fraction": 0.238,
       "status": "PASS",
-      "final_path": "smythe_artifacts\\asset_suite\\final\\x_banner.jpg"
+      "final_path": "smythe_artifacts\\asset_suite\\final\\x_banner.jpg",
+      "brand_consistency": 8,
+      "defects": [
+        "Logo on product displays only partial/distorted marks due to perspective",
+        "Sub-text added below logo"
+      ]
     },
     {
       "asset": "story",
@@ -63,7 +82,11 @@
       "upscale_factor": 1.43,
       "cropped_fraction": 0.015,
       "status": "PASS",
-      "final_path": "smythe_artifacts\\asset_suite\\final\\story.png"
+      "final_path": "smythe_artifacts\\asset_suite\\final\\story.png",
+      "brand_consistency": 9,
+      "defects": [
+        "Logo mark is consistent, but typography in 'Power from the sun' uses a slightly different weight than the logo's secondary text alignment"
+      ]
     },
     {
       "asset": "email_header",
@@ -76,7 +99,11 @@
       "upscale_factor": 0.39,
       "cropped_fraction": 0.237,
       "status": "PASS",
-      "final_path": "smythe_artifacts\\asset_suite\\final\\email_header.png"
+      "final_path": "smythe_artifacts\\asset_suite\\final\\email_header.png",
+      "brand_consistency": 9,
+      "defects": [
+        "Logo mark is correct; sub-text 'Power from the sun' is present but typography weight varies slightly from official branding"
+      ]
     },
     {
       "asset": "appstore",
@@ -89,7 +116,12 @@
       "upscale_factor": 2.08,
       "cropped_fraction": 0.193,
       "status": "PASS",
-      "final_path": "smythe_artifacts\\asset_suite\\final\\appstore.png"
+      "final_path": "smythe_artifacts\\asset_suite\\final\\appstore.png",
+      "brand_consistency": 7,
+      "defects": [
+        "Logo on product in app thumbnail is distorted/scaled inconsistently",
+        "Sub-text in 'Power from the sun' is missing specific spacing/font alignment from the master logo"
+      ]
     },
     {
       "asset": "og_card",
@@ -102,7 +134,12 @@
       "upscale_factor": 0.89,
       "cropped_fraction": 0.082,
       "status": "PASS",
-      "final_path": "smythe_artifacts\\asset_suite\\final\\og_card.png"
+      "final_path": "smythe_artifacts\\asset_suite\\final\\og_card.png",
+      "brand_consistency": 8,
+      "defects": [
+        "Logo on product is low fidelity",
+        "Typography for 'Power from the sun' does not match the official logo's font styling"
+      ]
     },
     {
       "asset": "print_ad",
@@ -115,7 +152,11 @@
       "upscale_factor": 2.95,
       "cropped_fraction": 0.056,
       "status": "PASS",
-      "final_path": "smythe_artifacts\\asset_suite\\final\\print_ad.png"
+      "final_path": "smythe_artifacts\\asset_suite\\final\\print_ad.png",
+      "brand_consistency": 9,
+      "defects": [
+        "Logo mark is reproduced well, but sub-text 'Power from the sun' typography is inconsistent with the master logo's defined style guide"
+      ]
     }
   ]
 }
