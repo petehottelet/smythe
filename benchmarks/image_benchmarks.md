@@ -51,6 +51,27 @@ uncurated fan-out — the motivation for a select-from-N curation tier
 (generate N, dedup + pick the best) rather than trusting one sample per
 prompt.
 
+## Follow-up cells (2026-07-12, same day)
+
+**Aspect-ratio compliance** ([results/image_aspect_ratio.json](results/image_aspect_ratio.json)):
+with `image_config={"aspect_ratio": "16:9"}`, 4/4 images returned native
+widescreen **1344×768** — no letterboxing, uniform dimensions. (Note:
+1344×768 is Gemini's 16:9 output bucket; its true ratio is 1.75 vs the
+nominal 1.78.) This closes the earlier failure where wide-format
+requests came back letterboxed inside a 1024×1024 square.
+
+**k=25 ceiling probe** ([results/image_k25_ceiling.json](results/image_k25_ceiling.json)):
+25 prompts, `max_concurrency=25`, single run — **25/25 images in 10.2s
+wall ($0.975)**, 147 images/min throughput, zero rate-limit events on
+one paid key. Concurrency factor 15.9 (64% of ideal 25): efficiency
+declines at this width because per-call latency spreads 4.8–8.3s and
+stragglers dominate the wall clock, not because anything queued or
+failed. The single-key rate ceiling is therefore **above 25 concurrent
+image requests** — multi-key pooling is not yet needed at this scale.
+Diversity note: this run cycles 8 scene prompts across 25 nodes, so
+pairwise dHash includes same-prompt pairs; min distance 7 bits means
+even same-prompt regenerations differed materially.
+
 ## Caveats
 
 - n=3 per cell: ranges shown; treat sub-second deltas as noise. Single

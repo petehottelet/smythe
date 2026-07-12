@@ -124,9 +124,15 @@ def analyze_artifacts(records: list[dict]) -> dict:
     }
 
 
-def run_once(*, k: int, n_images: int, live: bool, model: str, out_dir: Path) -> dict:
+def run_once(
+    *, k: int, n_images: int, live: bool, model: str, out_dir: Path,
+    aspect_ratio: str | None = None,
+) -> dict:
+    image_config = {"aspect_ratio": aspect_ratio} if aspect_ratio else None
     provider = (
-        GeminiProvider(cost_per_image_usd=COST_PER_IMAGE_USD)
+        GeminiProvider(
+            cost_per_image_usd=COST_PER_IMAGE_USD, image_config=image_config,
+        )
         if live
         else OfflineProvider(artifacts_per_call=1)
     )
@@ -170,6 +176,7 @@ def run_once(*, k: int, n_images: int, live: bool, model: str, out_dir: Path) ->
             round(len(records) * 60 / wall_s, 1) if wall_s else None
         ),
         "cost_usd": round(result.total_cost_usd, 4),
+        "aspect_ratio_requested": aspect_ratio,
         "artifacts": analyze_artifacts(records) if live else {"offline": True},
         "execution_id": result.execution_id,
     }
@@ -185,6 +192,10 @@ def main() -> None:
     parser.add_argument("--out", default=None, help="results JSON path")
     parser.add_argument(
         "--artifact-dir", default="smythe_artifacts/image_benchmark",
+    )
+    parser.add_argument(
+        "--aspect-ratio", default=None,
+        help='Gemini image_config aspect ratio, e.g. "16:9"',
     )
     args = parser.parse_args()
 
@@ -204,6 +215,7 @@ def main() -> None:
             record = run_once(
                 k=k, n_images=args.images, live=live, model=args.model,
                 out_dir=Path(args.artifact_dir),
+                aspect_ratio=args.aspect_ratio,
             )
             record["repeat"] = rep
             runs.append(record)
