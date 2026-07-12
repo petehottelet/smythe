@@ -82,6 +82,31 @@ even same-prompt regenerations differed materially.
 - k>8 unmeasured; the rate-limit ceiling on one key is not yet found.
 - Prompts authored by this project.
 
+## The asset suite: 8 exact-spec launch assets (2026-07-12)
+
+The README's broadcast-reduce example run for real
+([run_asset_suite.py](run_asset_suite.py), records in
+[results/asset_suite.json](results/asset_suite.json)): one brand brief,
+eight assets with exact pixel specifications — hero 2400×1200, App
+Store 1290×2796, print 2550×3300 at 300 dpi, and five more.
+
+**Result: 8/8 specs met, 11.0s generation wall, $0.312.** Five aspect
+buckets ran as concurrent parallel swarms (one Gemini `image_config`
+per provider); a deterministic finishing pass (resize-to-cover +
+center-crop) produced the exact dimensions, because no image model
+emits 2400×1200 or 300-dpi print natively.
+
+Honesty metrics per asset: upscale factor and cropped fraction are
+recorded — print ad upscaled 2.95× and App Store 2.08× beyond native
+model resolution (the visible quality cost of oversized specs), while
+five of eight assets finished at ≤1.4× (near-native). Known defect
+class observed: small on-device brand text renders imperfectly at
+hero size — the tiny-text fidelity limit of current image models, and
+precisely the defect the vision-judge curation tier
+(`examples/11_vision_judge.py`) is built to catch. This run measured
+generation + finishing only; adding the judge as a reduce stage is the
+ad-suite consistency benchmark, next.
+
 ## Planned next
 
 - Select-from-N curation tier with a vision judge (quality-per-dollar
