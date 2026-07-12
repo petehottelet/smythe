@@ -21,6 +21,26 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
+Future work tracked in [ROADMAP.md](ROADMAP.md).
+
+---
+
+## [0.6.0] - 2026-07-12
+
+Sight. Nodes can now see images — the art-director pattern — and the
+brand-locked asset suite runs end to end: confirm or create a logo,
+generate eight exact-spec assets in parallel with the logo as a
+reference image, and score brand consistency with a vision judge
+(measured 8/10 overall in ~19 seconds for $0.38). Also fixes a
+provider defect shipped in 0.5.0. No breaking API changes.
+
+### Fixed
+
+- **`OpenAIProvider` was broken against current OpenAI models**: it
+  sent the legacy `max_tokens` parameter, which GPT-5.x models reject
+  with a 400. Now sends `max_completion_tokens`. Found by the first
+  live vision verification — offline tests could never have caught it.
+
 ### Added
 
 - **Vision input — nodes can see images.** `ChatMessage.attachments`
@@ -34,8 +54,15 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   path runs deterministically in CI. New example:
   `examples/11_vision_judge.py` — in its first real run the judge
   caught and rejected a candidate ad with a spelling error.
-
-Future work tracked in [ROADMAP.md](ROADMAP.md).
+- **Brand-locked asset suite benchmark**
+  (`benchmarks/run_asset_suite.py`): confirm-or-create brand logo,
+  reference-image propagation across concurrent aspect-bucket swarms,
+  deterministic exact-spec finishing (8/8 including 300-dpi print),
+  and a `--judge` reduce stage scoring per-asset brand consistency.
+- **Repo Doctor MVP** (`skills/repo-doctor/`): an offline-first
+  release-readiness auditor built on smythe — deterministic repo
+  snapshot with secret redaction, scoring rubric with hard caps, and
+  a specialist-fork → red-team → synthesis audit graph.
 
 ---
 
