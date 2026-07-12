@@ -217,6 +217,47 @@ async def judge_assets(
     return verdict
 
 
+def composite_tagline(path: Path, tagline: str) -> None:
+    """Deterministically set the exact tagline onto a finished asset.
+
+    The two-brand finding (see image_benchmarks.md): long/uncommon
+    tagline words misrender systematically when generated as pixels.
+    The production answer is to keep typography out of the model and
+    composite the exact copy — bottom-centered, ink chosen by sampling
+    the luminance behind the text.
+    """
+    from PIL import Image, ImageDraw, ImageFont
+
+    img = Image.open(path).convert("RGB")
+    w, h = img.size
+    size = max(14, w // 30)
+    font = None
+    for name in ("segoeuib.ttf", "arialbd.ttf", "DejaVuSans-Bold.ttf"):
+        try:
+            font = ImageFont.truetype(name, size)
+            break
+        except OSError:
+            continue
+    if font is None:
+        font = ImageFont.load_default(size)
+    draw = ImageDraw.Draw(img)
+    bbox = draw.textbbox((0, 0), tagline, font=font)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    x, y = (w - tw) // 2, h - th - max(10, h // 16)
+    strip = img.crop((
+        max(0, x), max(0, y), min(w, x + tw), min(h, y + th + 4),
+    )).convert("L")
+    data = list(strip.getdata())
+    lum = sum(data) / max(1, len(data))
+    ink = (24, 24, 22) if lum > 140 else (245, 244, 240)
+    draw.text((x, y), tagline, font=font, fill=ink)
+    fmt = "JPEG" if path.suffix == ".jpg" else "PNG"
+    kwargs: dict = {"quality": 92} if fmt == "JPEG" else {}
+    if path.stem == "print_ad":
+        kwargs["dpi"] = (300, 300)
+    img.save(path, fmt, **kwargs)
+
+
 def finish(src: Path, dst: Path, width: int, height: int, fmt: str) -> dict:
     """Deterministically finish a generated image to its exact spec.
 
@@ -256,6 +297,13 @@ async def run_bucket(
         else OfflineProvider(artifacts_per_call=1)
     )
     intake = logo_intake_node(logo_path)
+    no_text = (
+        " Do not render any tagline, slogan, or small text anywhere in the "
+        "image — leave clean negative space near the bottom for typography "
+        "to be added later. The logo mark may appear on products and signage."
+        if brand.get("composite_tagline")
+        else ""
+    )
     nodes = [
         Node(
             id=asset_id,
@@ -263,7 +311,7 @@ async def run_bucket(
                 f"The attached image is the official {brand['name']} brand "
                 "logo. Reproduce this exact mark faithfully wherever the "
                 "brand appears — never invent a different logo. Generate a "
-                f"{brand['scenes'][asset_id]} {brand['brief']}"
+                f"{brand['scenes'][asset_id]} {brand['brief']}{no_text}"
             ),
             depends_on=[intake.id],
             attach_dep_artifacts=True,
@@ -337,6 +385,9 @@ async def main_async(
             continue
         dst = final_dir / f"{asset_id}.{'jpg' if fmt == 'JPEG' else 'png'}"
         entry.update(finish(Path(src), dst, width, height, fmt))
+        if brand.get("composite_tagline") and brand.get("tagline"):
+            composite_tagline(dst, brand["tagline"])
+            entry["tagline_composited"] = True
         from PIL import Image
         with Image.open(dst) as img:
             ok = img.size == (width, height) and img.format == fmt

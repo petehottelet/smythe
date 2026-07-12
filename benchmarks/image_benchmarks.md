@@ -161,6 +161,19 @@ exact copy deterministically) and gives the select-from-N curation
 tier a measurable target. It also validates the judge itself: every
 typo it reported exists in the pixels.
 
+**The fix, measured (same day): 3/10 → 8/10.** With
+`composite_tagline` in the brand config, generation prompts suppress
+in-image typography ("leave clean negative space") and the finishing
+pass composites the exact tagline deterministically (Pillow,
+luminance-adaptive ink). Rerun: **overall 8/10, zero misspelling
+defects** — the entire typo class eliminated in one run at identical
+cost ($0.384); residual defects are the same logo-fidelity class as
+Osiris at its 8/10. Honest residue: the negative-space instruction
+sometimes yields a visible empty placeholder box the compositor
+doesn't fill — placement-aware compositing is the refinement.
+MetaCortex now matches Osiris despite a tagline that is 3x harder to
+render, because it no longer renders it.
+
 ## Planned next
 
 - Select-from-N curation tier with a vision judge (quality-per-dollar

@@ -5,7 +5,7 @@
   "model": "offline",
   "assets_pass": "8/8",
   "brand_logo": {
-    "path": "C:\\Users\\PeteHottelet\\Projects\\smythe\\smythe_artifacts\\asset_suite\\metacortex_datacentres\\raw\\logo\\935c57165fc6\\brand_logo_00.png",
+    "path": "C:\\Users\\PeteHottelet\\Projects\\smythe\\smythe_artifacts\\asset_suite\\metacortex_datacentres\\raw\\logo\\cc24888b9957\\brand_logo_00.png",
     "source": "generated",
     "cost_usd": 0.00030000000000000003,
     "wall_s": 0.01
@@ -25,6 +25,7 @@
       ],
       "upscale_factor": 2400.0,
       "cropped_fraction": 0.5,
+      "tagline_composited": true,
       "status": "PASS",
       "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\hero.png"
     },
@@ -38,6 +39,7 @@
       ],
       "upscale_factor": 1080.0,
       "cropped_fraction": 0.0,
+      "tagline_composited": true,
       "status": "PASS",
       "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\instagram.jpg"
     },
@@ -51,6 +53,7 @@
       ],
       "upscale_factor": 1500.0,
       "cropped_fraction": 0.667,
+      "tagline_composited": true,
       "status": "PASS",
       "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\x_banner.jpg"
     },
@@ -64,6 +67,7 @@
       ],
       "upscale_factor": 1920.0,
       "cropped_fraction": 0.438,
+      "tagline_composited": true,
       "status": "PASS",
       "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\story.png"
     },
@@ -77,6 +81,7 @@
       ],
       "upscale_factor": 600.0,
       "cropped_fraction": 0.667,
+      "tagline_composited": true,
       "status": "PASS",
       "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\email_header.png"
     },
@@ -90,6 +95,7 @@
       ],
       "upscale_factor": 2796.0,
       "cropped_fraction": 0.539,
+      "tagline_composited": true,
       "status": "PASS",
       "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\appstore.png"
     },
@@ -103,6 +109,7 @@
       ],
       "upscale_factor": 1200.0,
       "cropped_fraction": 0.475,
+      "tagline_composited": true,
       "status": "PASS",
       "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\og_card.png"
     },
@@ -116,6 +123,7 @@
       ],
       "upscale_factor": 3300.0,
       "cropped_fraction": 0.227,
+      "tagline_composited": true,
       "status": "PASS",
       "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\print_ad.png"
     }
