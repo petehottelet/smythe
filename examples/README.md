@@ -17,4 +17,6 @@ python examples/01_quickstart_yaml.py
 | [06_mcp_github.py](06_mcp_github.py) | The real GitHub MCP server with a mandatory tool allowlist and `env_passthrough` for the token. Env-gated: needs `GITHUB_PERSONAL_ACCESS_TOKEN`, an LLM key, and npx. |
 | [07_mcp_saas.py](07_mcp_saas.py) | Any SaaS MCP server over streamable HTTP (Linear, Notion, ...), configured entirely by environment variables. Env-gated. |
 | [08_learning_loop.py](08_learning_loop.py) | The learning loop, end to end: run 1's outcome is recorded by `PlannerMemory`, recalled into run 2's planning prompt, and the Architect returns a leaner plan (8 nodes → 3). |
+| [09_image_generation.py](09_image_generation.py) | Parallel image artifacts, per-image cost accounting, and deterministic offline image fixtures; real mode uses Gemini. |
+| [10_gpt_image_generation.py](10_gpt_image_generation.py) | Three GPT Image requests fan out concurrently through the dedicated `OpenAIImageProvider`; offline mode remains free and deterministic. |
 | [acquisition_diligence/](acquisition_diligence/) | **The flagship demo.** Task intake → generated `fork-join → adversarial → serial` topology → parallel specialists → red-team review → final memo, with committed expected artifacts (graph, trace, memo). |

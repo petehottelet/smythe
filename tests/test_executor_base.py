@@ -161,3 +161,165 @@ def test_single_node_graph_is_not_stamped():
                   architect=SimpleArchitect())
     graph = swarm.plan(Task(goal="Do the thing"))
     assert "task_context" not in graph.nodes[0].metadata
+
+
+# ---------------------------------------------------------------------------
+# Artifact persistence (finalize_node_result)
+# ---------------------------------------------------------------------------
+
+from smythe.executor import Executor  # noqa: E402
+from smythe.provider import Artifact  # noqa: E402
+
+
+def _artifact_result(*, text: str = "done", images: int = 1) -> CompletionResult:
+    return CompletionResult(
+        text=text,
+        artifacts=[Artifact(data=b"\x89PNG-bytes", mime_type="image/png")] * images,
+    )
+
+
+def _make_base_with_dir(artifact_dir) -> ExecutorBase:
+    return ExecutorBase(
+        provider=DummyProvider(),
+        registry=Registry(),
+        tracer=Tracer(),
+        artifact_dir=artifact_dir,
+    )
+
+
+def test_finalize_persists_artifacts_and_records_paths(tmp_path):
+    base = _make_base_with_dir(tmp_path / "assets")
+    node = Node(label="make an image", id="hero")
+    base.finalize_node_result(node, _artifact_result(images=2))
+
+    records = node.metadata["artifacts"]
+    assert len(records) == 2
+    for record in records:
+        from pathlib import Path
+        path = Path(record["path"])
+        assert path.exists()
+        assert path.read_bytes() == b"\x89PNG-bytes"
+        assert record["mime_type"] == "image/png"
+    assert records[0]["path"].endswith("hero_00.png")
+    # node.result stays the provider text verbatim (JSON consumers rely
+    # on it); paths reach dependents via gather_dep_results instead.
+    assert node.result == "done"
+
+
+def test_finalize_artifact_only_result_gets_listing_text(tmp_path):
+    base = _make_base_with_dir(tmp_path)
+    node = Node(label="image only", id="img")
+    base.finalize_node_result(node, _artifact_result(text="", images=1))
+    assert "Generated artifacts:" in node.result
+    assert "img_00.png" in node.result
+
+
+def test_finalize_without_artifact_dir_notes_discard(tmp_path):
+    base = _make_base_with_dir(None)
+    node = Node(label="image", id="img")
+    base.finalize_node_result(node, _artifact_result(text="", images=1))
+    assert "discarded" in node.result
+    assert node.metadata["artifacts_discarded"] == 1
+    assert "artifacts" not in node.metadata
+
+
+def test_finalize_plain_text_unchanged(tmp_path):
+    base = _make_base_with_dir(tmp_path)
+    node = Node(label="text", id="t")
+    base.finalize_node_result(node, CompletionResult(text="just text"))
+    assert node.result == "just text"
+    assert "artifacts" not in node.metadata
+    assert not any(tmp_path.iterdir())  # no dir contents created
+
+
+class ArtifactProvider(Provider):
+    """Provider whose every completion carries one PNG artifact."""
+
+    async def complete(self, system, prompt, model):
+        return CompletionResult(
+            text="generated",
+            prompt_tokens=5,
+            completion_tokens=5,
+            artifacts=[Artifact(data=b"\x89PNG-e2e", mime_type="image/png")],
+        )
+
+
+def test_executor_persists_artifacts_end_to_end(tmp_path):
+    node = Node(label="Generate the hero image", id="hero")
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
+    executor = Executor(
+        provider=ArtifactProvider(),
+        registry=Registry(),
+        tracer=Tracer(),
+        artifact_dir=tmp_path / "out",
+    )
+    executor.run(graph)
+
+    assert node.status == NodeStatus.COMPLETED
+    assert (tmp_path / "out" / "hero_00.png").read_bytes() == b"\x89PNG-e2e"
+    assert node.metadata["artifacts"][0]["mime_type"] == "image/png"
+    assert node.result == "generated"
+
+
+# ---------------------------------------------------------------------------
+# Parallel hardening: sanitization, dep artifact injection, backoff
+# ---------------------------------------------------------------------------
+
+from pathlib import Path  # noqa: E402
+from smythe.executor_base import _safe_filename_component  # noqa: E402
+
+
+def test_safe_filename_component_sanitizes_hostile_ids(tmp_path):
+    base = _make_base_with_dir(tmp_path)
+    for hostile in ("../evil", "step:1", "a/b\\c", "..", "con?*|"):
+        node = Node(label="x", id=hostile)
+        base.finalize_node_result(node, _artifact_result(text="", images=1))
+        path = Path(node.metadata["artifacts"][0]["path"])
+        # File landed inside the artifact dir, not outside it.
+        assert path.exists()
+        assert tmp_path.resolve() in path.resolve().parents
+
+
+def test_safe_filename_component_keeps_distinct_ids_distinct():
+    assert _safe_filename_component("a/b") != _safe_filename_component("a_b")
+    assert _safe_filename_component("safe-id.1") == "safe-id.1"
+
+
+def test_gather_dep_results_injects_artifact_paths(tmp_path):
+    base = _make_base_with_dir(tmp_path)
+    dep = Node(label="make image", id="dep")
+    dep.status = NodeStatus.COMPLETED
+    base.finalize_node_result(dep, _artifact_result(text='{"ok": true}', images=1))
+    # The stored result is pure JSON...
+    import json
+    assert json.loads(dep.result) == {"ok": True}
+
+    consumer = Node(label="use image", id="use", depends_on=["dep"])
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[dep, consumer])
+    dep_results = base.gather_dep_results(consumer, graph)
+    # ...but dependents see the artifact paths appended.
+    assert "dep_00.png" in dep_results["dep"]
+    assert '{"ok": true}' in dep_results["dep"]
+
+
+def test_retry_backoff_defaults_off_and_validates():
+    base = _make_base_with_dir(None)
+    assert base.retry_delay_s(1) == 0.0
+    import pytest
+    with pytest.raises(ValueError, match="retry_backoff_s"):
+        ExecutorBase(
+            provider=DummyProvider(), registry=Registry(), tracer=Tracer(),
+            retry_backoff_s=-1,
+        )
+
+
+def test_retry_backoff_grows_with_attempts():
+    base = ExecutorBase(
+        provider=DummyProvider(), registry=Registry(), tracer=Tracer(),
+        retry_backoff_s=0.5,
+    )
+    assert base.retry_delay_s(0) == 0.0
+    for attempt, ceiling in ((1, 0.5), (2, 1.0), (3, 2.0)):
+        for _ in range(5):
+            d = base.retry_delay_s(attempt)
+            assert 0.0 <= d <= ceiling

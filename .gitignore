@@ -12,6 +12,12 @@ build/
 venv/
 env/
 .env
+.env.*
+*.pem
+*.key
+credentials*
+smythe_artifacts/
+smythe/output/
 *.log
 .mypy_cache/
 .pytest_cache/

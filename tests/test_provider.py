@@ -9,6 +9,7 @@ from smythe.provider import (
     AnthropicProvider,
     CompletionResult,
     GeminiProvider,
+    OpenAIImageProvider,
     OpenAIProvider,
     Provider,
 )
@@ -56,6 +57,11 @@ def test_auto_detect_claude():
 def test_auto_detect_gpt():
     p = _auto_detect_provider("gpt-4o")
     assert isinstance(p, OpenAIProvider)
+
+
+def test_auto_detect_gpt_image():
+    p = _auto_detect_provider("gpt-image-2")
+    assert isinstance(p, OpenAIImageProvider)
 
 
 def test_auto_detect_o1():
@@ -503,3 +509,275 @@ def test_openai_provider_no_base_url_by_default(monkeypatch):
     monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
     p = OpenAIProvider(api_key="k")
     assert p._base_url is None
+
+
+# ---------------------------------------------------------------------------
+# Artifacts (image generation)
+# ---------------------------------------------------------------------------
+
+from smythe.provider import Artifact, OfflineProvider  # noqa: E402
+
+
+def test_artifact_suffix_mapping():
+    assert Artifact(data=b"x", mime_type="image/png").suffix == ".png"
+    assert Artifact(data=b"x", mime_type="image/jpeg").suffix == ".jpg"
+    assert Artifact(data=b"x", mime_type="application/x-unknown").suffix == ".bin"
+
+
+def test_completion_result_defaults_have_no_artifacts_or_cost():
+    r = CompletionResult(text="hi")
+    assert r.artifacts == []
+    assert r.cost_usd is None
+
+
+def test_offline_provider_artifacts_per_call():
+    p = OfflineProvider(artifacts_per_call=2)
+    result = asyncio.run(p.complete("sys", "make images", "demo"))
+    assert len(result.artifacts) == 2
+    # Deterministic, valid PNG payload (magic bytes).
+    assert result.artifacts[0].data.startswith(b"\x89PNG")
+    assert result.artifacts[0].mime_type == "image/png"
+
+
+def test_offline_provider_no_artifacts_by_default():
+    p = OfflineProvider()
+    result = asyncio.run(p.complete("sys", "plain text", "demo"))
+    assert result.artifacts == []
+
+
+def _image_response(images: int = 1, text: str = "made it"):
+    """Duck-typed Gemini response carrying inline image parts."""
+    from unittest.mock import MagicMock
+
+    parts = []
+    for _ in range(images):
+        blob = MagicMock()
+        blob.data = b"\x89PNG-fake-bytes"
+        blob.mime_type = "image/png"
+        part = MagicMock()
+        part.inline_data = blob
+        parts.append(part)
+    text_part = MagicMock()
+    text_part.inline_data = None
+    parts.append(text_part)
+
+    content = MagicMock()
+    content.parts = parts
+    candidate = MagicMock()
+    candidate.content = content
+
+    response = MagicMock()
+    response.text = text
+    response.candidates = [candidate]
+    response.function_calls = None
+    response.usage_metadata = MagicMock(prompt_token_count=10, candidates_token_count=1290)
+    return response
+
+
+def _gemini_with_response(response, **kwargs) -> GeminiProvider:
+    from unittest.mock import AsyncMock, MagicMock
+
+    p = GeminiProvider(api_key="fake", **kwargs)
+    mock_client = MagicMock()
+    mock_client.aio.models.generate_content = AsyncMock(return_value=response)
+    p._client = mock_client
+    return p
+
+
+def test_gemini_extracts_image_artifacts():
+    p = _gemini_with_response(_image_response(images=2))
+    result = asyncio.run(p.complete("sys", "two images please", "gemini-2.5-flash-image"))
+    assert len(result.artifacts) == 2
+    assert result.artifacts[0].data == b"\x89PNG-fake-bytes"
+    assert result.artifacts[0].mime_type == "image/png"
+    assert result.text == "made it"
+
+
+def test_gemini_auto_requests_image_modalities_for_image_models():
+    p = _gemini_with_response(_image_response())
+    asyncio.run(p.complete("sys", "prompt", "gemini-2.5-flash-image"))
+    sent = p._client.aio.models.generate_content.call_args.kwargs
+    assert sent["config"]["response_modalities"] == ["TEXT", "IMAGE"]
+
+
+def test_gemini_no_modalities_for_text_models():
+    p = _gemini_with_response(_image_response(images=0))
+    asyncio.run(p.complete("sys", "prompt", "gemini-3-flash"))
+    sent = p._client.aio.models.generate_content.call_args.kwargs
+    assert "response_modalities" not in sent["config"]
+
+
+def test_gemini_explicit_modalities_override():
+    p = _gemini_with_response(_image_response(), response_modalities=["IMAGE"])
+    asyncio.run(p.complete("sys", "prompt", "gemini-3-flash"))
+    sent = p._client.aio.models.generate_content.call_args.kwargs
+    assert sent["config"]["response_modalities"] == ["IMAGE"]
+
+
+def test_gemini_per_image_cost():
+    p = _gemini_with_response(_image_response(images=3), cost_per_image_usd=0.039)
+    result = asyncio.run(p.complete("sys", "prompt", "gemini-2.5-flash-image"))
+    assert result.cost_usd == pytest.approx(3 * 0.039)
+
+
+def test_gemini_no_explicit_cost_without_price_or_images():
+    p = _gemini_with_response(_image_response(images=0), cost_per_image_usd=0.039)
+    result = asyncio.run(p.complete("sys", "prompt", "gemini-2.5-flash-image"))
+    assert result.cost_usd is None
+    p2 = _gemini_with_response(_image_response(images=2))
+    result2 = asyncio.run(p2.complete("sys", "prompt", "gemini-2.5-flash-image"))
+    assert result2.cost_usd is None
+
+
+def test_gemini_decodes_base64_string_inline_data():
+    import base64
+
+    response = _image_response(images=1)
+    blob = response.candidates[0].content.parts[0].inline_data
+    blob.data = base64.b64encode(b"raw-bytes").decode()
+    p = _gemini_with_response(response)
+    result = asyncio.run(p.complete("sys", "prompt", "gemini-2.5-flash-image"))
+    assert result.artifacts[0].data == b"raw-bytes"
+
+
+def test_gemini_auto_modalities_for_nano_banana_models():
+    p = _gemini_with_response(_image_response())
+    asyncio.run(p.complete("sys", "prompt", "nano-banana-pro-preview"))
+    sent = p._client.aio.models.generate_content.call_args.kwargs
+    assert sent["config"]["response_modalities"] == ["TEXT", "IMAGE"]
+
+
+# ---------------------------------------------------------------------------
+# OpenAI Image API
+# ---------------------------------------------------------------------------
+
+
+def _openai_image_response(images: int = 1):
+    import base64
+    from unittest.mock import MagicMock
+
+    response = MagicMock()
+    response.data = []
+    for index in range(images):
+        item = MagicMock()
+        item.b64_json = base64.b64encode(f"image-{index}".encode()).decode()
+        response.data.append(item)
+    response.usage = MagicMock(input_tokens=11, output_tokens=22)
+    return response
+
+
+def _openai_image_with_response(response, **kwargs) -> OpenAIImageProvider:
+    from unittest.mock import AsyncMock, MagicMock
+
+    provider = OpenAIImageProvider(api_key="fake", **kwargs)
+    client = MagicMock()
+    client.images.generate = AsyncMock(return_value=response)
+    provider._client = client
+    return provider
+
+
+def test_openai_image_provider_extracts_artifacts_usage_and_cost():
+    provider = _openai_image_with_response(
+        _openai_image_response(images=2),
+        size="1536x1024",
+        quality="medium",
+        output_format="jpeg",
+        output_compression=90,
+        n=2,
+        cost_per_image_usd=0.041,
+    )
+
+    result = asyncio.run(
+        provider.complete("creative director", "Golden Gate Bridge", "gpt-image-2")
+    )
+
+    assert [artifact.data for artifact in result.artifacts] == [b"image-0", b"image-1"]
+    assert all(artifact.mime_type == "image/jpeg" for artifact in result.artifacts)
+    assert result.prompt_tokens == 11
+    assert result.completion_tokens == 22
+    assert result.cost_usd == pytest.approx(0.082)
+    sent = provider._client.images.generate.call_args.kwargs
+    assert sent == {
+        "model": "gpt-image-2",
+        "prompt": "creative director\n\nGolden Gate Bridge",
+        "n": 2,
+        "size": "1536x1024",
+        "quality": "medium",
+        "output_format": "jpeg",
+        "moderation": "auto",
+        "output_compression": 90,
+    }
+
+
+def test_openai_image_provider_rejects_non_image_model_and_tools():
+    from smythe.tools import ToolSpec
+
+    provider = _openai_image_with_response(_openai_image_response())
+    with pytest.raises(ValueError, match="requires a GPT Image model"):
+        asyncio.run(provider.complete("sys", "prompt", "gpt-5"))
+
+    tool = ToolSpec(name="lookup", description="test", input_schema={})
+    with pytest.raises(ValueError, match="does not support tool calls"):
+        asyncio.run(
+            provider.chat(
+                "sys",
+                [ChatMessage(role="user", content="prompt")],
+                "gpt-image-2",
+                tools=[tool],
+            )
+        )
+
+
+def test_openai_image_provider_rejects_empty_image_data():
+    provider = _openai_image_with_response(_openai_image_response(images=0))
+    with pytest.raises(RuntimeError, match="no base64 image data"):
+        asyncio.run(provider.complete("sys", "prompt", "gpt-image-2"))
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"quality": "ultra"}, "quality must be one of"),
+        ({"moderation": "strict"}, "moderation must be one of"),
+        (
+            {"output_format": "png", "output_compression": 90},
+            "supported only for JPEG or WebP",
+        ),
+    ],
+)
+def test_openai_image_provider_validates_image_options(kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        OpenAIImageProvider(api_key="fake", **kwargs)
+
+
+def test_gemini_image_config_passthrough():
+    p = _gemini_with_response(_image_response(), image_config={"aspect_ratio": "16:9"})
+    asyncio.run(p.complete("sys", "wide banner", "gemini-2.5-flash-image"))
+    sent = p._client.aio.models.generate_content.call_args.kwargs
+    assert sent["config"]["image_config"] == {"aspect_ratio": "16:9"}
+
+
+def test_gemini_tools_suppress_auto_image_modality():
+    p = _gemini_with_response(_image_response(images=0))
+    asyncio.run(p.chat(
+        "sys", [ChatMessage(role="user", content="go")],
+        "gemini-2.5-flash-image", tools=[WEATHER_TOOL],
+    ))
+    sent = p._client.aio.models.generate_content.call_args.kwargs
+    assert "response_modalities" not in sent["config"]
+    assert "tools" in sent["config"]
+
+
+def test_gemini_explicit_modalities_still_sent_with_tools():
+    p = _gemini_with_response(_image_response(images=0), response_modalities=["TEXT"])
+    asyncio.run(p.chat(
+        "sys", [ChatMessage(role="user", content="go")],
+        "gemini-2.5-flash-image", tools=[WEATHER_TOOL],
+    ))
+    sent = p._client.aio.models.generate_content.call_args.kwargs
+    assert sent["config"]["response_modalities"] == ["TEXT"]
+
+
+def test_provider_cost_estimate_hints():
+    assert GeminiProvider(api_key="k").cost_estimate_per_call is None
+    assert GeminiProvider(api_key="k", cost_per_image_usd=0.04).cost_estimate_per_call == 0.04

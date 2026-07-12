@@ -357,3 +357,53 @@ async def test_node_timeout_respects_skip_policy():
 
     assert slow.status == NodeStatus.SKIPPED
     assert downstream.status == NodeStatus.COMPLETED
+
+
+# ---------------------------------------------------------------------------
+# Cost-aware reservations (parallel image budgeting)
+# ---------------------------------------------------------------------------
+
+def test_provider_cost_hint_drives_reservations():
+    """Per-image pricing must be reflected in reservations, not token math."""
+    import asyncio as _asyncio
+
+    from smythe.budget import Sentinel, SentinelAlert
+
+    class PricedProvider(Provider):
+        cost_estimate_per_call = 0.04
+
+        async def complete(self, system, prompt, model):
+            return CompletionResult(text="img", cost_usd=0.04)
+
+    nodes = [Node(id=f"n{i}", label=f"image {i}") for i in range(3)]
+    graph = ExecutionGraph(topology=[Topology.BROADCAST_REDUCE], nodes=nodes)
+    executor = AsyncExecutor(
+        provider=PricedProvider(), registry=Registry(), tracer=Tracer(),
+        budget=Sentinel(max_budget_usd=0.10), artifact_dir=None,
+    )
+    # 3 x $0.04 reservations exceed the $0.10 cap up front — the wave is
+    # refused instead of overshooting mid-flight.
+    with pytest.raises(SentinelAlert):
+        _asyncio.run(executor.run(graph))
+
+
+def test_node_estimated_cost_overrides_hint():
+    import asyncio as _asyncio
+
+    from smythe.budget import Sentinel
+
+    class PricedProvider(Provider):
+        cost_estimate_per_call = 9.99  # would blow any cap
+
+        async def complete(self, system, prompt, model):
+            return CompletionResult(text="img", cost_usd=0.01)
+
+    node = Node(id="cheap", label="tiny image")
+    node.metadata["estimated_cost_usd"] = 0.02
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
+    executor = AsyncExecutor(
+        provider=PricedProvider(), registry=Registry(), tracer=Tracer(),
+        budget=Sentinel(max_budget_usd=0.05), artifact_dir=None,
+    )
+    _asyncio.run(executor.run(graph))
+    assert node.status == NodeStatus.COMPLETED

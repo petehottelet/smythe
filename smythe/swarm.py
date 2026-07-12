@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -25,7 +26,13 @@ from smythe.memory import PlannerMemory
 from smythe.tools import ToolRuntime
 from smythe.planner import Architect, LLMArchitect, SimpleArchitect
 from smythe.router import WhiteRabbit
-from smythe.provider import AnthropicProvider, GeminiProvider, OpenAIProvider, Provider
+from smythe.provider import (
+    AnthropicProvider,
+    GeminiProvider,
+    OpenAIImageProvider,
+    OpenAIProvider,
+    Provider,
+)
 from smythe.registry import Registry
 from smythe.synthesizer import Synthesizer
 from smythe.task import Task
@@ -57,6 +64,8 @@ def _auto_detect_provider(model: str) -> Provider:
     lower = model.lower()
     if lower.startswith("claude"):
         return AnthropicProvider()
+    if lower.startswith("gpt-image-"):
+        return OpenAIImageProvider()
     if lower.startswith(("gpt", "o1", "o3", "o4")):
         return OpenAIProvider()
     if lower.startswith("gemini"):
@@ -90,12 +99,16 @@ class Swarm:
         checkpoint_store: CheckpointStore | None = None,
         tool_runtime: ToolRuntime | None = None,
         max_tool_iterations: int = DEFAULT_MAX_TOOL_ITERATIONS,
+        artifact_dir: str | Path | None = "smythe_artifacts",
+        retry_backoff_s: float = 0.0,
     ) -> None:
         self.model = model
         self.max_budget_usd = max_budget_usd
         self.parallel = parallel
         self.max_concurrency = max_concurrency
         self.max_tool_iterations = max_tool_iterations
+        self.artifact_dir = artifact_dir
+        self.retry_backoff_s = retry_backoff_s
         self._checkpoint_store = checkpoint_store
         self._tool_runtime = tool_runtime
         self._provider = provider or _auto_detect_provider(model)
@@ -210,8 +223,7 @@ class Swarm:
         if task is not None:
             graph = await self.aplan(task)
         else:
-            graph = task_or_graph
-            graph.validate()
+            graph = self._prepare_graph(task_or_graph)
 
         execution_id = uuid4().hex
         created_at = time.time()
@@ -224,6 +236,8 @@ class Swarm:
             budget=budget, max_concurrency=self.max_concurrency,
             tool_runtime=self._tool_runtime,
             max_tool_iterations=self.max_tool_iterations,
+            artifact_dir=self._run_artifact_dir(execution_id),
+            retry_backoff_s=self.retry_backoff_s,
             on_node_update=self._checkpointer(
                 execution_id, graph, budget, task, created_at,
             ),
@@ -271,8 +285,7 @@ class Swarm:
         if task is not None:
             graph = self.plan(task)
         else:
-            graph = task_or_graph
-            graph.validate()
+            graph = self._prepare_graph(task_or_graph)
 
         execution_id = uuid4().hex
         created_at = time.time()
@@ -285,6 +298,8 @@ class Swarm:
             budget=budget,
             tool_runtime=self._tool_runtime,
             max_tool_iterations=self.max_tool_iterations,
+            artifact_dir=self._run_artifact_dir(execution_id),
+            retry_backoff_s=self.retry_backoff_s,
             on_node_update=self._checkpointer(
                 execution_id, graph, budget, task, created_at,
             ),
@@ -427,6 +442,8 @@ class Swarm:
             budget=budget, max_concurrency=self.max_concurrency,
             tool_runtime=self._tool_runtime,
             max_tool_iterations=self.max_tool_iterations,
+            artifact_dir=self._run_artifact_dir(execution_id),
+            retry_backoff_s=self.retry_backoff_s,
             on_node_update=self._checkpointer(
                 execution_id, graph, budget, task, created_at,
             ),
@@ -514,3 +531,27 @@ class Swarm:
         for node in graph.nodes:
             if "model" not in node.metadata:
                 node.metadata["model"] = self.model
+
+    def _prepare_graph(self, graph: ExecutionGraph) -> ExecutionGraph:
+        """Ready a caller-built graph for execution.
+
+        Graphs built by hand skip plan()/from_yaml(), so nodes have no
+        model stamped yet; providers reject an empty model name.  One
+        shared helper so no execute path can forget it again.
+        """
+        graph.validate()
+        self._stamp_model(graph)
+        return graph
+
+    def _run_artifact_dir(self, execution_id: str) -> Path | None:
+        """Per-execution artifact directory.
+
+        Scoping by execution id keeps re-runs of the same graph (fixed
+        node ids in YAML/hand-built graphs) from silently overwriting a
+        previous run's files while old checkpoints still point at them.
+        resume() reuses the original execution_id, so a resumed run
+        lands in the same directory — which is the correct semantics.
+        """
+        if self.artifact_dir is None:
+            return None
+        return Path(self.artifact_dir) / execution_id[:12]

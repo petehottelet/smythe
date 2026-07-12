@@ -247,3 +247,27 @@ async def test_async_executor_runs_the_same_loop():
     await executor.run(graph)
     assert node.result == "async done"
     assert runtime.closed == 1
+
+
+def test_intermediate_artifacts_survive_the_tool_loop(tmp_path):
+    """Artifacts returned alongside tool calls are billed AND persisted."""
+    from smythe.provider import Artifact
+
+    with_artifact = tool_use(call("c1"))
+    with_artifact.artifacts = [Artifact(data=b"\x89PNG-mid", mime_type="image/png")]
+    final = text("done")
+
+    provider = ScriptedToolProvider([with_artifact, final])
+    node = Node(id="imgnode", label="Generate then annotate")
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
+    executor = Executor(
+        provider=provider, registry=Registry(), tracer=Tracer(),
+        tool_runtime=SimpleRuntime(), artifact_dir=tmp_path,
+    )
+    executor.run(graph)
+
+    assert node.status == NodeStatus.COMPLETED
+    records = node.metadata["artifacts"]
+    assert len(records) == 1
+    from pathlib import Path
+    assert Path(records[0]["path"]).read_bytes() == b"\x89PNG-mid"

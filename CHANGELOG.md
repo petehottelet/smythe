@@ -21,6 +21,78 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
+### Added
+
+- **Image generation (Gemini "Nano Banana") support.** Provider calls
+  can now return binary artifacts: `CompletionResult.artifacts` carries
+  `Artifact` objects (bytes + mime type), `GeminiProvider` requests
+  image response modalities automatically for `gemini-*-image*` models
+  and extracts returned inline images, and executors persist artifacts
+  under `Swarm(artifact_dir=...)` (default `smythe_artifacts/`) with
+  paths recorded in `node.metadata["artifacts"]` — bytes never enter
+  checkpoints or planner memory. `CompletionResult.cost_usd` lets a
+  provider price a call explicitly (e.g. `GeminiProvider(
+  cost_per_image_usd=...)` for per-image billing) instead of the
+  Sentinel's blended token rate. `OfflineProvider(artifacts_per_call=N)`
+  returns deterministic PNGs so image pipelines run offline in CI.
+  New example: `examples/09_image_generation.py`.
+- **GPT Image support.** Dedicated `OpenAIImageProvider`
+  (`images.generate` endpoint; size/quality/format/compression/
+  moderation controls, per-image cost) with mocked coverage and a
+  deterministic offline example (`examples/10_gpt_image_generation.py`).
+- **Image concurrency benchmark**
+  (`benchmarks/run_image_benchmarks.py`): objective metrics only — wall
+  time, throughput, efficiency, decode/format compliance, dHash
+  diversity. First published sweep: 6.6x wall-clock speedup at
+  concurrency 8, 81–88% parallel efficiency, 72/72 valid images
+  (`benchmarks/image_benchmarks.md`).
+
+### Changed — parallel/artifact hardening (post-review)
+
+A multi-agent code review of the artifact pipeline confirmed 8 findings;
+all are addressed:
+
+- **Cost-aware parallel reservations.** The AsyncExecutor now reserves
+  per-node estimates from (in priority order) `node.metadata
+  ["estimated_cost_usd"]`, the provider's new `cost_estimate_per_call`
+  hint (set by `cost_per_image_usd` on the image providers), then the
+  token estimate — a wide image wave is refused up front instead of
+  overshooting `max_budget_usd` mid-flight.
+- **Execution-scoped artifact paths.** Artifacts land in
+  `artifact_dir/<execution_id>/`, so re-running a graph with fixed node
+  ids no longer overwrites the previous run's files; `resume()` reuses
+  the original directory. Filenames are sanitized (node ids from
+  YAML/LLM plans can carry path separators or Windows-illegal
+  characters) and recorded as absolute paths so checkpoints survive a
+  cwd change.
+- **`node.result` is the provider text verbatim again.** Artifact paths
+  live in `node.metadata["artifacts"]` and are surfaced to dependent
+  nodes by `gather_dep_results` — JSON results stay parseable by
+  STRUCTURED synthesis and downstream consumers.
+- **Tool-loop artifacts survive.** Images returned on intermediate
+  tool-calling turns (already billed) are carried to the final result
+  and persisted instead of silently dropped.
+- **Gemini: tools no longer collide with image modalities** (auto-detect
+  is suppressed when tools are passed; explicit `response_modalities`
+  still win), and `image_config` (e.g. `{"aspect_ratio": "16:9"}`) is
+  passed through for true format control.
+- Artifact writes run off the event loop (`asyncio.to_thread`) in the
+  parallel executor; opt-in full-jitter retry backoff
+  (`retry_backoff_s` on `Swarm`/executors) for rate-limited fan-outs;
+  negative provider costs are clamped so a buggy provider can't refund
+  the budget; both `execute()` paths share one `_prepare_graph` helper.
+
+### Fixed
+
+- **Hand-built graphs passed directly to `Swarm.execute()` never got a
+  model stamped onto their nodes**, so real providers rejected the call
+  with an empty model name ("model is required"). Only `plan()`,
+  `from_yaml()`, and `resume()` stamped models; every offline example
+  masked the bug because `OfflineProvider` ignores the model string.
+  Both execute paths now stamp the swarm's model onto unstamped nodes.
+- `smythe.__version__` was stale at `0.2.0`; it now matches the
+  released package version.
+
 Future work tracked in [ROADMAP.md](ROADMAP.md).
 
 ---

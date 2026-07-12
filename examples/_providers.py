@@ -82,7 +82,9 @@ def pick_provider() -> tuple[Provider, str]:
     if os.environ.get("OPENAI_API_KEY"):
         return OpenAIProvider(), "gpt-5.2"
     if os.environ.get("GOOGLE_API_KEY"):
-        return GeminiProvider(), "gemini-3-flash"
+        # The dated "gemini-3-flash" id 404s for newer API keys; the
+        # -latest alias tracks the current flash model.
+        return GeminiProvider(), "gemini-flash-latest"
     print("No API key found - running offline with smythe's built-in OfflineProvider.")
     print("Set ANTHROPIC_API_KEY / OPENAI_API_KEY / GOOGLE_API_KEY for real output.\n")
     return DemoProvider(), "demo-model"
