@@ -297,10 +297,23 @@ async def run_bucket(
         else OfflineProvider(artifacts_per_call=1)
     )
     intake = logo_intake_node(logo_path)
+    # Prompt policies are brand-overridable — this is the optimizer's
+    # search space (see run_optimizer.py); defaults are the hand-tuned
+    # versions that produced the published results.
+    logo_lock = brand.get(
+        "logo_lock_instruction",
+        "The attached image is the official {name} brand logo. Reproduce "
+        "this exact mark faithfully wherever the brand appears — never "
+        "invent a different logo. ",
+    ).format(name=brand["name"])
     no_text = (
-        " Do not render any tagline, slogan, or small text anywhere in the "
-        "image — leave clean negative space near the bottom for typography "
-        "to be added later. The logo mark may appear on products and signage."
+        brand.get(
+            "no_text_instruction",
+            " Do not render any tagline, slogan, or small text anywhere in "
+            "the image — leave clean negative space near the bottom for "
+            "typography to be added later. The logo mark may appear on "
+            "products and signage.",
+        )
         if brand.get("composite_tagline")
         else ""
     )
@@ -308,9 +321,7 @@ async def run_bucket(
         Node(
             id=asset_id,
             label=(
-                f"The attached image is the official {brand['name']} brand "
-                "logo. Reproduce this exact mark faithfully wherever the "
-                "brand appears — never invent a different logo. Generate a "
+                f"{logo_lock}Generate a "
                 f"{brand['scenes'][asset_id]} {brand['brief']}{no_text}"
             ),
             depends_on=[intake.id],

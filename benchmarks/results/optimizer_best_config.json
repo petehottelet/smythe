@@ -1,0 +1,17 @@
+{
+  "name": "MetaCortex Datacentres",
+  "brief": "for 'MetaCortex Datacentres', an enterprise AI-infrastructure and colocation provider. Brand palette: deep emerald green, graphite black, cool white, with restrained copper accents. Style: architectural photography, dramatic clean lighting, vast scale, precision engineering, enterprise B2B polish. ",
+  "tagline": "METACORTEX \u2014 Infrastructure for the intelligence age",
+  "composite_tagline": true,
+  "logo_prompt": "Design the official brand logo for 'MetaCortex Datacentres', an enterprise AI-infrastructure provider. A flat, geometric hexagonal mark suggesting a neural node or circuit core, with the wordmark 'METACORTEX' beneath it. Palette: deep emerald green mark, graphite black text, cool white background. Clean corporate vector style, centered, no photography, no extra text.",
+  "scenes": {
+    "hero": "hero image: a vast, immaculate datacenter aisle with rows of server racks receding into the distance, subtle emerald accent lighting",
+    "instagram": "Instagram post: dramatic close-up of a liquid-cooled server rack with branded panel, engineering-precision aesthetic",
+    "x_banner": "X/Twitter banner: sweeping wide shot of the datacenter facility exterior at dusk, architectural lines",
+    "story": "Story/Reel card: vertical shot of an engineer with a tablet walking a server aisle, scale and calm competence",
+    "email_header": "email header: slim banner of fiber-optic cabling in perfect order with negative space for text",
+    "appstore": "App Store screenshot: the infrastructure monitoring app UI on a phone - uptime, power, cooling dashboards",
+    "og_card": "OG preview card: link-share thumbnail of the facility with the brand lockup and room for a headline",
+    "print_ad": "print ad: magazine full-page composition, the facility rendered as monumental architecture with generous margins"
+  }
+}
