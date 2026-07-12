@@ -1,0 +1,169 @@
+{
+  "benchmark": "brand-asset-suite",
+  "brand": "MetaCortex Datacentres",
+  "mode": "LIVE",
+  "model": "gemini-2.5-flash-image",
+  "assets_pass": "8/8",
+  "brand_logo": {
+    "path": "C:\\Users\\PeteHottelet\\Projects\\smythe\\smythe_artifacts\\asset_suite\\metacortex_datacentres\\raw\\logo\\bf2a7f2d6826\\brand_logo_00.png",
+    "source": "generated",
+    "cost_usd": 0.039,
+    "wall_s": 6.93
+  },
+  "generation_wall_s": 11.83,
+  "buckets_run_concurrently": 5,
+  "cost_usd": 0.3837,
+  "brand_judge": {
+    "overall": 3,
+    "cost_usd": 0.032724
+  },
+  "assets": [
+    {
+      "asset": "hero",
+      "spec": "2400x1200 PNG",
+      "aspect_bucket": "16:9",
+      "generated_size": [
+        1344,
+        768
+      ],
+      "upscale_factor": 1.79,
+      "cropped_fraction": 0.125,
+      "status": "PASS",
+      "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\hero.png",
+      "brand_consistency": 4,
+      "defects": [
+        "Typo in 'Infrastrcture'",
+        "Logo is distorted/scaled inconsistently",
+        "Logo is missing 'METACORTEX' text component in certain placements"
+      ]
+    },
+    {
+      "asset": "instagram",
+      "spec": "1080x1080 JPEG",
+      "aspect_bucket": "1:1",
+      "generated_size": [
+        1024,
+        1024
+      ],
+      "upscale_factor": 1.05,
+      "cropped_fraction": 0.0,
+      "status": "PASS",
+      "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\instagram.jpg",
+      "brand_consistency": 4,
+      "defects": [
+        "Typo in 'Infrastrcture'",
+        "Logo mark is inconsistent in size and placement"
+      ]
+    },
+    {
+      "asset": "x_banner",
+      "spec": "1500x500 JPEG",
+      "aspect_bucket": "21:9",
+      "generated_size": [
+        1536,
+        672
+      ],
+      "upscale_factor": 0.98,
+      "cropped_fraction": 0.238,
+      "status": "PASS",
+      "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\x_banner.jpg",
+      "brand_consistency": 3,
+      "defects": [
+        "Typo in 'Datacnetres'",
+        "Typo in 'Infrastrcture'",
+        "Inconsistent logo usage (cut off)"
+      ]
+    },
+    {
+      "asset": "story",
+      "spec": "1080x1920 PNG",
+      "aspect_bucket": "9:16",
+      "generated_size": [
+        768,
+        1344
+      ],
+      "upscale_factor": 1.43,
+      "cropped_fraction": 0.015,
+      "status": "PASS",
+      "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\story.png",
+      "brand_consistency": 3,
+      "defects": [
+        "Typo in 'Infrastrcture'",
+        "Typo in 'inteligence'"
+      ]
+    },
+    {
+      "asset": "email_header",
+      "spec": "600x200 PNG",
+      "aspect_bucket": "21:9",
+      "generated_size": [
+        1536,
+        672
+      ],
+      "upscale_factor": 0.39,
+      "cropped_fraction": 0.237,
+      "status": "PASS",
+      "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\email_header.png",
+      "brand_consistency": 3,
+      "defects": [
+        "Typo in 'Datacanetres'",
+        "Typo in 'Infrastrcture'"
+      ]
+    },
+    {
+      "asset": "appstore",
+      "spec": "1290x2796 PNG",
+      "aspect_bucket": "9:16",
+      "generated_size": [
+        768,
+        1344
+      ],
+      "upscale_factor": 2.08,
+      "cropped_fraction": 0.193,
+      "status": "PASS",
+      "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\appstore.png",
+      "brand_consistency": 3,
+      "defects": [
+        "Typo in 'Infrastrcture'",
+        "Typo in 'inteligence'",
+        "UI text contains gibberish/non-latin characters in labels"
+      ]
+    },
+    {
+      "asset": "og_card",
+      "spec": "1200x630 PNG",
+      "aspect_bucket": "16:9",
+      "generated_size": [
+        1344,
+        768
+      ],
+      "upscale_factor": 0.89,
+      "cropped_fraction": 0.082,
+      "status": "PASS",
+      "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\og_card.png",
+      "brand_consistency": 4,
+      "defects": [
+        "Typo in 'Datacentres' (capitalization inconsistency)",
+        "Typo in 'Infrastrcture'"
+      ]
+    },
+    {
+      "asset": "print_ad",
+      "spec": "2550x3300 PNG",
+      "aspect_bucket": "3:4",
+      "generated_size": [
+        864,
+        1184
+      ],
+      "upscale_factor": 2.95,
+      "cropped_fraction": 0.056,
+      "status": "PASS",
+      "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\print_ad.png",
+      "brand_consistency": 4,
+      "defects": [
+        "Typo in 'Infrastrcture'",
+        "Typo in 'infarsilocture'"
+      ]
+    }
+  ]
+}

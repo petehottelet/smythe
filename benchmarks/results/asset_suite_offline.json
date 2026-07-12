@@ -1,21 +1,19 @@
 {
-  "benchmark": "osiris-asset-suite",
+  "benchmark": "brand-asset-suite",
+  "brand": "MetaCortex Datacentres",
   "mode": "offline",
   "model": "offline",
   "assets_pass": "8/8",
   "brand_logo": {
-    "path": "C:\\Users\\PeteHottelet\\Projects\\smythe\\smythe_artifacts\\asset_suite\\raw\\logo\\c5c0b84abc1d\\brand_logo_00.png",
+    "path": "C:\\Users\\PeteHottelet\\Projects\\smythe\\smythe_artifacts\\asset_suite\\metacortex_datacentres\\raw\\logo\\935c57165fc6\\brand_logo_00.png",
     "source": "generated",
     "cost_usd": 0.00030000000000000003,
     "wall_s": 0.01
   },
   "generation_wall_s": 0.01,
   "buckets_run_concurrently": 5,
-  "cost_usd": 0.003,
-  "brand_judge": {
-    "overall": null,
-    "cost_usd": 0.00030000000000000003
-  },
+  "cost_usd": 0.0027,
+  "brand_judge": null,
   "assets": [
     {
       "asset": "hero",
@@ -28,7 +26,7 @@
       "upscale_factor": 2400.0,
       "cropped_fraction": 0.5,
       "status": "PASS",
-      "final_path": "smythe_artifacts\\asset_suite\\final\\hero.png"
+      "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\hero.png"
     },
     {
       "asset": "instagram",
@@ -41,7 +39,7 @@
       "upscale_factor": 1080.0,
       "cropped_fraction": 0.0,
       "status": "PASS",
-      "final_path": "smythe_artifacts\\asset_suite\\final\\instagram.jpg"
+      "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\instagram.jpg"
     },
     {
       "asset": "x_banner",
@@ -54,7 +52,7 @@
       "upscale_factor": 1500.0,
       "cropped_fraction": 0.667,
       "status": "PASS",
-      "final_path": "smythe_artifacts\\asset_suite\\final\\x_banner.jpg"
+      "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\x_banner.jpg"
     },
     {
       "asset": "story",
@@ -67,7 +65,7 @@
       "upscale_factor": 1920.0,
       "cropped_fraction": 0.438,
       "status": "PASS",
-      "final_path": "smythe_artifacts\\asset_suite\\final\\story.png"
+      "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\story.png"
     },
     {
       "asset": "email_header",
@@ -80,7 +78,7 @@
       "upscale_factor": 600.0,
       "cropped_fraction": 0.667,
       "status": "PASS",
-      "final_path": "smythe_artifacts\\asset_suite\\final\\email_header.png"
+      "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\email_header.png"
     },
     {
       "asset": "appstore",
@@ -93,7 +91,7 @@
       "upscale_factor": 2796.0,
       "cropped_fraction": 0.539,
       "status": "PASS",
-      "final_path": "smythe_artifacts\\asset_suite\\final\\appstore.png"
+      "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\appstore.png"
     },
     {
       "asset": "og_card",
@@ -106,7 +104,7 @@
       "upscale_factor": 1200.0,
       "cropped_fraction": 0.475,
       "status": "PASS",
-      "final_path": "smythe_artifacts\\asset_suite\\final\\og_card.png"
+      "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\og_card.png"
     },
     {
       "asset": "print_ad",
@@ -119,7 +117,7 @@
       "upscale_factor": 3300.0,
       "cropped_fraction": 0.227,
       "status": "PASS",
-      "final_path": "smythe_artifacts\\asset_suite\\final\\print_ad.png"
+      "final_path": "smythe_artifacts\\asset_suite\\metacortex_datacentres\\final\\print_ad.png"
     }
   ]
 }

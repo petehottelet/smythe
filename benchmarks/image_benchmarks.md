@@ -135,6 +135,32 @@ precisely the defect the vision-judge curation tier
 generation + finishing only; adding the judge as a reduce stage is the
 ad-suite consistency benchmark, next.
 
+## Two brands, one pipeline: text complexity drives consistency (2026-07-12)
+
+The suite is brand-parameterized ([brands/](brands/)); the same
+pipeline ran for two brands at identical cost and speed:
+
+| Brand | Tagline | Judge overall | Dominant defect class |
+|---|---|---:|---|
+| Osiris | "Power from the sun" | **8/10** | secondary-typography drift |
+| MetaCortex Datacentres | "Infrastructure for the intelligence age" | **3/10** | systematic tagline misspellings |
+
+Same model, same brand-lock mechanism, same 8/8 format compliance,
+~$0.38 each — a five-point consistency gap
+([results/asset_suite_metacortex_datacentres.json](results/asset_suite_metacortex_datacentres.json)).
+The judge attributed it to text: "Infrastrcture" appears in 7 of 8
+MetaCortex assets, alongside "Datacnetres", "inteligence", and
+gibberish glyphs in UI/panel text — all verified accurate by human
+inspection of the images. Short, common tagline words render reliably;
+long or uncommon words misrender *systematically*, not occasionally.
+
+**Implication:** for text-heavy enterprise branding, generated
+typography is not production-ready regardless of logo locking. The
+data validates the master-plates approach (generate imagery, composite
+exact copy deterministically) and gives the select-from-N curation
+tier a measurable target. It also validates the judge itself: every
+typo it reported exists in the pixels.
+
 ## Planned next
 
 - Select-from-N curation tier with a vision judge (quality-per-dollar
