@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 EXAMPLES_DIR = Path(__file__).parents[1] / "examples"
-EXAMPLE_SCRIPTS = sorted(EXAMPLES_DIR.glob("0*.py")) + [
+EXAMPLE_SCRIPTS = sorted(EXAMPLES_DIR.glob("[0-9][0-9]_*.py")) + [
     EXAMPLES_DIR / "acquisition_diligence" / "run.py",
 ]
 

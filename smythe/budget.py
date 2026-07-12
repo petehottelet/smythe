@@ -76,6 +76,18 @@ class Sentinel:
         reserved = self._reservations.pop(node_id, 0.0)
         self._spent -= reserved
 
+    def _cost_of(self, result: CompletionResult) -> float:
+        """Price a provider call: explicit provider cost wins over token math.
+
+        Providers set ``cost_usd`` when they can price the call better
+        than a blended token rate — per-image billing, for instance.
+        """
+        explicit = getattr(result, "cost_usd", None)
+        if explicit is not None:
+            # Clamp: a buggy provider must never "refund" the budget.
+            return max(0.0, explicit)
+        return result.total_tokens * self.cost_per_token
+
     def record(self, node_id: str, result: CompletionResult) -> float:
         """Record the actual cost, replacing any outstanding reservation.
 
@@ -84,7 +96,7 @@ class Sentinel:
         """
         reserved = self._reservations.pop(node_id, 0.0)
         self._spent -= reserved
-        cost = result.total_tokens * self.cost_per_token
+        cost = self._cost_of(result)
         self._node_costs[node_id] = cost
         self._spent += cost
         return cost
@@ -98,7 +110,7 @@ class Sentinel:
         """
         reserved = self._reservations.pop(node_id, 0.0)
         self._spent -= reserved
-        cost = result.total_tokens * self.cost_per_token
+        cost = self._cost_of(result)
         self._node_costs[node_id] = self._node_costs.get(node_id, 0.0) + cost
         self._spent += cost
         return self._node_costs[node_id]

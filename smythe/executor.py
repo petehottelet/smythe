@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 from smythe.executor_base import ExecutorBase
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
@@ -70,13 +71,16 @@ class Executor(ExecutorBase):
         attempts = 1 + max(node.max_retries, 0) if node.failure_policy == FailurePolicy.RETRY else 1
 
         for attempt in range(attempts):
+            delay = self.retry_delay_s(attempt)
+            if delay:
+                time.sleep(delay)
             node.status = NodeStatus.RUNNING
             self._tracer.on_node_start(node)
 
             try:
                 # Cost recording happens inside acall_node (per provider call).
                 result = asyncio.run(self.acall_node(node, graph))
-                node.result = result.text
+                self.finalize_node_result(node, result)
                 node.status = NodeStatus.COMPLETED
                 self._tracer.on_node_end(node)
                 self.notify_update(node)

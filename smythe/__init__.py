@@ -10,9 +10,11 @@ from smythe.memory import PlannerMemory
 from smythe.planner import ArchitectError, DeterministicArchitect, LLMArchitect, SimpleArchitect
 from smythe.provider import (
     AnthropicProvider,
+    Artifact,
     CompletionResult,
     GeminiProvider,
     OfflineProvider,
+    OpenAIImageProvider,
     OpenAIProvider,
     Provider,
 )
@@ -40,6 +42,7 @@ from smythe.tools import (
 __all__ = [
     "AnthropicProvider",
     "ArchitectError",
+    "Artifact",
     "CapabilityHydrationMode",
     "CapabilityMapper",
     "ChatMessage",
@@ -57,6 +60,7 @@ __all__ = [
     "MCPSkillProvider",
     "MCPToolRuntime",
     "OfflineProvider",
+    "OpenAIImageProvider",
     "OpenAIProvider",
     "PlannerMemory",
     "Provider",
@@ -80,4 +84,4 @@ __all__ = [
     "WhiteRabbit",
     "load_graph",
 ]
-__version__ = "0.2.0"
+__version__ = "0.4.0"

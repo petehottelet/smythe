@@ -191,3 +191,30 @@ def test_add_cost_releases_reservation_once():
 
     s.add_cost("n1", r)  # no reservation left to release; just accumulates
     assert s.total_cost_usd == first * 2
+
+
+def test_explicit_cost_overrides_token_math():
+    """A provider-priced call (cost_usd) wins over the blended token rate."""
+    tracker = Sentinel(max_budget_usd=10.0, cost_per_token=0.000003)
+    priced = CompletionResult(
+        text="img", prompt_tokens=10, completion_tokens=1290, cost_usd=0.039,
+    )
+    tracker.record("node-1", priced)
+    assert abs(tracker.total_cost_usd - 0.039) < 1e-10
+
+
+def test_explicit_cost_accumulates_via_add_cost():
+    tracker = Sentinel(max_budget_usd=10.0, cost_per_token=0.000003)
+    priced = CompletionResult(text="img", cost_usd=0.05)
+    unpriced = CompletionResult(text="txt", prompt_tokens=100, completion_tokens=0)
+    tracker.add_cost("node-1", priced)
+    tracker.add_cost("node-1", unpriced)
+    expected = 0.05 + 100 * 0.000003
+    assert abs(tracker.total_cost_usd - expected) < 1e-10
+
+
+def test_negative_explicit_cost_is_clamped_to_zero():
+    tracker = Sentinel(max_budget_usd=1.0)
+    tracker.record("n1", CompletionResult(text="x", cost_usd=0.5))
+    tracker.add_cost("n1", CompletionResult(text="x", cost_usd=-0.4))
+    assert tracker.total_cost_usd == pytest.approx(0.5)

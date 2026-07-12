@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import random
+import re
 import time
+from pathlib import Path
 from typing import Any, Callable
 
 from smythe.agent import Agent
@@ -15,6 +19,21 @@ from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntim
 from smythe.tracer import Tracer
 
 DEFAULT_MAX_TOOL_ITERATIONS = 10
+
+
+def _safe_filename_component(raw: str) -> str:
+    """Make an arbitrary node id safe as a filename component.
+
+    Node ids come from YAML and LLM plan JSON with no character
+    validation, so they can carry path separators (traversal out of the
+    artifact dir) or Windows-illegal characters (OSError after an
+    already-billed provider call).  When sanitization changes anything,
+    a short hash of the original keeps distinct ids distinct.
+    """
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", raw).strip("._") or "node"
+    if safe != raw:
+        safe = f"{safe}_{hashlib.sha1(raw.encode('utf-8')).hexdigest()[:6]}"
+    return safe
 
 # When False, root nodes ignore the task_context stamped by Swarm.plan()
 # and see only their planned label - exists for benchmark ablations.
@@ -50,6 +69,8 @@ class ExecutorBase:
         on_node_update: Callable[[Node], None] | None = None,
         tool_runtime: ToolRuntime | None = None,
         max_tool_iterations: int = DEFAULT_MAX_TOOL_ITERATIONS,
+        artifact_dir: str | Path | None = "smythe_artifacts",
+        retry_backoff_s: float = 0.0,
     ) -> None:
         self._provider = provider
         self._registry = registry
@@ -58,6 +79,23 @@ class ExecutorBase:
         self._on_node_update = on_node_update
         self._tool_runtime = tool_runtime
         self._max_tool_iterations = max_tool_iterations
+        self._artifact_dir = Path(artifact_dir) if artifact_dir is not None else None
+        if retry_backoff_s < 0:
+            raise ValueError(f"retry_backoff_s must be >= 0, got {retry_backoff_s}")
+        self._retry_backoff_s = retry_backoff_s
+
+    def retry_delay_s(self, attempt: int) -> float:
+        """Full-jitter exponential backoff before retry `attempt` (1-based).
+
+        Returns 0 when backoff is disabled (the default) so existing
+        RETRY behavior and test timing are unchanged; opt in via
+        ``retry_backoff_s`` for rate-limited workloads (429s at wide
+        parallel image fan-out).
+        """
+        if attempt <= 0 or not self._retry_backoff_s:
+            return 0.0
+        ceiling = self._retry_backoff_s * (2 ** (attempt - 1))
+        return random.uniform(0, ceiling)
 
     def notify_update(self, node: Node) -> None:
         """Invoke the node-update hook (used for checkpointing) if one is set.
@@ -138,6 +176,7 @@ class ExecutorBase:
             self._record_cost(node, result)
             return result
 
+        collected_artifacts: list = []
         async with self._tool_runtime.open(agent) as session:
             tools = list(session.tools) or None
             limit = node.max_tool_iterations or self._max_tool_iterations
@@ -146,12 +185,18 @@ class ExecutorBase:
                     self._budget.check(node.id)
                 result = await self._provider.chat(system, messages, model, tools=tools)
                 self._record_cost(node, result)
+                # Artifacts on intermediate turns are already billed —
+                # carry them to the final result so they get persisted.
+                if result.artifacts:
+                    collected_artifacts.extend(result.artifacts)
 
                 if result.stop_reason == "pause_turn" and not result.tool_calls:
                     # Provider paused a server-side loop; re-send to continue.
                     messages.append(ChatMessage(role="assistant", content=result.text))
                     continue
                 if not result.tool_calls:
+                    if len(collected_artifacts) != len(result.artifacts):
+                        result.artifacts = list(collected_artifacts)
                     return result
 
                 messages.append(ChatMessage(
@@ -183,9 +228,62 @@ class ExecutorBase:
         if self._budget:
             node.metadata["cost_usd"] = self._budget.add_cost(node.id, result)
 
+    def finalize_node_result(self, node: Node, result: CompletionResult) -> None:
+        """Store the node's text result, persisting any artifacts to disk.
+
+        Artifact bytes never land on the node itself — checkpoints are
+        plain JSON and planner memory is JSONL, so binary payloads would
+        break or bloat both.  Files go under ``artifact_dir`` with a
+        filesystem-safe name; absolute paths are recorded in
+        ``node.metadata["artifacts"]``, which ``gather_dep_results``
+        surfaces to dependent nodes.  ``node.result`` stays the
+        provider's text verbatim (downstream JSON parsers rely on it) —
+        only when a node produced artifacts and no text does the result
+        become a path listing.  With ``artifact_dir=None``, artifacts
+        are dropped and counted in ``metadata["artifacts_discarded"]``.
+        """
+        node.result = result.text
+        artifacts = result.artifacts
+        if not artifacts:
+            return
+        if self._artifact_dir is None:
+            node.metadata["artifacts_discarded"] = len(artifacts)
+            if not result.text.strip():
+                node.result = (
+                    f"[{len(artifacts)} artifact(s) discarded: artifact_dir is None]"
+                )
+            return
+        self._artifact_dir.mkdir(parents=True, exist_ok=True)
+        stem = _safe_filename_component(node.id)
+        records = []
+        for i, art in enumerate(artifacts):
+            path = self._artifact_dir / f"{stem}_{i:02d}{art.suffix}"
+            path.write_bytes(art.data)
+            records.append({"path": str(path.resolve()), "mime_type": art.mime_type})
+        node.metadata["artifacts"] = records
+        if not result.text.strip():
+            node.result = "Generated artifacts:\n" + "\n".join(
+                r["path"] for r in records
+            )
+
     def gather_dep_results(self, node: Node, graph: ExecutionGraph) -> dict[str, Any]:
-        return {
-            dep_id: dep_node.result
-            for dep_id in node.depends_on
-            if (dep_node := self.node_by_id(dep_id, graph)) is not None
-        }
+        """Collect dependency results for prompt building.
+
+        Artifact paths live in dep metadata (not in the result text, so
+        JSON results stay parseable); they are appended here so
+        downstream nodes can reference the files.
+        """
+        dep_results: dict[str, Any] = {}
+        for dep_id in node.depends_on:
+            dep_node = self.node_by_id(dep_id, graph)
+            if dep_node is None:
+                continue
+            value = dep_node.result
+            records = dep_node.metadata.get("artifacts") or []
+            if records and isinstance(value, str) and records[0]["path"] not in value:
+                listing = "\n".join(
+                    f"- {r['path']} ({r['mime_type']})" for r in records
+                )
+                value = f"{value}\n\nArtifact files from this step:\n{listing}"
+            dep_results[dep_id] = value
+        return dep_results

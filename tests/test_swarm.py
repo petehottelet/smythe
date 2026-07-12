@@ -306,3 +306,26 @@ def test_execute_validates_direct_graph():
     )
     with pytest.raises(ValueError, match="nonexistent"):
         swarm.execute(bad_graph)
+
+
+def test_artifact_dirs_are_scoped_per_execution(tmp_path):
+    """Two runs with identical node ids must not overwrite each other."""
+    from smythe.graph import ExecutionGraph, Node, Topology
+    from smythe.provider import OfflineProvider
+
+    def make_graph():
+        return ExecutionGraph(
+            topology=[Topology.SERIAL], nodes=[Node(id="hero", label="make image")],
+        )
+
+    swarm = Swarm(
+        provider=OfflineProvider(artifacts_per_call=1),
+        model="demo", artifact_dir=tmp_path,
+    )
+    swarm.execute(make_graph())
+    swarm.execute(make_graph())
+
+    run_dirs = [d for d in tmp_path.iterdir() if d.is_dir()]
+    assert len(run_dirs) == 2
+    for d in run_dirs:
+        assert (d / "hero_00.png").exists()
