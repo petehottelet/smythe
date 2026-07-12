@@ -84,4 +84,4 @@ __all__ = [
     "WhiteRabbit",
     "load_graph",
 ]
-__version__ = "0.4.0"
+__version__ = "0.5.0"

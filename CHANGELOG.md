@@ -21,6 +21,18 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
+Future work tracked in [ROADMAP.md](ROADMAP.md).
+
+---
+
+## [0.5.0] - 2026-07-12
+
+Parallel images, measured. This release adds the multimodal artifact
+pipeline, hardens the parallel executor around it, and publishes the
+first benchmark where generated parallel topology demonstrably wins:
+6.6x wall-clock at concurrency 8, 25 images in 10.2 seconds at
+concurrency 25, at identical cost to serial. No breaking API changes.
+
 ### Added
 
 - **Image generation (Gemini "Nano Banana") support.** Provider calls
@@ -93,7 +105,6 @@ all are addressed:
 - `smythe.__version__` was stale at `0.2.0`; it now matches the
   released package version.
 
-Future work tracked in [ROADMAP.md](ROADMAP.md).
 
 ---
 
