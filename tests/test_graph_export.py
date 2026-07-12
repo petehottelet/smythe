@@ -63,3 +63,13 @@ def test_to_json_roundtrips_through_json_dumps():
     assert research["status"] == "completed"
     assert research["cost_usd"] == 0.0012
     assert parsed["nodes"][1]["depends_on"] == ["research"]
+
+
+def test_to_mermaid_theme_prepends_house_header():
+    out = _graph().to_mermaid(theme=True)
+    first, second = out.split("\n")[:2]
+    assert first.startswith("%%{init:")
+    assert "Georgia" in first
+    assert second == "flowchart TD"
+    # Default stays clean for snapshot stability.
+    assert _graph().to_mermaid().startswith("flowchart TD")
