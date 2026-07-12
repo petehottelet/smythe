@@ -34,7 +34,9 @@ With the default `FileCheckpointStore`, checkpoints live at `~/.smythe/checkpoin
         "failure_policy": "halt",
         "max_retries": 1,
         "required_capabilities": [],
-        "timeout_s": null
+        "timeout_s": null,
+        "max_tool_iterations": null,
+        "attach_dep_artifacts": false
       }
     ]
   },
