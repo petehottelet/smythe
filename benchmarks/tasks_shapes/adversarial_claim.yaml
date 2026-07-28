@@ -1,0 +1,15 @@
+name: adversarial-claim
+natural_shape: adversarial
+goal: |
+  Make the strongest honest case that a mid-sized company should replace its
+  entire customer support team with an AI agent this quarter. Then attack that
+  case as hard as you can and state what survives.
+constraints:
+  - "The opening case must be genuinely strong, not a strawman"
+  - "The critique must engage the strongest version of the argument"
+  - "End with only the claims that survive the critique"
+rubric:
+  - "The opening case is substantive and would persuade a reasonable reader"
+  - "The critique attacks the actual argument, not a weakened version"
+  - "Specific failure modes and costs are named, not gestured at"
+  - "The surviving claims are narrower than the opening case"

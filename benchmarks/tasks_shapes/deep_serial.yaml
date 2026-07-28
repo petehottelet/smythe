@@ -1,0 +1,19 @@
+name: deep-serial
+natural_shape: deep-serial
+goal: |
+  A subscription business has 4,000 subscribers, 3% monthly churn, $29/month
+  ARPU, and spends $180 to acquire each customer.
+
+  Step 1: compute average customer lifetime in months.
+  Step 2: use that to compute lifetime value.
+  Step 3: use LTV and CAC to compute the payback period and LTV:CAC ratio.
+  Step 4: state whether this business should increase acquisition spend, and
+  why, using the numbers from the previous steps.
+constraints:
+  - "Show the arithmetic for each step"
+  - "Each step must use the result of the previous step, not restate inputs"
+rubric:
+  - "Average lifetime is computed correctly (1 / churn = 33.3 months)"
+  - "LTV follows from lifetime and ARPU, arithmetic shown"
+  - "Payback period and LTV:CAC ratio both follow from earlier steps"
+  - "The recommendation is justified by the computed ratio, not vibes"

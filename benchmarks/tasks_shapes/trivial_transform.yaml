@@ -1,0 +1,13 @@
+name: trivial-transform
+natural_shape: single-step
+goal: |
+  Convert each of these dates to ISO 8601 (YYYY-MM-DD) and return them as a
+  JSON array of strings, in the order given.
+
+  March 3 2024; 7/4/1999; 22 Oct 2011; Jan 1, 2000; 2023-12-31; Feb 29 2024
+constraints:
+  - "Output only the JSON array, no commentary"
+rubric:
+  - "All six dates are converted correctly"
+  - "Output is a bare JSON array of strings in the original order"
+  - "No extraneous prose, headings, or explanation"

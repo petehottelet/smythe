@@ -1,0 +1,16 @@
+name: parallel-profiles
+natural_shape: wide-parallel
+goal: |
+  Profile these four unrelated technologies independently, then rank them by
+  suitability for a low-power embedded sensor that sends one reading an hour.
+  For each: power draw, range, and one disqualifying weakness.
+
+  LoRaWAN; Bluetooth Low Energy; NB-IoT; Wi-Fi HaLow (802.11ah)
+constraints:
+  - "Each technology gets its own clearly separated profile"
+  - "The ranking must cite the specific figures from the profiles"
+rubric:
+  - "All four technologies are profiled separately and substantively"
+  - "Each profile covers power draw, range, and a disqualifying weakness"
+  - "The final ranking references figures established in the profiles"
+  - "No technology is conflated with or contaminated by another"
