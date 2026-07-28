@@ -10,15 +10,19 @@ import re
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from smythe.agent import Agent
 from smythe.budget import BudgetEstimateRequired, Sentinel
-from smythe.graph import ExecutionGraph, Node, NodeStatus
+from smythe.graph import ExecutionGraph, Node, NodeStatus, RevisionError
 from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
 from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
 from smythe.tracer import Tracer
+
+if TYPE_CHECKING:
+    from smythe.supervisor import Supervisor
+    from smythe.task import Task
 
 DEFAULT_MAX_TOOL_ITERATIONS = 10
 
@@ -87,6 +91,9 @@ class ExecutorBase:
         max_tool_iterations: int = DEFAULT_MAX_TOOL_ITERATIONS,
         artifact_dir: str | Path | None = "smythe_artifacts",
         retry_backoff_s: float = 0.0,
+        supervisor: Supervisor | None = None,
+        max_revisions: int = 0,
+        task: Task | None = None,
     ) -> None:
         self._provider = provider
         self._registry = registry
@@ -102,6 +109,86 @@ class ExecutorBase:
         if retry_backoff_s < 0:
             raise ValueError(f"retry_backoff_s must be >= 0, got {retry_backoff_s}")
         self._retry_backoff_s = retry_backoff_s
+        if max_revisions < 0:
+            raise ValueError(f"max_revisions must be >= 0, got {max_revisions}")
+        self._supervisor = supervisor
+        self._max_revisions = max_revisions
+        self._task = task
+        self._revisions_used = 0
+
+    @property
+    def revisions_used(self) -> int:
+        """How many supervisor revisions this executor has applied."""
+        return self._revisions_used
+
+    async def maybe_revise(self, node: Node, graph: ExecutionGraph) -> bool:
+        """Let the supervisor revise the plan after *node* completed.
+
+        Returns True when the graph changed, so the caller can refresh
+        any scheduling state it derived from it.  Every failure mode
+        here — a supervisor that raises, returns junk, or proposes an
+        invalid change — is contained and traced: supervision is an
+        optional improvement and must never be able to fail a run that
+        would otherwise succeed.
+        """
+        if self._supervisor is None:
+            return False
+        remaining = self._max_revisions - self._revisions_used
+        if remaining <= 0:
+            return False
+
+        try:
+            revision = await self._supervisor.review(
+                graph, node, task=self._task, revisions_remaining=remaining,
+            )
+        except Exception as exc:
+            self._tracer.on_revision(
+                node, None, applied=False, detail=f"supervisor raised: {exc}",
+            )
+            return False
+        if revision is None or revision.is_empty:
+            return False
+
+        try:
+            graph.apply_revision(revision)
+        except RevisionError as exc:
+            self._tracer.on_revision(node, revision, applied=False, detail=str(exc))
+            return False
+
+        self._revisions_used += 1
+        self._inherit_execution_context(revision.add_nodes, graph)
+        self.prepare_graph(graph)
+        self._tracer.on_revision(node, revision, applied=True)
+        return True
+
+    def _inherit_execution_context(
+        self, new_nodes: tuple[Node, ...], graph: ExecutionGraph,
+    ) -> None:
+        """Give supervisor-added nodes the run's model and task context.
+
+        Nodes minted mid-run never passed through ``Swarm.plan``, so
+        they carry none of the metadata the executor depends on; without
+        this a revision would produce nodes that call the provider with
+        an empty model name.
+        """
+        if not new_nodes:
+            return
+        model = next(
+            (n.metadata["model"] for n in graph.nodes if n.metadata.get("model")), None,
+        )
+        context = next(
+            (
+                n.metadata["task_context"]
+                for n in graph.nodes
+                if n.metadata.get("task_context")
+            ),
+            None,
+        )
+        for node in new_nodes:
+            if model is not None:
+                node.metadata.setdefault("model", model)
+            if context is not None:
+                node.metadata.setdefault("task_context", context)
 
     def retry_delay_s(self, attempt: int) -> float:
         """Full-jitter exponential backoff before retry `attempt` (1-based).

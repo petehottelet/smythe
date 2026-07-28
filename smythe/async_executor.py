@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections import deque
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 from smythe.budget import Sentinel, SentinelAlert
 from smythe.executor_base import (
@@ -18,6 +18,10 @@ from smythe.provider import Provider
 from smythe.registry import Registry
 from smythe.tools import ToolRuntime
 from smythe.tracer import Tracer
+
+if TYPE_CHECKING:
+    from smythe.supervisor import Supervisor
+    from smythe.task import Task
 
 
 class AsyncExecutor(ExecutorBase):
@@ -54,27 +58,41 @@ class AsyncExecutor(ExecutorBase):
         max_tool_iterations: int = DEFAULT_MAX_TOOL_ITERATIONS,
         artifact_dir: str | Path | None = "smythe_artifacts",
         retry_backoff_s: float = 0.0,
+        supervisor: Supervisor | None = None,
+        max_revisions: int = 0,
+        task: Task | None = None,
     ) -> None:
         super().__init__(
             provider=provider, registry=registry, tracer=tracer, budget=budget,
             on_node_update=on_node_update, tool_runtime=tool_runtime,
             max_tool_iterations=max_tool_iterations, artifact_dir=artifact_dir,
-            retry_backoff_s=retry_backoff_s,
+            retry_backoff_s=retry_backoff_s, supervisor=supervisor,
+            max_revisions=max_revisions, task=task,
         )
         self._estimated_tokens_per_node = estimated_tokens_per_node
         if max_concurrency is not None and max_concurrency < 1:
             raise ValueError(f"max_concurrency must be >= 1, got {max_concurrency}")
         self._max_concurrency = max_concurrency
 
-    async def run(self, graph: ExecutionGraph) -> ExecutionGraph:
-        """Execute every node, fanning out independent nodes concurrently."""
-        self.prepare_graph(graph)
-        pending = {
-            node.id: node for node in graph.nodes if node.status == NodeStatus.PENDING
-        }
-        if not pending:
-            return graph
+    def _schedule_state(
+        self, graph: ExecutionGraph, active: dict[asyncio.Task[None], Node],
+    ) -> tuple[
+        dict[str, Node], set[str], dict[str, list[Node]], dict[str, int],
+        deque[Node], dict[str, int],
+    ]:
+        """Derive scheduling state from the graph's live node statuses.
 
+        Also used to rebuild after a supervisor revision: node status is
+        the authority, so recomputing from it is both simpler and safer
+        than patching the derived structures node by node.  Nodes already
+        in flight are excluded — they are running, not schedulable.
+        """
+        active_ids = {node.id for node in active.values()}
+        pending = {
+            node.id: node
+            for node in graph.nodes
+            if node.status == NodeStatus.PENDING and node.id not in active_ids
+        }
         resolved = {
             node.id for node in graph.nodes
             if node.status in (NodeStatus.COMPLETED, NodeStatus.SKIPPED)
@@ -88,16 +106,26 @@ class AsyncExecutor(ExecutorBase):
                 unresolved[node.id] = sum(
                     dep_id not in resolved for dep_id in node.depends_on
                 )
-
         ready = deque(
             node for node in graph.nodes
             if node.id in pending and unresolved[node.id] == 0
         )
+        order = {node.id: i for i, node in enumerate(graph.nodes)}
+        return pending, resolved, dependents, unresolved, ready, order
+
+    async def run(self, graph: ExecutionGraph) -> ExecutionGraph:
+        """Execute every node, fanning out independent nodes concurrently."""
+        self.prepare_graph(graph)
+        active: dict[asyncio.Task[None], Node] = {}
+        pending, resolved, dependents, unresolved, ready, order = self._schedule_state(
+            graph, active,
+        )
+        if not pending:
+            return graph
+
         # None intentionally retains the documented unlimited mode.  With a
         # concrete cap, the active task set can never grow beyond that cap.
         concurrency = self._max_concurrency or max(1, len(pending))
-        order = {node.id: i for i, node in enumerate(graph.nodes)}
-        active: dict[asyncio.Task[None], Node] = {}
 
         try:
             while ready or active:
@@ -129,6 +157,7 @@ class AsyncExecutor(ExecutorBase):
                     active, return_when=asyncio.FIRST_COMPLETED,
                 )
                 first_error: Exception | None = None
+                just_completed: list[Node] = []
                 for task in sorted(done, key=lambda item: order[active[item].id]):
                     node = active.pop(task)
                     try:
@@ -142,12 +171,22 @@ class AsyncExecutor(ExecutorBase):
 
                     pending.pop(node.id, None)
                     resolved.add(node.id)
+                    just_completed.append(node)
                     for child in dependents.get(node.id, []):
                         if child.id not in pending:
                             continue
                         unresolved[child.id] -= 1
                         if unresolved[child.id] == 0:
                             ready.append(child)
+
+                if first_error is None and self._supervisor is not None:
+                    revised = False
+                    for node in just_completed:
+                        revised |= await self.maybe_revise(node, graph)
+                    if revised:
+                        (
+                            pending, resolved, dependents, unresolved, ready, order,
+                        ) = self._schedule_state(graph, active)
 
                 if first_error is not None:
                     # HALT means no queued sibling may start after the error

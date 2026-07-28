@@ -81,6 +81,44 @@ class Tracer:
             tool_name, node.id, duration_ms, " (error)" if is_error else "",
         )
 
+    def on_revision(
+        self,
+        node: Node,
+        revision: Any,
+        *,
+        applied: bool,
+        detail: str = "",
+    ) -> None:
+        """Record a supervisor revision, whether it was applied or refused.
+
+        Refusals are recorded too: a supervisor that keeps proposing
+        invalid changes is a finding, and silently dropping those
+        attempts would hide it.
+        """
+        now = time.time()
+        span = Span(
+            node_id=f"supervisor:{node.id}",
+            label=getattr(revision, "reason", "") or "plan review",
+            agent_id=None,
+            start_time=now,
+            end_time=now,
+            status="revision_applied" if applied else "revision_rejected",
+        )
+        if detail:
+            span.error = detail
+        span.metadata["revision"] = {
+            "after_node": node.id,
+            "change": getattr(revision, "summary", lambda: "unknown")(),
+            "added": [n.id for n in getattr(revision, "add_nodes", ())],
+            "dropped": list(getattr(revision, "drop_node_ids", ())),
+            "rewired": sorted(getattr(revision, "rewire", {})),
+        }
+        self.spans.append(span)
+        logger.info(
+            "Plan revision %s after node %s: %s",
+            "applied" if applied else "rejected", node.id, span.label,
+        )
+
     def on_node_error(self, node: Node, exc: Exception) -> None:
         span = self._active.get(node.id)
         if span:
@@ -101,5 +139,7 @@ class Tracer:
             }
             if "tool_calls" in s.metadata:
                 entry["tool_calls"] = s.metadata["tool_calls"]
+            if "revision" in s.metadata:
+                entry["revision"] = s.metadata["revision"]
             out.append(entry)
         return out

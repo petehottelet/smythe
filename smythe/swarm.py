@@ -34,6 +34,7 @@ from smythe.provider import (
     Provider,
 )
 from smythe.registry import Registry
+from smythe.supervisor import Supervisor
 from smythe.synthesizer import Synthesizer
 from smythe.task import Task
 from smythe.tracer import Tracer
@@ -107,6 +108,8 @@ class Swarm:
         max_tool_iterations: int = DEFAULT_MAX_TOOL_ITERATIONS,
         artifact_dir: str | Path | None = "smythe_artifacts",
         retry_backoff_s: float = 0.0,
+        supervisor: Supervisor | None = None,
+        max_revisions: int = 0,
     ) -> None:
         self.model = model
         self.max_budget_usd = max_budget_usd
@@ -115,6 +118,8 @@ class Swarm:
         self.max_tool_iterations = max_tool_iterations
         self.artifact_dir = artifact_dir
         self.retry_backoff_s = retry_backoff_s
+        self.supervisor = supervisor
+        self.max_revisions = max_revisions
         self._checkpoint_store = checkpoint_store
         if (
             isinstance(checkpoint_every_n_nodes, bool)
@@ -254,6 +259,9 @@ class Swarm:
             max_tool_iterations=self.max_tool_iterations,
             artifact_dir=self._run_artifact_dir(execution_id),
             retry_backoff_s=self.retry_backoff_s,
+            supervisor=self.supervisor,
+            max_revisions=self.max_revisions,
+            task=task,
             on_node_update=self._checkpointer(
                 execution_id, graph, budget, task, created_at,
             ),
@@ -317,6 +325,9 @@ class Swarm:
             max_tool_iterations=self.max_tool_iterations,
             artifact_dir=self._run_artifact_dir(execution_id),
             retry_backoff_s=self.retry_backoff_s,
+            supervisor=self.supervisor,
+            max_revisions=self.max_revisions,
+            task=task,
             on_node_update=self._checkpointer(
                 execution_id, graph, budget, task, created_at,
             ),
@@ -491,6 +502,9 @@ class Swarm:
             max_tool_iterations=self.max_tool_iterations,
             artifact_dir=self._run_artifact_dir(execution_id),
             retry_backoff_s=self.retry_backoff_s,
+            supervisor=self.supervisor,
+            max_revisions=self.max_revisions,
+            task=task,
             on_node_update=self._checkpointer(
                 execution_id, graph, budget, task, created_at,
             ),
