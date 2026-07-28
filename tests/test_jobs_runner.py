@@ -1,0 +1,457 @@
+"""End-to-end offline execution tests for Jobs v1."""
+
+from __future__ import annotations
+
+import asyncio
+import io
+import threading
+import time
+
+import pytest
+import smythe.jobs.runner as runner_module
+
+from smythe.jobs import JobManifestV1, make_approval, preflight_job
+from smythe.jobs.models import (
+    DEFAULT_CALL_TIMEOUT_S,
+    DEFAULT_MAX_WALL_SECONDS,
+    MAX_CALL_TIMEOUT_S,
+)
+from smythe.jobs.providers import ProviderPool
+from smythe.jobs.runner import JobRunner
+from smythe.jobs.store import OperationStatus, RunLeaseError, RunStatus, SQLiteRunStore
+from smythe.provider import Artifact, CompletionResult, Provider
+
+Image = pytest.importorskip("PIL.Image")
+
+
+_png_buffer = io.BytesIO()
+Image.new("RGBA", (1, 1), (255, 0, 0, 255)).save(_png_buffer, format="PNG")
+PNG_1X1 = _png_buffer.getvalue()
+
+
+def _manifest(*, count=4, attempts=1):
+    return JobManifestV1.from_dict(
+        {
+            "version": 1,
+            "name": "runner-test",
+            "profiles": [
+                {
+                    "name": "default",
+                    "provider": "offline",
+                    "model": "offline-image",
+                    "max_cost_per_call_usd": "0",
+                    "options": {"artifacts_per_call": 1},
+                }
+            ],
+            "operations": [
+                {
+                    "key": "glyph",
+                    "count": count,
+                    "prompt": "Generate one glyph",
+                    "profile": "default",
+                    "artifact": {
+                        "mime_type": "image/png",
+                        "width": 1,
+                        "height": 1,
+                    },
+                }
+            ],
+            "execution": {
+                "max_concurrency": 2,
+                "max_attempts": attempts,
+                "max_budget_usd": "0",
+                "output_directory": "outputs",
+            },
+        }
+    )
+
+
+def test_runner_executes_bounded_offline_job_and_persists_artifacts(tmp_path):
+    plan = preflight_job(_manifest(), manifest_root=tmp_path)
+    store = SQLiteRunStore(tmp_path / "jobs.db")
+    runner = JobRunner(store)
+
+    result = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path))
+
+    assert result["status"] == RunStatus.COMPLETED.value
+    assert result["counts"] == {OperationStatus.SUCCEEDED.value: 4}
+    assert result["execution_metrics"]["peak_active_calls"] <= 2
+    assert result["cost"]["confirmed_microusd"] == 0
+    assert len(result["artifacts"]) == 4
+    for artifact in result["artifacts"]:
+        assert (tmp_path / "outputs" / result["run_id"] / artifact["relative_path"]).is_file()
+
+
+def test_internal_provider_transport_timeout_covers_approved_contract_max(tmp_path):
+    runner = JobRunner(SQLiteRunStore(tmp_path / "jobs.db"))
+
+    assert runner.providers._request_timeout_s == MAX_CALL_TIMEOUT_S
+    assert runner.call_timeout_s is None
+    assert runner.max_wall_seconds is None
+
+
+def test_operator_deadlines_can_only_tighten_the_approved_plan(tmp_path):
+    data = _manifest(count=1).to_dict()
+    data["execution"]["call_timeout_s"] = 900
+    data["execution"]["max_wall_seconds"] = 7200
+    plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
+
+    default_runner = JobRunner(SQLiteRunStore(tmp_path / "default.db"))
+    strict_runner = JobRunner(
+        SQLiteRunStore(tmp_path / "strict.db"),
+        call_timeout_s=120,
+        max_wall_seconds=600,
+    )
+    loose_runner = JobRunner(
+        SQLiteRunStore(tmp_path / "loose.db"),
+        call_timeout_s=1200,
+        max_wall_seconds=9000,
+    )
+
+    assert runner_module._plan_timeout(
+        plan,
+        ("call_timeout_s",),
+        operator_ceiling=default_runner.call_timeout_s,
+        fallback=DEFAULT_CALL_TIMEOUT_S,
+    ) == 900
+    assert runner_module._plan_timeout(
+        plan,
+        ("call_timeout_s",),
+        operator_ceiling=strict_runner.call_timeout_s,
+        fallback=DEFAULT_CALL_TIMEOUT_S,
+    ) == 120
+    assert runner_module._plan_timeout(
+        plan,
+        ("max_wall_seconds",),
+        operator_ceiling=loose_runner.max_wall_seconds,
+        fallback=DEFAULT_MAX_WALL_SECONDS,
+    ) == 7200
+
+
+class _SequenceProvider(Provider):
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        self.calls += 1
+        artifacts = [] if self.calls == 1 else [Artifact(PNG_1X1, "image/png")]
+        return CompletionResult(text=f"attempt {self.calls}", artifacts=artifacts)
+
+
+class _FixedPool(ProviderPool):
+    def __init__(self, provider: Provider) -> None:
+        super().__init__()
+        self.provider = provider
+
+    def get(self, operation):
+        return self.provider
+
+    @staticmethod
+    def validate_operation(operation):
+        return None
+
+    @staticmethod
+    def preflight(operation, **_kwargs):
+        return None
+
+
+def test_selective_reroll_replaces_only_rejected_operation(tmp_path):
+    manifest = _manifest(count=1, attempts=2)
+    plan = preflight_job(manifest, manifest_root=tmp_path)
+    store = SQLiteRunStore(tmp_path / "jobs.db")
+    runner = JobRunner(store, provider_pool=_FixedPool(_SequenceProvider()))
+
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path))
+    operation_key = first["operations"][0]["operation_key"]
+    assert first["status"] == RunStatus.FAILED.value
+    assert first["counts"] == {OperationStatus.REJECTED.value: 1}
+
+    second = asyncio.run(runner.reroll(first["run_id"], [operation_key], reason="missing glyph"))
+
+    assert second["status"] == RunStatus.COMPLETED.value
+    assert second["counts"] == {OperationStatus.SUCCEEDED.value: 1}
+    assert second["operations"][0]["attempt_count"] == 2
+    assert len(second["attempts"]) == 2
+
+
+class _AmbiguousProvider(Provider):
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        raise ConnectionError("response lost")
+
+
+def test_provider_exception_after_dispatch_becomes_unknown_outcome(tmp_path):
+    plan = preflight_job(_manifest(count=1, attempts=2), manifest_root=tmp_path)
+    store = SQLiteRunStore(tmp_path / "jobs.db")
+    runner = JobRunner(store, provider_pool=_FixedPool(_AmbiguousProvider()))
+
+    result = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path))
+
+    assert result["status"] == RunStatus.NEEDS_ATTENTION.value
+    assert result["counts"] == {OperationStatus.UNKNOWN_OUTCOME.value: 1}
+    assert store.pending_operations(result["run_id"]) == []
+
+
+def test_runner_rejects_attachment_changed_after_approval(tmp_path):
+    attachment = tmp_path / "input.png"
+    attachment.write_bytes(b"approved-input")
+    data = _manifest(count=1).to_dict()
+    data["operations"][0]["attachments"] = ["input.png"]
+    manifest = JobManifestV1.from_dict(data)
+    plan = preflight_job(manifest, manifest_root=tmp_path)
+    approval = make_approval(plan)
+    attachment.write_bytes(b"different-input")
+    store = SQLiteRunStore(tmp_path / "jobs.db")
+
+    with pytest.raises(ValueError, match="changed after preflight"):
+        asyncio.run(JobRunner(store).start(plan, approval, manifest_root=tmp_path))
+
+
+@pytest.mark.parametrize(
+    "run_id",
+    ["../outside", "..\\outside", ".", "", "name/child", "name\\child"],
+)
+def test_runner_rejects_unsafe_custom_run_id(tmp_path, run_id):
+    plan = preflight_job(_manifest(count=1), manifest_root=tmp_path)
+    store = SQLiteRunStore(tmp_path / "jobs.db")
+
+    with pytest.raises(ValueError, match="run_id"):
+        asyncio.run(
+            JobRunner(store).start(
+                plan,
+                make_approval(plan),
+                manifest_root=tmp_path,
+                run_id=run_id,
+            )
+        )
+
+
+class _BlockingProvider(Provider):
+    def __init__(self) -> None:
+        self.entered = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        self.entered.set()
+        await self.release.wait()
+        return CompletionResult(
+            text="completed after release",
+            artifacts=[Artifact(PNG_1X1, "image/png")],
+        )
+
+
+def test_runner_lease_heartbeat_blocks_concurrent_resume(tmp_path):
+    async def scenario() -> None:
+        plan = preflight_job(_manifest(count=1), manifest_root=tmp_path)
+        first_store = SQLiteRunStore(tmp_path / "jobs.db")
+        second_store = SQLiteRunStore(tmp_path / "jobs.db")
+        provider = _BlockingProvider()
+        first_runner = JobRunner(
+            first_store,
+            provider_pool=_FixedPool(provider),
+            lease_ttl_s=30,
+            lease_heartbeat_s=0.05,
+        )
+        task = asyncio.create_task(
+            first_runner.start(
+                plan,
+                make_approval(plan),
+                manifest_root=tmp_path,
+                run_id="leased-run",
+            )
+        )
+        try:
+            await asyncio.wait_for(provider.entered.wait(), timeout=30)
+            acquired = first_store.get_run_lease("leased-run")
+            assert acquired is not None
+            await asyncio.sleep(0.12)
+            renewed = first_store.get_run_lease("leased-run")
+            assert renewed is not None
+            assert renewed.heartbeat_at_ns > acquired.heartbeat_at_ns
+            with pytest.raises(RunLeaseError, match="leased"):
+                await JobRunner(second_store).resume("leased-run")
+            provider.release.set()
+            result = await asyncio.wait_for(task, timeout=30)
+            assert result["status"] == RunStatus.COMPLETED.value
+            assert first_store.get_run_lease("leased-run") is None
+        finally:
+            provider.release.set()
+            if not task.done():
+                task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            first_store.close()
+            second_store.close()
+
+    asyncio.run(scenario())
+
+
+def _priced_manifest(*, count=1):
+    data = _manifest(count=count).to_dict()
+    data["profiles"][0].update(
+        {
+            "provider": "openai_image",
+            "model": "gpt-image-2",
+            "max_cost_per_call_usd": "0.10",
+            "options": {},
+        }
+    )
+    data["execution"]["max_budget_usd"] = f"{count * 0.10:.2f}"
+    return JobManifestV1.from_dict(data)
+
+
+class _NeverReturningProvider(Provider):
+    def __init__(self) -> None:
+        self.entered = asyncio.Event()
+
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        self.entered.set()
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable")
+
+
+class _InvalidCostProvider(Provider):
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        return CompletionResult(
+            text="invalid billing metadata",
+            artifacts=[Artifact(PNG_1X1, "image/png")],
+            cost_usd=float("nan"),
+        )
+
+
+class _EstimatedCostProvider(Provider):
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        return CompletionResult(
+            text="estimated billing metadata",
+            artifacts=[Artifact(PNG_1X1, "image/png")],
+            cost_usd=0.08,
+            cost_usd_is_estimate=True,
+        )
+
+
+class _ImmediateArtifactProvider(Provider):
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        return CompletionResult(
+            text="ready",
+            artifacts=[Artifact(PNG_1X1, "image/png")],
+        )
+
+
+def test_never_returning_provider_hits_call_deadline_and_becomes_unknown(tmp_path):
+    plan = preflight_job(_manifest(count=1), manifest_root=tmp_path)
+    store = SQLiteRunStore(tmp_path / "jobs.db")
+    runner = JobRunner(
+        store,
+        provider_pool=_FixedPool(_NeverReturningProvider()),
+        call_timeout_s=0.05,
+    )
+
+    result = asyncio.run(
+        runner.start(plan, make_approval(plan), manifest_root=tmp_path)
+    )
+
+    assert result["status"] == RunStatus.NEEDS_ATTENTION.value
+    assert result["counts"] == {OperationStatus.UNKNOWN_OUTCOME.value: 1}
+    assert "deadline after dispatch" in result["operations"][0]["error"]
+
+
+def test_whole_run_deadline_cancels_dispatched_call_conservatively(tmp_path):
+    plan = preflight_job(_manifest(count=1), manifest_root=tmp_path)
+    store = SQLiteRunStore(tmp_path / "jobs.db")
+    runner = JobRunner(
+        store,
+        provider_pool=_FixedPool(_NeverReturningProvider()),
+        call_timeout_s=10,
+        max_wall_seconds=0.05,
+    )
+
+    with pytest.raises(TimeoutError, match="wall deadline"):
+        asyncio.run(
+            runner.start(
+                plan,
+                make_approval(plan),
+                manifest_root=tmp_path,
+                run_id="wall-deadline",
+            )
+        )
+
+    snapshot = store.snapshot("wall-deadline")
+    assert snapshot["status"] == RunStatus.NEEDS_ATTENTION.value
+    assert snapshot["counts"] == {OperationStatus.UNKNOWN_OUTCOME.value: 1}
+
+
+def test_invalid_provider_cost_is_immediately_journaled_unknown(tmp_path):
+    plan = preflight_job(_priced_manifest(), manifest_root=tmp_path)
+    store = SQLiteRunStore(tmp_path / "jobs.db")
+    runner = JobRunner(store, provider_pool=_FixedPool(_InvalidCostProvider()))
+
+    result = asyncio.run(
+        runner.start(plan, make_approval(plan), manifest_root=tmp_path)
+    )
+
+    assert result["status"] == RunStatus.NEEDS_ATTENTION.value
+    assert result["cost"]["confirmed_microusd"] == 0
+    assert result["cost"]["exposure_microusd"] == 100_000
+    assert "finite and non-negative" in result["operations"][0]["error"]
+
+
+def test_estimated_provider_cost_remains_exposure_not_confirmed(tmp_path):
+    plan = preflight_job(_priced_manifest(), manifest_root=tmp_path)
+    store = SQLiteRunStore(tmp_path / "jobs.db")
+    runner = JobRunner(store, provider_pool=_FixedPool(_EstimatedCostProvider()))
+
+    result = asyncio.run(
+        runner.start(plan, make_approval(plan), manifest_root=tmp_path)
+    )
+
+    assert result["status"] == RunStatus.COMPLETED.value
+    assert result["cost"]["confirmed_microusd"] == 0
+    assert result["cost"]["exposure_microusd"] == 100_000
+    assert not result["cost"]["cost_is_complete"]
+    assert result["cost"]["cost_contains_estimates"]
+
+
+def test_slow_artifact_finalizer_does_not_starve_lease_heartbeat(
+    tmp_path, monkeypatch
+):
+    import smythe.jobs.runner as runner_module
+
+    entered = threading.Event()
+    original_write = runner_module.atomic_write_bytes
+
+    def slow_write(path, data):
+        entered.set()
+        time.sleep(0.25)
+        original_write(path, data)
+
+    monkeypatch.setattr(runner_module, "atomic_write_bytes", slow_write)
+
+    async def scenario() -> None:
+        plan = preflight_job(_manifest(count=1), manifest_root=tmp_path)
+        store = SQLiteRunStore(tmp_path / "jobs.db")
+        runner = JobRunner(
+            store,
+            provider_pool=_FixedPool(_ImmediateArtifactProvider()),
+            lease_ttl_s=30,
+            lease_heartbeat_s=0.05,
+        )
+        task = asyncio.create_task(
+            runner.start(
+                plan,
+                make_approval(plan),
+                manifest_root=tmp_path,
+                run_id="slow-finalizer",
+            )
+        )
+        deadline = asyncio.get_running_loop().time() + 5
+        while not entered.is_set() and asyncio.get_running_loop().time() < deadline:
+            await asyncio.sleep(0.01)
+        assert entered.is_set()
+        before = store.get_run_lease("slow-finalizer")
+        assert before is not None
+        await asyncio.sleep(0.1)
+        after = store.get_run_lease("slow-finalizer")
+        assert after is not None
+        assert after.heartbeat_at_ns > before.heartbeat_at_ns
+        result = await asyncio.wait_for(task, timeout=5)
+        assert result["status"] == RunStatus.COMPLETED.value
+
+    asyncio.run(scenario())

@@ -1,0 +1,31 @@
+version: 1
+name: offline-glyph-job
+
+profiles:
+  - name: offline
+    provider: offline
+    model: offline-image
+    max_cost_per_call_usd: "0"
+    options:
+      artifacts_per_call: 1
+
+operations:
+  - key: glyph
+    count: 4
+    prompt: >-
+      Generate one minimal monochrome fictional glyph on a transparent
+      background. Keep the mark centered and do not include words.
+    profile: offline
+    artifact:
+      mime_type: image/png
+      width: 1
+      height: 1
+
+execution:
+  max_concurrency: 2
+  max_attempts: 2
+  max_budget_usd: "0"
+  # Defaults shown explicitly: 5 minutes per provider call, 6 hours per run.
+  call_timeout_s: 300
+  max_wall_seconds: 21600
+  output_directory: smythe_artifacts/jobs-example

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import base64
 import json
+import math
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -28,6 +29,15 @@ _MIME_SUFFIXES = {
     "image/webp": ".webp",
     "image/gif": ".gif",
 }
+
+
+def _is_nonnegative_finite_number(value: object) -> bool:
+    return (
+        not isinstance(value, bool)
+        and isinstance(value, (int, float))
+        and math.isfinite(float(value))
+        and value >= 0
+    )
 
 
 @dataclass
@@ -370,10 +380,29 @@ class OpenAIProvider(Provider):
         api_key: str | None = None,
         max_tokens: int = 4096,
         base_url: str | None = None,
+        request_timeout_s: float | None = None,
+        max_retries: int | None = None,
     ) -> None:
+        if request_timeout_s is not None and (
+            isinstance(request_timeout_s, bool)
+            or not isinstance(request_timeout_s, (int, float))
+            or not math.isfinite(float(request_timeout_s))
+            or request_timeout_s <= 0
+        ):
+            raise ValueError("request_timeout_s must be finite and positive")
+        if max_retries is not None and (
+            isinstance(max_retries, bool)
+            or not isinstance(max_retries, int)
+            or max_retries < 0
+        ):
+            raise ValueError("max_retries must be a non-negative integer")
         self._api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
         self._max_tokens = max_tokens
         self._base_url = base_url or os.environ.get("OPENAI_BASE_URL") or None
+        self._request_timeout_s = (
+            float(request_timeout_s) if request_timeout_s is not None else None
+        )
+        self._client_max_retries = max_retries
         self._client = None
 
     def _get_client(self):
@@ -387,6 +416,10 @@ class OpenAIProvider(Provider):
             kwargs = {"api_key": self._api_key}
             if self._base_url:
                 kwargs["base_url"] = self._base_url
+            if self._request_timeout_s is not None:
+                kwargs["timeout"] = self._request_timeout_s
+            if self._client_max_retries is not None:
+                kwargs["max_retries"] = self._client_max_retries
             self._client = openai.AsyncOpenAI(**kwargs)
         return self._client
 
@@ -546,8 +579,15 @@ class OpenAIImageProvider(OpenAIProvider):
         n: int = 1,
         cost_per_image_usd: float | None = None,
         max_cost_per_call_usd: float | None = None,
+        request_timeout_s: float | None = None,
+        max_retries: int | None = None,
     ) -> None:
-        super().__init__(api_key=api_key, base_url=base_url)
+        super().__init__(
+            api_key=api_key,
+            base_url=base_url,
+            request_timeout_s=request_timeout_s,
+            max_retries=max_retries,
+        )
         if not 1 <= n <= 10:
             raise ValueError(f"n must be between 1 and 10, got {n}")
         if output_format not in self._OUTPUT_MIME_TYPES:
@@ -571,13 +611,18 @@ class OpenAIImageProvider(OpenAIProvider):
             )
         if output_compression is not None and output_format == "png":
             raise ValueError("output_compression is supported only for JPEG or WebP")
-        if cost_per_image_usd is not None and cost_per_image_usd < 0:
+        if cost_per_image_usd is not None and not _is_nonnegative_finite_number(
+            cost_per_image_usd
+        ):
             raise ValueError(
-                f"cost_per_image_usd must be non-negative, got {cost_per_image_usd}"
+                "cost_per_image_usd must be finite and non-negative, "
+                f"got {cost_per_image_usd}"
             )
-        if max_cost_per_call_usd is not None and max_cost_per_call_usd < 0:
+        if max_cost_per_call_usd is not None and not _is_nonnegative_finite_number(
+            max_cost_per_call_usd
+        ):
             raise ValueError(
-                "max_cost_per_call_usd must be non-negative, "
+                "max_cost_per_call_usd must be finite and non-negative, "
                 f"got {max_cost_per_call_usd}"
             )
 
@@ -703,14 +748,19 @@ class GeminiProvider(Provider):
         self._api_key = api_key or os.environ.get("GOOGLE_API_KEY", "")
         self._max_tokens = max_tokens
         self._response_modalities = response_modalities
-        if cost_per_image_usd is not None and cost_per_image_usd < 0:
+        if cost_per_image_usd is not None and not _is_nonnegative_finite_number(
+            cost_per_image_usd
+        ):
             raise ValueError(
-                f"cost_per_image_usd must be non-negative, got {cost_per_image_usd}"
+                "cost_per_image_usd must be finite and non-negative, "
+                f"got {cost_per_image_usd}"
             )
         self._cost_per_image_usd = cost_per_image_usd
-        if max_cost_per_call_usd is not None and max_cost_per_call_usd < 0:
+        if max_cost_per_call_usd is not None and not _is_nonnegative_finite_number(
+            max_cost_per_call_usd
+        ):
             raise ValueError(
-                "max_cost_per_call_usd must be non-negative, "
+                "max_cost_per_call_usd must be finite and non-negative, "
                 f"got {max_cost_per_call_usd}"
             )
         self._max_cost_per_call_usd = max_cost_per_call_usd

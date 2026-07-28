@@ -7,6 +7,16 @@ pip install -e .            # from the repo root
 python examples/01_quickstart_yaml.py
 ```
 
+The durable artifact-job example uses the installed CLI. It is completely
+offline and its approval token is bound to the exact manifest and budget:
+
+```bash
+smythe jobs validate examples/12_jobs_manifest.yaml
+smythe jobs plan examples/12_jobs_manifest.yaml
+# Copy the printed approval token into the next command.
+smythe jobs run examples/12_jobs_manifest.yaml --approve approve_v1_...
+```
+
 | Example | What it shows |
 |---|---|
 | [01_quickstart_yaml.py](01_quickstart_yaml.py) | Load a declarative YAML DAG ([01_pipeline.yaml](01_pipeline.yaml)) with failure policies and per-node timeouts, execute it in parallel. |
@@ -20,4 +30,5 @@ python examples/01_quickstart_yaml.py
 | [09_image_generation.py](09_image_generation.py) | Parallel image artifacts, per-image cost accounting, and deterministic offline image fixtures; real mode uses Gemini. |
 | [10_gpt_image_generation.py](10_gpt_image_generation.py) | Three GPT Image requests fan out concurrently through the dedicated `OpenAIImageProvider`; offline mode remains free and deterministic. |
 | [11_vision_judge.py](11_vision_judge.py) | Select-from-N curation: parallel ad candidates judged by an art-director node that sees the actual images (`attach_dep_artifacts=True`). In its first real run the judge caught a spelling error in a generated ad. |
+| [12_jobs_manifest.yaml](12_jobs_manifest.yaml) | A zero-cost, four-operation artifact job for the installed `smythe jobs` validate, plan, run, status, resume, reroll, and export workflow. |
 | [acquisition_diligence/](acquisition_diligence/) | **The flagship demo.** Task intake → generated `fork-join → adversarial → serial` topology → parallel specialists → red-team review → final memo, with committed expected artifacts (graph, trace, memo). |
