@@ -35,6 +35,35 @@ Future work tracked in [ROADMAP.md](ROADMAP.md).
 - `checkpoint_every_n_nodes` optionally batches full-graph snapshots; initial,
   failed, and terminal states are still forced, and the unflushed tail is the
   documented crash-replay and possible duplicate-spend granularity.
+- **Durable artifact Jobs v1** adds strict JSON/YAML manifests and JSON Schema,
+  deterministic operation expansion and attachment fingerprints, complete
+  worst-case cost preflight, and approvals bound to the exact manifest, plan,
+  and spend ceiling.
+- The installed `smythe jobs` CLI provides `schema`, `validate`, `plan`, `run`,
+  `status`, `resume`, `reroll`, and `export`. A SQLite WAL dispatch journal
+  persists calls before provider dispatch, distinguishes safe recovery from
+  `unknown_outcome`, retains attempt lineage and artifact hashes, and requires
+  explicit acknowledgment before rerunning an ambiguous call.
+- The public `smythe.assets` package adds frozen image/brand specifications,
+  concept-versus-production policy, deterministic exact-logo and text
+  compositing, atomic resize/crop finishing, hash-bound receipts, and hard
+  versus advisory validation findings.
+- A 64-node glyph screensaver benchmark exercises visually inspectable artifact
+  fan-out with a deterministic procedural provider and an optional fail-closed
+  GPT Image lane. It validates 64 unique normalized tiles and assembles a
+  1920×1080 preview, looping GIF, contact-sheet atlas, and standalone animated
+  HTML canvas with objective receipts.
+- Bounded Autotune v1 adds immutable, hash-bound experiment contracts and
+  allowlisted candidates, a zero-API-spend offline concurrency campaign, a
+  plan-bound async runner with atomic dispatch claims, paired confirmation and
+  a sealed per-campaign holdout, exact gate inventories, typed mutation rules,
+  seeded and work-bounded bootstrap promotion policy, immutable append-only
+  budget-visible evidence, conservative ambiguous-outcome stopping, and
+  installed `smythe optimize concurrency` plus read-only `smythe optimize
+  inspect` commands. Ledger schema v3 atomically seals the complete candidate
+  inventory and plan hash, exposes holdout material only through a private
+  capability boundary, and permits exactly one evidence-complete terminal
+  decision. Pre-v3 ledgers are rejected and must be recreated.
 
 ### Changed
 

@@ -58,25 +58,45 @@ The current unreleased work hardens the guarantees users depend on before a
    of a batch is replayed.
 4. **Portable benchmark evidence** — installable optional harness dependencies,
    repo-relative artifact references, protocol metadata, and offline CI coverage
+5. **Durable artifact Jobs v1** — strict manifests, deterministic preflight,
+   plan-and-ceiling approvals, a SQLite dispatch/event journal, conservative
+   unknown outcomes, selective rerolls, portable exports, and an installed CLI
+6. **Typed production asset contracts** — concept-versus-production brand
+   rules, exact master/text compositing, atomic finishing, hash receipts, and
+   deterministic validation gates separated from advisory judgments
+7. **Glyph screensaver fan-out workload** — 64 objectively validated unique
+   tiles, deterministic offline concurrency sweep, optional fail-closed GPT
+   Image lane, and assembled preview/GIF/atlas/HTML deliverables
+8. **Bounded Autotune v1**: immutable hash-bound contracts and allowlisted
+   candidates, a zero-API-spend offline concurrency campaign, plan-bound async
+   orchestration, atomic dispatch claims, paired confirmation and sealed
+   per-campaign holdout, exact gate inventories, typed mutation domains,
+   bounded statistical/CPU work, immutable budget-visible evidence, and
+   read-only `inspect` alongside the `concurrency` command
+   ([docs](docs/optimize.md))
 
 ## Next
 
-1. **Productize the artifact-factory wedge** — typed job manifests, preflight
-   estimate/approval, OCR and brand validators, partial rerolls, and select-from-N
-   curation
-2. **Operator surface** — `smythe plan`, `run`, `inspect`, and `replay`, with a
-   rendered DAG, per-node prompt/response/cost/duration, artifacts, and the
-   Architect's reasoning
+1. **Integrate asset policy with Jobs v1** — manifest-native production brand
+   masters, OCR and perceptual brand validators, select-from-N curation, and
+   deterministic export bundles built from accepted attempt pointers
+2. **Operator inspection surface** — render the Jobs event/attempt timeline,
+   costs, prompts, responses, validation findings, and artifacts without
+   requiring users to inspect SQLite or raw JSON
 3. **Scale ladder** — offline 5,000-item stress tests followed by bounded paid
    50/250/1,000-item trials with kill-and-resume and duplicate detection
 4. **Benchmarks, continued** — a discriminating judge, human calibration,
-   repeated k=25 cells, and held-out brand-consistency comparisons
+   repeated k=25 cells, repeated glyph live cells, and held-out
+   brand-consistency comparisons
+5. **Autotune generalization**: add campaign-wide leases, calibrated
+   sample-size and repeated-comparison guidance, richer reports, process-
+   supervised evaluator isolation, and conservative live-evaluator adapters
+   after the offline campaign
 
 ## Later
 
-- A constrained `smythe optimize` research loop: immutable evaluation contract,
-  small mutable candidate surface, held-out tasks, repeated end-to-end trials,
-  confidence-aware promotion, and append-only resumable history
+- Autonomous Autotune proposal strategies after the bounded runner and
+  evidence protocol are calibrated on more than the concurrency workload
 - Recursive subgraph decomposition, with depth limits and shared
   budget/trace/failure machinery
 - Human-in-the-loop approval gates (pause/approve/reject, state survives restart)
