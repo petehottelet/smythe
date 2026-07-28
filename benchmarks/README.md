@@ -10,6 +10,15 @@ measure that honestly, including where the claim fails.
 > below.** The core harness also runs
 > end-to-end offline in CI (mechanics verified, deterministic, zero cost).
 
+> **Measurement caveat (2026-07-28).** The tables below collect a run's
+> deliverable by joining *terminal nodes only* (`harness.py`). That
+> convention systematically penalises decomposed topologies whose
+> deliverable is cumulative — measured swing of about 3 points between
+> the fixed pipeline and generated topology on a shape-varied suite.
+> See [shape_suite.md](shape_suite.md). **These tables should be re-run
+> on the delivered-output measurement before being cited as framework
+> results.**
+
 ## The three systems
 
 Every task runs through all three, with the same provider and model:

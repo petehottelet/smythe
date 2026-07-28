@@ -1,0 +1,20 @@
+name: mixed-audit
+natural_shape: fan-in-verify
+goal: |
+  Audit this pricing page copy for three separate defects, then produce a
+  corrected version.
+
+  "Our Pro plan is just $49/mo (billed anually). Save 20% versus monthly —
+  that's $588/year instead of $588. Includes unlimited seats, 99.99% uptime
+  guarunteed, and 24/7 support. Cancel anytime, no refunds."
+
+  Check: (1) spelling, (2) arithmetic and internal contradictions,
+  (3) claims that are legally or logically incoherent.
+constraints:
+  - "Report each defect class separately before the corrected copy"
+  - "The corrected copy must fix every defect you identified"
+rubric:
+  - "Both misspellings are caught (anually, guarunteed)"
+  - "The $588 vs $588 contradiction is caught and the discount math questioned"
+  - "The 'cancel anytime, no refunds' incoherence is identified"
+  - "The corrected copy actually fixes every defect named"

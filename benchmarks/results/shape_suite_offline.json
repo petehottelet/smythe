@@ -1,0 +1,365 @@
+{
+  "benchmark": "shape-suite",
+  "mode": "offline",
+  "executor_model": "offline",
+  "judge_model": null,
+  "reps": 1,
+  "summary": [
+    {
+      "baseline": "single_agent",
+      "runs": 5,
+      "quality_mean": null,
+      "quality_min": null,
+      "quality_terminal_mean": null,
+      "nodes_mean": 1,
+      "cost_total_usd": 0.0015
+    },
+    {
+      "baseline": "fixed_pipeline",
+      "runs": 5,
+      "quality_mean": null,
+      "quality_min": null,
+      "quality_terminal_mean": null,
+      "nodes_mean": 3,
+      "cost_total_usd": 0.0045
+    },
+    {
+      "baseline": "smythe_dynamic",
+      "runs": 5,
+      "quality_mean": null,
+      "quality_min": null,
+      "quality_terminal_mean": null,
+      "nodes_mean": 3,
+      "cost_total_usd": 0.0045
+    }
+  ],
+  "by_task": {
+    "adversarial-claim": {
+      "single_agent": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          1
+        ]
+      },
+      "fixed_pipeline": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      },
+      "smythe_dynamic": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      }
+    },
+    "deep-serial": {
+      "single_agent": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          1
+        ]
+      },
+      "fixed_pipeline": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      },
+      "smythe_dynamic": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      }
+    },
+    "mixed-audit": {
+      "single_agent": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          1
+        ]
+      },
+      "fixed_pipeline": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      },
+      "smythe_dynamic": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      }
+    },
+    "parallel-profiles": {
+      "single_agent": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          1
+        ]
+      },
+      "fixed_pipeline": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      },
+      "smythe_dynamic": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      }
+    },
+    "trivial-transform": {
+      "single_agent": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          1
+        ]
+      },
+      "fixed_pipeline": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      },
+      "smythe_dynamic": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      }
+    }
+  },
+  "records": [
+    {
+      "task": "adversarial-claim",
+      "baseline": "single_agent",
+      "nodes": 1,
+      "depth": 0,
+      "topology": "serial",
+      "cost_usd": 0.0003,
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "adversarial-claim",
+      "baseline": "fixed_pipeline",
+      "nodes": 3,
+      "depth": 2,
+      "topology": "serial",
+      "cost_usd": 0.0009,
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "adversarial-claim",
+      "baseline": "smythe_dynamic",
+      "nodes": 3,
+      "depth": 1,
+      "topology": "fork_join",
+      "cost_usd": 0.0009,
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "deep-serial",
+      "baseline": "single_agent",
+      "nodes": 1,
+      "depth": 0,
+      "topology": "serial",
+      "cost_usd": 0.0003,
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "deep-serial",
+      "baseline": "fixed_pipeline",
+      "nodes": 3,
+      "depth": 2,
+      "topology": "serial",
+      "cost_usd": 0.0009,
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "deep-serial",
+      "baseline": "smythe_dynamic",
+      "nodes": 3,
+      "depth": 1,
+      "topology": "fork_join",
+      "cost_usd": 0.0009,
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "mixed-audit",
+      "baseline": "single_agent",
+      "nodes": 1,
+      "depth": 0,
+      "topology": "serial",
+      "cost_usd": 0.0003,
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "mixed-audit",
+      "baseline": "fixed_pipeline",
+      "nodes": 3,
+      "depth": 2,
+      "topology": "serial",
+      "cost_usd": 0.0009,
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "mixed-audit",
+      "baseline": "smythe_dynamic",
+      "nodes": 3,
+      "depth": 1,
+      "topology": "fork_join",
+      "cost_usd": 0.0009,
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "parallel-profiles",
+      "baseline": "single_agent",
+      "nodes": 1,
+      "depth": 0,
+      "topology": "serial",
+      "cost_usd": 0.0003,
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "parallel-profiles",
+      "baseline": "fixed_pipeline",
+      "nodes": 3,
+      "depth": 2,
+      "topology": "serial",
+      "cost_usd": 0.0009,
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "parallel-profiles",
+      "baseline": "smythe_dynamic",
+      "nodes": 3,
+      "depth": 1,
+      "topology": "fork_join",
+      "cost_usd": 0.0009,
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "trivial-transform",
+      "baseline": "single_agent",
+      "nodes": 1,
+      "depth": 0,
+      "topology": "serial",
+      "cost_usd": 0.0003,
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "trivial-transform",
+      "baseline": "fixed_pipeline",
+      "nodes": 3,
+      "depth": 2,
+      "topology": "serial",
+      "cost_usd": 0.0009,
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "trivial-transform",
+      "baseline": "smythe_dynamic",
+      "nodes": 3,
+      "depth": 1,
+      "topology": "fork_join",
+      "cost_usd": 0.0009,
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    }
+  ]
+}
