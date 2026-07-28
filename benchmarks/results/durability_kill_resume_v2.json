@@ -1,0 +1,91 @@
+{
+  "benchmark_schema": "smythe.durability-benchmark.v2",
+  "evidence_semantics": "duplicate_dispatches conservatively counts repeated operation IDs recorded before simulated remote work; it is exposure, not invoice proof",
+  "protocol": {
+    "generated_at": "2026-07-16T13:31:21.173691+00:00",
+    "versions": {
+      "python": "3.11.7",
+      "platform": "Windows-10-10.0.26200-SP0",
+      "smythe": "0.6.0 (source tree)",
+      "langgraph": "n/a",
+      "langgraph-checkpoint-sqlite": "n/a"
+    },
+    "source": {
+      "harness_sha256": "5ee2fd47b2c1dce68ecdcc52ea53faadafdd2b1891dc740797e53908bb421778",
+      "git_revision": "d2c201f0ef2a76c2e10d8b4fbe72e7c1841ab377",
+      "git_dirty": true,
+      "note": "git fields were recovered immediately after the run; harness_sha256 is the exact run-time source identity"
+    },
+    "cell_a": {
+      "latency_ms": 25,
+      "concurrency": 16,
+      "reps": 3,
+      "sizes": [64, 256, 1024],
+      "persistence": "none"
+    },
+    "cell_b": {
+      "n": 64,
+      "latency_ms": 100,
+      "concurrency": 8,
+      "kill_at_dispatches": 32,
+      "reps": 3,
+      "call_event_schema": "smythe.durability-call-event.v1",
+      "call_event_fsync": true,
+      "smythe": "FileCheckpointStore, checkpoint_every_n_nodes=1",
+      "langgraph": "AsyncSqliteSaver, durability='sync'"
+    }
+  },
+  "cell_b_durability": [
+    {
+      "framework": "smythe",
+      "rep": 0,
+      "n": 64,
+      "dispatches_at_kill": 32,
+      "completions_at_kill": 24,
+      "inflight_attempts_at_kill": 8,
+      "total_dispatches": 72,
+      "total_completions": 64,
+      "duplicate_dispatches": 8,
+      "replayed_operation_ids": [
+        "n0024", "n0025", "n0026", "n0027",
+        "n0028", "n0029", "n0030", "n0031"
+      ],
+      "resume_completed": 64,
+      "resume_wall_s": 27.8427,
+      "durability": "file/every=1"
+    },
+    {
+      "framework": "smythe",
+      "rep": 1,
+      "n": 64,
+      "dispatches_at_kill": 32,
+      "completions_at_kill": 31,
+      "inflight_attempts_at_kill": 1,
+      "total_dispatches": 68,
+      "total_completions": 67,
+      "duplicate_dispatches": 4,
+      "replayed_operation_ids": ["n0028", "n0029", "n0030", "n0031"],
+      "resume_completed": 64,
+      "resume_wall_s": 12.3646,
+      "durability": "file/every=1"
+    },
+    {
+      "framework": "smythe",
+      "rep": 2,
+      "n": 64,
+      "dispatches_at_kill": 32,
+      "completions_at_kill": 28,
+      "inflight_attempts_at_kill": 4,
+      "total_dispatches": 72,
+      "total_completions": 68,
+      "duplicate_dispatches": 8,
+      "replayed_operation_ids": [
+        "n0024", "n0025", "n0026", "n0027",
+        "n0028", "n0029", "n0030", "n0031"
+      ],
+      "resume_completed": 64,
+      "resume_wall_s": 10.0523,
+      "durability": "file/every=1"
+    }
+  ]
+}

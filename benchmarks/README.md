@@ -5,8 +5,9 @@ outperforms both a single agent and a fixed pipeline** — often enough,
 and by enough, to justify the planning call. This harness exists to
 measure that honestly, including where the claim fails.
 
-> **Status: self-baselines, memory-on/off, image-pipeline, and framework
-> head-to-head results are published below.** The core harness also runs
+> **Status: self-baselines, memory-on/off, image-pipeline, glyph fan-out,
+> hard-kill durability, and framework head-to-head workloads are published
+> below.** The core harness also runs
 > end-to-end offline in CI (mechanics verified, deterministic, zero cost).
 
 ## The three systems
@@ -236,6 +237,58 @@ identical cost, 81–88% of ideal parallel efficiency, 72/72 images valid,
 zero rate-limit events on one paid key. Full table, protocol, and
 honest caveats (including an observed near-duplicate pair):
 [image_benchmarks.md](image_benchmarks.md).
+
+## Glyph screensaver fan-out
+
+The [glyph screensaver workload](glyph_screensaver_benchmark.md) turns wide
+artifact generation into something directly inspectable: one independent node
+per original fictional cyber glyph, 64 calls total, followed by objective PNG
+normalization and SHA-256 uniqueness checks.
+
+```bash
+python benchmarks/run_glyph_screensaver.py
+```
+
+The default lane is deterministic, local, and costs nothing. It sweeps
+concurrency 1, 4, 8, and 16 with controlled asynchronous latency, records
+generation and end-to-end timing separately, and assembles the fastest valid
+64-tile run into:
+
+- 64 normalized 128×128 PNG tiles;
+- a 1024×1024 contact-sheet atlas;
+- a 1920×1080 green digital-rain preview;
+- a compact 640×360 looping GIF; and
+- a self-contained animated 1920×1080 HTML canvas.
+
+The marks and composition are procedural originals rather than copied font,
+logo, screenshot, or reference pixels. Every output has a dimensions, frame,
+byte-size, and SHA-256 receipt. The optional GPT Image lane executes one chosen
+concurrency and refuses to start without an API key, explicit inclusive
+per-call ceiling, and a whole-run budget large enough for every call:
+
+```bash
+python benchmarks/run_glyph_screensaver.py --live --concurrency 8 \
+  --max-cost-per-call-usd 0.01 --max-budget-usd 0.64
+```
+
+Those values are examples of the guardrail shape, not current pricing advice.
+Verify provider pricing immediately before any paid run. The offline sweep is
+an executor benchmark; only a repeated live lane can support claims about an
+external image API's latency or rate limits.
+
+## Hard-kill durability
+
+The [durability benchmark](durability_benchmark.md) runs an entirely offline
+wide fan-out, terminates each worker process without cleanup, and measures
+operation IDs dispatched again after restart. Dispatch and completion are
+durably recorded as separate events, so in-flight exposure is not hidden by a
+completion-time log. The current v2 record covers Smythe only; the historical
+framework comparison awaits a rerun under v2 accounting. This is a durability
+microbenchmark, not provider invoice evidence or a universal framework claim.
+
+```bash
+python benchmarks/run_durability_benchmark.py --quick
+```
 
 ## Planned
 

@@ -1,0 +1,444 @@
+{
+  "benchmark": "banner-ad-suite",
+  "brand": "Wright Research",
+  "mode": "LIVE",
+  "model": "gemini-2.5-flash-image",
+  "director": {
+    "model": "gemini-flash-latest",
+    "source": "director",
+    "cost_usd": 0.00885
+  },
+  "candidates_per_placement": 3,
+  "cost_per_image_usd": 0.039,
+  "environment": {
+    "python": "3.12.7",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "packages": {
+      "smythe": "0.1.0",
+      "google-genai": "2.11.0",
+      "pillow": "12.3.0"
+    }
+  },
+  "placements_pass": "7/7",
+  "brand_logo": {
+    "path": "smythe_artifacts/wright_logo.png",
+    "source": "provided",
+    "dark_variant": "derived-knockout"
+  },
+  "generation_wall_s": 12.98,
+  "cost_usd": 1.3778,
+  "placements": [
+    {
+      "placement": "leaderboard_728x90",
+      "spec": "728x90 PNG",
+      "aspect_bucket": "21:9",
+      "candidates": 3,
+      "concepts": [
+        "A clean horizontal medium shot of the Osiris charger resting on a polished slate navy laboratory bench with brass alignment pins, its matte black casing and vibrant amber solar face illuminated by crisp, cool directional light on the left third of the frame, while the right 40% of the image dissolves into a smooth, out-of-focus dark slate-navy shadow that serves as a clean, low-detail negative space.",
+        "A precise horizontal macro profile of the Osiris charger cradled in a machined brass mount against a cool off-white laboratory wall, with a warm spotlight highlighting its amber solar face in the left third of the vertical center, transitioning on the right side into a clean, low-detail off-white gradient reserved entirely for text placement.",
+        "A sharp eye-level horizontal shot of the Osiris charger resting on a dark steel optical test grid in the left-hand third, a sharp bar of cool white light accentuating its matte black edges and rich amber face, while the right 40% of the frame extends into a completely unadorned, deep navy shadow zone kept free of any visual detail."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 5,
+          "photo_quality": 6,
+          "tonal_harmony": 7,
+          "cta_craft": 8,
+          "defects": [
+            "Subject is cropped awkwardly, making it hard to identify as a product.",
+            "Composition feels unbalanced due to the empty space on the left."
+          ]
+        },
+        "c2": {
+          "focal_clarity": 4,
+          "photo_quality": 5,
+          "tonal_harmony": 7,
+          "cta_craft": 8,
+          "defects": [
+            "Extreme close-up makes the subject unrecognizable.",
+            "Lighting is flat, lacks premium feel."
+          ]
+        },
+        "c3": {
+          "focal_clarity": 8,
+          "photo_quality": 8,
+          "tonal_harmony": 9,
+          "cta_craft": 9,
+          "defects": [
+            "Minor perspective distortion on the grid lines."
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 6.5,
+        "c2": 6.0,
+        "c3": 8.5
+      },
+      "winner": "c3",
+      "generated_size": [
+        1536,
+        672
+      ],
+      "upscale_factor": 0.47,
+      "cropped_fraction": 0.717,
+      "placement_class": "horizontal",
+      "treatment": "knockout",
+      "horizontal_layout": "wordmark-over-cta",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/wright_live1/final/osiris_leaderboard_728x90.png"
+    },
+    {
+      "placement": "mobile_banner_320x100",
+      "spec": "320x100 PNG",
+      "aspect_bucket": "21:9",
+      "candidates": 3,
+      "concepts": [
+        "A horizontal eye-level shot of the Osiris charger resting on a dark slate laboratory bench on the left side of the frame, its matte black housing and golden amber solar face illuminated by a precise beam of cool directional light, while the right 40% of the frame is a completely clear, dark navy negative space for copy.",
+        "A sleek horizontal profile of the Osiris charger mounted on a warm brass calibration rail in the left-hand third of the frame, set against a clean, cool off-white technical background with soft directional shadows, leaving the right 40% of the frame as an even, low-detail light gradient.",
+        "A sharp horizontal macro shot of the Osiris charger on a slate-colored engineering surface on the left, capturing the crisp contrast between its matte black chassis and amber solar face under cool overhead light, while the right 40% of the image is composed of a clean, uninterrupted deep shadow."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 7,
+          "photo_quality": 6,
+          "tonal_harmony": 5,
+          "cta_craft": 8,
+          "defects": [
+            "The object in the photography has unnatural circular lighting artifacts",
+            "The logo is illegible due to low contrast against the dark background"
+          ]
+        },
+        "c2": {
+          "focal_clarity": 8,
+          "photo_quality": 8,
+          "tonal_harmony": 7,
+          "cta_craft": 8,
+          "defects": [
+            "Minor logo-to-background contrast issues",
+            "The product perspective creates an awkward dead space on the right side"
+          ]
+        },
+        "c3": {
+          "focal_clarity": 9,
+          "photo_quality": 9,
+          "tonal_harmony": 8,
+          "cta_craft": 9,
+          "defects": [
+            "Slightly tight vertical composition for the brand mark"
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 6.5,
+        "c2": 7.75,
+        "c3": 8.75
+      },
+      "winner": "c3",
+      "generated_size": [
+        1536,
+        672
+      ],
+      "upscale_factor": 0.21,
+      "cropped_fraction": 0.286,
+      "placement_class": "horizontal",
+      "treatment": "knockout",
+      "horizontal_layout": "wordmark-over-cta",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/wright_live1/final/osiris_mobile_banner_320x100.png"
+    },
+    {
+      "placement": "mobile_leaderboard_320x50",
+      "spec": "320x50 PNG",
+      "aspect_bucket": "21:9",
+      "candidates": 3,
+      "concepts": [
+        "A tight horizontal detail shot of the Osiris charger positioned on the left side of a dark slate-navy workbench, its matte black body and rich amber face catching cool, sharp directional light, while the right 40% of the frame is maintained as a clean, low-detail dark blue negative space.",
+        "A precise horizontal side view of the Osiris charger resting on a machined brass plate in the left third of the frame, illuminated by a warm spotlight that makes the amber solar face glow, with the right 40% of the composition reserved as a plain, off-white empty background.",
+        "A low-profile horizontal shot of the Osiris charger on a matte black laboratory surface in the left third of the frame, showing the clean lines of the device under cool white lighting, while the right 40% of the frame remains a completely blank, dark gray shadow zone."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 6,
+          "photo_quality": 5,
+          "tonal_harmony": 5,
+          "cta_craft": 4,
+          "defects": [
+            "Product perspective is awkward and cropped poorly for a 320x50 space",
+            "Lighting artifacts on the product surface",
+            "Brand mark lacks contrast against the dark background"
+          ]
+        },
+        "c2": {
+          "focal_clarity": 7,
+          "photo_quality": 6,
+          "tonal_harmony": 7,
+          "cta_craft": 6,
+          "defects": [
+            "Product feels isolated from the CTA zone",
+            "Overall composition feels disjointed due to the heavy background gradient",
+            "Logo reads better here but still lacks professional integration"
+          ]
+        },
+        "c3": {
+          "focal_clarity": 8,
+          "photo_quality": 8,
+          "tonal_harmony": 9,
+          "cta_craft": 8,
+          "defects": [
+            "Slightly tight vertical margins for the typography",
+            "Minor contrast check: CTA text is legible but could be bolder for accessibility at 320px width"
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 5.0,
+        "c2": 6.5,
+        "c3": 8.25
+      },
+      "winner": "c3",
+      "generated_size": [
+        1536,
+        672
+      ],
+      "upscale_factor": 0.21,
+      "cropped_fraction": 0.643,
+      "placement_class": "horizontal",
+      "treatment": "knockout",
+      "horizontal_layout": "icon+cta-text",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/wright_live1/final/osiris_mobile_leaderboard_320x50.png"
+    },
+    {
+      "placement": "large_rectangle_336x280",
+      "spec": "336x280 PNG",
+      "aspect_bucket": "4:3",
+      "candidates": 3,
+      "concepts": [
+        "A sharp eye-level studio shot of the Osiris charger sitting in the upper two-thirds of the frame on a clean slate-navy laboratory bench next to a subtle warm brass measuring tool, illuminated by cool directional light that defines its matte black chassis and amber solar face, while the bottom 25% of the frame is kept as a solid, dark navy negative space.",
+        "A high-angle product shot of the Osiris charger mounted on a machined brass testing bracket against a cool off-white wall in the upper two-thirds of the image, bathed in a warm spotlight that highlights its solar panel, leaving the bottom 25% of the frame as an empty, light-colored off-white gradient.",
+        "A clean three-quarter view of the Osiris charger resting on a dark gray engineering table in the upper two-thirds of the frame, captured under sharp, cool laboratory light that accentuates its matte black finish and vibrant amber face, with the bottom 25% of the image preserved as a plain, low-detail dark shadow."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 5,
+          "photo_quality": 6,
+          "tonal_harmony": 7,
+          "cta_craft": 8,
+          "defects": [
+            "Ambiguous subject matter",
+            "The calipurs are disconnected from the primary subject",
+            "Lacks a clear hero focal point"
+          ]
+        },
+        "c2": {
+          "focal_clarity": 7,
+          "photo_quality": 7,
+          "tonal_harmony": 7,
+          "cta_craft": 8,
+          "defects": [
+            "Technical assembly is visually busy",
+            "Hardware-focused aesthetic feels industrial rather than research-oriented"
+          ]
+        },
+        "c3": {
+          "focal_clarity": 9,
+          "photo_quality": 9,
+          "tonal_harmony": 9,
+          "cta_craft": 8,
+          "defects": [
+            "None"
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 6.5,
+        "c2": 7.25,
+        "c3": 8.75
+      },
+      "winner": "c3",
+      "generated_size": [
+        1184,
+        864
+      ],
+      "upscale_factor": 0.32,
+      "cropped_fraction": 0.125,
+      "placement_class": "rectangle",
+      "treatment": "knockout",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/wright_live1/final/osiris_large_rectangle_336x280.png"
+    },
+    {
+      "placement": "inline_rectangle_300x250",
+      "spec": "300x250 PNG",
+      "aspect_bucket": "4:3",
+      "candidates": 3,
+      "concepts": [
+        "A direct studio shot of the Osiris charger resting in the upper two-thirds of the frame on a dark slate bench, its matte black surface and rich amber solar face catching a precise beam of cool light, while the bottom 25% of the frame is a clean, unadorned slate-navy shadow zone.",
+        "A premium vertical angle shot of the Osiris charger positioned in the upper two-thirds of the frame on a brass laboratory plate against a cool off-white background, illuminated to emphasize the texture of its matte black body, with the bottom 25% kept as a completely blank, light off-white negative space.",
+        "A close-up three-quarter shot of the Osiris charger in the upper two-thirds of the frame on a slate-colored table, showing the detailed craftsmanship of the matte black casing and amber face under cool directional light, leaving the bottom 25% of the image as a dark, low-detail negative space."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 8,
+          "photo_quality": 8,
+          "tonal_harmony": 9,
+          "cta_craft": 9,
+          "defects": [
+            "Slight soft-focus blur at the top edge of the product"
+          ]
+        },
+        "c2": {
+          "focal_clarity": 7,
+          "photo_quality": 7,
+          "tonal_harmony": 8,
+          "cta_craft": 9,
+          "defects": [
+            "Inconsistent lighting between the object and the surface plate",
+            "Product looks somewhat pasted onto the background plate"
+          ]
+        },
+        "c3": {
+          "focal_clarity": 9,
+          "photo_quality": 9,
+          "tonal_harmony": 9,
+          "cta_craft": 9,
+          "defects": []
+        }
+      },
+      "score_means": {
+        "c1": 8.5,
+        "c2": 7.75,
+        "c3": 9.0
+      },
+      "winner": "c3",
+      "generated_size": [
+        1184,
+        864
+      ],
+      "upscale_factor": 0.29,
+      "cropped_fraction": 0.125,
+      "placement_class": "rectangle",
+      "treatment": "knockout",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/wright_live1/final/osiris_inline_rectangle_300x250.png"
+    },
+    {
+      "placement": "half_page_300x600",
+      "spec": "300x600 PNG",
+      "aspect_bucket": "9:16",
+      "candidates": 3,
+      "concepts": [
+        "A dramatic vertical shot of the Osiris charger standing upright in the narrow center column of the upper two-thirds on a polished slate laboratory bench, its matte black form and amber face defined by a sharp beam of cool directional light, while the bottom 30% of the frame is kept entirely empty as a deep slate-navy shadow.",
+        "A clean vertical composition featuring the Osiris charger mounted in a warm brass testing frame against a minimalist, cool off-white wall in the upper two-thirds, illuminated by a soft, warm light that highlights its solar face, leaving the bottom 30% of the canvas as a completely plain, off-white negative space.",
+        "A high-contrast vertical shot looking down at the Osiris charger on a dark steel laboratory grid in the upper two-thirds, with a cool spotlight accentuating the matte black chassis and rich amber solar face, while the bottom 30% of the frame is a smooth, unadorned dark gradient."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 8,
+          "photo_quality": 8,
+          "tonal_harmony": 9,
+          "cta_craft": 9,
+          "defects": [
+            "Slight soft focus on the edges of the device",
+            "Minimalist aesthetic works well for the brand"
+          ]
+        },
+        "c2": {
+          "focal_clarity": 6,
+          "photo_quality": 7,
+          "tonal_harmony": 5,
+          "cta_craft": 9,
+          "defects": [
+            "Incorrect logo usage (dark logo on light background is not high contrast enough for the brand standards)",
+            "Composition feels somewhat disjointed",
+            "Lighting on the object appears slightly synthetic"
+          ]
+        },
+        "c3": {
+          "focal_clarity": 7,
+          "photo_quality": 8,
+          "tonal_harmony": 9,
+          "cta_craft": 9,
+          "defects": [
+            "Complex background texture competes slightly with the hero object for attention",
+            "Object geometry feels slightly abstract, reducing immediate recognition"
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 8.5,
+        "c2": 6.75,
+        "c3": 8.25
+      },
+      "winner": "c1",
+      "generated_size": [
+        768,
+        1344
+      ],
+      "upscale_factor": 0.45,
+      "cropped_fraction": 0.125,
+      "placement_class": "vertical",
+      "treatment": "knockout",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/wright_live1/final/osiris_half_page_300x600.png"
+    },
+    {
+      "placement": "skyscraper_160x600",
+      "spec": "160x600 PNG",
+      "aspect_bucket": "9:16",
+      "candidates": 3,
+      "concepts": [
+        "A vertical studio shot of the Osiris charger positioned in the narrow center column of the upper two-thirds of the frame on a dark slate workbench, its matte black casing and amber face catching a crisp ray of cool directional light, with the bottom 30% of the frame preserved as a clean, low-detail slate-navy negative space.",
+        "A sleek vertical shot of the Osiris charger resting on a polished brass support rail in the upper two-thirds of the frame against a cool off-white backdrop, illuminated by a warm golden spotlight on its solar face, while the bottom 30% of the composition is a solid, clean off-white field.",
+        "A precise vertical profile of the Osiris charger in the upper two-thirds of the frame on a dark gray engineering surface, capturing its clean lines and amber solar panel under cool, sharp laboratory light, with the bottom 30% of the frame kept completely blank and dark."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 7,
+          "photo_quality": 8,
+          "tonal_harmony": 9,
+          "cta_craft": 8,
+          "defects": [
+            "The object lighting is slightly flat and lacks a clear focal point compared to the other compositions.",
+            "Texture on the surface is a bit repetitive."
+          ]
+        },
+        "c2": {
+          "focal_clarity": 9,
+          "photo_quality": 9,
+          "tonal_harmony": 9,
+          "cta_craft": 8,
+          "defects": [
+            "The text 'OSIRIS' on the product is clear, but the product itself occupies less of the frame's visual weight than the other comps.",
+            "Slightly distracting background blur."
+          ]
+        },
+        "c3": {
+          "focal_clarity": 9,
+          "photo_quality": 9,
+          "tonal_harmony": 9,
+          "cta_craft": 9,
+          "defects": [
+            "None notable; the lighting and composition provide the most professional presentation of the product."
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 8.0,
+        "c2": 8.75,
+        "c3": 9.0
+      },
+      "winner": "c3",
+      "generated_size": [
+        768,
+        1344
+      ],
+      "upscale_factor": 0.45,
+      "cropped_fraction": 0.534,
+      "placement_class": "vertical",
+      "treatment": "knockout",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/wright_live1/final/osiris_skyscraper_160x600.png"
+    }
+  ]
+}

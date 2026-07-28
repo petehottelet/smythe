@@ -1,0 +1,166 @@
+{
+  "benchmark_schema": "smythe.durability-benchmark.legacy-invalid.v1",
+  "invalidated": true,
+  "invalidation_reason": "Completion-time call logs undercounted requests that were dispatched but still in flight at process termination, so duplicate-dispatch accounting is not comparable to v2.",
+  "superseded_by": "durability_kill_resume_v2.json",
+  "protocol": {
+    "generated_at": "2026-07-15T08:40:27.671565+00:00",
+    "versions": {
+      "python": "3.12.7",
+      "platform": "Windows-11-10.0.26200-SP0",
+      "smythe": "0.6.0",
+      "langgraph": "1.2.9",
+      "langgraph-checkpoint-sqlite": "3.1.0"
+    },
+    "cell_a": {
+      "latency_ms": 25,
+      "concurrency": 16,
+      "reps": 3,
+      "sizes": [
+        64,
+        256,
+        1024
+      ],
+      "persistence": "none"
+    },
+    "cell_b": {
+      "n": 64,
+      "latency_ms": 100,
+      "concurrency": 8,
+      "kill_at_calls": 32,
+      "reps": 3,
+      "smythe": "FileCheckpointStore, checkpoint_every_n_nodes=1",
+      "langgraph": "AsyncSqliteSaver, durability='sync'"
+    }
+  },
+  "cell_a_overhead": [
+    {
+      "framework": "smythe",
+      "n": 64,
+      "ideal_s": 0.1,
+      "wall_mean_s": 0.164,
+      "wall_min_s": 0.15,
+      "wall_max_s": 0.179,
+      "overhead_per_node_ms": 0.996,
+      "build_mean_s": 0.0
+    },
+    {
+      "framework": "langgraph",
+      "n": 64,
+      "ideal_s": 0.1,
+      "wall_mean_s": 0.167,
+      "wall_min_s": 0.163,
+      "wall_max_s": 0.169,
+      "overhead_per_node_ms": 1.045,
+      "build_mean_s": 0.021
+    },
+    {
+      "framework": "smythe",
+      "n": 256,
+      "ideal_s": 0.4,
+      "wall_mean_s": 0.585,
+      "wall_min_s": 0.576,
+      "wall_max_s": 0.594,
+      "overhead_per_node_ms": 0.722,
+      "build_mean_s": 0.0
+    },
+    {
+      "framework": "langgraph",
+      "n": 256,
+      "ideal_s": 0.4,
+      "wall_mean_s": 0.805,
+      "wall_min_s": 0.727,
+      "wall_max_s": 0.864,
+      "overhead_per_node_ms": 1.58,
+      "build_mean_s": 0.084
+    },
+    {
+      "framework": "smythe",
+      "n": 1024,
+      "ideal_s": 1.6,
+      "wall_mean_s": 2.282,
+      "wall_min_s": 2.056,
+      "wall_max_s": 2.397,
+      "overhead_per_node_ms": 0.666,
+      "build_mean_s": 0.002
+    },
+    {
+      "framework": "langgraph",
+      "n": 1024,
+      "ideal_s": 1.6,
+      "wall_mean_s": 3.46,
+      "wall_min_s": 3.047,
+      "wall_max_s": 3.678,
+      "overhead_per_node_ms": 1.816,
+      "build_mean_s": 0.351
+    }
+  ],
+  "cell_b_durability": [
+    {
+      "framework": "smythe",
+      "rep": 0,
+      "n": 64,
+      "calls_at_kill": 32,
+      "total_calls": 72,
+      "duplicated_calls": 8,
+      "resume_completed": 64,
+      "resume_wall_s": 0.8795,
+      "durability": "file/every=1"
+    },
+    {
+      "framework": "smythe",
+      "rep": 1,
+      "n": 64,
+      "calls_at_kill": 32,
+      "total_calls": 69,
+      "duplicated_calls": 5,
+      "resume_completed": 64,
+      "resume_wall_s": 0.6379,
+      "durability": "file/every=1"
+    },
+    {
+      "framework": "smythe",
+      "rep": 2,
+      "n": 64,
+      "calls_at_kill": 32,
+      "total_calls": 64,
+      "duplicated_calls": 0,
+      "resume_completed": 64,
+      "resume_wall_s": 0.522,
+      "durability": "file/every=1"
+    },
+    {
+      "framework": "langgraph",
+      "rep": 0,
+      "n": 64,
+      "calls_at_kill": 32,
+      "total_calls": 96,
+      "duplicated_calls": 32,
+      "resume_completed": 64,
+      "resume_wall_s": 4.9081,
+      "durability": "sync"
+    },
+    {
+      "framework": "langgraph",
+      "rep": 1,
+      "n": 64,
+      "calls_at_kill": 32,
+      "total_calls": 96,
+      "duplicated_calls": 32,
+      "resume_completed": 64,
+      "resume_wall_s": 4.5081,
+      "durability": "sync"
+    },
+    {
+      "framework": "langgraph",
+      "rep": 2,
+      "n": 64,
+      "calls_at_kill": 32,
+      "total_calls": 96,
+      "duplicated_calls": 32,
+      "resume_completed": 64,
+      "resume_wall_s": 7.998,
+      "durability": "sync"
+    }
+  ]
+}

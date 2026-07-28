@@ -1,0 +1,461 @@
+{
+  "benchmark": "banner-ad-suite",
+  "brand": "SimuLatte",
+  "mode": "LIVE",
+  "model": "gemini-2.5-flash-image",
+  "director": {
+    "model": "gemini-flash-latest",
+    "source": "director",
+    "cost_usd": 0.008814
+  },
+  "candidates_per_placement": 3,
+  "cost_per_image_usd": 0.039,
+  "environment": {
+    "python": "3.12.7",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "packages": {
+      "smythe": "0.1.0",
+      "google-genai": "2.11.0",
+      "pillow": "12.3.0"
+    }
+  },
+  "placements_pass": "7/7",
+  "brand_logo": {
+    "path": "smythe_artifacts/simulatte_logo.png",
+    "source": "provided",
+    "dark_variant": "derived-knockout"
+  },
+  "generation_wall_s": 12.48,
+  "cost_usd": 1.3795,
+  "placements": [
+    {
+      "placement": "leaderboard_728x90",
+      "spec": "728x90 PNG",
+      "aspect_bucket": "21:9",
+      "candidates": 3,
+      "concepts": [
+        "An eye-level close-up shot of the matte black Osiris charger with its amber solar face resting on a warm oak counter next to a steaming ceramic mug, illuminated by a sharp beam of golden morning light raking from the side with a shallow depth of field, leaving the right 40% of the horizontal center strip as a completely clean, low-detail, warm caramel-toned negative space.",
+        "A low-angle macro shot of the Osiris charger catching warm morning sunlight as it leans against a rustic textured clay vase on a polished dark wood table, captured with a prime lens that blurs the background, keeping the right 40% of the horizontal frame as a quiet, low-detail oat-milk cream gradient.",
+        "A high-angle tabletop shot of the Osiris charger laying flat on a textured linen surface next to scattered roasted coffee beans under a warm, diffused morning glow, with the right 40% of the horizontal strip reserved as a flat, uncluttered, deep espresso-brown shadow zone."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 6,
+          "photo_quality": 6,
+          "tonal_harmony": 7,
+          "cta_craft": 8,
+          "defects": [
+            "Inconsistent lighting between the coffee cup and the heater unit",
+            "The heater unit looks like a low-fidelity AI generation",
+            "The logo text is slightly illegible due to the busy background contrast"
+          ]
+        },
+        "c2": {
+          "focal_clarity": 5,
+          "photo_quality": 4,
+          "tonal_harmony": 6,
+          "cta_craft": 8,
+          "defects": [
+            "Major AI artifacts in the ceramic texture",
+            "Subject matter is ambiguous (cannot identify the product)",
+            "Lack of professional lighting contrast"
+          ]
+        },
+        "c3": {
+          "focal_clarity": 9,
+          "photo_quality": 9,
+          "tonal_harmony": 9,
+          "cta_craft": 9,
+          "defects": [
+            "Slightly cropped coffee beans at the left edge",
+            "Overall high-quality execution with minimal composition errors"
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 6.75,
+        "c2": 5.75,
+        "c3": 9.0
+      },
+      "winner": "c3",
+      "generated_size": [
+        1536,
+        672
+      ],
+      "upscale_factor": 0.47,
+      "cropped_fraction": 0.717,
+      "placement_class": "horizontal",
+      "treatment": "knockout",
+      "horizontal_layout": "lockup+cta",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/simulatte_live1/final/osiris_leaderboard_728x90.png"
+    },
+    {
+      "placement": "mobile_banner_320x100",
+      "spec": "320x100 PNG",
+      "aspect_bucket": "21:9",
+      "candidates": 3,
+      "concepts": [
+        "A tight, horizontal macro shot of the Osiris charger's matte black body and glowing amber face basking in direct golden morning sunlight on a weathered wooden window sill, shot with a shallow depth of field, leaving the right 40% of the horizontal center strip as a clean, out-of-focus, warm caramel negative space.",
+        "An eye-level profile shot of the Osiris charger resting on a warm oak bar next to a soft-focus porcelain espresso cup, illuminated by a rich, warm morning sunbeam, where the right 40% of the horizontal frame is a smooth, low-detail oat-milk cream wash.",
+        "A low-angle shot of the Osiris charger resting on a dark walnut table with warm morning light catching its amber solar surface, filmed with a telephoto lens to keep the background soft, reserving the right 40% of the frame as a clean, flat, espresso-brown shadow zone."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 7,
+          "photo_quality": 6,
+          "tonal_harmony": 5,
+          "cta_craft": 4,
+          "defects": [
+            "Inconsistent brand logo usage: utilized text-only name instead of the DNA-cup icon logo",
+            "CTA button has low contrast and amateurish typography",
+            "Product placement feels disconnected from the banner environment"
+          ]
+        },
+        "c2": {
+          "focal_clarity": 8,
+          "photo_quality": 7,
+          "tonal_harmony": 6,
+          "cta_craft": 5,
+          "defects": [
+            "Inconsistent brand logo usage: text-only name instead of official icon",
+            "AI-generated wood texture on the device appears slightly warped",
+            "CTA lacks professional tracking and premium finish"
+          ]
+        },
+        "c3": {
+          "focal_clarity": 7,
+          "photo_quality": 7,
+          "tonal_harmony": 6,
+          "cta_craft": 5,
+          "defects": [
+            "Inconsistent brand logo usage: text-only name instead of official icon",
+            "Product geometry exhibits AI-typical perspective distortion",
+            "Overall composition feels unbalanced for a 320x100 format"
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 5.5,
+        "c2": 6.5,
+        "c3": 6.25
+      },
+      "winner": "c2",
+      "generated_size": [
+        1536,
+        672
+      ],
+      "upscale_factor": 0.21,
+      "cropped_fraction": 0.286,
+      "placement_class": "horizontal",
+      "treatment": "primary",
+      "horizontal_layout": "wordmark-over-cta",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/simulatte_live1/final/osiris_mobile_banner_320x100.png"
+    },
+    {
+      "placement": "mobile_leaderboard_320x50",
+      "spec": "320x50 PNG",
+      "aspect_bucket": "21:9",
+      "candidates": 3,
+      "concepts": [
+        "An extreme close-up horizontal shot of the Osiris charger's glowing amber face lying flat on a warm, sun-drenched oak counter with soft-focus steam rising nearby, captured with a macro lens, leaving the right 40% of the horizontal center strip as a clean, low-detail, warm caramel-toned negative space.",
+        "A low-profile horizontal shot of the Osiris charger resting on a textured linen napkin under soft, golden morning light, filmed at eye-level to maintain a shallow depth of field, where the right 40% of the frame is kept as a pristine, low-detail oat-milk cream gradient.",
+        "A sharp tabletop macro shot of the Osiris charger catching a sliver of bright morning sun on a dark walnut surface, leaving the right 40% of the horizontal frame as an entirely uncluttered, deep espresso-brown shadow zone."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 5,
+          "photo_quality": 4,
+          "tonal_harmony": 5,
+          "cta_craft": 4,
+          "defects": [
+            "Incoherent text artifacts on the glass coaster surface",
+            "Low contrast between the logo and the background",
+            "Poorly integrated lighting"
+          ]
+        },
+        "c2": {
+          "focal_clarity": 7,
+          "photo_quality": 6,
+          "tonal_harmony": 7,
+          "cta_craft": 6,
+          "defects": [
+            "Slightly generic texture on the coaster surface",
+            "Composition feels somewhat unbalanced for a 320x50 space"
+          ]
+        },
+        "c3": {
+          "focal_clarity": 8,
+          "photo_quality": 8,
+          "tonal_harmony": 8,
+          "cta_craft": 7,
+          "defects": [
+            "Slightly aggressive lens flare/highlight that competes with the brand block"
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 4.5,
+        "c2": 6.5,
+        "c3": 7.75
+      },
+      "winner": "c3",
+      "generated_size": [
+        1536,
+        672
+      ],
+      "upscale_factor": 0.21,
+      "cropped_fraction": 0.643,
+      "placement_class": "horizontal",
+      "treatment": "knockout",
+      "horizontal_layout": "icon+cta-text",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/simulatte_live1/final/osiris_mobile_leaderboard_320x50.png"
+    },
+    {
+      "placement": "large_rectangle_336x280",
+      "spec": "336x280 PNG",
+      "aspect_bucket": "4:3",
+      "candidates": 3,
+      "concepts": [
+        "A warm, high-angle shot of the Osiris charger with its amber face glowing under golden morning light on a textured oak counter next to a ceramic cup of latte art, captured with a shallow depth of field that makes the product pop, with the bottom 25% of the frame fading into a clean, low-detail, dark espresso wood shadow.",
+        "An eye-level close-up shot of the Osiris charger leaning against a textured clay pot on a sunlit window ledge, bathed in warm caramel-toned morning rays from a low angle, leaving the bottom 25% of the frame as a clean, uniform, low-detail cream-colored surface.",
+        "A cozy, macro shot of the matte black Osiris charger resting on a folded linen cloth next to a scattering of roasted coffee beans under bright morning sun, shot with a 50mm lens, with the bottom 25% of the frame reserved as a clean, dark, out-of-focus negative space."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 8,
+          "photo_quality": 8,
+          "tonal_harmony": 7,
+          "cta_craft": 8,
+          "defects": [
+            "Inconsistent logo usage; brand logo used a white-fill DNA strand which clashes slightly with the warm lighting on the coaster.",
+            "Minor AI artifacting on the edge of the coaster."
+          ]
+        },
+        "c2": {
+          "focal_clarity": 5,
+          "photo_quality": 6,
+          "tonal_harmony": 6,
+          "cta_craft": 8,
+          "defects": [
+            "Composition is poorly balanced; the subject is leaning against the pot awkwardly.",
+            "Lighting on the coaster looks flat compared to the surrounding environment.",
+            "The coaster shape is ambiguous and poorly defined."
+          ]
+        },
+        "c3": {
+          "focal_clarity": 7,
+          "photo_quality": 7,
+          "tonal_harmony": 7,
+          "cta_craft": 8,
+          "defects": [
+            "The background is cluttered with coffee beans which distracts from the main hero product.",
+            "The steam effect looks unnatural and poorly integrated.",
+            "The coaster perspective feels distorted."
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 7.75,
+        "c2": 6.25,
+        "c3": 7.25
+      },
+      "winner": "c1",
+      "generated_size": [
+        1184,
+        864
+      ],
+      "upscale_factor": 0.32,
+      "cropped_fraction": 0.125,
+      "placement_class": "rectangle",
+      "treatment": "knockout",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/simulatte_live1/final/osiris_large_rectangle_336x280.png"
+    },
+    {
+      "placement": "inline_rectangle_300x250",
+      "spec": "300x250 PNG",
+      "aspect_bucket": "4:3",
+      "candidates": 3,
+      "concepts": [
+        "A close-up, eye-level shot focusing on the amber solar face of the Osiris charger resting on a warm oak table as golden morning light streams across its matte black frame, captured with a prime lens, with the bottom 25% of the frame transitioning to a clean, low-detail shadow of deep espresso brown.",
+        "A warm lifestyle shot of the Osiris charger catching direct morning sunlight on a cafe counter next to a steaming cup of oat-milk coffee, framed from a slightly elevated angle to emphasize the charger's form, keeping the bottom 25% of the frame as a flat, uncluttered, warm caramel-colored surface.",
+        "A low-angle shot of the Osiris charger propped up on a wooden ledge bathed in morning glow with soft-focus steam in the background, captured with a shallow depth of field, leaving the bottom 25% of the frame as a clean, low-detail, soft cream-colored negative space."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 7,
+          "photo_quality": 6,
+          "tonal_harmony": 5,
+          "cta_craft": 6,
+          "defects": [
+            "Inconsistent logo placement and scale",
+            "AI-generated device mesh/pixels are muddy",
+            "Low contrast between dark logo text and dark background",
+            "Subject lacks clear hierarchy"
+          ]
+        },
+        "c2": {
+          "focal_clarity": 8,
+          "photo_quality": 7,
+          "tonal_harmony": 6,
+          "cta_craft": 7,
+          "defects": [
+            "Logo reads poorly against the brown tabletop",
+            "Steam artifacts appear somewhat synthetic",
+            "Device is visually disconnected from the coffee cup subject"
+          ]
+        },
+        "c3": {
+          "focal_clarity": 9,
+          "photo_quality": 8,
+          "tonal_harmony": 9,
+          "cta_craft": 8,
+          "defects": [
+            "Logo slightly cramped in the lower left corner",
+            "Minimal texture noise in the background steam"
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 6.0,
+        "c2": 7.0,
+        "c3": 8.5
+      },
+      "winner": "c3",
+      "generated_size": [
+        1184,
+        864
+      ],
+      "upscale_factor": 0.29,
+      "cropped_fraction": 0.125,
+      "placement_class": "rectangle",
+      "treatment": "primary",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/simulatte_live1/final/osiris_inline_rectangle_300x250.png"
+    },
+    {
+      "placement": "half_page_300x600",
+      "spec": "300x600 PNG",
+      "aspect_bucket": "9:16",
+      "candidates": 3,
+      "concepts": [
+        "A vertical, eye-level shot of the Osiris charger standing upright in the narrow center column of the frame on an oak bar, fully illuminated by a raking beam of golden morning light, with the bottom 30% of the frame reserved as a clean, solid, dark espresso-brown counter shadow.",
+        "A cozy vertical composition featuring the Osiris charger positioned in the upper center, catching warm sunlight through a window pane next to a steaming ceramic espresso cup, shot with a medium telephoto lens, with the bottom 30% of the frame fading into a clean, low-detail, warm caramel-toned gradient.",
+        "A premium, close-up vertical shot of the matte black Osiris charger with its amber face shining in morning light, centered perfectly on a textured wooden shelf with a shallow depth of field, with the bottom 30% of the frame kept as a clean, uniform, oat-milk cream colored negative space."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 7,
+          "photo_quality": 6,
+          "tonal_harmony": 5,
+          "cta_craft": 8,
+          "defects": [
+            "Product placement is slightly awkward",
+            "Background lighting is muddy",
+            "Brand block feels slightly detached from the image"
+          ]
+        },
+        "c2": {
+          "focal_clarity": 9,
+          "photo_quality": 9,
+          "tonal_harmony": 9,
+          "cta_craft": 9,
+          "defects": [
+            "None"
+          ]
+        },
+        "c3": {
+          "focal_clarity": 6,
+          "photo_quality": 7,
+          "tonal_harmony": 6,
+          "cta_craft": 8,
+          "defects": [
+            "Product is not immediately recognizable as a beverage appliance",
+            "Composition is overly static",
+            "Low contrast in the lower brand block area"
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 6.5,
+        "c2": 9.0,
+        "c3": 6.75
+      },
+      "winner": "c2",
+      "generated_size": [
+        768,
+        1344
+      ],
+      "upscale_factor": 0.45,
+      "cropped_fraction": 0.125,
+      "placement_class": "vertical",
+      "treatment": "scrim",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/simulatte_live1/final/osiris_half_page_300x600.png"
+    },
+    {
+      "placement": "skyscraper_160x600",
+      "spec": "160x600 PNG",
+      "aspect_bucket": "9:16",
+      "candidates": 3,
+      "concepts": [
+        "An elegant, vertical macro shot of the Osiris charger positioned in the narrow center of the upper two-thirds, its amber face glowing under sharp morning sunlight on an oak counter, captured with a low-angle perspective, with the bottom 30% of the frame transitioning into a clean, low-detail, deep espresso-brown wood grain shadow.",
+        "A tall, dramatic shot of the Osiris charger standing vertically in the upper center column, flanked by soft-focus ceramic mugs in warm morning light, filmed with a shallow depth of field, with the bottom 30% of the frame reserved as a completely uncluttered, warm caramel-colored negative space.",
+        "A vertical close-up of the Osiris charger catching golden morning rays next to a linen napkin on a wooden ledge, framed with a telephoto lens to isolate the charger, with the bottom 30% of the frame kept as a clean, flat, oat-milk cream toned negative space."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 7,
+          "photo_quality": 6,
+          "tonal_harmony": 5,
+          "cta_craft": 7,
+          "defects": [
+            "Product subject lacks clear context",
+            "Lighting on product feels slightly flat",
+            "Logo color palette clashes with the brown photo background"
+          ]
+        },
+        "c2": {
+          "focal_clarity": 8,
+          "photo_quality": 8,
+          "tonal_harmony": 8,
+          "cta_craft": 8,
+          "defects": [
+            "Product scale is slightly small in the frame",
+            "Minimal background depth"
+          ]
+        },
+        "c3": {
+          "focal_clarity": 6,
+          "photo_quality": 7,
+          "tonal_harmony": 6,
+          "cta_craft": 7,
+          "defects": [
+            "Product (a flat disc) is less visually engaging than the cylindrical variants",
+            "Background clutter (plant) distracts from the primary subject",
+            "The light-colored logo treatment feels slightly disconnected from the cream-toned background"
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 6.25,
+        "c2": 8.0,
+        "c3": 6.5
+      },
+      "winner": "c2",
+      "generated_size": [
+        768,
+        1344
+      ],
+      "upscale_factor": 0.45,
+      "cropped_fraction": 0.534,
+      "placement_class": "vertical",
+      "treatment": "scrim",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/simulatte_live1/final/osiris_skyscraper_160x600.png"
+    }
+  ]
+}
