@@ -21,9 +21,26 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
-Future work tracked in [ROADMAP.md](ROADMAP.md).
-
 ### Added
+
+- **Adaptive supervision — plans can now correct themselves mid-run.**
+  The Architect plans once; until now the executor walked that plan to
+  the end no matter what the results showed, and the published
+  head-to-head puts a number on the cost (`smythe_dynamic` 9.27 with a
+  [5-10] range, one bad plan dragging a task down with no way to
+  recover). A `Supervisor` reviews completed work and may return a
+  `Revision` that changes the *unexecuted* remainder: `add_nodes` to
+  close a gap, `drop_node_ids` to cancel work the results made
+  pointless, `rewire` to insert a step ahead of pending work.
+  History is immutable - completed, running, and failed nodes are never
+  touched, so a revision cannot invalidate a banked result.
+  Guardrails: off by default (`max_revisions=0`), full validation
+  before any mutation, contained failure (a supervisor that raises or
+  proposes nonsense is traced and ignored, never fails the run), and
+  revision-added nodes go through the same budget reservation as
+  planned ones. `LLMSupervisor` reviews only at stage boundaries by
+  default to keep the supervising model out of the routine path.
+  New: `docs/supervisor.md`, `examples/13_adaptive_supervision.py`.
 
 - Image providers accept `max_cost_per_call_usd`, a caller-maintained
   inclusive whole-request ceiling. Budgeted image calls without a defensible

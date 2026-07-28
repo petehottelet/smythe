@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -11,6 +12,27 @@ from uuid import uuid4
 def _escape_mermaid(text: str) -> str:
     """Escape characters that break Mermaid node labels."""
     return text.replace('"', "#quot;").replace("[", "(").replace("]", ")")
+
+
+def _has_cycle_in(adjacency: Mapping[str, list[str]]) -> bool:
+    """Cycle check over a node-id -> dependency-ids mapping."""
+    visiting: set[str] = set()
+    done: set[str] = set()
+
+    def dfs(node_id: str) -> bool:
+        if node_id in done:
+            return False
+        if node_id in visiting:
+            return True
+        visiting.add(node_id)
+        for dep in adjacency.get(node_id, ()):
+            if dfs(dep):
+                return True
+        visiting.discard(node_id)
+        done.add(node_id)
+        return False
+
+    return any(dfs(node_id) for node_id in adjacency)
 
 
 # House diagram style (docs/style.md): serif type, ivory nodes, hairline
@@ -46,6 +68,43 @@ class FailurePolicy(Enum):
     HALT = "halt"
     SKIP = "skip"
     RETRY = "retry"
+
+
+class RevisionError(ValueError):
+    """Raised when a proposed revision would corrupt the execution graph."""
+
+
+@dataclass(frozen=True)
+class Revision:
+    """A proposed change to the *unexecuted* part of a running graph.
+
+    The three operations compose into the useful cases: append work that
+    closes a gap (``add_nodes``), cancel planned work the results made
+    unnecessary (``drop_node_ids``), and insert a step ahead of pending
+    work (``add_nodes`` plus ``rewire`` to redirect the dependent).
+
+    Completed, running, and failed nodes are never touched — history is
+    immutable, so a revision can only change what has not happened yet.
+    """
+
+    add_nodes: tuple[Node, ...] = ()
+    drop_node_ids: tuple[str, ...] = ()
+    rewire: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    reason: str = ""
+
+    @property
+    def is_empty(self) -> bool:
+        return not (self.add_nodes or self.drop_node_ids or self.rewire)
+
+    def summary(self) -> str:
+        parts = []
+        if self.add_nodes:
+            parts.append(f"+{len(self.add_nodes)}")
+        if self.drop_node_ids:
+            parts.append(f"-{len(self.drop_node_ids)}")
+        if self.rewire:
+            parts.append(f"~{len(self.rewire)}")
+        return " ".join(parts) or "no-op"
 
 
 @dataclass
@@ -159,6 +218,77 @@ class ExecutionGraph:
                     raise ValueError(f"Node {node.id!r} depends on unknown node {dep!r}")
         if self._has_cycle():
             raise ValueError("Execution graph contains a cycle")
+
+    def apply_revision(self, revision: Revision) -> None:
+        """Apply a supervisor's revision to the unexecuted part of the graph.
+
+        Validated in full before anything mutates, so a rejected
+        revision leaves the graph exactly as it was — a supervisor that
+        proposes nonsense costs a trace entry, never a corrupt run.
+        """
+        if revision.is_empty:
+            return
+
+        by_id = {n.id: n for n in self.nodes}
+        drop = set(revision.drop_node_ids)
+
+        for node_id in sorted(drop):
+            node = by_id.get(node_id)
+            if node is None:
+                raise RevisionError(f"cannot drop unknown node {node_id!r}")
+            if node.status is not NodeStatus.PENDING:
+                raise RevisionError(
+                    f"cannot drop node {node_id!r} with status "
+                    f"{node.status.value}; only pending work may be revised"
+                )
+
+        seen_added: set[str] = set()
+        for node in revision.add_nodes:
+            if node.id in by_id:
+                raise RevisionError(f"cannot add node {node.id!r}: id already exists")
+            if node.id in seen_added:
+                raise RevisionError(f"revision adds duplicate node id {node.id!r}")
+            if node.status is not NodeStatus.PENDING:
+                raise RevisionError(
+                    f"added node {node.id!r} must be pending, got {node.status.value}"
+                )
+            seen_added.add(node.id)
+
+        for node_id in sorted(revision.rewire):
+            node = by_id.get(node_id)
+            if node is None:
+                raise RevisionError(f"cannot rewire unknown node {node_id!r}")
+            if node.status is not NodeStatus.PENDING:
+                raise RevisionError(
+                    f"cannot rewire node {node_id!r} with status "
+                    f"{node.status.value}; only pending work may be revised"
+                )
+            if node_id in drop:
+                raise RevisionError(f"node {node_id!r} is both dropped and rewired")
+
+        kept = [n for n in self.nodes if n.id not in drop]
+        candidate = kept + list(revision.add_nodes)
+        candidate_ids = {n.id for n in candidate}
+        adjacency = {
+            n.id: list(revision.rewire.get(n.id, n.depends_on)) for n in candidate
+        }
+
+        # Only pending nodes can be rewired (checked above), so a finished
+        # node's edges are necessarily unchanged here — its banked result
+        # can never be invalidated by a revision.
+        for node in candidate:
+            for dep in adjacency[node.id]:
+                if dep not in candidate_ids:
+                    raise RevisionError(
+                        f"node {node.id!r} would depend on missing node {dep!r}"
+                    )
+
+        if _has_cycle_in(adjacency):
+            raise RevisionError("revision would introduce a cycle")
+
+        for node_id, deps in revision.rewire.items():
+            by_id[node_id].depends_on = list(deps)
+        self.nodes = candidate
 
     def to_json(self) -> dict[str, Any]:
         """Serializable snapshot of the graph: topology, nodes, statuses, costs."""

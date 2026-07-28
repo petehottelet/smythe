@@ -8,7 +8,7 @@ from smythe.budget import (
 )
 from smythe.checkpoint import CheckpointStore, FileCheckpointStore
 from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
-from smythe.graph import FailurePolicy
+from smythe.graph import FailurePolicy, Revision, RevisionError
 from smythe.loader import load_graph
 from smythe.mcp import MCPConfigError, MCPServerSpec, MCPSkillProvider, MCPToolRuntime
 from smythe.memory import PlannerMemory
@@ -31,6 +31,7 @@ from smythe.skills import (
     SkillProvider,
     SkillRef,
 )
+from smythe.supervisor import LLMSupervisor, Supervisor
 from smythe.swarm import Swarm, SwarmResult
 from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.task import Task
@@ -62,6 +63,7 @@ __all__ = [
     "FileCheckpointStore",
     "GeminiProvider",
     "LLMArchitect",
+    "LLMSupervisor",
     "MCPConfigError",
     "MCPServerSpec",
     "MCPSkillProvider",
@@ -71,12 +73,15 @@ __all__ = [
     "OpenAIProvider",
     "PlannerMemory",
     "Provider",
+    "Revision",
+    "RevisionError",
     "Sentinel",
     "SentinelAlert",
     "SimpleArchitect",
     "SkillProvider",
     "SkillRef",
     "SubGraphTemplate",
+    "Supervisor",
     "Swarm",
     "SwarmResult",
     "Synthesizer",

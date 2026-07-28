@@ -21,7 +21,16 @@ class Executor(ExecutorBase):
         """Execute every node in the graph, respecting dependency order."""
         self.prepare_graph(graph)
         first_error: Exception | None = None
-        for node in self._walk(graph):
+        visited: set[str] = set()
+        # The walk is recomputed each step rather than taken once, so a
+        # supervisor revision that adds or drops pending work is picked
+        # up on the next iteration.
+        while True:
+            remaining = [n for n in self._walk(graph) if n.id not in visited]
+            if not remaining:
+                break
+            node = remaining[0]
+            visited.add(node.id)
             try:
                 self._execute_node(node, graph)
             except (BudgetEstimateRequired, NodeFinalizationError, SentinelAlert):
@@ -32,6 +41,9 @@ class Executor(ExecutorBase):
             except Exception as exc:
                 if first_error is None:
                     first_error = exc
+                continue
+            if self._supervisor is not None:
+                asyncio.run(self.maybe_revise(node, graph))
         if first_error is not None:
             raise first_error
         return graph
