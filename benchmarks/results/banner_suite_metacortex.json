@@ -1,0 +1,447 @@
+{
+  "benchmark": "banner-ad-suite",
+  "brand": "MetaCortex",
+  "mode": "LIVE",
+  "model": "gemini-2.5-flash-image",
+  "director": {
+    "model": "gemini-flash-latest",
+    "source": "director",
+    "cost_usd": 0.008985
+  },
+  "candidates_per_placement": 3,
+  "cost_per_image_usd": 0.039,
+  "environment": {
+    "python": "3.12.7",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "packages": {
+      "smythe": "0.1.0",
+      "google-genai": "2.11.0",
+      "pillow": "12.3.0"
+    }
+  },
+  "placements_pass": "7/7",
+  "brand_logo": {
+    "path": "smythe_artifacts/metacortex_logo.png",
+    "source": "provided",
+    "dark_variant": "derived-knockout"
+  },
+  "generation_wall_s": 12.31,
+  "cost_usd": 1.3789,
+  "placements": [
+    {
+      "placement": "leaderboard_728x90",
+      "spec": "728x90 PNG",
+      "aspect_bucket": "21:9",
+      "candidates": 3,
+      "concepts": [
+        "A wide eye-level shot of a monolithic indigo processor module with a sharp teal-glowing optical seam, positioned in the vertical center and left-third of a pristine server-room platform, illuminated by cool off-white directional light, captured with a tilt-shift lens; the right 40% of the frame must remain a completely clean, low-detail deep indigo shadow for branding.",
+        "A close-up studio shot of a brushed off-white aluminum data conduit with a single vibrant teal light-guide strip running horizontally along its center, set against a dark indigo matte background, shot flat-on with a macro lens; the right 40% of the frame must remain a completely clean, low-detail deep indigo shadow for branding.",
+        "A side-profile architectural shot of a sleek glass optical routing block reflecting a thin teal laser line, sitting in the vertical center and left third of a dark server environment with soft blue-hour light pouring from the side, shot on a prime 50mm lens; the right 40% of the frame must remain a completely clean, low-detail deep indigo shadow for branding."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 8,
+          "photo_quality": 8,
+          "tonal_harmony": 9,
+          "cta_craft": 9,
+          "defects": [
+            "Minimal clutter",
+            "Subject matter is clean and well-lit"
+          ]
+        },
+        "c2": {
+          "focal_clarity": 7,
+          "photo_quality": 7,
+          "tonal_harmony": 9,
+          "cta_craft": 9,
+          "defects": [
+            "Subject matter feels slightly generic",
+            "Composition is static"
+          ]
+        },
+        "c3": {
+          "focal_clarity": 6,
+          "photo_quality": 7,
+          "tonal_harmony": 8,
+          "cta_craft": 9,
+          "defects": [
+            "Abstract light lines are distracting",
+            "Subject lacks clear hierarchy",
+            "Visual noise reduces professionalism"
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 8.5,
+        "c2": 8.0,
+        "c3": 7.5
+      },
+      "winner": "c1",
+      "generated_size": [
+        1536,
+        672
+      ],
+      "upscale_factor": 0.47,
+      "cropped_fraction": 0.717,
+      "placement_class": "horizontal",
+      "treatment": "knockout",
+      "horizontal_layout": "wordmark-over-cta",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/metacortex_live1/final/osiris_leaderboard_728x90.png"
+    },
+    {
+      "placement": "mobile_banner_320x100",
+      "spec": "320x100 PNG",
+      "aspect_bucket": "21:9",
+      "candidates": 3,
+      "concepts": [
+        "A precise eye-level shot of a single indigo-finished processing blade with a glowing teal indicator bar in the exact vertical center and left third of the frame, surrounded by the cool off-white architectural structure of a quiet data center, captured with a clinical architectural lens; the right 40% of the frame must remain a completely clean, low-detail deep indigo shadow for branding.",
+        "A detailed horizontal shot of a matte-black server module featuring a single glowing teal data-vein running through its middle, positioned in the left third against a background of soft, out-of-focus deep indigo server racks under cool directional light; the right 40% of the frame must remain a completely clean, low-detail deep indigo shadow for branding.",
+        "A clean studio shot of a minimalist off-white metal data node with a sharp teal-glowing interface line, situated in the left third of a wide frame of uniform deep indigo darkness, shot with a high-end medium format camera; the right 40% of the frame must remain a completely clean, low-detail deep indigo shadow for branding."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 6,
+          "photo_quality": 7,
+          "tonal_harmony": 5,
+          "cta_craft": 8,
+          "defects": [
+            "The logo is illegible due to poor contrast against the light grey background.",
+            "The composition feels slightly off-balance with the heavy vertical pillar cutting the frame."
+          ]
+        },
+        "c2": {
+          "focal_clarity": 8,
+          "photo_quality": 8,
+          "tonal_harmony": 9,
+          "cta_craft": 8,
+          "defects": [
+            "Minor digital noise in the dark areas of the server rack.",
+            "Slightly cramped leading between the logo and CTA."
+          ]
+        },
+        "c3": {
+          "focal_clarity": 7,
+          "photo_quality": 7,
+          "tonal_harmony": 8,
+          "cta_craft": 8,
+          "defects": [
+            "The subject (a proprietary hardware unit) lacks the professional polish of a studio render.",
+            "The lighting on the unit is flat compared to the dramatic background."
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 6.5,
+        "c2": 8.25,
+        "c3": 7.5
+      },
+      "winner": "c2",
+      "generated_size": [
+        1536,
+        672
+      ],
+      "upscale_factor": 0.21,
+      "cropped_fraction": 0.286,
+      "placement_class": "horizontal",
+      "treatment": "knockout",
+      "horizontal_layout": "wordmark-over-cta",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/metacortex_live1/final/osiris_mobile_banner_320x100.png"
+    },
+    {
+      "placement": "mobile_leaderboard_320x50",
+      "spec": "320x50 PNG",
+      "aspect_bucket": "21:9",
+      "candidates": 3,
+      "concepts": [
+        "A highly cropped horizontal shot focusing on a sleek indigo data routing bar illuminated by a single thin teal light-glow, perfectly centered vertically in the left third of the frame, with a minimal and dark architectural background; the right 40% of the frame must remain a completely clean, low-detail deep indigo shadow for branding.",
+        "A minimalist studio capture of a clean off-white metal casing with a single glowing teal status bar, located in the vertical center and left third of a pristine indigo void, shot with sharp directional light; the right 40% of the frame must remain a completely clean, low-detail deep indigo shadow for branding.",
+        "A precise architectural macro shot of a glass optic fiber guide emitting a sharp teal beam, positioned in the left third against a uniform, dark indigo textured wall, shot from a dead-pan straight-on angle; the right 40% of the frame must remain a completely clean, low-detail deep indigo shadow for branding."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 5,
+          "photo_quality": 4,
+          "tonal_harmony": 6,
+          "cta_craft": 7,
+          "defects": [
+            "Abstract horizontal lines lack a clear focal point",
+            "Visual design feels dated and generic",
+            "Lack of depth or professional photographic quality"
+          ]
+        },
+        "c2": {
+          "focal_clarity": 6,
+          "photo_quality": 5,
+          "tonal_harmony": 6,
+          "cta_craft": 7,
+          "defects": [
+            "Uninspired technical graphic",
+            "Lack of subject interest for a high-end brand",
+            "Poor visual hierarchy in the background composition"
+          ]
+        },
+        "c3": {
+          "focal_clarity": 9,
+          "photo_quality": 9,
+          "tonal_harmony": 9,
+          "cta_craft": 9,
+          "defects": [
+            "None",
+            "Subject matter is high-tech, relevant, and visually compelling",
+            "Excellent color match between the fiber optic glow and brand UI elements"
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 5.5,
+        "c2": 6.0,
+        "c3": 9.0
+      },
+      "winner": "c3",
+      "generated_size": [
+        1536,
+        672
+      ],
+      "upscale_factor": 0.21,
+      "cropped_fraction": 0.643,
+      "placement_class": "horizontal",
+      "treatment": "knockout",
+      "horizontal_layout": "icon+cta-text",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/metacortex_live1/final/osiris_mobile_leaderboard_320x50.png"
+    },
+    {
+      "placement": "large_rectangle_336x280",
+      "spec": "336x280 PNG",
+      "aspect_bucket": "4:3",
+      "candidates": 3,
+      "concepts": [
+        "A high-angle studio shot of a monolithic indigo server tower with a sleek teal-glowing ventilation slit, standing in the upper two-thirds of the frame against a clean, architectural off-white floor, captured with a crisp 85mm prime lens; the bottom 25% of the frame must be reserved as clean, low-detail dark indigo negative space.",
+        "An eye-level shot of a glass-encased quantum processing cube hovering on a matte indigo pedestal, illuminated by a single teal data-glow from within, set inside a pristine blue-hour data center with dramatic directional lighting; the bottom 25% of the frame must be reserved as clean, low-detail dark indigo negative space.",
+        "A premium vertical-aligned shot of an off-white aluminum routing node with intricate indigo details and a prominent glowing teal lens, framed squarely in the upper two-thirds of a minimalist concrete studio; the bottom 25% of the frame must be reserved as clean, low-detail dark indigo negative space."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 7,
+          "photo_quality": 8,
+          "tonal_harmony": 9,
+          "cta_craft": 8,
+          "defects": [
+            "Subject is slightly obscure, lacks immediate impact."
+          ]
+        },
+        "c2": {
+          "focal_clarity": 9,
+          "photo_quality": 9,
+          "tonal_harmony": 9,
+          "cta_craft": 8,
+          "defects": [
+            "None."
+          ]
+        },
+        "c3": {
+          "focal_clarity": 8,
+          "photo_quality": 8,
+          "tonal_harmony": 9,
+          "cta_craft": 8,
+          "defects": [
+            "Slightly cluttered composition, subject is floating in an abstract space that lacks clear context."
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 8.0,
+        "c2": 8.75,
+        "c3": 8.25
+      },
+      "winner": "c2",
+      "generated_size": [
+        1184,
+        864
+      ],
+      "upscale_factor": 0.32,
+      "cropped_fraction": 0.125,
+      "placement_class": "rectangle",
+      "treatment": "knockout",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/metacortex_live1/final/osiris_large_rectangle_336x280.png"
+    },
+    {
+      "placement": "inline_rectangle_300x250",
+      "spec": "300x250 PNG",
+      "aspect_bucket": "4:3",
+      "candidates": 3,
+      "concepts": [
+        "A clean architectural shot of a sleek, dark indigo hardware module featuring a central teal-glowing data conduit, positioned proudly in the upper two-thirds of the frame on an off-white stone plinth, shot under soft, directional studio light; the bottom 25% of the frame must be reserved as clean, low-detail dark indigo negative space.",
+        "A three-quarters studio portrait of a matte off-white processing node with a sharp, glowing teal interface ring, situated in the upper two-thirds against a uniform deep indigo background with premium shadow gradients; the bottom 25% of the frame must be reserved as clean, low-detail dark indigo negative space.",
+        "A macro architectural photograph of a pristine indigo glass data hub reflecting a clean teal light-beam, positioned centrally in the upper two-thirds of a dark, uncluttered server corridor at blue hour; the bottom 25% of the frame must be reserved as clean, low-detail dark indigo negative space."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 8,
+          "photo_quality": 8,
+          "tonal_harmony": 9,
+          "cta_craft": 8,
+          "defects": [
+            "Slightly generic product representation",
+            "Composition feels a bit bottom-heavy with the pedestal"
+          ]
+        },
+        "c2": {
+          "focal_clarity": 7,
+          "photo_quality": 7,
+          "tonal_harmony": 9,
+          "cta_craft": 8,
+          "defects": [
+            "Floating object lacks clear environmental grounding",
+            "Lighting on the object feels disconnected from the background gradient"
+          ]
+        },
+        "c3": {
+          "focal_clarity": 9,
+          "photo_quality": 9,
+          "tonal_harmony": 10,
+          "cta_craft": 8,
+          "defects": [
+            "None"
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 8.25,
+        "c2": 7.75,
+        "c3": 9.0
+      },
+      "winner": "c3",
+      "generated_size": [
+        1184,
+        864
+      ],
+      "upscale_factor": 0.29,
+      "cropped_fraction": 0.125,
+      "placement_class": "rectangle",
+      "treatment": "knockout",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/metacortex_live1/final/osiris_inline_rectangle_300x250.png"
+    },
+    {
+      "placement": "half_page_300x600",
+      "spec": "300x600 PNG",
+      "aspect_bucket": "9:16",
+      "candidates": 3,
+      "concepts": [
+        "A dramatic low-angle shot of a towering, monolithic indigo server column with a single vertical teal-glowing light strip running down its center, positioned in the narrow center column of the upper two-thirds of the frame against a quiet, cool off-white architectural background; the bottom 30% of the frame must be kept entirely clean as low-detail, deep indigo negative space.",
+        "A pristine eye-level shot of a glass quantum node refracting a thin teal beam of light, centered in the upper two-thirds of the vertical frame on a dark indigo pedestal under cool directional studio lighting; the bottom 30% of the frame must be kept entirely clean as low-detail, deep indigo negative space.",
+        "A minimalist studio shot of a sleek off-white metal server blade with a central teal-glowing interface band, positioned in the narrow center column of the upper two-thirds against a deep indigo gradient background, captured with a clinical tilt-shift lens; the bottom 30% of the frame must be kept entirely clean as low-detail, deep indigo negative space."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 7,
+          "photo_quality": 7,
+          "tonal_harmony": 8,
+          "cta_craft": 9,
+          "defects": [
+            "The server rack perspective is slightly generic and lacks the high-end polish required for 'Reasoning at Scale'.",
+            "The lighting on the tower feels slightly flat compared to the dynamic energy of the brand logo."
+          ]
+        },
+        "c2": {
+          "focal_clarity": 8,
+          "photo_quality": 5,
+          "tonal_harmony": 7,
+          "cta_craft": 9,
+          "defects": [
+            "The hero subject appears to be an AI-generated abstract shape that lacks structural cohesion and realistic physical lighting.",
+            "The 'petri-dish' aesthetic of the hero image conflicts with the technological, data-center brand identity."
+          ]
+        },
+        "c3": {
+          "focal_clarity": 9,
+          "photo_quality": 9,
+          "tonal_harmony": 9,
+          "cta_craft": 9,
+          "defects": [
+            "Minimalist composition is highly effective; no significant defects."
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 7.75,
+        "c2": 7.25,
+        "c3": 9.0
+      },
+      "winner": "c3",
+      "generated_size": [
+        768,
+        1344
+      ],
+      "upscale_factor": 0.45,
+      "cropped_fraction": 0.125,
+      "placement_class": "vertical",
+      "treatment": "knockout",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/metacortex_live1/final/osiris_half_page_300x600.png"
+    },
+    {
+      "placement": "skyscraper_160x600",
+      "spec": "160x600 PNG",
+      "aspect_bucket": "9:16",
+      "candidates": 3,
+      "concepts": [
+        "A striking vertical shot of a tall, matte indigo data routing column with a sharp, continuous teal light-glow running down its front face, positioned in the narrow center column of the upper two-thirds of the frame, illuminated by a soft off-white rim light; the bottom 30% of the frame must be kept entirely clean as low-detail, deep indigo negative space.",
+        "An elegant architectural shot of a narrow off-white processing pillar featuring a single glowing teal data-vein, centered in the upper two-thirds of the vertical composition against a dark, featureless indigo shadow, shot on a high-end architectural camera; the bottom 30% of the frame must be kept entirely clean as low-detail, deep indigo negative space.",
+        "A high-contrast vertical shot of a sleek glass optical column projecting a precise teal light path upwards, positioned in the narrow center column of the upper two-thirds of a pristine data center environment at blue hour; the bottom 30% of the frame must be kept entirely clean as low-detail, deep indigo negative space."
+      ],
+      "judge": {
+        "c1": {
+          "focal_clarity": 8,
+          "photo_quality": 8,
+          "tonal_harmony": 9,
+          "cta_craft": 8,
+          "defects": [
+            "CTA button has a slight misalignment in border weight",
+            "Hero object is simple but effective"
+          ]
+        },
+        "c2": {
+          "focal_clarity": 7,
+          "photo_quality": 6,
+          "tonal_harmony": 8,
+          "cta_craft": 8,
+          "defects": [
+            "Wavy light artifact appears synthetic and slightly low-resolution",
+            "Subject lacks clear structural definition compared to other assets"
+          ]
+        },
+        "c3": {
+          "focal_clarity": 9,
+          "photo_quality": 9,
+          "tonal_harmony": 9,
+          "cta_craft": 9,
+          "defects": [
+            "None",
+            "Highly professional composition with excellent depth and lighting"
+          ]
+        }
+      },
+      "score_means": {
+        "c1": 8.25,
+        "c2": 7.25,
+        "c3": 9.0
+      },
+      "winner": "c3",
+      "generated_size": [
+        768,
+        1344
+      ],
+      "upscale_factor": 0.45,
+      "cropped_fraction": 0.534,
+      "placement_class": "vertical",
+      "treatment": "knockout",
+      "status": "PASS",
+      "final_path": "smythe_artifacts/banner_suite/metacortex_live1/final/osiris_skyscraper_160x600.png"
+    }
+  ]
+}

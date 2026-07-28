@@ -1,0 +1,28 @@
+{
+  "name": "MetaCortex",
+  "creative_worldview": "Intelligence as calm infrastructure. MetaCortex is the reasoning layer beneath modern software, so every frame is cool, precise, and quietly powerful - deep indigo server-room dark, a single teal data-glow as the hero light, and generous engineered negative space. No clutter, no hype: the confidence of a system that simply works. Photography feels like a documentary shot inside a pristine data center at blue hour.",
+  "brief": "Campaign: MetaCortex, an enterprise AI reasoning platform for autonomous data pipelines. Palette lock: deep indigo, teal data-glow, cool off-white. Style: clean architectural technology photography, cool directional light, one hero subject per frame, premium and restrained.",
+  "logo_prompt": "Design the official brand logo for 'MetaCortex', an enterprise AI reasoning platform. A precise geometric interlocking-nodes mark suggesting a neural mesh, with the wordmark 'METACORTEX' beside it. Palette: teal-to-indigo gradient mark, cool off-white text, deep indigo background. Clean vector style, centered, no photography, no extra text.",
+  "no_text_instruction": " Absolutely no text, letters, numbers, logos, wordmarks, watermarks, buttons, or UI elements anywhere in the image.",
+  "tagline": "REASONING AT SCALE",
+  "cta": "REQUEST DEMO",
+  "palette": {
+    "offwhite": [232, 238, 244],
+    "black": [16, 18, 30],
+    "amber": [46, 196, 200],
+    "amber_dark": [38, 120, 150]
+  },
+  "logo_slices": {
+    "icon": [0.0, 0.0, 1.0, 0.72],
+    "wordmark": [0.0, 0.78, 1.0, 1.0]
+  },
+  "scenes": {
+    "leaderboard_728x90": "ultra-wide cinematic banner photograph: a single sleek server blade glowing with cool teal light in a dark indigo data center, the hero unit large and vertically centered in the middle band, precise engineered detail on the left, clean dark negative space across the right 40%",
+    "mobile_banner_320x100": "ultra-wide banner photograph: macro close-up of a fiber-optic patch panel with one teal strand catching light, hero detail large and vertically centered in the left half, cool dark negative space to the right 40%",
+    "mobile_leaderboard_320x50": "ultra-wide minimal banner photograph: a single illuminated network switch in crisp profile on a cool off-white surface, hero unit large and vertically centered on the left, clean quiet negative space across the right 40%",
+    "large_rectangle_336x280": "architectural technology photograph: a lone server rack bathed in cool teal directional light in a pristine data hall, the hero rack large in the upper two-thirds with comfortable margins, quiet dark negative space in the bottom 25%",
+    "inline_rectangle_300x250": "product-hero photograph: a compact edge-compute node standing on brushed steel against a soft cool-white backdrop, one teal accent glow, hero unit large in the upper two-thirds, quiet negative space in the bottom 25%",
+    "half_page_300x600": "tall vertical photograph: an engineer's silhouette walking a cool blue-lit data-center aisle toward a glowing server wall, hero composition in the narrow center column of the upper two-thirds, calm dark negative space in the bottom 30%",
+    "skyscraper_160x600": "tall narrow vertical photograph: a single illuminated fiber tower rising through a dark indigo server hall, strong vertical hero composition in the narrow center column of the upper two-thirds, quiet negative space in the bottom 30%"
+  }
+}

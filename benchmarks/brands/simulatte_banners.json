@@ -1,0 +1,28 @@
+{
+  "name": "SimuLatte",
+  "creative_worldview": "Cozy craft, warmly lit. SimuLatte is the neighborhood cafe where every cup is made by hand, so each frame is tactile and unhurried: real ceramic, real steam, warm morning light raking across an oak counter. The mood is generous and human - the comfort of a slow first sip, never slick or corporate. Photography feels like a warm documentary moment inside a beloved coffee shop.",
+  "brief": "Campaign: SimuLatte, a modern artisan coffee shop known for hand-pulled espresso and latte art. Palette lock: espresso brown, warm caramel, oat-milk cream; golden morning light only. Style: warm tactile lifestyle and product photography, shallow depth of field, one hero subject per frame, cozy and premium.",
+  "logo_prompt": "Design the official brand logo for 'SimuLatte', a modern artisan coffee shop. A clean friendly mark of a coffee cup with a subtle rising-steam swirl, with the wordmark 'SimuLatte' beneath it. Palette: warm caramel and espresso-brown mark, deep coffee-brown text, on a completely flat solid pure-white background. Clean vector style, centered, generous margins, no photography, no extra text.",
+  "no_text_instruction": " Absolutely no text, letters, numbers, logos, wordmarks, watermarks, buttons, or UI elements anywhere in the image.",
+  "tagline": "BREW THE FUTURE",
+  "cta": "ORDER NOW",
+  "palette": {
+    "offwhite": [245, 238, 225],
+    "black": [38, 28, 22],
+    "amber": [198, 108, 58],
+    "amber_dark": [120, 78, 50]
+  },
+  "logo_slices": {
+    "icon": [0.0, 0.0, 1.0, 0.70],
+    "wordmark": [0.0, 0.76, 1.0, 1.0]
+  },
+  "scenes": {
+    "leaderboard_728x90": "ultra-wide cinematic banner photograph: a ceramic cup of latte with delicate leaf latte art on a warm oak cafe counter at morning light, the cup large and vertically centered in the middle band on the left third, soft steam rising, warm cream negative space across the right 40%",
+    "mobile_banner_320x100": "ultra-wide banner photograph: macro close-up of a golden espresso pour splitting into a cup with a warm crema swirl, hero detail large and vertically centered in the left half, soft cream negative space to the right 40%",
+    "mobile_leaderboard_320x50": "ultra-wide minimal banner photograph: a single ceramic cup of coffee in crisp side profile on a bright cream surface with soft morning light, cup large and vertically centered on the left, clean warm negative space across the right 40%",
+    "large_rectangle_336x280": "lifestyle photograph: two hands cradling a warm latte in a handmade ceramic mug on a cozy cafe table, shallow depth of field, warm window light, the mug large in the upper two-thirds with comfortable margins, quiet warm negative space in the bottom 25%",
+    "inline_rectangle_300x250": "product-hero photograph: a latte with rosetta latte art beside scattered roasted coffee beans on warm slate, soft golden light, the cup large and centered in the upper two-thirds, quiet cream negative space in the bottom 25%",
+    "half_page_300x600": "tall vertical photograph: a pour-over coffee dripping into a glass carafe on a sunlit cafe shelf, warm steam and morning glow, hero composition in the narrow center column of the upper two-thirds, calm warm negative space in the bottom 30%",
+    "skyscraper_160x600": "tall narrow vertical photograph: a tall glass of layered iced latte on a bright cafe windowsill with warm backlight, strong vertical hero composition in the narrow center column of the upper two-thirds, clean cream negative space in the bottom 30%"
+  }
+}

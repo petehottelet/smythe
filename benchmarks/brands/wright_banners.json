@@ -1,0 +1,28 @@
+{
+  "name": "Wright Research",
+  "creative_worldview": "Precision as a discipline. Wright Research works from first principles - measured, machined, proven - so every frame is exact and quietly confident: cool directional light on real prototype hardware, slate benches, warm brass detail, generous engineered negative space. Nothing decorative; the beauty is in the tolerances. Photography feels like a documentary shot inside a world-class research lab.",
+  "brief": "Campaign: Wright Research, an advanced technology research company building precision prototype hardware. Palette lock: slate navy, warm brass, cool off-white; cool measured directional light. Style: clean engineering and product photography, shallow depth of field, one hero subject per frame, premium and exact.",
+  "logo_prompt": "Design the official brand logo for 'Wright Research', a precision technology research company. A refined geometric mark suggesting a stylized wing or aerofoil cross-section, with the wordmark 'WRIGHT RESEARCH' beneath it. Palette: slate-navy and warm brass mark, slate-navy text, on a completely flat solid pure-white background. Clean vector style, centered, generous margins, no photography, no extra text.",
+  "no_text_instruction": " Absolutely no text, letters, numbers, logos, wordmarks, watermarks, buttons, or UI elements anywhere in the image.",
+  "tagline": "RESEARCH THAT FLIES",
+  "cta": "SEE OUR WORK",
+  "palette": {
+    "offwhite": [236, 240, 244],
+    "black": [18, 24, 34],
+    "amber": [201, 162, 90],
+    "amber_dark": [58, 78, 104]
+  },
+  "logo_slices": {
+    "icon": [0.0, 0.0, 1.0, 0.70],
+    "wordmark": [0.0, 0.76, 1.0, 1.0]
+  },
+  "scenes": {
+    "leaderboard_728x90": "ultra-wide cinematic banner photograph: a machined titanium prototype component under precise directional light on a slate engineering bench, the part large and vertically centered in the middle band on the left third, crisp technical detail, cool off-white negative space across the right 40%",
+    "mobile_banner_320x100": "ultra-wide banner photograph: macro close-up of a precision instrument dial with a warm brass bezel catching cool light, hero detail large and vertically centered in the left half, quiet slate negative space to the right 40%",
+    "mobile_leaderboard_320x50": "ultra-wide minimal banner photograph: a single machined metal prototype in crisp profile on a bright cool-white surface under measured light, part large and vertically centered on the left, clean negative space across the right 40%",
+    "large_rectangle_336x280": "engineering photograph: a research prototype rig with brass and machined-aluminium detail on a slate lab bench under cool directional light, the rig large in the upper two-thirds with comfortable margins, quiet negative space in the bottom 25%",
+    "inline_rectangle_300x250": "product-hero photograph: a precision-machined component standing on a slate plinth against a soft cool-white backdrop with one warm brass highlight, hero large and centered in the upper two-thirds, quiet negative space in the bottom 25%",
+    "half_page_300x600": "tall vertical photograph: an engineer's hand adjusting a wind-tunnel model in a cool-lit research lab, hero composition in the narrow center column of the upper two-thirds, calm negative space in the bottom 30%",
+    "skyscraper_160x600": "tall narrow vertical photograph: a slender precision prototype rising on a lab stand under cool directional light, strong vertical hero composition in the narrow center column of the upper two-thirds, quiet negative space in the bottom 30%"
+  }
+}

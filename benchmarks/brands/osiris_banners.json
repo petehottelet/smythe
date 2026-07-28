@@ -1,0 +1,29 @@
+{
+  "name": "Osiris",
+  "creative_worldview": "Quiet sunlit utility. Osiris turns raw morning light into power you can carry, so every frame is built from one honest subject, one warm directional light source, and generous calm space. The photography feels found, not staged: real terrain, real hands, real weather at golden hour. Restraint signals premium - nothing decorative, nothing busy, the sun always earning its place in the frame.",
+  "brief": "Campaign: the launch of 'Osiris', a palm-sized portable solar phone charger with a warm amber solar panel face and matte black body. Palette lock: warm amber, matte black, off-white; golden-hour natural light only. Style: premium minimalist product and lifestyle photography, shallow depth of field, one hero subject per frame.",
+  "logo_prompt": "Design the official brand logo for 'Osiris', a portable solar-powered phone charger. A flat, iconic sun-over-horizon mark with the wordmark 'OSIRIS' beneath it. Palette: warm amber mark, matte black text, off-white background. Clean vector style, centered, no photography, no extra text.",
+  "logo_dark": "00_project_files/osiris_dark.png",
+  "no_text_instruction": " Absolutely no text, letters, numbers, logos, wordmarks, watermarks, buttons, or UI elements anywhere in the image.",
+  "tagline": "POWER FROM THE SUN",
+  "cta": "LEARN MORE",
+  "palette": {
+    "offwhite": [250, 246, 236],
+    "black": [26, 26, 24],
+    "amber": [224, 154, 36],
+    "amber_dark": [154, 123, 45]
+  },
+  "logo_slices": {
+    "icon": [0.0, 0.0, 1.0, 0.776],
+    "wordmark": [0.0, 0.82, 1.0, 1.0]
+  },
+  "scenes": {
+    "leaderboard_728x90": "ultra-wide cinematic banner photograph: the matte black charger resting on warm dune sand at golden hour, low sun kissing the horizon line, all subject matter concentrated in a slim horizontal center band and the left 55% of the frame (the image will be cropped to a very wide strip - sky and foreground are expendable), clean warm negative space across the right 40%",
+    "mobile_banner_320x100": "ultra-wide banner photograph: macro close-up of the charger's amber solar panel catching low sunlight, composition concentrated in a slim horizontal center band and the left half (final crop is a wide strip), soft warm negative space to the right 40%",
+    "mobile_leaderboard_320x50": "ultra-wide minimal banner photograph: the charger in crisp profile on a bright off-white surface with one warm sun flare from the left, everything within a slim horizontal center band on the left half (final crop is a very wide strip), clean negative space across the right 40%",
+    "large_rectangle_336x280": "lifestyle photograph: the charger clipped to a weathered hiking backpack on a sunlit trail, shallow depth of field, warm amber morning light from the side, subject in the upper two-thirds with comfortable margins, the bottom 25% clean low-detail negative space",
+    "inline_rectangle_300x250": "product-hero photograph: the charger standing on warm slate stone against a soft off-white sky, low golden sun directly behind it echoing a sun-over-horizon silhouette, subject in the upper two-thirds, the bottom 25% clean low-detail negative space",
+    "half_page_300x600": "tall vertical photograph: a hand holding the charger up toward the morning sun on a mountain overlook, vertical composition concentrated in the narrow center column of the upper two-thirds, warm sky gradient, the bottom 30% calm low-detail negative space",
+    "skyscraper_160x600": "tall narrow vertical photograph: the charger standing upright on a sunlit windowsill with long warm shadows, strong vertical composition concentrated in a narrow center column of the upper two-thirds (final crop is a very narrow sliver - left and right edges are expendable), the bottom 30% clean negative space"
+  }
+}

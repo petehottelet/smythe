@@ -1,0 +1,28 @@
+{
+  "name": "Markov Corp",
+  "creative_worldview": "Intelligence that anticipates. Markov Corp builds AI that predicts the next state, so every frame is sleek, calm, and forward-leaning: a matte-black device breathing a soft violet glow on minimal surfaces, deep charcoal space, one confident accent of electric violet. Restraint signals capability - no clutter, no hype, just a quietly powerful object. Photography feels like a premium product film shot at dusk.",
+  "brief": "Campaign: Markov Corp, an AI company launching a sleek matte-black desktop AI device with a soft violet accent glow. Palette lock: charcoal black, electric violet, cool off-white; low moody dusk light. Style: premium minimalist product photography, shallow depth of field, one hero subject per frame, sleek and restrained.",
+  "logo_prompt": "Design the official brand logo for 'Markov Corp', an AI company. A precise geometric mark of connected state-nodes with directional links suggesting a Markov chain, with the wordmark 'MARKOV' beneath it. Palette: electric-violet gradient mark, near-black text, on a completely flat solid pure-white background. Clean vector style, centered, generous margins, no photography, no extra text.",
+  "no_text_instruction": " Absolutely no text, letters, numbers, logos, wordmarks, watermarks, buttons, or UI elements anywhere in the image.",
+  "tagline": "THE NEXT STATE",
+  "cta": "GET ACCESS",
+  "palette": {
+    "offwhite": [234, 232, 240],
+    "black": [18, 16, 22],
+    "amber": [138, 92, 246],
+    "amber_dark": [110, 80, 170]
+  },
+  "logo_slices": {
+    "icon": [0.0, 0.0, 1.0, 0.70],
+    "wordmark": [0.0, 0.76, 1.0, 1.0]
+  },
+  "scenes": {
+    "leaderboard_728x90": "ultra-wide cinematic banner photograph: a sleek matte-black AI device with a soft violet edge-glow on a minimal charcoal studio surface, the device large and vertically centered in the middle band on the left third, precise product detail, cool dark negative space across the right 40%",
+    "mobile_banner_320x100": "ultra-wide banner photograph: macro close-up of the AI device's violet-lit sensor face, hero detail large and vertically centered in the left half, quiet dark negative space to the right 40%",
+    "mobile_leaderboard_320x50": "ultra-wide minimal banner photograph: the matte-black AI device in crisp profile on a bright cool-white surface with one violet accent glow, device large and vertically centered on the left, clean negative space across the right 40%",
+    "large_rectangle_336x280": "product photograph: the sleek AI device on a minimal desk with a soft violet ambient glow and shallow depth of field, the device large in the upper two-thirds with comfortable margins, quiet dark negative space in the bottom 25%",
+    "inline_rectangle_300x250": "product-hero photograph: the matte-black AI device standing on a charcoal plinth against a soft cool-white backdrop with one violet accent light, hero large and centered in the upper two-thirds, quiet negative space in the bottom 25%",
+    "half_page_300x600": "tall vertical photograph: a hand resting beside the glowing violet AI device on a minimal desk at dusk, hero composition in the narrow center column of the upper two-thirds, calm dark negative space in the bottom 30%",
+    "skyscraper_160x600": "tall narrow vertical photograph: the slender AI device standing upright with a soft violet glow on a minimal cool-lit surface, strong vertical hero composition in the narrow center column of the upper two-thirds, quiet negative space in the bottom 30%"
+  }
+}
