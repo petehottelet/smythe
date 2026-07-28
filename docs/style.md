@@ -30,6 +30,20 @@ Status colors (graph exports): done `#eef0e4`/`#5a7742`, failed
 - Markdown body text is set by GitHub and can't be styled; don't fight
   it with HTML hacks.
 
+## Diagrams: hand-authored SVG for the showpieces
+
+The flagship pipeline diagram is a committed SVG
+(`assets/diligence_pipeline.svg`), not a Mermaid block. Mermaid routes
+skip-level edges — where a node depends on both its predecessor and its
+predecessor's predecessor — as long curves that sweep around
+intervening boxes, which reads as noise. Hand-authored SVG gives exact
+orthogonal routing, and it renders identically everywhere without a
+diagram engine.
+
+Use SVG when the diagram is a landing-page asset whose layout matters.
+Use Mermaid (below) for generated graphs and anything that must track
+code.
+
 ## Mermaid
 
 Every diagram carries this init header (kept as `MERMAID_THEME` in
