@@ -74,31 +74,9 @@ TaskGraph(topology="fork-join → adversarial → serial")
 # Estimated cost: $0.04 | Depth: 3 | Agents: 6
 ```
 
-```mermaid
-%%{init: {"theme":"base","themeVariables":{"fontFamily":"Georgia, 'Times New Roman', serif","fontSize":"14px","primaryColor":"#faf8f1","primaryTextColor":"#23221e","primaryBorderColor":"#a89f8c","lineColor":"#a89f8c"},"flowchart":{"curve":"basis","nodeSpacing":48,"rankSpacing":58}}}%%
-flowchart TD
-    financial("<b>FinancialAnalyst</b><br/>revenue model, margins, burn, comps")
-    technical("<b>TechDiligenceAgent</b><br/>IP portfolio, tech debt, key-person risk")
-    regulatory("<b>RegulatoryAgent</b><br/>SEC filings, antitrust, litigation")
-    draft("<b>DiligenceEditor</b><br/>merge findings into draft report")
-    redteam("<b>RedTeamAgent</b><br/>challenge every bullish claim")
-    memo("<b>MemoAgent</b><br/>final memo: summary, findings, risks, recommendation")
-    financial --> draft
-    technical --> draft
-    regulatory --> draft
-    draft --> redteam
-    draft --> memo
-    redteam --> memo
-    classDef specialist fill:#faf8f1,stroke:#a89f8c,stroke-width:1px,color:#23221e
-    classDef editor fill:#f1ecdf,stroke:#8a8578,stroke-width:1px,color:#23221e
-    classDef adversarial fill:#f5ead0,stroke:#9a7b2d,stroke-width:1px,color:#5c4a1e
-    classDef deliverable fill:#23221e,stroke:#9a7b2d,stroke-width:1.25px,color:#f5efe0
-    class financial,technical,regulatory specialist
-    class draft editor
-    class redteam adversarial
-    class memo deliverable
-    linkStyle default stroke:#a89f8c,stroke-width:1.25px
-```
+<p align="center">
+  <img src="assets/diligence_pipeline.svg" alt="Acquisition diligence pipeline: three specialist agents fan into a diligence editor; the draft flows to a red-team agent and to the memo agent, and the red team's review also feeds the final memo." width="620">
+</p>
 
 Three specialists run in parallel under a budget cap, a red team attacks the draft, and the memo node turns the surviving claims into a conditional go/no-go recommendation. The expected graph, trace, and memo are committed in [examples/acquisition_diligence/expected/](examples/acquisition_diligence/expected/) — a test regenerates them on every CI run, so what you see there is what the code does. Full walkthrough: [examples/acquisition_diligence/](examples/acquisition_diligence/).
 
