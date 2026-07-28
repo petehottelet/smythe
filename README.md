@@ -21,7 +21,9 @@ Most agent frameworks make you decide upfront how your agents will work together
 pip install smythe
 ```
 
-Python 3.11+. Provider extras (`smythe[anthropic]`, `[openai]`, `[gemini]`, `[mcp]`, `[all]`) are covered under [Installation](#installation).
+Python 3.11+. Provider and workflow extras (`smythe[anthropic]`, `[openai]`,
+`[gemini]`, `[mcp]`, `[jobs]`, `[all]`) are covered under
+[Installation](#installation).
 
 ## 60-second quickstart
 
@@ -129,6 +131,37 @@ its dependencies' outputs as pixels and curates them
 ([examples/11_vision_judge.py](examples/11_vision_judge.py)). In its
 first live run, the judge rejected a candidate ad for a spelling
 mistake baked into the generated image.
+
+## Durable artifact jobs
+
+For wide artifact runs, Smythe now has a separate durable operator surface:
+strict JSON/YAML manifests, complete worst-case cost preflight, an approval
+bound to the exact plan and spend ceiling, bounded parallel dispatch, and a
+SQLite attempt/event journal.
+
+```bash
+pip install "smythe[jobs]"
+
+smythe jobs validate job.yaml
+smythe jobs plan job.yaml --max-spend-usd 0.64
+smythe jobs run job.yaml --approve approve_v1_... --max-spend-usd 0.64
+smythe jobs status RUN_ID --events
+```
+
+Calls are journaled before provider dispatch. A crash before dispatch is safe
+to resume; a crash or lost response after dispatch becomes `unknown_outcome`
+and is never silently repeated. Failed or rejected operations can be rerolled
+selectively, while successful artifacts and their hashes remain untouched:
+
+```bash
+smythe jobs reroll RUN_ID "tile[17]" --reason "failed visual review"
+smythe jobs export RUN_ID --out run-export.json
+```
+
+An ambiguous operation requires `--acknowledge-unknown` before rerolling,
+because a duplicate provider charge may result. Manifest format, provider
+profiles, state transitions, cost fields, exit codes, and Python API:
+[docs/jobs.md](docs/jobs.md).
 
 ---
 
@@ -594,6 +627,7 @@ pip install "smythe[openai]"       # OpenAI GPT models (and OpenAI-compatible en
 pip install "smythe[gemini]"       # Google Gemini models
 pip install "smythe[mcp]"          # MCP tool support
 pip install "smythe[openclaw]"     # OpenClaw AgentSkills integration
+pip install "smythe[jobs]"         # durable artifact jobs + image inspection
 pip install "smythe[all]"          # all of the above
 pip install "smythe[benchmarks]"   # dependencies for the repo's benchmark harnesses
 ```
@@ -646,14 +680,27 @@ The core framework is implemented and tested across Python 3.11–3.13 in CI.
 - MCP tool support — agents use MCP servers (stdio + HTTP) through a bounded,
   budget-enforced tool loop, with capability hydration and planner tool awareness
 - Durable execution — per-node checkpointing and `swarm.resume()` with a pluggable store
+- Durable artifact Jobs v1 — strict manifests, plan-bound spend approval,
+  SQLite dispatch journal, conservative unknown outcomes, selective rerolls,
+  portable exports, and the installed `smythe jobs` CLI
+- Bounded Autotune v1: immutable experiment contracts and candidate patches,
+  a zero-API-spend offline concurrency evaluator, a plan-bound async runner
+  with paired confirmation and sealed per-campaign holdout, exact gates and
+  typed mutation domains, CPU/work ceilings, immutable budget-visible evidence,
+  atomic dispatch claims, and installed `smythe optimize concurrency` plus
+  read-only `smythe optimize inspect` commands
+  ([protocol and current boundaries](docs/optimize.md))
 - Provider abstraction (Anthropic, OpenAI, Gemini) with defensive response parsing
 - Structured observability traces
 - Runnable examples that work offline
 - Flagship demo — the acquisition-diligence showcase with committed
   expected artifacts ([examples/acquisition_diligence/](examples/acquisition_diligence/))
+- 64-node glyph screensaver workload — deterministic offline fan-out plus an
+  optional fail-closed GPT Image lane, producing a preview, GIF, atlas, and
+  standalone animated canvas ([benchmark protocol](benchmarks/glyph_screensaver_benchmark.md))
 
-**What's next:** see [ROADMAP.md](ROADMAP.md) — production fan-out safety,
-artifact-factory productization, and an operator-focused CLI and trace inspector.
+**What's next:** see [ROADMAP.md](ROADMAP.md) — scale certification, richer
+asset validation and curation, and an operator-focused trace inspector.
 
 ---
 

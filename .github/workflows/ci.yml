@@ -67,3 +67,45 @@ jobs:
           python benchmarks/run_asset_suite.py
           --out "$RUNNER_TEMP/asset-artifacts"
           --results "$RUNNER_TEMP/asset.json"
+      - name: Exercise glyph fan-out offline
+        run: >-
+          python benchmarks/run_glyph_screensaver.py
+          --glyphs 4
+          --concurrencies 1,2
+          --latency-s 0
+          --out "$RUNNER_TEMP/glyph-artifacts"
+          --results "$RUNNER_TEMP/glyph.json"
+
+  package-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Build distribution artifacts
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+      - name: Install the wheel in a clean environment
+        run: |
+          python -m venv "$RUNNER_TEMP/smythe-wheel"
+          "$RUNNER_TEMP/smythe-wheel/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/smythe-wheel/bin/python" -m pip install dist/*.whl pillow
+      - name: Smoke-test installed public surfaces
+        run: |
+          "$RUNNER_TEMP/smythe-wheel/bin/python" -c "import smythe, smythe.assets, smythe.jobs, smythe.optimize"
+          "$RUNNER_TEMP/smythe-wheel/bin/smythe" --help
+          "$RUNNER_TEMP/smythe-wheel/bin/smythe" jobs schema --json
+
+  windows-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Exercise the suite on Windows
+        run: python -m pytest tests/ -q
