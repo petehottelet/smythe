@@ -38,6 +38,7 @@ from smythe.supervisor import Supervisor
 from smythe.synthesizer import Synthesizer
 from smythe.task import Task
 from smythe.tracer import Tracer
+from smythe.verifier import Verifier
 
 
 @dataclass
@@ -110,6 +111,7 @@ class Swarm:
         retry_backoff_s: float = 0.0,
         supervisor: Supervisor | None = None,
         max_revisions: int = 0,
+        verifier: Verifier | None = None,
     ) -> None:
         self.model = model
         self.max_budget_usd = max_budget_usd
@@ -120,6 +122,7 @@ class Swarm:
         self.retry_backoff_s = retry_backoff_s
         self.supervisor = supervisor
         self.max_revisions = max_revisions
+        self.verifier = verifier
         self._checkpoint_store = checkpoint_store
         if (
             isinstance(checkpoint_every_n_nodes, bool)
@@ -262,6 +265,7 @@ class Swarm:
             supervisor=self.supervisor,
             max_revisions=self.max_revisions,
             task=task,
+            verifier=self.verifier,
             on_node_update=self._checkpointer(
                 execution_id, graph, budget, task, created_at,
             ),
@@ -328,6 +332,7 @@ class Swarm:
             supervisor=self.supervisor,
             max_revisions=self.max_revisions,
             task=task,
+            verifier=self.verifier,
             on_node_update=self._checkpointer(
                 execution_id, graph, budget, task, created_at,
             ),
@@ -505,6 +510,7 @@ class Swarm:
             supervisor=self.supervisor,
             max_revisions=self.max_revisions,
             task=task,
+            verifier=self.verifier,
             on_node_update=self._checkpointer(
                 execution_id, graph, budget, task, created_at,
             ),

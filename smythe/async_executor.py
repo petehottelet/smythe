@@ -22,6 +22,7 @@ from smythe.tracer import Tracer
 if TYPE_CHECKING:
     from smythe.supervisor import Supervisor
     from smythe.task import Task
+    from smythe.verifier import Verifier
 
 
 class AsyncExecutor(ExecutorBase):
@@ -61,13 +62,14 @@ class AsyncExecutor(ExecutorBase):
         supervisor: Supervisor | None = None,
         max_revisions: int = 0,
         task: Task | None = None,
+        verifier: Verifier | None = None,
     ) -> None:
         super().__init__(
             provider=provider, registry=registry, tracer=tracer, budget=budget,
             on_node_update=on_node_update, tool_runtime=tool_runtime,
             max_tool_iterations=max_tool_iterations, artifact_dir=artifact_dir,
             retry_backoff_s=retry_backoff_s, supervisor=supervisor,
-            max_revisions=max_revisions, task=task,
+            max_revisions=max_revisions, task=task, verifier=verifier,
         )
         self._estimated_tokens_per_node = estimated_tokens_per_node
         if max_concurrency is not None and max_concurrency < 1:
@@ -179,10 +181,12 @@ class AsyncExecutor(ExecutorBase):
                         if unresolved[child.id] == 0:
                             ready.append(child)
 
-                if first_error is None and self._supervisor is not None:
+                if first_error is None and just_completed:
                     revised = False
                     for node in just_completed:
-                        revised |= await self.maybe_revise(node, graph)
+                        revised |= self.maybe_regenerate(node, graph)
+                        if self._supervisor is not None:
+                            revised |= await self.maybe_revise(node, graph)
                     if revised:
                         (
                             pending, resolved, dependents, unresolved, ready, order,

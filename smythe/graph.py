@@ -131,6 +131,11 @@ class Node:
             node's dependencies are attached to its prompt as multimodal
             inputs — the node *sees* the images (vision judge /
             art-director pattern), not just their file paths.
+        verifies: ID of the node this node judges.  When the verdict is
+            a failure, the judged node and everything downstream of it
+            are reset and re-run (see smythe/verifier.py).
+        max_regenerations: How many times this verifier may send its
+            target back.  0 means the verdict is advisory only.
     """
 
     label: str
@@ -146,6 +151,8 @@ class Node:
     timeout_s: float | None = None
     max_tool_iterations: int | None = None
     attach_dep_artifacts: bool = False
+    verifies: str | None = None
+    max_regenerations: int = 0
 
 
 @dataclass
