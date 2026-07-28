@@ -8,6 +8,7 @@ from smythe.budget import (
 )
 from smythe.checkpoint import CheckpointStore, FileCheckpointStore
 from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
+from smythe.distill import DistillationError, distill_template
 from smythe.graph import FailurePolicy, Revision, RevisionError
 from smythe.loader import load_graph
 from smythe.mcp import MCPConfigError, MCPServerSpec, MCPSkillProvider, MCPToolRuntime
@@ -35,6 +36,12 @@ from smythe.supervisor import LLMSupervisor, Supervisor
 from smythe.swarm import Swarm, SwarmResult
 from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.task import Task
+from smythe.verifier import (
+    CallableVerifier,
+    TokenVerifier,
+    Verdict,
+    Verifier,
+)
 from smythe.tools import (
     ChatMessage,
     ToolCall,
@@ -51,6 +58,7 @@ __all__ = [
     "Artifact",
     "BudgetEstimateRequired",
     "BudgetReconciliationError",
+    "CallableVerifier",
     "CapabilityHydrationMode",
     "CapabilityMapper",
     "ChatMessage",
@@ -59,6 +67,7 @@ __all__ = [
     "ConstrainedArchitect",
     "DefaultCapabilityMapper",
     "DeterministicArchitect",
+    "DistillationError",
     "FailurePolicy",
     "FileCheckpointStore",
     "GeminiProvider",
@@ -92,8 +101,12 @@ __all__ = [
     "ToolResult",
     "ToolRuntime",
     "ToolSession",
+    "TokenVerifier",
     "ToolSpec",
+    "Verdict",
+    "Verifier",
     "WhiteRabbit",
+    "distill_template",
     "load_graph",
 ]
 __version__ = "0.6.0"

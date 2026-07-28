@@ -19,6 +19,7 @@ from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
 from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
 from smythe.tracer import Tracer
+from smythe.verifier import TokenVerifier, Verifier
 
 if TYPE_CHECKING:
     from smythe.supervisor import Supervisor
@@ -94,6 +95,7 @@ class ExecutorBase:
         supervisor: Supervisor | None = None,
         max_revisions: int = 0,
         task: Task | None = None,
+        verifier: Verifier | None = None,
     ) -> None:
         self._provider = provider
         self._registry = registry
@@ -115,6 +117,7 @@ class ExecutorBase:
         self._max_revisions = max_revisions
         self._task = task
         self._revisions_used = 0
+        self._verifier = verifier or TokenVerifier()
 
     @property
     def revisions_used(self) -> int:
@@ -160,6 +163,70 @@ class ExecutorBase:
         self.prepare_graph(graph)
         self._tracer.on_revision(node, revision, applied=True)
         return True
+
+    def maybe_regenerate(self, node: Node, graph: ExecutionGraph) -> bool:
+        """Act on *node*'s verdict when it is a verifier that failed.
+
+        Returns True when work was sent back, so the caller can refresh
+        any scheduling state.  Resets the judged node and everything
+        downstream of it — a failed draft invalidates the summary
+        written from it, so re-running only the draft would leave the
+        run internally inconsistent.
+        """
+        if not node.verifies or node.max_regenerations <= 0:
+            return False
+        target = self._cached_node_by_id(node.verifies, graph)
+        if target is None or target.status is not NodeStatus.COMPLETED:
+            return False
+
+        used = node.metadata.get("regenerations_used", 0)
+        if used >= node.max_regenerations:
+            return False
+
+        verdict = self._verifier.verdict(node, target)
+        if verdict.passed:
+            return False
+
+        node.metadata["regenerations_used"] = used + 1
+        reset = self._reset_for_regeneration(target, graph)
+        self._tracer.on_regeneration(
+            node, target, reason=verdict.reason,
+            attempt=used + 1, limit=node.max_regenerations,
+            reset_ids=[n.id for n in reset],
+        )
+        for reset_node in reset:
+            self.notify_update(reset_node)
+        return True
+
+    def _reset_for_regeneration(
+        self, target: Node, graph: ExecutionGraph,
+    ) -> list[Node]:
+        """Send *target* and its finished descendants back to pending."""
+        by_id = {n.id: n for n in graph.nodes}
+        children: dict[str, list[str]] = {n.id: [] for n in graph.nodes}
+        for candidate in graph.nodes:
+            for dep_id in candidate.depends_on:
+                children.setdefault(dep_id, []).append(candidate.id)
+
+        stack = [target.id]
+        seen: set[str] = set()
+        while stack:
+            node_id = stack.pop()
+            if node_id in seen:
+                continue
+            seen.add(node_id)
+            stack.extend(children.get(node_id, ()))
+
+        reset: list[Node] = []
+        for node_id in seen:
+            candidate = by_id.get(node_id)
+            if candidate is None:
+                continue
+            if candidate.status in (NodeStatus.COMPLETED, NodeStatus.FAILED):
+                candidate.status = NodeStatus.PENDING
+                candidate.result = None
+                reset.append(candidate)
+        return reset
 
     def _inherit_execution_context(
         self, new_nodes: tuple[Node, ...], graph: ExecutionGraph,

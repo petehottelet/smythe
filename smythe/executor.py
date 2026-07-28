@@ -26,7 +26,10 @@ class Executor(ExecutorBase):
         # supervisor revision that adds or drops pending work is picked
         # up on the next iteration.
         while True:
-            remaining = [n for n in self._walk(graph) if n.id not in visited]
+            remaining = [
+                n for n in self._walk(graph)
+                if n.id not in visited or n.status is NodeStatus.PENDING
+            ]
             if not remaining:
                 break
             node = remaining[0]
@@ -42,6 +45,7 @@ class Executor(ExecutorBase):
                 if first_error is None:
                     first_error = exc
                 continue
+            self.maybe_regenerate(node, graph)
             if self._supervisor is not None:
                 asyncio.run(self.maybe_revise(node, graph))
         if first_error is not None:

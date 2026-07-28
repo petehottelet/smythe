@@ -119,6 +119,39 @@ class Tracer:
             "applied" if applied else "rejected", node.id, span.label,
         )
 
+    def on_regeneration(
+        self,
+        verifier_node: Node,
+        target: Node,
+        *,
+        reason: str,
+        attempt: int,
+        limit: int,
+        reset_ids: list[str],
+    ) -> None:
+        """Record a failed verification sending work back for another try."""
+        now = time.time()
+        span = Span(
+            node_id=f"verifier:{verifier_node.id}",
+            label=reason or f"{target.id} failed verification",
+            agent_id=None,
+            start_time=now,
+            end_time=now,
+            status="regeneration",
+        )
+        span.metadata["regeneration"] = {
+            "verifier": verifier_node.id,
+            "target": target.id,
+            "attempt": attempt,
+            "limit": limit,
+            "reset": sorted(reset_ids),
+        }
+        self.spans.append(span)
+        logger.info(
+            "Verification failed (%s/%s): %s sent %s back — %s",
+            attempt, limit, verifier_node.id, target.id, reason or "no reason given",
+        )
+
     def on_node_error(self, node: Node, exc: Exception) -> None:
         span = self._active.get(node.id)
         if span:
@@ -141,5 +174,7 @@ class Tracer:
                 entry["tool_calls"] = s.metadata["tool_calls"]
             if "revision" in s.metadata:
                 entry["revision"] = s.metadata["revision"]
+            if "regeneration" in s.metadata:
+                entry["regeneration"] = s.metadata["regeneration"]
             out.append(entry)
         return out

@@ -15,11 +15,16 @@ class Task:
         goal: Natural-language description of the desired outcome.
         constraints: Optional hard requirements the execution must satisfy.
         context: Arbitrary key-value context forwarded to agents.
+        done_when: Acceptance criteria the deliverable must meet.
+            A plan finishes when its steps run out; these say when
+            the *work* is finished. A supervisor reads them to
+            decide whether more work is needed.
     """
 
     goal: str
     constraints: list[str] = field(default_factory=list)
     context: dict[str, Any] = field(default_factory=dict)
+    done_when: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not isinstance(self.goal, str):
@@ -39,6 +44,18 @@ class Task:
         if any(not isinstance(item, str) for item in constraints):
             raise TypeError("Task constraints must contain only strings")
         self.constraints = [item.strip() for item in constraints if item.strip()]
+
+        if isinstance(self.done_when, (str, bytes)):
+            raise TypeError("Task done_when must be an iterable of strings")
+        try:
+            criteria = list(self.done_when)
+        except TypeError as exc:
+            raise TypeError(
+                "Task done_when must be an iterable of strings"
+            ) from exc
+        if any(not isinstance(item, str) for item in criteria):
+            raise TypeError("Task done_when must contain only strings")
+        self.done_when = [item.strip() for item in criteria if item.strip()]
 
         if not isinstance(self.context, Mapping):
             raise TypeError("Task context must be a mapping")

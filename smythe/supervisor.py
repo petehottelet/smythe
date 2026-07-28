@@ -50,6 +50,9 @@ REVIEW_PROMPT = """Goal:
 Constraints:
 {constraints}
 
+Acceptance criteria (the work is not done until these hold):
+{done_when}
+
 Completed work so far:
 {completed}
 
@@ -62,6 +65,8 @@ Identify the gap, if any, between what the completed work has produced \
 and what the goal requires. Then decide:
 
 - If the remaining steps will close that gap, make no change.
+- If an acceptance criterion will not be met by any remaining step, add
+  the step that meets it.
 - If a needed step is missing, add it.
 - If a remaining step is now pointless or redundant, drop it.
 
@@ -176,9 +181,15 @@ class LLMSupervisor(Supervisor):
             if task is not None and task.constraints
             else "(none stated)"
         )
+        done_when = (
+            "\n".join(f"- {c}" for c in task.done_when)
+            if task is not None and task.done_when
+            else "(none stated)"
+        )
         return REVIEW_PROMPT.format(
             goal=goal or "(not recorded)",
             constraints=constraints,
+            done_when=done_when,
             completed="\n\n".join(completed) or "(nothing yet)",
             remaining="\n".join(remaining) or "(none — this is the last step)",
             node_id=node.id,

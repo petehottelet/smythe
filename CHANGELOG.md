@@ -41,6 +41,24 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   planned ones. `LLMSupervisor` reviews only at stage boundaries by
   default to keep the supervising model out of the routine path.
   New: `docs/supervisor.md`, `examples/13_adaptive_supervision.py`.
+- **Verification that gates.** A node can now declare `verifies=`
+  and `max_regenerations=`: when its verdict fails, the judged node
+  and everything downstream of it are reset and re-run, bounded per
+  verifier and billed like any other work. Verification is an
+  ordinary node, so it is planned, budgeted, traced, and
+  checkpointed for free. `TokenVerifier` (default) reads JSON or a
+  PASS/FAIL keyword and treats an unreadable verdict as a pass, so a
+  confused judge cannot burn the regeneration budget in a loop;
+  `CallableVerifier` gates on any objective rule with no model at
+  all. This is select-from-N generalised beyond images.
+- **`Task(done_when=[...])`** records acceptance criteria — what the
+  deliverable must satisfy, as opposed to what steps exist. A
+  supervisor reads them when deciding whether more work is needed.
+- **Distillation** (`distill_template`) turns a run that worked into
+  a `SubGraphTemplate` the `ConstrainedArchitect` can select, so a
+  proven topology is reused instead of re-derived. Structure and
+  personas carry over; results and statuses deliberately do not, and
+  a graph with unfinished nodes is refused by default.
 
 - Image providers accept `max_cost_per_call_usd`, a caller-maintained
   inclusive whole-request ceiling. Budgeted image calls without a defensible
