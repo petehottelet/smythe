@@ -46,6 +46,37 @@ def real_provider():
     return None
 
 
+_JUDGE_PROVIDERS: dict[str, object] = {}
+
+
+def judge_provider_for(judge_model: str, executor_provider):
+    """Provider for the judge, chosen from the judge model's name.
+
+    The judge should be able to run on a different vendor than the
+    executor — that is the point of using a different model — so it
+    cannot simply reuse the executor's provider. Falls back to the
+    executor's provider when the model is not recognized.
+    """
+    if judge_model in _JUDGE_PROVIDERS:
+        return _JUDGE_PROVIDERS[judge_model]
+    lower = (judge_model or "").lower()
+    provider = executor_provider
+    try:
+        if lower.startswith("gemini") or lower.startswith("nano-banana"):
+            from smythe.provider import GeminiProvider
+            provider = GeminiProvider()
+        elif lower.startswith("claude"):
+            from smythe.provider import AnthropicProvider
+            provider = AnthropicProvider()
+        elif lower.startswith(("gpt", "o1", "o3", "o4")):
+            from smythe.provider import OpenAIProvider
+            provider = OpenAIProvider()
+    except Exception:
+        provider = executor_provider
+    _JUDGE_PROVIDERS[judge_model] = provider
+    return provider
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--task", default=None, help="run only this task name")
@@ -107,17 +138,40 @@ def main() -> int:
                 else:
                     provider, model, judge_model = real
                     judge_model = args.judge_model or judge_model
-                record = run_one(bench_task, baseline, provider, model,
-                                 offline=offline)
+                try:
+                    record = run_one(bench_task, baseline, provider, model,
+                                     offline=offline)
+                except Exception as exc:
+                    # Provider timeouts and 5xx are facts of life across a
+                    # 45-cell campaign. Losing one cell is a gap in the
+                    # table; losing the campaign is an hour and real money.
+                    print(f"  FAILED {bench_task.name}/{baseline} "
+                          f"run={run_index}: {type(exc).__name__}: {exc}")
+                    records.append({
+                        "task": bench_task.name, "baseline": baseline,
+                        "model": model, "offline": offline, "run": run_index,
+                        "quality": None, "cost_usd": None, "nodes": None,
+                        "error": f"{type(exc).__name__}: {exc}"[:300],
+                    })
+                    continue
+                record["error"] = None
                 record["run"] = run_index
                 record["judge_model"] = None
                 record["ablate_terminal_note"] = args.ablate_terminal_note
                 record["ablate_task_context"] = args.ablate_task_context
                 if args.judge and not offline:
-                    record["quality"] = score_output(
-                        provider, judge_model, bench_task.goal,
-                        bench_task.rubric, record["output"],
-                    )
+                    try:
+                        record["quality"] = score_output(
+                            judge_provider_for(judge_model, provider),
+                            judge_model, bench_task.goal,
+                            bench_task.rubric, record["output"],
+                        )
+                    except Exception as exc:
+                        # An unscored cell is a gap in the table; a lost
+                        # campaign is hours and dollars of real work.
+                        record["quality"] = None
+                        record["judge_error"] = str(exc)[:200]
+                        print(f"  judge failed on {bench_task.name}/{baseline}: {exc}")
                     record["judge_model"] = judge_model
                 records.append(record)
                 print(f"  done: {bench_task.name} / {baseline} run={run_index}"

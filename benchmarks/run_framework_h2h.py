@@ -72,8 +72,9 @@ def run_smythe(baseline: str, task: BenchmarkTask) -> dict:
     result = swarm.execute(task.to_task())
     wall_s = time.perf_counter() - t0
     graph = result.graph
-    terminals = [n for n in graph.nodes if not graph.dependents(n.id)]
-    output = "\n\n".join(str(n.result) for n in terminals if n.result is not None)
+    # Judge what Swarm.execute returns, matching the harness: LangGraph's
+    # and CrewAI's outputs are likewise what their own APIs hand back.
+    output = result.output
     return {
         "output": output,
         "wall_s": round(wall_s, 2),

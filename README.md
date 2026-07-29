@@ -110,6 +110,41 @@ its dependencies' outputs as pixels and curates them
 first live run, the judge rejected a candidate ad for a spelling
 mistake baked into the generated image.
 
+## Plans that correct themselves
+
+An Architect plans before any work exists. When the work reveals the
+plan was wrong, a **supervisor** revises what has not run yet — adding a
+step that closes a gap, dropping work the results made pointless, or
+inserting a step ahead of pending work. Completed work is never touched.
+
+```python
+from smythe import LLMSupervisor, Swarm
+
+swarm = Swarm(supervisor=LLMSupervisor(provider), max_revisions=2)
+```
+
+A **verifier** closes the other half of the loop: scoring work is only
+useful if a bad score does something. A node declares what it judges,
+and a failed verdict sends that work back:
+
+```python
+Node(id="check", label="Verify every claim is supported",
+     depends_on=["draft"], verifies="draft", max_regenerations=2)
+```
+
+Both are off by default, bounded (`max_revisions`, `max_regenerations`),
+and spend through the same budget machinery as planned work — a
+supervisor can make a run stop sooner, never cost more than its cap.
+Gates need no model at all: `CallableVerifier` checks image dimensions,
+JSON schema, or any rule you can write.
+
+Finally, a run that worked can be kept. `distill_template` turns a
+successful graph into a `SubGraphTemplate` the `ConstrainedArchitect`
+selects from, so a proven topology is reused rather than re-derived.
+
+Details: [docs/supervisor.md](docs/supervisor.md),
+[docs/verifier.md](docs/verifier.md).
+
 ## Durable artifact jobs
 
 For wide artifact runs, Smythe now has a separate durable operator surface:
