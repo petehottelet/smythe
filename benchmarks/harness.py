@@ -167,8 +167,14 @@ def run_one(
     wall_ms = round((time.perf_counter() - started) * 1000, 1)
 
     graph = result.graph
+    # Quality is judged on the deliverable Swarm.execute returns, which is
+    # what a caller actually receives. Scoring only terminal nodes would
+    # discard the work of any plan whose deliverable is cumulative.
+    output = result.output
     terminals = [n for n in graph.nodes if not graph.dependents(n.id)]
-    output = "\n\n".join(str(n.result) for n in terminals if n.result is not None)
+    terminal_output = "\n\n".join(
+        str(n.result) for n in terminals if n.result is not None
+    )
 
     return {
         "task": bench_task.name,
@@ -182,5 +188,6 @@ def run_one(
         # Offline wall time measures the OS scheduler, not the work.
         "wall_ms": None if offline else wall_ms,
         "output": output,
+        "output_terminal": terminal_output,
         "quality": None,  # filled by the judge in real mode
     }

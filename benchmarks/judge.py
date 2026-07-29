@@ -56,14 +56,22 @@ def score_output(
 
     async def _score() -> dict:
         last_error: Exception | None = None
-        for _ in range(1 + max_retries):
-            result = await provider.complete(
-                JUDGE_SYSTEM, build_judge_prompt(goal, rubric, output), model,
-            )
+        for attempt in range(1 + max_retries):
+            if attempt:
+                # Judge providers return transient 503s under load; a
+                # campaign must not be lost to one of them.
+                await asyncio.sleep(2.0 * attempt)
+            try:
+                result = await provider.complete(
+                    JUDGE_SYSTEM, build_judge_prompt(goal, rubric, output), model,
+                )
+            except Exception as exc:
+                last_error = exc
+                continue
             try:
                 return parse_judge_response(result.text)
             except (json.JSONDecodeError, ValueError) as exc:
                 last_error = exc
-        raise ValueError(f"Judge produced unparseable output: {last_error}")
+        raise ValueError(f"Judge failed after {1 + max_retries} attempts: {last_error}")
 
     return asyncio.run(_score())
