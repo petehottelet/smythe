@@ -142,6 +142,25 @@ provider defect shipped in 0.5.0. No breaking API changes.
 
 ### Fixed
 
+- **Resuming refilled the supervisor's revision allowance.**
+  `max_revisions` was held only in memory, so a run that crashed after
+  spending its revisions came back from the checkpoint with a full
+  budget. A crash-resume cycle could therefore revise indefinitely past
+  the cap the caller set. Checkpoints now carry a `control` block with
+  `revisions_used`, and `resume()` seeds the executor from it: the cap
+  bounds the run, not the attempt.
+
+- **`Task.done_when` did not survive a checkpoint.** A resumed run
+  silently lost its acceptance criteria — it could not check for
+  completion against criteria it no longer had. `done_when` is now
+  serialized with the rest of the task.
+
+- **Checkpoint compatibility is now explicit.** `CHECKPOINT_VERSION` is
+  `2`; `SUPPORTED_CHECKPOINT_VERSIONS` is `(1, 2)`. Both additions above
+  are additive, so v1 checkpoints still resume (with documented
+  defaults) rather than being rejected. A checkpoint this build cannot
+  read now fails with a message naming the versions it does read.
+
 - **`OpenAIProvider` was broken against current OpenAI models**: it
   sent the legacy `max_tokens` parameter, which GPT-5.x models reject
   with a 400. Now sends `max_completion_tokens`. Found by the first

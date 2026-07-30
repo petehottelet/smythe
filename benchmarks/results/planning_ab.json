@@ -1,0 +1,359 @@
+{
+  "benchmark": "planning-model-ab",
+  "executor_model": "gpt-5.4-mini",
+  "cheap_planner_model": "gemini-flash-lite-latest",
+  "judge_model": "gemini-pro-latest",
+  "reps": 3,
+  "summary": [
+    {
+      "arm": "same-model",
+      "runs": 15,
+      "quality_mean": 9.43,
+      "quality_min": 8,
+      "nodes_mean": 4.87,
+      "cost_total_usd": 0.58842,
+      "wall_s_mean": 34.2
+    },
+    {
+      "arm": "cheap",
+      "runs": 15,
+      "quality_mean": 9.6,
+      "quality_min": 7,
+      "nodes_mean": 1.87,
+      "cost_total_usd": 0.21233,
+      "wall_s_mean": 17.48
+    }
+  ],
+  "records": [
+    {
+      "task": "acquisition-diligence",
+      "arm": "same-model",
+      "nodes": 6,
+      "depth": 3,
+      "cost_usd": 0.049641,
+      "wall_s": 40.42,
+      "quality": 10,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "acquisition-diligence",
+      "arm": "same-model",
+      "nodes": 6,
+      "depth": 3,
+      "cost_usd": 0.053313,
+      "wall_s": 41.25,
+      "quality": 10,
+      "error": null,
+      "rep": 1
+    },
+    {
+      "task": "acquisition-diligence",
+      "arm": "same-model",
+      "nodes": 6,
+      "depth": 3,
+      "cost_usd": 0.044556,
+      "wall_s": 33.73,
+      "quality": 10,
+      "error": null,
+      "rep": 2
+    },
+    {
+      "task": "acquisition-diligence",
+      "arm": "cheap",
+      "nodes": 5,
+      "depth": 2,
+      "cost_usd": 0.045357,
+      "wall_s": 29.89,
+      "quality": 10,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "acquisition-diligence",
+      "arm": "cheap",
+      "nodes": 6,
+      "depth": 3,
+      "cost_usd": 0.045909,
+      "wall_s": 34.95,
+      "quality": 10,
+      "error": null,
+      "rep": 1
+    },
+    {
+      "task": "acquisition-diligence",
+      "arm": "cheap",
+      "nodes": 5,
+      "depth": 2,
+      "cost_usd": 0.042717,
+      "wall_s": 30.14,
+      "quality": 10,
+      "error": null,
+      "rep": 2
+    },
+    {
+      "task": "code-review",
+      "arm": "same-model",
+      "nodes": 3,
+      "depth": 2,
+      "cost_usd": 0.016938,
+      "wall_s": 19.49,
+      "quality": 10,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "code-review",
+      "arm": "same-model",
+      "nodes": 3,
+      "depth": 2,
+      "cost_usd": 0.017505,
+      "wall_s": 19.63,
+      "quality": 8,
+      "error": null,
+      "rep": 1
+    },
+    {
+      "task": "code-review",
+      "arm": "same-model",
+      "nodes": 3,
+      "depth": 2,
+      "cost_usd": 0.017148,
+      "wall_s": 18.89,
+      "quality": 10,
+      "error": null,
+      "rep": 2
+    },
+    {
+      "task": "code-review",
+      "arm": "cheap",
+      "nodes": 1,
+      "depth": 0,
+      "cost_usd": 0.004923,
+      "wall_s": 9.81,
+      "quality": 7,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "code-review",
+      "arm": "cheap",
+      "nodes": 1,
+      "depth": 0,
+      "cost_usd": 0.004758,
+      "wall_s": 8.88,
+      "quality": 10,
+      "error": null,
+      "rep": 1
+    },
+    {
+      "task": "code-review",
+      "arm": "cheap",
+      "nodes": 1,
+      "depth": 0,
+      "cost_usd": 0.004191,
+      "wall_s": 8.64,
+      "quality": 9,
+      "error": null,
+      "rep": 2
+    },
+    {
+      "task": "competitive-analysis",
+      "arm": "same-model",
+      "nodes": 7,
+      "depth": 4,
+      "cost_usd": 0.079185,
+      "wall_s": 61.45,
+      "quality": 9,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "competitive-analysis",
+      "arm": "same-model",
+      "nodes": 8,
+      "depth": 4,
+      "cost_usd": 0.06168,
+      "wall_s": 47.27,
+      "quality": 9,
+      "error": null,
+      "rep": 1
+    },
+    {
+      "task": "competitive-analysis",
+      "arm": "same-model",
+      "nodes": 7,
+      "depth": 4,
+      "cost_usd": 0.082824,
+      "wall_s": 63.44,
+      "quality": 9,
+      "error": null,
+      "rep": 2
+    },
+    {
+      "task": "competitive-analysis",
+      "arm": "cheap",
+      "nodes": 1,
+      "depth": 0,
+      "cost_usd": 0.00747,
+      "wall_s": 16.77,
+      "quality": 9,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "competitive-analysis",
+      "arm": "cheap",
+      "nodes": 1,
+      "depth": 0,
+      "cost_usd": 0.008316,
+      "wall_s": 18.55,
+      "quality": 9,
+      "error": null,
+      "rep": 1
+    },
+    {
+      "task": "competitive-analysis",
+      "arm": "cheap",
+      "nodes": 1,
+      "depth": 0,
+      "cost_usd": 0.008496,
+      "wall_s": 17.29,
+      "quality": 10,
+      "error": null,
+      "rep": 2
+    },
+    {
+      "task": "product-launch",
+      "arm": "same-model",
+      "nodes": 1,
+      "depth": 0,
+      "cost_usd": 0.009102,
+      "wall_s": 18.23,
+      "quality": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "product-launch",
+      "arm": "same-model",
+      "nodes": 1,
+      "depth": 0,
+      "cost_usd": 0.007566,
+      "wall_s": 17.9,
+      "quality": 9,
+      "error": null,
+      "rep": 1
+    },
+    {
+      "task": "product-launch",
+      "arm": "same-model",
+      "nodes": 1,
+      "depth": 0,
+      "cost_usd": 0.008412,
+      "wall_s": 16.37,
+      "quality": 10,
+      "error": null,
+      "rep": 2
+    },
+    {
+      "task": "product-launch",
+      "arm": "cheap",
+      "nodes": 1,
+      "depth": 0,
+      "cost_usd": 0.009453,
+      "wall_s": 18.18,
+      "quality": 10,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "product-launch",
+      "arm": "cheap",
+      "nodes": 1,
+      "depth": 0,
+      "cost_usd": 0.009276,
+      "wall_s": 18.95,
+      "quality": 10,
+      "error": null,
+      "rep": 1
+    },
+    {
+      "task": "product-launch",
+      "arm": "cheap",
+      "nodes": 1,
+      "depth": 0,
+      "cost_usd": 0.009162,
+      "wall_s": 19.19,
+      "quality": 10,
+      "error": null,
+      "rep": 2
+    },
+    {
+      "task": "research-memo",
+      "arm": "same-model",
+      "nodes": 7,
+      "depth": 4,
+      "cost_usd": 0.04797,
+      "wall_s": 41.47,
+      "quality": 9,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "research-memo",
+      "arm": "same-model",
+      "nodes": 7,
+      "depth": 4,
+      "cost_usd": 0.046386,
+      "wall_s": 36.49,
+      "quality": 9,
+      "error": null,
+      "rep": 1
+    },
+    {
+      "task": "research-memo",
+      "arm": "same-model",
+      "nodes": 7,
+      "depth": 4,
+      "cost_usd": 0.046191,
+      "wall_s": 36.95,
+      "quality": 10,
+      "error": null,
+      "rep": 2
+    },
+    {
+      "task": "research-memo",
+      "arm": "cheap",
+      "nodes": 1,
+      "depth": 0,
+      "cost_usd": 0.004029,
+      "wall_s": 10.11,
+      "quality": 10,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "research-memo",
+      "arm": "cheap",
+      "nodes": 1,
+      "depth": 0,
+      "cost_usd": 0.00414,
+      "wall_s": 10.4,
+      "quality": 10,
+      "error": null,
+      "rep": 1
+    },
+    {
+      "task": "research-memo",
+      "arm": "cheap",
+      "nodes": 1,
+      "depth": 0,
+      "cost_usd": 0.004137,
+      "wall_s": 10.52,
+      "quality": 10,
+      "error": null,
+      "rep": 2
+    }
+  ]
+}

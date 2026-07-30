@@ -96,6 +96,7 @@ class ExecutorBase:
         max_revisions: int = 0,
         task: Task | None = None,
         verifier: Verifier | None = None,
+        revisions_used: int = 0,
     ) -> None:
         self._provider = provider
         self._registry = registry
@@ -116,7 +117,9 @@ class ExecutorBase:
         self._supervisor = supervisor
         self._max_revisions = max_revisions
         self._task = task
-        self._revisions_used = 0
+        # Restored from the checkpoint on resume: the revision cap is a
+        # per-run guarantee, so a crash must not refill the allowance.
+        self._revisions_used = revisions_used
         self._verifier = verifier or TokenVerifier()
 
     @property

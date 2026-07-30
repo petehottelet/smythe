@@ -63,6 +63,7 @@ class AsyncExecutor(ExecutorBase):
         max_revisions: int = 0,
         task: Task | None = None,
         verifier: Verifier | None = None,
+        revisions_used: int = 0,
     ) -> None:
         super().__init__(
             provider=provider, registry=registry, tracer=tracer, budget=budget,
@@ -70,6 +71,7 @@ class AsyncExecutor(ExecutorBase):
             max_tool_iterations=max_tool_iterations, artifact_dir=artifact_dir,
             retry_backoff_s=retry_backoff_s, supervisor=supervisor,
             max_revisions=max_revisions, task=task, verifier=verifier,
+            revisions_used=revisions_used,
         )
         self._estimated_tokens_per_node = estimated_tokens_per_node
         if max_concurrency is not None and max_concurrency < 1:

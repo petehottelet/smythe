@@ -12,6 +12,7 @@ from uuid import uuid4
 from smythe.budget import Sentinel
 from smythe.checkpoint import (
     CHECKPOINT_VERSION,
+    SUPPORTED_CHECKPOINT_VERSIONS,
     CheckpointStore,
     agents_from_list,
     build_state,
@@ -124,6 +125,9 @@ class Swarm:
         self.supervisor = supervisor
         self.max_revisions = max_revisions
         self.verifier = verifier
+        # The running executor, so checkpoints can record the revision
+        # allowance actually consumed rather than assuming zero.
+        self._active_executor: Any = None
         self._checkpoint_store = checkpoint_store
         if (
             isinstance(checkpoint_every_n_nodes, bool)
@@ -248,6 +252,7 @@ class Swarm:
         tracer = Tracer()
         budget = Sentinel(self.max_budget_usd)
 
+        self._active_executor = None
         task = task_or_graph if isinstance(task_or_graph, Task) else None
         if task is not None:
             graph = await self.aplan(task)
@@ -275,6 +280,7 @@ class Swarm:
                 execution_id, graph, budget, task, created_at,
             ),
         )
+        self._active_executor = executor
         try:
             graph = await executor.run(graph)
             output = await self._synthesizer.asynthesize(
@@ -315,6 +321,7 @@ class Swarm:
         tracer = Tracer()
         budget = Sentinel(self.max_budget_usd)
 
+        self._active_executor = None
         task = task_or_graph if isinstance(task_or_graph, Task) else None
         if task is not None:
             graph = self.plan(task)
@@ -342,6 +349,7 @@ class Swarm:
                 execution_id, graph, budget, task, created_at,
             ),
         )
+        self._active_executor = executor
         try:
             graph = executor.run(graph)
             output = self._synthesizer.synthesize(
@@ -391,6 +399,11 @@ class Swarm:
         if self._checkpoint_store is None:
             return
         state = build_state(
+            control={
+                "revisions_used": getattr(
+                    self._active_executor, "revisions_used", 0,
+                ),
+            },
             execution_id=execution_id,
             status=status,
             model=self.model,
@@ -458,10 +471,13 @@ class Swarm:
         if state is None:
             raise KeyError(f"No checkpoint found for execution {execution_id!r}")
         version = state.get("version")
-        if version != CHECKPOINT_VERSION:
+        if version not in SUPPORTED_CHECKPOINT_VERSIONS:
             raise ValueError(
-                f"Checkpoint version {version!r} is not supported "
-                f"(expected {CHECKPOINT_VERSION})"
+                f"Checkpoint version {version!r} cannot be read by this "
+                f"build of smythe, which writes version "
+                f"{CHECKPOINT_VERSION} and reads "
+                f"{list(SUPPORTED_CHECKPOINT_VERSIONS)}. Re-run the task "
+                f"instead of resuming."
             )
 
         graph = graph_from_dict(state["graph"])
@@ -514,12 +530,17 @@ class Swarm:
             retry_backoff_s=self.retry_backoff_s,
             supervisor=self.supervisor,
             max_revisions=self.max_revisions,
+            # The revision cap bounds the run, not the attempt: carrying the
+            # spent allowance forward stops a crash-resume cycle from
+            # refilling it and looping past max_revisions.
+            revisions_used=state.get("control", {}).get("revisions_used", 0),
             task=task,
             verifier=self.verifier,
             on_node_update=self._checkpointer(
                 execution_id, graph, budget, task, created_at,
             ),
         )
+        self._active_executor = executor
         try:
             graph = await executor.run(graph)
             output = await self._synthesizer.asynthesize(
