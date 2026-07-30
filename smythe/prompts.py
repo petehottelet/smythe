@@ -82,13 +82,23 @@ Respond with **only** a JSON object — no prose, no markdown fences.
    merely following it in time. \
    Fan out in parallel only when the branches are truly independent; do \
    not split one analysis into thin slices. 8 nodes is the ceiling.
-5. Give each agent a meaningful `persona` that guides its behaviour.
-6. Assign `capabilities` tags that describe the agent's expertise.
-7. For fork-join: create parallel root nodes and a join node that depends on all of them.
-8. For broadcast-reduce: create a setup node, parallel worker nodes depending on it, \
+5. **The last node returns the deliverable, so it must produce all of \
+   it.** Only that node's output is handed back — earlier nodes' work is \
+   not shown alongside it. When the goal asks for several parts (an \
+   argument *and* a critique of it; per-step arithmetic *and* a \
+   recommendation; findings *and* a corrected version), the final node's \
+   label must say it assembles the complete deliverable, listing those \
+   parts. A label like "state what survives" produces only the \
+   survivors and silently discards the rest of what was asked for. \
+   Write "Assemble the final deliverable: the case, the critique, and \
+   the surviving claims" instead.
+6. Give each agent a meaningful `persona` that guides its behaviour.
+7. Assign `capabilities` tags that describe the agent's expertise.
+8. For fork-join: create parallel root nodes and a join node that depends on all of them.
+9. For broadcast-reduce: create a setup node, parallel worker nodes depending on it, \
    and a reduce node depending on all workers.
-9. For adversarial: insert a review node after the main work, before the final output.
-10. **Only when the task states acceptance criteria**, you may add one \
+10. For adversarial: insert a review node after the main work, before the final output.
+11. **Only when the task states acceptance criteria**, you may add one \
    gating node that checks the deliverable against them:
 
    ```
