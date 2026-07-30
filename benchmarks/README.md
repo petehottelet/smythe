@@ -10,14 +10,12 @@ measure that honestly, including where the claim fails.
 > below.** The core harness also runs
 > end-to-end offline in CI (mechanics verified, deterministic, zero cost).
 
-> **Measurement caveat (2026-07-28).** The tables below collect a run's
-> deliverable by joining *terminal nodes only* (`harness.py`). That
-> convention systematically penalises decomposed topologies whose
-> deliverable is cumulative — measured swing of about 3 points between
-> the fixed pipeline and generated topology on a shape-varied suite.
-> See [shape_suite.md](shape_suite.md). **These tables should be re-run
-> on the delivered-output measurement before being cited as framework
-> results.**
+> **Measurement (2026-07-29).** A run's deliverable is what
+> `Swarm.execute` returns, which is what a caller actually receives.
+> `harness.py` records the terminal-node join alongside it so the two
+> conventions stay comparable. Getting this right took two fixes and
+> cost two campaigns; [shape_suite.md](shape_suite.md) documents both,
+> including the one where the framework, not the harness, was at fault.
 
 ## The three systems
 
