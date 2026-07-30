@@ -297,8 +297,25 @@ microbenchmark, not provider invoice evidence or a universal framework claim.
 python benchmarks/run_durability_benchmark.py --quick
 ```
 
+## Control features: supervision and verification (2026-07-29)
+
+Do the control tiers earn their cost? Four arms, two campaigns, 120 live
+runs. Short answer: on judged prose, no. The supervisor was consulted 94
+times across 30 runs and proposed a change **zero** times; gating fired
+in 4 of 30 runs, cost 34% more, and left the number of bad runs
+unchanged. Neither moved the floor, which was the pre-registered claim.
+
+Full writeup, including the two invalidated arms and why they are
+published anyway: [control_ablation.md](control_ablation.md).
+
 ## Planned
 
+- More reps on the `criteria` arm of the control ablation — stating
+  acceptance criteria without enforcing them was the best-scoring arm
+  (9.67, 1/15 floor runs) but has half the samples of the others
+- Deterministic deliverable assembly, which is the failure mode that
+  actually causes catastrophic runs and that none of the control
+  features catch
 - A memory task family with planted failure modes, so recall has
   mistakes to correct (the current family measures null — see above)
 - Framework head-to-head re-run on the original v5 protocol

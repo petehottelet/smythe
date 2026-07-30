@@ -196,11 +196,13 @@ def run_one(bench_task: BenchmarkTask, arm: str, *, live: bool) -> dict:
         # the arm answer the question it was built to ask.
         injected = ensure_gate(graph, criteria=task.done_when)
         if arm == "criteria":
-            # Disarm without removing: the review still runs and is still
-            # paid for, it just cannot send work back. Both arms execute
-            # the same graph, so only enforcement differs.
+            # Disarm via max_regenerations=0, the documented "advisory
+            # verdict" mode, and keep `verifies` set. Clearing `verifies`
+            # instead makes the node an ordinary terminal one, so
+            # DELIVERABLE synthesis returns the PASS/FAIL verdict as the
+            # deliverable -- which scored this arm 3.40 in the previous
+            # campaign and measured nothing but the mistake.
             for node in graph.nodes:
-                node.verifies = None
                 node.max_regenerations = 0
         result = swarm.execute(graph)
     else:
