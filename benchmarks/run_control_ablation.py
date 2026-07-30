@@ -11,8 +11,8 @@ the shape suite, which is the only task set the project has that
 produces a spread of scores rather than a wall of 9s and 10s.
 
     plain        default planning; constraints only
-    criteria     constraints restated as done_when; the review node the
-                 planner adds still runs, but cannot send work back
+    criteria     constraints restated as done_when, plus a review node
+                 that runs and is paid for but cannot send work back
     gated        identical plan, and that review node gates for real
     supervised   plain, plus LLMSupervisor with max_revisions=2
 
@@ -20,6 +20,13 @@ produces a spread of scores rather than a wall of 9s and 10s.
 token cost and differ only in whether a failed verdict is enforced.
 Deleting the review node instead would have confounded gating with the
 extra call it costs.
+
+The review node is injected when the planner does not produce one. In
+the first campaign the planner emitted a gate in only 2 of 15 gated
+runs, which made that arm mostly a rerun of `plain` -- the arm reported
+a 0.6-point lift from a mechanism that was absent from 13 of its runs.
+Single-node plans are left ungated, since adding a node there would
+compare 1-node against 2-node rather than isolating enforcement.
 
 ``done_when`` is the task's own ``constraints`` verbatim. That matters:
 the system already sees the constraints in every arm, so no new
@@ -53,7 +60,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from harness import BenchmarkTask, load_tasks, offline_provider  # noqa: E402
 
-from smythe import LLMSupervisor, Swarm, Task  # noqa: E402
+from smythe import LLMSupervisor, Supervisor, Swarm, Task  # noqa: E402
+from smythe.graph import Node  # noqa: E402
 from smythe.provider import GeminiProvider, OpenAIProvider  # noqa: E402
 
 EXECUTOR_MODEL = "gpt-5.4-mini"
@@ -112,28 +120,88 @@ def make_task(bench_task: BenchmarkTask, arm: str) -> Task:
     return task
 
 
-def make_swarm(arm: str, provider, model: str) -> Swarm:
+class CountingSupervisor(Supervisor):
+    """Wraps a supervisor and records what it was asked and what it said.
+
+    A supervisor that reviews and declines emits no trace span at all,
+    so a run with zero revisions is indistinguishable from a run where
+    supervision never engaged. That ambiguity made the first campaign's
+    "0 revisions" result uninterpretable; counting here removes it.
+    """
+
+    def __init__(self, inner: Supervisor) -> None:
+        self.inner = inner
+        self.reviews = 0
+        self.proposals = 0
+
+    async def review(self, graph, node, *, task, revisions_remaining):
+        self.reviews += 1
+        revision = await self.inner.review(
+            graph, node, task=task, revisions_remaining=revisions_remaining,
+        )
+        if revision is not None and not revision.is_empty:
+            self.proposals += 1
+        return revision
+
+
+def make_swarm(arm: str, provider, model: str) -> tuple[Swarm, CountingSupervisor | None]:
     common = dict(provider=provider, model=model, parallel=True, max_budget_usd=5.00)
     if arm == "supervised":
-        return Swarm(supervisor=LLMSupervisor(provider), max_revisions=2, **common)
-    return Swarm(**common)
+        supervisor = CountingSupervisor(LLMSupervisor(provider))
+        return Swarm(supervisor=supervisor, max_revisions=2, **common), supervisor
+    return Swarm(**common), None
+
+
+def ensure_gate(graph, *, criteria: list[str]) -> bool:
+    """Add a verifier on the deliverable node if the plan has none.
+
+    Returns True when one was injected. A single-node plan is left alone:
+    gating it would compare a 1-node run against a 2-node run rather than
+    isolating enforcement.
+    """
+    if any(node.verifies for node in graph.nodes) or len(graph.nodes) < 2:
+        return False
+    depended_on = {dep for node in graph.nodes for dep in node.depends_on}
+    terminal = [n for n in graph.nodes if n.id not in depended_on]
+    if len(terminal) != 1:
+        return False
+    target = terminal[0]
+    graph.nodes.append(Node(
+        id="injected-check",
+        label=(
+            "Check the deliverable against every criterion below. Reply "
+            "PASS if all are met, or FAIL with the specific reasons.\n"
+            + "\n".join(f"- {c}" for c in criteria)
+        ),
+        depends_on=[target.id],
+        verifies=target.id,
+        max_regenerations=1,
+    ))
+    return True
 
 
 def run_one(bench_task: BenchmarkTask, arm: str, *, live: bool) -> dict:
     provider = OpenAIProvider() if live else offline_provider("smythe_dynamic")
     model = EXECUTOR_MODEL if live else "demo-model"
-    swarm = make_swarm(arm, provider, model)
+    swarm, supervisor = make_swarm(arm, provider, model)
     task = make_task(bench_task, arm)
 
     started = time.perf_counter()
-    if arm == "criteria":
-        # Disarm the gate without removing the node: the review still
-        # runs and is still paid for, it just cannot send work back.
-        # That is what separates "stated and checked" from "enforced".
+    injected = False
+    if arm in ("criteria", "gated"):
         graph = swarm.plan(task)
-        for node in graph.nodes:
-            node.verifies = None
-            node.max_regenerations = 0
+        # The planner emits a gate only sometimes (2 of 15 in the first
+        # campaign), so leaving it to chance makes this arm mostly a
+        # rerun of `plain`. Injecting one when it is missing is what lets
+        # the arm answer the question it was built to ask.
+        injected = ensure_gate(graph, criteria=task.done_when)
+        if arm == "criteria":
+            # Disarm without removing: the review still runs and is still
+            # paid for, it just cannot send work back. Both arms execute
+            # the same graph, so only enforcement differs.
+            for node in graph.nodes:
+                node.verifies = None
+                node.max_regenerations = 0
         result = swarm.execute(graph)
     else:
         result = swarm.execute(task)
@@ -147,6 +215,11 @@ def run_one(bench_task: BenchmarkTask, arm: str, *, live: bool) -> dict:
     revisions = sum(
         1 for span in result.trace if span.get("status") == "revision_applied"
     )
+    # Counted separately: a rejected proposal is not the same result as
+    # a supervisor that looked and had nothing to say.
+    revisions_rejected = sum(
+        1 for span in result.trace if span.get("status") == "revision_rejected"
+    )
     return {
         "task": bench_task.name,
         "arm": arm,
@@ -157,8 +230,12 @@ def run_one(bench_task: BenchmarkTask, arm: str, *, live: bool) -> dict:
         # which no plan contains a gate is the same run as `criteria`,
         # and must be reported that way rather than as an effect.
         "gates": gates,
+        "gate_injected": injected,
         "regenerations": regenerations,
         "revisions": revisions,
+        "revisions_rejected": revisions_rejected,
+        "reviews": supervisor.reviews if supervisor else 0,
+        "proposals": supervisor.proposals if supervisor else 0,
         "cost_usd": round(result.total_cost_usd, 6),
         "wall_s": None if not live else wall_s,
         "output": result.output,
@@ -195,7 +272,9 @@ def main() -> None:
                     record = {
                         "task": task.name, "arm": arm, "quality": None,
                         "nodes": None, "depth": None, "topology": None,
-                        "gates": [], "regenerations": 0, "revisions": 0,
+                        "gates": [], "gate_injected": False,
+                        "regenerations": 0, "revisions": 0,
+                        "revisions_rejected": 0, "reviews": 0, "proposals": 0,
                         "cost_usd": None, "wall_s": None,
                         "error": f"{type(exc).__name__}: {exc}",
                     }
@@ -207,7 +286,9 @@ def main() -> None:
                     f"q={record.get('quality')} nodes={record.get('nodes')} "
                     f"gates={len(record.get('gates') or [])} "
                     f"regen={record.get('regenerations')} "
-                    f"rev={record.get('revisions')} ${record.get('cost_usd')}"
+                    f"rev={record.get('revisions')}/"
+                    f"{record.get('proposals')}/{record.get('reviews')} "
+                    f"${record.get('cost_usd')}"
                     + (f" ERROR {record['error']}" if record["error"] else ""),
                     flush=True,
                 )
@@ -228,8 +309,13 @@ def main() -> None:
             "floor_runs_under_7": sum(q < 7 for q in quals),
             "nodes_mean": round(mean(r["nodes"] for r in cell), 2) if cell else None,
             "plans_with_a_gate": sum(1 for r in cell if r["gates"]),
+            "gates_injected": sum(1 for r in cell if r.get("gate_injected")),
             "regenerations_total": sum(r["regenerations"] for r in cell),
-            "revisions_total": sum(r["revisions"] for r in cell),
+            "revisions_applied": sum(r["revisions"] for r in cell),
+            "revisions_rejected": sum(r["revisions_rejected"] for r in cell),
+            # The number that tells you whether the feature ran at all.
+            "supervisor_reviews": sum(r["reviews"] for r in cell),
+            "supervisor_proposals": sum(r["proposals"] for r in cell),
             "cost_total_usd": round(sum(costs), 5) if costs else None,
         })
 
