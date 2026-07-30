@@ -118,3 +118,23 @@ def test_llm_architect_prompt_unchanged_without_registry():
     asyncio.run(architect.aplan(Task(goal="Research something")))
     [prompt] = provider.prompts
     assert "Available agents" not in prompt
+
+
+def test_planner_sees_acceptance_criteria():
+    """The planner must know what 'done' means before it decomposes.
+
+    Without this the plan is shaped only by the goal, and no node in it
+    is accountable for the criteria the caller actually set.
+    """
+    task = Task(
+        goal="Write the memo",
+        done_when=["cites at least three sources", "under 500 words"],
+    )
+    prompt = build_user_prompt(task)
+    assert "cites at least three sources" in prompt
+    assert "under 500 words" in prompt
+
+
+def test_no_acceptance_section_when_unset():
+    prompt = build_user_prompt(Task(goal="Write the memo"))
+    assert "Acceptance criteria" not in prompt

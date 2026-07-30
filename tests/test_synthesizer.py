@@ -6,7 +6,7 @@ import pytest
 
 from helpers import make_completed_graph as _make_graph
 from smythe.budget import Sentinel
-from smythe.graph import ExecutionGraph, Topology
+from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, Provider
 from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.tracer import Tracer
@@ -297,3 +297,37 @@ def test_deliverable_falls_back_when_no_terminal_completed():
     graph.nodes[-1].result = None
     output = Synthesizer().synthesize(graph)
     assert "analysis of the notes" in output
+
+
+def test_verifier_verdict_is_not_the_deliverable():
+    """A gated run must return the artefact, not the verdict on it.
+
+    A verifier node has no dependents, so the naive terminal-node rule
+    hands back 'PASS' and silently discards the memo it approved.
+    """
+    draft = Node(
+        id="memo", label="Write the memo",
+        status=NodeStatus.COMPLETED, result="THE MEMO BODY",
+    )
+    check = Node(
+        id="check", label="Verify it", depends_on=["memo"],
+        verifies="memo", max_regenerations=1,
+        status=NodeStatus.COMPLETED, result="PASS - meets every criterion",
+    )
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[draft, check])
+
+    output = Synthesizer(SynthesisStrategy.DELIVERABLE).synthesize(graph)
+
+    assert "THE MEMO BODY" in output
+    assert "PASS - meets every criterion" not in output
+
+
+def test_deliverable_falls_back_when_every_node_is_a_verifier():
+    """Never return an empty deliverable just because the rule excluded all of it."""
+    only = Node(
+        id="check", label="Verify", verifies="ghost",
+        status=NodeStatus.COMPLETED, result="PASS",
+    )
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[only])
+
+    assert "PASS" in Synthesizer(SynthesisStrategy.DELIVERABLE).synthesize(graph)

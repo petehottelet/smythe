@@ -6,7 +6,11 @@ import tempfile
 import pytest
 
 from smythe.graph import ExecutionGraph, Topology
-from smythe.loader import load_graph, load_graph_from_string
+from smythe.loader import (
+    build_graph_from_dict,
+    load_graph,
+    load_graph_from_string,
+)
 
 
 SERIAL_YAML = """\
@@ -371,3 +375,59 @@ def test_loader_rejects_non_bool_attach_dep_artifacts(tmp_path):
     )
     with pytest.raises(ValueError, match="attach_dep_artifacts"):
         load_graph(str(yaml_path))
+
+
+# ---------------------------------------------------------------------------
+# Verification gating
+# ---------------------------------------------------------------------------
+
+
+def test_verifier_node_survives_the_loader():
+    """A plan that asks for verification must get it.
+
+    ``verifies``/``max_regenerations`` are the only way a generated plan
+    or a YAML file can turn on verification gating: the executor reads
+    them off the Node, and nothing else sets them.
+    """
+    graph, _ = build_graph_from_dict({
+        "topology": ["serial"],
+        "nodes": [
+            {"id": "draft", "label": "Write it"},
+            {
+                "id": "check",
+                "label": "Check it",
+                "depends_on": ["draft"],
+                "verifies": "draft",
+                "max_regenerations": 2,
+            },
+        ],
+    })
+
+    check = next(n for n in graph.nodes if n.id == "check")
+    assert check.verifies == "draft"
+    assert check.max_regenerations == 2
+
+
+def test_verifies_must_name_a_real_node():
+    with pytest.raises(ValueError, match="verifies"):
+        build_graph_from_dict({
+            "topology": ["serial"],
+            "nodes": [
+                {"id": "draft", "label": "Write it"},
+                {"id": "check", "label": "Check it", "verifies": "nonexistent"},
+            ],
+        })
+
+
+def test_max_regenerations_rejects_negative():
+    with pytest.raises(ValueError, match="max_regenerations"):
+        build_graph_from_dict({
+            "topology": ["serial"],
+            "nodes": [
+                {"id": "draft", "label": "Write it"},
+                {
+                    "id": "check", "label": "Check it",
+                    "verifies": "draft", "max_regenerations": -1,
+                },
+            ],
+        })

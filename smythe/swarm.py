@@ -211,6 +211,14 @@ class Swarm:
             context += "\n\nConstraints:\n" + "\n".join(
                 f"- {c}" for c in task.constraints
             )
+        # Nodes are what actually produce the deliverable, so they are what
+        # has to satisfy the acceptance criteria. Showing the criteria only
+        # to the planner and supervisor leaves the work itself unaware of
+        # the bar it is being held to.
+        if task.done_when:
+            context += "\n\nDone when:\n" + "\n".join(
+                f"- {c}" for c in task.done_when
+            )
         for node in graph.nodes:
             if node.label.strip() != task.goal.strip():
                 node.metadata.setdefault("task_context", context)
