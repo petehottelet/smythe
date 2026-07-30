@@ -83,18 +83,14 @@ Three specialists run in parallel under a budget cap, a red team attacks the dra
 ## Parallel image generation, measured
 
 Smythe agents generate images too — in parallel, under the same budget
-machinery. These three ads were produced by one broadcast graph on
-`gemini-2.5-flash-image` for a **$0.117 recorded output estimate,
-concurrently**, from
-nothing but a shared brand brief ([examples/09_image_generation.py](examples/09_image_generation.py)):
+machinery. This is a full set of seven IAB standard banner sizes,
+generated concurrently from one brand brief on
+`gemini-2.5-flash-image`: **14.3 seconds, $1.83 recorded**, every asset
+at its exact pixel spec.
 
-<table>
-  <tr>
-    <td><img src="assets/demo_ad_banner.jpg" alt="Generated banner ad" width="270"></td>
-    <td><img src="assets/demo_ad_dunes.jpg" alt="Generated rectangle ad" width="200"></td>
-    <td><img src="assets/demo_ad_flatlay.jpg" alt="Generated social ad" width="200"></td>
-  </tr>
-</table>
+<p align="center">
+  <img src="assets/osiris_ads/contact_sheet.png" alt="Contact sheet of seven generated banner ads at IAB standard sizes: leaderboard, skyscraper, half page, large rectangle, inline rectangle, mobile leaderboard, and mobile banner" width="640">
+</p>
 
 The performance numbers are published with the raw records, objective
 metrics only — no LLM judge: **6.6× wall-clock speedup at concurrency

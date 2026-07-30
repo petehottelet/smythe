@@ -4,11 +4,17 @@ The Architect plans once, before any work happens. Without a supervisor
 the executor walks that plan to the end regardless of what the results
 show — a plan that turns out to be wrong is still executed in full.
 
-The benchmark record puts a number on that. In the published framework
-head-to-head, `smythe_dynamic` scored **9.27 with a [5–10] range**: one
-badly generated plan dragged a whole task down, and nothing in the run
-could notice or correct it. Planning variance is the price of generated
-topology, and a static graph has no mechanism to pay it back.
+The failure mode is concrete: a benchmark run once produced a badly
+generated plan, and nothing in the run could notice or correct it —
+every node executed the wrong shape faithfully to the end. Planning
+variance is the price of generated topology, and a static graph has no
+mechanism to pay it back.
+
+(An earlier version of this page cited a specific score here. That
+figure came from a measurement the project later found invalid — see
+[benchmarks/shape_suite.md](../benchmarks/shape_suite.md) — so it has
+been removed rather than restated. Whether supervision improves
+outcomes is not yet measured.)
 
 A **supervisor** closes the loop. After a node completes it reviews the
 work so far against the goal and may revise the *unexecuted* remainder.
@@ -60,20 +66,22 @@ Four guardrails do that:
 
 ## Cost control
 
-Reviewing after every node is usually wasteful. `LLMSupervisor` reviews
-only after a node with no pending dependents finishes — the point where
-a missing step actually becomes visible. Override it when you know
-better:
+Reviewing after every node is usually wasteful. By default
+`LLMSupervisor` reviews only after a node with no pending dependents
+finishes. Be aware what that means in practice: on a simple serial
+graph it is the *final* node, so the supervisor can append remedial
+work but has nothing left to drop or rewire. Genuine stage-boundary
+review — closing a fork before its join — is not yet implemented.
+Until it is, target reviews explicitly:
 
 ```python
 LLMSupervisor(provider, review_after={"draft"})   # only after this node
 LLMSupervisor(provider, only_terminal=False)      # after every node
 ```
 
-Keeping the supervising model out of the routine path is where adaptive
-orchestration earns its keep: the published comparisons that beat
-static planning on cost do so by *not* consulting an expensive model on
-every step.
+Keeping the supervising model out of the routine path is the whole
+cost argument for adaptive orchestration: a review after every node in
+a wide graph can cost more than the work it supervises.
 
 ## Writing your own
 
