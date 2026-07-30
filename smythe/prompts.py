@@ -64,13 +64,24 @@ Respond with **only** a JSON object — no prose, no markdown fences.
 2. `depends_on` lists node IDs that must complete before this node starts.  \
    The graph must be acyclic.
 3. Keep graphs shallow — depth <= 5 levels.
-4. Right-size the graph: every node costs money and latency, so add one \
-   only when it contributes a distinct work product the deliverable needs. \
-   Tasks with a single deliverable rarely need more than 4-5 nodes. \
-   Fan out in parallel only when the branches produce genuinely \
-   independent analyses; do not split one analysis into thin slices. \
-   A single-node graph is acceptable for trivial tasks; 8 nodes is the \
-   ceiling for complex ones.
+4. Right-size the graph. **Start from one node and justify every \
+   addition** — do not start from a pipeline and trim. Every node costs \
+   money, latency, and a hand-off where detail is lost. \
+   Apply this test to each node you are about to add: name the distinct \
+   work product it contributes that no other node produces. If you \
+   cannot name one, do not add it. \
+   Use exactly one node when the task has a single deliverable and no \
+   independently investigable parts — a transformation, a calculation, \
+   a rewrite, a focused piece of writing. Splitting these produces \
+   worse results than one competent pass, because each hand-off loses \
+   specifics. \
+   Add nodes when the work has genuinely separable parts: distinct \
+   subjects that can be investigated without reference to each other, a \
+   deliverable that must be attacked by an adversarial reviewer, or \
+   stages where each consumes the previous stage's *output* rather than \
+   merely following it in time. \
+   Fan out in parallel only when the branches are truly independent; do \
+   not split one analysis into thin slices. 8 nodes is the ceiling.
 5. Give each agent a meaningful `persona` that guides its behaviour.
 6. Assign `capabilities` tags that describe the agent's expertise.
 7. For fork-join: create parallel root nodes and a join node that depends on all of them.

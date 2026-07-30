@@ -46,6 +46,7 @@ def test_full_swarm_pipeline_runs_offline():
     }
     swarm = Swarm(provider=OfflineProvider(plan=plan), model="demo", max_budget_usd=1.0)
     result = swarm.execute(Task(goal="Research and summarize"))
-    assert "offline: Do research" in result.output
+    # Default synthesis returns the deliverable, not the transcript.
+    assert result.output == "offline: Summarize it"
     assert "offline: Summarize it" in result.output
     assert result.total_cost_usd > 0

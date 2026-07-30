@@ -329,3 +329,57 @@ def test_artifact_dirs_are_scoped_per_execution(tmp_path):
     assert len(run_dirs) == 2
     for d in run_dirs:
         assert (d / "hero_00.png").exists()
+
+
+def test_planning_provider_separates_planning_from_execution():
+    """Planning is structured work; it need not use the executor's model
+    or even its vendor."""
+    from smythe.provider import CompletionResult, Provider
+
+    class Recorder(Provider):
+        def __init__(self, name, text='{"topology":["serial"],"nodes":['
+                                      '{"id":"a","label":"Do it","depends_on":[],'
+                                      '"agent":{"name":"A","persona":"p"}}]}'):
+            self.name = name
+            self.models: list[str] = []
+            self._text = text
+
+        async def complete(self, system, prompt, model):
+            self.models.append(model)
+            return CompletionResult(text=self._text, prompt_tokens=1,
+                                    completion_tokens=1)
+
+    planner = Recorder("planner")
+    executor = Recorder("executor", text="executed")
+    swarm = Swarm(
+        provider=executor,
+        planning_provider=planner,
+        planning_model="cheap-planner",
+        model="expensive-executor",
+        artifact_dir=None,
+    )
+    result = swarm.execute(Task(goal="Do the thing"))
+
+    assert planner.models == ["cheap-planner"], "planning used the wrong provider"
+    assert executor.models == ["expensive-executor"]
+    assert result.output == "executed"
+
+
+def test_planning_defaults_to_the_execution_provider():
+    from smythe.provider import CompletionResult, Provider
+
+    class Counting(Provider):
+        def __init__(self):
+            self.calls = 0
+
+        async def complete(self, system, prompt, model):
+            self.calls += 1
+            return CompletionResult(
+                text='{"topology":["serial"],"nodes":[{"id":"a","label":"x",'
+                     '"depends_on":[],"agent":{"name":"A","persona":"p"}}]}',
+                prompt_tokens=1, completion_tokens=1,
+            )
+
+    provider = Counting()
+    Swarm(provider=provider, model="m", artifact_dir=None).execute(Task(goal="g"))
+    assert provider.calls >= 2, "one provider should serve planning and execution"
