@@ -100,6 +100,7 @@ class Swarm:
         synthesizer: Synthesizer | None = None,
         parallel: bool = False,
         planning_model: str | None = None,
+        planning_provider: Provider | None = None,
         memory: PlannerMemory | None = None,
         router: WhiteRabbit | None = None,
         max_concurrency: int | None = 8,
@@ -145,8 +146,12 @@ class Swarm:
         if architect is not None:
             self._architect = architect
         else:
+            # Planning is structured, low-creativity work: it does not
+            # need the executor's model, and often should not pay for it.
+            # A separate provider also lets planning run on a different
+            # vendor entirely.
             self._architect = LLMArchitect(
-                provider=self._provider,
+                provider=planning_provider or self._provider,
                 planning_model=planning_model or model,
                 memory=memory,
                 registry=self._registry,

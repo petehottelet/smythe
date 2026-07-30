@@ -17,6 +17,7 @@ logger = logging.getLogger("smythe.synthesizer")
 
 
 class SynthesisStrategy(Enum):
+    DELIVERABLE = "deliverable"
     CONCATENATE = "concatenate"
     LLM_MERGE = "llm_merge"
     STRUCTURED = "structured"
@@ -42,7 +43,7 @@ class Synthesizer:
 
     def __init__(
         self,
-        strategy: SynthesisStrategy = SynthesisStrategy.CONCATENATE,
+        strategy: SynthesisStrategy = SynthesisStrategy.DELIVERABLE,
         provider: Provider | None = None,
         model: str | None = None,
         budget: Sentinel | None = None,
@@ -71,6 +72,8 @@ class Synthesizer:
         if not completed:
             return ""
 
+        if self._strategy == SynthesisStrategy.DELIVERABLE:
+            return self._deliverable(graph, completed)
         if self._strategy == SynthesisStrategy.CONCATENATE:
             return self._concatenate(completed)
         if self._strategy == SynthesisStrategy.STRUCTURED:
@@ -104,6 +107,8 @@ class Synthesizer:
         if not completed:
             return ""
 
+        if self._strategy == SynthesisStrategy.DELIVERABLE:
+            return self._deliverable(graph, completed)
         if self._strategy == SynthesisStrategy.CONCATENATE:
             return self._concatenate(completed)
         if self._strategy == SynthesisStrategy.STRUCTURED:
@@ -117,6 +122,23 @@ class Synthesizer:
                 tracer=tracer,
             )
         return self._concatenate(completed)
+
+    @staticmethod
+    def _deliverable(graph: ExecutionGraph, nodes: list[Node]) -> str:
+        """Return what the graph produced, not a transcript of producing it.
+
+        The executor already tells terminal nodes their output *is* the
+        deliverable (TERMINAL_DELIVERABLE_NOTE); this makes the returned
+        result agree with that instruction. Joining every node instead
+        pads a memo with the research and analysis that fed it, which is
+        rarely what a caller wants and measurably scores worse.
+
+        Falls back to every completed node when a graph has no terminal
+        result to hand back, so nothing is ever silently lost.
+        """
+        depended_on = {dep for node in graph.nodes for dep in node.depends_on}
+        terminal = [n for n in nodes if n.id not in depended_on]
+        return Synthesizer._concatenate(terminal or nodes)
 
     @staticmethod
     def _concatenate(nodes: list[Node]) -> str:

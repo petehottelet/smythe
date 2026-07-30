@@ -230,3 +230,70 @@ def test_llm_merge_provider_error_sets_failed_status():
 
     error_spans = [s for s in tracer.summary() if s.get("error") is not None]
     assert len(error_spans) == 1
+
+
+# ---------------------------------------------------------------------------
+# DELIVERABLE strategy (the default)
+# ---------------------------------------------------------------------------
+
+
+def _pipeline_graph():
+    from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
+
+    nodes = []
+    prev = None
+    for node_id, text in (
+        ("research", "raw research notes"),
+        ("analyze", "analysis of the notes"),
+        ("write", "THE FINAL MEMO"),
+    ):
+        node = Node(id=node_id, label=node_id, depends_on=[prev] if prev else [])
+        node.status = NodeStatus.COMPLETED
+        node.result = text
+        nodes.append(node)
+        prev = node_id
+    return ExecutionGraph(topology=[Topology.SERIAL], nodes=nodes)
+
+
+def test_deliverable_is_the_default_strategy():
+    assert Synthesizer()._strategy is SynthesisStrategy.DELIVERABLE
+
+
+def test_deliverable_returns_the_terminal_output_only():
+    """A memo, not a transcript of writing the memo."""
+    output = Synthesizer().synthesize(_pipeline_graph())
+    assert output == "THE FINAL MEMO"
+    assert "raw research notes" not in output
+
+
+def test_concatenate_still_available_for_the_old_behavior():
+    output = Synthesizer(
+        strategy=SynthesisStrategy.CONCATENATE,
+    ).synthesize(_pipeline_graph())
+    assert "raw research notes" in output
+    assert "THE FINAL MEMO" in output
+
+
+def test_deliverable_joins_multiple_terminals():
+    from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
+
+    nodes = []
+    for node_id in ("a", "b"):
+        node = Node(id=node_id, label=node_id)
+        node.status = NodeStatus.COMPLETED
+        node.result = f"result {node_id}"
+        nodes.append(node)
+    graph = ExecutionGraph(topology=[Topology.BROADCAST_REDUCE], nodes=nodes)
+    output = Synthesizer().synthesize(graph)
+    assert "result a" in output and "result b" in output
+
+
+def test_deliverable_falls_back_when_no_terminal_completed():
+    """Nothing is silently lost if the terminal node never finished."""
+    from smythe.graph import NodeStatus
+
+    graph = _pipeline_graph()
+    graph.nodes[-1].status = NodeStatus.FAILED
+    graph.nodes[-1].result = None
+    output = Synthesizer().synthesize(graph)
+    assert "analysis of the notes" in output

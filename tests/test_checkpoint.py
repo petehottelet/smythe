@@ -181,9 +181,13 @@ def test_crash_then_resume_completes_without_rerunning_finished_nodes(tmp_path):
     result = resumed.resume(execution_id)
 
     assert result.execution_id == execution_id
-    assert "ok: A" in result.output
-    assert "ok: B" in result.output
-    assert "ok: C" in result.output
+    # Default synthesis returns the terminal deliverable, so resumption is
+    # asserted on the graph itself: every node finished, and the results
+    # banked before the crash survived.
+    assert result.output == "ok: C"
+    results = {n.id: n.result for n in result.graph.nodes}
+    assert results == {"a": "ok: A", "b": "ok: B", "c": "ok: C"}
+    assert all(n.status.value == "completed" for n in result.graph.nodes)
     assert provider.calls.count("A") == 1, "completed node was re-executed on resume"
     assert store.load(execution_id)["status"] == "completed"
 
