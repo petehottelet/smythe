@@ -8,6 +8,7 @@ from smythe.budget import (
 )
 from smythe.checkpoint import CheckpointStore, FileCheckpointStore
 from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
+from smythe.design import DesignSystem, Finding, design_verifier, inspect_asset
 from smythe.distill import DistillationError, distill_template
 from smythe.graph import FailurePolicy, Revision, RevisionError
 from smythe.loader import load_graph
@@ -66,10 +67,12 @@ __all__ = [
     "CompletionResult",
     "ConstrainedArchitect",
     "DefaultCapabilityMapper",
+    "DesignSystem",
     "DeterministicArchitect",
     "DistillationError",
     "FailurePolicy",
     "FileCheckpointStore",
+    "Finding",
     "GeminiProvider",
     "LLMArchitect",
     "LLMSupervisor",
@@ -106,7 +109,9 @@ __all__ = [
     "Verdict",
     "Verifier",
     "WhiteRabbit",
+    "design_verifier",
     "distill_template",
+    "inspect_asset",
     "load_graph",
 ]
 __version__ = "0.6.0"
