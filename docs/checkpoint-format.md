@@ -1,4 +1,4 @@
-# Checkpoint format (version 1)
+# Checkpoint format (version 2)
 
 When a `Swarm` is constructed with a `checkpoint_store`, it persists the full
 execution state after planning and once more when the run finishes or fails.
@@ -17,7 +17,7 @@ With the default `FileCheckpointStore`, checkpoints live at `~/.smythe/checkpoin
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "execution_id": "9f2c4a…",
   "status": "running | completed | failed",
   "created_at": 1751600000.0,
@@ -26,7 +26,11 @@ With the default `FileCheckpointStore`, checkpoints live at `~/.smythe/checkpoin
   "task": {
     "goal": "…",
     "constraints": ["…"],
+    "done_when": ["…"],
     "context": {}
+  },
+  "control": {
+    "revisions_used": 0
   },
   "graph": {
     "topology": ["fork_join"],
@@ -45,7 +49,9 @@ With the default `FileCheckpointStore`, checkpoints live at `~/.smythe/checkpoin
         "required_capabilities": [],
         "timeout_s": null,
         "max_tool_iterations": null,
-        "attach_dep_artifacts": false
+        "attach_dep_artifacts": false,
+        "verifies": null,
+        "max_regenerations": 0
       }
     ]
   },
@@ -65,18 +71,30 @@ Notes:
 - `task` is `null` when a pre-built `ExecutionGraph` was executed instead of a `Task`.
 - Node `result` values that aren't JSON-serializable are stored as their `str()` form.
 - `budget.max_budget_usd` is the cap the execution started with; resume honors it, not whatever the resuming Swarm was constructed with.
+- `control.revisions_used` is how much of the supervisor's `max_revisions` allowance the run has already spent. Resume seeds the executor from it, so the cap bounds the **run**, not each attempt: a crash-resume cycle cannot refill the allowance and revise past the limit the caller set.
+- `task.done_when` carries the acceptance criteria forward. A resumed run that had forgotten them could not hold its own output to them.
 
 ## Resume semantics
 
 `swarm.resume(execution_id)` (or `await swarm.aresume(...)`):
 
-1. Loads the state and rejects unknown ids (`KeyError`) and unknown versions (`ValueError`).
+1. Loads the state and rejects unknown ids (`KeyError`) and unreadable versions (`ValueError`).
 2. If `status` is `completed` and `output` is present, returns the stored result without executing anything.
 3. Otherwise restores the graph, re-registers the recorded agents, and resets `running` / `failed` nodes to `pending`. `completed` and `skipped` nodes keep their recorded results and are **not** re-executed.
 4. Restores per-node costs into the budget so the resumed run keeps counting against the original cap.
 5. Executes the remaining nodes (always on the parallel executor), synthesizes over the full graph, and writes the final checkpoint.
 
 The trace on a resumed `SwarmResult` covers only the resumed portion; spans from before the crash are not reconstructed.
+
+## Version compatibility
+
+This build writes version `2` and reads `SUPPORTED_CHECKPOINT_VERSIONS =
+(1, 2)`. Version 2 added `control` and `task.done_when`; both are
+additive, so a version 1 document still resumes — it loads with
+`revisions_used: 0` and no acceptance criteria, which is exactly the
+state it was written in. A version this build cannot read fails with a
+`ValueError` naming the versions it does read, rather than resuming
+against a schema it would misinterpret.
 
 ## Finding an execution id after a crash
 

@@ -142,6 +142,26 @@ provider defect shipped in 0.5.0. No breaking API changes.
 
 ### Fixed
 
+- **Verification gating could not be switched on.** `verifies` and
+  `max_regenerations` were readable only by constructing `Node` objects
+  in Python: `build_graph_from_dict` — the path both YAML files and
+  generated plans take — dropped them silently, and the planner prompt
+  never mentioned them. The loader now parses and validates both, and a
+  `verifies` naming an unknown node fails to load rather than producing
+  a gate that quietly checks nothing.
+
+- **`done_when` did nothing in the default configuration.** It was
+  validated on `Task` and shown to `LLMSupervisor`, which is off unless
+  `max_revisions > 0`, and to nothing else. Acceptance criteria now
+  reach the planner (which is asked to make some node accountable for
+  each one, and may add a verifier node) and every executing node.
+
+- **A gated run returned the verdict instead of the deliverable.** A
+  verifier node has no dependents, so `DELIVERABLE` synthesis treated it
+  as terminal and handed back `"PASS"` while discarding the artefact it
+  approved. Verifier nodes are excluded from the deliverable, and an
+  edge from a verifier no longer makes its target non-terminal.
+
 - **Resuming refilled the supervisor's revision allowance.**
   `max_revisions` was held only in memory, so a run that crashed after
   spending its revisions came back from the checkpoint with a full
