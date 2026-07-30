@@ -64,12 +64,26 @@ INCLUDE_TASK_CONTEXT = True
 # chain: without it, final nodes tend to reference or summarize upstream
 # findings instead of reproducing them, and the specifics are lost
 # (benchmarks/README.md documents the failure mode this addresses).
+#
+# The second paragraph exists because the first was not enough. A node
+# labelled "state the surviving claims" obeyed its label and emitted only
+# the survivors, dropping the case and the critique the goal had also
+# asked for - the label scopes the model's behaviour more strongly than a
+# general instruction to be self-contained. The shape suite scored those
+# runs 1-2 out of 10, because most of what the task asked for was never
+# returned. The fix is to say plainly that the step name describes a
+# contribution, not the extent of the output.
 TERMINAL_DELIVERABLE_NOTE = (
     "You are the final step in this workflow: your output is the "
     "deliverable, and the context above will not be shown alongside it. "
     "Make your output self-contained - carry forward the concrete "
     "findings, evidence, and specifics from the context rather than "
-    "referencing or summarizing them."
+    "referencing or summarizing them.\n\n"
+    "Your step name describes what you contribute, not how much you "
+    "output. Deliver everything the overall task asked for, including "
+    "the parts produced in earlier steps: if the task asked for an "
+    "argument and then a critique of it, return both, not just your "
+    "own increment."
 )
 
 
