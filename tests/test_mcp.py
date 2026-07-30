@@ -5,7 +5,10 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("mcp", reason="mcp extra not installed")
+pytest.importorskip(
+    "mcp.server.fastmcp",
+    reason="mcp server extra not installed (mcp.server.fastmcp missing)",
+)
 
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 from mcp.shared.memory import create_connected_server_and_client_session  # noqa: E402
