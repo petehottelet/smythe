@@ -1,21 +1,42 @@
 """Tests for checkpointing — store, serialization, and crash/resume."""
 
 import asyncio
+import json
 
 import pytest
 
 from smythe.checkpoint import (
     FileCheckpointStore,
+    task_from_dict,
     graph_from_dict,
     graph_to_dict,
     node_from_dict,
     node_to_dict,
     reset_incomplete_nodes,
 )
-from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
+from smythe.graph import (
+    ExecutionGraph,
+    FailurePolicy,
+    Node,
+    NodeStatus,
+    Revision,
+    Topology,
+)
 from smythe.provider import CompletionResult, Provider
+from smythe.supervisor import Supervisor
 from smythe.swarm import Swarm
+from smythe.task import Task
 from smythe.synthesizer import Synthesizer, SynthesisStrategy
+
+
+_SERIAL_PLAN = {
+    "topology": ["serial"],
+    "nodes": [
+        {"id": "a", "label": "A", "depends_on": []},
+        {"id": "b", "label": "B", "depends_on": ["a"]},
+        {"id": "c", "label": "C", "depends_on": ["b"]},
+    ],
+}
 
 
 class ScriptedProvider(Provider):
@@ -26,7 +47,14 @@ class ScriptedProvider(Provider):
         self._fail = set(fail_labels or ())
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
-        label = prompt.split("\n")[0]
+        if system.startswith("You are a task-decomposition planner"):
+            return CompletionResult(
+                text=json.dumps(_SERIAL_PLAN), prompt_tokens=10, completion_tokens=10,
+            )
+        # A planned run wraps the label in task context; a hand-built graph
+        # sends the bare label. Both address the same node.
+        step = [ln for ln in prompt.split("\n") if ln.startswith("Your step: ")]
+        label = step[0][len("Your step: "):] if step else prompt.split("\n")[0]
         self.calls.append(label)
         if label in self._fail:
             self._fail.discard(label)
@@ -400,3 +428,82 @@ def test_attach_dep_artifacts_roundtrips():
     restored = node_from_dict(node_to_dict(node))
     assert restored.attach_dep_artifacts is True
     assert node_from_dict(node_to_dict(Node(label="x"))).attach_dep_artifacts is False
+
+
+# ---------------------------------------------------------------------------
+# Durable run-control state
+# ---------------------------------------------------------------------------
+
+
+def test_done_when_survives_checkpoint_and_resume(tmp_path):
+    """Acceptance criteria must outlive a crash.
+
+    A resumed run that has forgotten what 'done' means cannot check it.
+    """
+    store = FileCheckpointStore(tmp_path)
+    provider = ScriptedProvider(fail_labels={"B"})
+    swarm = Swarm(
+        provider=provider, model="test-model", checkpoint_store=store, parallel=True,
+    )
+    task = Task(
+        goal="Do the thing",
+        constraints=["be brief"],
+        done_when=["cites at least three sources"],
+    )
+    with pytest.raises(RuntimeError, match="boom: B"):
+        swarm.execute(task)
+
+    [execution_id] = store.list_ids()
+    restored = task_from_dict(store.load(execution_id)["task"])
+    assert restored.done_when == ["cites at least three sources"]
+    assert restored.constraints == ["be brief"]
+
+
+class AlwaysRevises(Supervisor):
+    """Proposes one new node every time it is consulted."""
+
+    def __init__(self) -> None:
+        self.reviews = 0
+
+    async def review(self, graph, node, *, task, revisions_remaining):
+        self.reviews += 1
+        return Revision(
+            add_nodes=(Node(
+                id=f"added-{self.reviews}-{node.id}",
+                label="extra work",
+                depends_on=[node.id],
+            ),),
+            reason="always",
+        )
+
+
+def test_revision_allowance_is_not_refilled_by_resume(tmp_path):
+    """The revision cap is a per-run guarantee, not a per-process one.
+
+    Without durable accounting a crash silently refills the allowance:
+    a run capped at one revision applies one, dies, resumes, and applies
+    another - spending money the cap was meant to prevent.
+    """
+    store = FileCheckpointStore(tmp_path)
+    supervisor = AlwaysRevises()
+    provider = ScriptedProvider(fail_labels={"C"})
+    swarm = Swarm(
+        provider=provider, model="test-model", checkpoint_store=store,
+        parallel=True, supervisor=supervisor, max_revisions=1,
+    )
+
+    with pytest.raises(RuntimeError, match="boom: C"):
+        swarm.execute(_serial_graph())
+
+    [execution_id] = store.list_ids()
+    state = store.load(execution_id)
+    assert state["control"]["revisions_used"] == 1, "the applied revision was not recorded"
+
+    resumed = Swarm(
+        provider=provider, model="test-model", checkpoint_store=store,
+        supervisor=supervisor, max_revisions=1,
+    )
+    result = resumed.resume(execution_id)
+
+    added = [n.id for n in result.graph.nodes if n.id.startswith("added-")]
+    assert len(added) == 1, f"resume refilled the revision allowance: {added}"

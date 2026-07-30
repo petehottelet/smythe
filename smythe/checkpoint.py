@@ -27,7 +27,11 @@ from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topolo
 from smythe.registry import Registry
 from smythe.task import Task
 
-CHECKPOINT_VERSION = 1
+CHECKPOINT_VERSION = 2
+# Versions this build can still read. v1 predates the durable control
+# block and Task.done_when; both are additive, so a v1 document loads
+# with documented defaults rather than being rejected.
+SUPPORTED_CHECKPOINT_VERSIONS = (1, 2)
 
 _EXECUTION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
@@ -142,6 +146,7 @@ def task_to_dict(task: Task | None) -> dict[str, Any] | None:
         "goal": task.goal,
         "constraints": list(task.constraints),
         "context": {k: _jsonable(v) for k, v in task.context.items()},
+        "done_when": list(task.done_when),
     }
 
 
@@ -152,6 +157,7 @@ def task_from_dict(data: dict[str, Any] | None) -> Task | None:
         goal=data["goal"],
         constraints=list(data.get("constraints", [])),
         context=dict(data.get("context", {})),
+        done_when=list(data.get("done_when", [])),
     )
 
 
@@ -252,8 +258,15 @@ def build_state(
     node_costs: dict[str, float],
     output: str | None = None,
     created_at: float | None = None,
+    control: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Assemble a version-1 checkpoint state document."""
+    """Assemble a checkpoint state document.
+
+    ``control`` carries run-level counters that enforce bounded-loop
+    guarantees. They must be durable: an allowance that resets on
+    resume is not a cap, and a crash would silently buy more work
+    than the caller authorised.
+    """
     now = time.time()
     return {
         "version": CHECKPOINT_VERSION,
@@ -270,4 +283,5 @@ def build_state(
             "node_costs": dict(node_costs),
         },
         "output": output,
+        "control": dict(control or {"revisions_used": 0}),
     }
