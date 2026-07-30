@@ -57,6 +57,46 @@ swarm = Swarm(verifier=long_enough, ...)
 A `CallableVerifier` can return a bool or a `Verdict(passed=..., reason=...)`
 when you want the reason recorded in the trace.
 
+## Gating from YAML and from a generated plan
+
+`verifies` and `max_regenerations` are ordinary node fields, so a YAML
+DAG declares a gate the same way Python does:
+
+```yaml
+topology: serial
+nodes:
+  - id: draft
+    label: "Write the launch brief"
+  - id: check
+    label: "Verify every claim is supported. Reply PASS or FAIL."
+    depends_on: [draft]
+    verifies: draft
+    max_regenerations: 2
+```
+
+A `verifies` that names a node the file does not define is a load
+error, not a silently inert gate — the failure mode worth protecting
+against is believing a run is checked when nothing is checking it.
+
+For generated plans, state the criteria on the task and the Architect
+may add the gate itself:
+
+```python
+task = Task(
+    goal="Write the launch brief",
+    done_when=["every claim cites a source", "under 800 words"],
+)
+```
+
+`done_when` reaches the planner (which shapes the plan around it and
+may add a verifier node) and every executing node (so the work knows
+the bar it is held to). The Architect is instructed to add at most one
+gate, on the node that produces the deliverable.
+
+The verifier's verdict is never the deliverable: `DELIVERABLE`
+synthesis excludes verifier nodes, so a gated run returns the artefact
+rather than the "PASS" that approved it.
+
 ## Cost
 
 Regeneration buys another provider call, so it is bounded per verifier
