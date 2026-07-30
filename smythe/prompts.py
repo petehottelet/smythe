@@ -88,6 +88,20 @@ Respond with **only** a JSON object — no prose, no markdown fences.
 8. For broadcast-reduce: create a setup node, parallel worker nodes depending on it, \
    and a reduce node depending on all workers.
 9. For adversarial: insert a review node after the main work, before the final output.
+10. **Only when the task states acceptance criteria**, you may add one \
+   gating node that checks the deliverable against them:
+
+   ```
+   {"id": "check", "label": "Verify the memo meets every acceptance \
+criterion; answer PASS or FAIL with reasons", "depends_on": ["memo"], \
+"verifies": "memo", "max_regenerations": 1}
+   ```
+
+   `verifies` names the node being judged; a FAIL verdict re-runs that \
+   node and everything downstream of it, up to `max_regenerations` \
+   times. Use at most one such node, put it on the node that produces \
+   the deliverable, and keep `max_regenerations` at 1 — each retry pays \
+   for the subtree again. Omit it entirely when no criteria are stated.
 """
 
 RETRY_PROMPT = """\
@@ -145,6 +159,15 @@ def build_user_prompt(
     if task.constraints:
         constraints_text = "\n".join(f"- {c}" for c in task.constraints)
         parts.append(f"## Constraints\n\n{constraints_text}")
+
+    if task.done_when:
+        criteria_text = "\n".join(f"- {c}" for c in task.done_when)
+        parts.append(
+            "## Acceptance criteria\n\n"
+            "The deliverable is not done until it meets all of these. "
+            "Make some node in your plan accountable for each one.\n\n"
+            + criteria_text
+        )
 
     if task.context:
         ctx_lines = "\n".join(f"- {k}: {v}" for k, v in task.context.items())

@@ -383,3 +383,30 @@ def test_planning_defaults_to_the_execution_provider():
     provider = Counting()
     Swarm(provider=provider, model="m", artifact_dir=None).execute(Task(goal="g"))
     assert provider.calls >= 2, "one provider should serve planning and execution"
+
+
+# ---------------------------------------------------------------------------
+# Acceptance criteria reach the work
+# ---------------------------------------------------------------------------
+
+
+def test_done_when_reaches_every_node_prompt():
+    """A node that cannot see the acceptance criteria cannot meet them.
+
+    ``done_when`` was previously visible only to LLMSupervisor, which is
+    off by default -- so in the default configuration it did nothing.
+    """
+    task = Task(
+        goal="Write the memo",
+        done_when=["cites at least three sources", "under 500 words"],
+    )
+    graph = ExecutionGraph(
+        topology=[Topology.SERIAL],
+        nodes=[Node(id="a", label="Draft"), Node(id="b", label="Edit", depends_on=["a"])],
+    )
+
+    Swarm._stamp_task_context(graph, task)
+
+    context = graph.nodes[0].metadata["task_context"]
+    assert "cites at least three sources" in context
+    assert "under 500 words" in context

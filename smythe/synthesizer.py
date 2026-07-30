@@ -133,11 +133,25 @@ class Synthesizer:
         pads a memo with the research and analysis that fed it, which is
         rarely what a caller wants and measurably scores worse.
 
+        Verifier nodes are excluded twice over: they judge the
+        deliverable rather than being it, and the edge from a verifier to
+        the node it judges does not make that node non-terminal.  Without
+        both exclusions a gated run returns "PASS" and throws away the
+        artefact it approved.
+
         Falls back to every completed node when a graph has no terminal
         result to hand back, so nothing is ever silently lost.
         """
-        depended_on = {dep for node in graph.nodes for dep in node.depends_on}
-        terminal = [n for n in nodes if n.id not in depended_on]
+        verifier_ids = {node.id for node in graph.nodes if node.verifies}
+        depended_on = {
+            dep
+            for node in graph.nodes if node.id not in verifier_ids
+            for dep in node.depends_on
+        }
+        terminal = [
+            n for n in nodes
+            if n.id not in depended_on and n.id not in verifier_ids
+        ]
         return Synthesizer._concatenate(terminal or nodes)
 
     @staticmethod

@@ -110,6 +110,25 @@ def build_graph_from_dict(data: dict) -> tuple[ExecutionGraph, Registry]:
                 f"got {type(attach_dep_artifacts).__name__}"
             )
 
+        verifies = entry.get("verifies")
+        if verifies is not None and not isinstance(verifies, str):
+            raise ValueError(
+                f"'verifies' on node {node_id!r} must be a node id string, "
+                f"got {type(verifies).__name__}"
+            )
+
+        max_regenerations = entry.get("max_regenerations", 0)
+        if isinstance(max_regenerations, bool) or not isinstance(max_regenerations, int):
+            raise ValueError(
+                f"'max_regenerations' on node {node_id!r} must be an integer, "
+                f"got {type(max_regenerations).__name__}"
+            )
+        if max_regenerations < 0:
+            raise ValueError(
+                f"'max_regenerations' on node {node_id!r} must be >= 0, "
+                f"got {max_regenerations}"
+            )
+
         node = Node(
             id=node_id,
             label=label,
@@ -121,6 +140,8 @@ def build_graph_from_dict(data: dict) -> tuple[ExecutionGraph, Registry]:
             timeout_s=timeout_s,
             max_tool_iterations=max_tool_iterations,
             attach_dep_artifacts=attach_dep_artifacts,
+            verifies=verifies,
+            max_regenerations=max_regenerations,
         )
 
         agent_data = entry.get("agent")
@@ -156,6 +177,16 @@ def build_graph_from_dict(data: dict) -> tuple[ExecutionGraph, Registry]:
             node.metadata["agent_name"] = agent.name
 
         nodes.append(node)
+
+    known_ids = {node.id for node in nodes}
+    for node in nodes:
+        if node.verifies is not None and node.verifies not in known_ids:
+            raise ValueError(
+                f"Node {node.id!r} 'verifies' names unknown node "
+                f"{node.verifies!r}"
+            )
+        if node.verifies == node.id:
+            raise ValueError(f"Node {node.id!r} cannot 'verifies' itself")
 
     graph = ExecutionGraph(topology=topology, nodes=nodes)
     graph.validate()
