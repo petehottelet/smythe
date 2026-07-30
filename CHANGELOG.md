@@ -25,10 +25,9 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 - **Adaptive supervision — plans can now correct themselves mid-run.**
   The Architect plans once; until now the executor walked that plan to
-  the end no matter what the results showed, and the published
-  head-to-head puts a number on the cost (`smythe_dynamic` 9.27 with a
-  [5-10] range, one bad plan dragging a task down with no way to
-  recover). A `Supervisor` reviews completed work and may return a
+  the end no matter what the results showed, so a badly generated plan
+  was executed faithfully with no way to recover. A `Supervisor`
+  reviews completed work and may return a
   `Revision` that changes the *unexecuted* remainder: `add_nodes` to
   close a gap, `drop_node_ids` to cancel work the results made
   pointless, `rewire` to insert a step ahead of pending work.
@@ -38,8 +37,9 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   before any mutation, contained failure (a supervisor that raises or
   proposes nonsense is traced and ignored, never fails the run), and
   revision-added nodes go through the same budget reservation as
-  planned ones. `LLMSupervisor` reviews only at stage boundaries by
-  default to keep the supervising model out of the routine path.
+  planned ones. `LLMSupervisor` reviews only after nodes with no
+  pending dependents, which on a serial graph is the final node;
+  true stage-boundary review is not yet implemented.
   New: `docs/supervisor.md`, `examples/13_adaptive_supervision.py`.
 - **Verification that gates.** A node can now declare `verifies=`
   and `max_regenerations=`: when its verdict fails, the judged node
