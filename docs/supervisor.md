@@ -10,11 +10,18 @@ every node executed the wrong shape faithfully to the end. Planning
 variance is the price of generated topology, and a static graph has no
 mechanism to pay it back.
 
-(An earlier version of this page cited a specific score here. That
-figure came from a measurement the project later found invalid — see
-[benchmarks/shape_suite.md](../benchmarks/shape_suite.md) — so it has
-been removed rather than restated. Whether supervision improves
-outcomes is not yet measured.)
+**Supervision has now been measured, and on judged prose it does not
+pay.** Across 30 live runs of the shape suite the supervisor was
+consulted 94 times and proposed a change **zero** times — 94 paid
+provider calls that changed nothing. See
+[benchmarks/control_ablation.md](../benchmarks/control_ablation.md).
+
+It is not inert by construction: it fires when a deliverable is visibly
+incomplete, which used to happen often enough to matter and now rarely
+does. Turn it on for workloads where you expect plans to be wrong in
+ways the results reveal — long-running research, tool-driven work whose
+findings redirect it. Do not turn it on expecting a quality lift on a
+well-specified writing task.
 
 A **supervisor** closes the loop. After a node completes it reviews the
 work so far against the goal and may revise the *unexecuted* remainder.

@@ -9,6 +9,16 @@ A verifier closes that loop. Verification is an ordinary node, so it is
 planned, budgeted, traced, and checkpointed like any other work. It just
 declares which node it judges:
 
+> **Use this for objective checks.** Measured on judged prose, gating
+> fired in 4 of 30 runs, cost 34% more per run, and did not reduce the
+> number of bad runs at all
+> ([benchmarks/control_ablation.md](../benchmarks/control_ablation.md)).
+> An LLM verifier asked "does this meet the criteria" reads a fluent
+> partial deliverable and passes it — it catches *malformed* output, not
+> *absent* output. The value is in the deterministic gates below: image
+> dimensions, schema conformance, a required section. Reach for
+> `CallableVerifier` before `TokenVerifier`.
+
 ```python
 from smythe.graph import Node
 
