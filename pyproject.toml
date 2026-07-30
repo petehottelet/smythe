@@ -35,7 +35,11 @@ anthropic = ["anthropic>=0.40"]
 openai = ["openai>=1.50"]
 gemini = ["google-genai>=1.0"]
 openclaw = ["openclaw-sdk>=0.1"]
-mcp = ["mcp>=1.2"]
+# Capped: mcp 2.0 moved mcp.server.fastmcp and
+# mcp.client.streamable_http.streamablehttp_client, which the
+# integration in smythe/mcp.py imports. Supporting 2.x is
+# tracked separately; an uncapped range ships a broken extra.
+mcp = ["mcp>=1.2,<2"]
 jobs = ["pillow>=10.0"]
 benchmarks = [
     "anthropic>=0.40",
@@ -60,7 +64,7 @@ dev = [
     "pytest-asyncio>=1.0",
     "pytest-cov>=5.0",
     "ruff>=0.8",
-    "mcp>=1.2",
+    "mcp>=1.2,<2",
     "pillow>=10.0",
 ]
 
