@@ -15,6 +15,69 @@
 
 Most agent frameworks make you decide upfront how your agents will work together. Smythe doesn't. It treats the execution graph itself as a generated artifact — letting an Architect decide whether a task should run serially, in parallel, or adversarially, based on the nature of the work and what's been learned from past runs.
 
+## One goal in. A screensaver out.
+
+<p align="center">
+  <img src="assets/glyph_rain/glyph-rain-loop.gif" alt="Animated green digital rain built from 192 original procedural cyber glyphs" width="640">
+</p>
+
+Smythe's flagship artifact workload hands the framework one goal — *generate
+an original cyber-glyph catalog and assemble it into a digital-rain
+screensaver* — and runs it as a **192-node broadcast graph**: one agent task
+per glyph, one provider call per task, every tile objectively validated
+(exact 128×128 PNG, unique SHA-256) before assembly. The result ships from
+this repo in four forms:
+
+**Try it:** [web screensaver](screensaver/) ·
+[Windows .scr download](screensaver/dist/SmytheGlyphRain.scr) ·
+[macOS .saver](screensaver/macos/) ·
+[the 192-glyph atlas](assets/glyph_rain/glyph-atlas.png)
+
+<p align="center">
+  <img src="assets/benchmarks/glyph_fanout_speedup.svg" alt="Measured wall-clock speedup of the 192-node glyph fan-out: 1x at concurrency 1 (1,150s) rising to 56.2x at concurrency 64 (20.5s)" width="640">
+</p>
+
+The same 192 calls that take **19 minutes serially finish in 20.5 seconds**
+at concurrency 64 — a **56× measured wall-clock speedup** at 88% parallel
+efficiency, with every run revalidated tile-by-tile. The sweep uses the live
+image lane's measured 5.8 s per-call latency, so the simulated provider
+behaves like the real API the lane calls.
+And the same graph runs against a **real image API**: 184 of 192
+`gemini-2.5-flash-image` glyphs generated and objectively validated in
+**121 seconds** at concurrency 8 — then the run halted itself at its
+fail-closed $11.52 ceiling rather than overspend. Along the way this one
+workload exposed two real framework bugs (a provider token-accounting crash
+and a floating-point budget-boundary rejection); both are fixed with
+regression tests, and every record — including the failed attempts — is
+committed.
+
+<p align="center">
+  <img src="assets/glyph_rain/live_glyphs_sample.png" alt="48 of the 184 live-generated glyphs: sharp green calligraphic marks drawn by gemini-2.5-flash-image on black" width="640">
+</p>
+
+Full protocol, evidence records, and interpretation boundaries:
+[benchmarks/glyph_screensaver_benchmark.md](benchmarks/glyph_screensaver_benchmark.md).
+
+### Against other frameworks, measured
+
+<p align="center">
+  <img src="assets/benchmarks/framework_h2h.svg" alt="Framework head-to-head: Smythe 8,372 tokens / 29.3s, LangGraph 8,782 tokens / 30.8s, CrewAI 39,696 tokens / 45.6s on the same pipeline and model" width="640">
+</p>
+
+<p align="center">
+  <img src="assets/benchmarks/durability_crash_cost.svg" alt="Hard-kill durability comparison: duplicated provider calls after resume for Smythe versus LangGraph" width="640">
+</p>
+
+Same tasks, same executor model, judged blind by a different vendor:
+**CrewAI consumed 4.7× the tokens and 56% more wall time** for quality
+inside the judge's noise band; LangGraph and Smythe are within 5% of each
+other on this pipeline — and when the process is hard-killed mid-fan-out,
+**LangGraph's superstep checkpointing re-dispatches every completed call
+while Smythe's per-node checkpoints re-expose at most one in-flight wave.**
+Every number comes from a committed record with the harness source
+alongside it, losses published included:
+[benchmarks/README.md](benchmarks/README.md).
+
 ## Install
 
 ```bash
@@ -704,9 +767,11 @@ The core framework is implemented and tested across Python 3.11–3.13 in CI.
 - Runnable examples that work offline
 - Flagship demo — the acquisition-diligence showcase with committed
   expected artifacts ([examples/acquisition_diligence/](examples/acquisition_diligence/))
-- 64-node glyph screensaver workload — deterministic offline fan-out plus an
-  optional fail-closed GPT Image lane, producing a preview, GIF, atlas, and
-  standalone animated canvas ([benchmark protocol](benchmarks/glyph_screensaver_benchmark.md))
+- 192-node glyph screensaver workload — deterministic offline fan-out plus an
+  optional fail-closed GPT Image lane, producing a preview, GIF, atlas,
+  standalone animated canvas, and downloadable native screensavers
+  ([benchmark protocol](benchmarks/glyph_screensaver_benchmark.md),
+  [screensaver ports](screensaver/))
 
 **What's next:** see [ROADMAP.md](ROADMAP.md) — scale certification, richer
 asset validation and curation, and an operator-focused trace inspector.

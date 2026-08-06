@@ -23,6 +23,18 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Added
 
+- **Glyph Rain screensaver ports** (`screensaver/`): a fullscreen web app
+  (three depth layers, persistence-fade trails, ~1,000 columns at 60 fps)
+  deployable as a static site; a native Windows `.scr` (C#/GDI+, built by
+  the compiler bundled with Windows, committed binary in
+  `screensaver/dist/`); and macOS `.saver` Swift source with a
+  one-command build script plus a `screensavers` CI workflow that builds
+  both binaries. All ports render the same exported `GLYPH_SPECS`
+  catalog via `screensaver/export_glyphs.py`.
+- **README benchmark charts** rendered deterministically from committed
+  result records by `benchmarks/render_readme_charts.py` into
+  `assets/benchmarks/`.
+
 - **Adaptive supervision — plans can now correct themselves mid-run.**
   The Architect plans once; until now the executor walked that plan to
   the end no matter what the results showed, so a badly generated plan
@@ -83,11 +95,17 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   concept-versus-production policy, deterministic exact-logo and text
   compositing, atomic resize/crop finishing, hash-bound receipts, and hard
   versus advisory validation findings.
-- A 64-node glyph screensaver benchmark exercises visually inspectable artifact
-  fan-out with a deterministic procedural provider and an optional fail-closed
-  GPT Image lane. It validates 64 unique normalized tiles and assembles a
-  1920×1080 preview, looping GIF, contact-sheet atlas, and standalone animated
-  HTML canvas with objective receipts.
+- A 192-node glyph screensaver benchmark exercises visually inspectable
+  artifact fan-out with a deterministic procedural provider and an optional
+  fail-closed GPT Image lane. The 192 marks come from a calligraphic stroke
+  grammar — bars, stems, hooks, enclosures, press diagonals, bowls, tail
+  sweeps, and diacritic dots on an ideograph grid — with geometric coverage
+  and ink-mass constraints enforcing a uniform stroke weight. It validates
+  192 unique normalized tiles and assembles a 1920×1080 preview, looping
+  GIF, 16×12 contact-sheet atlas, and standalone animated HTML canvas with
+  objective receipts, and a published realistic-latency profile re-runs the
+  sweep at the live image lane's measured 5.8 s per-call latency across
+  concurrency 1–64.
 - Bounded Autotune v1 adds immutable, hash-bound experiment contracts and
   allowlisted candidates, a zero-API-spend offline concurrency campaign, a
   plan-bound async runner with atomic dispatch claims, paired confirmation and
