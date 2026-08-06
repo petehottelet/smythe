@@ -249,7 +249,7 @@ honest caveats (including an observed near-duplicate pair):
 
 The [glyph screensaver workload](glyph_screensaver_benchmark.md) turns wide
 artifact generation into something directly inspectable: one independent node
-per original fictional cyber glyph, 64 calls total, followed by objective PNG
+per original fictional cyber glyph, 192 calls total, followed by objective PNG
 normalization and SHA-256 uniqueness checks.
 
 ```bash
@@ -259,23 +259,27 @@ python benchmarks/run_glyph_screensaver.py
 The default lane is deterministic, local, and costs nothing. It sweeps
 concurrency 1, 4, 8, and 16 with controlled asynchronous latency, records
 generation and end-to-end timing separately, and assembles the fastest valid
-64-tile run into:
+192-tile run into:
 
-- 64 normalized 128×128 PNG tiles;
-- a 1024×1024 contact-sheet atlas;
+- 192 normalized 128×128 PNG tiles;
+- a 2048×1536 contact-sheet atlas;
 - a 1920×1080 green digital-rain preview;
 - a compact 640×360 looping GIF; and
 - a self-contained animated 1920×1080 HTML canvas.
 
-The marks and composition are procedural originals rather than copied font,
-logo, screenshot, or reference pixels. Every output has a dimensions, frame,
-byte-size, and SHA-256 receipt. The optional GPT Image lane executes one chosen
-concurrency and refuses to start without an API key, explicit inclusive
-per-call ceiling, and a whole-run budget large enough for every call:
+The marks come from an original deterministic stroke grammar (bars, stems,
+hooks, enclosures, press diagonals, bowls, and diacritic dots on an ideograph
+grid) rather than any copied font, logo, screenshot, or reference pixels.
+Every output has a dimensions, frame, byte-size, and SHA-256 receipt. A
+published realistic-latency profile re-runs the sweep at the live image lane's
+measured 5.8 s per-call latency across concurrency 1–64. The optional GPT
+Image lane executes one chosen concurrency and refuses to start without an API
+key, explicit inclusive per-call ceiling, and a whole-run budget large enough
+for every call:
 
 ```bash
 python benchmarks/run_glyph_screensaver.py --live --concurrency 8 \
-  --max-cost-per-call-usd 0.01 --max-budget-usd 0.64
+  --max-cost-per-call-usd 0.01 --max-budget-usd 1.92
 ```
 
 Those values are examples of the guardrail shape, not current pricing advice.
@@ -283,15 +287,41 @@ Verify provider pricing immediately before any paid run. The offline sweep is
 an executor benchmark; only a repeated live lane can support claims about an
 external image API's latency or rate limits.
 
+### Results — realistic-latency profile (2026-08-05)
+
+One 192-node broadcast graph, simulated 5.8 s per-call latency (the live
+image lane's measured serial mean), all 192 tiles valid and SHA-256-unique
+at every concurrency
+([record](results/glyph_screensaver_offline_realistic.json)):
+
+| Concurrency | Wall | Speedup | Parallel efficiency |
+|---:|---:|---:|---:|
+| 1 | 1,149.6 s | 1.0× | — |
+| 4 | 285.7 s | 4.02× | 100% |
+| 8 | 144.2 s | 7.97× | 100% |
+| 16 | 74.1 s | 15.5× | 97% |
+| 32 | 40.6 s | 28.3× | 88% |
+| 64 | 20.5 s | 56.2× | 88% |
+
+The default 250 ms profile
+([record](results/glyph_screensaver_offline.json)) plateaus near 7× because
+fsync'd per-tile artifact journaling (~70 ms/tile on the reference
+Windows/NTFS machine) dominates its short latency envelope — that floor is
+documented in the protocol rather than hidden by construction.
+
 ## Hard-kill durability
 
 The [durability benchmark](durability_benchmark.md) runs an entirely offline
 wide fan-out, terminates each worker process without cleanup, and measures
 operation IDs dispatched again after restart. Dispatch and completion are
 durably recorded as separate events, so in-flight exposure is not hidden by a
-completion-time log. The current v2 record covers Smythe only; the historical
-framework comparison awaits a rerun under v2 accounting. This is a durability
-microbenchmark, not provider invoice evidence or a universal framework claim.
+completion-time log. The 2026-08-05 v2 record re-establishes the framework
+comparison under the conservative accounting: across three reps, Smythe
+re-dispatched exactly one in-flight wave (8 of 64 calls, resume 4.6–6.0 s)
+while LangGraph's superstep checkpointing re-dispatched every completed call
+(32 of 32, resume 16–19 s), with per-node fan-out overhead near parity and
+published as measured. This is a durability microbenchmark, not provider
+invoice evidence or a universal framework claim.
 
 ```bash
 python benchmarks/run_durability_benchmark.py --quick
