@@ -218,6 +218,32 @@ def test_gemini_provider_no_usage_metadata():
     assert result.completion_tokens == 0
 
 
+def test_gemini_provider_none_token_counts():
+    """A usage_metadata whose counts are None must not poison arithmetic.
+
+    Observed live on gemini-2.5-flash-image: the SDK returned a usage object
+    with ``candidates_token_count=None`` for an image-only response, which
+    crashed cost recording mid-fan-out with ``int + NoneType``.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+
+    p = GeminiProvider(api_key="fake")
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    mock_response.text = "response"
+    mock_response.usage_metadata = MagicMock(
+        prompt_token_count=None,
+        candidates_token_count=None,
+    )
+    mock_client.aio.models.generate_content = AsyncMock(return_value=mock_response)
+    p._client = mock_client
+
+    result = asyncio.run(p.complete("sys", "prompt", "gemini-3-pro"))
+    assert result.prompt_tokens == 0
+    assert result.completion_tokens == 0
+    assert result.total_tokens == 0
+
+
 def test_gemini_provider_empty_text():
     """GeminiProvider handles None text in the response."""
     from unittest.mock import AsyncMock, MagicMock

@@ -309,8 +309,8 @@ class AnthropicProvider(Provider):
 
         return CompletionResult(
             text="\n".join(text_parts),
-            prompt_tokens=getattr(response.usage, "input_tokens", 0),
-            completion_tokens=getattr(response.usage, "output_tokens", 0),
+            prompt_tokens=getattr(response.usage, "input_tokens", 0) or 0,
+            completion_tokens=getattr(response.usage, "output_tokens", 0) or 0,
             tool_calls=tool_calls,
             stop_reason=stop,
         )
@@ -489,8 +489,10 @@ class OpenAIProvider(Provider):
         usage = response.usage
         return CompletionResult(
             text=text,
-            prompt_tokens=getattr(usage, "prompt_tokens", 0) if usage else 0,
-            completion_tokens=getattr(usage, "completion_tokens", 0) if usage else 0,
+            prompt_tokens=(getattr(usage, "prompt_tokens", 0) or 0) if usage else 0,
+            completion_tokens=(
+                getattr(usage, "completion_tokens", 0) or 0
+            ) if usage else 0,
             tool_calls=tool_calls,
             stop_reason=stop,
         )
@@ -883,10 +885,14 @@ class GeminiProvider(Provider):
                 cost_usd_unknown = True
 
         usage = response.usage_metadata
+        # The SDK can set token-count attributes to None (observed on
+        # image-only responses), so coerce before arithmetic downstream.
         return CompletionResult(
             text=text,
-            prompt_tokens=getattr(usage, "prompt_token_count", 0) if usage else 0,
-            completion_tokens=getattr(usage, "candidates_token_count", 0) if usage else 0,
+            prompt_tokens=(getattr(usage, "prompt_token_count", 0) or 0) if usage else 0,
+            completion_tokens=(
+                getattr(usage, "candidates_token_count", 0) or 0
+            ) if usage else 0,
             tool_calls=tool_calls,
             stop_reason="tool_use" if tool_calls else "end_turn",
             artifacts=artifacts,

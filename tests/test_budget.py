@@ -127,6 +127,22 @@ def test_budget_reserve_prevents_overspend():
     assert exc_info.value.node_id == "node-c"
 
 
+def test_budget_reserve_exact_fit_survives_float_accumulation():
+    """A budget sized exactly for N ceiling reservations admits all N.
+
+    Observed live: the 192nd $0.06 reservation of an $11.52 budget was
+    rejected with $0.06 nominally remaining, because 191 accumulated float
+    additions had drifted past the exact-fit boundary.
+    """
+    tracker = Sentinel(max_budget_usd=192 * 0.06, cost_per_token=0.000003)
+    for index in range(192):
+        tracker.reserve(f"glyph-{index:03d}", 0.06)
+    assert len(tracker._reservations) == 192
+
+    with pytest.raises(SentinelAlert):
+        tracker.reserve("one-more", 0.06)
+
+
 def test_budget_record_replaces_reservation():
     """Actual cost should replace the estimated reservation."""
     tracker = Sentinel(max_budget_usd=1.0, cost_per_token=0.000003)
