@@ -21,7 +21,7 @@ Status: pre-1.0. Minor versions may break APIs (see [CHANGELOG.md](CHANGELOG.md)
 - ✅ **MCP tool support** — agents use MCP servers (stdio + streamable HTTP) through a bounded, budget-enforced tool loop; secrets via `env_passthrough`; capability hydration and planner tool awareness; examples for filesystem, GitHub, and SaaS servers ([docs/mcp.md](docs/mcp.md))
 - ✅ OpenAI-compatible `base_url` (Ollama, LM Studio, vLLM)
 - ✅ v0.2.0 on PyPI (`pip install smythe`)
-- ✅ **Flagship demo** — the acquisition-diligence showcase: fixture mode (no keys) and real mode, with committed graph, trace, and expected output ([examples/acquisition_diligence/](examples/acquisition_diligence/))
+- ✅ **Acquisition-diligence example** — fixture mode (no keys) and real mode, with committed graph, trace, and expected output ([examples/acquisition_diligence/](examples/acquisition_diligence/))
 
 ## Shipped (v0.5 line)
 
@@ -71,10 +71,10 @@ The current unreleased work hardens the guarantees users depend on before a
 6. **Typed production asset contracts** — concept-versus-production brand
    rules, exact master/text compositing, atomic finishing, hash receipts, and
    deterministic validation gates separated from advisory judgments
-7. **Glyph Rain fan-out workload** — 192 objectively validated unique tiles,
-   a realistic-latency concurrency sweep through k=64, live Gemini and GPT
-   Image lanes, and assembled preview/GIF/atlas/HTML deliverables plus web,
-   Windows, and macOS screensaver ports
+7. **Glyph Rain fan-out example** — 192 objectively validated unique tiles,
+   an isolated 256-node comparison, realistic-latency concurrency sweeps
+   through k=64, live Gemini and GPT Image lanes, and assembled
+   preview/GIF/atlas/HTML deliverables plus web, Windows, and macOS ports
 8. **Bounded Autotune v1**: immutable hash-bound contracts and allowlisted
    candidates, a zero-API-spend offline concurrency campaign, plan-bound async
    orchestration, atomic dispatch claims, paired confirmation and sealed

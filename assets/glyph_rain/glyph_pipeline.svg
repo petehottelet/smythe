@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="326" viewBox="0 0 960 326" role="img" aria-label="Glyph Rain example pipeline. A brief becomes a 192-node generated graph, each glyph is verified, and the outputs are assembled into four artifacts.">
+<rect width="960" height="326" fill="#ffffff"/>
+<text x="40" y="49" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="2.2">FROM BRIEF TO SCREEN SAVER</text>
+<text x="40" y="86" font-family="Georgia,'Times New Roman',serif" font-size="29" fill="#000000" text-anchor="start" font-weight="700">One example of Smythe at high fan-out</text>
+<line x1="40" y1="108" x2="920" y2="108" stroke="#000000" stroke-width="2"/>
+<rect x="40" y="146" width="176" height="108" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<text x="56" y="187" font-family="'Trajan Pro 3','Trajan Pro',Trajan,Cinzel,Georgia,serif" font-size="31" fill="#000000" text-anchor="start" font-weight="700">01</text>
+<text x="56" y="216" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="1.5">BRIEF</text>
+<text x="56" y="237" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="normal">Define the artifact</text>
+<line x1="216" y1="200" x2="274" y2="200" stroke="#000000" stroke-width="2"/>
+<path d="M266 194L274 200L266 206" fill="none" stroke="#000000" stroke-width="2"/>
+<rect x="274" y="146" width="176" height="108" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<text x="290" y="187" font-family="'Trajan Pro 3','Trajan Pro',Trajan,Cinzel,Georgia,serif" font-size="31" fill="#000000" text-anchor="start" font-weight="700">192</text>
+<text x="290" y="216" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="1.5">GENERATE</text>
+<text x="290" y="237" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="normal">One node per glyph</text>
+<line x1="450" y1="200" x2="508" y2="200" stroke="#000000" stroke-width="2"/>
+<path d="M500 194L508 200L500 206" fill="none" stroke="#000000" stroke-width="2"/>
+<rect x="508" y="146" width="176" height="108" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<text x="524" y="187" font-family="'Trajan Pro 3','Trajan Pro',Trajan,Cinzel,Georgia,serif" font-size="31" fill="#000000" text-anchor="start" font-weight="700">192</text>
+<text x="524" y="216" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="1.5">VERIFY</text>
+<text x="524" y="237" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="normal">Size + PNG + SHA-256</text>
+<line x1="684" y1="200" x2="742" y2="200" stroke="#000000" stroke-width="2"/>
+<path d="M734 194L742 200L734 206" fill="none" stroke="#000000" stroke-width="2"/>
+<rect x="742" y="146" width="178" height="108" fill="#000000" stroke="#000000" stroke-width="2"/>
+<text x="758" y="187" font-family="'Trajan Pro 3','Trajan Pro',Trajan,Cinzel,Georgia,serif" font-size="31" fill="#ffffff" text-anchor="start" font-weight="700">04</text>
+<text x="758" y="216" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#ffffff" text-anchor="start" font-weight="700" letter-spacing="1.5">ASSEMBLE</text>
+<text x="758" y="237" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#ffffff" text-anchor="start" font-weight="normal">Atlas + web + ports</text>
+<line x1="40" y1="282" x2="920" y2="282" stroke="#000000"/>
+<text x="40" y="306" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="1.1">Generated execution topology</text>
+<text x="920" y="306" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="end" font-weight="normal">Bounded concurrency / objective gates / traces / per-node recovery</text>
+</svg>

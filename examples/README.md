@@ -1,6 +1,6 @@
 # Smythe examples
 
-Examples 01–05, 08–13, and the flagship acquisition-diligence demo run offline
+Examples 01–05, 08–13, and the acquisition-diligence example run offline
 out of the box. A built-in `DemoProvider` returns deterministic responses so
 you can inspect planning, fan-out, budgets, recovery, and synthesis without an
 API key. Examples 06 and 07 are live MCP integration tours. Run examples from
@@ -36,4 +36,4 @@ smythe jobs run examples/12_jobs_manifest.yaml --approve approve_v1_...
 | [11_vision_judge.py](11_vision_judge.py) | Select-from-N curation: parallel ad candidates judged by an art-director node that sees the actual images (`attach_dep_artifacts=True`). In its first real run the judge caught a spelling error in a generated ad. |
 | [12_jobs_manifest.yaml](12_jobs_manifest.yaml) | A zero-cost, four-operation artifact job for the installed `smythe jobs` validate, plan, run, status, resume, reroll, and export workflow. |
 | [13_adaptive_supervision.py](13_adaptive_supervision.py) | A plan that corrects itself: research surfaces a conflict, and the supervisor inserts a reconciliation step ahead of the write step instead of letting the contradiction reach the deliverable. |
-| [acquisition_diligence/](acquisition_diligence/) | **The flagship demo.** Task intake → generated `fork-join → adversarial → serial` topology → parallel specialists → red-team review → final memo, with committed expected artifacts (graph, trace, memo). |
+| [acquisition_diligence/](acquisition_diligence/) | **Complete acquisition-diligence example.** Task intake → generated `fork-join → adversarial → serial` topology → parallel specialists → red-team review → final memo, with committed expected artifacts (graph, trace, memo). |

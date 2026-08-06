@@ -4,16 +4,16 @@
   <p><em>Agent swarms with generated execution topology.</em></p>
 
   <p>
-    <a href="https://pypi.org/project/smythe/"><img src="https://img.shields.io/pypi/v/smythe?style=flat-square&labelColor=000000&color=ffffff" alt="PyPI"></a>
-    <a href="https://github.com/petehottelet/smythe/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/petehottelet/smythe/ci.yml?style=flat-square&labelColor=000000&color=ffffff&label=ci" alt="CI"></a>
-    <img src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-ffffff?style=flat-square&labelColor=000000" alt="Python">
-    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-ffffff?style=flat-square&labelColor=000000" alt="License: MIT"></a>
+    <a href="https://pypi.org/project/smythe/"><img src="assets/badges/pypi.svg" alt="PyPI v0.6.0"></a>
+    <a href="https://github.com/petehottelet/smythe/actions/workflows/ci.yml"><img src="assets/badges/ci.svg" alt="CI passing"></a>
+    <img src="assets/badges/python.svg" alt="Python 3.11, 3.12, and 3.13">
+    <a href="LICENSE"><img src="assets/badges/license.svg" alt="License: MIT"></a>
   </p>
 
   <p>
     <a href="#60-second-quickstart">Quickstart</a> ·
     <a href="#why-smythe">Why Smythe</a> ·
-    <a href="#measured-evidence">Evidence</a> ·
+    <a href="#architected-planning-beats-fixed-execution-on-efficiency">Evidence</a> ·
     <a href="docs/index.md">Documentation</a>
   </p>
 </div>
@@ -22,64 +22,6 @@
 in parallel under hard cost, concurrency, verification, trace, and recovery
 controls.** The topology is generated for the task instead of hardcoded into
 the application.
-
-## One goal in. A finished artifact out.
-
-<p align="center">
-  <img src="assets/glyph_rain/glyph-rain-screenshot.png" alt="Smythe Glyph Rain screensaver running with 192 original procedural cyber glyphs" width="900">
-</p>
-
-The flagship workload generates 192 original cyber glyphs as one 192-node
-broadcast graph. Each node produces one tile; every tile is normalized,
-dimension-checked, and SHA-256 verified before Smythe assembles the final
-screensaver.
-
-**Download:** [Windows `.scr`](screensaver/dist/SmytheGlyphRain.scr) ·
-[macOS `.saver` build](https://github.com/petehottelet/smythe/actions/workflows/screensavers.yml) ·
-[screensaver source](screensaver/) ·
-[192-glyph atlas](assets/glyph_rain/glyph-atlas.png)
-
-On a matched framework suite—five tasks, the same fixed three-stage semantic
-pipeline, the same executor model, and a blind cross-vendor judge—Smythe
-recorded the highest blind quality, the fewest mean tokens, and the lowest mean
-wall time across Smythe, LangGraph, and CrewAI.
-
-<p align="center">
-  <img src="assets/benchmarks/framework_comparison.svg" alt="Framework benchmark comparing Smythe, LangGraph, and CrewAI across blind quality, mean tokens, and mean wall time; Smythe records the best result on all three measures" width="900">
-</p>
-
-<p align="center">
-  <img src="assets/benchmarks/framework_callouts.svg" alt="Measured framework advantages: Smythe records 77 percent lower mean token load than CrewAI and 6 percent lower mean wall time than LangGraph" width="900">
-</p>
-
-[Framework protocol and corrected records](benchmarks/README.md#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12).
-
-At the live image lane's measured 5.8-second call latency, the same 192 tasks
-take **19 minutes serially** and **20.5 seconds at concurrency 64**: a measured
-**56.2× speedup** with all 192 tiles valid and unique at every concurrency.
-[Protocol and records](benchmarks/glyph_screensaver_benchmark.md). On the same
-wide-fanout execution pattern, Smythe's per-node recovery re-exposed **8 calls
-after a hard kill versus LangGraph's 32**, across three repetitions with the
-strongest persistence mode enabled on both sides.
-[Durability protocol and records](benchmarks/durability_benchmark.md).
-
-## Measured evidence
-
-### Task-shaped plans beat fixed execution on efficiency
-
-<p align="center">
-  <img src="assets/benchmarks/shape_efficiency.svg" alt="Across five task shapes, Smythe dynamic plans match fixed-pipeline quality while using 19 percent less cost and 14 percent less wall time" width="900">
-</p>
-
-Across five deliberately different task shapes, Smythe reached the same quality
-band as a strong fixed pipeline while using **19% less cost**, **14% less wall
-time**, and **20% less cost per quality point**. It used one node for a
-one-step transform and 5.3 nodes for the parallel workload—the graph size
-changed with the work. [Shape-suite report and raw records](benchmarks/shape_suite.md).
-
-Every headline number above is rendered from a committed result record. The
-[benchmark index](benchmarks/README.md) separates current, claimable evidence
-from diagnostic campaigns that found and fixed framework or harness defects.
 
 ## 60-second quickstart
 
@@ -127,6 +69,90 @@ pip install -e ".[dev]"
 python examples/acquisition_diligence/run.py
 ```
 
+## Framework comparison
+
+On a matched suite—five tasks, the same fixed three-stage semantic pipeline,
+the same executor model, and a blind cross-vendor judge—Smythe recorded the
+highest blind quality, the fewest mean tokens, and the lowest mean wall time
+across Smythe, LangGraph, and CrewAI.
+
+<p align="center">
+  <img src="assets/benchmarks/framework_comparison.svg" alt="Framework benchmark comparing Smythe, LangGraph, and CrewAI across blind quality, mean tokens, and mean wall time; Smythe records the best result on all three measures" width="900">
+</p>
+
+<p align="center">
+  <img src="assets/benchmarks/framework_callouts.svg" alt="Measured framework advantages: Smythe records 77 percent lower mean token load than CrewAI and 6 percent lower mean wall time than LangGraph" width="900">
+</p>
+
+[Framework protocol and corrected records](benchmarks/README.md#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12).
+
+## Architected planning beats fixed execution on efficiency
+
+<p align="center">
+  <img src="assets/benchmarks/shape_efficiency.svg" alt="Across five task shapes, Smythe dynamic plans match fixed-pipeline quality while using 19 percent less cost and 14 percent less wall time" width="900">
+</p>
+
+Across five deliberately different task shapes, Smythe reached the same quality
+band as a strong fixed pipeline while using **19% less cost**, **14% less wall
+time**, and **20% less cost per quality point**. It used one node for a
+one-step transform and 5.3 nodes for the parallel workload—the graph size
+changed with the work. [Shape-suite report and raw records](benchmarks/shape_suite.md).
+
+## Artifact fan-out scales from 192 to 256 nodes
+
+<p align="center">
+  <img src="assets/benchmarks/glyph_scaling.svg" alt="Throughput across matched 192-node and isolated 256-node Glyph Rain sweeps; both produce valid unique tiles at every concurrency" width="900">
+</p>
+
+The partitioned 256-node run produced **256 valid, unique glyphs at every
+measured concurrency** and reached **49.56× speedup at concurrency 64**. Its
+result record, raw-output namespace, 16×16 atlas, preview, animation, and HTML
+are isolated from the existing 192-character screensaver build.
+[256-node report and records](benchmarks/partitions/glyph_256/README.md).
+
+Every headline number above is rendered from a committed result record. The
+[benchmark index](benchmarks/README.md) separates current, claimable evidence
+from diagnostic campaigns that found and fixed framework or harness defects.
+
+## Example: Glyph Rain at 192-node fan-out
+
+Glyph Rain demonstrates Smythe's general-purpose execution model on a concrete
+visual artifact. A screensaver brief becomes an inspectable 192-node broadcast
+graph governed by the same budgets, bounded concurrency, verification, traces,
+artifacts, and recovery available to any Smythe workload.
+
+<p align="center">
+  <img src="assets/glyph_rain/glyph-rain-screenshot.png" alt="Smythe Glyph Rain example running with 192 original procedural cyber glyphs" width="900">
+</p>
+
+<p align="center">
+  <img src="assets/glyph_rain/glyph_pipeline.svg" alt="Glyph Rain example pipeline: a brief becomes a generated 192-node graph, each glyph is verified, and the results are assembled into screensaver artifacts" width="900">
+</p>
+
+<p align="center">
+  <img src="assets/glyph_rain/glyph_specimens.svg" alt="Outlined specimen table of twelve actual glyphs selected from the generated 192-character catalog" width="900">
+</p>
+
+Each node produces one original tile. Every tile is normalized,
+dimension-checked, and SHA-256 verified before assembly. The specimen plate
+above is drawn directly from the committed vector stroke programs used by the
+web, Windows, and macOS ports.
+
+**Download:** [Windows `.scr`](screensaver/dist/SmytheGlyphRain.scr) ·
+[macOS `.saver` build](https://github.com/petehottelet/smythe/actions/workflows/screensavers.yml) ·
+[screensaver source](screensaver/) ·
+[192-glyph atlas](assets/glyph_rain/glyph-atlas.png) ·
+[256-glyph atlas](benchmarks/partitions/glyph_256/assets/glyph-atlas.png)
+
+At the published realistic-latency profile, the 192-node example takes **19
+minutes at concurrency 1** and **20.5 seconds at concurrency 64**: a measured
+**56.2× speedup** with all 192 tiles valid and unique at every concurrency.
+[Protocol and records](benchmarks/glyph_screensaver_benchmark.md). On the same
+wide-fanout execution pattern, Smythe's per-node recovery re-exposed **8 calls
+after a hard kill versus LangGraph's 32**, across three repetitions with the
+strongest persistence mode enabled on both sides.
+[Durability protocol and records](benchmarks/durability_benchmark.md).
+
 ## Why Smythe
 
 Most orchestration frameworks ask the developer to author the graph. Smythe
@@ -152,22 +178,6 @@ Three planning tiers let applications choose how much freedom to grant:
 | Deterministic | `DeterministicArchitect` | The workflow is proven and should be pure Python |
 | Constrained | `ConstrainedArchitect` | The model should select from approved graph templates |
 | Autonomous | `LLMArchitect` | The task needs a bespoke DAG generated from the goal |
-
-## How it works
-
-```mermaid
-%%{init: {"theme":"base","themeVariables":{"fontFamily":"Georgia, 'Times New Roman', serif","fontSize":"14px","primaryColor":"#ffffff","primaryTextColor":"#000000","primaryBorderColor":"#000000","lineColor":"#000000","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","background":"#ffffff","mainBkg":"#ffffff","clusterBkg":"#ffffff","clusterBorder":"#000000"},"flowchart":{"curve":"basis","nodeSpacing":48,"rankSpacing":58}}}%%
-flowchart LR
-    task["Task<br/>goal · constraints · acceptance"]
-    architect["Architect<br/>generate + right-size"]
-    graph["ExecutionGraph<br/>inspectable DAG"]
-    executor["Executor<br/>bounded parallel work"]
-    result["SwarmResult<br/>deliverable · cost · trace"]
-    memory["PlannerMemory<br/>outcomes + templates"]
-
-    task --> architect --> graph --> executor --> result
-    result --> memory --> architect
-```
 
 The runtime keeps planning, execution, and synthesis separate. A `Sentinel`
 admits spend before calls start; the tracer records every node; checkpoint
@@ -200,7 +210,7 @@ smythe jobs export RUN_ID --out run-export.json
 
 [Jobs guide and manifest reference](docs/jobs.md).
 
-## Flagship demo
+## Example: acquisition diligence
 
 The acquisition-diligence demo turns one goal into a
 `fork-join → adversarial → serial` graph: three specialists run in parallel, an
@@ -249,9 +259,10 @@ Python 3.11+ is supported.
 
 ## Project status
 
-Smythe is pre-1.0 and actively developed. The current branch includes the
-192-node artifact workload, checkpoint format v2, declarative verification
-gates, bounded supervision, durable Jobs, and deterministic README charts.
+Smythe is pre-1.0 and actively developed. The current branch includes a
+192-node artifact example, an isolated 256-node comparison, checkpoint format
+v2, declarative verification gates, bounded supervision, durable Jobs, and
+deterministic README charts.
 Release history and compatibility policy live in [CHANGELOG.md](CHANGELOG.md).
 
 Contributions are welcome through [CONTRIBUTING.md](CONTRIBUTING.md). Security

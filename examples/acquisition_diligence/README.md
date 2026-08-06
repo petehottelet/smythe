@@ -1,6 +1,6 @@
-# Flagship demo: acquisition diligence
+# Example: acquisition diligence
 
-The showcase from the main README, end to end: you hand the Swarm one
+This complete end-to-end example hands the Swarm one
 goal — *evaluate whether MetaCortex Corp is a viable acquisition target* —
 and the Architect decides the execution topology. Three specialists
 fan out in parallel, an editor joins their findings, a red team

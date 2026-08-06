@@ -33,7 +33,7 @@ verification, trace, artifact, and recovery controls.
 
 - [Framework comparison](../benchmarks/README.md#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12) — matched Smythe, LangGraph, and CrewAI evidence
 - [Image benchmarks](../benchmarks/image_benchmarks.md) — image fan-out and exact-spec finishing
-- [Glyph Rain benchmark](../benchmarks/glyph_screensaver_benchmark.md) — the 192-node artifact workload
+- [Glyph Rain benchmark](../benchmarks/glyph_screensaver_benchmark.md) — a 192-node artifact example plus an isolated 256-node comparison
 - [Glyph Rain screensaver](../screensaver/README.md) — web, Windows, and macOS ports
 
 ## Project guides

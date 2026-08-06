@@ -453,7 +453,7 @@ def _resolve_output_paths(
     out: str | None,
     results: str | None,
 ) -> tuple[Path, Path, str | None]:
-    """Resolve isolated defaults while preserving the flagship paths."""
+    """Resolve isolated defaults while preserving the default 192-glyph paths."""
 
     resolved_partition = partition
     if resolved_partition is None and glyph_count != GLYPH_COUNT:
@@ -507,7 +507,7 @@ def main() -> None:
         default=None,
         help=(
             "isolated result/artifact namespace; automatically enabled for "
-            "non-flagship glyph counts"
+            "non-default glyph counts"
         ),
     )
     parser.add_argument(

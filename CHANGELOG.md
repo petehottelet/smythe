@@ -34,10 +34,10 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 - **README benchmark charts** rendered deterministically from committed
   result records by `benchmarks/render_readme_charts.py` into
   `assets/benchmarks/`.
-- **Screensaver-first project showcase** using the supplied full-resolution
-  Glyph Rain screenshot and direct Windows/macOS/source links, followed by a
-  real Smythe/LangGraph/CrewAI comparison chart and Trajan-led result callouts
-  rendered from the corrected committed framework record.
+- **Glyph Rain example showcase** using the supplied full-resolution screenshot,
+  direct Windows/macOS/source links, a 192-vs-256 scaling chart, and diagrams
+  rendered from the committed glyph catalog. Framework and task-shape charts
+  appear before the example and remain bound to their committed result records.
 - **Partitioned 256-glyph benchmark** with a stable catalog extension,
   isolated result/artifact paths, a 16x16 atlas, and a six-cell realistic-
   latency record that validates 256 unique outputs at every concurrency.

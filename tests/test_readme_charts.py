@@ -8,6 +8,9 @@ from pathlib import Path
 from benchmarks.render_readme_charts import (
     render_framework_callouts,
     render_framework_comparison,
+    render_glyph_pipeline,
+    render_glyph_scaling,
+    render_glyph_specimens,
     render_shape_efficiency,
 )
 
@@ -39,6 +42,9 @@ def test_generated_public_charts_are_strictly_black_and_white():
         render_framework_comparison,
         render_framework_callouts,
         render_shape_efficiency,
+        render_glyph_scaling,
+        render_glyph_pipeline,
+        render_glyph_specimens,
     ):
         colors = set(HEX_COLOR.findall(renderer()))
         assert colors == MONOCHROME
@@ -53,10 +59,53 @@ def test_committed_graph_assets_are_strictly_black_and_white():
         assert colors <= MONOCHROME, f"{path} contains {colors - MONOCHROME}"
 
 
-def test_readme_badges_use_black_and_white_two_tone_fields():
+def test_readme_badges_use_bordered_black_and_white_assets():
     readme = ROOT.joinpath("README.md").read_text(encoding="utf-8")
-    badge_urls = re.findall(r'src="(https://img\.shields\.io/[^"]+)"', readme)
-    assert len(badge_urls) == 4
-    assert all("labelColor=000000" in url for url in badge_urls)
-    assert all("ffffff" in url for url in badge_urls)
-    assert "labelColor=ffffff" not in readme
+    badge_paths = re.findall(r'src="(assets/badges/[^"]+\.svg)"', readme)
+    assert len(badge_paths) == 4
+    for relative in badge_paths:
+        svg = ROOT.joinpath(relative).read_text(encoding="utf-8")
+        assert set(HEX_COLOR.findall(svg)) == MONOCHROME
+        assert 'fill="#ffffff" stroke="#000000"' in svg
+
+
+def test_glyph_diagrams_use_the_committed_vector_catalog():
+    pipeline = render_glyph_pipeline()
+    specimens = render_glyph_specimens()
+    assert "192-node generated graph" in pipeline
+    for glyph_id in ("GLYPH-000", "GLYPH-151"):
+        assert glyph_id in specimens
+    assert "12 / 192" in specimens
+
+
+def test_glyph_scaling_chart_uses_both_isolated_records():
+    svg = render_glyph_scaling()
+    for value in ("56.2×", "49.56×", "192 and 256 valid unique tiles"):
+        assert value in svg
+    assert "Scaling across 192 and 256 nodes" in svg
+
+
+def test_readme_places_evidence_before_the_glyph_rain_example():
+    readme = ROOT.joinpath("README.md").read_text(encoding="utf-8")
+    ordered_markers = (
+        "## 60-second quickstart",
+        "## Framework comparison",
+        "assets/benchmarks/framework_comparison.svg",
+        "## Architected planning beats fixed execution on efficiency",
+        "assets/benchmarks/shape_efficiency.svg",
+        "## Artifact fan-out scales from 192 to 256 nodes",
+        "assets/benchmarks/glyph_scaling.svg",
+        "## Example: Glyph Rain at 192-node fan-out",
+        "assets/glyph_rain/glyph-rain-screenshot.png",
+        "assets/glyph_rain/glyph_pipeline.svg",
+        "assets/glyph_rain/glyph_specimens.svg",
+    )
+    positions = [readme.index(marker) for marker in ordered_markers]
+    assert positions == sorted(positions)
+
+
+def test_public_mermaid_avoids_reserved_graph_node_id():
+    public_markdown = [ROOT / "README.md", *ROOT.joinpath("docs").glob("*.md")]
+    reserved_node = re.compile(r"^\s*graph\[", re.MULTILINE)
+    for path in public_markdown:
+        assert not reserved_node.search(path.read_text(encoding="utf-8")), path

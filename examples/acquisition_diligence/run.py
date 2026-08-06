@@ -1,4 +1,4 @@
-"""Flagship demo: acquisition diligence with an adversarial review tier.
+"""Acquisition-diligence example with an adversarial review tier.
 
     python examples/acquisition_diligence/run.py
 
