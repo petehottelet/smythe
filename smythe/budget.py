@@ -154,7 +154,12 @@ class Sentinel:
         if node_id in self._reservations:
             raise ValueError(f"Node {node_id!r} already has a budget reservation")
         if self.max_budget_usd is not None:
-            if self._spent + estimated_cost > self.max_budget_usd:
+            # A nano-dollar tolerance so an exact-fit budget (for example
+            # 192 reservations of $0.06 against an $11.52 limit) is not
+            # rejected by accumulated floating-point error. Observed live:
+            # the 192nd reservation of a full-budget image run failed with
+            # $0.06 nominally remaining.
+            if self._spent + estimated_cost > self.max_budget_usd + 1e-9:
                 raise SentinelAlert(self._spent, self.max_budget_usd, node_id)
         self._reservations[node_id] = estimated_cost
         if hard_ceiling:
@@ -233,9 +238,12 @@ class Sentinel:
         self._spent += call_cost
 
         reservation_exceeded = was_hard_ceiling and call_cost > reserved + 1e-12
+        # Matches the reserve() admission tolerance: an exact-fit budget may
+        # carry up to a nano-dollar of accumulated float error without that
+        # noise being reported as a genuine overrun.
         limit_exceeded = (
             self.max_budget_usd is not None
-            and self._spent > self.max_budget_usd + 1e-12
+            and self._spent > self.max_budget_usd + 1e-9
         )
         if (reservation_exceeded or limit_exceeded) and self.max_budget_usd is not None:
             raise BudgetReconciliationError(
