@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="550" viewBox="0 0 960 550" role="img" aria-label="Throughput chart for the isolated 192- and 256-node Glyph Rain sweeps. Both produce valid unique tiles at every measured concurrency.">
+<rect width="960" height="550" fill="#ffffff"/>
+<text x="40" y="49" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="2.2">ARTIFACT FAN-OUT</text>
+<text x="40" y="86" font-family="Georgia,'Times New Roman',serif" font-size="29" fill="#000000" text-anchor="start" font-weight="700">Scaling across 192 and 256 nodes</text>
+<text x="40" y="111" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="normal">Matched 5.8-second simulated provider latency; every tile valid and unique</text>
+<line x1="40" y1="132" x2="920" y2="132" stroke="#000000" stroke-width="2"/>
+<rect x="600" y="96" width="22" height="12" fill="#000000"/>
+<text x="631" y="108" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="600">192 nodes</text>
+<rect x="756" y="96" width="22" height="12" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<text x="787" y="108" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="600">256 nodes</text>
+<text x="73" y="354.0" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="10" fill="#000000" text-anchor="end" font-weight="normal">0</text>
+<line x1="92" y1="350.0" x2="900" y2="350.0" stroke="#000000" stroke-dasharray="2 7"/>
+<text x="73" y="308.5" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="10" fill="#000000" text-anchor="end" font-weight="normal">2.5</text>
+<line x1="92" y1="304.5" x2="900" y2="304.5" stroke="#000000" stroke-dasharray="2 7"/>
+<text x="73" y="263.0" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="10" fill="#000000" text-anchor="end" font-weight="normal">5</text>
+<line x1="92" y1="259.0" x2="900" y2="259.0" stroke="#000000" stroke-dasharray="2 7"/>
+<text x="73" y="217.5" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="10" fill="#000000" text-anchor="end" font-weight="normal">7.5</text>
+<line x1="92" y1="213.5" x2="900" y2="213.5" stroke="#000000" stroke-dasharray="2 7"/>
+<text x="73" y="172.0" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="10" fill="#000000" text-anchor="end" font-weight="normal">10</text>
+<line x1="92" y1="168.0" x2="900" y2="168.0" stroke="#000000" stroke-dasharray="2 7"/>
+<text x="40" y="260" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="9.5" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="1.2">GLYPHS / S</text>
+<line x1="92.0" y1="350" x2="92.0" y2="356" stroke="#000000"/>
+<text x="92.0" y="374" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="10.5" fill="#000000" text-anchor="middle" font-weight="normal">1</text>
+<line x1="253.6" y1="350" x2="253.6" y2="356" stroke="#000000"/>
+<text x="253.6" y="374" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="10.5" fill="#000000" text-anchor="middle" font-weight="normal">4</text>
+<line x1="415.2" y1="350" x2="415.2" y2="356" stroke="#000000"/>
+<text x="415.2" y="374" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="10.5" fill="#000000" text-anchor="middle" font-weight="normal">8</text>
+<line x1="576.8" y1="350" x2="576.8" y2="356" stroke="#000000"/>
+<text x="576.8" y="374" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="10.5" fill="#000000" text-anchor="middle" font-weight="normal">16</text>
+<line x1="738.4" y1="350" x2="738.4" y2="356" stroke="#000000"/>
+<text x="738.4" y="374" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="10.5" fill="#000000" text-anchor="middle" font-weight="normal">32</text>
+<line x1="900.0" y1="350" x2="900.0" y2="356" stroke="#000000"/>
+<text x="900.0" y="374" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="10.5" fill="#000000" text-anchor="middle" font-weight="normal">64</text>
+<text x="496.0" y="398" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="9.5" fill="#000000" text-anchor="middle" font-weight="700" letter-spacing="1.2">MAX CONCURRENCY</text>
+<polyline points="92.0,347.0 253.6,337.8 415.2,325.8 576.8,302.8 738.4,263.9 900.0,179.1" fill="none" stroke="#000000" stroke-width="4"/>
+<polyline points="92.0,346.9 253.6,337.8 415.2,326.3 576.8,304.1 738.4,264.8 900.0,197.8" fill="none" stroke="#000000" stroke-width="2" stroke-dasharray="9 7"/>
+<circle cx="92.0" cy="347.0" r="5" fill="#000000"/>
+<circle cx="253.6" cy="337.8" r="5" fill="#000000"/>
+<circle cx="415.2" cy="325.8" r="5" fill="#000000"/>
+<circle cx="576.8" cy="302.8" r="5" fill="#000000"/>
+<circle cx="738.4" cy="263.9" r="5" fill="#000000"/>
+<circle cx="900.0" cy="179.1" r="5" fill="#000000"/>
+<rect x="87.0" y="341.9" width="10" height="10" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<rect x="248.6" y="332.8" width="10" height="10" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<rect x="410.2" y="321.3" width="10" height="10" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<rect x="571.8" y="299.1" width="10" height="10" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<rect x="733.4" y="259.8" width="10" height="10" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<rect x="895.0" y="192.8" width="10" height="10" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<line x1="40" y1="420" x2="920" y2="420" stroke="#000000"/>
+<text x="40" y="477" font-family="'Trajan Pro 3','Trajan Pro',Trajan,Cinzel,Georgia,serif" font-size="42" fill="#000000" text-anchor="start" font-weight="700">56.2×</text>
+<text x="42" y="501" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="1.0">192 NODES / CONCURRENCY 64</text>
+<line x1="480" y1="438" x2="480" y2="506" stroke="#000000"/>
+<text x="520" y="477" font-family="'Trajan Pro 3','Trajan Pro',Trajan,Cinzel,Georgia,serif" font-size="42" fill="#000000" text-anchor="start" font-weight="700">49.56×</text>
+<text x="522" y="501" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="1.0">256 NODES / CONCURRENCY 64</text>
+<text x="40" y="533" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10.5" fill="#000000" text-anchor="start" font-weight="normal">192 and 256 valid unique tiles at every concurrency</text>
+<text x="920" y="533" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="10.5" fill="#000000" text-anchor="end" font-weight="normal">5.8s matched latency / $0 API cost</text>
+</svg>

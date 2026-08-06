@@ -325,9 +325,10 @@ with SQLiteRunStore("jobs.sqlite3") as store:
 - Unknown provider outcomes require human investigation or explicit duplicate
   acknowledgment.
 
-## Flagship fan-out workload
+## High-fan-out example workload
 
 The related [glyph screensaver benchmark](../benchmarks/glyph_screensaver_benchmark.md)
+is one concrete use of Smythe's general-purpose artifact execution model. It
 uses a 192-node `BROADCAST_REDUCE` graph to generate 192 original cyber-glyph
 tiles, validate dimensions and uniqueness, and assemble a 1920x1080 still,
 animated GIF, contact-sheet atlas, and standalone animated HTML canvas. Its

@@ -48,8 +48,10 @@ double rule, or a dashed outline on white.
 ## Diagrams
 
 Use hand-authored SVG for landing-page diagrams whose routing and hierarchy
-matter. Use Mermaid for generated graphs and documentation diagrams that must
-track code.
+matter. Catalog-bound plates, such as the Glyph Rain specimens, should be
+rendered deterministically from their committed source data. Use Mermaid for
+detailed documentation diagrams that must track code; keep it off the landing
+page when a polished example graph already tells the story.
 
 Differentiate node states without color:
 
@@ -72,10 +74,10 @@ Every public diagram carries the same pure black-and-white init header, kept as
 
 ## Badges
 
-Use shields.io `flat-square` with the conventional two-tone split: a black
-label field with white type and a white value field with black type:
-`?style=flat-square&labelColor=000000&color=ffffff`. Always override dynamic
-status colors so passing, failing, and unknown states remain monochrome.
+Use the repository-native SVG badges in `assets/badges/`. Each uses the
+conventional two-tone split—a black label field with white type and a white
+value field with black type—inside a complete one-pixel black rectangular
+border. Keep their values synchronized with the release and CI state.
 
 ## Verification
 

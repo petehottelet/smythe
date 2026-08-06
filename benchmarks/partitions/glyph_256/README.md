@@ -1,7 +1,7 @@
 # Glyph Rain 256-glyph partition
 
 This isolated benchmark extends the deterministic Glyph Rain catalog from 192
-to **256 unique fictional characters** without changing the flagship
+to **256 unique fictional characters** without changing the existing
 screensaver, its exported 192-character catalog, or any existing result
 record.
 

@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="470" viewBox="0 0 960 470" role="img" aria-label="Line-art table of twelve representative glyphs selected from the 192-character deterministic Glyph Rain catalog.">
+<rect width="960" height="470" fill="#ffffff"/>
+<text x="40" y="49" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="2.2">SELECTED GLYPHS</text>
+<text x="40" y="86" font-family="Georgia,'Times New Roman',serif" font-size="29" fill="#000000" text-anchor="start" font-weight="700">Twelve marks from the generated catalog</text>
+<text x="920" y="84" font-family="'Trajan Pro 3','Trajan Pro',Trajan,Cinzel,Georgia,serif" font-size="18" fill="#000000" text-anchor="end" font-weight="700">12 / 192</text>
+<line x1="40" y1="108" x2="920" y2="108" stroke="#000000" stroke-width="2"/>
+<rect x="40.0" y="126.0" width="146.7" height="151.0" fill="#ffffff" stroke="#000000"/>
+<g transform="translate(79.3 133.0) scale(0.680)">
+<line x1="10.2" y1="18" x2="87.2" y2="18" stroke="#000000" stroke-width="11.8" stroke-linecap="round"/>
+<line x1="87.2" y1="18" x2="87.2" y2="89.9" stroke="#000000" stroke-width="11.8" stroke-linecap="round"/>
+<line x1="10.2" y1="89.9" x2="87.2" y2="89.9" stroke="#000000" stroke-width="11.8" stroke-linecap="round"/>
+<path d="M22.2 46Q50 68 75.2 46" fill="none" stroke="#000000" stroke-width="9.8" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="51.8" y1="26" x2="53.8" y2="81.9" stroke="#000000" stroke-width="9.8" stroke-linecap="round"/>
+<path d="M22.2 46Q50 68 75.2 46" fill="none" stroke="#000000" stroke-width="9.8" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="28" y1="128.8" x2="72" y2="127.8" stroke="#000000" stroke-width="11.8" stroke-linecap="round"/>
+</g>
+<text x="113.33333333333333" y="265" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="9.5" fill="#000000" text-anchor="middle" font-weight="normal" letter-spacing="0.8">GLYPH-000</text>
+<rect x="186.7" y="126.0" width="146.7" height="151.0" fill="#ffffff" stroke="#000000"/>
+<g transform="translate(226.0 133.0) scale(0.680)">
+<path d="M54.7 14.7Q41.1 60.4 14.1 106.1" fill="none" stroke="#000000" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="67.3" y1="14.7" x2="64.9" y2="100.6" stroke="#000000" stroke-width="11" stroke-linecap="round"/>
+<line x1="22.8" y1="71.1" x2="77.7" y2="71.1" stroke="#000000" stroke-width="9.4" stroke-linecap="round"/>
+<circle cx="54.7" cy="6.7" r="5.2" fill="#000000"/>
+<line x1="28" y1="132.4" x2="72" y2="128.1" stroke="#000000" stroke-width="9.4" stroke-linecap="round"/>
+</g>
+<text x="260.0" y="265" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="9.5" fill="#000000" text-anchor="middle" font-weight="normal" letter-spacing="0.8">GLYPH-003</text>
+<rect x="333.3" y="126.0" width="146.7" height="151.0" fill="#ffffff" stroke="#000000"/>
+<g transform="translate(372.7 133.0) scale(0.680)">
+<path d="M14 70Q50 6 86 70" fill="none" stroke="#000000" stroke-width="11.8" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="52.7" y1="40" x2="52.7" y2="111.7" stroke="#000000" stroke-width="11.8" stroke-linecap="round"/>
+<path d="M52.7 111.7Q52.7 120.3 36.7 118.3" fill="none" stroke="#000000" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="48.4" cy="6.6" r="5.8" fill="#000000"/>
+<circle cx="59.5" cy="9.1" r="6.2" fill="#000000"/>
+</g>
+<text x="406.66666666666663" y="265" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="9.5" fill="#000000" text-anchor="middle" font-weight="normal" letter-spacing="0.8">GLYPH-005</text>
+<rect x="480.0" y="126.0" width="146.7" height="151.0" fill="#ffffff" stroke="#000000"/>
+<g transform="translate(519.3 133.0) scale(0.680)">
+<line x1="13.8" y1="15.2" x2="84.5" y2="15.2" stroke="#000000" stroke-width="10.6" stroke-linecap="round"/>
+<line x1="84.5" y1="15.2" x2="84.5" y2="85.2" stroke="#000000" stroke-width="10.6" stroke-linecap="round"/>
+<line x1="13.8" y1="85.2" x2="84.5" y2="85.2" stroke="#000000" stroke-width="10.6" stroke-linecap="round"/>
+<line x1="25.8" y1="64.1" x2="72.5" y2="51" stroke="#000000" stroke-width="9.6" stroke-linecap="round"/>
+<line x1="50.9" y1="23.2" x2="53.3" y2="77.2" stroke="#000000" stroke-width="9.6" stroke-linecap="round"/>
+<line x1="25.8" y1="38.7" x2="72.5" y2="61.9" stroke="#000000" stroke-width="9.6" stroke-linecap="round"/>
+<line x1="28" y1="125.2" x2="72" y2="130.9" stroke="#000000" stroke-width="10.6" stroke-linecap="round"/>
+</g>
+<text x="553.3333333333334" y="265" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="9.5" fill="#000000" text-anchor="middle" font-weight="normal" letter-spacing="0.8">GLYPH-012</text>
+<rect x="626.7" y="126.0" width="146.7" height="151.0" fill="#ffffff" stroke="#000000"/>
+<g transform="translate(666.0 133.0) scale(0.680)">
+<line x1="11" y1="12" x2="87.8" y2="14" stroke="#000000" stroke-width="11.1" stroke-linecap="round"/>
+<line x1="29.8" y1="40.3" x2="71.2" y2="39.2" stroke="#000000" stroke-width="9.9" stroke-linecap="round"/>
+<line x1="29.7" y1="101.3" x2="74.2" y2="100.8" stroke="#000000" stroke-width="11.1" stroke-linecap="round"/>
+<line x1="27.7" y1="-0.3" x2="27.7" y2="117.4" stroke="#000000" stroke-width="11.1" stroke-linecap="round"/>
+<path d="M27.7 117.4Q27.7 128.2 11.8 126.2" fill="none" stroke="#000000" stroke-width="9.4" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M79.4 10Q68 24 47 40.9" fill="none" stroke="#000000" stroke-width="9.9" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="24.3" cy="2.7" r="6.1" fill="#000000"/>
+<line x1="11" y1="8.1" x2="11" y2="15.9" stroke="#000000" stroke-width="9.9" stroke-linecap="round"/>
+<line x1="87.8" y1="10.1" x2="87.8" y2="17.9" stroke="#000000" stroke-width="9.9" stroke-linecap="round"/>
+</g>
+<text x="700.0" y="265" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="9.5" fill="#000000" text-anchor="middle" font-weight="normal" letter-spacing="0.8">GLYPH-014</text>
+<rect x="773.3" y="126.0" width="146.7" height="151.0" fill="#ffffff" stroke="#000000"/>
+<g transform="translate(812.7 133.0) scale(0.680)">
+<line x1="11.1" y1="98.4" x2="90.8" y2="101.3" stroke="#000000" stroke-width="11.1" stroke-linecap="round"/>
+<line x1="29.1" y1="128" x2="75" y2="126.5" stroke="#000000" stroke-width="11.1" stroke-linecap="round"/>
+<line x1="29.2" y1="90.5" x2="29.2" y2="128" stroke="#000000" stroke-width="11.1" stroke-linecap="round"/>
+<path d="M29.2 128Q29.2 138.9 12.8 136.9" fill="none" stroke="#000000" stroke-width="9.4" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M77.9 10Q68 24 47.3 43.9" fill="none" stroke="#000000" stroke-width="9.6" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="11.1" y1="94.5" x2="11.1" y2="102.3" stroke="#000000" stroke-width="9.6" stroke-linecap="round"/>
+<line x1="90.8" y1="97.4" x2="90.8" y2="105.2" stroke="#000000" stroke-width="9.6" stroke-linecap="round"/>
+</g>
+<text x="846.6666666666666" y="265" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="9.5" fill="#000000" text-anchor="middle" font-weight="normal" letter-spacing="0.8">GLYPH-021</text>
+<rect x="40.0" y="277.0" width="146.7" height="151.0" fill="#ffffff" stroke="#000000"/>
+<g transform="translate(79.3 284.0) scale(0.680)">
+<line x1="14.4" y1="12" x2="14.4" y2="132.7" stroke="#000000" stroke-width="11.6" stroke-linecap="round"/>
+<line x1="8.4" y1="77.9" x2="29" y2="77.9" stroke="#000000" stroke-width="9.8" stroke-linecap="round"/>
+<line x1="8.4" y1="96.3" x2="28.4" y2="96.3" stroke="#000000" stroke-width="9.8" stroke-linecap="round"/>
+<path d="M49.7 40Q95.6 70 53.7 112" fill="none" stroke="#000000" stroke-width="11.6" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<text x="113.33333333333333" y="416" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="9.5" fill="#000000" text-anchor="middle" font-weight="normal" letter-spacing="0.8">GLYPH-032</text>
+<rect x="186.7" y="277.0" width="146.7" height="151.0" fill="#ffffff" stroke="#000000"/>
+<g transform="translate(226.0 284.0) scale(0.680)">
+<line x1="10.2" y1="19.4" x2="87.5" y2="19.4" stroke="#000000" stroke-width="11.7" stroke-linecap="round"/>
+<line x1="10.2" y1="19.4" x2="10.2" y2="115.1" stroke="#000000" stroke-width="11.7" stroke-linecap="round"/>
+<line x1="87.5" y1="19.4" x2="87.5" y2="115.1" stroke="#000000" stroke-width="11.7" stroke-linecap="round"/>
+<line x1="10.2" y1="115.1" x2="87.5" y2="115.1" stroke="#000000" stroke-width="11.7" stroke-linecap="round"/>
+<path d="M22.2 59.2Q50 81.2 75.5 59.2" fill="none" stroke="#000000" stroke-width="9.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M22.2 59.2Q50 81.2 75.5 59.2" fill="none" stroke="#000000" stroke-width="9.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M22.2 59.2Q50 81.2 75.5 59.2" fill="none" stroke="#000000" stroke-width="9.8" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<text x="260.0" y="416" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="9.5" fill="#000000" text-anchor="middle" font-weight="normal" letter-spacing="0.8">GLYPH-044</text>
+<rect x="333.3" y="277.0" width="146.7" height="151.0" fill="#ffffff" stroke="#000000"/>
+<g transform="translate(372.7 284.0) scale(0.680)">
+<line x1="11.5" y1="20.2" x2="86.9" y2="20.2" stroke="#000000" stroke-width="10.6" stroke-linecap="round"/>
+<line x1="11.5" y1="20.2" x2="11.5" y2="81.4" stroke="#000000" stroke-width="10.6" stroke-linecap="round"/>
+<line x1="86.9" y1="20.2" x2="86.9" y2="81.4" stroke="#000000" stroke-width="10.6" stroke-linecap="round"/>
+<path d="M23.5 42.8Q50 64.8 74.9 42.8" fill="none" stroke="#000000" stroke-width="9.9" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="23.5" y1="55.3" x2="74.9" y2="55.8" stroke="#000000" stroke-width="9.9" stroke-linecap="round"/>
+<line x1="50.7" y1="81.4" x2="46.8" y2="132" stroke="#000000" stroke-width="10.6" stroke-linecap="round"/>
+</g>
+<text x="406.66666666666663" y="416" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="9.5" fill="#000000" text-anchor="middle" font-weight="normal" letter-spacing="0.8">GLYPH-063</text>
+<rect x="480.0" y="277.0" width="146.7" height="151.0" fill="#ffffff" stroke="#000000"/>
+<g transform="translate(519.3 284.0) scale(0.680)">
+<line x1="14" y1="12" x2="14" y2="129.1" stroke="#000000" stroke-width="12" stroke-linecap="round"/>
+<line x1="8" y1="76.9" x2="26.7" y2="76.9" stroke="#000000" stroke-width="9.8" stroke-linecap="round"/>
+<path d="M47 40Q97 70 51 112" fill="none" stroke="#000000" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="87" cy="16" r="5.8" fill="#000000"/>
+</g>
+<text x="553.3333333333334" y="416" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="9.5" fill="#000000" text-anchor="middle" font-weight="normal" letter-spacing="0.8">GLYPH-080</text>
+<rect x="626.7" y="277.0" width="146.7" height="151.0" fill="#ffffff" stroke="#000000"/>
+<g transform="translate(666.0 284.0) scale(0.680)">
+<line x1="15" y1="17.9" x2="15" y2="80.7" stroke="#000000" stroke-width="10.7" stroke-linecap="round"/>
+<line x1="88.1" y1="17.9" x2="88.1" y2="80.7" stroke="#000000" stroke-width="10.7" stroke-linecap="round"/>
+<line x1="15" y1="80.7" x2="88.1" y2="80.7" stroke="#000000" stroke-width="10.7" stroke-linecap="round"/>
+<line x1="27" y1="42.4" x2="76.1" y2="51.8" stroke="#000000" stroke-width="10" stroke-linecap="round"/>
+<circle cx="52.7" cy="55.6" r="6.6" fill="#000000"/>
+<line x1="28" y1="125.9" x2="72" y2="131.4" stroke="#000000" stroke-width="10.7" stroke-linecap="round"/>
+</g>
+<text x="700.0" y="416" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="9.5" fill="#000000" text-anchor="middle" font-weight="normal" letter-spacing="0.8">GLYPH-107</text>
+<rect x="773.3" y="277.0" width="146.7" height="151.0" fill="#ffffff" stroke="#000000"/>
+<g transform="translate(812.7 284.0) scale(0.680)">
+<line x1="30.5" y1="12" x2="72.8" y2="13.1" stroke="#000000" stroke-width="11" stroke-linecap="round"/>
+<line x1="14.2" y1="39.8" x2="83.6" y2="40" stroke="#000000" stroke-width="10" stroke-linecap="round"/>
+<line x1="12.8" y1="98.5" x2="90.9" y2="98.2" stroke="#000000" stroke-width="10" stroke-linecap="round"/>
+<line x1="12.8" y1="127.3" x2="92.1" y2="126.6" stroke="#000000" stroke-width="11" stroke-linecap="round"/>
+<line x1="69.8" y1="-1.6" x2="69.8" y2="128" stroke="#000000" stroke-width="11" stroke-linecap="round"/>
+<path d="M69.8 128Q69.8 136.3 53.2 134.3" fill="none" stroke="#000000" stroke-width="9.3" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<text x="846.6666666666666" y="416" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="9.5" fill="#000000" text-anchor="middle" font-weight="normal" letter-spacing="0.8">GLYPH-151</text>
+<text x="40" y="452" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="normal">Original deterministic stroke programs; no font or source-image extraction</text>
+<text x="920" y="452" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="11" fill="#000000" text-anchor="end" font-weight="normal">GLYPH_SPECS</text>
+</svg>

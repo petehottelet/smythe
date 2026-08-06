@@ -1,6 +1,7 @@
 # Glyph Rain screensaver
 
-A screensaver built from the 192 original procedural cyber glyphs that the
+A high-fan-out example of Smythe's general-purpose execution model, built from
+the 192 original procedural cyber glyphs that the
 [glyph screensaver benchmark](../benchmarks/glyph_screensaver_benchmark.md)
 generates as one 192-node parallel Smythe run. The stroke programs, fall
 speeds, and trail lengths in every port are the benchmark's generated

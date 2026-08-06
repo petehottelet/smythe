@@ -10,12 +10,20 @@ from __future__ import annotations
 
 import html
 import json
+import sys
 from collections.abc import Callable
 from pathlib import Path
+
+if __package__:
+    from .glyph_screensaver_assets import GlyphSpec, get_glyph_specs
+else:
+    sys.path.insert(0, str(Path(__file__).parents[1]))
+    from glyph_screensaver_assets import GlyphSpec, get_glyph_specs
 
 ROOT = Path(__file__).parents[1]
 RESULTS = ROOT / "benchmarks" / "results"
 OUT = ROOT / "assets" / "benchmarks"
+GLYPH_OUT = ROOT / "assets" / "glyph_rain"
 
 BLACK = "#000000"
 WHITE = "#ffffff"
@@ -353,15 +361,273 @@ def render_shape_efficiency() -> str:
     )
 
 
+def _glyph_runs(name: str) -> tuple[dict, list[dict]]:
+    record = _load(name)
+    runs = record.get("runs", [])
+    expected = record.get("protocol", {}).get("graph_nodes")
+    if record.get("status") != "passed" or not runs or expected not in (192, 256):
+        raise ValueError(f"{name} is not a passing 192- or 256-node glyph record")
+    for run in runs:
+        validation = run.get("validation", {})
+        if (
+            run.get("status") != "passed"
+            or validation.get("valid_png_tiles") != expected
+            or validation.get("unique_tile_hashes") != expected
+        ):
+            raise ValueError(f"{name} contains a non-claimable glyph run")
+    return record, runs
+
+
+def render_glyph_scaling() -> str:
+    """Render the isolated 192- and 256-node realistic-latency sweeps."""
+    record_192, runs_192 = _glyph_runs("glyph_screensaver_offline_realistic.json")
+    record_256, runs_256 = _glyph_runs("glyph_screensaver_256_offline_realistic.json")
+    concurrencies = [run["concurrency"] for run in runs_192]
+    if concurrencies != [run["concurrency"] for run in runs_256]:
+        raise ValueError("glyph scaling records use different concurrency sweeps")
+
+    body = _text(40, 49, "ARTIFACT FAN-OUT", size=11, weight="700", tracking=2.2)
+    body += _text(40, 86, "Scaling across 192 and 256 nodes", size=29, weight="700", family=SERIF)
+    body += _text(
+        40,
+        111,
+        "Matched 5.8-second simulated provider latency; every tile valid and unique",
+        size=13,
+    )
+    body += f'<line x1="40" y1="132" x2="920" y2="132" stroke="{BLACK}" stroke-width="2"/>\n'
+    body += _legend(600, 108, "192 nodes", "solid")
+    body += _legend(756, 108, "256 nodes", "outline")
+
+    plot_left, plot_top, plot_right, plot_bottom = 92, 168, 900, 350
+    max_throughput = 10.0
+    for tick in (0, 2.5, 5.0, 7.5, 10.0):
+        y = plot_bottom - (tick / max_throughput) * (plot_bottom - plot_top)
+        body += _text(73, y + 4, f"{tick:g}", size=10, anchor="end", family=MONO)
+        body += (
+            f'<line x1="{plot_left}" y1="{y:.1f}" x2="{plot_right}" y2="{y:.1f}" '
+            f'stroke="{BLACK}" stroke-dasharray="2 7"/>\n'
+        )
+    body += _text(40, 260, "GLYPHS / S", size=9.5, weight="700", tracking=1.2)
+
+    x_step = (plot_right - plot_left) / (len(concurrencies) - 1)
+    x_positions = [plot_left + index * x_step for index in range(len(concurrencies))]
+    for x, concurrency in zip(x_positions, concurrencies, strict=True):
+        body += f'<line x1="{x:.1f}" y1="{plot_bottom}" x2="{x:.1f}" y2="{plot_bottom + 6}" stroke="{BLACK}"/>\n'
+        body += _text(x, plot_bottom + 24, str(concurrency), size=10.5, anchor="middle", family=MONO)
+    body += _text(
+        (plot_left + plot_right) / 2,
+        plot_bottom + 48,
+        "MAX CONCURRENCY",
+        size=9.5,
+        anchor="middle",
+        weight="700",
+        tracking=1.2,
+    )
+
+    def points(runs: list[dict]) -> list[tuple[float, float]]:
+        return [
+            (
+                x,
+                plot_bottom
+                - (run["throughput_glyphs_per_s"] / max_throughput)
+                * (plot_bottom - plot_top),
+            )
+            for x, run in zip(x_positions, runs, strict=True)
+        ]
+
+    points_192 = points(runs_192)
+    points_256 = points(runs_256)
+    path_192 = " ".join(f"{x:.1f},{y:.1f}" for x, y in points_192)
+    path_256 = " ".join(f"{x:.1f},{y:.1f}" for x, y in points_256)
+    body += f'<polyline points="{path_192}" fill="none" stroke="{BLACK}" stroke-width="4"/>\n'
+    body += (
+        f'<polyline points="{path_256}" fill="none" stroke="{BLACK}" '
+        'stroke-width="2" stroke-dasharray="9 7"/>\n'
+    )
+    for x, y in points_192:
+        body += f'<circle cx="{x:.1f}" cy="{y:.1f}" r="5" fill="{BLACK}"/>\n'
+    for x, y in points_256:
+        body += (
+            f'<rect x="{x - 5:.1f}" y="{y - 5:.1f}" width="10" height="10" '
+            f'fill="{WHITE}" stroke="{BLACK}" stroke-width="2"/>\n'
+        )
+
+    speedup_192 = runs_192[-1]["speedup_vs_concurrency_1"]
+    speedup_256 = runs_256[-1]["speedup_vs_concurrency_1"]
+    body += f'<line x1="40" y1="420" x2="920" y2="420" stroke="{BLACK}"/>\n'
+    body += _text(40, 477, f"{speedup_192:.1f}×", size=42, family=TRAJAN, weight="700")
+    body += _text(42, 501, "192 NODES / CONCURRENCY 64", size=10, weight="700", tracking=1.0)
+    body += f'<line x1="480" y1="438" x2="480" y2="506" stroke="{BLACK}"/>\n'
+    body += _text(520, 477, f"{speedup_256:.2f}×", size=42, family=TRAJAN, weight="700")
+    body += _text(522, 501, "256 NODES / CONCURRENCY 64", size=10, weight="700", tracking=1.0)
+    body += _text(
+        40,
+        533,
+        "192 and 256 valid unique tiles at every concurrency",
+        size=10.5,
+    )
+    body += _text(
+        920,
+        533,
+        f'{record_192["protocol"]["offline_latency_s"]:.1f}s matched latency / $0 API cost',
+        size=10.5,
+        anchor="end",
+        family=MONO,
+    )
+    return _svg(
+        960,
+        550,
+        body,
+        label=(
+            "Throughput chart for the isolated 192- and 256-node Glyph Rain sweeps. "
+            "Both produce valid unique tiles at every measured concurrency."
+        ),
+    )
+
+
+def render_glyph_pipeline() -> str:
+    """Render the Glyph Rain example as a generated graph and execution envelope."""
+    body = _text(40, 49, "FROM BRIEF TO SCREEN SAVER", size=11, weight="700", tracking=2.2)
+    body += _text(40, 86, "One example of Smythe at high fan-out", size=29, weight="700", family=SERIF)
+    body += f'<line x1="40" y1="108" x2="920" y2="108" stroke="{BLACK}" stroke-width="2"/>\n'
+
+    stages = (
+        (40, 146, 176, 108, "01", "BRIEF", "Define the artifact"),
+        (274, 146, 176, 108, "192", "GENERATE", "One node per glyph"),
+        (508, 146, 176, 108, "192", "VERIFY", "Size + PNG + SHA-256"),
+        (742, 146, 178, 108, "04", "ASSEMBLE", "Atlas + web + ports"),
+    )
+    for index, (x, y, width, height, number, title, detail) in enumerate(stages):
+        fill = BLACK if index == len(stages) - 1 else WHITE
+        ink = WHITE if fill == BLACK else BLACK
+        body += (
+            f'<rect x="{x}" y="{y}" width="{width}" height="{height}" '
+            f'fill="{fill}" stroke="{BLACK}" stroke-width="2"/>\n'
+        )
+        body += _text(x + 16, y + 41, number, size=31, fill=ink, weight="700", family=TRAJAN)
+        body += _text(x + 16, y + 70, title, size=11, fill=ink, weight="700", tracking=1.5)
+        body += _text(x + 16, y + 91, detail, size=11, fill=ink)
+        if index < len(stages) - 1:
+            arrow_x = x + width
+            body += f'<line x1="{arrow_x}" y1="200" x2="{arrow_x + 58}" y2="200" stroke="{BLACK}" stroke-width="2"/>\n'
+            body += f'<path d="M{arrow_x + 50} 194L{arrow_x + 58} 200L{arrow_x + 50} 206" fill="none" stroke="{BLACK}" stroke-width="2"/>\n'
+
+    body += f'<line x1="40" y1="282" x2="920" y2="282" stroke="{BLACK}"/>\n'
+    body += _text(
+        40,
+        306,
+        "Generated execution topology",
+        size=11,
+        weight="700",
+        tracking=1.1,
+    )
+    body += _text(
+        920,
+        306,
+        "Bounded concurrency / objective gates / traces / per-node recovery",
+        size=11,
+        anchor="end",
+    )
+    return _svg(
+        960,
+        326,
+        body,
+        label=(
+            "Glyph Rain example pipeline. A brief becomes a 192-node generated graph, "
+            "each glyph is verified, and the outputs are assembled into four artifacts."
+        ),
+    )
+
+
+def _glyph_strokes(spec: GlyphSpec, *, x: float, y: float, scale: float) -> str:
+    body = f'<g transform="translate({x:.1f} {y:.1f}) scale({scale:.3f})">\n'
+    for stroke in spec.strokes:
+        kind, *values = stroke
+        if kind == "l":
+            x1, y1, x2, y2, width = values
+            body += (
+                f'<line x1="{x1:g}" y1="{y1:g}" x2="{x2:g}" y2="{y2:g}" '
+                f'stroke="{BLACK}" stroke-width="{width:g}" stroke-linecap="round"/>\n'
+            )
+        elif kind == "q":
+            x1, y1, cx, cy, x2, y2, width = values
+            body += (
+                f'<path d="M{x1:g} {y1:g}Q{cx:g} {cy:g} {x2:g} {y2:g}" '
+                f'fill="none" stroke="{BLACK}" stroke-width="{width:g}" '
+                'stroke-linecap="round" stroke-linejoin="round"/>\n'
+            )
+        else:
+            cx, cy, radius = values
+            body += f'<circle cx="{cx:g}" cy="{cy:g}" r="{radius:g}" fill="{BLACK}"/>\n'
+    return body + "</g>\n"
+
+
+def render_glyph_specimens() -> str:
+    """Render selected committed glyph stroke programs as a line-art specimen table."""
+    selected = (0, 3, 5, 12, 14, 21, 32, 44, 63, 80, 107, 151)
+    catalog = get_glyph_specs()
+    specs = tuple(catalog[index] for index in selected)
+    body = _text(40, 49, "SELECTED GLYPHS", size=11, weight="700", tracking=2.2)
+    body += _text(40, 86, "Twelve marks from the generated catalog", size=29, weight="700", family=SERIF)
+    body += _text(920, 84, "12 / 192", size=18, anchor="end", family=TRAJAN, weight="700")
+    body += f'<line x1="40" y1="108" x2="920" y2="108" stroke="{BLACK}" stroke-width="2"/>\n'
+
+    columns = 6
+    cell_width = 880 / columns
+    cell_height = 151
+    grid_y = 126
+    for index, spec in enumerate(specs):
+        row, column = divmod(index, columns)
+        x = 40 + column * cell_width
+        y = grid_y + row * cell_height
+        body += (
+            f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell_width:.1f}" '
+            f'height="{cell_height:.1f}" fill="{WHITE}" stroke="{BLACK}"/>\n'
+        )
+        scale = 0.68
+        mark_x = x + (cell_width - 100 * scale) / 2
+        mark_y = y + 7
+        body += _glyph_strokes(spec, x=mark_x, y=mark_y, scale=scale)
+        body += _text(
+            x + cell_width / 2,
+            y + 139,
+            spec.id.upper(),
+            size=9.5,
+            anchor="middle",
+            family=MONO,
+            tracking=0.8,
+        )
+
+    body += _text(
+        40,
+        452,
+        "Original deterministic stroke programs; no font or source-image extraction",
+        size=11,
+    )
+    body += _text(920, 452, "GLYPH_SPECS", size=11, anchor="end", family=MONO)
+    return _svg(
+        960,
+        470,
+        body,
+        label=(
+            "Line-art table of twelve representative glyphs selected from the "
+            "192-character deterministic Glyph Rain catalog."
+        ),
+    )
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    charts: dict[str, Callable[[], str]] = {
-        "framework_comparison.svg": render_framework_comparison,
-        "framework_callouts.svg": render_framework_callouts,
-        "shape_efficiency.svg": render_shape_efficiency,
+    GLYPH_OUT.mkdir(parents=True, exist_ok=True)
+    charts: dict[Path, Callable[[], str]] = {
+        OUT / "framework_comparison.svg": render_framework_comparison,
+        OUT / "framework_callouts.svg": render_framework_callouts,
+        OUT / "shape_efficiency.svg": render_shape_efficiency,
+        OUT / "glyph_scaling.svg": render_glyph_scaling,
+        GLYPH_OUT / "glyph_pipeline.svg": render_glyph_pipeline,
+        GLYPH_OUT / "glyph_specimens.svg": render_glyph_specimens,
     }
-    for name, renderer in charts.items():
-        destination = OUT / name
+    for destination, renderer in charts.items():
         destination.write_text(renderer(), encoding="utf-8", newline="\n")
         print(f"wrote {destination}")
 

@@ -1,6 +1,6 @@
 """Deterministic cyber-glyph provider and digital-rain asset assembly.
 
-The flagship 192 glyphs and extended 256-glyph benchmark catalog are
+The default 192 glyphs and extended 256-glyph benchmark catalog are
 fictional procedural marks built from a calligraphic
 stroke grammar: horizontal bars, vertical stems, hooks, enclosures, press
 diagonals, bowls, tail sweeps, and diacritic dots, composed on an ideograph
@@ -1204,7 +1204,7 @@ def build_glyph_screensaver_assets(
     *,
     seed: int = DEFAULT_SEED,
 ) -> GlyphSuiteReceipt:
-    """Build all 192 tiles and the four deterministic flagship outputs."""
+    """Build all 192 tiles and the four deterministic default outputs."""
 
     root = Path(output_dir)
     tile_dir = root / "tiles"

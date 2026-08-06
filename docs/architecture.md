@@ -11,7 +11,7 @@ flowchart LR
     task["Task<br/>goal · constraints · acceptance"]
     router["WhiteRabbit<br/>optional tier routing"]
     architect["Architect<br/>generate or select topology"]
-    graph["ExecutionGraph<br/>inspectable DAG"]
+    dag["ExecutionGraph<br/>inspectable DAG"]
 
     subgraph envelope["Durable execution envelope"]
         executor["Executor<br/>serial or bounded parallel"]
@@ -26,7 +26,7 @@ flowchart LR
     result["SwarmResult<br/>output · graph · trace · cost"]
     memory["PlannerMemory<br/>outcomes + distilled templates"]
 
-    task --> router --> architect --> graph --> executor --> synthesizer --> result
+    task --> router --> architect --> dag --> executor --> synthesizer --> result
     executor <--> sentinel
     executor <--> verifier
     executor <--> supervisor
