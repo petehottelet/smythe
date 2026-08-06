@@ -38,11 +38,16 @@ def _inspect_image(data_or_path) -> tuple[str, tuple[int, int], str, int]:
         return image.format, image.size, image.mode, int(getattr(image, "n_frames", 1))
 
 
-def test_catalog_contains_64_unique_fictional_bitmap_specs():
-    assert len(GLYPH_SPECS) == GLYPH_COUNT == 64
+def test_catalog_contains_192_unique_fictional_stroke_specs():
+    assert len(GLYPH_SPECS) == GLYPH_COUNT == 192
     assert len({spec.id for spec in GLYPH_SPECS}) == GLYPH_COUNT
-    assert len({spec.rows for spec in GLYPH_SPECS}) == GLYPH_COUNT
-    assert all(len(spec.rows) == 9 for spec in GLYPH_SPECS)
+    assert len({spec.strokes for spec in GLYPH_SPECS}) == GLYPH_COUNT
+    assert all(2 <= len(spec.strokes) <= 9 for spec in GLYPH_SPECS)
+    assert all(
+        stroke[0] in {"l", "q", "d"}
+        for spec in GLYPH_SPECS
+        for stroke in spec.strokes
+    )
     assert all(spec.speed > 0 and spec.trail_length >= 8 for spec in GLYPH_SPECS)
 
 
@@ -152,12 +157,12 @@ def test_complete_suite_has_valid_dimensions_animation_html_and_receipts(tmp_pat
     assert receipt.html.sha256 == hashlib.sha256(html_path.read_bytes()).hexdigest()
     assert '<canvas id="rain" width="1920" height="1080"' in html
     assert "requestAnimationFrame" in html
-    assert "const patterns=" in html
+    assert "const strokes=" in html
     assert "https://" not in html and "http://" not in html
 
     # Repeat the largest still and the executable canvas document to prove that
     # the seed and serialized program are stable without rebuilding the already
-    # verified GIF and all 64 tiles a second time in CI.
+    # verified GIF and all 192 tiles a second time in CI.
     tile_paths = [tile.path for tile in receipt.tiles]
     repeat_preview = assemble_preview(tile_paths, tmp_path / "repeat-preview.png")
     repeat_html = assemble_html(tmp_path / "repeat.html")
