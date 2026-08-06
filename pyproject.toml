@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "smythe"
 version = "0.6.0"
-description = "Task-based personalized agent swarms with dynamic execution topology"
+description = "Generated agent execution graphs with durable, budgeted orchestration"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -13,7 +13,7 @@ requires-python = ">=3.11"
 authors = [
     { name = "Pete Hottelet" },
 ]
-keywords = ["agents", "swarm", "llm", "dag", "orchestration"]
+keywords = ["agents", "swarm", "multi-agent", "llm", "dag", "orchestration", "checkpointing"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

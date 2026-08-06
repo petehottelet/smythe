@@ -35,13 +35,16 @@ def _has_cycle_in(adjacency: Mapping[str, list[str]]) -> bool:
     return any(dfs(node_id) for node_id in adjacency)
 
 
-# House diagram style (docs/style.md): serif type, ivory nodes, hairline
-# warm-gray edges, gentle curves. Opt in via to_mermaid(theme=True).
+# House diagram style (docs/style.md): serif type, pure black-and-white nodes,
+# hairline edges, and gentle curves. Opt in via to_mermaid(theme=True).
 MERMAID_THEME = (
     '%%{init: {"theme":"base","themeVariables":{'
     '"fontFamily":"Georgia, \'Times New Roman\', serif","fontSize":"14px",'
-    '"primaryColor":"#faf8f1","primaryTextColor":"#23221e",'
-    '"primaryBorderColor":"#a89f8c","lineColor":"#a89f8c"},'
+    '"primaryColor":"#ffffff","primaryTextColor":"#000000",'
+    '"primaryBorderColor":"#000000","lineColor":"#000000",'
+    '"secondaryColor":"#ffffff","tertiaryColor":"#ffffff",'
+    '"background":"#ffffff","mainBkg":"#ffffff",'
+    '"clusterBkg":"#ffffff","clusterBorder":"#000000"},'
     '"flowchart":{"curve":"basis","nodeSpacing":48,"rankSpacing":58}}}%%'
 )
 
@@ -320,7 +323,7 @@ class ExecutionGraph:
 
         Node statuses map to style classes so executed graphs are
         readable at a glance; output is deterministic for snapshot tests.
-        With ``theme=True``, the house style header (serif type, ivory
+        With ``theme=True``, the house style header (serif type, monochrome
         nodes, hairline edges — see docs/style.md) is prepended so
         generated diagrams match the hand-authored ones in the README.
         """
@@ -344,10 +347,16 @@ class ExecutionGraph:
             if cls:
                 styled.setdefault(cls, []).append(n.id)
         if styled:
-            lines.append("    classDef done fill:#eef0e4,stroke:#5a7742,color:#3a4d2b")
-            lines.append("    classDef failed fill:#f3e0dd,stroke:#8c3b2e,color:#66291f")
-            lines.append("    classDef skipped fill:#eceae3,stroke:#8a8578,color:#57534a")
-            lines.append("    classDef running fill:#f5ead0,stroke:#9a7b2d,color:#5c4a1e")
+            lines.append("    classDef done fill:#ffffff,stroke:#000000,color:#000000")
+            lines.append("    classDef failed fill:#000000,stroke:#000000,color:#ffffff")
+            lines.append(
+                "    classDef skipped fill:#ffffff,stroke:#000000,color:#000000,"
+                "stroke-dasharray:4 3"
+            )
+            lines.append(
+                "    classDef running fill:#ffffff,stroke:#000000,color:#000000,"
+                "stroke-width:3px"
+            )
             for cls in ("done", "failed", "skipped", "running"):
                 if cls in styled:
                     lines.append(f"    class {','.join(styled[cls])} {cls}")

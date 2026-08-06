@@ -1,27 +1,15 @@
 # Adaptive supervision
 
-The Architect plans once, before any work happens. Without a supervisor
-the executor walks that plan to the end regardless of what the results
-show — a plan that turns out to be wrong is still executed in full.
+Generated topology becomes result-aware with a supervisor. The Architect
+creates the initial graph; completed work can then redirect the unexecuted
+remainder without invalidating any result already banked.
 
-The failure mode is concrete: a benchmark run once produced a badly
-generated plan, and nothing in the run could notice or correct it —
-every node executed the wrong shape faithfully to the end. Planning
-variance is the price of generated topology, and a static graph has no
-mechanism to pay it back.
-
-**Supervision has now been measured, and on judged prose it does not
-pay.** Across 30 live runs of the shape suite the supervisor was
-consulted 94 times and proposed a change **zero** times — 94 paid
-provider calls that changed nothing. See
-[benchmarks/control_ablation.md](../benchmarks/control_ablation.md).
-
-It is not inert by construction: it fires when a deliverable is visibly
-incomplete, which used to happen often enough to matter and now rarely
-does. Turn it on for workloads where you expect plans to be wrong in
-ways the results reveal — long-running research, tool-driven work whose
-findings redirect it. Do not turn it on expecting a quality lift on a
-well-specified writing task.
+Use supervision when completed results can redirect the pending plan:
+long-running research, tool-driven investigation, and workflows with explicit
+stage boundaries. For a well-specified task with no evidence-driven branch,
+the generated plan can run directly. Explicit review points and fan-in
+triggers concentrate model review where new evidence can change the plan.
+[Measured control scope](../benchmarks/control_ablation.md).
 
 A **supervisor** closes the loop. After a node completes it reviews the
 work so far against the goal and may revise the *unexecuted* remainder.
@@ -31,7 +19,7 @@ from smythe import LLMSupervisor, Swarm
 
 swarm = Swarm(
     model="claude-opus-4-8",
-    supervisor=LLMSupervisor(provider),
+    supervisor=LLMSupervisor(provider, review_after={"research"}),
     max_revisions=2,          # supervision is off unless this is > 0
 )
 result = swarm.execute(task)
@@ -71,24 +59,24 @@ Four guardrails do that:
    same Sentinel reservation as planned ones. A supervisor cannot spend
    past `max_budget_usd` — it can only make the run stop sooner.
 
-## Cost control
+## Triggering reviews
 
 Reviewing after every node is usually wasteful. By default
-`LLMSupervisor` reviews only after a node with no pending dependents
-finishes. Be aware what that means in practice: on a simple serial
-graph it is the *final* node, so the supervisor can append remedial
-work but has nothing left to drop or rewire. Genuine stage-boundary
-review — closing a fork before its join — is not yet implemented.
-Until it is, target reviews explicitly:
+`LLMSupervisor` reviews when a multi-input join becomes ready and once when the
+whole graph finishes. A parallel set of terminal leaves produces one final
+review rather than one review per leaf. On a simple serial graph the default
+review is the final node, so use `review_after` when an earlier result can
+redirect the remaining steps:
 
 ```python
 LLMSupervisor(provider, review_after={"draft"})   # only after this node
 LLMSupervisor(provider, only_terminal=False)      # after every node
 ```
 
-Keeping the supervising model out of the routine path is the whole
-cost argument for adaptive orchestration: a review after every node in
-a wide graph can cost more than the work it supervises.
+The strongest default is an evidence-bearing stage boundary named in
+`review_after`. Deterministic supervisors can narrow this further by checking
+an anomaly first and calling a model only when the result gives the remaining
+plan something to reconsider.
 
 ## Writing your own
 

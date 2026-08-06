@@ -1,6 +1,7 @@
 """Deterministic cyber-glyph provider and digital-rain asset assembly.
 
-The 192 glyphs are fictional procedural marks built from a calligraphic
+The flagship 192 glyphs and extended 256-glyph benchmark catalog are
+fictional procedural marks built from a calligraphic
 stroke grammar: horizontal bars, vertical stems, hooks, enclosures, press
 diagonals, bowls, tail sweeps, and diacritic dots, composed on an ideograph
 grid with occasional serif nubs. The vocabulary is reminiscent of hand-drawn
@@ -29,6 +30,7 @@ from smythe.provider import Artifact, CompletionResult, Provider
 
 
 GLYPH_COUNT = 192
+MAX_GLYPH_COUNT = 256
 TILE_SIZE = 128
 PREVIEW_SIZE = (1920, 1080)
 GIF_SIZE = (640, 360)
@@ -521,11 +523,14 @@ def _coverage_ok(strokes: Sequence[tuple]) -> bool:
     )
 
 
-def _build_glyph_specs(seed: int = DEFAULT_SEED) -> tuple[GlyphSpec, ...]:
+def _build_glyph_specs(
+    count: int = GLYPH_COUNT,
+    seed: int = DEFAULT_SEED,
+) -> tuple[GlyphSpec, ...]:
     functions = [fn for fn, weight in _ARCHETYPES for _ in range(weight)]
     specs: list[GlyphSpec] = []
     seen: set[tuple[tuple, ...]] = set()
-    for index in range(GLYPH_COUNT):
+    for index in range(count):
         nonce = 0
         while True:
             rng = random.Random(seed ^ (index * 0x9E3779B1) ^ (nonce * 0x85EBCA6B))
@@ -550,9 +555,20 @@ def _build_glyph_specs(seed: int = DEFAULT_SEED) -> tuple[GlyphSpec, ...]:
     return tuple(specs)
 
 
-GLYPH_SPECS = _build_glyph_specs()
-_SPEC_BY_ID = {spec.id: spec for spec in GLYPH_SPECS}
+GLYPH_CATALOG_SPECS = _build_glyph_specs(MAX_GLYPH_COUNT)
+GLYPH_SPECS = GLYPH_CATALOG_SPECS[:GLYPH_COUNT]
+_SPEC_BY_ID = {spec.id: spec for spec in GLYPH_CATALOG_SPECS}
 _PROMPT_ID_RE = re.compile(r"CYBER_GLYPH_ID=(glyph-[0-9]{3})(?:\b|$)")
+
+
+def get_glyph_specs(count: int = GLYPH_COUNT) -> tuple[GlyphSpec, ...]:
+    """Return the stable catalog prefix for a supported benchmark width."""
+
+    if isinstance(count, bool) or not isinstance(count, int):
+        raise TypeError("count must be an integer")
+    if not 1 <= count <= MAX_GLYPH_COUNT:
+        raise ValueError(f"count must be between 1 and {MAX_GLYPH_COUNT}")
+    return GLYPH_CATALOG_SPECS[:count]
 
 
 def glyph_prompt(spec: GlyphSpec) -> str:
@@ -852,8 +868,7 @@ def _extract_glyph_mask(rgba):
 
 
 def _load_tile_masks(tile_paths: Sequence[str | os.PathLike[str]], size: int):
-    if len(tile_paths) != GLYPH_COUNT:
-        raise ValueError(f"exactly {GLYPH_COUNT} tile paths are required")
+    get_glyph_specs(len(tile_paths))
     Image, _, _, _ = _pillow()
     masks = []
     for path in tile_paths:
@@ -874,6 +889,7 @@ def _render_rain_layer(
     overlay,
     heads,
     masks,
+    specs: Sequence[GlyphSpec],
     width: int,
     height: int,
     cell: int,
@@ -888,8 +904,9 @@ def _render_rain_layer(
     rng = random.Random(seed)
     step = max(6, round(cell * spacing))
     column_count = math.ceil(width / step) + 1
+    glyph_count = len(masks)
     for column in range(column_count):
-        spec = GLYPH_SPECS[(column * 31) % GLYPH_COUNT]
+        spec = specs[(column * 31) % glyph_count]
         trail = max(
             7,
             round(spec.trail_length * 1.6 * height / PREVIEW_SIZE[1]),
@@ -901,13 +918,13 @@ def _render_rain_layer(
         # viewport, its trailing glyphs continue to drain before it wraps.
         head_y = (start + frame_index * speed) % cycle
         x = column * step + rng.randint(-2, 2)
-        base_glyph = rng.randrange(GLYPH_COUNT)
+        base_glyph = rng.randrange(glyph_count)
         for tail_index in range(trail, -1, -1):
             y = head_y - tail_index * cell
             if y < -glyph_size or y >= height:
                 continue
             mask = masks[
-                (base_glyph + tail_index * 7 + frame_index // 2) % GLYPH_COUNT
+                (base_glyph + tail_index * 7 + frame_index // 2) % glyph_count
             ]
             if tail_index == 0:
                 glow = mask.filter(ImageFilter.GaussianBlur(max(1.0, glyph_size / 5)))
@@ -941,6 +958,7 @@ def _render_rain_frame(
     image = Image.new("RGB", (width, height), (0, 2, 1))
     # Two depth layers: a dimmer, smaller, tighter far field behind a bright
     # near field. Overlapping spacing (< 1.0) packs columns like heavy rain.
+    specs = get_glyph_specs(len(tile_paths))
     layer_params = _rain_layer_params(width)
     if masks_by_layer is None:
         masks_by_layer = [
@@ -954,6 +972,7 @@ def _render_rain_frame(
             overlay=overlay,
             heads=heads,
             masks=masks_by_layer[layer_index],
+            specs=specs,
             width=width,
             height=height,
             cell=params["cell"],
@@ -1064,14 +1083,18 @@ def assemble_atlas(
     tile_paths: Sequence[str | os.PathLike[str]],
     destination: str | os.PathLike[str],
 ) -> OutputReceipt:
-    """Assemble a 16x12 contact-sheet atlas of normalized tiles."""
+    """Assemble a 16-column contact-sheet atlas of normalized tiles."""
 
-    if len(tile_paths) != GLYPH_COUNT:
-        raise ValueError(f"exactly {GLYPH_COUNT} tile paths are required")
+    get_glyph_specs(len(tile_paths))
     Image, ImageDraw, _, _ = _pillow()
-    atlas = Image.new("RGB", ATLAS_SIZE, (0, 3, 1))
-    draw = ImageDraw.Draw(atlas)
     columns = ATLAS_GRID[0]
+    rows = math.ceil(len(tile_paths) / columns)
+    atlas = Image.new(
+        "RGB",
+        (columns * TILE_SIZE, rows * TILE_SIZE),
+        (0, 3, 1),
+    )
+    draw = ImageDraw.Draw(atlas)
     for index, path_value in enumerate(tile_paths):
         with Image.open(path_value) as source:
             tile = source.convert("RGBA")
@@ -1084,10 +1107,10 @@ def assemble_atlas(
     return _image_receipt(path)
 
 
-def _html_document(seed: int) -> str:
-    strokes = [[list(stroke) for stroke in spec.strokes] for spec in GLYPH_SPECS]
-    speeds = [spec.speed for spec in GLYPH_SPECS]
-    trails = [spec.trail_length for spec in GLYPH_SPECS]
+def _html_document(seed: int, specs: Sequence[GlyphSpec]) -> str:
+    strokes = [[list(stroke) for stroke in spec.strokes] for spec in specs]
+    speeds = [spec.speed for spec in specs]
+    trails = [spec.trail_length for spec in specs]
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -1166,11 +1189,13 @@ def assemble_html(
     destination: str | os.PathLike[str],
     *,
     seed: int = DEFAULT_SEED,
+    glyph_count: int = GLYPH_COUNT,
 ) -> OutputReceipt:
     """Write a self-contained animated 1920x1080 HTML canvas screensaver."""
 
     path = Path(destination)
-    _atomic_write_bytes(path, _html_document(seed).encode("utf-8"))
+    specs = get_glyph_specs(glyph_count)
+    _atomic_write_bytes(path, _html_document(seed, specs).encode("utf-8"))
     return _text_receipt(path, width=PREVIEW_SIZE[0], height=PREVIEW_SIZE[1])
 
 
@@ -1216,8 +1241,10 @@ __all__ = [
     "DEFAULT_SEED",
     "GIF_FRAMES",
     "GIF_SIZE",
+    "GLYPH_CATALOG_SPECS",
     "GLYPH_COUNT",
     "GLYPH_SPECS",
+    "MAX_GLYPH_COUNT",
     "PREVIEW_SIZE",
     "TILE_SIZE",
     "GlyphSpec",
@@ -1229,6 +1256,7 @@ __all__ = [
     "assemble_html",
     "assemble_preview",
     "build_glyph_screensaver_assets",
+    "get_glyph_specs",
     "glyph_prompt",
     "normalize_tile",
     "render_glyph_tile",

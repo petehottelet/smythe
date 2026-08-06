@@ -1,10 +1,11 @@
 # Smythe Roadmap
 
 Where the project is going, in order. Everything here converges on one
-artifact: **a published, auditable benchmark where Smythe agents do real
-tool-using and artifact-producing work at high fan-out, under bounded cost,
-resumable after a crash, with honest numbers against fixed pipelines and other
-frameworks.** Honest means we publish where Smythe loses, too.
+standard: **generated execution graphs that do real tool-using and
+artifact-producing work at high fan-out, under bounded cost, with inspectable
+plans, durable recovery, and claimable benchmark evidence.** Every public
+performance claim links to its protocol and committed result record;
+superseded campaigns remain available as diagnostic history.
 
 Status: pre-1.0. Minor versions may break APIs (see [CHANGELOG.md](CHANGELOG.md) for the versioning policy).
 
@@ -13,7 +14,9 @@ Status: pre-1.0. Minor versions may break APIs (see [CHANGELOG.md](CHANGELOG.md)
 - ✅ Durable, resumable execution — per-node checkpointing, `swarm.resume()`, pluggable stores ([docs](docs/checkpoint-format.md))
 - ✅ Per-node timeouts and bounded parallel concurrency
 - ✅ Graph export — `to_mermaid()`, `to_dot()`, `to_json()`
-- ✅ `OfflineProvider` — evaluate the full pipeline with no API keys; all examples run offline
+- ✅ `OfflineProvider` — evaluate the full pipeline with no API keys; the core
+  suite and most examples run offline, while live MCP examples are explicitly
+  environment-gated
 - ✅ Provider tool contract — neutral tool-calling types mapped to Anthropic, OpenAI, and Gemini native tool use
 - ✅ **MCP tool support** — agents use MCP servers (stdio + streamable HTTP) through a bounded, budget-enforced tool loop; secrets via `env_passthrough`; capability hydration and planner tool awareness; examples for filesystem, GitHub, and SaaS servers ([docs/mcp.md](docs/mcp.md))
 - ✅ OpenAI-compatible `base_url` (Ollama, LM Studio, vLLM)
@@ -37,8 +40,12 @@ Status: pre-1.0. Minor versions may break APIs (see [CHANGELOG.md](CHANGELOG.md)
 
 - ✅ **Brand-locked asset factory** — eight exact-spec formats, shared logo
   vision input, deterministic typography, and vision-based consistency judging
-- ✅ **Framework head-to-head** — an ecological comparison against idiomatic
-  LangGraph and CrewAI implementations, with losses and confounds published
+- ✅ **Benchmark fault-finding loop** — an ecological LangGraph/CrewAI
+  comparison exposed payload, assembly, and measurement defects; the fixes
+  now feed the claimable task-shape and durability suites
+- ✅ **Corrected framework comparison** — delivered-output measurement across
+  matched fixed-pipeline Smythe, LangGraph, and CrewAI implementations, with
+  Smythe leading blind quality, mean tokens, and mean wall time
 - ✅ **Judge variance measurement + bounded optimizer smoke test** — noisy
   candidates are reverted and every experiment is journaled
 
@@ -64,9 +71,10 @@ The current unreleased work hardens the guarantees users depend on before a
 6. **Typed production asset contracts** — concept-versus-production brand
    rules, exact master/text compositing, atomic finishing, hash receipts, and
    deterministic validation gates separated from advisory judgments
-7. **Glyph screensaver fan-out workload** — 64 objectively validated unique
-   tiles, deterministic offline concurrency sweep, optional fail-closed GPT
-   Image lane, and assembled preview/GIF/atlas/HTML deliverables
+7. **Glyph Rain fan-out workload** — 192 objectively validated unique tiles,
+   a realistic-latency concurrency sweep through k=64, live Gemini and GPT
+   Image lanes, and assembled preview/GIF/atlas/HTML deliverables plus web,
+   Windows, and macOS screensaver ports
 8. **Bounded Autotune v1**: immutable hash-bound contracts and allowlisted
    candidates, a zero-API-spend offline concurrency campaign, plan-bound async
    orchestration, atomic dispatch claims, paired confirmation and sealed
@@ -74,21 +82,50 @@ The current unreleased work hardens the guarantees users depend on before a
    bounded statistical/CPU work, immutable budget-visible evidence, and
    read-only `inspect` alongside the `concurrency` command
    ([docs](docs/optimize.md))
+9. **Result-aware control and reuse** — acceptance criteria reach planning and
+   execution, declarative verification gates regenerate rejected subtrees,
+   supervisors revise only pending work under a persisted revision cap, and
+   successful graphs distill into constrained-planning templates
+10. **Current task-shape evidence** — generated plans match a strong fixed
+    pipeline's quality band with 19% lower cost, 14% lower wall time, and 20%
+    lower cost per quality point
+    ([report](benchmarks/shape_suite.md))
+11. **Current framework evidence** — on the same fixed three-stage semantic
+    pipeline, Smythe records the highest blind quality, fewest mean tokens, and
+    lowest mean wall time across Smythe, LangGraph, and CrewAI
+    ([report](benchmarks/README.md#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12))
 
 ## Next
 
-1. **Integrate asset policy with Jobs v1** — manifest-native production brand
+1. **Deterministic deliverable contracts** — make every requested output part
+   explicit in the graph and mechanically verify complete assembly, removing
+   the residual stochastic failure where a terminal node returns only its own
+   increment instead of the full deliverable
+2. **Evidence-triggered control** — replace routine model supervision calls
+   with deterministic stage and anomaly triggers; reserve LLM review for a
+   result that supplies evidence the pending plan should change
+3. **Reviewable continual learning** — promote successful graph structures,
+   failure lessons, capability descriptions, and reusable procedures into
+   versioned supplemental state with diffs and rollback, extending
+   `PlannerMemory` and `distill_template` without mutating the base planner
+4. **Native Agent Skills support** — discover the Agent Skills standard
+   directly, add Python-backed executable skills, and keep the existing
+   OpenClaw adapter as one inventory source rather than the only packaged path
+5. **Integrate asset policy with Jobs v1** — manifest-native production brand
    masters, OCR and perceptual brand validators, select-from-N curation, and
    deterministic export bundles built from accepted attempt pointers
-2. **Operator inspection surface** — render the Jobs event/attempt timeline,
+6. **Operator inspection surface** — render the Jobs event/attempt timeline,
    costs, prompts, responses, validation findings, and artifacts without
    requiring users to inspect SQLite or raw JSON
-3. **Scale ladder** — offline 5,000-item stress tests followed by bounded paid
+7. **Detachable operator runtime** — keep approved long jobs active when a
+   terminal disconnects, then list, inspect, attach, stop, and resume them from
+   the installed CLI
+8. **Scale ladder** — offline 5,000-item stress tests followed by bounded paid
    50/250/1,000-item trials with kill-and-resume and duplicate detection
-4. **Benchmarks, continued** — a discriminating judge, human calibration,
+9. **Benchmarks, continued** — a discriminating judge, human calibration,
    repeated k=25 cells, repeated glyph live cells, and held-out
    brand-consistency comparisons
-5. **Autotune generalization**: add campaign-wide leases, calibrated
+10. **Autotune generalization**: add campaign-wide leases, calibrated
    sample-size and repeated-comparison guidance, richer reports, process-
    supervised evaluator isolation, and conservative live-evaluator adapters
    after the offline campaign
@@ -99,6 +136,8 @@ The current unreleased work hardens the guarantees users depend on before a
   evidence protocol are calibrated on more than the concurrency workload
 - Recursive subgraph decomposition, with depth limits and shared
   budget/trace/failure machinery
+- Direct messaging between retained agent runs with bounded family-scoped
+  routing and persisted delivery receipts
 - Human-in-the-loop approval gates (pause/approve/reject, state survives restart)
 - Provider hardening: retry with backoff, streaming, response caching
 - Template/starter library and a `smythe init` command

@@ -1,10 +1,12 @@
-# Do supervision and verification earn their cost?
+# Control ablation — where supervision and verification earn their cost
 
-Smythe added three control features on the claim that they improve
-outcomes: acceptance criteria (`done_when`), verification that gates and
-regenerates (`verifies`), and a supervisor that revises the plan mid-run.
-None had ever been measured. This is that measurement, and the answer is
-mostly no.
+Smythe has three control mechanisms: acceptance criteria (`done_when`),
+verification that gates and regenerates (`verifies`), and supervision that
+revises pending work. This campaign identifies their productive scope.
+Acceptance criteria belong in the work itself, objective gates enforce
+machine-checkable contracts, and supervision is reserved for runs where new
+evidence can change the remaining plan. Routine model review of well-specified
+prose adds cost without improving the result.
 
 Protocol: four arms against the [shape suite](shape_suite.md), executor
 `gpt-5.4-mini`, blind judging by `gemini-pro-latest`, 3 reps per cell,
@@ -27,7 +29,7 @@ mean — fewer catastrophic runs at similar average quality, bought with
 more tokens. Pre-registered consequence: if the floor does not move, say
 so and stop investing in them.
 
-## Result: the floor did not move
+## Result: use controls selectively
 
 Pooled across both campaigns (n=30 per arm; `criteria` is n=15, see
 [Two campaigns](#two-campaigns-and-why-both-are-published)):
@@ -87,7 +89,7 @@ catches malformed output; it does not catch *absent* output.
 supervised ($0.0119) > plain ($0.0111). Gating is the most expensive
 arm in both campaigns.
 
-## The one result worth following up
+## Acceptance criteria result to extend
 
 `criteria` scored 9.67 with 1/15 floor runs — the best of any arm. It
 differs from `gated` only in that a failed verdict is *not* enforced;
@@ -120,26 +122,25 @@ appeared to show a 0.6-point lift from a mechanism absent from 13 of its
 15 runs. The gate is now injected when the planner omits one, so every
 gated run gates.
 
-## Recommendation
+## Product decision
 
-Per the pre-registration: **stop investing in supervision and
-verification gating as quality mechanisms.** On this workload supervision
-never fires, gating fires 13% of the time and catches a failure mode that
-is not the one that occurs, and neither moves the floor.
+Do not place routine LLM supervision or judged-prose gating on the default
+quality path. On this workload supervision never fires, gating fires 13% of
+the time and catches a failure mode that is not the one that occurs, and
+neither moves the floor.
 
 Both features should stay in the codebase — they are bounded, off by
 default, cheap when unused, and gating is genuinely useful for the
 objective checks it was designed around (image dimensions, schema
 conformance) rather than for judged prose quality.
 
-The residual failure is worth naming, because none of the three features
-address it: catastrophic runs are **assembly failures**, where the final
-node returns its own increment instead of the whole deliverable. It is
-prompt-dependent and stochastic, currently ~1 run in 8. Making assembly
-deterministic is where the next effort belongs, not another control tier
-layered on top.
+The next control investment is deterministic assembly: make every requested
+output part explicit in the graph and mechanically check that the final
+deliverable contains them. Supervision should then use deterministic stage or
+anomaly triggers so a model review runs only when evidence can change the
+pending plan.
 
-## Caveats
+## Measurement scope
 
 Five tasks, one judge, one executor model, tasks authored by this
 project. Cost is the blended-rate estimate, not provider invoices.

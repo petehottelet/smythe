@@ -9,6 +9,8 @@ import pytest
 from benchmarks.run_glyph_screensaver import (
     DEFAULT_LATENCY_S,
     _parse_concurrencies,
+    _parse_partition,
+    _resolve_output_paths,
     _write_json,
     build_graph,
     run_benchmark,
@@ -37,6 +39,15 @@ def test_build_graph_creates_one_independent_bounded_node_per_glyph():
     assert all(node.metadata["estimated_cost_usd"] == 0.125 for node in graph.nodes)
 
 
+def test_build_graph_supports_256_unique_glyph_nodes():
+    graph = build_graph(glyph_count=256, estimated_cost_per_call_usd=0)
+
+    assert len(graph.nodes) == 256
+    assert graph.nodes[0].id == "glyph-000"
+    assert graph.nodes[-1].id == "glyph-255"
+    assert len({node.id for node in graph.nodes}) == 256
+
+
 def test_parse_concurrencies_is_strict():
     assert _parse_concurrencies("1, 4,8") == (1, 4, 8)
     with pytest.raises(argparse.ArgumentTypeError):
@@ -45,6 +56,41 @@ def test_parse_concurrencies_is_strict():
         _parse_concurrencies("1,1")
     with pytest.raises(argparse.ArgumentTypeError):
         _parse_concurrencies("fast")
+
+
+def test_non_flagship_output_defaults_are_partitioned():
+    out, results, partition = _resolve_output_paths(
+        mode="offline",
+        glyph_count=256,
+        partition="256_offline_realistic",
+        out=None,
+        results=None,
+    )
+
+    assert partition == "256_offline_realistic"
+    assert out == Path(
+        "smythe_artifacts/glyph_screensaver/partitions/256_offline_realistic"
+    )
+    assert results == Path(
+        "benchmarks/results/glyph_screensaver_256_offline_realistic.json"
+    )
+
+    flagship_out, flagship_results, flagship_partition = _resolve_output_paths(
+        mode="offline",
+        glyph_count=192,
+        partition=None,
+        out=None,
+        results=None,
+    )
+    assert flagship_partition is None
+    assert flagship_out == Path("smythe_artifacts/glyph_screensaver/offline")
+    assert flagship_results == Path("benchmarks/results/glyph_screensaver_offline.json")
+
+
+def test_partition_name_rejects_path_traversal():
+    assert _parse_partition("256_offline_realistic") == "256_offline_realistic"
+    with pytest.raises(argparse.ArgumentTypeError):
+        _parse_partition("../offline")
 
 
 def test_offline_run_benchmark_smoke_is_zero_cost_and_objective(tmp_path):

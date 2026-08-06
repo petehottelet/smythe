@@ -1,76 +1,85 @@
 # House style
 
-One consistent visual voice across the README, docs, diagrams, and
-generated graph exports. Understated, warm, serif. If an element
-wouldn't look at home on a well-set title page, it doesn't ship.
+Smythe's visual system is editorial, inscriptional, and strictly monochrome.
+Landing-page assets should feel like a well-set title page: decisive hierarchy,
+precise rules, generous white space, and no decorative interface chrome.
+
+The Glyph Rain screenshot, atlas, and animation are the sole intentional color
+exception. They show the green product artifact itself. Every graph, chart,
+diagram, wordmark, and callout uses black and white only.
 
 ## Palette
 
 | Role | Hex | Use |
 |---|---|---|
-| Ink | `#23221e` | Text, the deliverable node, badge labels |
-| Paper | `#faf8f1` | Default node fill |
-| Parchment | `#f1ecdf` | Secondary node fill (editors, joins) |
-| Champagne tint | `#f5ead0` | Accent fill (adversarial/red-team, running) |
-| Hairline | `#a89f8c` | Borders, edges, arrows |
-| Gold | `#9a7b2d` | The accent: badge values, deliverable border, running stroke |
-| Ivory ink | `#f5efe0` / `#ece7da` | Text on ink-filled surfaces |
+| Ink | `#000000` | Text, rules, arrows, solid data marks, emphasis surfaces |
+| Paper | `#ffffff` | Canvas, open data marks, reversed text |
 
-Status colors (graph exports): done `#eef0e4`/`#5a7742`, failed
-`#f3e0dd`/`#8c3b2e`, skipped `#eceae3`/`#8a8578`, running
-`#f5ead0`/`#9a7b2d`. Muted, same warmth — never traffic-light saturation.
+Do not use gray, color, transparency, gradients, glows, shadows, or tinted
+fills. When a third visual category is required, use a black hatch, dots, a
+double rule, or a dashed outline on white.
 
 ## Type
 
-- **Wordmark**: Trajan-style inscriptional capitals (Cinzel, baked to
-  SVG paths in `assets/wordmark.svg` so it renders identically
-  everywhere — webfonts don't load inside GitHub-proxied images).
-- **Diagrams**: `Georgia, 'Times New Roman', serif` — system serifs
-  that Mermaid can actually use on a viewer's machine.
-- Markdown body text is set by GitHub and can't be styled; don't fight
-  it with HTML hacks.
+- **Wordmark**: inscriptional capitals baked into SVG paths so the mark renders
+  identically without a webfont.
+- **Callout numerals**: `Trajan Pro 3`, `Trajan Pro`, Trajan, Cinzel, Georgia,
+  serif, in that order. Trajan is reserved for the large number; explanatory
+  copy remains quiet and compact.
+- **Chart and diagram titles**: Georgia or Times New Roman.
+- **Labels and annotations**: Avenir Next or Helvetica Neue; monospace only for
+  source records and exact machine values.
+- Markdown body text is set by GitHub and should not be restyled with HTML.
 
-## Diagrams: hand-authored SVG for the showpieces
+## Charts and callouts
 
-The flagship pipeline diagram is a committed SVG
-(`assets/diligence_pipeline.svg`), not a Mermaid block. Mermaid routes
-skip-level edges — where a node depends on both its predecessor and its
-predecessor's predecessor — as long curves that sweep around
-intervening boxes, which reads as noise. Hand-authored SVG gives exact
-orthogonal routing, and it renders identically everywhere without a
-diagram engine.
+- Render charts from committed result records with
+  `python benchmarks/render_readme_charts.py`.
+- Prefer small multiples with direct values over decorative dashboard cards.
+- Encode Smythe as solid black, the primary comparison as white with a black
+  outline, and a third comparison with black hatching on white.
+- Keep scales honest and state whether higher or lower is better.
+- Put the result record and sample size on the asset itself.
+- Use square rules and open space. Avoid rounded panels, pills, gradients,
+  shadows, and glow effects.
+- A callout pairs one Trajan numeral with one exact comparison. It never
+  substitutes for the underlying chart.
 
-Use SVG when the diagram is a landing-page asset whose layout matters.
-Use Mermaid (below) for generated graphs and anything that must track
-code.
+## Diagrams
+
+Use hand-authored SVG for landing-page diagrams whose routing and hierarchy
+matter. Use Mermaid for generated graphs and documentation diagrams that must
+track code.
+
+Differentiate node states without color:
+
+- completed: white fill, black outline;
+- failed or final deliverable: black fill, white text;
+- skipped: white fill, dashed black outline;
+- running: white fill, heavy black outline.
+
+Edges remain solid black hairlines. Use orthogonal routes for showpiece SVGs
+and gentle Mermaid curves for generated graphs.
 
 ## Mermaid
 
-Every diagram carries this init header (kept as `MERMAID_THEME` in
-`smythe/graph.py`; `ExecutionGraph.to_mermaid(theme=True)` emits it):
+Every public diagram carries the same pure black-and-white init header, kept as
+`MERMAID_THEME` in `smythe/graph.py`:
 
 ```text
-%%{init: {"theme":"base","themeVariables":{"fontFamily":"Georgia, 'Times New Roman', serif","fontSize":"14px","primaryColor":"#faf8f1","primaryTextColor":"#23221e","primaryBorderColor":"#a89f8c","lineColor":"#a89f8c"},"flowchart":{"curve":"basis","nodeSpacing":48,"rankSpacing":58}}}%%
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Georgia, 'Times New Roman', serif","fontSize":"14px","primaryColor":"#ffffff","primaryTextColor":"#000000","primaryBorderColor":"#000000","lineColor":"#000000","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","background":"#ffffff","mainBkg":"#ffffff","clusterBkg":"#ffffff","clusterBorder":"#000000"},"flowchart":{"curve":"basis","nodeSpacing":48,"rankSpacing":58}}}%%
 ```
-
-Rules:
-
-- `curve: basis` — gentle curves, never `step` (elbow arrows read as
-  circuit diagrams, and GitHub's renderer draws them awkwardly).
-- Edges and borders stay hairline (`1px`–`1.25px`), colored `#a89f8c`.
-- One emphasis node per diagram at most: ink fill, gold border
-  (`fill:#23221e,stroke:#9a7b2d,color:#f5efe0`) — the deliverable.
-- Node titles `<b>bold</b>`, detail on a second line, five words or
-  fewer per line where possible.
 
 ## Badges
 
-shields.io flat-square, ink label + gold value:
-`?style=flat-square&labelColor=23221e&color=9a7b2d`.
+Use shields.io `flat-square` with the conventional two-tone split: a black
+label field with white type and a white value field with black type:
+`?style=flat-square&labelColor=000000&color=ffffff`. Always override dynamic
+status colors so passing, failing, and unknown states remain monochrome.
 
-## Regenerating the wordmark
+## Verification
 
-`assets/wordmark.svg` is generated from Cinzel (OFL) at weight 560,
-52px, +14 tracking, via fontTools' SVGPathPen — glyph outlines, no
-text elements, dark-mode aware via `prefers-color-scheme`. If the
-wording ever changes, re-bake rather than editing paths by hand.
+After changing graph assets, regenerate them, scan every active SVG and Mermaid
+file for colors outside `#000000` and `#ffffff`, then render the SVGs to pixels
+for visual review. Pattern fills and `none` are allowed; translucent marks are
+not.

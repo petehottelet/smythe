@@ -51,11 +51,26 @@ python benchmarks/run_glyph_screensaver.py --latency-s 5.8 \
 ```
 
 For a quick mechanics smoke test, reduce the graph width. The atlas, preview, GIF, and
-HTML are assembled only for the full 192-glyph suite:
+HTML are assembled for the flagship 192-glyph suite and the extended 256-glyph
+comparison:
 
 ```bash
 python benchmarks/run_glyph_screensaver.py --glyphs 8 --concurrencies 1,4
 ```
+
+### Partitioned 256-glyph comparison
+
+Non-flagship widths automatically use isolated output names. The published
+256-glyph comparison names its partition explicitly so its result record,
+raw tiles, and assembled 16x16 atlas cannot overwrite the 192-glyph flagship:
+
+```bash
+python benchmarks/run_glyph_screensaver.py --glyphs 256 \
+  --partition 256_offline_realistic --latency-s 5.8 \
+  --concurrencies 1,4,8,16,32,64
+```
+
+See the partition [report and comparison](partitions/glyph_256/README.md).
 
 ## Protocol
 
@@ -74,9 +89,10 @@ python benchmarks/run_glyph_screensaver.py --glyphs 8 --concurrencies 1,4
 - Throughput is completed glyphs divided by generation wall time.
 - Speedup is concurrency-1 wall time divided by the candidate wall time.
 - Parallel efficiency is speedup divided by concurrency.
-- The fastest fully valid 192-glyph run supplies the tiles for a 2048x1536 contact-sheet
-  atlas (16x12), a 1920x1080 still preview, a 640x360 looping GIF, and a self-contained
-  1920x1080 HTML canvas screensaver.
+- The fastest fully valid flagship or extended run supplies the tiles for a
+  16-column contact-sheet atlas (16x12 for 192; 16x16 for 256), a 1920x1080
+  still preview, a 640x360 looping GIF, and a self-contained 1920x1080 HTML
+  canvas example.
 
 The JSON evidence record includes protocol and environment snapshots, each run's timing,
 throughput, speedup, efficiency, cost completeness flags, errors, and SHA-256-bound output

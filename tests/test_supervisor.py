@@ -340,8 +340,33 @@ def test_only_terminal_review_gate():
     graph = _graph("first", "second")
     supervisor = LLMSupervisor(EchoProvider())
     # n0 has a pending dependent, so it is mid-stream; n1 is terminal.
+    graph.nodes[0].status = NodeStatus.COMPLETED
     assert supervisor._should_review(graph, graph.nodes[0]) is False
+    graph.nodes[1].status = NodeStatus.COMPLETED
     assert supervisor._should_review(graph, graph.nodes[1]) is True
+
+
+def test_default_review_gate_fires_when_a_fan_in_becomes_ready():
+    left = Node(id="left", label="left", status=NodeStatus.COMPLETED)
+    right = Node(id="right", label="right", status=NodeStatus.PENDING)
+    join = Node(id="join", label="join", depends_on=["left", "right"])
+    graph = ExecutionGraph(topology=[Topology.FORK_JOIN], nodes=[left, right, join])
+    supervisor = LLMSupervisor(EchoProvider())
+
+    assert supervisor._should_review(graph, left) is False
+    right.status = NodeStatus.COMPLETED
+    assert supervisor._should_review(graph, right) is True
+
+
+def test_parallel_terminal_leaves_produce_one_final_review():
+    first = Node(id="first", label="first", status=NodeStatus.COMPLETED)
+    last = Node(id="last", label="last", status=NodeStatus.PENDING)
+    graph = ExecutionGraph(topology=[Topology.FORK_JOIN], nodes=[first, last])
+    supervisor = LLMSupervisor(EchoProvider())
+
+    assert supervisor._should_review(graph, first) is False
+    last.status = NodeStatus.COMPLETED
+    assert supervisor._should_review(graph, last) is True
 
 
 def test_review_after_targets_specific_nodes():

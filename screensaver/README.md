@@ -14,9 +14,9 @@ No font, logo, screenshot, or film frame is reproduced.
 
 | Port | Where | Run it |
 |---|---|---|
-| Web (this directory) | [index.html](index.html) + [glyphs.js](glyphs.js) | open `index.html`, or the hosted demo linked from the main README |
+| Web (this directory) | [index.html](index.html) + [glyphs.js](glyphs.js) | open `index.html` directly or deploy this static directory |
 | Windows 11 (`.scr`) | source [windows/](windows/), binary [dist/SmytheGlyphRain.scr](dist/SmytheGlyphRain.scr) | download the `.scr`, right-click → **Install** |
-| macOS 12+ (`.saver`) | source [macos/](macos/) | build on a Mac with `macos/build_macos.sh`, or grab the artifact from the `screensavers` GitHub Actions workflow |
+| macOS 12+ (`.saver`) | source [macos/](macos/) | download the `GlyphRain-macos-saver` artifact from the [screensavers build](https://github.com/petehottelet/smythe/actions/workflows/screensavers.yml), or build on a Mac with `macos/build_macos.sh` |
 
 All three implement the same simulation: three depth layers of overlapping
 columns, persistence-fade trails, glowing white-green heads, and per-glyph

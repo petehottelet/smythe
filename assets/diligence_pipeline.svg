@@ -1,55 +1,63 @@
 <svg width="680" height="480" viewBox="0 0 680 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Acquisition diligence pipeline: three specialist agents fan into a diligence editor; the draft flows to a red-team agent and directly to the memo agent; the red team's review also feeds the final memo.">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-      <path d="M2 1L8 5L2 9" fill="none" stroke="#9a7b2d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#000000" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter"/>
     </marker>
+    <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse">
+      <rect width="8" height="8" fill="#ffffff"/>
+      <path d="M-2 2L2-2M0 8L8 0M6 10L10 6" fill="none" stroke="#000000" stroke-width="1.5"/>
+    </pattern>
     <style>
-      .t  { font-family: Georgia, 'Times New Roman', serif; font-size: 14px; font-weight: bold; }
-      .s  { font-family: Georgia, 'Times New Roman', serif; font-size: 12px; }
-      .arr { stroke: #9a7b2d; stroke-width: 1.25; fill: none; }
+      .title { font-family: Georgia, 'Times New Roman', serif; font-size: 14px; font-weight: bold; }
+      .detail { font-family: Baskerville, Georgia, 'Times New Roman', serif; font-size: 11px; letter-spacing: .15px; }
+      .arrow { stroke: #000000; stroke-width: 1.25; fill: none; }
+      .node { fill: #ffffff; stroke: #000000; stroke-width: 1.25; }
     </style>
   </defs>
 
+  <rect width="680" height="480" fill="#ffffff"/>
+
   <g>
-    <rect x="40" y="40" width="190" height="56" rx="8" fill="#f7f1e0" stroke="#9a7b2d" stroke-width="1"/>
-    <text class="t" x="135" y="60" text-anchor="middle" dominant-baseline="central" fill="#23221e">FinancialAnalyst</text>
-    <text class="s" x="135" y="79" text-anchor="middle" dominant-baseline="central" fill="#6b551f">Revenue, margins, comps</text>
+    <rect class="node" x="40" y="40" width="190" height="56"/>
+    <text class="title" x="135" y="60" text-anchor="middle" dominant-baseline="central" fill="#000000">FinancialAnalyst</text>
+    <text class="detail" x="135" y="79" text-anchor="middle" dominant-baseline="central" fill="#000000">Revenue, margins, comps</text>
   </g>
   <g>
-    <rect x="245" y="40" width="190" height="56" rx="8" fill="#f7f1e0" stroke="#9a7b2d" stroke-width="1"/>
-    <text class="t" x="340" y="60" text-anchor="middle" dominant-baseline="central" fill="#23221e">TechDiligenceAgent</text>
-    <text class="s" x="340" y="79" text-anchor="middle" dominant-baseline="central" fill="#6b551f">IP, tech debt, key risk</text>
+    <rect class="node" x="245" y="40" width="190" height="56"/>
+    <text class="title" x="340" y="60" text-anchor="middle" dominant-baseline="central" fill="#000000">TechDiligenceAgent</text>
+    <text class="detail" x="340" y="79" text-anchor="middle" dominant-baseline="central" fill="#000000">IP, tech debt, key risk</text>
   </g>
   <g>
-    <rect x="450" y="40" width="190" height="56" rx="8" fill="#f7f1e0" stroke="#9a7b2d" stroke-width="1"/>
-    <text class="t" x="545" y="60" text-anchor="middle" dominant-baseline="central" fill="#23221e">RegulatoryAgent</text>
-    <text class="s" x="545" y="79" text-anchor="middle" dominant-baseline="central" fill="#6b551f">SEC filings, antitrust</text>
+    <rect class="node" x="450" y="40" width="190" height="56"/>
+    <text class="title" x="545" y="60" text-anchor="middle" dominant-baseline="central" fill="#000000">RegulatoryAgent</text>
+    <text class="detail" x="545" y="79" text-anchor="middle" dominant-baseline="central" fill="#000000">SEC filings, antitrust</text>
   </g>
 
-  <path class="arr" d="M135 96 V133 H290 V164" marker-end="url(#arrow)"/>
-  <path class="arr" d="M340 96 V164" marker-end="url(#arrow)"/>
-  <path class="arr" d="M545 96 V133 H390 V164" marker-end="url(#arrow)"/>
+  <path class="arrow" d="M135 96V133H290V164" marker-end="url(#arrow)"/>
+  <path class="arrow" d="M340 96V164" marker-end="url(#arrow)"/>
+  <path class="arrow" d="M545 96V133H390V164" marker-end="url(#arrow)"/>
 
   <g>
-    <rect x="240" y="170" width="200" height="56" rx="8" fill="#eee1bd" stroke="#9a7b2d" stroke-width="1"/>
-    <text class="t" x="340" y="190" text-anchor="middle" dominant-baseline="central" fill="#23221e">DiligenceEditor</text>
-    <text class="s" x="340" y="209" text-anchor="middle" dominant-baseline="central" fill="#6b551f">Merge findings into draft</text>
+    <rect x="240" y="170" width="200" height="56" fill="#000000" stroke="#000000" stroke-width="1.25"/>
+    <text class="title" x="340" y="190" text-anchor="middle" dominant-baseline="central" fill="#ffffff">DiligenceEditor</text>
+    <text class="detail" x="340" y="209" text-anchor="middle" dominant-baseline="central" fill="#ffffff">Merge findings into draft</text>
   </g>
 
-  <path class="arr" d="M400 226 V248 H490 V264" marker-end="url(#arrow)"/>
-  <path class="arr" d="M280 226 V374" marker-end="url(#arrow)"/>
+  <path class="arrow" d="M400 226V248H490V264" marker-end="url(#arrow)"/>
+  <path class="arrow" d="M280 226V374" marker-end="url(#arrow)"/>
 
   <g>
-    <rect x="390" y="270" width="200" height="56" rx="8" fill="#dfca8f" stroke="#9a7b2d" stroke-width="1.25"/>
-    <text class="t" x="490" y="290" text-anchor="middle" dominant-baseline="central" fill="#23221e">RedTeamAgent</text>
-    <text class="s" x="490" y="309" text-anchor="middle" dominant-baseline="central" fill="#5c4a1e">Adversarial draft review</text>
+    <rect x="390" y="270" width="200" height="56" fill="url(#hatch)" stroke="#000000" stroke-width="1.5"/>
+    <rect x="395" y="275" width="190" height="46" fill="#ffffff" stroke="#000000"/>
+    <text class="title" x="490" y="290" text-anchor="middle" dominant-baseline="central" fill="#000000">RedTeamAgent</text>
+    <text class="detail" x="490" y="309" text-anchor="middle" dominant-baseline="central" fill="#000000">Adversarial draft review</text>
   </g>
 
-  <path class="arr" d="M490 326 V352 H400 V374" marker-end="url(#arrow)"/>
+  <path class="arrow" d="M490 326V352H400V374" marker-end="url(#arrow)"/>
 
   <g>
-    <rect x="220" y="380" width="240" height="56" rx="8" fill="#23221e" stroke="#9a7b2d" stroke-width="1.25"/>
-    <text class="t" x="340" y="400" text-anchor="middle" dominant-baseline="central" fill="#f8f6f0">MemoAgent</text>
-    <text class="s" x="340" y="419" text-anchor="middle" dominant-baseline="central" fill="#d9bc74">Summary, risks, recommendation</text>
+    <rect x="220" y="380" width="240" height="56" fill="#000000" stroke="#000000" stroke-width="1.5"/>
+    <text class="title" x="340" y="400" text-anchor="middle" dominant-baseline="central" fill="#ffffff">MemoAgent</text>
+    <text class="detail" x="340" y="419" text-anchor="middle" dominant-baseline="central" fill="#ffffff">Summary, risks, recommendation</text>
   </g>
 </svg>

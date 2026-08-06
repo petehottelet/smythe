@@ -1,4 +1,4 @@
-"""Benchmark a 192-node glyph fan-out and assemble a digital-rain showcase.
+"""Benchmark a wide glyph fan-out and assemble a digital-rain showcase.
 
 Offline (default, zero cost):
     python benchmarks/run_glyph_screensaver.py
@@ -15,6 +15,7 @@ import asyncio
 import json
 import math
 import os
+import re
 import sys
 import tempfile
 import time
@@ -28,6 +29,7 @@ from benchmarks.artifact_records import environment_snapshot, portable_path  # n
 from benchmarks.glyph_screensaver_assets import (  # noqa: E402
     GLYPH_COUNT,
     GLYPH_SPECS,
+    MAX_GLYPH_COUNT,
     TILE_SIZE,
     ProceduralGlyphProvider,
     assemble_animation,
@@ -35,6 +37,7 @@ from benchmarks.glyph_screensaver_assets import (  # noqa: E402
     assemble_html,
     assemble_preview,
     glyph_prompt,
+    get_glyph_specs,
     normalize_tile,
     render_glyph_tile,
 )
@@ -62,12 +65,13 @@ DEFAULT_CONCURRENCIES = (1, 4, 8, 16)
 # benchmark measures bounded async fan-out instead of mostly local PNG
 # journaling. Use --latency-s 0 for a separate fixed-overhead smoke profile.
 DEFAULT_LATENCY_S = 0.25
+ASSEMBLY_GLYPH_COUNTS = (GLYPH_COUNT, MAX_GLYPH_COUNT)
 IMAGE_GENERATION_GUIDE = "https://developers.openai.com/api/docs/guides/image-generation"
 
 
 def build_graph(*, glyph_count: int, estimated_cost_per_call_usd: float) -> ExecutionGraph:
     """Build one independent Smythe node per fictional glyph."""
-    specs = GLYPH_SPECS[:glyph_count]
+    specs = get_glyph_specs(glyph_count)
     nodes = [
         Node(
             id=spec.id,
@@ -266,7 +270,7 @@ def _assemble(tile_paths: Sequence[str], output_dir: Path) -> dict[str, Any]:
     atlas = assemble_atlas(tile_paths, output_dir / "glyph-atlas.png")
     preview = assemble_preview(tile_paths, output_dir / "glyph-rain-preview.png")
     animation = assemble_animation(tile_paths, output_dir / "glyph-rain-loop.gif")
-    html = assemble_html(output_dir / "glyph-rain.html")
+    html = assemble_html(output_dir / "glyph-rain.html", glyph_count=len(tile_paths))
     return {
         "wall_s": round(time.perf_counter() - started, 6),
         "atlas": _receipt_dict(atlas),
@@ -287,6 +291,7 @@ async def run_benchmark(
     max_cost_per_call_usd: float | None,
     max_budget_usd: float | None,
     live_provider: str = "openai",
+    partition: str | None = None,
 ) -> dict[str, Any]:
     """Execute the configured benchmark and return its portable evidence record."""
     mode = "live" if live else "offline"
@@ -356,7 +361,7 @@ async def run_benchmark(
     successful = [run for run in runs if run["status"] == "passed"]
     fastest = min(successful, key=lambda run: run["generation_wall_s"], default=None)
     assembly = None
-    if fastest is not None and glyph_count == GLYPH_COUNT:
+    if fastest is not None and glyph_count in ASSEMBLY_GLYPH_COUNTS:
         assembly = _assemble(
             paths_by_concurrency[fastest["concurrency"]], out / "assembled"
         )
@@ -367,6 +372,7 @@ async def run_benchmark(
     return {
         "benchmark": "glyph-screensaver-fanout",
         "record_version": 1,
+        "partition": partition,
         "mode": mode,
         "status": "passed" if len(successful) == len(runs) else "failed",
         "protocol": {
@@ -376,7 +382,10 @@ async def run_benchmark(
             "concurrencies": list(concurrencies),
             "offline_latency_s": latency_s if not live else None,
             "normalization": f"PNG {TILE_SIZE}x{TILE_SIZE}",
-            "assembly_requires_glyphs": GLYPH_COUNT,
+            "assembly_requires_glyphs": (
+                glyph_count if glyph_count in ASSEMBLY_GLYPH_COUNTS else None
+            ),
+            "assembly_supported_glyphs": list(ASSEMBLY_GLYPH_COUNTS),
         },
         "provider": {
             "name": (
@@ -427,6 +436,42 @@ def _parse_concurrencies(value: str) -> tuple[int, ...]:
     return values
 
 
+def _parse_partition(value: str) -> str:
+    normalized = value.strip()
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", normalized):
+        raise argparse.ArgumentTypeError(
+            "partition must use 1-64 lowercase letters, numbers, underscores, or hyphens"
+        )
+    return normalized
+
+
+def _resolve_output_paths(
+    *,
+    mode: str,
+    glyph_count: int,
+    partition: str | None,
+    out: str | None,
+    results: str | None,
+) -> tuple[Path, Path, str | None]:
+    """Resolve isolated defaults while preserving the flagship paths."""
+
+    resolved_partition = partition
+    if resolved_partition is None and glyph_count != GLYPH_COUNT:
+        resolved_partition = f"glyphs_{glyph_count}_{mode}"
+    if resolved_partition is None:
+        default_out = f"smythe_artifacts/glyph_screensaver/{mode}"
+        default_results = f"benchmarks/results/glyph_screensaver_{mode}.json"
+    else:
+        default_out = (
+            "smythe_artifacts/glyph_screensaver/partitions/"
+            f"{resolved_partition}"
+        )
+        default_results = (
+            f"benchmarks/results/glyph_screensaver_{resolved_partition}.json"
+        )
+    return Path(out or default_out), Path(results or default_results), resolved_partition
+
+
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary: Path | None = None
@@ -457,10 +502,22 @@ def main() -> None:
     parser.add_argument("--out", default=None, help="artifact output directory")
     parser.add_argument("--results", default=None, help="JSON evidence-record path")
     parser.add_argument(
+        "--partition",
+        type=_parse_partition,
+        default=None,
+        help=(
+            "isolated result/artifact namespace; automatically enabled for "
+            "non-flagship glyph counts"
+        ),
+    )
+    parser.add_argument(
         "--glyphs",
         type=int,
         default=GLYPH_COUNT,
-        help=f"number of glyph nodes (1-{GLYPH_COUNT}); assembly requires the default {GLYPH_COUNT}",
+        help=(
+            f"number of glyph nodes (1-{MAX_GLYPH_COUNT}); assembled outputs "
+            f"are produced for {GLYPH_COUNT} and {MAX_GLYPH_COUNT}"
+        ),
     )
     parser.add_argument(
         "--concurrencies",
@@ -492,8 +549,8 @@ def main() -> None:
     parser.add_argument("--max-budget-usd", type=float, default=None)
     args = parser.parse_args()
 
-    if not 1 <= args.glyphs <= GLYPH_COUNT:
-        parser.error(f"--glyphs must be between 1 and {GLYPH_COUNT}")
+    if not 1 <= args.glyphs <= MAX_GLYPH_COUNT:
+        parser.error(f"--glyphs must be between 1 and {MAX_GLYPH_COUNT}")
     if args.concurrency < 1:
         parser.error("--concurrency must be positive")
     if args.latency_s < 0:
@@ -506,9 +563,12 @@ def main() -> None:
         parser.error("paid budget flags are accepted only with --live")
 
     mode = "live" if args.live else "offline"
-    out = Path(args.out or f"smythe_artifacts/glyph_screensaver/{mode}")
-    results = Path(
-        args.results or f"benchmarks/results/glyph_screensaver_{mode}.json"
+    out, results, partition = _resolve_output_paths(
+        mode=mode,
+        glyph_count=args.glyphs,
+        partition=args.partition,
+        out=args.out,
+        results=args.results,
     )
     concurrencies = (args.concurrency,) if args.live else args.concurrencies
     model = args.model or LIVE_PROVIDER_DEFAULTS[args.live_provider]["model"]
@@ -524,6 +584,7 @@ def main() -> None:
                 live_provider=args.live_provider,
                 max_cost_per_call_usd=args.max_cost_per_call_usd,
                 max_budget_usd=args.max_budget_usd,
+                partition=partition,
             )
         )
     except ValueError as exc:

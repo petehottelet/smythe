@@ -36,7 +36,8 @@ class Synthesizer:
     """Combines completed node results into a coherent final output.
 
     Strategies:
-    - CONCATENATE: join results with newlines (default, zero cost).
+    - DELIVERABLE: return completed terminal outputs (default, zero cost).
+    - CONCATENATE: join every completed result with newlines (zero cost).
     - LLM_MERGE: send all results to an LLM for intelligent merging.
     - STRUCTURED: parse each result as JSON and shallow-merge.
     """
