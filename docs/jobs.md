@@ -328,7 +328,7 @@ with SQLiteRunStore("jobs.sqlite3") as store:
 ## Flagship fan-out workload
 
 The related [glyph screensaver benchmark](../benchmarks/glyph_screensaver_benchmark.md)
-uses a 64-node `BROADCAST_REDUCE` graph to generate 64 original cyber-glyph
+uses a 192-node `BROADCAST_REDUCE` graph to generate 192 original cyber-glyph
 tiles, validate dimensions and uniqueness, and assemble a 1920x1080 still,
 animated GIF, contact-sheet atlas, and standalone animated HTML canvas. Its
 offline lane is deterministic and free; its optional GPT Image lane requires

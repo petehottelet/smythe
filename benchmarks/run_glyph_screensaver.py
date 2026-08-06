@@ -1,11 +1,11 @@
-"""Benchmark a 64-node glyph fan-out and assemble a digital-rain showcase.
+"""Benchmark a 192-node glyph fan-out and assemble a digital-rain showcase.
 
 Offline (default, zero cost):
     python benchmarks/run_glyph_screensaver.py
 
 Explicitly budgeted GPT Image run:
     python benchmarks/run_glyph_screensaver.py --live --concurrency 8 \
-      --max-cost-per-call-usd 0.01 --max-budget-usd 0.64
+      --max-cost-per-call-usd 0.01 --max-budget-usd 1.92
 """
 
 from __future__ import annotations
@@ -38,7 +38,8 @@ from benchmarks.glyph_screensaver_assets import (  # noqa: E402
     normalize_tile,
     render_glyph_tile,
 )
-from smythe import OpenAIImageProvider, Swarm  # noqa: E402
+from smythe import Swarm  # noqa: E402
+from smythe.provider import GeminiProvider, OpenAIImageProvider  # noqa: E402
 from smythe.graph import (  # noqa: E402
     ExecutionGraph,
     FailurePolicy,
@@ -47,7 +48,15 @@ from smythe.graph import (  # noqa: E402
     Topology,
 )
 
-DEFAULT_MODEL = "gpt-image-2"
+LIVE_PROVIDER_DEFAULTS = {
+    "openai": {"model": "gpt-image-2", "env": "OPENAI_API_KEY"},
+    "gemini": {"model": "gemini-2.5-flash-image", "env": "GOOGLE_API_KEY"},
+}
+# Recorded per-image estimate for the Gemini lane, mirroring the asset
+# suite's convention. The explicit --max-cost-per-call-usd ceiling, not this
+# estimate, is what budget enforcement reserves; verify current pricing
+# before any paid run.
+GEMINI_COST_PER_IMAGE_USD = 0.039
 DEFAULT_CONCURRENCIES = (1, 4, 8, 16)
 # A quarter-second is short for an image API but large enough that this
 # benchmark measures bounded async fan-out instead of mostly local PNG
@@ -149,6 +158,22 @@ def _validate_and_normalize(
     return receipts, tile_paths, validation
 
 
+def _live_provider(name: str, max_cost_per_call_usd: float):
+    if name == "gemini":
+        return GeminiProvider(
+            cost_per_image_usd=GEMINI_COST_PER_IMAGE_USD,
+            max_cost_per_call_usd=max_cost_per_call_usd,
+            image_config={"aspect_ratio": "1:1"},
+        )
+    return OpenAIImageProvider(
+        size="1024x1024",
+        quality="low",
+        output_format="png",
+        n=1,
+        max_cost_per_call_usd=max_cost_per_call_usd,
+    )
+
+
 async def _run_once(
     *,
     mode: str,
@@ -157,19 +182,14 @@ async def _run_once(
     concurrency: int,
     latency_s: float,
     model: str,
+    live_provider: str,
     max_cost_per_call_usd: float,
     max_budget_usd: float,
 ) -> tuple[dict[str, Any], list[str]]:
     provider = (
         ProceduralGlyphProvider(latency_s=latency_s, tile_size=TILE_SIZE)
         if mode == "offline"
-        else OpenAIImageProvider(
-            size="1024x1024",
-            quality="low",
-            output_format="png",
-            n=1,
-            max_cost_per_call_usd=max_cost_per_call_usd,
-        )
+        else _live_provider(live_provider, max_cost_per_call_usd)
     )
     graph = build_graph(
         glyph_count=glyph_count,
@@ -266,12 +286,19 @@ async def run_benchmark(
     model: str,
     max_cost_per_call_usd: float | None,
     max_budget_usd: float | None,
+    live_provider: str = "openai",
 ) -> dict[str, Any]:
     """Execute the configured benchmark and return its portable evidence record."""
     mode = "live" if live else "offline"
+    if live_provider not in LIVE_PROVIDER_DEFAULTS:
+        raise ValueError(f"unknown live provider {live_provider!r}")
     if live:
-        if not os.environ.get("OPENAI_API_KEY"):
-            raise ValueError("--live requires OPENAI_API_KEY; no offline fallback is allowed")
+        env_name = LIVE_PROVIDER_DEFAULTS[live_provider]["env"]
+        if not os.environ.get(env_name):
+            raise ValueError(
+                f"--live with --live-provider {live_provider} requires "
+                f"{env_name}; no offline fallback is allowed"
+            )
         if (
             max_cost_per_call_usd is None
             or not math.isfinite(max_cost_per_call_usd)
@@ -309,6 +336,7 @@ async def run_benchmark(
             concurrency=concurrency,
             latency_s=latency_s,
             model=model,
+            live_provider=live_provider,
             max_cost_per_call_usd=max_cost_per_call_usd,
             max_budget_usd=max_budget_usd,
         )
@@ -351,15 +379,34 @@ async def run_benchmark(
             "assembly_requires_glyphs": GLYPH_COUNT,
         },
         "provider": {
-            "name": "OpenAIImageProvider" if live else "ProceduralGlyphProvider",
+            "name": (
+                ("GeminiProvider" if live_provider == "gemini" else "OpenAIImageProvider")
+                if live
+                else "ProceduralGlyphProvider"
+            ),
             "model": model if live else "procedural-glyph-v1",
-            "size": "1024x1024" if live else f"{TILE_SIZE}x{TILE_SIZE}",
-            "quality": "low" if live else "deterministic-procedural",
+            "size": (
+                ("1024x1024 (1:1 aspect config)" if live_provider == "gemini" else "1024x1024")
+                if live
+                else f"{TILE_SIZE}x{TILE_SIZE}"
+            ),
+            "quality": (
+                ("default" if live_provider == "gemini" else "low")
+                if live
+                else "deterministic-procedural"
+            ),
+            "cost_per_image_usd_estimate": (
+                GEMINI_COST_PER_IMAGE_USD if live and live_provider == "gemini" else None
+            ),
             "max_cost_per_call_usd": max_cost_per_call_usd,
             "max_budget_usd": max_budget_usd,
-            "official_guide": IMAGE_GENERATION_GUIDE if live else None,
+            "official_guide": (
+                IMAGE_GENERATION_GUIDE if live and live_provider == "openai" else None
+            ),
         },
-        "environment": environment_snapshot("smythe", "pillow", "openai"),
+        "environment": environment_snapshot(
+            "smythe", "pillow", "openai", "google-genai"
+        ),
         "runs": runs,
         "fastest_concurrency": fastest["concurrency"] if fastest else None,
         "assembly": assembly,
@@ -413,7 +460,7 @@ def main() -> None:
         "--glyphs",
         type=int,
         default=GLYPH_COUNT,
-        help="number of glyph nodes (1-64); assembly requires the default 64",
+        help=f"number of glyph nodes (1-{GLYPH_COUNT}); assembly requires the default {GLYPH_COUNT}",
     )
     parser.add_argument(
         "--concurrencies",
@@ -430,7 +477,17 @@ def main() -> None:
         default=DEFAULT_LATENCY_S,
         help="simulated per-call latency for the offline provider",
     )
-    parser.add_argument("--model", default=DEFAULT_MODEL, help="GPT Image model for --live")
+    parser.add_argument(
+        "--live-provider",
+        choices=sorted(LIVE_PROVIDER_DEFAULTS),
+        default="openai",
+        help="image provider for --live (default: openai)",
+    )
+    parser.add_argument(
+        "--model",
+        default=None,
+        help="image model for --live (default: the provider's current default)",
+    )
     parser.add_argument("--max-cost-per-call-usd", type=float, default=None)
     parser.add_argument("--max-budget-usd", type=float, default=None)
     args = parser.parse_args()
@@ -454,6 +511,7 @@ def main() -> None:
         args.results or f"benchmarks/results/glyph_screensaver_{mode}.json"
     )
     concurrencies = (args.concurrency,) if args.live else args.concurrencies
+    model = args.model or LIVE_PROVIDER_DEFAULTS[args.live_provider]["model"]
     try:
         payload = asyncio.run(
             run_benchmark(
@@ -462,7 +520,8 @@ def main() -> None:
                 glyph_count=args.glyphs,
                 concurrencies=concurrencies,
                 latency_s=args.latency_s,
-                model=args.model,
+                model=model,
+                live_provider=args.live_provider,
                 max_cost_per_call_usd=args.max_cost_per_call_usd,
                 max_budget_usd=args.max_budget_usd,
             )

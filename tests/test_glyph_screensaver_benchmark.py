@@ -25,10 +25,10 @@ def test_build_graph_creates_one_independent_bounded_node_per_glyph():
 
     assert graph.topology == [Topology.BROADCAST_REDUCE]
     assert [node.id for node in graph.nodes] == [
-        "glyph-00",
-        "glyph-01",
-        "glyph-02",
-        "glyph-03",
+        "glyph-000",
+        "glyph-001",
+        "glyph-002",
+        "glyph-003",
     ]
     assert all(not node.depends_on for node in graph.nodes)
     assert all("CYBER_GLYPH_ID=" in node.label for node in graph.nodes)
