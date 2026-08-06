@@ -22,5 +22,5 @@ if not exist "%HERE%..\dist" mkdir "%HERE%..\dist"
 if errorlevel 1 exit /b 1
 echo Built %HERE%..\dist\SmytheGlyphRain.scr
 echo Install: right-click the .scr and choose "Install", or copy to a folder
-echo and select it under Settings ^> Personalization ^> Lock screen ^> Screen saver.
+echo and select it under Settings ^> Personalization ^> Lock screen ^> Screensaver.
 endlocal

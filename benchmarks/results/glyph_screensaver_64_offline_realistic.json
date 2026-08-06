@@ -1,0 +1,4067 @@
+{
+  "benchmark": "glyph-screensaver-fanout",
+  "record_version": 1,
+  "partition": "64_offline_realistic",
+  "mode": "offline",
+  "status": "passed",
+  "protocol": {
+    "graph_nodes": 64,
+    "topology": "broadcast_reduce",
+    "one_provider_call_per_node": true,
+    "concurrencies": [
+      1,
+      4,
+      8,
+      16,
+      32,
+      64
+    ],
+    "offline_latency_s": 5.8,
+    "normalization": "PNG 128x128",
+    "assembly_requires_glyphs": null,
+    "assembly_supported_glyphs": [
+      192,
+      256
+    ]
+  },
+  "provider": {
+    "name": "ProceduralGlyphProvider",
+    "model": "procedural-glyph-v1",
+    "size": "128x128",
+    "quality": "deterministic-procedural",
+    "cost_per_image_usd_estimate": null,
+    "max_cost_per_call_usd": 0.0,
+    "max_budget_usd": 0.0,
+    "official_guide": null
+  },
+  "environment": {
+    "python": "3.11.7",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "packages": {
+      "smythe": "0.6.0",
+      "pillow": "10.4.0",
+      "openai": null,
+      "google-genai": null
+    }
+  },
+  "runs": [
+    {
+      "concurrency": 1,
+      "status": "passed",
+      "execution_id": "c5bc034f3347474b964420fa9c672f8b",
+      "generation_wall_s": 377.89698,
+      "validation_wall_s": 5.505368,
+      "end_to_end_wall_s": 383.402349,
+      "completed_nodes": 64,
+      "throughput_glyphs_per_s": 0.1694,
+      "cost_usd": 0.0,
+      "cost_is_complete": true,
+      "cost_contains_estimates": false,
+      "validation": {
+        "passed": true,
+        "expected_tiles": 64,
+        "valid_png_tiles": 64,
+        "tile_size": [
+          128,
+          128
+        ],
+        "unique_tile_hashes": 64,
+        "errors": []
+      },
+      "tile_receipts": [
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-000.png",
+          "sha256": "b838edcdcc0a842b06857d62940368c1c4fc1fea03ef648ee20c3651340a6cdb",
+          "byte_size": 8202,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-000"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-001.png",
+          "sha256": "6905d8e97b47b063408c7f5b7282d2222fababacf499d4827cacccd1353eea46",
+          "byte_size": 6780,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-001"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-002.png",
+          "sha256": "a90c184fec031ae3ba6cff40469a08cd1d09282017cf58e331b25ba6a47dbc55",
+          "byte_size": 7537,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-002"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-003.png",
+          "sha256": "d53f36301cdfc3bdace4abd564e6c826938f50b70d2c0dce2dc5aed93d5db462",
+          "byte_size": 7663,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-003"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-004.png",
+          "sha256": "ffc006a16f856e67bd08bb4069f7fd5f815899ef07af3b37efbe2c5689f41b22",
+          "byte_size": 6218,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-004"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-005.png",
+          "sha256": "191d96fce14a29542b15b3dd0beb29887310f6f266c13947ac89da727bcafb1d",
+          "byte_size": 6715,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-005"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-006.png",
+          "sha256": "86650547160e25300ed03fd888b041cca80e71d6ab249019ea015be4f4e56a62",
+          "byte_size": 8147,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-006"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-007.png",
+          "sha256": "e7b1da6047fcee67ad7440edd20f614608155f665787d8bf3678d1772d4808ee",
+          "byte_size": 7128,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-007"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-008.png",
+          "sha256": "37e1daec37515668ccbf855ba980805a0c0e6b96ebfe8a67c5034a12e5d5965b",
+          "byte_size": 7627,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-008"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-009.png",
+          "sha256": "661c3e0d28eef79970f78312ae5cdc77922a39ab4f8f6adf5402a649c4feae4d",
+          "byte_size": 6114,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-009"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-010.png",
+          "sha256": "1e27e4139f64a7fe6ea4331e84b0712f25445a22d3930756c171d8cf49787659",
+          "byte_size": 7077,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-010"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-011.png",
+          "sha256": "6ef0674648a7f39ae8128d0cfa8481fa173ca5e79b4f9f04d2a67384925409ed",
+          "byte_size": 6032,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-011"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-012.png",
+          "sha256": "2a6da5de4637fee6feb1d1bd549c3b78e40903f82a331aea8c1fe0239dd141a7",
+          "byte_size": 8330,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-012"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-013.png",
+          "sha256": "ac7ef5476b9e069873a7c9ade05c103f26f59120beb544dacb49870d0dba4b6d",
+          "byte_size": 6957,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-013"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-014.png",
+          "sha256": "8c0d6979ebcd66b413be4f8b902a3662c89ce83d86a16f8f757cec113384c9ce",
+          "byte_size": 7300,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-014"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-015.png",
+          "sha256": "ac580a37c32949c2f29473c6a87e89e0cea5e1ee203ed23765b07bb94202bc51",
+          "byte_size": 7689,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-015"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-016.png",
+          "sha256": "24df3f19d01bfbb401c02aada9eb00b0b77d68649ef9b1606751e3cb1c997ee4",
+          "byte_size": 8200,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-016"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-017.png",
+          "sha256": "58ab2f0083ba7e79b9f061abdbe7f7ee518a0fd5c8a1c6247c5d66aaf979756d",
+          "byte_size": 6930,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-017"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-018.png",
+          "sha256": "d03c51fd9d97cecaffef6eb8936b982b98bc058099a6cc185dab875389c11b66",
+          "byte_size": 7786,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-018"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-019.png",
+          "sha256": "d32036c903dea684f95efe2572b5dc3085e4efea5a5dcccb833033d949b5b776",
+          "byte_size": 7657,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-019"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-020.png",
+          "sha256": "9e5b81c326c68ceb57865cbe8f39eb0c670145f877e6f104c03434989d25ad28",
+          "byte_size": 7604,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-020"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-021.png",
+          "sha256": "e5fc283b11e9fac8bfd3427231554df17d93229a42d2cff844e2ae9f79fa68a6",
+          "byte_size": 6956,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-021"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-022.png",
+          "sha256": "781e53cae41f9e112293c372dc157329c81a16b71de9031a0fe64711a6be36a0",
+          "byte_size": 7208,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-022"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-023.png",
+          "sha256": "3b9e005010d53ed3ba98edd3da56a7c5f6bbc12210d639563f69f43087a58c30",
+          "byte_size": 8422,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-023"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-024.png",
+          "sha256": "dcbf0adddb2e6f5dd893454056d965d8ed106a3dca5910a68cfcbfa45efd2d40",
+          "byte_size": 7751,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-024"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-025.png",
+          "sha256": "5ca8791d85c8ccf6ac1276e4ae34eab379815c2a5c5d0a520104cf76344043ee",
+          "byte_size": 7250,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-025"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-026.png",
+          "sha256": "3fe63787378f20cbc510e8af605e1c4d9aa308ec7a68c6fea8e11129ee9ff8d5",
+          "byte_size": 6983,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-026"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-027.png",
+          "sha256": "c4ed94b39772251bc7acae572c2c89ddefef494c0c4ea11c7718fd4de995c317",
+          "byte_size": 8111,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-027"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-028.png",
+          "sha256": "528ddf773d03da29bb16c923276e83aad453fb19f541c17dc615fbba2a5ad124",
+          "byte_size": 6813,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-028"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-029.png",
+          "sha256": "b3edf58e1b830723c90f1b0438f317557141b3b9e9e423734e3b79c1865f3857",
+          "byte_size": 6892,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-029"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-030.png",
+          "sha256": "0c26d1f4d8c0c3dbbc57fe5584636741353c7a080cc9fcdeb41445a2e0c7575a",
+          "byte_size": 8814,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-030"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-031.png",
+          "sha256": "d728f3d7aee1b23213da51d33df61e7f98cf11926f843e8aded5318274aada83",
+          "byte_size": 6872,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-031"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-032.png",
+          "sha256": "cb442cdbf1c13dc9a203adcce98e4e29baf4fd23078243e40032c6346abd6ecc",
+          "byte_size": 6920,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-032"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-033.png",
+          "sha256": "b7a2624e8e5fdbf74049676920e601d0b7e62d9182af83ad0d774b13d46c191a",
+          "byte_size": 7107,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-033"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-034.png",
+          "sha256": "2d8ea7196c95772b81cd3c74ae0b219bc962ceb96ce1ef8a404ca624aab59211",
+          "byte_size": 7599,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-034"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-035.png",
+          "sha256": "e43f91c321fb1331a4a89d7b4221a4ce341e0edc61bc2f586155f2adbaf74d93",
+          "byte_size": 7392,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-035"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-036.png",
+          "sha256": "5bf2667dcf333aea574d1126ab06496e74188542895378a5d22e4a3f35575978",
+          "byte_size": 6965,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-036"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-037.png",
+          "sha256": "5e4f24def58d9d9df28c51a16d4d09c86f57aa8817185c389f1b82c08fb8c629",
+          "byte_size": 6564,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-037"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-038.png",
+          "sha256": "74b5d69d70c853eb2f1dc536b8550c43fa9bd17f268442ce160b9ed11c8e9690",
+          "byte_size": 7610,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-038"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-039.png",
+          "sha256": "84c9ab1d35a50b01bb900ef096c4715febda366c98d70e2d7f6885f67aab930e",
+          "byte_size": 7494,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-039"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-040.png",
+          "sha256": "58de7583d96c740b394b78e6bc3d71805c41ebe0d528751fa47b189c3d8e8db5",
+          "byte_size": 8222,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-040"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-041.png",
+          "sha256": "b640fb11d44d56db1c62f853d85dd12bf23443da2dd688976dcd07bff30116ba",
+          "byte_size": 7803,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-041"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-042.png",
+          "sha256": "8b8829305bf13af4889d5e8af7cbfaa5585a127770681989a2736c3a11e7622b",
+          "byte_size": 7652,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-042"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-043.png",
+          "sha256": "365eef987e5940e5bb7827b6a2ae7da87386d435b22ad5ff9863865637d7e621",
+          "byte_size": 7496,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-043"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-044.png",
+          "sha256": "21a9821c702b15ac0600552a904698661c03164675a1cfa2515d2e38962d9821",
+          "byte_size": 6990,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-044"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-045.png",
+          "sha256": "c83bfaebf27e0e50d480776431743e6d7e61d8125ffe8e19c84bea7c98b3da13",
+          "byte_size": 5459,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-045"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-046.png",
+          "sha256": "73baad84f4e0cf294ab9750116fc40e151a1f03a736936767a6ad6f2304eb173",
+          "byte_size": 8204,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-046"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-047.png",
+          "sha256": "ce464b2c9a64fa0b394f89f24a80c8bc31ea814235a2042c0a50a1cfd5add2fb",
+          "byte_size": 6922,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-047"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-048.png",
+          "sha256": "25426e609ea9a6504379b48a001cfe2eb01423e99eb1771c0433bf15c9dda1dc",
+          "byte_size": 7740,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-048"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-049.png",
+          "sha256": "00c42025a758a002afaae576b1cef8e2a7431f773295c8e213cb0656fd1dc91b",
+          "byte_size": 5509,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-049"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-050.png",
+          "sha256": "5b17099bb8fcf5dc48c48207a3577d19a4cbd1b54c7e76022a4559a4c02548fa",
+          "byte_size": 7104,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-050"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-051.png",
+          "sha256": "fd7cd99b4eaa0c62ffb6b634493c22e8ba731a470230ec08a4db3ee2d4813548",
+          "byte_size": 4597,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-051"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-052.png",
+          "sha256": "3b9ff7695ea0d18e88d3bb42dd6613f4e7b7b2069fc2d2ba2074b1a12c15b9c6",
+          "byte_size": 6449,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-052"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-053.png",
+          "sha256": "5e8954876c1d75356872bdeb68fef78c57b098637730be4b891720ecd4663817",
+          "byte_size": 6014,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-053"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-054.png",
+          "sha256": "689ffbd687140358da6498c53df2f9f2fcbe134ff2b31d8e3155cca9415fbe29",
+          "byte_size": 5571,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-054"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-055.png",
+          "sha256": "ebfabf569bd2c68f082ce85bc0baa920ad6c184757c20cf3b9632e4da7c1ff55",
+          "byte_size": 7138,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-055"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-056.png",
+          "sha256": "d3e4270434d0f7fda8b5d627406949294ca71e3743a809112589f542a7bb19f7",
+          "byte_size": 8759,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-056"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-057.png",
+          "sha256": "84197fcfcf87702ab58c30d9245add340a11a9ee102d44743faaf9e18cc6436e",
+          "byte_size": 7395,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-057"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-058.png",
+          "sha256": "435558093991b548cc2f5eb9a5e2ce3ac1c003f8adda728c8ea04f533a3a5823",
+          "byte_size": 7455,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-058"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-059.png",
+          "sha256": "7ba6a87f6cb91f1686bbed92f965b885a436356077e010ae1790d362655e9cc7",
+          "byte_size": 6669,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-059"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-060.png",
+          "sha256": "51fafae64f33c09badbea566ec779c619244f5863dd5f1e049f86afa97eb6da0",
+          "byte_size": 7280,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-060"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-061.png",
+          "sha256": "7780904cc9de0e1c318ac14ccd35600dc31ca924374f77673d945da6395e6216",
+          "byte_size": 5624,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-061"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-062.png",
+          "sha256": "232fde035edb200a6f68c1c631b60c06ac61696a85f0bae87cc4fca6623ca068",
+          "byte_size": 6770,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-062"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-1/tiles/glyph-063.png",
+          "sha256": "eb0a266a337a32c1730a2aee288015643af7452ee0ad28f3839c73a6b2afb5e4",
+          "byte_size": 7118,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-063"
+        }
+      ],
+      "errors": [],
+      "speedup_vs_concurrency_1": 1.0,
+      "parallel_efficiency": 1.0
+    },
+    {
+      "concurrency": 4,
+      "status": "passed",
+      "execution_id": "a466a525d8b64b5abded2f1aec73061d",
+      "generation_wall_s": 96.209606,
+      "validation_wall_s": 9.161486,
+      "end_to_end_wall_s": 105.371093,
+      "completed_nodes": 64,
+      "throughput_glyphs_per_s": 0.6652,
+      "cost_usd": 0.0,
+      "cost_is_complete": true,
+      "cost_contains_estimates": false,
+      "validation": {
+        "passed": true,
+        "expected_tiles": 64,
+        "valid_png_tiles": 64,
+        "tile_size": [
+          128,
+          128
+        ],
+        "unique_tile_hashes": 64,
+        "errors": []
+      },
+      "tile_receipts": [
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-000.png",
+          "sha256": "b838edcdcc0a842b06857d62940368c1c4fc1fea03ef648ee20c3651340a6cdb",
+          "byte_size": 8202,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-000"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-001.png",
+          "sha256": "6905d8e97b47b063408c7f5b7282d2222fababacf499d4827cacccd1353eea46",
+          "byte_size": 6780,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-001"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-002.png",
+          "sha256": "a90c184fec031ae3ba6cff40469a08cd1d09282017cf58e331b25ba6a47dbc55",
+          "byte_size": 7537,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-002"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-003.png",
+          "sha256": "d53f36301cdfc3bdace4abd564e6c826938f50b70d2c0dce2dc5aed93d5db462",
+          "byte_size": 7663,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-003"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-004.png",
+          "sha256": "ffc006a16f856e67bd08bb4069f7fd5f815899ef07af3b37efbe2c5689f41b22",
+          "byte_size": 6218,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-004"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-005.png",
+          "sha256": "191d96fce14a29542b15b3dd0beb29887310f6f266c13947ac89da727bcafb1d",
+          "byte_size": 6715,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-005"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-006.png",
+          "sha256": "86650547160e25300ed03fd888b041cca80e71d6ab249019ea015be4f4e56a62",
+          "byte_size": 8147,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-006"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-007.png",
+          "sha256": "e7b1da6047fcee67ad7440edd20f614608155f665787d8bf3678d1772d4808ee",
+          "byte_size": 7128,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-007"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-008.png",
+          "sha256": "37e1daec37515668ccbf855ba980805a0c0e6b96ebfe8a67c5034a12e5d5965b",
+          "byte_size": 7627,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-008"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-009.png",
+          "sha256": "661c3e0d28eef79970f78312ae5cdc77922a39ab4f8f6adf5402a649c4feae4d",
+          "byte_size": 6114,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-009"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-010.png",
+          "sha256": "1e27e4139f64a7fe6ea4331e84b0712f25445a22d3930756c171d8cf49787659",
+          "byte_size": 7077,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-010"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-011.png",
+          "sha256": "6ef0674648a7f39ae8128d0cfa8481fa173ca5e79b4f9f04d2a67384925409ed",
+          "byte_size": 6032,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-011"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-012.png",
+          "sha256": "2a6da5de4637fee6feb1d1bd549c3b78e40903f82a331aea8c1fe0239dd141a7",
+          "byte_size": 8330,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-012"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-013.png",
+          "sha256": "ac7ef5476b9e069873a7c9ade05c103f26f59120beb544dacb49870d0dba4b6d",
+          "byte_size": 6957,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-013"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-014.png",
+          "sha256": "8c0d6979ebcd66b413be4f8b902a3662c89ce83d86a16f8f757cec113384c9ce",
+          "byte_size": 7300,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-014"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-015.png",
+          "sha256": "ac580a37c32949c2f29473c6a87e89e0cea5e1ee203ed23765b07bb94202bc51",
+          "byte_size": 7689,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-015"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-016.png",
+          "sha256": "24df3f19d01bfbb401c02aada9eb00b0b77d68649ef9b1606751e3cb1c997ee4",
+          "byte_size": 8200,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-016"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-017.png",
+          "sha256": "58ab2f0083ba7e79b9f061abdbe7f7ee518a0fd5c8a1c6247c5d66aaf979756d",
+          "byte_size": 6930,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-017"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-018.png",
+          "sha256": "d03c51fd9d97cecaffef6eb8936b982b98bc058099a6cc185dab875389c11b66",
+          "byte_size": 7786,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-018"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-019.png",
+          "sha256": "d32036c903dea684f95efe2572b5dc3085e4efea5a5dcccb833033d949b5b776",
+          "byte_size": 7657,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-019"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-020.png",
+          "sha256": "9e5b81c326c68ceb57865cbe8f39eb0c670145f877e6f104c03434989d25ad28",
+          "byte_size": 7604,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-020"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-021.png",
+          "sha256": "e5fc283b11e9fac8bfd3427231554df17d93229a42d2cff844e2ae9f79fa68a6",
+          "byte_size": 6956,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-021"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-022.png",
+          "sha256": "781e53cae41f9e112293c372dc157329c81a16b71de9031a0fe64711a6be36a0",
+          "byte_size": 7208,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-022"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-023.png",
+          "sha256": "3b9e005010d53ed3ba98edd3da56a7c5f6bbc12210d639563f69f43087a58c30",
+          "byte_size": 8422,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-023"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-024.png",
+          "sha256": "dcbf0adddb2e6f5dd893454056d965d8ed106a3dca5910a68cfcbfa45efd2d40",
+          "byte_size": 7751,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-024"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-025.png",
+          "sha256": "5ca8791d85c8ccf6ac1276e4ae34eab379815c2a5c5d0a520104cf76344043ee",
+          "byte_size": 7250,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-025"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-026.png",
+          "sha256": "3fe63787378f20cbc510e8af605e1c4d9aa308ec7a68c6fea8e11129ee9ff8d5",
+          "byte_size": 6983,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-026"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-027.png",
+          "sha256": "c4ed94b39772251bc7acae572c2c89ddefef494c0c4ea11c7718fd4de995c317",
+          "byte_size": 8111,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-027"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-028.png",
+          "sha256": "528ddf773d03da29bb16c923276e83aad453fb19f541c17dc615fbba2a5ad124",
+          "byte_size": 6813,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-028"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-029.png",
+          "sha256": "b3edf58e1b830723c90f1b0438f317557141b3b9e9e423734e3b79c1865f3857",
+          "byte_size": 6892,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-029"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-030.png",
+          "sha256": "0c26d1f4d8c0c3dbbc57fe5584636741353c7a080cc9fcdeb41445a2e0c7575a",
+          "byte_size": 8814,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-030"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-031.png",
+          "sha256": "d728f3d7aee1b23213da51d33df61e7f98cf11926f843e8aded5318274aada83",
+          "byte_size": 6872,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-031"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-032.png",
+          "sha256": "cb442cdbf1c13dc9a203adcce98e4e29baf4fd23078243e40032c6346abd6ecc",
+          "byte_size": 6920,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-032"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-033.png",
+          "sha256": "b7a2624e8e5fdbf74049676920e601d0b7e62d9182af83ad0d774b13d46c191a",
+          "byte_size": 7107,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-033"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-034.png",
+          "sha256": "2d8ea7196c95772b81cd3c74ae0b219bc962ceb96ce1ef8a404ca624aab59211",
+          "byte_size": 7599,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-034"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-035.png",
+          "sha256": "e43f91c321fb1331a4a89d7b4221a4ce341e0edc61bc2f586155f2adbaf74d93",
+          "byte_size": 7392,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-035"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-036.png",
+          "sha256": "5bf2667dcf333aea574d1126ab06496e74188542895378a5d22e4a3f35575978",
+          "byte_size": 6965,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-036"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-037.png",
+          "sha256": "5e4f24def58d9d9df28c51a16d4d09c86f57aa8817185c389f1b82c08fb8c629",
+          "byte_size": 6564,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-037"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-038.png",
+          "sha256": "74b5d69d70c853eb2f1dc536b8550c43fa9bd17f268442ce160b9ed11c8e9690",
+          "byte_size": 7610,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-038"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-039.png",
+          "sha256": "84c9ab1d35a50b01bb900ef096c4715febda366c98d70e2d7f6885f67aab930e",
+          "byte_size": 7494,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-039"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-040.png",
+          "sha256": "58de7583d96c740b394b78e6bc3d71805c41ebe0d528751fa47b189c3d8e8db5",
+          "byte_size": 8222,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-040"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-041.png",
+          "sha256": "b640fb11d44d56db1c62f853d85dd12bf23443da2dd688976dcd07bff30116ba",
+          "byte_size": 7803,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-041"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-042.png",
+          "sha256": "8b8829305bf13af4889d5e8af7cbfaa5585a127770681989a2736c3a11e7622b",
+          "byte_size": 7652,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-042"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-043.png",
+          "sha256": "365eef987e5940e5bb7827b6a2ae7da87386d435b22ad5ff9863865637d7e621",
+          "byte_size": 7496,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-043"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-044.png",
+          "sha256": "21a9821c702b15ac0600552a904698661c03164675a1cfa2515d2e38962d9821",
+          "byte_size": 6990,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-044"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-045.png",
+          "sha256": "c83bfaebf27e0e50d480776431743e6d7e61d8125ffe8e19c84bea7c98b3da13",
+          "byte_size": 5459,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-045"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-046.png",
+          "sha256": "73baad84f4e0cf294ab9750116fc40e151a1f03a736936767a6ad6f2304eb173",
+          "byte_size": 8204,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-046"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-047.png",
+          "sha256": "ce464b2c9a64fa0b394f89f24a80c8bc31ea814235a2042c0a50a1cfd5add2fb",
+          "byte_size": 6922,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-047"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-048.png",
+          "sha256": "25426e609ea9a6504379b48a001cfe2eb01423e99eb1771c0433bf15c9dda1dc",
+          "byte_size": 7740,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-048"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-049.png",
+          "sha256": "00c42025a758a002afaae576b1cef8e2a7431f773295c8e213cb0656fd1dc91b",
+          "byte_size": 5509,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-049"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-050.png",
+          "sha256": "5b17099bb8fcf5dc48c48207a3577d19a4cbd1b54c7e76022a4559a4c02548fa",
+          "byte_size": 7104,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-050"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-051.png",
+          "sha256": "fd7cd99b4eaa0c62ffb6b634493c22e8ba731a470230ec08a4db3ee2d4813548",
+          "byte_size": 4597,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-051"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-052.png",
+          "sha256": "3b9ff7695ea0d18e88d3bb42dd6613f4e7b7b2069fc2d2ba2074b1a12c15b9c6",
+          "byte_size": 6449,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-052"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-053.png",
+          "sha256": "5e8954876c1d75356872bdeb68fef78c57b098637730be4b891720ecd4663817",
+          "byte_size": 6014,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-053"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-054.png",
+          "sha256": "689ffbd687140358da6498c53df2f9f2fcbe134ff2b31d8e3155cca9415fbe29",
+          "byte_size": 5571,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-054"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-055.png",
+          "sha256": "ebfabf569bd2c68f082ce85bc0baa920ad6c184757c20cf3b9632e4da7c1ff55",
+          "byte_size": 7138,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-055"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-056.png",
+          "sha256": "d3e4270434d0f7fda8b5d627406949294ca71e3743a809112589f542a7bb19f7",
+          "byte_size": 8759,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-056"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-057.png",
+          "sha256": "84197fcfcf87702ab58c30d9245add340a11a9ee102d44743faaf9e18cc6436e",
+          "byte_size": 7395,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-057"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-058.png",
+          "sha256": "435558093991b548cc2f5eb9a5e2ce3ac1c003f8adda728c8ea04f533a3a5823",
+          "byte_size": 7455,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-058"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-059.png",
+          "sha256": "7ba6a87f6cb91f1686bbed92f965b885a436356077e010ae1790d362655e9cc7",
+          "byte_size": 6669,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-059"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-060.png",
+          "sha256": "51fafae64f33c09badbea566ec779c619244f5863dd5f1e049f86afa97eb6da0",
+          "byte_size": 7280,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-060"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-061.png",
+          "sha256": "7780904cc9de0e1c318ac14ccd35600dc31ca924374f77673d945da6395e6216",
+          "byte_size": 5624,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-061"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-062.png",
+          "sha256": "232fde035edb200a6f68c1c631b60c06ac61696a85f0bae87cc4fca6623ca068",
+          "byte_size": 6770,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-062"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-4/tiles/glyph-063.png",
+          "sha256": "eb0a266a337a32c1730a2aee288015643af7452ee0ad28f3839c73a6b2afb5e4",
+          "byte_size": 7118,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-063"
+        }
+      ],
+      "errors": [],
+      "speedup_vs_concurrency_1": 3.9279,
+      "parallel_efficiency": 0.982
+    },
+    {
+      "concurrency": 8,
+      "status": "passed",
+      "execution_id": "fca99fb3a3124f069f819550618681ca",
+      "generation_wall_s": 49.319729,
+      "validation_wall_s": 6.821766,
+      "end_to_end_wall_s": 56.141495,
+      "completed_nodes": 64,
+      "throughput_glyphs_per_s": 1.2977,
+      "cost_usd": 0.0,
+      "cost_is_complete": true,
+      "cost_contains_estimates": false,
+      "validation": {
+        "passed": true,
+        "expected_tiles": 64,
+        "valid_png_tiles": 64,
+        "tile_size": [
+          128,
+          128
+        ],
+        "unique_tile_hashes": 64,
+        "errors": []
+      },
+      "tile_receipts": [
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-000.png",
+          "sha256": "b838edcdcc0a842b06857d62940368c1c4fc1fea03ef648ee20c3651340a6cdb",
+          "byte_size": 8202,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-000"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-001.png",
+          "sha256": "6905d8e97b47b063408c7f5b7282d2222fababacf499d4827cacccd1353eea46",
+          "byte_size": 6780,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-001"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-002.png",
+          "sha256": "a90c184fec031ae3ba6cff40469a08cd1d09282017cf58e331b25ba6a47dbc55",
+          "byte_size": 7537,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-002"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-003.png",
+          "sha256": "d53f36301cdfc3bdace4abd564e6c826938f50b70d2c0dce2dc5aed93d5db462",
+          "byte_size": 7663,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-003"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-004.png",
+          "sha256": "ffc006a16f856e67bd08bb4069f7fd5f815899ef07af3b37efbe2c5689f41b22",
+          "byte_size": 6218,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-004"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-005.png",
+          "sha256": "191d96fce14a29542b15b3dd0beb29887310f6f266c13947ac89da727bcafb1d",
+          "byte_size": 6715,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-005"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-006.png",
+          "sha256": "86650547160e25300ed03fd888b041cca80e71d6ab249019ea015be4f4e56a62",
+          "byte_size": 8147,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-006"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-007.png",
+          "sha256": "e7b1da6047fcee67ad7440edd20f614608155f665787d8bf3678d1772d4808ee",
+          "byte_size": 7128,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-007"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-008.png",
+          "sha256": "37e1daec37515668ccbf855ba980805a0c0e6b96ebfe8a67c5034a12e5d5965b",
+          "byte_size": 7627,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-008"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-009.png",
+          "sha256": "661c3e0d28eef79970f78312ae5cdc77922a39ab4f8f6adf5402a649c4feae4d",
+          "byte_size": 6114,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-009"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-010.png",
+          "sha256": "1e27e4139f64a7fe6ea4331e84b0712f25445a22d3930756c171d8cf49787659",
+          "byte_size": 7077,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-010"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-011.png",
+          "sha256": "6ef0674648a7f39ae8128d0cfa8481fa173ca5e79b4f9f04d2a67384925409ed",
+          "byte_size": 6032,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-011"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-012.png",
+          "sha256": "2a6da5de4637fee6feb1d1bd549c3b78e40903f82a331aea8c1fe0239dd141a7",
+          "byte_size": 8330,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-012"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-013.png",
+          "sha256": "ac7ef5476b9e069873a7c9ade05c103f26f59120beb544dacb49870d0dba4b6d",
+          "byte_size": 6957,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-013"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-014.png",
+          "sha256": "8c0d6979ebcd66b413be4f8b902a3662c89ce83d86a16f8f757cec113384c9ce",
+          "byte_size": 7300,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-014"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-015.png",
+          "sha256": "ac580a37c32949c2f29473c6a87e89e0cea5e1ee203ed23765b07bb94202bc51",
+          "byte_size": 7689,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-015"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-016.png",
+          "sha256": "24df3f19d01bfbb401c02aada9eb00b0b77d68649ef9b1606751e3cb1c997ee4",
+          "byte_size": 8200,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-016"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-017.png",
+          "sha256": "58ab2f0083ba7e79b9f061abdbe7f7ee518a0fd5c8a1c6247c5d66aaf979756d",
+          "byte_size": 6930,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-017"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-018.png",
+          "sha256": "d03c51fd9d97cecaffef6eb8936b982b98bc058099a6cc185dab875389c11b66",
+          "byte_size": 7786,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-018"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-019.png",
+          "sha256": "d32036c903dea684f95efe2572b5dc3085e4efea5a5dcccb833033d949b5b776",
+          "byte_size": 7657,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-019"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-020.png",
+          "sha256": "9e5b81c326c68ceb57865cbe8f39eb0c670145f877e6f104c03434989d25ad28",
+          "byte_size": 7604,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-020"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-021.png",
+          "sha256": "e5fc283b11e9fac8bfd3427231554df17d93229a42d2cff844e2ae9f79fa68a6",
+          "byte_size": 6956,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-021"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-022.png",
+          "sha256": "781e53cae41f9e112293c372dc157329c81a16b71de9031a0fe64711a6be36a0",
+          "byte_size": 7208,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-022"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-023.png",
+          "sha256": "3b9e005010d53ed3ba98edd3da56a7c5f6bbc12210d639563f69f43087a58c30",
+          "byte_size": 8422,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-023"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-024.png",
+          "sha256": "dcbf0adddb2e6f5dd893454056d965d8ed106a3dca5910a68cfcbfa45efd2d40",
+          "byte_size": 7751,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-024"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-025.png",
+          "sha256": "5ca8791d85c8ccf6ac1276e4ae34eab379815c2a5c5d0a520104cf76344043ee",
+          "byte_size": 7250,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-025"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-026.png",
+          "sha256": "3fe63787378f20cbc510e8af605e1c4d9aa308ec7a68c6fea8e11129ee9ff8d5",
+          "byte_size": 6983,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-026"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-027.png",
+          "sha256": "c4ed94b39772251bc7acae572c2c89ddefef494c0c4ea11c7718fd4de995c317",
+          "byte_size": 8111,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-027"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-028.png",
+          "sha256": "528ddf773d03da29bb16c923276e83aad453fb19f541c17dc615fbba2a5ad124",
+          "byte_size": 6813,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-028"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-029.png",
+          "sha256": "b3edf58e1b830723c90f1b0438f317557141b3b9e9e423734e3b79c1865f3857",
+          "byte_size": 6892,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-029"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-030.png",
+          "sha256": "0c26d1f4d8c0c3dbbc57fe5584636741353c7a080cc9fcdeb41445a2e0c7575a",
+          "byte_size": 8814,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-030"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-031.png",
+          "sha256": "d728f3d7aee1b23213da51d33df61e7f98cf11926f843e8aded5318274aada83",
+          "byte_size": 6872,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-031"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-032.png",
+          "sha256": "cb442cdbf1c13dc9a203adcce98e4e29baf4fd23078243e40032c6346abd6ecc",
+          "byte_size": 6920,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-032"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-033.png",
+          "sha256": "b7a2624e8e5fdbf74049676920e601d0b7e62d9182af83ad0d774b13d46c191a",
+          "byte_size": 7107,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-033"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-034.png",
+          "sha256": "2d8ea7196c95772b81cd3c74ae0b219bc962ceb96ce1ef8a404ca624aab59211",
+          "byte_size": 7599,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-034"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-035.png",
+          "sha256": "e43f91c321fb1331a4a89d7b4221a4ce341e0edc61bc2f586155f2adbaf74d93",
+          "byte_size": 7392,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-035"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-036.png",
+          "sha256": "5bf2667dcf333aea574d1126ab06496e74188542895378a5d22e4a3f35575978",
+          "byte_size": 6965,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-036"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-037.png",
+          "sha256": "5e4f24def58d9d9df28c51a16d4d09c86f57aa8817185c389f1b82c08fb8c629",
+          "byte_size": 6564,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-037"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-038.png",
+          "sha256": "74b5d69d70c853eb2f1dc536b8550c43fa9bd17f268442ce160b9ed11c8e9690",
+          "byte_size": 7610,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-038"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-039.png",
+          "sha256": "84c9ab1d35a50b01bb900ef096c4715febda366c98d70e2d7f6885f67aab930e",
+          "byte_size": 7494,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-039"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-040.png",
+          "sha256": "58de7583d96c740b394b78e6bc3d71805c41ebe0d528751fa47b189c3d8e8db5",
+          "byte_size": 8222,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-040"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-041.png",
+          "sha256": "b640fb11d44d56db1c62f853d85dd12bf23443da2dd688976dcd07bff30116ba",
+          "byte_size": 7803,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-041"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-042.png",
+          "sha256": "8b8829305bf13af4889d5e8af7cbfaa5585a127770681989a2736c3a11e7622b",
+          "byte_size": 7652,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-042"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-043.png",
+          "sha256": "365eef987e5940e5bb7827b6a2ae7da87386d435b22ad5ff9863865637d7e621",
+          "byte_size": 7496,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-043"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-044.png",
+          "sha256": "21a9821c702b15ac0600552a904698661c03164675a1cfa2515d2e38962d9821",
+          "byte_size": 6990,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-044"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-045.png",
+          "sha256": "c83bfaebf27e0e50d480776431743e6d7e61d8125ffe8e19c84bea7c98b3da13",
+          "byte_size": 5459,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-045"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-046.png",
+          "sha256": "73baad84f4e0cf294ab9750116fc40e151a1f03a736936767a6ad6f2304eb173",
+          "byte_size": 8204,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-046"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-047.png",
+          "sha256": "ce464b2c9a64fa0b394f89f24a80c8bc31ea814235a2042c0a50a1cfd5add2fb",
+          "byte_size": 6922,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-047"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-048.png",
+          "sha256": "25426e609ea9a6504379b48a001cfe2eb01423e99eb1771c0433bf15c9dda1dc",
+          "byte_size": 7740,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-048"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-049.png",
+          "sha256": "00c42025a758a002afaae576b1cef8e2a7431f773295c8e213cb0656fd1dc91b",
+          "byte_size": 5509,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-049"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-050.png",
+          "sha256": "5b17099bb8fcf5dc48c48207a3577d19a4cbd1b54c7e76022a4559a4c02548fa",
+          "byte_size": 7104,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-050"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-051.png",
+          "sha256": "fd7cd99b4eaa0c62ffb6b634493c22e8ba731a470230ec08a4db3ee2d4813548",
+          "byte_size": 4597,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-051"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-052.png",
+          "sha256": "3b9ff7695ea0d18e88d3bb42dd6613f4e7b7b2069fc2d2ba2074b1a12c15b9c6",
+          "byte_size": 6449,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-052"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-053.png",
+          "sha256": "5e8954876c1d75356872bdeb68fef78c57b098637730be4b891720ecd4663817",
+          "byte_size": 6014,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-053"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-054.png",
+          "sha256": "689ffbd687140358da6498c53df2f9f2fcbe134ff2b31d8e3155cca9415fbe29",
+          "byte_size": 5571,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-054"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-055.png",
+          "sha256": "ebfabf569bd2c68f082ce85bc0baa920ad6c184757c20cf3b9632e4da7c1ff55",
+          "byte_size": 7138,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-055"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-056.png",
+          "sha256": "d3e4270434d0f7fda8b5d627406949294ca71e3743a809112589f542a7bb19f7",
+          "byte_size": 8759,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-056"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-057.png",
+          "sha256": "84197fcfcf87702ab58c30d9245add340a11a9ee102d44743faaf9e18cc6436e",
+          "byte_size": 7395,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-057"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-058.png",
+          "sha256": "435558093991b548cc2f5eb9a5e2ce3ac1c003f8adda728c8ea04f533a3a5823",
+          "byte_size": 7455,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-058"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-059.png",
+          "sha256": "7ba6a87f6cb91f1686bbed92f965b885a436356077e010ae1790d362655e9cc7",
+          "byte_size": 6669,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-059"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-060.png",
+          "sha256": "51fafae64f33c09badbea566ec779c619244f5863dd5f1e049f86afa97eb6da0",
+          "byte_size": 7280,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-060"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-061.png",
+          "sha256": "7780904cc9de0e1c318ac14ccd35600dc31ca924374f77673d945da6395e6216",
+          "byte_size": 5624,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-061"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-062.png",
+          "sha256": "232fde035edb200a6f68c1c631b60c06ac61696a85f0bae87cc4fca6623ca068",
+          "byte_size": 6770,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-062"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-8/tiles/glyph-063.png",
+          "sha256": "eb0a266a337a32c1730a2aee288015643af7452ee0ad28f3839c73a6b2afb5e4",
+          "byte_size": 7118,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-063"
+        }
+      ],
+      "errors": [],
+      "speedup_vs_concurrency_1": 7.6622,
+      "parallel_efficiency": 0.9578
+    },
+    {
+      "concurrency": 16,
+      "status": "passed",
+      "execution_id": "5f06553e986142a491062fe908e6b0c8",
+      "generation_wall_s": 26.193015,
+      "validation_wall_s": 6.2435,
+      "end_to_end_wall_s": 32.436515,
+      "completed_nodes": 64,
+      "throughput_glyphs_per_s": 2.4434,
+      "cost_usd": 0.0,
+      "cost_is_complete": true,
+      "cost_contains_estimates": false,
+      "validation": {
+        "passed": true,
+        "expected_tiles": 64,
+        "valid_png_tiles": 64,
+        "tile_size": [
+          128,
+          128
+        ],
+        "unique_tile_hashes": 64,
+        "errors": []
+      },
+      "tile_receipts": [
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-000.png",
+          "sha256": "b838edcdcc0a842b06857d62940368c1c4fc1fea03ef648ee20c3651340a6cdb",
+          "byte_size": 8202,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-000"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-001.png",
+          "sha256": "6905d8e97b47b063408c7f5b7282d2222fababacf499d4827cacccd1353eea46",
+          "byte_size": 6780,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-001"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-002.png",
+          "sha256": "a90c184fec031ae3ba6cff40469a08cd1d09282017cf58e331b25ba6a47dbc55",
+          "byte_size": 7537,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-002"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-003.png",
+          "sha256": "d53f36301cdfc3bdace4abd564e6c826938f50b70d2c0dce2dc5aed93d5db462",
+          "byte_size": 7663,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-003"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-004.png",
+          "sha256": "ffc006a16f856e67bd08bb4069f7fd5f815899ef07af3b37efbe2c5689f41b22",
+          "byte_size": 6218,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-004"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-005.png",
+          "sha256": "191d96fce14a29542b15b3dd0beb29887310f6f266c13947ac89da727bcafb1d",
+          "byte_size": 6715,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-005"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-006.png",
+          "sha256": "86650547160e25300ed03fd888b041cca80e71d6ab249019ea015be4f4e56a62",
+          "byte_size": 8147,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-006"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-007.png",
+          "sha256": "e7b1da6047fcee67ad7440edd20f614608155f665787d8bf3678d1772d4808ee",
+          "byte_size": 7128,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-007"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-008.png",
+          "sha256": "37e1daec37515668ccbf855ba980805a0c0e6b96ebfe8a67c5034a12e5d5965b",
+          "byte_size": 7627,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-008"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-009.png",
+          "sha256": "661c3e0d28eef79970f78312ae5cdc77922a39ab4f8f6adf5402a649c4feae4d",
+          "byte_size": 6114,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-009"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-010.png",
+          "sha256": "1e27e4139f64a7fe6ea4331e84b0712f25445a22d3930756c171d8cf49787659",
+          "byte_size": 7077,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-010"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-011.png",
+          "sha256": "6ef0674648a7f39ae8128d0cfa8481fa173ca5e79b4f9f04d2a67384925409ed",
+          "byte_size": 6032,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-011"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-012.png",
+          "sha256": "2a6da5de4637fee6feb1d1bd549c3b78e40903f82a331aea8c1fe0239dd141a7",
+          "byte_size": 8330,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-012"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-013.png",
+          "sha256": "ac7ef5476b9e069873a7c9ade05c103f26f59120beb544dacb49870d0dba4b6d",
+          "byte_size": 6957,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-013"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-014.png",
+          "sha256": "8c0d6979ebcd66b413be4f8b902a3662c89ce83d86a16f8f757cec113384c9ce",
+          "byte_size": 7300,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-014"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-015.png",
+          "sha256": "ac580a37c32949c2f29473c6a87e89e0cea5e1ee203ed23765b07bb94202bc51",
+          "byte_size": 7689,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-015"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-016.png",
+          "sha256": "24df3f19d01bfbb401c02aada9eb00b0b77d68649ef9b1606751e3cb1c997ee4",
+          "byte_size": 8200,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-016"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-017.png",
+          "sha256": "58ab2f0083ba7e79b9f061abdbe7f7ee518a0fd5c8a1c6247c5d66aaf979756d",
+          "byte_size": 6930,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-017"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-018.png",
+          "sha256": "d03c51fd9d97cecaffef6eb8936b982b98bc058099a6cc185dab875389c11b66",
+          "byte_size": 7786,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-018"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-019.png",
+          "sha256": "d32036c903dea684f95efe2572b5dc3085e4efea5a5dcccb833033d949b5b776",
+          "byte_size": 7657,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-019"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-020.png",
+          "sha256": "9e5b81c326c68ceb57865cbe8f39eb0c670145f877e6f104c03434989d25ad28",
+          "byte_size": 7604,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-020"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-021.png",
+          "sha256": "e5fc283b11e9fac8bfd3427231554df17d93229a42d2cff844e2ae9f79fa68a6",
+          "byte_size": 6956,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-021"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-022.png",
+          "sha256": "781e53cae41f9e112293c372dc157329c81a16b71de9031a0fe64711a6be36a0",
+          "byte_size": 7208,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-022"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-023.png",
+          "sha256": "3b9e005010d53ed3ba98edd3da56a7c5f6bbc12210d639563f69f43087a58c30",
+          "byte_size": 8422,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-023"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-024.png",
+          "sha256": "dcbf0adddb2e6f5dd893454056d965d8ed106a3dca5910a68cfcbfa45efd2d40",
+          "byte_size": 7751,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-024"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-025.png",
+          "sha256": "5ca8791d85c8ccf6ac1276e4ae34eab379815c2a5c5d0a520104cf76344043ee",
+          "byte_size": 7250,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-025"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-026.png",
+          "sha256": "3fe63787378f20cbc510e8af605e1c4d9aa308ec7a68c6fea8e11129ee9ff8d5",
+          "byte_size": 6983,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-026"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-027.png",
+          "sha256": "c4ed94b39772251bc7acae572c2c89ddefef494c0c4ea11c7718fd4de995c317",
+          "byte_size": 8111,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-027"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-028.png",
+          "sha256": "528ddf773d03da29bb16c923276e83aad453fb19f541c17dc615fbba2a5ad124",
+          "byte_size": 6813,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-028"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-029.png",
+          "sha256": "b3edf58e1b830723c90f1b0438f317557141b3b9e9e423734e3b79c1865f3857",
+          "byte_size": 6892,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-029"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-030.png",
+          "sha256": "0c26d1f4d8c0c3dbbc57fe5584636741353c7a080cc9fcdeb41445a2e0c7575a",
+          "byte_size": 8814,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-030"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-031.png",
+          "sha256": "d728f3d7aee1b23213da51d33df61e7f98cf11926f843e8aded5318274aada83",
+          "byte_size": 6872,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-031"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-032.png",
+          "sha256": "cb442cdbf1c13dc9a203adcce98e4e29baf4fd23078243e40032c6346abd6ecc",
+          "byte_size": 6920,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-032"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-033.png",
+          "sha256": "b7a2624e8e5fdbf74049676920e601d0b7e62d9182af83ad0d774b13d46c191a",
+          "byte_size": 7107,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-033"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-034.png",
+          "sha256": "2d8ea7196c95772b81cd3c74ae0b219bc962ceb96ce1ef8a404ca624aab59211",
+          "byte_size": 7599,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-034"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-035.png",
+          "sha256": "e43f91c321fb1331a4a89d7b4221a4ce341e0edc61bc2f586155f2adbaf74d93",
+          "byte_size": 7392,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-035"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-036.png",
+          "sha256": "5bf2667dcf333aea574d1126ab06496e74188542895378a5d22e4a3f35575978",
+          "byte_size": 6965,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-036"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-037.png",
+          "sha256": "5e4f24def58d9d9df28c51a16d4d09c86f57aa8817185c389f1b82c08fb8c629",
+          "byte_size": 6564,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-037"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-038.png",
+          "sha256": "74b5d69d70c853eb2f1dc536b8550c43fa9bd17f268442ce160b9ed11c8e9690",
+          "byte_size": 7610,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-038"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-039.png",
+          "sha256": "84c9ab1d35a50b01bb900ef096c4715febda366c98d70e2d7f6885f67aab930e",
+          "byte_size": 7494,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-039"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-040.png",
+          "sha256": "58de7583d96c740b394b78e6bc3d71805c41ebe0d528751fa47b189c3d8e8db5",
+          "byte_size": 8222,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-040"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-041.png",
+          "sha256": "b640fb11d44d56db1c62f853d85dd12bf23443da2dd688976dcd07bff30116ba",
+          "byte_size": 7803,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-041"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-042.png",
+          "sha256": "8b8829305bf13af4889d5e8af7cbfaa5585a127770681989a2736c3a11e7622b",
+          "byte_size": 7652,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-042"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-043.png",
+          "sha256": "365eef987e5940e5bb7827b6a2ae7da87386d435b22ad5ff9863865637d7e621",
+          "byte_size": 7496,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-043"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-044.png",
+          "sha256": "21a9821c702b15ac0600552a904698661c03164675a1cfa2515d2e38962d9821",
+          "byte_size": 6990,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-044"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-045.png",
+          "sha256": "c83bfaebf27e0e50d480776431743e6d7e61d8125ffe8e19c84bea7c98b3da13",
+          "byte_size": 5459,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-045"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-046.png",
+          "sha256": "73baad84f4e0cf294ab9750116fc40e151a1f03a736936767a6ad6f2304eb173",
+          "byte_size": 8204,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-046"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-047.png",
+          "sha256": "ce464b2c9a64fa0b394f89f24a80c8bc31ea814235a2042c0a50a1cfd5add2fb",
+          "byte_size": 6922,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-047"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-048.png",
+          "sha256": "25426e609ea9a6504379b48a001cfe2eb01423e99eb1771c0433bf15c9dda1dc",
+          "byte_size": 7740,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-048"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-049.png",
+          "sha256": "00c42025a758a002afaae576b1cef8e2a7431f773295c8e213cb0656fd1dc91b",
+          "byte_size": 5509,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-049"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-050.png",
+          "sha256": "5b17099bb8fcf5dc48c48207a3577d19a4cbd1b54c7e76022a4559a4c02548fa",
+          "byte_size": 7104,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-050"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-051.png",
+          "sha256": "fd7cd99b4eaa0c62ffb6b634493c22e8ba731a470230ec08a4db3ee2d4813548",
+          "byte_size": 4597,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-051"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-052.png",
+          "sha256": "3b9ff7695ea0d18e88d3bb42dd6613f4e7b7b2069fc2d2ba2074b1a12c15b9c6",
+          "byte_size": 6449,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-052"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-053.png",
+          "sha256": "5e8954876c1d75356872bdeb68fef78c57b098637730be4b891720ecd4663817",
+          "byte_size": 6014,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-053"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-054.png",
+          "sha256": "689ffbd687140358da6498c53df2f9f2fcbe134ff2b31d8e3155cca9415fbe29",
+          "byte_size": 5571,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-054"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-055.png",
+          "sha256": "ebfabf569bd2c68f082ce85bc0baa920ad6c184757c20cf3b9632e4da7c1ff55",
+          "byte_size": 7138,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-055"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-056.png",
+          "sha256": "d3e4270434d0f7fda8b5d627406949294ca71e3743a809112589f542a7bb19f7",
+          "byte_size": 8759,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-056"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-057.png",
+          "sha256": "84197fcfcf87702ab58c30d9245add340a11a9ee102d44743faaf9e18cc6436e",
+          "byte_size": 7395,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-057"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-058.png",
+          "sha256": "435558093991b548cc2f5eb9a5e2ce3ac1c003f8adda728c8ea04f533a3a5823",
+          "byte_size": 7455,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-058"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-059.png",
+          "sha256": "7ba6a87f6cb91f1686bbed92f965b885a436356077e010ae1790d362655e9cc7",
+          "byte_size": 6669,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-059"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-060.png",
+          "sha256": "51fafae64f33c09badbea566ec779c619244f5863dd5f1e049f86afa97eb6da0",
+          "byte_size": 7280,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-060"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-061.png",
+          "sha256": "7780904cc9de0e1c318ac14ccd35600dc31ca924374f77673d945da6395e6216",
+          "byte_size": 5624,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-061"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-062.png",
+          "sha256": "232fde035edb200a6f68c1c631b60c06ac61696a85f0bae87cc4fca6623ca068",
+          "byte_size": 6770,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-062"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-16/tiles/glyph-063.png",
+          "sha256": "eb0a266a337a32c1730a2aee288015643af7452ee0ad28f3839c73a6b2afb5e4",
+          "byte_size": 7118,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-063"
+        }
+      ],
+      "errors": [],
+      "speedup_vs_concurrency_1": 14.4274,
+      "parallel_efficiency": 0.9017
+    },
+    {
+      "concurrency": 32,
+      "status": "passed",
+      "execution_id": "eb7de9532c8440cca584a8d6290939b3",
+      "generation_wall_s": 13.26427,
+      "validation_wall_s": 7.96055,
+      "end_to_end_wall_s": 21.22482,
+      "completed_nodes": 64,
+      "throughput_glyphs_per_s": 4.825,
+      "cost_usd": 0.0,
+      "cost_is_complete": true,
+      "cost_contains_estimates": false,
+      "validation": {
+        "passed": true,
+        "expected_tiles": 64,
+        "valid_png_tiles": 64,
+        "tile_size": [
+          128,
+          128
+        ],
+        "unique_tile_hashes": 64,
+        "errors": []
+      },
+      "tile_receipts": [
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-000.png",
+          "sha256": "b838edcdcc0a842b06857d62940368c1c4fc1fea03ef648ee20c3651340a6cdb",
+          "byte_size": 8202,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-000"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-001.png",
+          "sha256": "6905d8e97b47b063408c7f5b7282d2222fababacf499d4827cacccd1353eea46",
+          "byte_size": 6780,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-001"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-002.png",
+          "sha256": "a90c184fec031ae3ba6cff40469a08cd1d09282017cf58e331b25ba6a47dbc55",
+          "byte_size": 7537,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-002"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-003.png",
+          "sha256": "d53f36301cdfc3bdace4abd564e6c826938f50b70d2c0dce2dc5aed93d5db462",
+          "byte_size": 7663,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-003"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-004.png",
+          "sha256": "ffc006a16f856e67bd08bb4069f7fd5f815899ef07af3b37efbe2c5689f41b22",
+          "byte_size": 6218,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-004"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-005.png",
+          "sha256": "191d96fce14a29542b15b3dd0beb29887310f6f266c13947ac89da727bcafb1d",
+          "byte_size": 6715,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-005"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-006.png",
+          "sha256": "86650547160e25300ed03fd888b041cca80e71d6ab249019ea015be4f4e56a62",
+          "byte_size": 8147,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-006"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-007.png",
+          "sha256": "e7b1da6047fcee67ad7440edd20f614608155f665787d8bf3678d1772d4808ee",
+          "byte_size": 7128,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-007"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-008.png",
+          "sha256": "37e1daec37515668ccbf855ba980805a0c0e6b96ebfe8a67c5034a12e5d5965b",
+          "byte_size": 7627,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-008"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-009.png",
+          "sha256": "661c3e0d28eef79970f78312ae5cdc77922a39ab4f8f6adf5402a649c4feae4d",
+          "byte_size": 6114,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-009"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-010.png",
+          "sha256": "1e27e4139f64a7fe6ea4331e84b0712f25445a22d3930756c171d8cf49787659",
+          "byte_size": 7077,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-010"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-011.png",
+          "sha256": "6ef0674648a7f39ae8128d0cfa8481fa173ca5e79b4f9f04d2a67384925409ed",
+          "byte_size": 6032,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-011"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-012.png",
+          "sha256": "2a6da5de4637fee6feb1d1bd549c3b78e40903f82a331aea8c1fe0239dd141a7",
+          "byte_size": 8330,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-012"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-013.png",
+          "sha256": "ac7ef5476b9e069873a7c9ade05c103f26f59120beb544dacb49870d0dba4b6d",
+          "byte_size": 6957,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-013"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-014.png",
+          "sha256": "8c0d6979ebcd66b413be4f8b902a3662c89ce83d86a16f8f757cec113384c9ce",
+          "byte_size": 7300,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-014"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-015.png",
+          "sha256": "ac580a37c32949c2f29473c6a87e89e0cea5e1ee203ed23765b07bb94202bc51",
+          "byte_size": 7689,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-015"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-016.png",
+          "sha256": "24df3f19d01bfbb401c02aada9eb00b0b77d68649ef9b1606751e3cb1c997ee4",
+          "byte_size": 8200,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-016"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-017.png",
+          "sha256": "58ab2f0083ba7e79b9f061abdbe7f7ee518a0fd5c8a1c6247c5d66aaf979756d",
+          "byte_size": 6930,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-017"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-018.png",
+          "sha256": "d03c51fd9d97cecaffef6eb8936b982b98bc058099a6cc185dab875389c11b66",
+          "byte_size": 7786,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-018"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-019.png",
+          "sha256": "d32036c903dea684f95efe2572b5dc3085e4efea5a5dcccb833033d949b5b776",
+          "byte_size": 7657,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-019"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-020.png",
+          "sha256": "9e5b81c326c68ceb57865cbe8f39eb0c670145f877e6f104c03434989d25ad28",
+          "byte_size": 7604,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-020"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-021.png",
+          "sha256": "e5fc283b11e9fac8bfd3427231554df17d93229a42d2cff844e2ae9f79fa68a6",
+          "byte_size": 6956,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-021"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-022.png",
+          "sha256": "781e53cae41f9e112293c372dc157329c81a16b71de9031a0fe64711a6be36a0",
+          "byte_size": 7208,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-022"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-023.png",
+          "sha256": "3b9e005010d53ed3ba98edd3da56a7c5f6bbc12210d639563f69f43087a58c30",
+          "byte_size": 8422,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-023"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-024.png",
+          "sha256": "dcbf0adddb2e6f5dd893454056d965d8ed106a3dca5910a68cfcbfa45efd2d40",
+          "byte_size": 7751,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-024"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-025.png",
+          "sha256": "5ca8791d85c8ccf6ac1276e4ae34eab379815c2a5c5d0a520104cf76344043ee",
+          "byte_size": 7250,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-025"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-026.png",
+          "sha256": "3fe63787378f20cbc510e8af605e1c4d9aa308ec7a68c6fea8e11129ee9ff8d5",
+          "byte_size": 6983,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-026"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-027.png",
+          "sha256": "c4ed94b39772251bc7acae572c2c89ddefef494c0c4ea11c7718fd4de995c317",
+          "byte_size": 8111,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-027"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-028.png",
+          "sha256": "528ddf773d03da29bb16c923276e83aad453fb19f541c17dc615fbba2a5ad124",
+          "byte_size": 6813,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-028"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-029.png",
+          "sha256": "b3edf58e1b830723c90f1b0438f317557141b3b9e9e423734e3b79c1865f3857",
+          "byte_size": 6892,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-029"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-030.png",
+          "sha256": "0c26d1f4d8c0c3dbbc57fe5584636741353c7a080cc9fcdeb41445a2e0c7575a",
+          "byte_size": 8814,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-030"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-031.png",
+          "sha256": "d728f3d7aee1b23213da51d33df61e7f98cf11926f843e8aded5318274aada83",
+          "byte_size": 6872,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-031"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-032.png",
+          "sha256": "cb442cdbf1c13dc9a203adcce98e4e29baf4fd23078243e40032c6346abd6ecc",
+          "byte_size": 6920,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-032"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-033.png",
+          "sha256": "b7a2624e8e5fdbf74049676920e601d0b7e62d9182af83ad0d774b13d46c191a",
+          "byte_size": 7107,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-033"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-034.png",
+          "sha256": "2d8ea7196c95772b81cd3c74ae0b219bc962ceb96ce1ef8a404ca624aab59211",
+          "byte_size": 7599,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-034"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-035.png",
+          "sha256": "e43f91c321fb1331a4a89d7b4221a4ce341e0edc61bc2f586155f2adbaf74d93",
+          "byte_size": 7392,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-035"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-036.png",
+          "sha256": "5bf2667dcf333aea574d1126ab06496e74188542895378a5d22e4a3f35575978",
+          "byte_size": 6965,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-036"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-037.png",
+          "sha256": "5e4f24def58d9d9df28c51a16d4d09c86f57aa8817185c389f1b82c08fb8c629",
+          "byte_size": 6564,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-037"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-038.png",
+          "sha256": "74b5d69d70c853eb2f1dc536b8550c43fa9bd17f268442ce160b9ed11c8e9690",
+          "byte_size": 7610,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-038"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-039.png",
+          "sha256": "84c9ab1d35a50b01bb900ef096c4715febda366c98d70e2d7f6885f67aab930e",
+          "byte_size": 7494,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-039"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-040.png",
+          "sha256": "58de7583d96c740b394b78e6bc3d71805c41ebe0d528751fa47b189c3d8e8db5",
+          "byte_size": 8222,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-040"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-041.png",
+          "sha256": "b640fb11d44d56db1c62f853d85dd12bf23443da2dd688976dcd07bff30116ba",
+          "byte_size": 7803,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-041"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-042.png",
+          "sha256": "8b8829305bf13af4889d5e8af7cbfaa5585a127770681989a2736c3a11e7622b",
+          "byte_size": 7652,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-042"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-043.png",
+          "sha256": "365eef987e5940e5bb7827b6a2ae7da87386d435b22ad5ff9863865637d7e621",
+          "byte_size": 7496,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-043"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-044.png",
+          "sha256": "21a9821c702b15ac0600552a904698661c03164675a1cfa2515d2e38962d9821",
+          "byte_size": 6990,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-044"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-045.png",
+          "sha256": "c83bfaebf27e0e50d480776431743e6d7e61d8125ffe8e19c84bea7c98b3da13",
+          "byte_size": 5459,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-045"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-046.png",
+          "sha256": "73baad84f4e0cf294ab9750116fc40e151a1f03a736936767a6ad6f2304eb173",
+          "byte_size": 8204,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-046"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-047.png",
+          "sha256": "ce464b2c9a64fa0b394f89f24a80c8bc31ea814235a2042c0a50a1cfd5add2fb",
+          "byte_size": 6922,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-047"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-048.png",
+          "sha256": "25426e609ea9a6504379b48a001cfe2eb01423e99eb1771c0433bf15c9dda1dc",
+          "byte_size": 7740,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-048"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-049.png",
+          "sha256": "00c42025a758a002afaae576b1cef8e2a7431f773295c8e213cb0656fd1dc91b",
+          "byte_size": 5509,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-049"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-050.png",
+          "sha256": "5b17099bb8fcf5dc48c48207a3577d19a4cbd1b54c7e76022a4559a4c02548fa",
+          "byte_size": 7104,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-050"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-051.png",
+          "sha256": "fd7cd99b4eaa0c62ffb6b634493c22e8ba731a470230ec08a4db3ee2d4813548",
+          "byte_size": 4597,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-051"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-052.png",
+          "sha256": "3b9ff7695ea0d18e88d3bb42dd6613f4e7b7b2069fc2d2ba2074b1a12c15b9c6",
+          "byte_size": 6449,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-052"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-053.png",
+          "sha256": "5e8954876c1d75356872bdeb68fef78c57b098637730be4b891720ecd4663817",
+          "byte_size": 6014,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-053"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-054.png",
+          "sha256": "689ffbd687140358da6498c53df2f9f2fcbe134ff2b31d8e3155cca9415fbe29",
+          "byte_size": 5571,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-054"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-055.png",
+          "sha256": "ebfabf569bd2c68f082ce85bc0baa920ad6c184757c20cf3b9632e4da7c1ff55",
+          "byte_size": 7138,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-055"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-056.png",
+          "sha256": "d3e4270434d0f7fda8b5d627406949294ca71e3743a809112589f542a7bb19f7",
+          "byte_size": 8759,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-056"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-057.png",
+          "sha256": "84197fcfcf87702ab58c30d9245add340a11a9ee102d44743faaf9e18cc6436e",
+          "byte_size": 7395,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-057"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-058.png",
+          "sha256": "435558093991b548cc2f5eb9a5e2ce3ac1c003f8adda728c8ea04f533a3a5823",
+          "byte_size": 7455,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-058"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-059.png",
+          "sha256": "7ba6a87f6cb91f1686bbed92f965b885a436356077e010ae1790d362655e9cc7",
+          "byte_size": 6669,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-059"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-060.png",
+          "sha256": "51fafae64f33c09badbea566ec779c619244f5863dd5f1e049f86afa97eb6da0",
+          "byte_size": 7280,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-060"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-061.png",
+          "sha256": "7780904cc9de0e1c318ac14ccd35600dc31ca924374f77673d945da6395e6216",
+          "byte_size": 5624,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-061"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-062.png",
+          "sha256": "232fde035edb200a6f68c1c631b60c06ac61696a85f0bae87cc4fca6623ca068",
+          "byte_size": 6770,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-062"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-32/tiles/glyph-063.png",
+          "sha256": "eb0a266a337a32c1730a2aee288015643af7452ee0ad28f3839c73a6b2afb5e4",
+          "byte_size": 7118,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-063"
+        }
+      ],
+      "errors": [],
+      "speedup_vs_concurrency_1": 28.4898,
+      "parallel_efficiency": 0.8903
+    },
+    {
+      "concurrency": 64,
+      "status": "passed",
+      "execution_id": "f5265c24933d4ff5b2bb5aedfcf73af0",
+      "generation_wall_s": 9.361431,
+      "validation_wall_s": 4.633658,
+      "end_to_end_wall_s": 13.995089,
+      "completed_nodes": 64,
+      "throughput_glyphs_per_s": 6.8366,
+      "cost_usd": 0.0,
+      "cost_is_complete": true,
+      "cost_contains_estimates": false,
+      "validation": {
+        "passed": true,
+        "expected_tiles": 64,
+        "valid_png_tiles": 64,
+        "tile_size": [
+          128,
+          128
+        ],
+        "unique_tile_hashes": 64,
+        "errors": []
+      },
+      "tile_receipts": [
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-000.png",
+          "sha256": "b838edcdcc0a842b06857d62940368c1c4fc1fea03ef648ee20c3651340a6cdb",
+          "byte_size": 8202,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-000"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-001.png",
+          "sha256": "6905d8e97b47b063408c7f5b7282d2222fababacf499d4827cacccd1353eea46",
+          "byte_size": 6780,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-001"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-002.png",
+          "sha256": "a90c184fec031ae3ba6cff40469a08cd1d09282017cf58e331b25ba6a47dbc55",
+          "byte_size": 7537,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-002"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-003.png",
+          "sha256": "d53f36301cdfc3bdace4abd564e6c826938f50b70d2c0dce2dc5aed93d5db462",
+          "byte_size": 7663,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-003"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-004.png",
+          "sha256": "ffc006a16f856e67bd08bb4069f7fd5f815899ef07af3b37efbe2c5689f41b22",
+          "byte_size": 6218,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-004"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-005.png",
+          "sha256": "191d96fce14a29542b15b3dd0beb29887310f6f266c13947ac89da727bcafb1d",
+          "byte_size": 6715,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-005"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-006.png",
+          "sha256": "86650547160e25300ed03fd888b041cca80e71d6ab249019ea015be4f4e56a62",
+          "byte_size": 8147,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-006"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-007.png",
+          "sha256": "e7b1da6047fcee67ad7440edd20f614608155f665787d8bf3678d1772d4808ee",
+          "byte_size": 7128,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-007"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-008.png",
+          "sha256": "37e1daec37515668ccbf855ba980805a0c0e6b96ebfe8a67c5034a12e5d5965b",
+          "byte_size": 7627,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-008"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-009.png",
+          "sha256": "661c3e0d28eef79970f78312ae5cdc77922a39ab4f8f6adf5402a649c4feae4d",
+          "byte_size": 6114,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-009"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-010.png",
+          "sha256": "1e27e4139f64a7fe6ea4331e84b0712f25445a22d3930756c171d8cf49787659",
+          "byte_size": 7077,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-010"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-011.png",
+          "sha256": "6ef0674648a7f39ae8128d0cfa8481fa173ca5e79b4f9f04d2a67384925409ed",
+          "byte_size": 6032,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-011"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-012.png",
+          "sha256": "2a6da5de4637fee6feb1d1bd549c3b78e40903f82a331aea8c1fe0239dd141a7",
+          "byte_size": 8330,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-012"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-013.png",
+          "sha256": "ac7ef5476b9e069873a7c9ade05c103f26f59120beb544dacb49870d0dba4b6d",
+          "byte_size": 6957,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-013"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-014.png",
+          "sha256": "8c0d6979ebcd66b413be4f8b902a3662c89ce83d86a16f8f757cec113384c9ce",
+          "byte_size": 7300,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-014"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-015.png",
+          "sha256": "ac580a37c32949c2f29473c6a87e89e0cea5e1ee203ed23765b07bb94202bc51",
+          "byte_size": 7689,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-015"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-016.png",
+          "sha256": "24df3f19d01bfbb401c02aada9eb00b0b77d68649ef9b1606751e3cb1c997ee4",
+          "byte_size": 8200,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-016"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-017.png",
+          "sha256": "58ab2f0083ba7e79b9f061abdbe7f7ee518a0fd5c8a1c6247c5d66aaf979756d",
+          "byte_size": 6930,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-017"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-018.png",
+          "sha256": "d03c51fd9d97cecaffef6eb8936b982b98bc058099a6cc185dab875389c11b66",
+          "byte_size": 7786,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-018"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-019.png",
+          "sha256": "d32036c903dea684f95efe2572b5dc3085e4efea5a5dcccb833033d949b5b776",
+          "byte_size": 7657,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-019"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-020.png",
+          "sha256": "9e5b81c326c68ceb57865cbe8f39eb0c670145f877e6f104c03434989d25ad28",
+          "byte_size": 7604,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-020"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-021.png",
+          "sha256": "e5fc283b11e9fac8bfd3427231554df17d93229a42d2cff844e2ae9f79fa68a6",
+          "byte_size": 6956,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-021"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-022.png",
+          "sha256": "781e53cae41f9e112293c372dc157329c81a16b71de9031a0fe64711a6be36a0",
+          "byte_size": 7208,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-022"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-023.png",
+          "sha256": "3b9e005010d53ed3ba98edd3da56a7c5f6bbc12210d639563f69f43087a58c30",
+          "byte_size": 8422,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-023"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-024.png",
+          "sha256": "dcbf0adddb2e6f5dd893454056d965d8ed106a3dca5910a68cfcbfa45efd2d40",
+          "byte_size": 7751,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-024"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-025.png",
+          "sha256": "5ca8791d85c8ccf6ac1276e4ae34eab379815c2a5c5d0a520104cf76344043ee",
+          "byte_size": 7250,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-025"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-026.png",
+          "sha256": "3fe63787378f20cbc510e8af605e1c4d9aa308ec7a68c6fea8e11129ee9ff8d5",
+          "byte_size": 6983,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-026"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-027.png",
+          "sha256": "c4ed94b39772251bc7acae572c2c89ddefef494c0c4ea11c7718fd4de995c317",
+          "byte_size": 8111,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-027"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-028.png",
+          "sha256": "528ddf773d03da29bb16c923276e83aad453fb19f541c17dc615fbba2a5ad124",
+          "byte_size": 6813,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-028"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-029.png",
+          "sha256": "b3edf58e1b830723c90f1b0438f317557141b3b9e9e423734e3b79c1865f3857",
+          "byte_size": 6892,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-029"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-030.png",
+          "sha256": "0c26d1f4d8c0c3dbbc57fe5584636741353c7a080cc9fcdeb41445a2e0c7575a",
+          "byte_size": 8814,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-030"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-031.png",
+          "sha256": "d728f3d7aee1b23213da51d33df61e7f98cf11926f843e8aded5318274aada83",
+          "byte_size": 6872,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-031"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-032.png",
+          "sha256": "cb442cdbf1c13dc9a203adcce98e4e29baf4fd23078243e40032c6346abd6ecc",
+          "byte_size": 6920,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-032"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-033.png",
+          "sha256": "b7a2624e8e5fdbf74049676920e601d0b7e62d9182af83ad0d774b13d46c191a",
+          "byte_size": 7107,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-033"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-034.png",
+          "sha256": "2d8ea7196c95772b81cd3c74ae0b219bc962ceb96ce1ef8a404ca624aab59211",
+          "byte_size": 7599,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-034"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-035.png",
+          "sha256": "e43f91c321fb1331a4a89d7b4221a4ce341e0edc61bc2f586155f2adbaf74d93",
+          "byte_size": 7392,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-035"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-036.png",
+          "sha256": "5bf2667dcf333aea574d1126ab06496e74188542895378a5d22e4a3f35575978",
+          "byte_size": 6965,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-036"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-037.png",
+          "sha256": "5e4f24def58d9d9df28c51a16d4d09c86f57aa8817185c389f1b82c08fb8c629",
+          "byte_size": 6564,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-037"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-038.png",
+          "sha256": "74b5d69d70c853eb2f1dc536b8550c43fa9bd17f268442ce160b9ed11c8e9690",
+          "byte_size": 7610,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-038"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-039.png",
+          "sha256": "84c9ab1d35a50b01bb900ef096c4715febda366c98d70e2d7f6885f67aab930e",
+          "byte_size": 7494,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-039"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-040.png",
+          "sha256": "58de7583d96c740b394b78e6bc3d71805c41ebe0d528751fa47b189c3d8e8db5",
+          "byte_size": 8222,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-040"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-041.png",
+          "sha256": "b640fb11d44d56db1c62f853d85dd12bf23443da2dd688976dcd07bff30116ba",
+          "byte_size": 7803,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-041"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-042.png",
+          "sha256": "8b8829305bf13af4889d5e8af7cbfaa5585a127770681989a2736c3a11e7622b",
+          "byte_size": 7652,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-042"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-043.png",
+          "sha256": "365eef987e5940e5bb7827b6a2ae7da87386d435b22ad5ff9863865637d7e621",
+          "byte_size": 7496,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-043"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-044.png",
+          "sha256": "21a9821c702b15ac0600552a904698661c03164675a1cfa2515d2e38962d9821",
+          "byte_size": 6990,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-044"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-045.png",
+          "sha256": "c83bfaebf27e0e50d480776431743e6d7e61d8125ffe8e19c84bea7c98b3da13",
+          "byte_size": 5459,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-045"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-046.png",
+          "sha256": "73baad84f4e0cf294ab9750116fc40e151a1f03a736936767a6ad6f2304eb173",
+          "byte_size": 8204,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-046"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-047.png",
+          "sha256": "ce464b2c9a64fa0b394f89f24a80c8bc31ea814235a2042c0a50a1cfd5add2fb",
+          "byte_size": 6922,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-047"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-048.png",
+          "sha256": "25426e609ea9a6504379b48a001cfe2eb01423e99eb1771c0433bf15c9dda1dc",
+          "byte_size": 7740,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-048"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-049.png",
+          "sha256": "00c42025a758a002afaae576b1cef8e2a7431f773295c8e213cb0656fd1dc91b",
+          "byte_size": 5509,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-049"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-050.png",
+          "sha256": "5b17099bb8fcf5dc48c48207a3577d19a4cbd1b54c7e76022a4559a4c02548fa",
+          "byte_size": 7104,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-050"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-051.png",
+          "sha256": "fd7cd99b4eaa0c62ffb6b634493c22e8ba731a470230ec08a4db3ee2d4813548",
+          "byte_size": 4597,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-051"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-052.png",
+          "sha256": "3b9ff7695ea0d18e88d3bb42dd6613f4e7b7b2069fc2d2ba2074b1a12c15b9c6",
+          "byte_size": 6449,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-052"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-053.png",
+          "sha256": "5e8954876c1d75356872bdeb68fef78c57b098637730be4b891720ecd4663817",
+          "byte_size": 6014,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-053"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-054.png",
+          "sha256": "689ffbd687140358da6498c53df2f9f2fcbe134ff2b31d8e3155cca9415fbe29",
+          "byte_size": 5571,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-054"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-055.png",
+          "sha256": "ebfabf569bd2c68f082ce85bc0baa920ad6c184757c20cf3b9632e4da7c1ff55",
+          "byte_size": 7138,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-055"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-056.png",
+          "sha256": "d3e4270434d0f7fda8b5d627406949294ca71e3743a809112589f542a7bb19f7",
+          "byte_size": 8759,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-056"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-057.png",
+          "sha256": "84197fcfcf87702ab58c30d9245add340a11a9ee102d44743faaf9e18cc6436e",
+          "byte_size": 7395,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-057"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-058.png",
+          "sha256": "435558093991b548cc2f5eb9a5e2ce3ac1c003f8adda728c8ea04f533a3a5823",
+          "byte_size": 7455,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-058"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-059.png",
+          "sha256": "7ba6a87f6cb91f1686bbed92f965b885a436356077e010ae1790d362655e9cc7",
+          "byte_size": 6669,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-059"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-060.png",
+          "sha256": "51fafae64f33c09badbea566ec779c619244f5863dd5f1e049f86afa97eb6da0",
+          "byte_size": 7280,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-060"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-061.png",
+          "sha256": "7780904cc9de0e1c318ac14ccd35600dc31ca924374f77673d945da6395e6216",
+          "byte_size": 5624,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-061"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-062.png",
+          "sha256": "232fde035edb200a6f68c1c631b60c06ac61696a85f0bae87cc4fca6623ca068",
+          "byte_size": 6770,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-062"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/partitions/64_offline_realistic/runs/concurrency-64/tiles/glyph-063.png",
+          "sha256": "eb0a266a337a32c1730a2aee288015643af7452ee0ad28f3839c73a6b2afb5e4",
+          "byte_size": 7118,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-063"
+        }
+      ],
+      "errors": [],
+      "speedup_vs_concurrency_1": 40.3674,
+      "parallel_efficiency": 0.6307
+    }
+  ],
+  "fastest_concurrency": 64,
+  "assembly": null,
+  "total_recorded_cost_usd": 0.0,
+  "errors": []
+}

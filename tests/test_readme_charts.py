@@ -78,11 +78,21 @@ def test_glyph_diagrams_use_the_committed_vector_catalog():
     assert "12 / 192" in specimens
 
 
-def test_glyph_scaling_chart_uses_both_isolated_records():
+def test_glyph_scaling_chart_uses_all_four_isolated_records():
     svg = render_glyph_scaling()
-    for value in ("56.2×", "49.56×", "192 and 256 valid unique tiles"):
+    for value in (
+        "64 nodes",
+        "128 nodes",
+        "192 nodes",
+        "256 nodes",
+        "40.37×",
+        "44.51×",
+        "56.21×",
+        "49.56×",
+        "64 / 128 / 192 / 256 valid unique tiles",
+    ):
         assert value in svg
-    assert "Scaling across 192 and 256 nodes" in svg
+    assert "Scaling across 64, 128, 192 and 256 nodes" in svg
 
 
 def test_readme_places_evidence_before_the_glyph_rain_example():
@@ -93,10 +103,11 @@ def test_readme_places_evidence_before_the_glyph_rain_example():
         "assets/benchmarks/framework_comparison.svg",
         "## Architected planning beats fixed execution on efficiency",
         "assets/benchmarks/shape_efficiency.svg",
-        "## Artifact fan-out scales from 192 to 256 nodes",
+        "## Artifact fan-out scales from 64 to 256 nodes",
         "assets/benchmarks/glyph_scaling.svg",
         "## Example: Glyph Rain at 192-node fan-out",
         "assets/glyph_rain/glyph-rain-screenshot.png",
+        "**Download:** [Windows `.scr`]",
         "assets/glyph_rain/glyph_pipeline.svg",
         "assets/glyph_rain/glyph_specimens.svg",
     )
@@ -109,3 +120,10 @@ def test_public_mermaid_avoids_reserved_graph_node_id():
     reserved_node = re.compile(r"^\s*graph\[", re.MULTILINE)
     for path in public_markdown:
         assert not reserved_node.search(path.read_text(encoding="utf-8")), path
+
+
+def test_screensaver_is_one_word_in_public_landing_copy():
+    readme = ROOT.joinpath("README.md").read_text(encoding="utf-8")
+    pipeline = render_glyph_pipeline()
+    assert not re.search(r"screen saver", readme, re.IGNORECASE)
+    assert "SCREEN SAVER" not in pipeline

@@ -71,9 +71,9 @@ The current unreleased work hardens the guarantees users depend on before a
 6. **Typed production asset contracts** — concept-versus-production brand
    rules, exact master/text compositing, atomic finishing, hash receipts, and
    deterministic validation gates separated from advisory judgments
-7. **Glyph Rain fan-out example** — 192 objectively validated unique tiles,
-   an isolated 256-node comparison, realistic-latency concurrency sweeps
-   through k=64, live Gemini and GPT Image lanes, and assembled
+7. **Glyph Rain fan-out example** — isolated 64-, 128-, 192-, and 256-node
+   partitions with objectively validated unique tiles, realistic-latency
+   concurrency sweeps through k=64, live Gemini and GPT Image lanes, and assembled
    preview/GIF/atlas/HTML deliverables plus web, Windows, and macOS ports
 8. **Bounded Autotune v1**: immutable hash-bound contracts and allowlisted
    candidates, a zero-API-spend offline concurrency campaign, plan-bound async

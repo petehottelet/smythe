@@ -29,14 +29,15 @@ the application.
 pip install smythe
 ```
 
-Set `ANTHROPIC_API_KEY`, then hand Smythe a goal. Planning returns the generated
-DAG for inspection before execution starts:
+Set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY`, then choose a
+model from that provider in `Swarm(model=...)`. Hand Smythe a goal and planning
+returns the generated DAG for inspection before execution starts:
 
 ```python
 from smythe import Swarm, Task
 
 swarm = Swarm(
-    model="claude-opus-4-8",
+    model="claude-opus-4-8",  # or an OpenAI / Gemini model you can access
     max_budget_usd=0.50,
     parallel=True,
     max_concurrency=8,
@@ -98,17 +99,17 @@ time**, and **20% less cost per quality point**. It used one node for a
 one-step transform and 5.3 nodes for the parallel workload—the graph size
 changed with the work. [Shape-suite report and raw records](benchmarks/shape_suite.md).
 
-## Artifact fan-out scales from 192 to 256 nodes
+## Artifact fan-out scales from 64 to 256 nodes
 
 <p align="center">
-  <img src="assets/benchmarks/glyph_scaling.svg" alt="Throughput across matched 192-node and isolated 256-node Glyph Rain sweeps; both produce valid unique tiles at every concurrency" width="900">
+  <img src="assets/benchmarks/glyph_scaling.svg" alt="Throughput across matched 64-, 128-, 192-, and 256-node Glyph Rain sweeps; every run produces valid unique tiles at each concurrency" width="900">
 </p>
 
-The partitioned 256-node run produced **256 valid, unique glyphs at every
-measured concurrency** and reached **49.56× speedup at concurrency 64**. Its
-result record, raw-output namespace, 16×16 atlas, preview, animation, and HTML
-are isolated from the existing 192-character screensaver build.
-[256-node report and records](benchmarks/partitions/glyph_256/README.md).
+The matched 64-, 128-, 192-, and 256-node partitions each produced a complete
+set of valid, unique glyphs at every measured concurrency. Each width has its
+own result record and raw-output namespace; the wider comparisons do not alter
+the existing 192-character screensaver build.
+[Width-scaling protocol and records](benchmarks/glyph_screensaver_benchmark.md#width-scaling-from-64-to-256-nodes).
 
 Every headline number above is rendered from a committed result record. The
 [benchmark index](benchmarks/README.md) separates current, claimable evidence
@@ -125,6 +126,12 @@ artifacts, and recovery available to any Smythe workload.
   <img src="assets/glyph_rain/glyph-rain-screenshot.png" alt="Smythe Glyph Rain example running with 192 original procedural cyber glyphs" width="900">
 </p>
 
+**Download:** [Windows `.scr`](screensaver/dist/SmytheGlyphRain.scr) ·
+[macOS `.saver` build](https://github.com/petehottelet/smythe/actions/workflows/screensavers.yml) ·
+[screensaver source](screensaver/) ·
+[192-glyph atlas](assets/glyph_rain/glyph-atlas.png) ·
+[256-glyph atlas](benchmarks/partitions/glyph_256/assets/glyph-atlas.png)
+
 <p align="center">
   <img src="assets/glyph_rain/glyph_pipeline.svg" alt="Glyph Rain example pipeline: a brief becomes a generated 192-node graph, each glyph is verified, and the results are assembled into screensaver artifacts" width="900">
 </p>
@@ -137,12 +144,6 @@ Each node produces one original tile. Every tile is normalized,
 dimension-checked, and SHA-256 verified before assembly. The specimen plate
 above is drawn directly from the committed vector stroke programs used by the
 web, Windows, and macOS ports.
-
-**Download:** [Windows `.scr`](screensaver/dist/SmytheGlyphRain.scr) ·
-[macOS `.saver` build](https://github.com/petehottelet/smythe/actions/workflows/screensavers.yml) ·
-[screensaver source](screensaver/) ·
-[192-glyph atlas](assets/glyph_rain/glyph-atlas.png) ·
-[256-glyph atlas](benchmarks/partitions/glyph_256/assets/glyph-atlas.png)
 
 At the published realistic-latency profile, the 192-node example takes **19
 minutes at concurrency 1** and **20.5 seconds at concurrency 64**: a measured
