@@ -72,6 +72,24 @@ python benchmarks/run_glyph_screensaver.py --glyphs 256 \
 
 See the partition [report and comparison](partitions/glyph_256/README.md).
 
+### Width scaling from 64 to 256 nodes
+
+Four isolated partitions measure the same deterministic provider, 5.8-second
+simulated call latency, and concurrency sweep at different graph widths. No
+result or artifact namespace is shared between widths:
+
+| Nodes | Record | Serial wall | Wall at c=64 | Throughput at c=64 | Speedup at c=64 | Validation |
+|---:|---|---:|---:|---:|---:|---|
+| 64 | [JSON](results/glyph_screensaver_64_offline_realistic.json) | 377.9 s | 9.4 s | 6.8 glyphs/s | 40.37× | 64/64 valid and unique |
+| 128 | [JSON](results/glyph_screensaver_128_offline_realistic.json) | 756.4 s | 17.0 s | 7.5 glyphs/s | 44.51× | 128/128 valid and unique |
+| 192 | [JSON](results/glyph_screensaver_offline_realistic.json) | 1,149.6 s | 20.5 s | 9.4 glyphs/s | 56.21× | 192/192 valid and unique |
+| 256 | [JSON](results/glyph_screensaver_256_offline_realistic.json) | 1,517.0 s | 30.6 s | 8.4 glyphs/s | 49.56× | 256/256 valid and unique |
+
+Every partition passed its objective PNG and SHA-256 uniqueness gates at every
+measured concurrency. These are controlled executor measurements, not image-API
+capacity claims; the constant latency makes graph width and concurrency the
+variables under test.
+
 ## Protocol
 
 - One `ExecutionGraph` containing one independent `Node` task per glyph. Here a node is a

@@ -365,8 +365,8 @@ def _glyph_runs(name: str) -> tuple[dict, list[dict]]:
     record = _load(name)
     runs = record.get("runs", [])
     expected = record.get("protocol", {}).get("graph_nodes")
-    if record.get("status") != "passed" or not runs or expected not in (192, 256):
-        raise ValueError(f"{name} is not a passing 192- or 256-node glyph record")
+    if record.get("status") != "passed" or not runs or expected not in (64, 128, 192, 256):
+        raise ValueError(f"{name} is not a passing 64-, 128-, 192-, or 256-node glyph record")
     for run in runs:
         validation = run.get("validation", {})
         if (
@@ -378,16 +378,55 @@ def _glyph_runs(name: str) -> tuple[dict, list[dict]]:
     return record, runs
 
 
+def _glyph_marker(kind: str, x: float, y: float) -> str:
+    if kind == "circle":
+        return f'<circle cx="{x:.1f}" cy="{y:.1f}" r="5" fill="{BLACK}"/>\n'
+    if kind == "square":
+        return (
+            f'<rect x="{x - 5:.1f}" y="{y - 5:.1f}" width="10" height="10" '
+            f'fill="{WHITE}" stroke="{BLACK}" stroke-width="2"/>\n'
+        )
+    if kind == "diamond":
+        return (
+            f'<path d="M{x:.1f} {y - 6:.1f}L{x + 6:.1f} {y:.1f}'
+            f'L{x:.1f} {y + 6:.1f}L{x - 6:.1f} {y:.1f}Z" fill="{BLACK}"/>\n'
+        )
+    if kind == "triangle":
+        return (
+            f'<path d="M{x:.1f} {y - 6:.1f}L{x + 6:.1f} {y + 5:.1f}'
+            f'L{x - 6:.1f} {y + 5:.1f}Z" fill="{WHITE}" stroke="{BLACK}" '
+            'stroke-width="2"/>\n'
+        )
+    raise ValueError(f"unknown glyph chart marker: {kind}")
+
+
 def render_glyph_scaling() -> str:
-    """Render the isolated 192- and 256-node realistic-latency sweeps."""
+    """Render the isolated 64-, 128-, 192-, and 256-node sweeps."""
+    record_64, runs_64 = _glyph_runs("glyph_screensaver_64_offline_realistic.json")
+    record_128, runs_128 = _glyph_runs("glyph_screensaver_128_offline_realistic.json")
     record_192, runs_192 = _glyph_runs("glyph_screensaver_offline_realistic.json")
     record_256, runs_256 = _glyph_runs("glyph_screensaver_256_offline_realistic.json")
-    concurrencies = [run["concurrency"] for run in runs_192]
-    if concurrencies != [run["concurrency"] for run in runs_256]:
+    series = (
+        (64, record_64, runs_64, "2 6", "triangle", 2.0),
+        (128, record_128, runs_128, "12 5 2 5", "diamond", 2.0),
+        (192, record_192, runs_192, None, "circle", 4.0),
+        (256, record_256, runs_256, "9 7", "square", 2.0),
+    )
+    concurrencies = [run["concurrency"] for run in runs_64]
+    if any(concurrencies != [run["concurrency"] for run in runs] for _, _, runs, *_ in series):
         raise ValueError("glyph scaling records use different concurrency sweeps")
+    if any(record["protocol"]["offline_latency_s"] != 5.8 for _, record, *_ in series):
+        raise ValueError("glyph scaling records do not use the matched 5.8-second latency")
 
     body = _text(40, 49, "ARTIFACT FAN-OUT", size=11, weight="700", tracking=2.2)
-    body += _text(40, 86, "Scaling across 192 and 256 nodes", size=29, weight="700", family=SERIF)
+    body += _text(
+        40,
+        86,
+        "Scaling across 64, 128, 192 and 256 nodes",
+        size=27,
+        weight="700",
+        family=SERIF,
+    )
     body += _text(
         40,
         111,
@@ -395,10 +434,18 @@ def render_glyph_scaling() -> str:
         size=13,
     )
     body += f'<line x1="40" y1="132" x2="920" y2="132" stroke="{BLACK}" stroke-width="2"/>\n'
-    body += _legend(600, 108, "192 nodes", "solid")
-    body += _legend(756, 108, "256 nodes", "outline")
 
-    plot_left, plot_top, plot_right, plot_bottom = 92, 168, 900, 350
+    legend_positions = (70, 282, 494, 706)
+    for x, (nodes, _, _, dash, marker, width) in zip(legend_positions, series, strict=True):
+        dash_attr = "" if dash is None else f' stroke-dasharray="{dash}"'
+        body += (
+            f'<line x1="{x}" y1="158" x2="{x + 42}" y2="158" stroke="{BLACK}" '
+            f'stroke-width="{width:g}"{dash_attr}/>\n'
+        )
+        body += _glyph_marker(marker, x + 21, 158)
+        body += _text(x + 54, 162, f"{nodes} nodes", size=11.5, weight="700")
+
+    plot_left, plot_top, plot_right, plot_bottom = 92, 196, 900, 378
     max_throughput = 10.0
     for tick in (0, 2.5, 5.0, 7.5, 10.0):
         y = plot_bottom - (tick / max_throughput) * (plot_bottom - plot_top)
@@ -407,7 +454,7 @@ def render_glyph_scaling() -> str:
             f'<line x1="{plot_left}" y1="{y:.1f}" x2="{plot_right}" y2="{y:.1f}" '
             f'stroke="{BLACK}" stroke-dasharray="2 7"/>\n'
         )
-    body += _text(40, 260, "GLYPHS / S", size=9.5, weight="700", tracking=1.2)
+    body += _text(40, 288, "GLYPHS / S", size=9.5, weight="700", tracking=1.2)
 
     x_step = (plot_right - plot_left) / (len(concurrencies) - 1)
     x_positions = [plot_left + index * x_step for index in range(len(concurrencies))]
@@ -435,40 +482,41 @@ def render_glyph_scaling() -> str:
             for x, run in zip(x_positions, runs, strict=True)
         ]
 
-    points_192 = points(runs_192)
-    points_256 = points(runs_256)
-    path_192 = " ".join(f"{x:.1f},{y:.1f}" for x, y in points_192)
-    path_256 = " ".join(f"{x:.1f},{y:.1f}" for x, y in points_256)
-    body += f'<polyline points="{path_192}" fill="none" stroke="{BLACK}" stroke-width="4"/>\n'
-    body += (
-        f'<polyline points="{path_256}" fill="none" stroke="{BLACK}" '
-        'stroke-width="2" stroke-dasharray="9 7"/>\n'
-    )
-    for x, y in points_192:
-        body += f'<circle cx="{x:.1f}" cy="{y:.1f}" r="5" fill="{BLACK}"/>\n'
-    for x, y in points_256:
+    for _, _, runs, dash, marker, width in series:
+        series_points = points(runs)
+        path = " ".join(f"{x:.1f},{y:.1f}" for x, y in series_points)
+        dash_attr = "" if dash is None else f' stroke-dasharray="{dash}"'
         body += (
-            f'<rect x="{x - 5:.1f}" y="{y - 5:.1f}" width="10" height="10" '
-            f'fill="{WHITE}" stroke="{BLACK}" stroke-width="2"/>\n'
+            f'<polyline points="{path}" fill="none" stroke="{BLACK}" '
+            f'stroke-width="{width:g}"{dash_attr}/>\n'
         )
+        for x, y in series_points:
+            body += _glyph_marker(marker, x, y)
 
-    speedup_192 = runs_192[-1]["speedup_vs_concurrency_1"]
-    speedup_256 = runs_256[-1]["speedup_vs_concurrency_1"]
-    body += f'<line x1="40" y1="420" x2="920" y2="420" stroke="{BLACK}"/>\n'
-    body += _text(40, 477, f"{speedup_192:.1f}×", size=42, family=TRAJAN, weight="700")
-    body += _text(42, 501, "192 NODES / CONCURRENCY 64", size=10, weight="700", tracking=1.0)
-    body += f'<line x1="480" y1="438" x2="480" y2="506" stroke="{BLACK}"/>\n'
-    body += _text(520, 477, f"{speedup_256:.2f}×", size=42, family=TRAJAN, weight="700")
-    body += _text(522, 501, "256 NODES / CONCURRENCY 64", size=10, weight="700", tracking=1.0)
+    body += f'<line x1="40" y1="448" x2="920" y2="448" stroke="{BLACK}"/>\n'
+    callout_x = (40, 260, 480, 700)
+    for index, (x, (nodes, _, runs, *_)) in enumerate(zip(callout_x, series, strict=True)):
+        speedup = runs[-1]["speedup_vs_concurrency_1"]
+        body += _text(x, 499, f"{speedup:.2f}×", size=34, family=TRAJAN, weight="700")
+        body += _text(
+            x + 2,
+            522,
+            f"{nodes} NODES / CONCURRENCY 64",
+            size=8.5,
+            weight="700",
+            tracking=0.8,
+        )
+        if index < len(callout_x) - 1:
+            body += f'<line x1="{x + 202}" y1="464" x2="{x + 202}" y2="528" stroke="{BLACK}"/>\n'
     body += _text(
         40,
-        533,
-        "192 and 256 valid unique tiles at every concurrency",
+        557,
+        "64 / 128 / 192 / 256 valid unique tiles at every concurrency",
         size=10.5,
     )
     body += _text(
         920,
-        533,
+        557,
         f'{record_192["protocol"]["offline_latency_s"]:.1f}s matched latency / $0 API cost',
         size=10.5,
         anchor="end",
@@ -476,18 +524,18 @@ def render_glyph_scaling() -> str:
     )
     return _svg(
         960,
-        550,
+        574,
         body,
         label=(
-            "Throughput chart for the isolated 192- and 256-node Glyph Rain sweeps. "
-            "Both produce valid unique tiles at every measured concurrency."
+            "Throughput chart for isolated 64-, 128-, 192-, and 256-node Glyph Rain "
+            "sweeps. Every run produces valid unique tiles at each measured concurrency."
         ),
     )
 
 
 def render_glyph_pipeline() -> str:
     """Render the Glyph Rain example as a generated graph and execution envelope."""
-    body = _text(40, 49, "FROM BRIEF TO SCREEN SAVER", size=11, weight="700", tracking=2.2)
+    body = _text(40, 49, "FROM BRIEF TO SCREENSAVER", size=11, weight="700", tracking=2.2)
     body += _text(40, 86, "One example of Smythe at high fan-out", size=29, weight="700", family=SERIF)
     body += f'<line x1="40" y1="108" x2="920" y2="108" stroke="{BLACK}" stroke-width="2"/>\n'
 

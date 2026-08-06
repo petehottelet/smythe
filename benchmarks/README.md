@@ -16,8 +16,7 @@ mechanics run in CI with deterministic providers and zero API cost.
 |---|---|---|
 | [Task-shape suite v3](shape_suite.md) | **Claimable** | Quality within judge variance of fixed; 19% lower cost; 14% lower wall time |
 | [Hard-kill durability v2](durability_benchmark.md) | **Claimable** | 8 duplicate dispatches after resume versus LangGraph's 32, across 3 reps |
-| [Glyph Rain realistic-latency sweep](glyph_screensaver_benchmark.md) | **Claimable** | 192 valid unique tiles; 56.2× measured speedup at concurrency 64 |
-| [Glyph Rain 256-glyph partition](partitions/glyph_256/README.md) | **Claimable** | 256 valid unique tiles at every concurrency; 49.56× at concurrency 64; isolated outputs |
+| [Glyph Rain width-scaling sweep](glyph_screensaver_benchmark.md#width-scaling-from-64-to-256-nodes) | **Claimable** | 64, 128, 192, and 256 valid unique tiles at every concurrency; 40.37×–56.21× at concurrency 64; isolated outputs |
 | [Image concurrency sweep](image_benchmarks.md) | **Claimable** | 6.6× wall-clock speedup at concurrency 8; 72/72 valid images |
 | [Corrected framework head-to-head](#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12) | **Claimable** | Best blind quality, mean tokens, and mean wall time across the three fixed-pipeline implementations |
 | Original self-baselines and pre-correction framework record | Diagnostic | Preserved because they found payload, assembly, and measurement defects; superseded by corrected campaigns |
@@ -282,6 +281,11 @@ Those values are examples of the guardrail shape, not current pricing advice.
 Verify provider pricing immediately before any paid run. The offline sweep is
 an executor benchmark; only a repeated live lane can support claims about an
 external image API's latency or rate limits.
+
+The matched [width-scaling records](glyph_screensaver_benchmark.md#width-scaling-from-64-to-256-nodes)
+cover 64, 128, 192, and 256 nodes in separate output namespaces. Every width
+produced a complete set of valid, SHA-256-unique tiles at every measured
+concurrency; speedup at concurrency 64 ranged from 40.37× to 56.21×.
 
 ### Results — realistic-latency profile (2026-08-05)
 
