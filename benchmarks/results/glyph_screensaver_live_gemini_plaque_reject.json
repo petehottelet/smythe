@@ -1,0 +1,2114 @@
+{
+  "benchmark": "glyph-screensaver-fanout",
+  "record_version": 1,
+  "mode": "live",
+  "status": "failed",
+  "protocol": {
+    "graph_nodes": 192,
+    "topology": "broadcast_reduce",
+    "one_provider_call_per_node": true,
+    "concurrencies": [
+      8
+    ],
+    "offline_latency_s": null,
+    "normalization": "PNG 128x128",
+    "assembly_requires_glyphs": 192
+  },
+  "provider": {
+    "name": "GeminiProvider",
+    "model": "gemini-2.5-flash-image",
+    "size": "1024x1024 (1:1 aspect config)",
+    "quality": "default",
+    "cost_per_image_usd_estimate": 0.039,
+    "max_cost_per_call_usd": 0.06,
+    "max_budget_usd": 11.52,
+    "official_guide": null
+  },
+  "environment": {
+    "python": "3.12.7",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "packages": {
+      "smythe": "0.1.0",
+      "pillow": "12.3.0",
+      "openai": "2.45.0",
+      "google-genai": "2.11.0"
+    }
+  },
+  "runs": [
+    {
+      "concurrency": 8,
+      "status": "failed",
+      "execution_id": "3089b36db2054eb883c7faf7ff0c0787",
+      "generation_wall_s": 141.265195,
+      "validation_wall_s": 21.180668,
+      "end_to_end_wall_s": 162.445863,
+      "completed_nodes": 192,
+      "throughput_glyphs_per_s": 1.3591,
+      "cost_usd": 11.281044,
+      "cost_is_complete": true,
+      "cost_contains_estimates": true,
+      "validation": {
+        "passed": false,
+        "expected_tiles": 192,
+        "valid_png_tiles": 95,
+        "tile_size": [
+          128,
+          128
+        ],
+        "unique_tile_hashes": 95,
+        "errors": [
+          "glyph-000: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-001: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-004: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-008: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-014: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-015: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-016: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-019: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-020: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-021: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-022: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-023: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-024: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-025: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-028: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-029: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-032: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-033: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-034: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-035: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-037: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-040: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-041: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-044: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-046: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-049: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-050: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-051: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-053: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-055: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-056: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-060: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-061: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-063: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-065: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-066: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-069: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-078: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-080: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-085: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-087: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-091: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-092: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-094: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-096: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-101: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-102: expected one artifact, found 0",
+          "glyph-105: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-107: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-108: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-109: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-110: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-112: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-114: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-116: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-118: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-119: expected one artifact, found 0",
+          "glyph-120: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-122: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-124: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-125: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-127: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-131: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-132: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-133: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-134: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-136: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-139: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-140: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-142: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-143: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-150: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-153: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-155: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-156: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-158: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-159: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-161: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-162: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-165: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-167: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-168: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-172: expected one artifact, found 0",
+          "glyph-173: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-175: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-176: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-178: expected one artifact, found 0",
+          "glyph-179: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-181: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-182: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-183: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-184: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-185: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-186: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-188: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-190: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "glyph-191: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph",
+          "expected 192 valid tiles, found 95",
+          "expected 192 unique tile hashes, found 95"
+        ]
+      },
+      "tile_receipts": [
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-002.png",
+          "sha256": "6c634541c3037048f12d880fcabdbd9c2deaab5f6ca89f3739769f38a510e6a8",
+          "byte_size": 26271,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-002"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-003.png",
+          "sha256": "d9b0f22a4fa208fb768a555bd95072b3846b4d2db9513cdc648709778a183091",
+          "byte_size": 31999,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-003"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-005.png",
+          "sha256": "bbbf72ffea44f37d05a1d9034f5329d03be54a78f8a301bf6584cbe0f2df7eb7",
+          "byte_size": 23877,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-005"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-006.png",
+          "sha256": "4e1a8091094d1c3d5af0354c8480bc8ccc015167eeb2b6e1e2c2ba126d44b258",
+          "byte_size": 32157,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-006"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-007.png",
+          "sha256": "22f2c26782ab7d6fa094cfd9d7842e705d7ad062d763e27ad740b182f5d43793",
+          "byte_size": 27346,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-007"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-009.png",
+          "sha256": "74682d0d90c201975993540c29e967aac4b8bc5c06e9d1d5a400a8426b96fd68",
+          "byte_size": 26194,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-009"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-010.png",
+          "sha256": "452ee63caf70eba4d0d539eb2db079fc5ce06cdada93d2ba594f556eb123e9df",
+          "byte_size": 18881,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-010"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-011.png",
+          "sha256": "0e126acf25af03bad415133831d08ad6d1ea92f1c5b1012c96245be25082ef2c",
+          "byte_size": 33032,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-011"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-012.png",
+          "sha256": "fafe0a7d8ba3f10572a289a72d4f86b8140e83f152beb98151c9120f22026bb8",
+          "byte_size": 22649,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-012"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-013.png",
+          "sha256": "ff19c639ff69430dc8b49116a7269bec3fdb027977f1d5036e14ad9d2ae327a1",
+          "byte_size": 25068,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-013"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-017.png",
+          "sha256": "448a82bf0cb0ba6480391dad7d6fcdce7e8ecc80489ce05d925fb2cc37db465f",
+          "byte_size": 27260,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-017"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-018.png",
+          "sha256": "43ea35188ba74057a3696852297041c01050fd1a58aff4036d0afb10c58e96e6",
+          "byte_size": 30941,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-018"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-026.png",
+          "sha256": "5a296f53394d6f16c08a4eed46f377f694fbceef30826bfafe8d27834097e7fa",
+          "byte_size": 28226,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-026"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-027.png",
+          "sha256": "f5fc4ca6999fda18fb7bfdd5ebcd06a89afd2af383e0642e984b9ab81b854e44",
+          "byte_size": 26272,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-027"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-030.png",
+          "sha256": "181382c2ff0b2468c1758e7b556e93a5f60ca8b274443035c99e9b33aa70b834",
+          "byte_size": 33331,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-030"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-031.png",
+          "sha256": "123f9250773c12bface6aa13b44ee00b3eab7140225477867ae7477f809576b3",
+          "byte_size": 31269,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-031"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-036.png",
+          "sha256": "074a5e0460b4608cb505dfed032bce3acefaa808752630af51c73c02e03ad3c7",
+          "byte_size": 23438,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-036"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-038.png",
+          "sha256": "16c1a96d45c8faf1cedfaa39ec913a35701ca1db7c9c9a176e7c829b8a1c8912",
+          "byte_size": 32502,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-038"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-039.png",
+          "sha256": "0727cf0495d795e2b709b0c376ad64fb0c7e9cb520eeff01a900b5402970d0c8",
+          "byte_size": 27650,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-039"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-042.png",
+          "sha256": "bc163a3d17f356a73630ec8cf2a7b47a420f8ec9cdfc3cfc84eb77c20ae5a81b",
+          "byte_size": 14160,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-042"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-043.png",
+          "sha256": "ba857f7cd435540ea2fa902ce702d0c3bfb6cca24b08ec71cd3d6d7617589cf3",
+          "byte_size": 28970,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-043"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-045.png",
+          "sha256": "3d08a9bb81fd24d1cb9c3e0fcbf076f35ffa60f206498cea18c7c640b2222ab3",
+          "byte_size": 28815,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-045"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-047.png",
+          "sha256": "b934f40fbad0f4d73c1b9e11eb43f436d7d8da75ff294eafb37f6ca08a3db3d7",
+          "byte_size": 28342,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-047"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-048.png",
+          "sha256": "a5322dd3db70bd293ec33d5d263a04ba18f5cafa2bb77ae8620b12005403a8a2",
+          "byte_size": 32601,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-048"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-052.png",
+          "sha256": "cb224a2f3dcac2a298ef55f574a7a28d44025654f2b3671b00fa3462ae7c9823",
+          "byte_size": 17372,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-052"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-054.png",
+          "sha256": "2482251e9b9f3902dd81e3be362c55e8bbf3fa55a626f9b91f3c5fdd5aa0109f",
+          "byte_size": 21265,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-054"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-057.png",
+          "sha256": "a6429fc2f0859668583f9bd70b3eb8821863e1ce57382fcb3cd5a57ff0a5f975",
+          "byte_size": 36191,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-057"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-058.png",
+          "sha256": "7e0bd2a8b81c09bc4f1f0426eadc6c1ff1a28fe7c6ff47830bb2b8db0974c202",
+          "byte_size": 29173,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-058"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-059.png",
+          "sha256": "5fda2e0b4cd84ac7f2c7801aa2b05b2adc9f0d4b7738f8ee7d975d7ad02fb472",
+          "byte_size": 26046,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-059"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-062.png",
+          "sha256": "1b71543f6839a9256cc06153159d5f50f985b3d543245741da797a22d3a6feff",
+          "byte_size": 31203,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-062"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-064.png",
+          "sha256": "d69f000a0e61b11ea8704ae81a6b4d4a26cc22600037202aca3e000c869cfa00",
+          "byte_size": 28663,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-064"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-067.png",
+          "sha256": "c2092df99ffba5d9ec88aa4dd22ce6671658d3912cef3de021a14c5d1b516111",
+          "byte_size": 21923,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-067"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-068.png",
+          "sha256": "0449a7407f0e1cc0f9cbc9cceb58f596f027a9689dc2ceb2cb8a9e3d24435238",
+          "byte_size": 23452,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-068"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-070.png",
+          "sha256": "8e9db45a4f036675dc95397048c1ab732bbca78ed684a3364824ba048819ed28",
+          "byte_size": 25941,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-070"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-071.png",
+          "sha256": "cea99b1b7d2c85af280024f8b82e8ccab78be123c769c53b1c054ded35ce5d92",
+          "byte_size": 25255,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-071"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-072.png",
+          "sha256": "b60d614a879303bcaa638bae93f2563fd79422a776a80d411bac87d6f21a9cb2",
+          "byte_size": 25035,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-072"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-073.png",
+          "sha256": "ed44c4746a0fc2440c90c2676f4547ebaa8e2d164b1d805198b0e4d88f7da942",
+          "byte_size": 27113,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-073"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-074.png",
+          "sha256": "e31207c1531f65dcfe11b4348e09d34c77daa7c5915ec7f51e5e69c2d587afe9",
+          "byte_size": 29557,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-074"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-075.png",
+          "sha256": "7d5aadc2cb207c710f985b53517ca75a267dee80219767a794c42cef08922eca",
+          "byte_size": 32039,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-075"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-076.png",
+          "sha256": "eda8fdd98dcf9261a2d95ae23c058f10d3fa3714efbcfcd87fdee338d2849518",
+          "byte_size": 32949,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-076"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-077.png",
+          "sha256": "63bfc085a84219a3e6d87227b02470fe6a3690e4ecbca4488fbc2aa36e5f2f7b",
+          "byte_size": 27035,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-077"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-079.png",
+          "sha256": "55af2b8325036e3304a2b5f301f4a305c61e214fc49055bfb57d4a12e0ee5e82",
+          "byte_size": 15299,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-079"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-081.png",
+          "sha256": "0bb7e3dd85b60ba90cb39476ca0eb6cdf97060bcb90ab7015a3bdcb6dcaf7818",
+          "byte_size": 27244,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-081"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-082.png",
+          "sha256": "d0c0245b44fa83a8c42278d3b8a19394b4a10a003c0ea76832443505e206c8a2",
+          "byte_size": 28704,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-082"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-083.png",
+          "sha256": "1595154887c99498ba826cca30b4b6ee6aa9260a8f1ba56564b6b1f1772a9a54",
+          "byte_size": 20373,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-083"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-084.png",
+          "sha256": "017250c5c192751805cfa69d7cb808c9855aed9fc473f71aa766847368584a5e",
+          "byte_size": 23123,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-084"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-086.png",
+          "sha256": "a4972c53e25fbcf1c6c5e93531e0e5faed6233b9f5c1c78aba58239f2963f381",
+          "byte_size": 31264,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-086"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-088.png",
+          "sha256": "29b000169bb02061392f2b39291461ed9ac6e11108d7c9b2575281e83b4d23a1",
+          "byte_size": 23560,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-088"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-089.png",
+          "sha256": "8411567f7c9f1ee2f3cb2903755f22d3a5e7014fe80701cd02d522444f3b581b",
+          "byte_size": 26163,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-089"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-090.png",
+          "sha256": "5e3ea58102568bb1675eb7ee2517a38cb648a6c442698a67c3f8fcba7e1fe601",
+          "byte_size": 25388,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-090"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-093.png",
+          "sha256": "329b27dc2e712e804caa9ad49e306061043ef6dd497d1d787db6b989ceb0b1e5",
+          "byte_size": 27872,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-093"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-095.png",
+          "sha256": "3fae91ff2d635c55cb4fd18b6976bd04f10a631504a66a306ffbc86ac6b90d46",
+          "byte_size": 28289,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-095"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-097.png",
+          "sha256": "0b7a92dfc5fb771ece599e6f17161929bf80907e29314999776d86d029e620fa",
+          "byte_size": 28210,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-097"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-098.png",
+          "sha256": "775ef5a2ee22e0e42ee5e520dfaa20b0303128bbd22055d18b580eece24039dc",
+          "byte_size": 24373,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-098"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-099.png",
+          "sha256": "ec76cfa52efee2f66e4fe35a601163c60390b1e69fb0d3d4169c2f2b27ff45f8",
+          "byte_size": 28451,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-099"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-100.png",
+          "sha256": "326fdc18078fad561160afa804285401a04821a26799bfc621fcaa66fde071cc",
+          "byte_size": 15909,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-100"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-103.png",
+          "sha256": "3c8c3d8e235f621b472a995fd76cc3aedaa2e645fe1bbdbe2bb11127e4291473",
+          "byte_size": 28205,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-103"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-104.png",
+          "sha256": "b1fd6e932e37289bec57f4b455211db747e5d9597757facae0aa20b83edfa280",
+          "byte_size": 23247,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-104"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-106.png",
+          "sha256": "1364d4b87156c1650ba9260cca4f727c392b59098ebdcccae270a4d771866ee8",
+          "byte_size": 28166,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-106"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-111.png",
+          "sha256": "a35bf2093e7fc59ef5f53940688a5e32d0427b6b83c0e668e5714e4a8838a91f",
+          "byte_size": 25980,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-111"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-113.png",
+          "sha256": "a0a5d59de39f633f2e3fe929c2e828a1248ef0f37fe1b712244448bcf133a7a2",
+          "byte_size": 20514,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-113"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-115.png",
+          "sha256": "230a85fbfe5a78363ac8c023ff13f830930616efd4a118e24875a60b57231f46",
+          "byte_size": 29099,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-115"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-117.png",
+          "sha256": "ed48c2c4286e8842c557f63ee9f059ceef467407454f0d98784377ce5265a300",
+          "byte_size": 30282,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-117"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-121.png",
+          "sha256": "9a91dc21d949683b0afdd11905dcb4d6c0265e14339e4d8a2f9684d6d54a268d",
+          "byte_size": 25910,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-121"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-123.png",
+          "sha256": "e0ad3277a27f9d72c6005873782c06e21a2a1f33c4bdc0cd857bb2706b1f57a0",
+          "byte_size": 25862,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-123"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-126.png",
+          "sha256": "66bf1c285bb7b4e56b44e2ffc2de6ca45e39f80aeec8edbcfad37ba2f39fd9c7",
+          "byte_size": 31685,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-126"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-128.png",
+          "sha256": "cd2c8a7da7f572b3a1749dc3ee99f1aa166441d758b29e93b5f584ed7fc2ad20",
+          "byte_size": 25730,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-128"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-129.png",
+          "sha256": "f81f342103c56ff70d78dab496e1b20cf21b45d2bcb184bdc82d7d0c54c0bd95",
+          "byte_size": 16791,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-129"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-130.png",
+          "sha256": "9237b69fd692012ab95c6b2c67aa24ad88c82ee00a8aaebaca3d4bcef49c3a34",
+          "byte_size": 28220,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-130"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-135.png",
+          "sha256": "5aad4c60820c3bc879a2920b63cc4956d1d74102a547303059d24dfdf4dbeeb9",
+          "byte_size": 25449,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-135"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-137.png",
+          "sha256": "a96517eb66263799f9c60cc83fd8f43096f96f125c81890c8c3fb0c3b91073e1",
+          "byte_size": 27766,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-137"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-138.png",
+          "sha256": "813a8290cfc1a726c8f4c541350e4773d7bf38b7b81de776f4494820ffebfdbf",
+          "byte_size": 25898,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-138"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-141.png",
+          "sha256": "4ae57528e511bd43ad13d649ad0d0dc392b59a3d455e24476a9797f09605a147",
+          "byte_size": 26940,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-141"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-144.png",
+          "sha256": "a65373c5f864cb14c27f5bc51cf110003c451c79b4ae020699c1ace4e92ad21d",
+          "byte_size": 32020,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-144"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-145.png",
+          "sha256": "8589cb8d8dec189d981579532e02e60d3cc40c3e248c5135d25c003515c598a9",
+          "byte_size": 28227,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-145"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-146.png",
+          "sha256": "c1b9554b4d3e5cbebe6c5ea359ad479e70bc4f966a8bfa95fc0890fe8c59c6dc",
+          "byte_size": 29322,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-146"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-147.png",
+          "sha256": "3d50701532cc4b53e1a9cd0cabe935f21428fac6c77e6ebe9ada49bbd4645d9a",
+          "byte_size": 22950,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-147"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-148.png",
+          "sha256": "090a8e0726695eb466f617fbe5c8bd3426952333101be7e965d2360649ecb7f9",
+          "byte_size": 26076,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-148"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-149.png",
+          "sha256": "6e95faed90baa6e4056345bb452a0d43fd227784e3e8908fe0c08bb253363898",
+          "byte_size": 27923,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-149"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-151.png",
+          "sha256": "7a92f3c7e2a9ef2eaf0efcb3d286d00899e2d0e4908cc4a1624c692072ca0df6",
+          "byte_size": 27217,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-151"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-152.png",
+          "sha256": "34fae9426f34d092e6081db40b8348052b63d9506591ab118e70962b661f31db",
+          "byte_size": 30000,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-152"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-154.png",
+          "sha256": "5732a0bc8a522610cebeac1184f684d8f9764f9f8df3a4dc1b261edbef95edb7",
+          "byte_size": 29748,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-154"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-157.png",
+          "sha256": "6d7a2b4bff324645c8e0012b0e10c931a5c844a31ab04e4e6223f4af168f1840",
+          "byte_size": 32154,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-157"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-160.png",
+          "sha256": "3ae6f0e850cb9bcfa9b5675382b07925ceffc29e777623f2a8e75a0fdf8101c4",
+          "byte_size": 33292,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-160"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-163.png",
+          "sha256": "6ee77453ef0b5343aa2a8662e58bf5703ba093c1adeb4d868deca70226323ec3",
+          "byte_size": 34601,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-163"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-164.png",
+          "sha256": "b9b92e7934b9c1c908e9afe57f100ebba707d370415a7d7f4b816b4ab58a0f8a",
+          "byte_size": 26123,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-164"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-166.png",
+          "sha256": "40ad0440a6991d3b9ee51a65f526ebcfd2860d59d89a81624a7243d88c35f981",
+          "byte_size": 27483,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-166"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-169.png",
+          "sha256": "add98e2e8a5fa6430580086678cbf412acb99c5ed4849051c509924f4fd15d99",
+          "byte_size": 33022,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-169"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-170.png",
+          "sha256": "f9cf6656dd97173e9e90e1d3174a53384a2fe64a5b6616a0e1def95e57749e21",
+          "byte_size": 33963,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-170"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-171.png",
+          "sha256": "55333ad4f625da923c5f47e4aee29f473dfdd2b8edf17a1f2188e362d0cd4d48",
+          "byte_size": 31199,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-171"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-174.png",
+          "sha256": "e3eca55ac8b2df8ee7f47cdf0fc1ba44dd366aa4eef49411de4add655f4a8b43",
+          "byte_size": 31530,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-174"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-177.png",
+          "sha256": "0b041e47e8d3c9af0f5c032bafd6b8041b30bacc34fce9af6e231364d0fec769",
+          "byte_size": 30886,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-177"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-180.png",
+          "sha256": "5064df20046159891037e88dc217171f5e6de3a8922977aa96fac4512d60215b",
+          "byte_size": 29285,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-180"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-187.png",
+          "sha256": "e3353ef634db853d248cc9b4c0f9c5aa567988cbc6a3dcbf5e385666a2d97443",
+          "byte_size": 26187,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-187"
+        },
+        {
+          "path": "smythe_artifacts/glyph_screensaver/live/runs/concurrency-8/tiles/glyph-189.png",
+          "sha256": "2e003a29351335ea80dd30f58f38757008c6ffa2951a1897e088a75112166c47",
+          "byte_size": 20104,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-189"
+        }
+      ],
+      "errors": [
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-000: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-001: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-004: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-008: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-014: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-015: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-016: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-019: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-020: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-021: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-022: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-023: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-024: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-025: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-028: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-029: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-032: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-033: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-034: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-035: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-037: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-040: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-041: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-044: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-046: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-049: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-050: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-051: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-053: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-055: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-056: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-060: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-061: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-063: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-065: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-066: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-069: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-078: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-080: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-085: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-087: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-091: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-092: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-094: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-096: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-101: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-102: expected one artifact, found 0"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-105: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-107: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-108: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-109: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-110: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-112: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-114: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-116: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-118: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-119: expected one artifact, found 0"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-120: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-122: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-124: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-125: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-127: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-131: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-132: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-133: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-134: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-136: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-139: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-140: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-142: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-143: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-150: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-153: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-155: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-156: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-158: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-159: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-161: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-162: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-165: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-167: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-168: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-172: expected one artifact, found 0"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-173: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-175: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-176: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-178: expected one artifact, found 0"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-179: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-181: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-182: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-183: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-184: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-185: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-186: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-188: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-190: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-191: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "expected 192 valid tiles, found 95"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "expected 192 unique tile hashes, found 95"
+        }
+      ],
+      "speedup_vs_concurrency_1": null,
+      "parallel_efficiency": null
+    }
+  ],
+  "fastest_concurrency": null,
+  "assembly": null,
+  "total_recorded_cost_usd": 11.281044,
+  "errors": [
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-000: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-001: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-004: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-008: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-014: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-015: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-016: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-019: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-020: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-021: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-022: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-023: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-024: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-025: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-028: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-029: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-032: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-033: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-034: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-035: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-037: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-040: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-041: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-044: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-046: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-049: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-050: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-051: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-053: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-055: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-056: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-060: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-061: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-063: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-065: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-066: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-069: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-078: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-080: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-085: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-087: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-091: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-092: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-094: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-096: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-101: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-102: expected one artifact, found 0"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-105: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-107: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-108: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-109: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-110: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-112: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-114: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-116: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-118: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-119: expected one artifact, found 0"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-120: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-122: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-124: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-125: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-127: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-131: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-132: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-133: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-134: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-136: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-139: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-140: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-142: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-143: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-150: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-153: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-155: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-156: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-158: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-159: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-161: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-162: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-165: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-167: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-168: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-172: expected one artifact, found 0"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-173: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-175: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-176: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-178: expected one artifact, found 0"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-179: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-181: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-182: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-183: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-184: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-185: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-186: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-188: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-190: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-191: normalization failed: tile foreground covers most of the canvas; refusing an opaque background or rectangular pseudo-glyph"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "expected 192 valid tiles, found 95"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "expected 192 unique tile hashes, found 95"
+    }
+  ]
+}

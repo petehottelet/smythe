@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="340" viewBox="0 0 640 340" role="img">
+<rect width="640" height="340" rx="10" fill="#23221e" stroke="#3a382f"/>
+<text x="24" y="34" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="19" fill="#ece4cf" text-anchor="start" font-weight="600" opacity="1.0">192 parallel image tasks, one Smythe graph</text>
+<text x="24" y="56" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12.5" fill="#a49d8a" text-anchor="start" font-weight="normal" opacity="1.0">measured wall-clock speedup vs serial · simulated 5.8s image-API latency · zero API cost</text>
+<text x="24" y="103" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#a49d8a" text-anchor="start" font-weight="normal" opacity="1.0">c = 1</text>
+<rect x="150" y="88" width="6.4" height="21" rx="4" fill="#8a8478" opacity="0.55"/>
+<text x="166.4040758384892" y="103" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e8e0cc" text-anchor="start" font-weight="600" opacity="1.0">1.0× · 1,150 s</text>
+<text x="24" y="137" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#a49d8a" text-anchor="start" font-weight="normal" opacity="1.0">c = 4</text>
+<rect x="150" y="122" width="25.8" height="21" rx="4" fill="#57e07f" opacity="0.64"/>
+<text x="185.76615872857747" y="137" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e8e0cc" text-anchor="start" font-weight="600" opacity="1.0">4.0× · 286 s</text>
+<text x="24" y="171" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#a49d8a" text-anchor="start" font-weight="normal" opacity="1.0">c = 8</text>
+<rect x="150" y="156" width="51.1" height="21" rx="4" fill="#57e07f" opacity="0.73"/>
+<text x="211.0539329920198" y="171" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e8e0cc" text-anchor="start" font-weight="600" opacity="1.0">8.0× · 144 s</text>
+<text x="24" y="205" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#a49d8a" text-anchor="start" font-weight="normal" opacity="1.0">c = 16</text>
+<rect x="150" y="190" width="99.4" height="21" rx="4" fill="#57e07f" opacity="0.82"/>
+<text x="259.3585962265762" y="205" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e8e0cc" text-anchor="start" font-weight="600" opacity="1.0">15.5× · 74.1 s</text>
+<text x="24" y="239" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#a49d8a" text-anchor="start" font-weight="normal" opacity="1.0">c = 32</text>
+<rect x="150" y="224" width="181.3" height="21" rx="4" fill="#57e07f" opacity="0.91"/>
+<text x="341.33845185024427" y="239" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e8e0cc" text-anchor="start" font-weight="600" opacity="1.0">28.3× · 40.6 s</text>
+<text x="24" y="273" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#a49d8a" text-anchor="start" font-weight="normal" opacity="1.0">c = 64</text>
+<rect x="150" y="258" width="360.0" height="21" rx="4" fill="#57e07f" opacity="1.00"/>
+<text x="520.0" y="273" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e8e0cc" text-anchor="start" font-weight="600" opacity="1.0">56.2× · 20.5 s</text>
+<text x="24" y="322" font-family="-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11.5" fill="#a49d8a" text-anchor="start" font-weight="normal" opacity="1.0">benchmarks/run_glyph_screensaver.py · all 192 tiles valid + unique (SHA-256) at every concurrency</text>
+</svg>
