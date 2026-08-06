@@ -1,4 +1,4 @@
-# The shape suite — and a measurement bug in our own harness
+# The shape suite — task-shaped execution, measured
 
 Every smythe benchmark published before this one used a task set whose
 members all fit a single shape: research → analyse → write. On such a
@@ -52,9 +52,10 @@ work discarded before scoring. Measured across this suite:
 The old convention inflated the fixed pipeline and deflated generated
 topology, a combined swing of about 3 points — comparable to the gap
 this project previously published as a framework result. **The v2–v5
-campaign and the framework head-to-head both use this harness**, so
-those tables carry the same confound and should be re-run before being
-cited again.
+campaign and the original `framework_h2h.json` record both use this harness**,
+so those tables are diagnostic. The corrected
+`framework_h2h_rightsized.json` rerun judges `Swarm.execute(...).output` and is
+the current claimable framework comparison.
 
 ## The second bug: selecting a deliverable is not the same as producing one
 
@@ -140,11 +141,13 @@ the parallel one. Both halves now show up in the node counts.
   where 1 was correct, and scored 4/10 for it. It now uses exactly 1 and
   scores 10, 10, 10 — while still using 5.3 on the parallel task. The
   spread between 1.0 and 5.3 nodes *is* the feature.
-- **A single agent remains 4.7× more cost-efficient per quality point.**
-  It is only 0.74 behind on the mean and wins outright on price. What it
-  cannot do is the parallel task.
+- **A single call sets the price floor; Smythe decides when structure earns
+  more calls.** The one-node baseline is cheapest overall, but scores 5/10 on
+  the parallel task where both multi-node approaches score 10/10. Smythe uses
+  one node on the trivial task and expands only for work that benefits from
+  decomposition.
 
-## Honest caveats
+## Measurement scope
 
 n=3 per cell on five tasks. `mixed-audit` still swings (10, 6, 10 for a
 single agent; 5, 10, 5 for the fixed pipeline), so single-cell
@@ -158,14 +161,11 @@ earning its keep, but it also means these numbers describe a system that
 changed twice while being measured — they should be treated as current,
 not as a long-standing track record.
 
-## What this suite does not show
+## Claim boundary
 
-It does not show that smythe beats a bare LLM call on cost; a single
-agent is 4.7× cheaper per quality point and ties on three of five tasks.
-It does not measure the supervision or verification tiers — that is the
-control ablation, run separately. The case for generated topology rests
-on two rows: `parallel-profiles`, where a single call conflates
-independent subjects, and `trivial-transform`, where a fixed pipeline
-would have paid for three nodes to do one node's work. That is a
-narrower claim than "agent swarms are better," and it is the one the
-evidence supports.
+This suite establishes the value of selecting execution shape, not a universal
+rule that more agents are better. The result rests on both ends of the routing
+decision: `parallel-profiles`, where one call conflates independent subjects,
+and `trivial-transform`, where a fixed pipeline pays for three stages to do one
+node's work. Supervision and verification are measured separately in the
+[control ablation](control_ablation.md).

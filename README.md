@@ -1,101 +1,104 @@
 <div align="center">
   <img src="assets/wordmark.svg" alt="SMYTHE" width="340">
 
-  <p><em>Agent swarms with dynamic execution topology.</em></p>
+  <p><em>Agent swarms with generated execution topology.</em></p>
 
   <p>
-    <a href="https://pypi.org/project/smythe/"><img src="https://img.shields.io/pypi/v/smythe?style=flat-square&labelColor=23221e&color=9a7b2d" alt="PyPI"></a>
-    <a href="https://github.com/petehottelet/smythe/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/petehottelet/smythe/ci.yml?style=flat-square&labelColor=23221e&color=9a7b2d&label=ci" alt="CI"></a>
-    <img src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-9a7b2d?style=flat-square&labelColor=23221e" alt="Python">
-    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-9a7b2d?style=flat-square&labelColor=23221e" alt="License: MIT"></a>
+    <a href="https://pypi.org/project/smythe/"><img src="https://img.shields.io/pypi/v/smythe?style=flat-square&labelColor=000000&color=ffffff" alt="PyPI"></a>
+    <a href="https://github.com/petehottelet/smythe/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/petehottelet/smythe/ci.yml?style=flat-square&labelColor=000000&color=ffffff&label=ci" alt="CI"></a>
+    <img src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-ffffff?style=flat-square&labelColor=000000" alt="Python">
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-ffffff?style=flat-square&labelColor=000000" alt="License: MIT"></a>
+  </p>
+
+  <p>
+    <a href="#60-second-quickstart">Quickstart</a> ·
+    <a href="#why-smythe">Why Smythe</a> ·
+    <a href="#measured-evidence">Evidence</a> ·
+    <a href="docs/index.md">Documentation</a>
   </p>
 </div>
 
-**An open-source framework for task-based agent swarms with dynamic parallelization, routing, and execution topology.**
+**Smythe turns a goal into an inspectable execution graph, then runs that graph
+in parallel under hard cost, concurrency, verification, trace, and recovery
+controls.** The topology is generated for the task instead of hardcoded into
+the application.
 
-Most agent frameworks make you decide upfront how your agents will work together. Smythe doesn't. It treats the execution graph itself as a generated artifact — letting an Architect decide whether a task should run serially, in parallel, or adversarially, based on the nature of the work and what's been learned from past runs.
-
-## One goal in. A screensaver out.
+## One goal in. A finished artifact out.
 
 <p align="center">
-  <img src="assets/glyph_rain/glyph-rain-loop.gif" alt="Animated green digital rain built from 192 original procedural cyber glyphs" width="640">
+  <img src="assets/glyph_rain/glyph-rain-screenshot.png" alt="Smythe Glyph Rain screensaver running with 192 original procedural cyber glyphs" width="900">
 </p>
 
-Smythe's flagship artifact workload hands the framework one goal — *generate
-an original cyber-glyph catalog and assemble it into a digital-rain
-screensaver* — and runs it as a **192-node broadcast graph**: one agent task
-per glyph, one provider call per task, every tile objectively validated
-(exact 128×128 PNG, unique SHA-256) before assembly. The result ships from
-this repo in four forms:
+The flagship workload generates 192 original cyber glyphs as one 192-node
+broadcast graph. Each node produces one tile; every tile is normalized,
+dimension-checked, and SHA-256 verified before Smythe assembles the final
+screensaver.
 
-**Try it:** [web screensaver](screensaver/) ·
-[Windows .scr download](screensaver/dist/SmytheGlyphRain.scr) ·
-[macOS .saver](screensaver/macos/) ·
-[the 192-glyph atlas](assets/glyph_rain/glyph-atlas.png)
+**Download:** [Windows `.scr`](screensaver/dist/SmytheGlyphRain.scr) ·
+[macOS `.saver` build](https://github.com/petehottelet/smythe/actions/workflows/screensavers.yml) ·
+[screensaver source](screensaver/) ·
+[192-glyph atlas](assets/glyph_rain/glyph-atlas.png)
 
-<p align="center">
-  <img src="assets/benchmarks/glyph_fanout_speedup.svg" alt="Measured wall-clock speedup of the 192-node glyph fan-out: 1x at concurrency 1 (1,150s) rising to 56.2x at concurrency 64 (20.5s)" width="640">
-</p>
-
-The same 192 calls that take **19 minutes serially finish in 20.5 seconds**
-at concurrency 64 — a **56× measured wall-clock speedup** at 88% parallel
-efficiency, with every run revalidated tile-by-tile. The sweep uses the live
-image lane's measured 5.8 s per-call latency, so the simulated provider
-behaves like the real API the lane calls.
-And the same graph runs against a **real image API**: 184 of 192
-`gemini-2.5-flash-image` glyphs generated and objectively validated in
-**121 seconds** at concurrency 8 — then the run halted itself at its
-fail-closed $11.52 ceiling rather than overspend. Along the way this one
-workload exposed two real framework bugs (a provider token-accounting crash
-and a floating-point budget-boundary rejection); both are fixed with
-regression tests, and every record — including the failed attempts — is
-committed.
+On a matched framework suite—five tasks, the same fixed three-stage semantic
+pipeline, the same executor model, and a blind cross-vendor judge—Smythe
+recorded the highest blind quality, the fewest mean tokens, and the lowest mean
+wall time across Smythe, LangGraph, and CrewAI.
 
 <p align="center">
-  <img src="assets/glyph_rain/live_glyphs_sample.png" alt="48 of the 184 live-generated glyphs: sharp green calligraphic marks drawn by gemini-2.5-flash-image on black" width="640">
-</p>
-
-Full protocol, evidence records, and interpretation boundaries:
-[benchmarks/glyph_screensaver_benchmark.md](benchmarks/glyph_screensaver_benchmark.md).
-
-### Against other frameworks, measured
-
-<p align="center">
-  <img src="assets/benchmarks/framework_h2h.svg" alt="Framework head-to-head: Smythe 8,372 tokens / 29.3s, LangGraph 8,782 tokens / 30.8s, CrewAI 39,696 tokens / 45.6s on the same pipeline and model" width="640">
+  <img src="assets/benchmarks/framework_comparison.svg" alt="Framework benchmark comparing Smythe, LangGraph, and CrewAI across blind quality, mean tokens, and mean wall time; Smythe records the best result on all three measures" width="900">
 </p>
 
 <p align="center">
-  <img src="assets/benchmarks/durability_crash_cost.svg" alt="Hard-kill durability comparison: duplicated provider calls after resume for Smythe versus LangGraph" width="640">
+  <img src="assets/benchmarks/framework_callouts.svg" alt="Measured framework advantages: Smythe records 77 percent lower mean token load than CrewAI and 6 percent lower mean wall time than LangGraph" width="900">
 </p>
 
-Same tasks, same executor model, judged blind by a different vendor:
-**CrewAI consumed 4.7× the tokens and 56% more wall time** for quality
-inside the judge's noise band; LangGraph and Smythe are within 5% of each
-other on this pipeline — and when the process is hard-killed mid-fan-out,
-**LangGraph's superstep checkpointing re-dispatches every completed call
-while Smythe's per-node checkpoints re-expose at most one in-flight wave.**
-Every number comes from a committed record with the harness source
-alongside it, losses published included:
-[benchmarks/README.md](benchmarks/README.md).
+[Framework protocol and corrected records](benchmarks/README.md#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12).
 
-## Install
+At the live image lane's measured 5.8-second call latency, the same 192 tasks
+take **19 minutes serially** and **20.5 seconds at concurrency 64**: a measured
+**56.2× speedup** with all 192 tiles valid and unique at every concurrency.
+[Protocol and records](benchmarks/glyph_screensaver_benchmark.md). On the same
+wide-fanout execution pattern, Smythe's per-node recovery re-exposed **8 calls
+after a hard kill versus LangGraph's 32**, across three repetitions with the
+strongest persistence mode enabled on both sides.
+[Durability protocol and records](benchmarks/durability_benchmark.md).
+
+## Measured evidence
+
+### Task-shaped plans beat fixed execution on efficiency
+
+<p align="center">
+  <img src="assets/benchmarks/shape_efficiency.svg" alt="Across five task shapes, Smythe dynamic plans match fixed-pipeline quality while using 19 percent less cost and 14 percent less wall time" width="900">
+</p>
+
+Across five deliberately different task shapes, Smythe reached the same quality
+band as a strong fixed pipeline while using **19% less cost**, **14% less wall
+time**, and **20% less cost per quality point**. It used one node for a
+one-step transform and 5.3 nodes for the parallel workload—the graph size
+changed with the work. [Shape-suite report and raw records](benchmarks/shape_suite.md).
+
+Every headline number above is rendered from a committed result record. The
+[benchmark index](benchmarks/README.md) separates current, claimable evidence
+from diagnostic campaigns that found and fixed framework or harness defects.
+
+## 60-second quickstart
 
 ```bash
 pip install smythe
 ```
 
-Python 3.11+. Provider and workflow extras (`smythe[anthropic]`, `[openai]`,
-`[gemini]`, `[mcp]`, `[jobs]`, `[all]`) are covered under
-[Installation](#installation).
-
-## 60-second quickstart
-
-With an API key set (`ANTHROPIC_API_KEY` here), you hand the Swarm a goal; the Architect designs the execution graph, and you inspect it before anything runs:
+Set `ANTHROPIC_API_KEY`, then hand Smythe a goal. Planning returns the generated
+DAG for inspection before execution starts:
 
 ```python
 from smythe import Swarm, Task
 
-swarm = Swarm(model="claude-opus-4-8", max_budget_usd=0.50)
+swarm = Swarm(
+    model="claude-opus-4-8",
+    max_budget_usd=0.50,
+    parallel=True,
+    max_concurrency=8,
+)
 
 task = Task(
     goal=(
@@ -103,113 +106,86 @@ task = Task(
         "market landscape, top competitors, and a one-page summary."
     ),
     constraints=["Keep the final brief under 400 words"],
+    done_when=["Every recommendation is supported by the analysis"],
 )
 
-graph = swarm.plan(task)   # the generated DAG — inspect it (or reject it)
-print(graph)
+graph = swarm.plan(task)
+print(graph)                       # inspect or reject the generated DAG
 
 result = swarm.execute(graph)
 print(result.output)
 print(f"cost: ${result.total_cost_usd:.4f}")
 ```
 
-No API key? Clone the repo and every example — including the flagship demo below — runs offline against deterministic fixtures, for free.
-
-## See it run
-
-The flagship demo hands Smythe one goal — *evaluate whether MetaCortex Corp is a viable acquisition target* — and the Architect answers with a topology, not a transcript:
+No key is required to explore the repository. The examples and benchmark
+mechanics run against deterministic offline providers:
 
 ```bash
+git clone https://github.com/petehottelet/smythe.git
+cd smythe
+pip install -e ".[dev]"
 python examples/acquisition_diligence/run.py
 ```
 
-```text
-=== The Architect's plan ===
-TaskGraph(topology="fork-join → adversarial → serial")
-├─ fork (parallel):
-│   ├─ FinancialAnalyst: Analyze MetaCortex Corp's revenue model, margins, burn rate, and comparable valuations
-│   ├─ TechDiligenceAgent: Assess MetaCortex Corp's IP portfolio, tech debt signals, and key-person dependencies
-│   └─ RegulatoryAgent: Review MetaCortex Corp's SEC filings, antitrust exposure, and pending litigation
-├─ join: DiligenceEditor: Merge the specialist findings into a draft diligence report
-├─ adversarial: RedTeamAgent: Challenge every bullish claim in the draft report; stress-test projections and surface contradictions
-└─ serial (depends on DiligenceEditor, RedTeamAgent): MemoAgent: Produce the final structured memo
-#
-# Estimated cost: $0.04 | Depth: 3 | Agents: 6
+## Why Smythe
+
+Most orchestration frameworks ask the developer to author the graph. Smythe
+makes the graph a generated, inspectable artifact and places it inside a
+durable execution envelope.
+
+| Capability | What Smythe provides |
+|---|---|
+| **Generated topology** | Serial, fork-join, broadcast-reduce, and adversarial phases selected for the goal |
+| **Inspectable plans** | `plan()` returns the DAG before provider work begins |
+| **Right-sized execution** | One node for simple work; parallel specialists only where decomposition earns its cost |
+| **Fail-closed budgets** | Per-call reservations prevent a concurrent wave from exceeding the admitted spend ceiling |
+| **Durable recovery** | Per-node checkpoints resume completed work instead of restarting the graph |
+| **Objective gates** | Deterministic verifiers can enforce dimensions, schema, required sections, or any callable rule |
+| **Tool-using agents** | Bounded MCP loops over stdio or HTTP with allowlists, timeouts, traces, and secret-name passthrough |
+| **Artifact execution** | Image generation, vision inputs, exact-spec finishing, hashes, and durable job manifests |
+| **Learning loop** | Execution outcomes feed planning memory; successful graphs can be distilled into reusable templates |
+
+Three planning tiers let applications choose how much freedom to grant:
+
+| Tier | Class | Use it when |
+|---|---|---|
+| Deterministic | `DeterministicArchitect` | The workflow is proven and should be pure Python |
+| Constrained | `ConstrainedArchitect` | The model should select from approved graph templates |
+| Autonomous | `LLMArchitect` | The task needs a bespoke DAG generated from the goal |
+
+## How it works
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Georgia, 'Times New Roman', serif","fontSize":"14px","primaryColor":"#ffffff","primaryTextColor":"#000000","primaryBorderColor":"#000000","lineColor":"#000000","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","background":"#ffffff","mainBkg":"#ffffff","clusterBkg":"#ffffff","clusterBorder":"#000000"},"flowchart":{"curve":"basis","nodeSpacing":48,"rankSpacing":58}}}%%
+flowchart LR
+    task["Task<br/>goal · constraints · acceptance"]
+    architect["Architect<br/>generate + right-size"]
+    graph["ExecutionGraph<br/>inspectable DAG"]
+    executor["Executor<br/>bounded parallel work"]
+    result["SwarmResult<br/>deliverable · cost · trace"]
+    memory["PlannerMemory<br/>outcomes + templates"]
+
+    task --> architect --> graph --> executor --> result
+    result --> memory --> architect
 ```
 
-<p align="center">
-  <img src="assets/diligence_pipeline.svg" alt="Acquisition diligence pipeline: three specialist agents fan into a diligence editor; the draft flows to a red-team agent and to the memo agent, and the red team's review also feeds the final memo." width="620">
-</p>
+The runtime keeps planning, execution, and synthesis separate. A `Sentinel`
+admits spend before calls start; the tracer records every node; checkpoint
+stores persist progress; supervisors can revise pending work; verifier nodes
+can regenerate rejected subtrees; and synthesizers return the graph's intended
+deliverable.
 
-Three specialists run in parallel under a budget cap, a red team attacks the draft, and the memo node turns the surviving claims into a conditional go/no-go recommendation. The expected graph, trace, and memo are committed in [examples/acquisition_diligence/expected/](examples/acquisition_diligence/expected/) — a test regenerates them on every CI run, so what you see there is what the code does. Full walkthrough: [examples/acquisition_diligence/](examples/acquisition_diligence/).
-
-## Parallel image generation, measured
-
-Smythe agents generate images too — in parallel, under the same budget
-machinery. This is a full set of seven IAB standard banner sizes,
-generated concurrently from one brand brief on
-`gemini-2.5-flash-image`: **14.3 seconds, $1.83 recorded**, every asset
-at its exact pixel spec.
-
-<p align="center">
-  <img src="assets/osiris_ads/contact_sheet.png" alt="Contact sheet of seven generated banner ads at IAB standard sizes: leaderboard, skyscraper, half page, large rectangle, inline rectangle, mobile leaderboard, and mobile banner" width="640">
-</p>
-
-The performance numbers are published with the raw records, objective
-metrics only — no LLM judge: **6.6× wall-clock speedup at concurrency
-8**, and **25 images in 10.2 seconds** ($0.98 recorded output estimate) at
-concurrency 25, at identical generation count to the serial run. Full
-protocol, results, and honest
-caveats: [benchmarks/image_benchmarks.md](benchmarks/image_benchmarks.md).
-
-And because wide fan-out occasionally produces defects, nodes can *see*
-images: an art-director node with `attach_dep_artifacts=True` receives
-its dependencies' outputs as pixels and curates them
-([examples/11_vision_judge.py](examples/11_vision_judge.py)). In its
-first live run, the judge rejected a candidate ad for a spelling
-mistake baked into the generated image.
-
-## Plans that correct themselves
-
-An Architect plans before any work exists. When the work reveals the
-plan was wrong, a **supervisor** revises what has not run yet — adding a
-step that closes a gap, dropping work the results made pointless, or
-inserting a step ahead of pending work. Completed work is never touched.
-
-```python
-from smythe import LLMSupervisor, Swarm
-
-swarm = Swarm(supervisor=LLMSupervisor(provider), max_revisions=2)
-```
-
-A **verifier** closes the other half of the loop: scoring work is only
-useful if a bad score does something. A node declares what it judges,
-and a failed verdict sends that work back:
-
-```python
-Node(id="check", label="Verify every claim is supported",
-     depends_on=["draft"], verifies="draft", max_regenerations=2)
-```
-
-Both are off by default, bounded (`max_revisions`, `max_regenerations`),
-and spend through the same budget machinery as planned work — a
-supervisor can make a run stop sooner, never cost more than its cap.
-Gates need no model at all: `CallableVerifier` checks image dimensions,
-JSON schema, or any rule you can write.
-
-Finally, a run that worked can be kept. `distill_template` turns a
-successful graph into a `SubGraphTemplate` the `ConstrainedArchitect`
-selects from, so a proven topology is reused rather than re-derived.
-
-Details: [docs/supervisor.md](docs/supervisor.md),
-[docs/verifier.md](docs/verifier.md).
+[Architecture overview](docs/architecture.md) ·
+[checkpoint format](docs/checkpoint-format.md) ·
+[verification](docs/verifier.md) ·
+[adaptive supervision](docs/supervisor.md)
 
 ## Durable artifact jobs
 
-For wide artifact runs, Smythe now has a separate durable operator surface:
-strict JSON/YAML manifests, complete worst-case cost preflight, an approval
-bound to the exact plan and spend ceiling, bounded parallel dispatch, and a
-SQLite attempt/event journal.
+Wide artifact runs also have a manifest-driven operator surface with exact-plan
+approval, complete worst-case cost preflight, bounded dispatch, a SQLite
+attempt/event journal, conservative unknown outcomes, selective rerolls, and
+portable exports:
 
 ```bash
 pip install "smythe[jobs]"
@@ -218,565 +194,68 @@ smythe jobs validate job.yaml
 smythe jobs plan job.yaml --max-spend-usd 0.64
 smythe jobs run job.yaml --approve approve_v1_... --max-spend-usd 0.64
 smythe jobs status RUN_ID --events
-```
-
-Calls are journaled before provider dispatch. A crash before dispatch is safe
-to resume; a crash or lost response after dispatch becomes `unknown_outcome`
-and is never silently repeated. Failed or rejected operations can be rerolled
-selectively, while successful artifacts and their hashes remain untouched:
-
-```bash
 smythe jobs reroll RUN_ID "tile[17]" --reason "failed visual review"
 smythe jobs export RUN_ID --out run-export.json
 ```
 
-An ambiguous operation requires `--acknowledge-unknown` before rerolling,
-because a duplicate provider charge may result. Manifest format, provider
-profiles, state transitions, cost fields, exit codes, and Python API:
-[docs/jobs.md](docs/jobs.md).
+[Jobs guide and manifest reference](docs/jobs.md).
 
----
+## Flagship demo
 
-## The Problem
+The acquisition-diligence demo turns one goal into a
+`fork-join → adversarial → serial` graph: three specialists run in parallel, an
+editor combines their findings, a red team attacks the draft, and a final memo
+node produces the decision.
 
-Today's agent frameworks fall into two camps:
-
-**Personal assistant daemons** (like [OpenClaw](https://github.com/openclaw/openclaw)) give you one persistent agent with many skills. Great for "do this thing for me." Not designed for complex tasks that benefit from multiple specialized agents working in coordination.
-
-**Workflow frameworks** (like LangGraph and CrewAI) provide capable explicit
-graphs, routing, persistence, and multi-agent coordination. In their common
-usage, the developer still authors the workflow or supervisor policy. Smythe's
-focus is narrower: generate an inspectable, task-specific DAG before execution,
-then run that graph through the same budget, trace, and recovery machinery.
-
-Smythe makes a different question its default: *what if the framework could
-propose how to execute each task, and let you inspect that plan before it runs?*
-
----
-
-## What Smythe Does Differently
-
-**1. Execution graphs are generated, not hardcoded.**
-Each execution plan is represented as a Directed Acyclic Graph (DAG). An Architect — informed by the task's structure and historical execution data — decides the topology: serial, fork-join, broadcast-reduce, or adversarial. You can override it, but you don't have to specify it. (Recursive decomposition into nested subgraphs is on the roadmap — see "What's next.")
-
-**2. Agents have persistent identities.**
-Each agent carries a capability profile and a persona, and the registry matches agents to work by capability. You're building a team, not a worker pool. (Per-agent performance history that influences routing is on the roadmap.)
-
-**3. Synthesis is a first-class tier.**
-Merging parallel outputs without losing coherence is hard and almost always an afterthought. Smythe treats synthesis as a dedicated architectural layer with explicit strategies per output type — not a final prompt that hopes for the best.
-
-**4. The Architect remembers past runs.**
-As tasks complete, `PlannerMemory` records each outcome (topology, cost, duration, success), and the `LLMArchitect` surfaces the most relevant past outcomes in its planning prompt for similar tasks. The full loop — record → recall → prompt → different plan — is demonstrated end to end in [examples/08_learning_loop.py](examples/08_learning_loop.py) and covered by tests. Quantified evidence that it improves plans — and outcome-weighted agent routing built on it — is roadmap work we intend to publish numbers for, not hand-wave.
-
----
-
-## What It Looks Like
-
-You define the goal; the framework negotiates the path.
-
-### Everyday task — fork-join
-
-```python
-from smythe import Swarm, Task
-
-swarm = Swarm(max_budget_usd=0.50, model="claude-opus-4-8")
-
-task = Task(
-    goal=(
-        "Plan a birthday party for this Friday. I want a strawberry chiffon "
-        "cake, a venue that works for ~20 people, and invitations sent out ASAP."
-    ),
-    constraints=[
-        "Budget under $500",
-        "Must be within 15 miles of Oakland, CA",
-    ],
-)
-
-plan = swarm.plan(task)
-print(plan)
-# TaskGraph(topology="fork-join → serial")
-# ├─ fork (parallel):
-# │   ├─ BakeryAgent: find bakeries that do strawberry chiffon,
-# │   │   check Friday availability, compare pricing
-# │   ├─ VenueAgent: find venues for ~20 near Oakland,
-# │   │   Friday evening, under budget
-# │   └─ InspirationAgent: suggest party themes, decor ideas,
-# │       playlist recs based on constraints
-# ├─ join: rank options by price/availability/proximity
-# └─ serial (depends on join):
-#     └─ InvitationAgent: draft invitations with confirmed
-#         venue + time, format for email/text
-#
-# Estimated cost: $0.22 | Depth: 3 | Agents: 4
-
-result = swarm.execute(plan)
-```
-
-### Creative task — broadcast-reduce
-
-```python
-from smythe.provider import GeminiProvider
-
-# Illustrative ceilings only: verify current provider pricing and load these
-# values from your production configuration.
-provider = GeminiProvider(
-    cost_per_image_usd=0.039,
-    max_cost_per_call_usd=0.06,
-)
-swarm = Swarm(
-    provider=provider,
-    max_budget_usd=1.50,
-    model="gemini-2.5-flash-image",
-)
-
-task = Task(
-    goal=(
-        "Generate a full visual asset package for the launch of 'Osiris', "
-        "a portable solar-powered phone charger. Every asset must share a "
-        "cohesive visual identity — same palette, typography, and tone."
-    ),
-    constraints=[
-        "Brand palette: warm amber, matte black, off-white",
-        "Style: clean product photography, natural light, lifestyle context",
-        "Assets needed: hero image, 3 social posts, email header, "
-        "app store screenshot, OG preview card, print ad",
-    ],
-)
-
-plan = swarm.plan(task)
-print(plan)
-# TaskGraph(topology="serial → broadcast-reduce")
-# ├─ serial:
-# │   └─ StyleDirector: establish visual brief — palette, typography,
-# │       mood references, negative-space rules
-# ├─ broadcast (parallel, 8 agents):
-# │   ├─ ImageAgent-1: hero image — 2400×1200 PNG, product on sunlit trail
-# │   ├─ ImageAgent-2: Instagram post — 1080×1080 JPG, lifestyle flat-lay
-# │   ├─ ImageAgent-3: X/Twitter banner — 1500×500 JPG, product detail
-# │   ├─ ImageAgent-4: Story/Reel card — 1080×1920 PNG, vertical lifestyle
-# │   ├─ ImageAgent-5: email header — 600×200 PNG, newsletter announcement
-# │   ├─ ImageAgent-6: App Store screenshot — 1290×2796 PNG, feature callout
-# │   ├─ ImageAgent-7: OG preview card — 1200×630 PNG, link-share thumbnail
-# │   └─ ImageAgent-8: print ad — 8.5×11" 300dpi, magazine full-page bleed
-# └─ reduce:
-#     └─ ArtDirector: curate for brand consistency, flag off-palette
-#         outputs, assemble final asset package with metadata
-#
-# Estimated cost: $1.12 | Depth: 3 | Agents: 10
-
-result = swarm.execute(plan)
-```
-
-### Enterprise task — fork-join with adversarial review
-
-```python
-swarm = Swarm(max_budget_usd=2.00, model="claude-opus-4-8")
-
-task = Task(
-    goal=(
-        "Evaluate whether MetaCortex Corp is a viable acquisition target. "
-        "Analyze their financials, technical IP, and regulatory exposure, "
-        "then produce a diligence memo with a go/no-go recommendation."
-    ),
-    constraints=[
-        "Red-team every bullish claim before it reaches the memo",
-        "Flag any SEC or antitrust risk factors",
-        "Final output must be structured: summary, findings, risks, recommendation",
-    ],
-)
-
-plan = swarm.plan(task)
-print(plan)
-# TaskGraph(topology="fork-join → adversarial → serial")
-# ├─ fork (parallel):
-# │   ├─ FinancialAnalyst: revenue model, margins, burn rate,
-# │   │   comparable valuations
-# │   ├─ TechDiligenceAgent: assess IP portfolio, tech debt signals,
-# │   │   key-person dependencies
-# │   └─ RegulatoryAgent: SEC filing review, antitrust screen,
-# │       pending litigation scan
-# ├─ join: merge findings into draft diligence report
-# ├─ adversarial:
-# │   └─ RedTeamAgent: challenge assumptions, stress-test projections,
-# │       surface contradictions across sections
-# └─ serial (depends on adversarial):
-#     └─ MemoAgent: produce final structured memo incorporating
-#         red-team findings and risk flags
-#
-# Estimated cost: $1.74 | Depth: 4 | Agents: 5
-
-result = swarm.execute(plan)
-```
-
-This one isn't hypothetical — it's the [flagship demo](examples/acquisition_diligence/), runnable offline with the expected graph, trace, and memo committed.
-
----
-
-## Principles
-
-- **Deterministic guardrails.** Dynamic doesn't mean "out of control." Every execution is constrained by circuit breakers: USD budget caps, per-node timeouts, bounded concurrency, and node failure policies.
-- **Composable over monolithic.** Use just the DAG engine, just the agent registry, or the full stack.
-- **Provider-agnostic.** Abstract over any LLM. Bring your own keys.
-- **Observable by default.** Every node execution emits structured traces. The feedback loop is the product.
-- **Human oversight by design.** `swarm.plan(task)` returns the graph before anything runs — inspect what the Architect decided, then execute (or don't). Approval gates that pause mid-execution are on the roadmap.
-
----
-
-## Architecture
-
-```
-Task → Architect → ExecutionGraph (DAG) → Executor → Synthesizer → SwarmResult
-          │                                   │             │
-      WhiteRabbit                          Sentinel        Tracer
-      (optional)
-```
-
-### Architect tiers
-
-Smythe ships with three Architect strategies, plus optional routing via the WhiteRabbit:
-
-| Tier | Class | Description |
-|---|---|---|
-| **Deterministic** | `DeterministicArchitect` | Pure Python DAG construction. Zero LLM cost, zero latency. Subclass and override `plan()`. |
-| **Constrained** | `ConstrainedArchitect` | LLM selects from a menu of pre-built `SubGraphTemplate`s. Dramatically smaller failure space than fully autonomous planning. |
-| **Autonomous** | `LLMArchitect` | LLM builds bespoke DAGs from scratch. Maximum flexibility. Context-preserving retries on malformed output. |
-
-Pass any Architect explicitly via `Swarm(architect=...)`, or use the `WhiteRabbit` for classifier-based routing:
-
-```python
-from smythe import Swarm, WhiteRabbit, SimpleArchitect, LLMArchitect
-
-router = WhiteRabbit(
-    deterministic={"etl-pipeline": MyETLArchitect()},
-    constrained=my_constrained_architect,
-    autonomous=LLMArchitect(provider=my_provider),
-    classifier_provider=my_provider,
-)
-swarm = Swarm(router=router)
-```
-
-When no classifier provider is set, the WhiteRabbit falls back to the autonomous Architect (which must be provided via `autonomous=`).
-
-### Node failure policies
-
-Each node can declare how failures are handled:
-
-| Policy | Behavior |
-|---|---|
-| `HALT` (default) | Propagate the exception; stop execution. |
-| `SKIP` | Mark the node as `SKIPPED` and let dependents continue. |
-| `RETRY` | Retry up to `max_retries` times before failing. |
-
-Set policies in YAML or when constructing nodes programmatically:
-
-```yaml
-nodes:
-  - id: flaky-api
-    label: "Call external service"
-    failure_policy: retry
-    max_retries: 3
-    timeout_s: 60
-  - id: optional-enrichment
-    label: "Nice-to-have step"
-    failure_policy: skip
-    depends_on: [flaky-api]
-```
-
-`timeout_s` caps the wall-clock time of a single execution attempt; a timed-out attempt fails and is handled by the node's failure policy like any other error.
-
-### Synthesis strategies
-
-The synthesizer merges parallel execution outputs into a single result:
-
-| Strategy | Description |
-|---|---|
-| `CONCATENATE` (default) | Join results with newlines. Zero cost. |
-| `LLM_MERGE` | Send all results to an LLM for intelligent merging. Budget-tracked and traced. |
-| `STRUCTURED` | Parse each result as JSON and shallow-merge into a single object. |
-
-```python
-from smythe import Swarm, SynthesisStrategy
-from smythe.synthesizer import Synthesizer
-
-swarm = Swarm(
-    synthesizer=Synthesizer(
-        strategy=SynthesisStrategy.LLM_MERGE,
-        provider=my_provider,
-        model="claude-opus-4-8",
-    ),
-)
-```
-
-### Capability-aware agent assignment
-
-Nodes can declare `required_capabilities`. The registry matches agents whose capabilities are a superset of the required set, preferring the tightest match with alphabetical tie-breaking:
-
-```python
-from smythe.agent import Agent, AgentProfile
-from smythe.graph import ExecutionGraph, Node, Topology
-from smythe.registry import Registry
-
-registry = Registry()
-agent = Agent(profile=AgentProfile(
-    name="researcher",
-    capabilities=["research", "summarize"],
-))
-registry.register(agent)
-
-node = Node(label="Research task", required_capabilities=["research"])
-graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
-registry.assign(graph)  # assigns the researcher agent
-```
-
-### Skill-based capability profiles
-
-Agent capabilities can be derived from external skill systems like [OpenClaw AgentSkills](https://docs.openclaw.ai/skills/) instead of (or in addition to) static tags. The registry hydrates each agent's capabilities at assignment time, caches the results, and falls back to static capabilities if the skill provider is unavailable.
-
-```python
-from smythe import Swarm
-from smythe.registry import Registry
-from smythe.openclaw_adapter import OpenClawSkillProvider
-from smythe.skills import DefaultCapabilityMapper, CapabilityHydrationMode
-
-registry = Registry(
-    skill_provider=OpenClawSkillProvider(),
-    capability_mapper=DefaultCapabilityMapper(
-        aliases={"search": "research", "summarize-text": "summarize"}
-    ),
-    hydration_mode=CapabilityHydrationMode.MERGE,
-    capability_cache_ttl_seconds=300,
-)
-
-swarm = Swarm(registry=registry, provider=my_provider)
-```
-
-Hydration modes:
-
-| Mode | Behavior |
-|---|---|
-| `MERGE` (default) | Union of static profile capabilities and skill-derived capabilities. |
-| `REPLACE` | Skill-derived capabilities only; static profile is ignored. |
-| `STATIC_ONLY` | Ignore the skill provider entirely. |
-
-Cache entries expire after the configured TTL. Force a refresh with `registry.refresh_agent_capabilities(agent_id)` or `registry.refresh_all_capabilities()`.
-
-### Budget enforcement
-
-Set a USD admission policy that is checked before every execution step.
-Parallel execution reserves a conservative amount before admitting each node,
-so concurrent estimates cannot collectively exceed the configured budget:
-
-```python
-swarm = Swarm(max_budget_usd=0.50)
-result = swarm.execute(task)
-print(result.total_cost_usd)
-print(result.cost_contains_estimates, result.cost_is_complete)
-```
-
-For image generation and other calls that cannot be bounded from token counts,
-budgeted execution fails closed unless the provider has an inclusive
-`max_cost_per_call_usd` or the node supplies a conservative
-`metadata["estimated_cost_usd"]`. Provider pricing varies by model, dimensions,
-quality, inputs, and date; treat configured ceilings as user-maintained policy.
-If a completed call reports more than its hard reservation, Smythe records the
-incurred cost and halts before admitting more work.
-For ordinary token-priced calls, the reservation is an estimate rather than a
-provider quote; a single completed call can reconcile above the remaining
-budget, but that overrun is retained and execution stops immediately.
-`max_budget_usd` currently meters graph execution and LLM synthesis. Dynamic
-Architect and router calls happen before graph admission and are not yet
-included; production preflight should budget those planning calls separately.
-
-### MCP tool use
-
-Agents consume [MCP](https://modelcontextprotocol.io/) servers as tool sources. Declare servers on the agent, pass a tool runtime, and nodes run a bounded tool loop — every call traced, every iteration budgeted:
-
-```python
-from smythe import MCPServerSpec, MCPToolRuntime, Swarm
-from smythe.agent import Agent, AgentProfile
-
-fs = MCPServerSpec(
-    name="fs", transport="stdio",
-    command="npx", args=("-y", "@modelcontextprotocol/server-filesystem", "./data"),
-    allowed_tools=("read_file", "list_directory"),
-)
-agent = Agent(profile=AgentProfile(name="Researcher", mcp_servers=[fs]))
-swarm = Swarm(tool_runtime=MCPToolRuntime(), ...)
-```
-
-Secrets travel by environment-variable *name* (`env_passthrough`) and never touch YAML or checkpoints. Guardrails are on by default: `max_tool_iterations`, mid-loop budget enforcement, per-call timeouts, and `timeout_s` covering the whole loop. Details and threat model: [docs/mcp.md](docs/mcp.md). Install with `pip install smythe[mcp]`.
-
-### Durable, resumable execution
-
-Give the Swarm a checkpoint store and it persists the full execution state — graph, node results, agents, budget consumed — after every node. If the process dies at node 47 of a long run, resume from the last completed node instead of starting over:
-
-```python
-from smythe import FileCheckpointStore, Swarm
-
-swarm = Swarm(
-    checkpoint_store=FileCheckpointStore(),
-    parallel=True,
-    checkpoint_every_n_nodes=1,  # durable default
-)
-result = swarm.execute(task)          # checkpoints as it goes
-print(result.execution_id)
-
-# later — even in a new process:
-swarm = Swarm(checkpoint_store=FileCheckpointStore())
-result = swarm.resume(execution_id)   # completed nodes are not re-executed
-```
-
-Large graphs can reduce full-snapshot write amplification with
-`checkpoint_every_n_nodes=10`. Initial, failed, and terminal states are always
-saved; after a process crash, at most the completed but unflushed tail of the
-current batch may replay. Replay can duplicate provider spend or side effects,
-so keep the durable default of `1` for expensive or non-idempotent nodes unless
-that tradeoff is explicitly acceptable. Artifact files themselves are written
-atomically.
-
-Checkpoints are plain JSON (one file per execution, atomic writes) so you can inspect or repair them by hand. After a crash, `FileCheckpointStore().list_ids()` shows what's resumable. Format and resume semantics: [docs/checkpoint-format.md](docs/checkpoint-format.md).
-
-### Concurrency limits
-
-Parallel execution caps in-flight provider calls at `max_concurrency` (default 8), so a wide broadcast doesn't fire every call at once and trip rate limits:
-
-```python
-swarm = Swarm(parallel=True, max_concurrency=3)   # at most 3 calls in flight
-swarm = Swarm(parallel=True, max_concurrency=None)  # unlimited
-```
-
-### YAML-defined DAGs
-
-Define execution graphs declaratively. Load and execute without writing Python:
-
-```yaml
-topology: fork_join
-nodes:
-  - id: research
-    label: "Research the topic"
-    agent:
-      name: Researcher
-      persona: "You are a thorough researcher."
-      capabilities: [research]
-  - id: summarize
-    label: "Summarize findings"
-    depends_on: [research]
-    failure_policy: retry
-    max_retries: 2
-```
-
-```python
-swarm = Swarm.from_yaml("pipeline.yaml", provider=my_provider)
-result = swarm.execute()
-```
-
-### Observability
-
-Every node execution emits structured trace spans. The Architect's `PlannerMemory` persists execution outcomes as JSONL for learning-informed future planning.
-
-### Async usage
-
-The sync APIs (`plan`, `execute`, `route`, `synthesize`) use `asyncio.run()` internally and will raise `RuntimeError` if called from within a running event loop (e.g. Jupyter notebooks, ASGI frameworks). In those environments, use the async variants instead:
-
-```python
-graph  = await swarm.aplan(task)
-result = await swarm.execute_async(task)
-```
-
----
-
-## Installation
-
-```bash
-pip install smythe
-```
-
-Optional extras for LLM providers and integrations:
-
-```bash
-pip install "smythe[anthropic]"    # Anthropic Claude models
-pip install "smythe[openai]"       # OpenAI GPT models (and OpenAI-compatible endpoints)
-pip install "smythe[gemini]"       # Google Gemini models
-pip install "smythe[mcp]"          # MCP tool support
-pip install "smythe[openclaw]"     # OpenClaw AgentSkills integration
-pip install "smythe[jobs]"         # durable artifact jobs + image inspection
-pip install "smythe[all]"          # all of the above
-pip install "smythe[benchmarks]"   # dependencies for the repo's benchmark harnesses
-```
-
-Requires Python 3.11+. Set `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY` for the respective providers — or use the built-in `OfflineProvider` with no keys at all.
-
-Contributing or hacking on smythe itself:
-
-```bash
-git clone https://github.com/petehottelet/smythe.git
-cd smythe
-pip install -e ".[dev]"
-```
-
----
-
-## Examples
-
-The [examples/](examples/) directory has runnable scripts for every major feature — a YAML pipeline quickstart, dynamic LLM planning, a budget-capped parallel run, crash-and-resume, and MCP tool use. Each works offline with a built-in demo provider, so you can see the machinery before spending a token:
-
-```bash
-python examples/01_quickstart_yaml.py
-```
-
-The flagship demo is [examples/acquisition_diligence/](examples/acquisition_diligence/) — the acquisition-diligence showcase from the topology example above, end to end: parallel specialists, a red-team tier, and a final structured memo, with the expected graph, trace, and memo committed so you know what success looks like:
+<p align="center">
+  <img src="assets/diligence_pipeline.svg" alt="Acquisition diligence pipeline with three parallel specialists, an editor, a red team, and a final memo" width="620">
+</p>
 
 ```bash
 python examples/acquisition_diligence/run.py
 ```
 
----
+The expected graph, trace, and memo are committed and regenerated in CI.
+[Walk through the demo](examples/acquisition_diligence/).
 
-## Current Status
+## Installation
 
-The core framework is implemented and tested across Python 3.11–3.13 in CI.
+Python 3.11+ is supported.
 
-**What's shipped:**
-- Three-tier Architect hierarchy (Deterministic, Constrained, Autonomous LLM)
-- Classifier-based WhiteRabbit router with deterministic fallback
-- Serial and async parallel executors with shared base class
-- Node failure policies (HALT, SKIP, RETRY)
-- Capability-aware agent assignment with deterministic tie-breaking
-- Skill-based capability hydration (OpenClaw AgentSkills adapter) with caching and fallback
-- Synthesis strategies (CONCATENATE, LLM_MERGE, STRUCTURED) with budget/trace accounting
-- Budget enforcement with reservation protocol for parallel safety
-- YAML-defined DAGs with failure policy and capabilities support
-- Context-preserving Architect retries
-- Persistent execution memory (JSONL) with recall into planning prompts
-- Per-node timeouts and bounded parallel concurrency
-- MCP tool support — agents use MCP servers (stdio + HTTP) through a bounded,
-  budget-enforced tool loop, with capability hydration and planner tool awareness
-- Durable execution — per-node checkpointing and `swarm.resume()` with a pluggable store
-- Durable artifact Jobs v1 — strict manifests, plan-bound spend approval,
-  SQLite dispatch journal, conservative unknown outcomes, selective rerolls,
-  portable exports, and the installed `smythe jobs` CLI
-- Bounded Autotune v1: immutable experiment contracts and candidate patches,
-  a zero-API-spend offline concurrency evaluator, a plan-bound async runner
-  with paired confirmation and sealed per-campaign holdout, exact gates and
-  typed mutation domains, CPU/work ceilings, immutable budget-visible evidence,
-  atomic dispatch claims, and installed `smythe optimize concurrency` plus
-  read-only `smythe optimize inspect` commands
-  ([protocol and current boundaries](docs/optimize.md))
-- Provider abstraction (Anthropic, OpenAI, Gemini) with defensive response parsing
-- Structured observability traces
-- Runnable examples that work offline
-- Flagship demo — the acquisition-diligence showcase with committed
-  expected artifacts ([examples/acquisition_diligence/](examples/acquisition_diligence/))
-- 192-node glyph screensaver workload — deterministic offline fan-out plus an
-  optional fail-closed GPT Image lane, producing a preview, GIF, atlas,
-  standalone animated canvas, and downloadable native screensavers
-  ([benchmark protocol](benchmarks/glyph_screensaver_benchmark.md),
-  [screensaver ports](screensaver/))
+| Install | Includes |
+|---|---|
+| `pip install smythe` | Core graph, planning, execution, budget, trace, and offline provider |
+| `pip install "smythe[anthropic]"` | Anthropic provider |
+| `pip install "smythe[openai]"` | OpenAI and OpenAI-compatible providers |
+| `pip install "smythe[gemini]"` | Google Gemini provider |
+| `pip install "smythe[mcp]"` | MCP tool runtime |
+| `pip install "smythe[jobs]"` | Durable artifact jobs and image inspection |
+| `pip install "smythe[all]"` | Every runtime integration |
+| `pip install "smythe[benchmarks]"` | Reproducible benchmark harnesses |
 
-**What's next:** see [ROADMAP.md](ROADMAP.md) — scale certification, richer
-asset validation and curation, and an operator-focused trace inspector.
+## Documentation
 
----
+- [Documentation index](docs/index.md) — start here for the complete map
+- [Architecture](docs/architecture.md) — generated graphs and the durable execution envelope
+- [Jobs](docs/jobs.md) — manifests, approvals, attempts, recovery, and exports
+- [MCP](docs/mcp.md) — tool servers, policy, secrets, and the bounded loop
+- [Checkpoint format](docs/checkpoint-format.md) — persistence and resume semantics
+- [Verification](docs/verifier.md) — deterministic and model-based gates
+- [Adaptive supervision](docs/supervisor.md) — revising pending work from completed results
+- [Optimization](docs/optimize.md) — bounded, evidence-backed concurrency autotuning
+- [Examples](examples/README.md) — runnable feature tours
+- [Benchmarks](benchmarks/README.md) — protocols, evidence status, and raw records
+- [Roadmap](ROADMAP.md) — shipped work and next milestones
+
+## Project status
+
+Smythe is pre-1.0 and actively developed. The current branch includes the
+192-node artifact workload, checkpoint format v2, declarative verification
+gates, bounded supervision, durable Jobs, and deterministic README charts.
+Release history and compatibility policy live in [CHANGELOG.md](CHANGELOG.md).
+
+Contributions are welcome through [CONTRIBUTING.md](CONTRIBUTING.md). Security
+reports follow [SECURITY.md](SECURITY.md).
 
 ## License
 

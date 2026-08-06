@@ -112,8 +112,9 @@ class LLMSupervisor(Supervisor):
     Reviewing after every node is usually wasteful — the interesting
     moments are when a stage of work concludes.  ``review_after``
     restricts reviews to specific node ids; ``only_terminal`` (the
-    default) reviews only when a node with no pending dependents
-    finishes, which is where a missing step actually shows up.
+    default) reviews at a fan-in boundary or when the whole graph has
+    finished.  Parallel terminal leaves therefore produce one review,
+    not one review per leaf.
     """
 
     def __init__(
@@ -134,8 +135,12 @@ class LLMSupervisor(Supervisor):
             return node.id in self._review_after
         if not self._only_terminal:
             return True
-        return not any(
+        if not any(n.status is NodeStatus.PENDING for n in graph.nodes):
+            return True
+        return any(
             dependent.status is NodeStatus.PENDING
+            and len(dependent.depends_on) > 1
+            and graph.is_ready(dependent)
             for dependent in graph.dependents(node.id)
         )
 

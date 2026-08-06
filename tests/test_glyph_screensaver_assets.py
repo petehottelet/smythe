@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import io
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -17,14 +18,18 @@ from benchmarks.glyph_screensaver_assets import (  # noqa: E402
     ATLAS_SIZE,
     GIF_FRAMES,
     GIF_SIZE,
+    GLYPH_CATALOG_SPECS,
     GLYPH_COUNT,
     GLYPH_SPECS,
+    MAX_GLYPH_COUNT,
     PREVIEW_SIZE,
     TILE_SIZE,
     ProceduralGlyphProvider,
+    assemble_atlas,
     assemble_html,
     assemble_preview,
     build_glyph_screensaver_assets,
+    get_glyph_specs,
     glyph_prompt,
     normalize_tile,
     render_glyph_tile,
@@ -49,6 +54,35 @@ def test_catalog_contains_192_unique_fictional_stroke_specs():
         for stroke in spec.strokes
     )
     assert all(spec.speed > 0 and spec.trail_length >= 8 for spec in GLYPH_SPECS)
+
+
+def test_extended_256_catalog_preserves_flagship_and_adds_unique_specs():
+    extended = get_glyph_specs(MAX_GLYPH_COUNT)
+
+    assert len(extended) == len(GLYPH_CATALOG_SPECS) == MAX_GLYPH_COUNT == 256
+    assert extended[:GLYPH_COUNT] == GLYPH_SPECS
+    assert len({spec.id for spec in extended}) == MAX_GLYPH_COUNT
+    assert len({spec.strokes for spec in extended}) == MAX_GLYPH_COUNT
+    assert extended[-1].id == "glyph-255"
+
+
+def test_extended_catalog_assembles_16_by_16_atlas_and_html(tmp_path):
+    tile_paths = []
+    for spec in get_glyph_specs(MAX_GLYPH_COUNT):
+        path = tmp_path / f"{spec.id}.png"
+        path.write_bytes(render_glyph_tile(spec))
+        tile_paths.append(path)
+
+    atlas = assemble_atlas(tile_paths, tmp_path / "atlas.png")
+    html = assemble_html(
+        tmp_path / "glyph-rain.html",
+        glyph_count=MAX_GLYPH_COUNT,
+    )
+    html_text = Path(html.path).read_text(encoding="utf-8")
+    strokes = json.loads(re.search(r"const strokes=(.*);", html_text).group(1))
+
+    assert (atlas.width, atlas.height) == (2048, 2048)
+    assert len(strokes) == MAX_GLYPH_COUNT
 
 
 def test_rendered_tiles_are_deterministic_unique_transparent_pngs():

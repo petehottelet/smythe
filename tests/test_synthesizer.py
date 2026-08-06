@@ -29,7 +29,7 @@ def test_concatenate_strategy():
     assert result == "Hello\n\nWorld"
 
 
-def test_concatenate_is_default():
+def test_deliverable_is_default_and_returns_terminal_nodes():
     synth = Synthesizer()
     graph = _make_graph("A", "B")
     assert synth.synthesize(graph) == "A\n\nB"

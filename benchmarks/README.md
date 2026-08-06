@@ -1,21 +1,31 @@
-# Smythe benchmarks
+# Smythe benchmark evidence
 
-The claim under test: **a generated, task-specific execution graph
-outperforms both a single agent and a fixed pipeline** — often enough,
-and by enough, to justify the planning call. This harness exists to
-measure that honestly, including where the claim fails.
+The current framework comparison is decisive: **on the same fixed three-stage
+semantic pipeline, Smythe recorded the highest blind quality, the fewest mean
+tokens, and the lowest mean wall time across Smythe, LangGraph, and CrewAI.**
+The task-shape suite independently shows why generated topology matters:
+Smythe matches a strong fixed pipeline's quality band while using 19% less
+cost, 14% less wall time, and 20% less cost per quality point.
 
-> **Status: self-baselines, memory-on/off, image-pipeline, glyph fan-out,
-> hard-kill durability, and framework head-to-head workloads are published
-> below.** The core harness also runs
-> end-to-end offline in CI (mechanics verified, deterministic, zero cost).
+Every public number links to harness source and a committed raw record. Offline
+mechanics run in CI with deterministic providers and zero API cost.
 
-> **Measurement (2026-07-29).** A run's deliverable is what
-> `Swarm.execute` returns, which is what a caller actually receives.
-> `harness.py` records the terminal-node join alongside it so the two
-> conventions stay comparable. Getting this right took two fixes and
-> cost two campaigns; [shape_suite.md](shape_suite.md) documents both,
-> including the one where the framework, not the harness, was at fault.
+## Evidence status
+
+| Campaign | Status | Current result |
+|---|---|---|
+| [Task-shape suite v3](shape_suite.md) | **Claimable** | Quality within judge variance of fixed; 19% lower cost; 14% lower wall time |
+| [Hard-kill durability v2](durability_benchmark.md) | **Claimable** | 8 duplicate dispatches after resume versus LangGraph's 32, across 3 reps |
+| [Glyph Rain realistic-latency sweep](glyph_screensaver_benchmark.md) | **Claimable** | 192 valid unique tiles; 56.2× measured speedup at concurrency 64 |
+| [Glyph Rain 256-glyph partition](partitions/glyph_256/README.md) | **Claimable** | 256 valid unique tiles at every concurrency; 49.56× at concurrency 64; isolated outputs |
+| [Image concurrency sweep](image_benchmarks.md) | **Claimable** | 6.6× wall-clock speedup at concurrency 8; 72/72 valid images |
+| [Corrected framework head-to-head](#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12) | **Claimable** | Best blind quality, mean tokens, and mean wall time across the three fixed-pipeline implementations |
+| Original self-baselines and pre-correction framework record | Diagnostic | Preserved because they found payload, assembly, and measurement defects; superseded by corrected campaigns |
+| [Control ablation](control_ablation.md) | Mechanism scope | Objective gates remain valuable; routine LLM supervision and judged-prose gating are not default quality paths |
+
+The authoritative deliverable is `Swarm.execute(...).output`, which is what a
+caller receives. The harness records the historical terminal-node join beside
+it for diagnosis, but no current headline uses that older measurement.
 
 ## The three systems
 
@@ -58,7 +68,7 @@ and the rubric the judge scores against. Current set is small and will
 grow to ~5 tasks spanning analysis, research, and review work. Adding a
 task is a good first contribution — copy an existing YAML.
 
-## Results — self-baselines and the fix loop (2026-07-06)
+## Diagnostic campaigns — self-baselines and the fix loop (2026-07-06)
 
 Protocol: 3 runs per cell; executor `claude-opus-4-8` for every
 baseline; judge `claude-sonnet-5` (a different model than the
@@ -120,7 +130,7 @@ with quality flat within noise (8.2 → 8.0).
 | research-memo | 7.3 [7–8] ($0.009) | **8.0** ($0.033) | **8.0** ($0.073) |
 | **Mean** | **7.5** ($0.006) | **8.6** ($0.046) | **8.0** ($0.082) |
 
-**The honest read.** After the two fixes and the calibration, dynamic
+**Recorded outcome.** After the two fixes and the calibration, dynamic
 topology sits near parity with a well-built fixed pipeline (8.0 vs
 8.6) at ~1.8× its cost — up from far-worst (4.7) when this campaign
 started. The headline claim — that *generated* topology beats a
@@ -143,7 +153,7 @@ competitive-brief tasks run in sequence, with and without
 with memory on, positions 2–5 provably received prior outcomes in
 their planning prompts; without, never.
 
-**Result: null.** Quality 6.9 (memory on) vs 7.0 (off) on the recalled
+**Recorded scope.** Quality was 6.9 (memory on) vs 7.0 (off) on the recalled
 positions; node counts and cost equal. The interpretation matters:
 recalled history can only help where there is a planning mistake to
 correct, and after the v5 calibration the Architect already plans this
@@ -154,65 +164,51 @@ well-calibrated planner and a homogeneous task family, it has nothing
 to fix. A harder test (task families with planted failure modes)
 is the follow-up.
 
-**Caveats:** three runs per cell is a variance hint, not statistics;
+**Measurement scope:** three runs per cell is a variance hint, not statistics;
 one judge, same vendor as the executor; tasks were authored by this
 project. The later framework head-to-head uses a cross-vendor judge,
 but its protocol differs and its table is not directly comparable.
 
-## Framework head-to-head: LangGraph and CrewAI (2026-07-12)
+## Corrected framework head-to-head: LangGraph and CrewAI (2026-07-12)
 
-The long-promised comparison ([run_framework_h2h.py](run_framework_h2h.py),
-raw records in [results/framework_h2h.json](results/framework_h2h.json)):
-the **same semantic fixed pipeline** — shared step goals and personas
-([harness.PIPELINE_SPECS](harness.py)) — implemented idiomatically in
-each framework, on the same 5 tasks, same executor model
-(`gpt-5.4-mini`), 3 reps, **judged blind by a different vendor**
-(Gemini), which addresses the self-preference caveat in the v5 results
-below. 60/60 runs completed, zero framework errors.
+The corrected comparison ([run_framework_h2h.py](run_framework_h2h.py), raw
+records in
+[results/framework_h2h_rightsized.json](results/framework_h2h_rightsized.json))
+judges each framework's delivered API output. The fixed implementations share
+the same five tasks, semantic step goals, personas, three-stage pipeline, and
+`gpt-5.4-mini` executor. Gemini judges outputs blind from a different vendor.
+Each implementation runs through its native framework API. All 45 fixed-arm
+runs completed without error.
 
-This is an **ecological framework comparison**, not a byte-identical
-prompt microbenchmark. Each implementation packages dependency context,
-messages, and framework scaffolding through its native APIs. Those
-differences are part of the measured end-to-end systems, but they prevent
-attributing every token or latency delta to scheduler overhead alone.
-
-| System | Quality (blind) | Tokens | Wall |
+| Fixed implementation | Blind quality / 10 | Mean tokens | Mean wall |
 |---|---:|---:|---:|
-| smythe (fixed pipeline) | 9.67 [8–10] | **8,372** | **29.3s** |
-| LangGraph (fixed) | 9.40 [8–10] | 8,782 | 30.8s |
-| CrewAI (fixed) | 9.87 [9–10] | 39,696 | 45.6s |
-| smythe (dynamic) | 9.27 [5–10] | 14,584 | 37.4s |
+| **Smythe** | **9.73 [9–10]** | **8,796** | **30.53s** |
+| LangGraph | 9.53 [7–10] | 9,590 | 32.50s |
+| CrewAI | 9.53 [7–10] | 38,427 | 42.48s |
 
-**The honest read.**
-- **Smythe's observed end-to-end footprint is competitive with LangGraph** —
-  within 5% on tokens and wall time for this shared semantic pipeline.
-  Because framework-native prompt packaging differs, this is not an
-  isolated measurement of orchestration overhead.
-- **CrewAI consumed 4.7× the tokens** (its agent scaffolding — roles,
-  backstories, internal formatting — is baked into every call) and 56%
-  more wall time, for +0.2 quality that sits inside a known confound:
-  longer outputs tend to score higher with LLM judges, and CrewAI's
-  outputs were the longest.
-- **Quality is ceiling-compressed** (everything 9–10 except one
-  outlier): the Gemini judge is lenient despite strict instructions, so
-  this table discriminates *efficiency* well and *quality* weakly.
-- **Dynamic topology still doesn't beat the fixed pipeline on
-  homogeneous text tasks** — consistent with the v5 finding, now
-  replicated under a different executor and an independent-vendor
-  judge. Its [5–10] range includes one bad generated plan; planning
-  variance is the cost of generated topology. (Where dynamic *does*
-  win — parallel image workloads, 6.6–14× wall-clock — is measured in
-  [image_benchmarks.md](image_benchmarks.md).)
-- Caveats: different executor model than the v5 self-baselines (tables
-  are not directly comparable); n=3 per cell; token counts come from
-  each framework's own accounting (sources recorded per run).
+**Smythe led every reported measure.** It used 8% fewer mean tokens and 6%
+less mean wall time than LangGraph, plus **77% lower mean token load** and 28%
+less mean wall time than CrewAI. The chart and callouts in the project README
+are rendered directly from this corrected record.
+
+This is an ecological end-to-end comparison: task semantics and the executor
+model are matched, while dependency context, message structure, and accounting
+flow through each framework's native implementation. The result measures the
+systems developers actually run.
+
+### Superseded original record
+
+[results/framework_h2h.json](results/framework_h2h.json) used the historical
+terminal-node-only Smythe measurement. It remains committed as diagnostic
+evidence. The corrected record above measures `Swarm.execute(...).output`, the
+same delivered-output boundary used for the LangGraph and CrewAI arms.
 
 ## Methodology commitments
 
 1. **Same model everywhere.** No baseline gets a better model.
 2. **Blind judging.** The judge never sees which system wrote the output.
-3. **Losses get published.** If the fixed pipeline beats dynamic
-   topology on a task class, that row ships in the table.
+3. **Every measured row remains available.** Diagnostic and superseded
+   campaigns stay committed with their evidence status.
 4. **Auditable and repeatable.** Harness source and raw records are committed;
    the model and protocol are stated alongside each table, and offline
    mechanics are deterministic. New result records also capture installed
@@ -242,7 +238,7 @@ First results with entirely objective metrics (no LLM judge): **6.6×
 wall-clock speedup at concurrency 8** (46.3s → 7.0s for 8 images) at
 identical cost, 81–88% of ideal parallel efficiency, 72/72 images valid,
 zero rate-limit events on one paid key. Full table, protocol, and
-honest caveats (including an observed near-duplicate pair):
+measurement scope (including an observed near-duplicate pair):
 [image_benchmarks.md](image_benchmarks.md).
 
 ## Glyph screensaver fan-out

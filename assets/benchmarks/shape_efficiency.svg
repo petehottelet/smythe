@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="492" viewBox="0 0 960 492" role="img" aria-label="Task-shape benchmark. Smythe dynamic matches the fixed pipeline quality band with lower measured cost and wall time.">
+<rect width="960" height="492" fill="#ffffff"/>
+<defs>
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse">
+    <rect width="8" height="8" fill="#ffffff"/>
+    <path d="M-2 2L2-2M0 8L8 0M6 10L10 6" fill="none" stroke="#000000" stroke-width="2"/>
+  </pattern>
+</defs>
+<text x="40" y="55" font-family="Georgia,'Times New Roman',serif" font-size="31" fill="#000000" text-anchor="start" font-weight="700">Task-shaped execution</text>
+<text x="40" y="84" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="14" fill="#000000" text-anchor="start" font-weight="normal">Five task shapes; three reps each; blind cross-vendor judge</text>
+<line x1="40" y1="112" x2="920" y2="112" stroke="#000000" stroke-width="2"/>
+<rect x="40" y="131" width="22" height="12" fill="#000000"/>
+<text x="71" y="143" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="600">Smythe dynamic</text>
+<rect x="232" y="131" width="22" height="12" fill="url(#hatch)" stroke="#000000"/>
+<text x="263" y="143" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="600">Fixed pipeline</text>
+<text x="40" y="194" font-family="Georgia,'Times New Roman',serif" font-size="17" fill="#000000" text-anchor="start" font-weight="700">Blind quality / 10</text>
+<text x="40" y="217" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10.5" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="1.4">HIGHER IS BETTER</text>
+<text x="40" y="258" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="600">Smythe dynamic</text>
+<text x="300" y="258" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="13" fill="#000000" text-anchor="end" font-weight="normal">9.47</text>
+<rect x="40" y="270" width="198.9" height="16" fill="#000000"/>
+<text x="40" y="330" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="600">Fixed pipeline</text>
+<text x="300" y="330" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="13" fill="#000000" text-anchor="end" font-weight="normal">9.33</text>
+<rect x="40" y="342" width="195.9" height="16" fill="url(#hatch)" stroke="#000000" stroke-width="2"/>
+<line x1="330" y1="178" x2="330" y2="382" stroke="#000000"/>
+<text x="350" y="194" font-family="Georgia,'Times New Roman',serif" font-size="17" fill="#000000" text-anchor="start" font-weight="700">Total cost / 15 runs</text>
+<text x="350" y="217" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10.5" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="1.4">LOWER IS BETTER</text>
+<text x="350" y="258" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="600">Smythe dynamic</text>
+<text x="610" y="258" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="13" fill="#000000" text-anchor="end" font-weight="normal">$0.163</text>
+<rect x="350" y="270" width="170.3" height="16" fill="#000000"/>
+<text x="350" y="330" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="600">Fixed pipeline</text>
+<text x="610" y="330" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="13" fill="#000000" text-anchor="end" font-weight="normal">$0.201</text>
+<rect x="350" y="342" width="210.0" height="16" fill="url(#hatch)" stroke="#000000" stroke-width="2"/>
+<line x1="640" y1="178" x2="640" y2="382" stroke="#000000"/>
+<text x="660" y="194" font-family="Georgia,'Times New Roman',serif" font-size="17" fill="#000000" text-anchor="start" font-weight="700">Mean wall time</text>
+<text x="660" y="217" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10.5" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="1.4">LOWER IS BETTER</text>
+<text x="660" y="258" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="600">Smythe dynamic</text>
+<text x="920" y="258" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="13" fill="#000000" text-anchor="end" font-weight="normal">12.8s</text>
+<rect x="660" y="270" width="180.6" height="16" fill="#000000"/>
+<text x="660" y="330" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="600">Fixed pipeline</text>
+<text x="920" y="330" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="13" fill="#000000" text-anchor="end" font-weight="normal">14.9s</text>
+<rect x="660" y="342" width="210.0" height="16" fill="url(#hatch)" stroke="#000000" stroke-width="2"/>
+<line x1="40" y1="406" x2="920" y2="406" stroke="#000000"/>
+<text x="40" y="437" font-family="Georgia,'Times New Roman',serif" font-size="14" fill="#000000" text-anchor="start" font-weight="700">19% lower cost   /   14% lower wall time   /   20% lower cost per quality point</text>
+<text x="40" y="468" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11.5" fill="#000000" text-anchor="start" font-weight="normal">Quality remains in the same measured band</text>
+<text x="920" y="468" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="11.5" fill="#000000" text-anchor="end" font-weight="normal">shape_suite_v3.json</text>
+</svg>

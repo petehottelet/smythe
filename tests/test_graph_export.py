@@ -1,6 +1,7 @@
 """Tests for graph export: Mermaid, DOT, and JSON renderings."""
 
 import json
+import re
 
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 
@@ -25,6 +26,8 @@ def test_to_mermaid_status_classes():
     out = _graph().to_mermaid()
     assert "class research done" in out
     assert "class review failed" in out
+    assert "classDef done fill:#ffffff,stroke:#000000,color:#000000" in out
+    assert "classDef failed fill:#000000,stroke:#000000,color:#ffffff" in out
 
 
 def test_to_mermaid_escapes_label_breakers():
@@ -71,5 +74,11 @@ def test_to_mermaid_theme_prepends_house_header():
     assert first.startswith("%%{init:")
     assert "Georgia" in first
     assert second == "flowchart TD"
+    assert set(re.findall(r"#[0-9a-fA-F]{6}", out)) == {"#000000", "#ffffff"}
     # Default stays clean for snapshot stability.
     assert _graph().to_mermaid().startswith("flowchart TD")
+
+
+def test_to_mermaid_status_styles_are_strictly_black_and_white():
+    out = _graph().to_mermaid()
+    assert set(re.findall(r"#[0-9a-fA-F]{6}", out)) == {"#000000", "#ffffff"}

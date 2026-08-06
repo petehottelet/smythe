@@ -34,6 +34,13 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 - **README benchmark charts** rendered deterministically from committed
   result records by `benchmarks/render_readme_charts.py` into
   `assets/benchmarks/`.
+- **Screensaver-first project showcase** using the supplied full-resolution
+  Glyph Rain screenshot and direct Windows/macOS/source links, followed by a
+  real Smythe/LangGraph/CrewAI comparison chart and Trajan-led result callouts
+  rendered from the corrected committed framework record.
+- **Partitioned 256-glyph benchmark** with a stable catalog extension,
+  isolated result/artifact paths, a 16x16 atlas, and a six-cell realistic-
+  latency record that validates 256 unique outputs at every concurrency.
 
 - **Adaptive supervision — plans can now correct themselves mid-run.**
   The Architect plans once; until now the executor walked that plan to
@@ -49,9 +56,8 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   before any mutation, contained failure (a supervisor that raises or
   proposes nonsense is traced and ignored, never fails the run), and
   revision-added nodes go through the same budget reservation as
-  planned ones. `LLMSupervisor` reviews only after nodes with no
-  pending dependents, which on a serial graph is the final node;
-  true stage-boundary review is not yet implemented.
+  planned ones. `LLMSupervisor` reviews when a pending fan-in becomes
+  ready and when the graph finishes, or at explicit `review_after` targets.
   New: `docs/supervisor.md`, `examples/13_adaptive_supervision.py`.
 - **Verification that gates.** A node can now declare `verifies=`
   and `max_regenerations=`: when its verdict fails, the judged node
@@ -96,8 +102,8 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   compositing, atomic resize/crop finishing, hash-bound receipts, and hard
   versus advisory validation findings.
 - A 192-node glyph screensaver benchmark exercises visually inspectable
-  artifact fan-out with a deterministic procedural provider and an optional
-  fail-closed GPT Image lane. The 192 marks come from a calligraphic stroke
+  artifact fan-out with a deterministic procedural provider and live,
+  fail-closed Gemini and GPT Image lanes. The 192 marks come from a calligraphic stroke
   grammar — bars, stems, hooks, enclosures, press diagonals, bowls, tail
   sweeps, and diacritic dots on an ideograph grid — with geometric coverage
   and ink-mass constraints enforcing a uniform stroke weight. It validates
@@ -124,6 +130,9 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   dependency indexes instead of repeated full-graph scans, and cancels and
   awaits active siblings after a fatal failure. Queued nodes never start after
   the failure is observed.
+- Default LLM supervision now reviews once when a fan-in becomes ready and
+  once when the graph finishes, instead of reviewing every terminal leaf in a
+  parallel stage. Explicit `review_after` targets continue to take precedence.
 - Synthesis failures now write a failed checkpoint; resuming reuses completed
   node results and retries the synthesis stage instead of leaving a stale
   `running` checkpoint. LLM synthesis also reserves budget before its provider
@@ -146,17 +155,13 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   explicitly rejects embedded instructions. OpenClaw skill hydration now
   accepts mapping payloads and empty inventories, while skill references and
   capability aliases receive stricter normalization.
-
----
-
-## [0.6.0] - 2026-07-12
-
-Sight. Nodes can now see images — the art-director pattern — and the
-brand-locked asset suite runs end to end: confirm or create a logo,
-generate eight exact-spec assets in parallel with the logo as a
-reference image, and score brand consistency with a vision judge
-(measured 8/10 overall in ~19 seconds for $0.38). Also fixes a
-provider defect shipped in 0.5.0. No breaking API changes.
+- Reworked the README around Smythe's two defining abstractions and current,
+  claimable benchmark evidence; added a documentation index, architecture
+  overview, and repository-wide evidence/documentation working agreement.
+- Replaced the README's superseded framework visual with deterministic,
+  record-backed framework and shape-suite charts. All graph assets now use a
+  strict black-and-white editorial system with Trajan reserved for headline
+  callout numerals.
 
 ### Fixed
 
@@ -198,6 +203,19 @@ provider defect shipped in 0.5.0. No breaking API changes.
   are additive, so v1 checkpoints still resume (with documented
   defaults) rather than being rejected. A checkpoint this build cannot
   read now fails with a message naming the versions it does read.
+
+---
+
+## [0.6.0] - 2026-07-12
+
+Sight. Nodes can now see images — the art-director pattern — and the
+brand-locked asset suite runs end to end: confirm or create a logo,
+generate eight exact-spec assets in parallel with the logo as a
+reference image, and score brand consistency with a vision judge
+(measured 8/10 overall in ~19 seconds for $0.38). Also fixes a
+provider defect shipped in 0.5.0. No breaking API changes.
+
+### Fixed
 
 - **`OpenAIProvider` was broken against current OpenAI models**: it
   sent the legacy `max_tokens` parameter, which GPT-5.x models reject
