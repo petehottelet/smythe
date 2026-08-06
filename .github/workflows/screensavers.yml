@@ -1,0 +1,39 @@
+name: screensavers
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "screensaver/**"
+      - ".github/workflows/screensavers.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  windows-scr:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build SmytheGlyphRain.scr
+        shell: cmd
+        run: screensaver\windows\build_windows.cmd
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SmytheGlyphRain-windows-scr
+          path: screensaver/dist/SmytheGlyphRain.scr
+          if-no-files-found: error
+
+  macos-saver:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build GlyphRain.saver
+        run: |
+          chmod +x screensaver/macos/build_macos.sh
+          screensaver/macos/build_macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GlyphRain-macos-saver
+          path: screensaver/dist/GlyphRain.saver
+          if-no-files-found: error

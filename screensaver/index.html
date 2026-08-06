@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SMYTHE — Glyph Rain</title>
+<meta name="description" content="192 original procedural cyber glyphs, generated as one parallel agent run by the Smythe framework, raining as a fullscreen screensaver.">
+<meta property="og:title" content="SMYTHE — Glyph Rain">
+<meta property="og:description" content="192 glyphs. One goal. One parallel run. An agent-swarm-generated screensaver.">
+<meta property="og:image" content="./glyph-rain-preview.png">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000502'/%3E%3Cpath d='M8 6h16M16 6v20m-8-6h16' stroke='%237dffa0' stroke-width='3.4' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000502; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  #far  { z-index: 1; }
+  #mid  { z-index: 2; }
+  #near { z-index: 3; }
+  /* Vignette + scanlines: display texture without touching the simulation. */
+  #overlay {
+    position: fixed; inset: 0; z-index: 4; pointer-events: none;
+    background:
+      repeating-linear-gradient(0deg, rgba(0,0,0,0) 0 3px, rgba(0,10,4,.14) 3px 4px),
+      radial-gradient(ellipse at center, rgba(0,0,0,0) 58%, rgba(0,4,1,.5) 100%);
+  }
+  #badge {
+    position: fixed; right: 18px; bottom: 14px; z-index: 5;
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: #57e07f; text-decoration: none; letter-spacing: .08em;
+    opacity: .45; transition: opacity .4s ease;
+    text-shadow: 0 0 8px rgba(87,224,127,.6);
+  }
+  #badge:hover { opacity: 1; }
+  #badge b { color: #baffce; font-weight: 600; }
+  body.idle { cursor: none; }
+  body.idle #badge { opacity: 0; }
+  #hint {
+    position: fixed; left: 50%; bottom: 8%; transform: translateX(-50%); z-index: 5;
+    font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: #7dffa0; letter-spacing: .14em; text-transform: uppercase;
+    text-shadow: 0 0 12px rgba(125,255,160,.75); pointer-events: none;
+    opacity: 0; animation: hint 7s ease 1.2s 1 forwards;
+  }
+  @keyframes hint { 8% { opacity: .85; } 78% { opacity: .85; } 100% { opacity: 0; } }
+</style>
+</head>
+<body>
+<canvas id="far" aria-hidden="true"></canvas>
+<canvas id="mid" aria-hidden="true"></canvas>
+<canvas id="near" aria-label="Animated green digital rain built from 192 procedural cyber glyphs"></canvas>
+<div id="overlay"></div>
+<div id="hint">click for fullscreen &nbsp;·&nbsp; space to pause</div>
+<a id="badge" href="https://github.com/petehottelet/smythe" target="_blank" rel="noopener">
+  <b>SMYTHE</b> · 192 glyphs · one parallel run
+</a>
+<script src="glyphs.js"></script>
+<script>
+"use strict";
+// GLYPHS (from glyphs.js) carries the framework-generated stroke programs:
+// ("l", x1,y1,x2,y2,w) lines, ("q", x1,y1,cx,cy,x2,y2,w) curves, and
+// ("d", x,y,r) dots on a 100x140 canvas, plus per-glyph speed and trail.
+const COUNT = GLYPHS.strokes.length;
+const [CW, CH] = GLYPHS.canvas;
+
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const dpr = Math.min(2, window.devicePixelRatio || 1);
+
+// Three depth layers, tightly packed (spacing < 1 overlaps columns) so the
+// field fills the screen: a dense dim far field, a mid field, and a bright
+// near field. Each runs the persistence-fade rain algorithm on its canvas.
+const LAYERS = [
+  // Near-uniform glyph size across the three planes (depth reads through
+  // brightness and speed, not scale), with matched fade so every stream
+  // falls a long way before it dims.
+  { canvas: document.getElementById("far"),  cell: 24, spacing: 0.50, speed: 0.62, level: 0.78, fade: 0.034, opaque: true },
+  { canvas: document.getElementById("mid"),  cell: 26, spacing: 0.52, speed: 0.80, level: 0.88, fade: 0.030, opaque: false },
+  { canvas: document.getElementById("near"), cell: 28, spacing: 0.54, speed: 1.00, level: 1.00, fade: 0.026, opaque: false },
+];
+
+function drawGlyphPath(ctx, index, ox, oy, glyphH, color) {
+  const gw = glyphH * CW / CH;
+  const sx = gw / CW, sy = glyphH / CH;
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  for (const s of GLYPHS.strokes[index]) {
+    if (s[0] === "d") {
+      ctx.beginPath();
+      ctx.arc(ox + s[1] * sx, oy + s[2] * sy, Math.max(0.9, s[3] * sx), 0, 7);
+      ctx.fill();
+      continue;
+    }
+    ctx.beginPath();
+    ctx.lineWidth = Math.max(1.3, s[s.length - 1] * sx);
+    ctx.moveTo(ox + s[1] * sx, oy + s[2] * sy);
+    if (s[0] === "l") ctx.lineTo(ox + s[3] * sx, oy + s[4] * sy);
+    else ctx.quadraticCurveTo(ox + s[3] * sx, oy + s[4] * sy, ox + s[5] * sx, oy + s[6] * sy);
+    ctx.stroke();
+  }
+}
+
+// Pre-render every glyph twice per layer: a trail sprite in layer green and a
+// head sprite with a baked white-green glow, so the frame loop stays at plain
+// drawImage calls.
+function makeSprites(cellCss, level) {
+  const cell = Math.round(cellCss * dpr);
+  const pad = Math.ceil(cell * 0.5);
+  const size = cell + pad * 2;
+  const gw = cell * CW / CH;
+  const ox = pad + (cell - gw) / 2;
+  const trail = [], head = [];
+  const trailColor = `rgb(${40 * level | 0},${226 * level | 0},${96 * level | 0})`;
+  for (let g = 0; g < COUNT; g++) {
+    let c = new OffscreenCanvas(size, size), ctx = c.getContext("2d");
+    // No baked glow on trail stamps: a fading glyph should dim cleanly
+    // instead of leaving a dark core inside a glowing halo.
+    drawGlyphPath(ctx, g, ox, pad, cell, trailColor);
+    trail.push(c);
+    c = new OffscreenCanvas(size, size); ctx = c.getContext("2d");
+    ctx.shadowColor = "rgba(70,255,130,.95)";
+    ctx.shadowBlur = cell * 0.42;
+    drawGlyphPath(ctx, g, ox, pad, cell, "#3bff78");
+    ctx.shadowColor = "rgba(190,255,210,.9)";
+    ctx.shadowBlur = cell * 0.15;
+    drawGlyphPath(ctx, g, ox, pad, cell, "#eaffef");
+    head.push(c);
+  }
+  return { trail, head, size, pad, cell };
+}
+
+function buildLayer(layer) {
+  // Only the bottom layer is opaque; upper layers stay transparent so all
+  // three depth planes composite instead of the top one occluding the rest.
+  const ctx = layer.canvas.getContext("2d", { alpha: !layer.opaque });
+  layer.ctx = ctx;
+  layer.w = Math.round(innerWidth * dpr);
+  layer.h = Math.round(innerHeight * dpr);
+  layer.canvas.width = layer.w;
+  layer.canvas.height = layer.h;
+  if (layer.opaque) {
+    ctx.fillStyle = "#000502";
+    ctx.fillRect(0, 0, layer.w, layer.h);
+  } else {
+    ctx.clearRect(0, 0, layer.w, layer.h);
+  }
+  layer.sprites = makeSprites(layer.cell, layer.level);
+  const step = Math.max(4, Math.round(layer.sprites.cell * layer.spacing));
+  // 2x columns: extra passes re-cover the width with offset duplicates, so
+  // several streams can share one lane at different phases.
+  const cols = Math.round((Math.ceil(layer.w / step) + 1) * 2.0);
+  layer.step = Math.round(layer.sprites.cell * 1.04);
+  layer.columns = [];
+  for (let i = 0; i < cols; i++) {
+    const g = (Math.random() * COUNT) | 0;
+    layer.columns.push({
+      x: (i * step) % (layer.w + step) + ((Math.random() * 7 - 3) * dpr | 0),
+      glyph: g,
+      phase: (Math.random() * COUNT) | 0,
+      y: ((Math.random() * 2.2 - 1.2) * layer.h) | 0,
+      // Cells per second: the glyph's generated speed scaled by layer depth.
+      rate: GLYPHS.speeds[g] * 5.6 * layer.speed,
+      acc: Math.random(),
+      burst: 0,
+    });
+  }
+}
+
+function stepLayer(layer, dt) {
+  const { ctx, w, h, sprites, step, columns } = layer;
+  // Persistence fade: what was bright last frame becomes this frame's trail.
+  // Opaque bottom layer fades toward near-black; transparent layers erase
+  // toward transparency so lower planes stay visible through them.
+  ctx.globalAlpha = 1;
+  if (layer.opaque) {
+    ctx.fillStyle = `rgba(0,5,2,${layer.fade})`;
+    ctx.fillRect(0, 0, w, h);
+  } else {
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.fillStyle = `rgba(0,0,0,${layer.fade * 1.35})`;
+    ctx.fillRect(0, 0, w, h);
+    ctx.globalCompositeOperation = "source-over";
+  }
+  for (const col of columns) {
+    col.acc += dt * col.rate * (col.burst > 0 ? 1.9 : 1);
+    if (col.burst > 0) col.burst -= dt;
+    while (col.acc >= 1) {
+      col.acc -= 1;
+      // Stamp the old head as a plain trail glyph before it dims.
+      const old = sprites.trail[(col.glyph + col.phase) % COUNT];
+      ctx.globalAlpha = 1;
+      ctx.drawImage(old, col.x - sprites.pad, col.y - sprites.pad);
+      col.y += step;
+      col.phase = (col.phase + 7) % COUNT;
+      const past = col.y - GLYPHS.trails[col.glyph] * step * 1.15;
+      if (past > h && Math.random() < 0.6) {
+        col.y = -step * ((Math.random() * 7) | 0);
+        col.glyph = (Math.random() * COUNT) | 0;
+        col.rate = GLYPHS.speeds[col.glyph] * 5.6 * layer.speed;
+        if (Math.random() < 0.06) col.burst = 1.6;
+      }
+    }
+    if (col.y > -step && col.y < h + step) {
+      const head = sprites.head[(col.glyph + col.phase) % COUNT];
+      ctx.globalAlpha = (col.burst > 0 ? 1 : 0.92) * layer.level;
+      ctx.drawImage(head, col.x - sprites.pad, col.y - sprites.pad);
+    }
+  }
+}
+
+let paused = false, last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  if (!paused) for (const layer of LAYERS) stepLayer(layer, dt);
+  requestAnimationFrame(frame);
+}
+
+function rebuild() { for (const layer of LAYERS) buildLayer(layer); }
+rebuild();
+
+if (reduced) {
+  // Reduced motion: settle into a single rich still frame, no animation.
+  for (let i = 0; i < 240; i++) for (const layer of LAYERS) stepLayer(layer, 1 / 30);
+} else {
+  requestAnimationFrame(frame);
+}
+
+let resizeTimer;
+addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(rebuild, 150);
+});
+document.addEventListener("visibilitychange", () => {
+  last = performance.now();
+});
+addEventListener("keydown", (event) => {
+  if (event.code === "Space") { paused = !paused; event.preventDefault(); }
+  if (event.key === "f" || event.key === "F") toggleFullscreen();
+});
+function toggleFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen().catch(() => {});
+}
+addEventListener("click", (event) => {
+  if (!event.target.closest("#badge")) toggleFullscreen();
+});
+
+// Hide the cursor and badge after a few idle seconds.
+let idleTimer;
+function poke() {
+  document.body.classList.remove("idle");
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => document.body.classList.add("idle"), 2600);
+}
+addEventListener("mousemove", poke);
+addEventListener("touchstart", poke, { passive: true });
+poke();
+</script>
+</body>
+</html>
