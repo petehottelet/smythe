@@ -2,7 +2,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
-dist/
+# Root-anchored: the Python build output only. screensaver/dist/ holds
+# committed downloadable screensaver binaries.
+/dist/
 build/
 *.egg-info/
 *.egg
