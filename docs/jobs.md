@@ -385,6 +385,12 @@ with SQLiteRunStore("jobs.sqlite3") as store:
 
 ## High-fan-out example workload
 
+The [Jobs scale and recovery protocol](../benchmarks/jobs_scale_benchmark.md)
+executes actual offline artifact operations, hard-kills an owned worker,
+preserves completed outputs during resume, and explicitly rerolls unknown
+calls. It verifies durable call identity and artifact receipts using tiny PNG
+fixtures. Its evidence is separate from glyph generation and provider latency.
+
 The related [glyph screensaver benchmark](../benchmarks/glyph_screensaver_benchmark.md)
 is one concrete use of Smythe's general-purpose artifact execution model. It
 uses a 192-node `BROADCAST_REDUCE` graph to generate 192 original cyber-glyph

@@ -21,6 +21,7 @@ mechanics run in CI with deterministic providers and zero API cost.
 | [Corrected framework head-to-head](#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12) | **Claimable for the fixed arms** | 77% fewer tokens and 28% less wall time than CrewAI; highest observed blind score |
 | Original self-baselines and pre-correction framework record | Diagnostic | Preserved because they found payload, assembly, and measurement defects; superseded by corrected campaigns |
 | [Control ablation](control_ablation.md) | Mechanism scope | Objective gates remain valuable; routine LLM supervision and judged-prose gating are not default quality paths |
+| [Jobs scale and recovery](jobs_scale_benchmark.md) | Protocol prepared | Actual offline operations, owned-worker hard kill, pending-only resume, and explicit unknown rerolls; full 5,000-operation evidence pending |
 
 The authoritative deliverable is `Swarm.execute(...).output`, which is what a
 caller receives. The harness records the historical terminal-node join beside

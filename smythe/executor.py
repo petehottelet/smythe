@@ -7,7 +7,7 @@ import time
 
 from smythe.budget import BudgetValidationError, SentinelAlert
 from smythe.executor_base import ExecutorBase, NodeFinalizationError
-from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
+from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, _dependency_order
 from smythe.provider import ProviderResponseError
 from smythe.verifier import VerificationRecoveryError
 from smythe.workflow_store import WorkflowError
@@ -52,25 +52,7 @@ class Executor(ExecutorBase):
 
     def _walk(self, graph: ExecutionGraph) -> list[Node]:
         """Topological sort of nodes by dependency order."""
-        visited: set[str] = set()
-        order: list[Node] = []
-        lookup = {n.id: n for n in graph.nodes}
-
-        def visit(node: Node) -> None:
-            if node.id in visited:
-                return
-            visited.add(node.id)
-            for dep_id in node.depends_on:
-                if dep_id not in lookup:
-                    raise ValueError(
-                        f"Node {node.id!r} depends on unknown node {dep_id!r}"
-                    )
-                visit(lookup[dep_id])
-            order.append(node)
-
-        for node in graph.nodes:
-            visit(node)
-        return order
+        return _dependency_order(graph.nodes, strict_missing=True)
 
     def _execute_node(self, node: Node, graph: ExecutionGraph) -> None:
         """Run a single node through the provider, respecting its failure policy."""

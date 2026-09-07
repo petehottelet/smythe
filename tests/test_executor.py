@@ -1,12 +1,14 @@
 """Tests for the serial Executor with failure policy support."""
 
+import random
+
 import pytest
 
 from helpers import FailingProvider
 from smythe.executor import Executor
 from smythe.executor_base import NodeFinalizationError
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
-from smythe.provider import CompletionResult, Provider
+from smythe.provider import CompletionResult, OfflineProvider, Provider
 from smythe.registry import Registry
 from smythe.tracer import Tracer
 
@@ -192,3 +194,74 @@ def test_node_without_timeout_completes():
 
     assert node.status == NodeStatus.COMPLETED
     assert node.timeout_s is None
+
+
+@pytest.mark.parametrize("order", ["forward", "reverse", "shuffled"])
+def test_walk_5000_node_chain_in_any_input_order(order):
+    nodes = [
+        Node(id=f"n{i}", label=f"Step {i}", depends_on=[f"n{i - 1}"] if i else [])
+        for i in range(5_000)
+    ]
+    if order == "reverse":
+        nodes.reverse()
+    elif order == "shuffled":
+        random.Random(20260907).shuffle(nodes)
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=nodes)
+    executor, _ = _make_executor()
+
+    assert [node.id for node in executor._walk(graph)] == [f"n{i}" for i in range(5_000)]
+
+
+def test_walk_preserves_branch_order_and_shared_dependencies():
+    root = Node(id="root", label="Root")
+    a = Node(id="a", label="A", depends_on=[root.id])
+    b = Node(id="b", label="B", depends_on=[root.id])
+    join = Node(id="join", label="Join", depends_on=[b.id, a.id, b.id])
+    later = Node(id="later", label="Later")
+    graph = ExecutionGraph(topology=[Topology.FORK_JOIN], nodes=[join, a, later, root, b])
+    provider = OfflineProvider()
+    executor, _ = _make_executor(provider)
+
+    executor.run(graph)
+
+    assert provider.calls == ["Root", "B", "A", "Join", "Later"]
+    assert all(node.status is NodeStatus.COMPLETED for node in graph.nodes)
+
+
+def test_walk_reports_first_missing_dependency_in_depth_first_order():
+    child = Node(id="child", label="Child", depends_on=["parent", "missing"])
+    parent = Node(id="parent", label="Parent", depends_on=["ghost"])
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[child, parent])
+    executor, _ = _make_executor()
+
+    with pytest.raises(ValueError, match="^Node 'parent' depends on unknown node 'ghost'$"):
+        executor._walk(graph)
+
+
+@pytest.mark.parametrize("count", [1, 2, 5_000])
+def test_private_walk_retains_cycle_tolerance(count):
+    nodes = [
+        Node(id=f"n{i}", label="Step", depends_on=[f"n{i - 1}"] if i else [])
+        for i in range(count)
+    ]
+    nodes[0].depends_on = [nodes[-1].id]
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=list(reversed(nodes)))
+    executor, _ = _make_executor()
+
+    assert executor._walk(graph) == nodes
+
+
+def test_reverse_5000_node_chain_executes_offline_in_dependency_order():
+    nodes = [
+        Node(id=f"n{i}", label=f"Step {i}", depends_on=[f"n{i - 1}"] if i else [])
+        for i in range(5_000)
+    ]
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=list(reversed(nodes)))
+    provider = OfflineProvider(responses=["done"])
+    executor, tracer = _make_executor(provider)
+
+    assert executor.run(graph) is graph
+
+    assert provider.calls == [f"Step {i}" for i in range(5_000)]
+    assert all(node.status is NodeStatus.COMPLETED and node.result == "done" for node in nodes)
+    assert len(tracer.summary()) == 5_000
