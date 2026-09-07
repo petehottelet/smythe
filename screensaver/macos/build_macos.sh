@@ -32,7 +32,7 @@ build_slice arm64
 build_slice x86_64
 lipo -create -output "$BUNDLE/Contents/MacOS/GlyphRain" \
     "$DIST/GlyphRain-arm64" "$DIST/GlyphRain-x86_64"
-lipo -verify_arch arm64 x86_64 "$BUNDLE/Contents/MacOS/GlyphRain"
+lipo "$BUNDLE/Contents/MacOS/GlyphRain" -verify_arch arm64 x86_64
 rm -f "$DIST/GlyphRain-arm64" "$DIST/GlyphRain-x86_64"
 
 cp "$HERE/Info.plist" "$BUNDLE/Contents/Info.plist"

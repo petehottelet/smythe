@@ -289,6 +289,10 @@ the macOS build succeeded and Windows failed at the same setup boundary.
 These workflow failures are infrastructure/setup failures, not evidence of
 failed assertions or a broken screensaver build.
 
-The baseline local `ruff check .` passed. The full local offline suite is
-reported in the accompanying change handoff. This review does not infer live
-test status from a static badge.
+The final local offline suite passed **1,022 tests with 4 skips** on Python
+3.11; `ruff check .` passed. The source distribution and wheel built successfully,
+and a clean virtual environment imported the installed wheel and ran the Jobs
+schema CLI. [CI run 34093152554](https://github.com/petehottelet/smythe/actions/runs/34093152554)
+passed lint, all three Python versions, Windows, package installation, and
+offline benchmark smoke checks for the review changes. This review does not
+infer live test status from a static badge.
