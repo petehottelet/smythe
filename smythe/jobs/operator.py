@@ -70,6 +70,10 @@ class _StartupAborted(RunStoreError):
     pass
 
 
+class _BreakawayDenied(RunStoreError):
+    pass
+
+
 def _seconds(value, name, *, minimum, maximum):
     if (type(value) not in (int, float) or not math.isfinite(value)
             or not minimum <= value <= maximum):
@@ -318,8 +322,7 @@ def _authorization_after_error(directory, request, *, attempted):
 
 def _process_options():
     if os.name == "nt":
-        # A terminal/job object's lifetime must not own the actual worker.
-        # If its job prohibits breakaway, Popen fails before any child starts.
+        # Request job breakaway as well as console detachment.
         startup = subprocess.STARTUPINFO()
         startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         startup.wShowWindow = 0
@@ -327,6 +330,34 @@ def _process_options():
                                    | subprocess.CREATE_BREAKAWAY_FROM_JOB),
                 "startupinfo": startup}
     return {"start_new_session": True}
+
+
+def _select_process_options(deadline):
+    options = _process_options()
+    if os.name != "nt":
+        return options
+    # This isolated, no-work probe checks support. The actual worker is
+    # launched exactly once, even if its constructor fails
+    # after Windows creates it. -I -S excludes site hooks and PYTHONPATH.
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError("Worker startup deadline expired before process probe")
+    try:
+        subprocess.run(
+            [sys.executable, "-I", "-S", "-c", "pass"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            shell=False, close_fds=True, timeout=remaining, check=True, **options,
+        )
+    except PermissionError as error:
+        # Report the observed access-denied probe, not an inferred cause.
+        # Dropping BREAKAWAY could bind the worker to a dying launcher job.
+        if getattr(error, "winerror", None) != 5 or error.filename is not None:
+            raise
+        raise _BreakawayDenied(
+            "Windows denied the breakaway probe; this launch did not start a worker. "
+            "Resume the saved run without --detach or use a host that permits breakaway."
+        ) from error
+    return options
 
 
 def _python_environment():
@@ -350,7 +381,8 @@ def launch_worker(store_path, run_id, *, startup_timeout_s=DEFAULT_STARTUP_TIMEO
     """Launch an already-created, approved run and wait for its lease receipt.
 
     The returned PID is reported by the Python worker itself; it can differ
-    from Popen.pid for a Windows venv redirector. No process is killed here.
+    from Popen.pid for a Windows venv redirector. No worker is killed here;
+    a timed-out, owned no-op probe is terminated and reaped by subprocess.run.
     Failures before authorization deny dispatch. Errors at the authorization
     boundary report whether a grant is visible or its state remains unknown.
     """
@@ -397,11 +429,14 @@ def launch_worker(store_path, run_id, *, startup_timeout_s=DEFAULT_STARTUP_TIMEO
         descriptor = os.open(directory / "worker.log", os.O_WRONLY | os.O_CREAT | os.O_EXCL
                              | getattr(os, "O_BINARY", 0), 0o600)
         with os.fdopen(descriptor, "wb") as log:
+            process_options = _select_process_options(deadline)
+            if time.monotonic() >= deadline:
+                raise TimeoutError("Worker startup deadline expired after process probe")
             process = subprocess.Popen(
                 [sys.executable, "-P", "-u", "-m", "smythe.jobs.operator", "--worker",
                  str(directory / "request.json")], cwd=str(database.parent),
                 stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
-                shell=False, close_fds=True, env=_python_environment(), **_process_options(),
+                shell=False, close_fds=True, env=_python_environment(), **process_options,
             )
         while True:
             failed = _read_json(directory / "finished.json", missing_ok=True)
@@ -437,6 +472,8 @@ def launch_worker(store_path, run_id, *, startup_timeout_s=DEFAULT_STARTUP_TIMEO
     except BaseException as error:
         authorized = _authorization_after_error(directory, request, attempted=authorization_attempted)
         launch = dict(launch, startup_authorized=authorized)
+        if isinstance(error, _BreakawayDenied):
+            launch["unsupported_reason"] = "windows_breakaway_denied"
         if created_directory:
             try:
                 _decision(directory, request, "abort")

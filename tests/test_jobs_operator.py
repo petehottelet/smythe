@@ -51,6 +51,7 @@ class Child:
 
 def fake_launch(monkeypatch, journal, *, behavior="ready"):
     calls = []
+    monkeypatch.setattr(operator, "_select_process_options", lambda deadline: operator._process_options())
 
     def popen(command, **kwargs):
         directory = Path(command[-1]).parent
@@ -581,6 +582,113 @@ def test_process_options_detach_from_terminal_and_hide_windows():
         assert options["startupinfo"].wShowWindow == 0
     else:
         assert options == {"start_new_session": True}
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows process creation policy")
+@pytest.mark.parametrize("denied", [False, True])
+def test_windows_probe_is_isolated_no_work_and_bounded(monkeypatch, denied):
+    calls = []
+    monkeypatch.setattr(operator.time, "monotonic", lambda: 10)
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        if denied:
+            raise __import__("ctypes").WinError(5)
+
+    monkeypatch.setattr(operator.subprocess, "run", run)
+    if denied:
+        with pytest.raises(operator._BreakawayDenied):
+            operator._select_process_options(15)
+        options = operator._process_options()
+    else:
+        options = operator._select_process_options(15)
+    assert len(calls) == 1
+    command, kwargs = calls[0]
+    assert command == [sys.executable, "-I", "-S", "-c", "pass"]
+    assert kwargs["timeout"] == 5 and kwargs["check"] is True
+    assert kwargs["stdin"] == kwargs["stdout"] == kwargs["stderr"] == subprocess.DEVNULL
+    assert kwargs["shell"] is False and kwargs["close_fds"] is True
+    assert "env" not in kwargs  # Isolated Python ignores inherited startup configuration.
+    assert kwargs["creationflags"] & subprocess.CREATE_BREAKAWAY_FROM_JOB
+    assert options["creationflags"] & subprocess.CREATE_BREAKAWAY_FROM_JOB
+    assert options["creationflags"] & subprocess.DETACHED_PROCESS
+    assert options["creationflags"] & subprocess.CREATE_NEW_PROCESS_GROUP
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows process creation policy")
+@pytest.mark.parametrize("kind", ["filename", "other_code", "timeout", "nonzero"])
+def test_windows_probe_other_failures_are_not_fallbacks(monkeypatch, kind):
+    import ctypes
+
+    if kind == "filename":
+        error = PermissionError(13, "private file denied", "private.log", 5)
+    elif kind == "other_code":
+        error = ctypes.WinError(1314)
+    elif kind == "timeout":
+        error = subprocess.TimeoutExpired("probe", 1)
+    else:
+        error = subprocess.CalledProcessError(1, "probe")
+
+    def run(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr(operator.subprocess, "run", run)
+    with pytest.raises(type(error)) as caught:
+        operator._select_process_options(time.monotonic() + 1)
+    assert caught.value is error
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows process creation policy")
+def test_actual_worker_access_denied_is_never_retried_or_authorized(journal, monkeypatch):
+    import ctypes
+
+    attempts = []
+    monkeypatch.setattr(operator, "_select_process_options", lambda deadline: operator._process_options())
+
+    def popen(*args, **kwargs):
+        attempts.append(args)
+        raise ctypes.WinError(5)
+
+    monkeypatch.setattr(operator.subprocess, "Popen", popen)
+    with pytest.raises(operator.WorkerStartupError) as caught:
+        operator.launch_worker(journal.path, "run")
+    assert len(attempts) == 1 and caught.value.launch["startup_authorized"] is False
+    directory = Path(caught.value.launch["receipt_path"])
+    assert operator._read_json(directory / "decision.json")["action"] == "abort"
+    assert journal._call_rows("run") == []
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows breakaway policy")
+def test_denied_breakaway_refuses_worker_and_authorization(journal, monkeypatch):
+    import ctypes
+
+    monkeypatch.setattr(operator.subprocess, "run", lambda *args, **kwargs: (_ for _ in ()).throw(
+        ctypes.WinError(5)))
+    monkeypatch.setattr(operator.subprocess, "Popen", lambda *args, **kwargs: pytest.fail("Worker spawned"))
+    with pytest.raises(operator.WorkerStartupError, match="did not start a worker") as caught:
+        operator.launch_worker(journal.path, "run")
+    assert caught.value.launch["startup_authorized"] is False
+    directory = Path(caught.value.launch["receipt_path"])
+    assert operator._read_json(directory / "decision.json")["action"] == "abort"
+    assert caught.value.launch["unsupported_reason"] == "windows_breakaway_denied"
+    assert not (directory / "ready.json").exists() and journal._call_rows("run") == []
+
+
+def test_process_probe_cannot_spend_past_startup_deadline(journal, monkeypatch):
+    tick = [0.0]
+    monkeypatch.setattr(operator.time, "monotonic", lambda: tick[0])
+
+    def select(deadline):
+        tick[0] = deadline
+        return {}
+
+    monkeypatch.setattr(operator, "_select_process_options", select)
+    monkeypatch.setattr(operator.subprocess, "Popen", lambda *args, **kwargs: pytest.fail("Worker spawned"))
+    with pytest.raises(operator.WorkerStartupError, match="after process probe") as caught:
+        operator.launch_worker(journal.path, "run")
+    assert caught.value.launch["startup_authorized"] is False
+    assert journal._call_rows("run") == []
+
 
 
 def test_stop_persists_request_without_constructing_or_signaling_a_worker(journal, monkeypatch):

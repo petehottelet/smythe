@@ -1,0 +1,57 @@
+{
+  "archive_sha256": "aad4eec40c613c1199812c25b692cc6f87f324fa2e8394151ec43acb8fd54751",
+  "checks": {
+    "accepted_pointers_preserved": true,
+    "archive_verified": true,
+    "artifacts_verified": true,
+    "attempt_lineage_verified": true,
+    "frozen_source_verified": true,
+    "lease_expiry_verified": true,
+    "ledger_reconciled": true,
+    "real_kill_verified": true,
+    "zero_cost_verified": true
+  },
+  "inventory_sha256": "733b572bc3825df95c6a4ef4a5b65577819e8ec2c4c1c7538360260fafb3dc93",
+  "known_measurement_defects": [],
+  "method": "Every original archive member verified by raw SHA/size. SQLite is inspected only from an extracted copy. Historical accepted sets are reconstructed from final ledger events/provider logs and bound receipt subsets, not historical database snapshots.",
+  "observation_claimable": true,
+  "reconciled": {
+    "accepted_artifacts": 5000,
+    "accepted_receipts_sha256": "092ee12e4f76ea77699b9b5f843393e369289143473cc8de5518c8173086268e",
+    "calls": 5008,
+    "events": 20051,
+    "explicit_rerolls": 8,
+    "operations": 5000,
+    "pillow_version": "12.3.0",
+    "preserved_precrash_receipts_sha256": "34924a5bb77170fc1098e4ed920385bf9739fce0db20aa20288fe12477818072",
+    "state_counts": {
+      "after_kill": {
+        "pending": 2500,
+        "running": 8,
+        "succeeded": 2492
+      },
+      "after_resume": {
+        "succeeded": 4992,
+        "unknown_outcome": 8
+      },
+      "final": {
+        "succeeded": 5000
+      }
+    }
+  },
+  "record_sha256": "96df796d8dfe452e8ef7167f4fd7648b59ea0410a95cd5be228497e9e4626695",
+  "review_runtime": {
+    "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+    "sqlite": "3.49.1"
+  },
+  "review_source_sha256": {
+    "review-source/benchmarks/archive_jobs_scale.py": "57fed8123e32733833481df860506a62117f94587f27b48ab0facbc70ced6f6d",
+    "review-source/benchmarks/jobs_scale_chart.py": "7d1350699e5ef8b57146efc561a17e7a2253d946e9ecae3baca601a631ac4c39",
+    "review-source/benchmarks/render_readme_charts.py": "641cd65d19e9f879c694ea56f885ebac0824ee2ba91dacead8da26af6cc7ef58",
+    "review-source/tests/test_jobs_scale_archive.py": "ae0090ebbb5f617f39c4fa6b0f180ecf1d497507baaeb39e517c61ad4324f68e"
+  },
+  "schema": "smythe.jobs-scale-review.v1",
+  "scope": "offline_correctness_observation",
+  "source_revision": "4bb7c0295cec658c7118d7bf9305764dae9b1c57",
+  "status": "passed"
+}

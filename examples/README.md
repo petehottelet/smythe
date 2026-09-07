@@ -26,11 +26,18 @@ smythe jobs list
 smythe jobs inspect RUN_ID --out job-report.html
 ```
 
-For long jobs, add `--detach` to `run` or `resume`, follow with `jobs attach`,
+For long jobs on supported hosts, add `--detach` to `run` or `resume` so the launcher can exit,
+follow with `jobs attach`,
 and use `jobs stop` to save a pause request while admitted calls drain.
+Windows hosts must permit process breakaway; refused starts retain the run
+for foreground resume without authorizing a worker.
 [Operator commands and recovery semantics](../docs/jobs.md#detached-execution-and-attachment).
 Use the saved `artifact_directory` or exported `artifact_root` to locate files;
 new runs receive persistent namespaces independent of their public run IDs.
+The [5,000-operation recovery report](../benchmarks/jobs_scale_5000_20260907_results.md)
+retains a full offline fixture campaign on the earlier schema-v3 runtime;
+it verifies safe resume and explicit unknown rerolls separately from the
+current operator commands and schema-v4 namespaces.
 
 For local graphics measurements, the [renderer protocol](../benchmarks/renderer_performance_20260907.md)
 defines six fresh browser sessions and validates their raw timing receipts.

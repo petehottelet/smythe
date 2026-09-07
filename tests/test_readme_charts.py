@@ -15,6 +15,7 @@ from benchmarks.render_readme_charts import (
     render_glyph_pipeline,
     render_glyph_scaling,
     render_glyph_specimens,
+    render_jobs_scale_observation,
     render_recovery,
     render_shape_efficiency,
     render_svg_workflow,
@@ -51,6 +52,7 @@ def test_generated_public_charts_are_strictly_black_and_white():
         render_shape_efficiency,
         render_svg_workflow,
         render_recovery,
+        render_jobs_scale_observation,
         render_glyph_scaling,
         render_glyph_pipeline,
         render_glyph_specimens,
@@ -76,6 +78,7 @@ def test_committed_benchmark_charts_match_the_current_evidence_renderer():
         "glyph_scaling.svg": render_glyph_scaling,
         "svg_workflow.svg": render_svg_workflow,
         "recovery.svg": render_recovery,
+        "jobs_scale.svg": render_jobs_scale_observation,
     }
     for name, renderer in charts.items():
         path = ROOT / "assets" / "benchmarks" / name
@@ -131,6 +134,8 @@ def test_readme_connects_glyph_rain_to_benchmark_evidence():
         "assets/benchmarks/svg_workflow.svg",
         "### Glyph generation and scaling",
         "assets/benchmarks/glyph_scaling.svg",
+        "### Jobs at 5,000 operations",
+        "assets/benchmarks/jobs_scale.svg",
         "### Recovery after interruption",
         "assets/benchmarks/recovery.svg",
         "### Framework efficiency",
@@ -153,6 +158,16 @@ def test_shape_chart_promotes_complete_wall_time_and_not_partial_cost():
     assert "Planning included in wall time" in svg
     assert "lower end-to-end wall time" in svg
     assert "lower cost" not in svg
+
+
+def test_jobs_scale_figure_preserves_observed_states_and_fixture_scope():
+    svg = render_jobs_scale_observation()
+    for stage, accepted in (("after_kill", 2492), ("after_resume", 4992), ("final", 5000)):
+        assert f'data-stage="{stage}" data-accepted="{accepted}" data-maximum="5000"' in svg
+    assert "8 explicit rerolls" in svg
+    assert "0 previously accepted operations reissued; 0 calls on completed resume" in svg
+    assert "1 campaign; identical 1×1 PNG fixtures; zero API calls and zero API cost" in svg
+    assert "no comparative speed or model-quality claim" in svg
 
 
 @pytest.mark.parametrize("defect", ["summary", "missing", "unmatched", "failed"])

@@ -911,6 +911,14 @@ def render_glyph_specimens() -> str:
     )
 
 
+def render_jobs_scale_observation() -> str:
+    """Render the independently reconciled, single-campaign recovery record."""
+    from benchmarks.jobs_scale_chart import render_jobs_scale
+
+    campaign = RESULTS / "jobs_scale_5000_20260907_f1"
+    return render_jobs_scale(campaign / "result.json", campaign / "review.json")
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     GLYPH_OUT.mkdir(parents=True, exist_ok=True)
@@ -921,6 +929,7 @@ def main() -> None:
         OUT / "glyph_scaling.svg": render_glyph_scaling,
         OUT / "svg_workflow.svg": render_svg_workflow,
         OUT / "recovery.svg": render_recovery,
+        OUT / "jobs_scale.svg": render_jobs_scale_observation,
         GLYPH_OUT / "glyph_pipeline.svg": render_glyph_pipeline,
         GLYPH_OUT / "glyph_specimens.svg": render_glyph_specimens,
     }

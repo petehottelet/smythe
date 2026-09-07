@@ -1,0 +1,27 @@
+import ctypes, json, subprocess, sys
+from ctypes import wintypes
+k = ctypes.WinDLL('kernel32', use_last_error=True)
+k.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+k.CreateJobObjectW.restype = wintypes.HANDLE
+k.GetCurrentProcess.restype = wintypes.HANDLE
+k.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+k.AssignProcessToJobObject.restype = wintypes.BOOL
+k.CloseHandle.argtypes = [wintypes.HANDLE]
+job = k.CreateJobObjectW(None, None)
+if not job or not k.AssignProcessToJobObject(job, k.GetCurrentProcess()):
+    raise ctypes.WinError(ctypes.get_last_error())
+try:
+    for breakaway in (True, False):
+        flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+        if breakaway:
+            flags |= subprocess.CREATE_BREAKAWAY_FROM_JOB
+        try:
+            child = subprocess.Popen([sys.executable, '-c', 'pass'], creationflags=flags,
+                                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                     stderr=subprocess.DEVNULL, close_fds=True)
+            print(json.dumps({'breakaway':breakaway,'returncode':child.wait(timeout=10)}))
+        except OSError as error:
+            print(json.dumps({'breakaway':breakaway,'exception':type(error).__name__,
+                              'winerror':error.winerror,'message':str(error)}))
+finally:
+    k.CloseHandle(job)

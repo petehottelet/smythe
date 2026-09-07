@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+from uuid import uuid4
 
 import pytest
 
@@ -178,7 +179,56 @@ def wait_until(predicate, *, timeout=30):
     raise AssertionError("Owned offline worker did not reach its expected barrier")
 
 
-def test_real_process_worker_survives_launcher_exit_and_retains_python_environment(tmp_path):
+class WindowsHostJob:
+    """A test-owned restrictive supervisor, held beyond launcher exit."""
+
+    def __init__(self, *, kill_on_close):
+        import ctypes
+        from ctypes import wintypes
+
+        class BasicLimits(ctypes.Structure):
+            _fields_ = [("process_time", ctypes.c_longlong), ("job_time", ctypes.c_longlong),
+                        ("flags", wintypes.DWORD), ("minimum_ws", ctypes.c_size_t),
+                        ("maximum_ws", ctypes.c_size_t), ("active_processes", wintypes.DWORD),
+                        ("affinity", ctypes.c_size_t), ("priority", wintypes.DWORD),
+                        ("scheduling", wintypes.DWORD)]
+
+        class ExtendedLimits(ctypes.Structure):
+            _fields_ = [("basic", BasicLimits), ("io", ctypes.c_ulonglong * 6),
+                        ("process_memory", ctypes.c_size_t), ("job_memory", ctypes.c_size_t),
+                        ("peak_process_memory", ctypes.c_size_t), ("peak_job_memory", ctypes.c_size_t)]
+
+        self.kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        self.kernel.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+        self.kernel.CreateJobObjectW.restype = wintypes.HANDLE
+        self.kernel.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int,
+                                                       ctypes.c_void_p, wintypes.DWORD]
+        self.kernel.SetInformationJobObject.restype = wintypes.BOOL
+        self.kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        self.name = "Local\\SmytheOperatorTest-" + uuid4().hex
+        self.handle = self.kernel.CreateJobObjectW(None, self.name)
+        if not self.handle:
+            raise ctypes.WinError(ctypes.get_last_error())
+        limits = ExtendedLimits()
+        limits.basic.flags = 0x2000 if kill_on_close else 0  # No breakaway permission.
+        if not self.kernel.SetInformationJobObject(self.handle, 9, ctypes.byref(limits), ctypes.sizeof(limits)):
+            self.close()
+            raise ctypes.WinError(ctypes.get_last_error())
+
+    def close(self):
+        if self.handle:
+            self.kernel.CloseHandle(self.handle)
+            self.handle = None
+
+
+
+@pytest.mark.parametrize("host_policy", [
+    None,
+    pytest.param("restricted", marks=pytest.mark.skipif(os.name != "nt", reason="Windows host jobs")),
+    pytest.param("kill_on_close", marks=pytest.mark.skipif(os.name != "nt", reason="Windows host jobs")),
+    pytest.param("restricted_venv", marks=pytest.mark.skipif(os.name != "nt", reason="Windows venv host jobs")),
+])
+def test_real_process_detachment_checks_host_policy_and_launcher_survival(tmp_path, host_policy):
     manifest, _, approval = planned(tmp_path)
     database = tmp_path / "jobs.db"
     gate = tmp_path / "release-worker"
@@ -188,6 +238,21 @@ def test_real_process_worker_survives_launcher_exit_and_retains_python_environme
     # fixture allows the actual child to complete. No provider key is used.
     (customization / "sitecustomize.py").write_text(
         "import asyncio, os\n"
+        "job_name = os.environ.pop('SMYTHE_OPERATOR_TEST_HOST_JOB', None)\n"
+        "if job_name:\n"
+        "    import ctypes\n"
+        "    from ctypes import wintypes\n"
+        "    kernel = ctypes.WinDLL('kernel32', use_last_error=True)\n"
+        "    kernel.OpenJobObjectW.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.LPCWSTR]\n"
+        "    kernel.OpenJobObjectW.restype = wintypes.HANDLE\n"
+        "    kernel.GetCurrentProcess.restype = wintypes.HANDLE\n"
+        "    kernel.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]\n"
+        "    kernel.AssignProcessToJobObject.restype = wintypes.BOOL\n"
+        "    kernel.CloseHandle.argtypes = [wintypes.HANDLE]\n"
+        "    job = kernel.OpenJobObjectW(1, False, job_name)\n"
+        "    if not job or not kernel.AssignProcessToJobObject(job, kernel.GetCurrentProcess()):\n"
+        "        os._exit(98)\n"
+        "    kernel.CloseHandle(job)\n"
         "from pathlib import Path\n"
         "from smythe.provider import OfflineProvider\n"
         "original = OfflineProvider.complete\n"
@@ -208,17 +273,52 @@ def test_real_process_worker_survives_launcher_exit_and_retains_python_environme
     environment["SMYTHE_OPERATOR_TEST_GATE"] = str(gate)
     for key in ("OPENAI_API_KEY", "GOOGLE_API_KEY", "ANTHROPIC_API_KEY"):
         environment.pop(key, None)
+    executable, expected_prefix = sys.executable, sys.prefix
+    if host_policy in {"restricted", "kill_on_close"}:
+        # Exercise a direct interpreter whose launcher owns no extra venv
+        # job. The original case above still tests the invoking environment.
+        executable, expected_prefix = sys._base_executable, sys.base_prefix
+    elif host_policy == "restricted_venv" and sys.prefix == sys.base_prefix:
+        import venv
+
+        target = tmp_path / "redirected-python"
+        venv.EnvBuilder(with_pip=False).create(target)
+        executable = str(target / "Scripts" / "python.exe")
+    host = WindowsHostJob(kill_on_close=host_policy == "kill_on_close") if host_policy else None
+    if host is not None:
+        environment["SMYTHE_OPERATOR_TEST_HOST_JOB"] = host.name
     launched = None
-    process = subprocess.Popen(
-        [sys.executable, "-P", "-m", "smythe.cli", "jobs", "run", str(manifest),
-         "--approve", approval.token, "--detach", "--startup-timeout-s", "20",
-         "--store", str(database), "--json"],
-        cwd=tmp_path, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        stdin=subprocess.DEVNULL, text=True,
-        **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}),
-    )
+    process = None
     try:
+        process = subprocess.Popen(
+            [executable, "-P", "-m", "smythe.cli", "jobs", "run", str(manifest),
+             "--approve", approval.token, "--detach", "--startup-timeout-s", "20",
+             "--store", str(database), "--json"],
+            cwd=tmp_path, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL, text=True,
+            **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}),
+        )
         stdout, stderr = process.communicate(timeout=30)
+        if host_policy is not None or process.returncode == 7:
+            assert process.returncode == 7, (stdout, stderr)
+            error = json.loads(stdout)["error"]
+            assert error["type"] == "WorkerStartupError" and "breakaway probe" in error["message"]
+            assert error["launch"]["startup_authorized"] is False
+            assert error["launch"]["unsupported_reason"] == "windows_breakaway_denied"
+            failed = error["launch"]
+            directory = Path(failed["receipt_path"])
+            assert operator._read_json(directory / "decision.json")["action"] == "abort"
+            assert not (directory / "ready.json").exists()
+            assert not gate.with_suffix(".entered").exists()
+            with SQLiteRunStore(database, read_only=True) as store:
+                assert store.get_run(failed["run_id"])["status"] == "approved"
+                assert store.get_run_lease(failed["run_id"]) is None
+                assert store._call_rows(failed["run_id"]) == []
+            (tmp_path / "detachment-proof.json").write_text(json.dumps({
+                "host_policy": host_policy, "outcome": "unsupported_before_worker",
+                "run_id": failed["run_id"], "zero_calls": True, "startup_authorized": False,
+            }), encoding="utf-8")
+            return
         assert process.returncode == 0, (stdout, stderr)
         launched = json.loads(stdout)["run"]
         assert process.poll() == 0 and launched["detached"] is True
@@ -228,7 +328,7 @@ def test_real_process_worker_survives_launcher_exit_and_retains_python_environme
         assert launched["worker_pid"] != process.pid
         directory = Path(launched["receipt_path"])
         ready = operator._read_json(directory / "ready.json")
-        assert Path(ready["python_prefix"]) == Path(sys.prefix)
+        assert Path(ready["python_prefix"]) == Path(expected_prefix)
         assert not (directory / "finished.json").exists()
         stopped = operator.stop_job(database, launched["run_id"], timeout_s=0)
         assert stopped["control"]["pause_requested"] is True
@@ -242,13 +342,24 @@ def test_real_process_worker_survives_launcher_exit_and_retains_python_environme
             snapshot = store.snapshot(launched["run_id"])
             assert snapshot["counts"] == {"succeeded": 1}
             assert len(snapshot["artifacts"]) == 1 and store.get_run_lease(launched["run_id"]) is None
+            calls = store._call_rows(launched["run_id"])
+            assert len(calls) == 1 and calls[0]["status"] == "succeeded"
         attached = operator.attach_job(database, launched["run_id"], timeout_s=0)
         assert attached["attachment"]["state"] == "stopped"
+        (tmp_path / "detachment-proof.json").write_text(json.dumps({
+            "host_policy": host_policy, "outcome": "survived_launcher_and_completed",
+            "run_id": launched["run_id"], "worker_pid": launched["worker_pid"],
+            "python_prefix": ready["python_prefix"], "one_call": True,
+        }), encoding="utf-8")
     finally:
-        gate.write_text("finish", encoding="utf-8")
-        if process.poll() is None:
-            # This waits only for the owned launcher; no PID-based termination.
-            process.wait(timeout=35)
-        if launched is not None:
-            directory = Path(launched["receipt_path"])
-            wait_until(lambda: (directory / "finished.json").exists(), timeout=35)
+        try:
+            gate.write_text("finish", encoding="utf-8")
+            if process is not None and process.poll() is None:
+                # Wait only for the owned launcher; no PID-based termination.
+                process.wait(timeout=35)
+            if launched is not None:
+                directory = Path(launched["receipt_path"])
+                wait_until(lambda: (directory / "finished.json").exists(), timeout=35)
+        finally:
+            if host is not None:
+                host.close()

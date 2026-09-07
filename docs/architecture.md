@@ -144,13 +144,18 @@ prompt mutation.
 - The graph is the planning and inspection boundary.
 - Nodes carry retries, timeouts, traces, and cost records. Node results and
   verification control transitions form the checkpoint boundaries.
-- The run budget governs execution and synthesis.
-- Planning and model-based supervision currently call providers outside that
-  budget. Complete workflow accounting is a [planned extension](../ROADMAP.md#coming-soon).
+- Without `run_store`, the ordinary Swarm budget governs execution and synthesis;
+  model-based routing, planning, and successful supervision remain outside it.
+- With `run_store=SQLiteWorkflowStore(...)`, supported text workflows share one
+  durable ledger across routing, planning, execution, verification, supervision,
+  and synthesis. Request-bound quotes, fenced dispatch, and retained response
+  evidence govern admission and recovery. See [managed scope](workflow-accounting.md#supported-scope).
 - A supervisor may change only pending work.
 - A verifier may reset only its target and downstream dependents.
 - A resumed run keeps completed results, recorded spend, and consumed control allowances.
 
 The [cost guardrails](budgets.md) reject malformed usage and block unresolved
 accounting on resume. The [repository review](project-review-2026-09-06.md)
-records the original defects and remaining lifecycle-accounting work.
+records the original defects and dated follow-up work. Managed accounting does
+not expand the supported text-workflow boundary to tools, attachments, or
+arbitrary paid custom components; those retain their separate documented scopes.

@@ -108,6 +108,25 @@ unique tiles. This measures artifact generation, not screensaver frame rate.
 
 [Glyph protocol and records](benchmarks/glyph_screensaver_benchmark.md).
 
+### Jobs at 5,000 operations
+
+**5,000 accepted artifacts after a hard process kill and recovery.** Safe
+resume completed 2,500 pending operations and preserved the 2,492 already
+accepted outputs. Eight interrupted operations required explicit rerolls;
+their original unknown call records remain in the ledger. No accepted
+operation was reissued; resuming the completed job made
+zero new calls.
+
+<p align="center">
+  <img src="assets/benchmarks/jobs_scale.svg" alt="One offline Jobs campaign: 2,492 accepted after the kill, 4,992 after safe resume, and 5,000 after eight explicit rerolls" width="900">
+</p>
+
+One Windows campaign, concurrency eight, identical 1×1 PNG fixtures, and
+**$0 provider API charges**. This tests durable recovery on the frozen
+schema-v3 runtime; glyph generation, model quality, and the later schema-v4
+operator features have separate evidence.
+[Results, complete archive, and independent reconciliation](benchmarks/jobs_scale_5000_20260907_results.md).
+
 ### Recovery after interruption
 
 A separate matched durability test measures work repeated after a hard kill.
@@ -167,7 +186,7 @@ documents each comparison, its scope, and its evidence status.
 
 Agents use MCP tools, generate images, and pass artifacts to downstream nodes.
 Durable Jobs add manifest validation, plan approvals, an attempt journal,
-selective rerolls, detached workers, durable pauses, read-only inspection,
+selective rerolls, detached workers on supported hosts, durable pauses, read-only inspection,
 and portable exports. Inspect
 prompts, responses, costs, and artifact receipts in a local HTML report.
 Lease epochs reject stale-worker journal writes after ownership changes.
@@ -259,7 +278,7 @@ team challenges the draft, and a final node writes the decision memo.
   [six-session headless study](benchmarks/renderer_performance_20260907_results.md)
   measured 56.21–56.24 draws/second and retained every result; its pacing target
   was not met.
-- **Broader evidence:** larger stress tests, repeated live glyph sweeps, and
+- **Broader evidence:** bounded paid scale trials, repeated live glyph sweeps, and
   human-calibrated quality comparisons with saved outputs and judge reasoning.
 - **Astra benchmarks:** matched model and orchestration comparisons with full
   usage accounting and blind quality scoring. The 13-task pack and schedules

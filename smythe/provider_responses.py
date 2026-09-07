@@ -2,7 +2,8 @@
 
 Generation does not count inputs first. ``prepare`` is local; ``quote`` is an
 optional HTTP operation. ``dispatch`` returns bytes before either pricing or
-output decoding, providing the persistence boundary for a future run ledger.
+output decoding, providing the persistence boundary used by the managed
+text-workflow ledger.
 """
 
 from __future__ import annotations

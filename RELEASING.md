@@ -48,6 +48,10 @@ published or when a maintainer dispatches it manually.
    explicit in the build record; attaching them does not imply a new rebuild.
 7. Verify the successful publish workflow. In a fresh environment, install
    `smythe==X.Y.Z` from PyPI, check its version, and exercise the installed CLI.
+   Download the workflow's retained distributions and `package-hashes.txt`;
+   confirm PyPI serves those exact wheel and sdist bytes. Build hosts can use
+   different source newlines, so local candidate hashes do not substitute for
+   the publication workflow's artifact hashes.
    Update the PyPI badge only after the published version is available.
 
 ## If publishing fails

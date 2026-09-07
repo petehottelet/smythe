@@ -3,21 +3,36 @@
 **Rating: 7/10. Keep the architecture and harden the runtime. A complete rewrite
 would discard useful work without addressing the main problems.**
 
-Follow-up: [strict numeric cost validation](budgets.md),
+**Follow-up — 7 September 2026:** [strict numeric cost validation](budgets.md),
 [consistent serial halt](execution.md), and
 [durable verification](verifier.md#recovery-and-concurrent-work) now address
 those findings, including invalid-report recovery and active descendants.
 [Complete task snapshots](tasks.md) also close the planning and handoff gaps.
-The remaining work is tracked in
-the [completion campaign](../plans/coming-soon-2026-09-07.md). This review's
-reproductions and counts describe the original reviewed commit.
+[Managed text workflows](workflow-accounting.md) now provide the complete call
+ledger for supported `run_store` configurations, including planning and
+supervision. Ordinary Swarm execution without `run_store` retains its narrower
+execution/synthesis accounting; tools and arbitrary paid custom components are
+outside the managed text-workflow scope.
+
+[Jobs inspection](jobs.md), [iterative deep-graph execution](execution.md#deep-graphs),
+and [unique, flushed file checkpoints](checkpoint-format.md) are implemented.
+The [completion campaign](../plans/coming-soon-2026-09-07.md#work-queue) records
+their source-bound tests and CI evidence. The [Astra pilot runtime qualification](../benchmarks/results/astra_pilot_runtime_20260907/README.md)
+is offline evidence; new paid comparisons and calibrated quality results remain
+pending. Deliverable contracts, Autotune campaign ownership, strict capability
+assignment, and the other remaining work are tracked in that campaign and the
+[roadmap](../ROADMAP.md#coming-soon).
+
+The rating, assessment, reproductions, counts, and original delivery sequence
+below describe the reviewed commit. The subsystem table distinguishes completed
+follow-up work from the remaining improvements.
 
 Smythe has a clear product: generate an inspectable execution graph for a goal,
 then run it within a durable execution envelope. The repository implements
 both ideas, with working provider adapters, tools, checkpoints, artifact jobs,
-verification, supervision, and bounded optimization. The next improvement is
-consistency: the older Swarm runtime should meet the stronger validation and
-accounting standards already present in Jobs and Autotune.
+verification, supervision, and bounded optimization. At the reviewed commit,
+the next improvement was consistency: the older Swarm runtime needed the
+stronger validation and accounting standards already present in Jobs and Autotune.
 
 This review examined the checkout at
 `63941dc72ff7e94bb445c19d3e0932097ff7a6de`. It covered the public API, graph and
@@ -187,6 +202,12 @@ after the stop is observed.
 
 **Priority: high for benchmark claims and budget expectations.**
 
+**7 September follow-up:** the supported `run_store` text-workflow path now
+records all its phases and failed attempts under one allowance. The reproduction
+below describes the original unmanaged path, whose narrower accounting remains
+documented in [Cost guardrails](budgets.md#current-scope). Fresh matched paid
+campaigns and calibrated acceptance evidence are still required.
+
 The [LLM planner](../smythe/planner.py#L117) and
 [LLM supervisor](../smythe/supervisor.py#L159) call providers without the run
 Sentinel. Swarm reports execution and synthesis charges. The architecture
@@ -218,15 +239,15 @@ boundaries; earlier incomplete campaigns remain diagnostic evidence.
 
 | Subsystem | Keep | Improve next |
 |---|---|---|
-| Planning and graph | Three planning tiers, inspectable DAGs, validated revisions, capability inventory | Preserve Task identity; require a declared deliverable contract; validate node fields consistently across Python, YAML, planner JSON, and checkpoint loading. |
-| Execution | Bounded active-task admission, explicit retries, timeouts, cancellation, per-call recording | Resolve the four correctness findings above; share failure-policy logic between executors; make verification generations explicit. |
-| Durability | Atomic artifact replacement, versioned checkpoints, terminal checkpoints | Use unique checkpoint temporary files and durable flushing; define ownership for concurrent resume. The file checkpoint store uses a fixed `.json.tmp` path and an instance-local lock at [checkpoint.py:228](../smythe/checkpoint.py#L228), while Jobs already has stronger storage primitives. |
-| Jobs | Approval bound to exact plans, SQLite WAL/FULL durability, dispatch journal, leases, explicit unknown outcomes | Reuse these primitives in the main Swarm runtime; add operator inspection and integrate production asset policies into manifests. |
+| Planning and graph | Three planning tiers, inspectable DAGs, validated revisions, capability inventory | Task identity is preserved. Add a declared deliverable contract and consistent node-field validation across Python, YAML, planner JSON, and checkpoint loading. |
+| Execution | Bounded active-task admission, explicit retries, timeouts, cancellation, per-call recording | The four correctness findings and explicit verification generations are addressed. Continue consolidating shared executor behavior while retaining the regression matrix. |
+| Durability | Atomic artifact replacement, versioned checkpoints, terminal checkpoints | The reviewed fixed `.json.tmp` collision is addressed by unique temporary files and durable flushing. Ordinary file checkpoints still provide no concurrent-resume ownership; managed workflows and Jobs have fenced leases. |
+| Jobs | Approval bound to exact plans, SQLite WAL/FULL durability, dispatch journal, leases, explicit unknown outcomes | Managed Swarm accounting and Jobs operator inspection are implemented. Production asset-policy integration remains open. |
 | Autotune | Immutable contracts, allowlisted mutation, paired comparisons, confirmation and held-out evaluation | Add campaign ownership and evaluator process isolation before live generalization. Keep the offline simulator distinct from measured provider performance. |
 | Providers and MCP | Lazy optional SDK imports, vendor-neutral messages/tools, allowlists, environment-variable names in persisted configuration | Unify adapter configuration and costing; test supported minimum/current SDKs. Offer strict capability assignment: [Registry.assign](../smythe/registry.py#L112) currently creates a generalist when no agent satisfies required capabilities. |
 | Assets | Separate production/concept policies, deterministic finishing, validation and hash receipts | Keep exact production constraints separate from model judgment. Promote Jobs artifact validation without implying the simpler Swarm artifact records have all the same guarantees. |
-| Observability and memory | Structured lifecycle events, explicit revision/regeneration traces, reviewable history | Record durable phase totals and request identifiers. Distinguish wall time from summed node duration; memory currently sums span durations, which grows with parallel work. |
-| Packaging and CI | Minimal core install, provider extras, wheel smoke tests, offline tests, trusted PyPI publishing | Test README installation commands from clean environments; use dependency constraints for reproducible benchmark campaigns; establish type checks and a measured coverage floor. |
+| Observability and memory | Structured lifecycle events, explicit revision/regeneration traces, reviewable history | Managed workflows now record durable phase totals and request identifiers. Distinguish wall time from summed node duration; memory still sums span durations, which grows with parallel work. |
+| Packaging and CI | Minimal core install, provider extras, wheel smoke tests, offline tests, trusted PyPI publishing | Clean-environment README candidate checks are qualified in the completion campaign; final distributions still need release qualification. Broaden reproducible dependency constraints, type checks, and a measured coverage floor. |
 | Documentation and examples | Concise README plus subsystem guides, architecture diagram, offline acquisition example | Keep exact claims prominent and protocol scope adjacent. Put planned capabilities in Coming soon while retaining limitations beside the behavior they constrain. |
 | Screensaver | Shared glyph catalog across web, Windows, macOS, and Linux | Preserve catalog parity across renderers and native artifact checks; add notarized Mac distribution and native Wayland integration. Tune rendering independently of benchmark timing. |
 
@@ -245,22 +266,32 @@ Retain `Task`, `ExecutionGraph`, provider/tool contracts, inspectable planning,
 the async scheduler, and the durable Jobs/Autotune storage model. Fix their
 invariants before introducing another abstraction layer.
 
-Then split modules along existing boundaries. `provider.py` has 972 lines;
-`jobs/store.py` has 1,512; `optimize/engine.py` has 1,356; and
-`optimize/ledger.py` has 1,764. Extract vendor adapters, shared validators,
+Then split modules along existing boundaries. At the reviewed commit,
+`provider.py` had 972 lines; `jobs/store.py` had 1,512;
+`optimize/engine.py` had 1,356; and `optimize/ledger.py` had 1,764.
+Extract vendor adapters, shared validators,
 storage schema/migrations, and transaction operations behind existing public
 interfaces. Keep compatibility tests around the extraction. A language change
 would not solve task loss, stale dependencies, incomplete accounting, or
 measurement design.
 
-For large graphs, replace recursive depth, cycle, and topological walks with
-iterative algorithms. A valid reverse-ordered chain of 1,500 nodes raised
+The review called for replacing recursive depth, cycle, and topological walks
+with iterative algorithms. A valid reverse-ordered chain of 1,500 nodes raised
 `RecursionError` in [`ExecutionGraph.validate`](../smythe/graph.py#L484), while
 the same dependency structure in forward order passed. The acceptance case
 should cover deep and wide DAGs in arbitrary input order; throughput tests on
 wide graphs alone do not cover depth.
 
+**7 September follow-up:** iterative traversal now passes forward, reverse,
+and shuffled deep-graph regressions, including actual offline execution of all
+5,000 nodes in a reversed chain. [Deep-graph scope](execution.md#deep-graphs)
+and the [completion record](../plans/coming-soon-2026-09-07.md#work-queue)
+separate these correctness checks from throughput measurements.
+
 ## Delivery sequence
+
+This is the original 6 September sequence; the follow-up above records completed
+work and the remaining scope.
 
 1. **Runtime correctness:** fix monetary validation, active-subtree
    invalidation, complete Task propagation, and consistent HALT behavior.
@@ -312,6 +343,6 @@ The Mac jobs tested the same universal bundle; the Linux jobs tested the same
 ELF executable. The downloaded Windows binary also passed the local native
 smoke test. Published packages and receipts are identified in
 [build provenance](../screensaver/dist/BUILD_INFO.json). These checks cover
-rendering, motion, resizing, and native lifecycle behavior; Mac notarization,
-Windows multi-monitor dispatch, and native Wayland integration remain outside
-the verified scope.
+rendering, motion, resizing, and native lifecycle behavior. At that verification
+boundary, Mac notarization, Windows multi-monitor dispatch, and native Wayland
+integration remained outside the verified scope.
