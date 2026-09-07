@@ -1,0 +1,46 @@
+{
+  "repository": "https://github.com/m8e/matrix-rain",
+  "upstream_repository": "https://github.com/Rezmason/matrix",
+  "commit": "5ba90490453ceceb6812d6b1bc658a99a92411d0",
+  "files": [
+    {
+      "source": "lib/regl.min.js",
+      "path": "lib/regl.min.js",
+      "sha256": "1e85c84ef254125921378d82f4da4e457a0a399bc315880c8c997dd5af8c534d",
+      "modified": false
+    },
+    {
+      "source": "lib/gl-matrix.js",
+      "path": "lib/gl-matrix.js",
+      "sha256": "07855fa64096dbc30c3cf9088be433f29c8e344665c87b66c7463443d38c15a7",
+      "modified": false
+    },
+    {
+      "source": "assets/matrixcode_msdf.png",
+      "path": "reference/matrixcode_msdf.png",
+      "sha256": "1fd4ed52f8e9cc4af6eaad69d28cd289bf6486f15f00c952548ff0533d6a83ab",
+      "modified": false
+    },
+    {
+      "source": "LICENSE",
+      "path": "engine/LICENSE",
+      "sha256": "65333257cebb87e8af86201a65f0e550d65b3cf5a468bfee2a69c9d2b5d21123",
+      "modified": false
+    },
+    {
+      "source": "js/config.js",
+      "path": "engine/upstream-config.mjs",
+      "sha256": "10a09629ba28592998e8e00054db13d17be1656fd57f632205e3c24b61ecc132",
+      "modified": false
+    }
+  ],
+  "dependency_licenses": {
+    "regl": {
+      "url": "https://raw.githubusercontent.com/regl-project/regl/main/LICENSE",
+      "sha256": "42d997d1f47c9222dec2844468fc2a4fd144c6950d698eade460e94537ddcdd3"
+    },
+    "gl-matrix": {
+      "source": "License header in bundled gl-matrix3.4.0"
+    }
+  }
+}

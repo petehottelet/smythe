@@ -41,6 +41,7 @@ openclaw = ["openclaw-sdk>=0.1"]
 # tracked separately; an uncapped range ships a broken extra.
 mcp = ["mcp>=1.2,<2"]
 jobs = ["pillow>=10.0"]
+glyphs = ["pillow>=10.1", "numpy>=2.0,<3", "scipy>=1.14,<2", "shapely==2.1.2"]
 benchmarks = [
     "anthropic>=0.40",
     "openai>=1.50",
@@ -58,6 +59,7 @@ all = [
     "smythe[openclaw]",
     "smythe[mcp]",
     "smythe[jobs]",
+    "smythe[glyphs]",
 ]
 dev = [
     "pytest>=8.0",
@@ -65,7 +67,10 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.8",
     "mcp>=1.2,<2",
-    "pillow>=10.0",
+    "pillow>=10.1",
+    "numpy>=2.0,<3",
+    "scipy>=1.14,<2",
+    "shapely==2.1.2",
 ]
 
 [project.urls]

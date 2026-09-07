@@ -4,9 +4,9 @@ Smythe's visual system is editorial, inscriptional, and strictly monochrome.
 Landing-page assets should feel like a well-set title page: decisive hierarchy,
 precise rules, generous white space, and no decorative interface chrome.
 
-The Glyph Rain screenshot, atlas, and animation are the sole intentional color
-exception. They show the green product artifact itself. Every graph, chart,
-diagram, wordmark, and callout uses black and white only.
+The Glyph Rain screenshot, atlas, animation, and explorer controls are the
+intentional color exception. They show the green product artifact itself. Every graph, chart,
+diagram, landing-page wordmark, and callout uses black and white only.
 
 ## Palette
 
@@ -78,6 +78,19 @@ Use the repository-native SVG badges in `assets/badges/`. Each uses the
 conventional two-tone split—a black label field with white type and a white
 value field with black type—inside a complete one-pixel black rectangular
 border. Keep their values synchronized with the release and CI state.
+
+## Explorer controls
+
+Use VT323 pixel lettering for explorer headings, labels, numerals, buttons,
+inputs, and help text. The separate SMYTHE logo uses outlined Trajan Pro Bold,
+with generous black padding above and below it. Keep text controls borderless,
+without interface glow, corner ornaments, or stepped edges.
+Use primary `#37FF6E`, bright `#9CFFBC`, and black, following
+[hottelet.com](https://www.hottelet.com/). Focus and selection use visible
+outlines or solid fills. These UI colors do not change the rain's 137°
+Matrix green body grade, `#A2FFD8` leading glyphs, or bloom.
+This explorer treatment does not change the chart typography or the README's
+strictly black-and-white charts.
 
 ## Verification
 

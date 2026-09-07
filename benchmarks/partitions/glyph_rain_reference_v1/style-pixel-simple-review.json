@@ -1,0 +1,272 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "checkedAtUtc": "2026-09-07T11:38:07.683Z",
+  "method": "Quick final visual, loaded-font/logo, and keyboard-focus check after removal of persistent frames. This does not repeat the earlier full interaction campaign.",
+  "rendererSources": {
+    "base-glyphs.js": "8722d0bf011b22878695699b2e3cbe7b6ae27397cd3dcd88317024d80eff787e",
+    "browser-command.mjs": "8b98aa31695467a0a72d3ebb15853f2ea7740fc0ba849628ace21a102218530e",
+    "catalog.html": "fd5f9d2cc6a75b0f32e7d50f026f6cf46089149e8cf4d2a20a5d2dc25492d4e0",
+    "config.mjs": "f823471fc6cc40a5193f9470bb5012d1edefbfc5ca73ec73a451e2f1203a6613",
+    "engine/bloomPass.js": "79f6009f6d6eaa2844bad93c78f1fdfd20204dd83ac9bc4560f9ff40b7d86c30",
+    "engine/colorToRGB.js": "cc868a9b4047c2c325ade036fb9bad79f4985705b58af338de10349370a0b9a9",
+    "engine/palettePass.js": "9913f36fa9db86e405088bc975bf69f731c7019cca45f98de2d6a5c83e583e94",
+    "engine/rainPass.js": "70c51df478d33a73ebe9e9ca6fef1ed09f7a1a9ffd64b68911a67f0963cce93d",
+    "engine/shaders/bloomPass.blur.frag.glsl": "c1a2b01ad593d1d5bf95cbe2eb3a957c85840c0ede6fe893c61baf81fe610faa",
+    "engine/shaders/bloomPass.combine.frag.glsl": "a2cebf40734ecba772668548816a32235ef7e48439ee1c2ddb9fb20582060b0b",
+    "engine/shaders/bloomPass.highPass.frag.glsl": "727979238690fc06a8fcc14065468e43bd23d6710ab0b8fc4dbf985f6fa00034",
+    "engine/shaders/palettePass.frag.glsl": "d58298cd551be59495289463e93bf306a345eae7693617c147e7b332b7714e82",
+    "engine/shaders/rainPass.effect.frag.glsl": "6c0ee969bd62a7d313a69e19d8a29a0febf2884b5534a706685717496a3289b4",
+    "engine/shaders/rainPass.frag.glsl": "1cd3c2fbdb887965e0906b5a55cf16c0e95385f2deb15008fd8e1433b1000fa5",
+    "engine/shaders/rainPass.intro.frag.glsl": "d409f1f2fe372b6ce2b4a7aaaab00ce85c43853b87011e1c0030a3f45a70bb9e",
+    "engine/shaders/rainPass.raindrop.frag.glsl": "8f8ce9164ff8bf2005f10ad981959e75e4cb153b6f6a12d347586f3813820213",
+    "engine/shaders/rainPass.symbol.frag.glsl": "08f5220fce20c9191170086615061556401db5484994a153335aeda5569ca99c",
+    "engine/shaders/rainPass.vert.glsl": "365b7bb1f7c165103472adaea6198cb2ac5889141f2ef4f20ca62baa863b5adf",
+    "engine/upstream-config.mjs": "10a09629ba28592998e8e00054db13d17be1656fd57f632205e3c24b61ecc132",
+    "engine/utils.js": "5018541245bf7d8556fd43089b09110ff4c145db7352b102b62a7e29e426569e",
+    "glyphs.js": "63967d8b1fe5c7dfb46ec665851b675682d88bd5c18e39a6a7f44ac692cbaabd",
+    "index.html": "df3ccdd32d2c6279c7ecd7773dbb544d830ee5211225329fa2425a672c47c573",
+    "lib/gl-matrix.js": "07855fa64096dbc30c3cf9088be433f29c8e344665c87b66c7463443d38c15a7",
+    "lib/regl.min.js": "1e85c84ef254125921378d82f4da4e457a0a399bc315880c8c997dd5af8c534d",
+    "measure.mjs": "55ae15311c31d53c6f47d3017d6cfe868b79a08f0e210bf15a1a85c5e71d4ce3",
+    "model.mjs": "90c18929d1449b248114104c1af2163047b2163536cea0ee45f90ee2466a9511",
+    "provenance.mjs": "327debb738aa27a06f5c033a76d710889b7fada5057a6d4a8446ffde4ff1f420",
+    "rain.js": "2b0da82d359c366baea4556efa7905d7de57229fd3894d438c8e547337b06b5a",
+    "review.mjs": "b4070ef64ee274583aa5773c1b1682e097d5e79585bb502ac4859e606b8b80db",
+    "settings.css": "f722eb1588483d31b81513f42f8e4428b81b39aca0625e41a330068569ce0222",
+    "settings.mjs": "d660a83d282f411474458821e175dd89b5777941c0e4410528ab455051aa76ed",
+    "soak.mjs": "035c36e2384aa7fb431f8fcfc2fbfab82c769b308d2e8167d33265ff7b4b77f6",
+    "source-files.mjs": "466394893888dfc3d4fcad1c0fc28cde12c77a292d646c35cd645f63de56a999",
+    "style.css": "7beb1ab4e5db96b992ea3a8e7a951b760497ea4ee9982d3e93af422a94960164",
+    "timing.mjs": "1a7ae6897b0564d71b897f1ee8129c7c9b914b9cf0a390236f2336487860d3f5",
+    "verify-browser-command.mjs": "9d60c40623d2ad04512ba842bce0562e3997847aae2bbee65f858cd8b1fc9fbf",
+    "verify-config.mjs": "dcec2353565e92fa1c9bd9f90d63c24cd7980ffbe608dd5fd2d58b37fa596d9e",
+    "verify-measure-guard.mjs": "8d1cedd1ec25237d8758ce7f99c71236c56d67f17d9d47d01098acc3a853a007",
+    "verify-model.mjs": "037b4fcb160dee7bdeb2d6a25e052642c6e782e0dab6897e10ccd6d259581ab6",
+    "verify-provenance.mjs": "39587265439919bd18905978671ddd73b5ced2eb9694e781857a582fe6fcfb20",
+    "verify-settings.mjs": "dd2aeb89552812b918f51825ef3989fe8b2df1bfce6e4c7f294277511074f8ce",
+    "verify-timing.mjs": "d6d0652ad7d1cd02197a2878619b758221c73d1378483b4e4c81423f66136837"
+  },
+  "checks": {
+    "font": {
+      "faces": [
+        {
+          "family": "VT323",
+          "status": "loaded",
+          "weight": "400"
+        }
+      ],
+      "ready": "loaded"
+    },
+    "logo": {
+      "alt": "SMYTHE",
+      "loaded": true,
+      "src": "wordmark.svg"
+    },
+    "desktopChrome": {
+      "buttonBackgrounds": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)"
+      ],
+      "buttonBorders": [
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px"
+      ],
+      "dialogBorder": null,
+      "dialogOverflow": false,
+      "fonts": [
+        "VT323, monospace"
+      ],
+      "groupBorders": [],
+      "overflow": false,
+      "smallControls": [],
+      "viewport": [
+        1920,
+        1080,
+        1
+      ]
+    },
+    "desktopFocusVisible": {
+      "baseline": "rgb(156, 255, 188) 0px -1px 0px 0px inset",
+      "decoration": "underline",
+      "focused": "rain-settings-1-preset",
+      "outline": "none",
+      "visible": true,
+      "width": "3px"
+    },
+    "desktopSettings": {
+      "buttonBackgrounds": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)"
+      ],
+      "buttonBorders": [
+        "0px",
+        "0px",
+        "0px"
+      ],
+      "dialogBorder": "0px",
+      "dialogOverflow": false,
+      "fonts": [
+        "VT323, monospace"
+      ],
+      "groupBorders": [
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px"
+      ],
+      "overflow": false,
+      "smallControls": [],
+      "viewport": [
+        1920,
+        1080,
+        1
+      ]
+    },
+    "desktopFocusRestored": true,
+    "mobileChrome": {
+      "buttonBackgrounds": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)"
+      ],
+      "buttonBorders": [
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px"
+      ],
+      "dialogBorder": null,
+      "dialogOverflow": false,
+      "fonts": [
+        "VT323, monospace"
+      ],
+      "groupBorders": [],
+      "overflow": false,
+      "smallControls": [],
+      "viewport": [
+        390,
+        844,
+        1
+      ]
+    },
+    "mobileFocusVisible": {
+      "baseline": "rgb(156, 255, 188) 0px -1px 0px 0px inset",
+      "decoration": "underline",
+      "focused": "rain-settings-1-preset",
+      "outline": "none",
+      "visible": true,
+      "width": "3px"
+    },
+    "mobileSettings": {
+      "buttonBackgrounds": [
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)",
+        "rgba(0, 0, 0, 0)"
+      ],
+      "buttonBorders": [
+        "0px",
+        "0px",
+        "0px"
+      ],
+      "dialogBorder": "0px",
+      "dialogOverflow": false,
+      "fonts": [
+        "VT323, monospace"
+      ],
+      "groupBorders": [
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px",
+        "0px"
+      ],
+      "overflow": false,
+      "smallControls": [],
+      "viewport": [
+        390,
+        844,
+        1
+      ]
+    },
+    "mobileFocusRestored": true,
+    "errors": {
+      "errors": []
+    },
+    "console": {
+      "messages": []
+    }
+  },
+  "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+  "screenshots": [
+    {
+      "path": "pixel-simple-chrome-desktop.png",
+      "sha256": "21110a1d29890c072fa19a66d88368c9773f522708e362d630c43b335a86c05b"
+    },
+    {
+      "path": "pixel-simple-settings-desktop.png",
+      "sha256": "9d924e40a84844810dfd1509b3ff8b23583783c147916fba42cbd625d78c98ae"
+    },
+    {
+      "path": "pixel-simple-chrome-mobile.png",
+      "sha256": "4d2a92c575e822c2162873a77e5baad6b3a0260171f7c5490040d8e7bc0d0ee6"
+    },
+    {
+      "path": "pixel-simple-settings-mobile.png",
+      "sha256": "6651ab8a5395fc9ca79d41c1c6579ab2bb4163aa3b3f2ac25f77d65e38c47a4e"
+    }
+  ],
+  "rendererAssets": {
+    "wordmark.svg": "e9b13d24a04522248a7f6cf11ae8b94840ffb4c8c30fbdd4fb3f130e1fbfd789",
+    "fonts/VT323-Regular.ttf": "cf4de751ada78ceac033dbe16a687742939995b77bc2a052ae17a4957958594d",
+    "fonts/provenance.json": "820d9d15bc495c6125c915187b3b2c8edbc2ea7ad1069e62b768ed5d088c8beb",
+    "generated-sdf.png": "0e8e3e43cc7f6c1973db06840ea1c69a390b5cb78329fb312bbe39aebf6a7c38",
+    "reference/matrixcode_msdf.png": "1fd4ed52f8e9cc4af6eaad69d28cd289bf6486f15f00c952548ff0533d6a83ab"
+  },
+  "sourcesUnchanged": true,
+  "screenshotScene": "Default Classic paused after startup, advanced120review ticks; initial elapsed phase not fixed. Existing focused controls blurred only for the screenshots so persistent styling is visible; keyboard focus was verified immediately before each Settings capture.",
+  "passed": true,
+  "visualReview": {
+    "passed": true,
+    "findings": [],
+    "notes": "Final desktop chrome and mobile Settings captures inspected: plain pixel text actions, no persistent button frames or fills, separate loaded Trajan logo, no Settings section/panel frames. Keyboard focus remains visible as a baseline/underline."
+  },
+  "sourceBindingScope": "Final simple borderless CSS, local VT323 font, and updated Trajan logo are bound below. All earlier style receipts remain unchanged checkpoints. This receipt covers desktop1920x1080 and mobile390x844 visual/focus checks only; it makes no new full-interaction or renderer-performance claim.",
+  "exclusions": [
+    "Native screensaver menus",
+    "Native color-picker popup styling",
+    "Full interaction campaign repeated after this final CSS-only adjustment",
+    "Renderer performance and soak measurements"
+  ]
+}

@@ -1,0 +1,3262 @@
+{
+  "version": "glyph-svg-v1",
+  "count": 192,
+  "canvas": [
+    100,
+    100
+  ],
+  "method": "exact publication of measured SVG sources; no regeneration",
+  "reference_artwork_included": false,
+  "source_artifacts": {
+    "kind": "measured-smythe-benchmark-run",
+    "directory": "smythe_artifacts/svg_glyph_v1/runs/r03-process-c16",
+    "catalog": "smythe_artifacts/svg_glyph_v1/runs/r03-process-c16/catalog.json",
+    "validation": "smythe_artifacts/svg_glyph_v1/runs/r03-process-c16/validation.json",
+    "atlas": "smythe_artifacts/svg_glyph_v1/runs/r03-process-c16/atlas.png",
+    "catalog_sha256": "df53be90cbc0cc59279ec2450d4d53c021cca4128ee04f74ea4aae9fe29866a9",
+    "validation_sha256": "c56b69d2d789e2d5a89bc9590ff2f8dbeb076668fc0ba13a9d35b2244110e145",
+    "atlas_sha256": "c3c1d7849f9646f03dd6c394456fefb48f9e6db5520376cf1dbc2b085c04a92c",
+    "campaign": {
+      "file": "benchmarks/results/glyph_svg_v1.json",
+      "sha256": "d575bb27fe9fdf9af908568588f85d77808d1b62f89b47ea10fe052b44d1f9c0",
+      "protocol_version": "original-svg-workflow-v1",
+      "timing_claimable": true,
+      "readme_promotion_eligible": true,
+      "run": {
+        "executor": "process",
+        "concurrency": 16,
+        "repeat": 3,
+        "execution_id": "d7ab3f7c67384f66ab3a884399843a0d"
+      }
+    }
+  },
+  "catalog_style_accepted": true,
+  "glyphs": [
+    {
+      "index": 0,
+      "glyph_id": "GLYPH-000",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591676282949,
+      "svg_sha256": "f518cf74bf57df859da5dea9832a6a55130ef84dfda159bd54cccfcd6632dc65",
+      "pixel_sha256": "4da65634708dcb7c18aae47f69e321cd576d89ac86f726e102681264d4cf09c5",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.7796,
+      "file": "GLYPH-000.svg"
+    },
+    {
+      "index": 1,
+      "glyph_id": "GLYPH-001",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591676387678,
+      "svg_sha256": "d16206e90eabcd43d366e71ea36551dcab2c3b5d97f2de5d4ec49878664b726b",
+      "pixel_sha256": "6ebcdc5c838bc2ffdb7ea7ade611a168c91705e6d4e8fcb29dee251f6734de24",
+      "authoring_parameters": {
+        "apertures": [
+          [
+            70.703,
+            30.859,
+            6.0
+          ]
+        ],
+        "weight": 1.16
+      },
+      "recipe": "bar_hook/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 16.395,
+      "file": "GLYPH-001.svg"
+    },
+    {
+      "index": 2,
+      "glyph_id": "GLYPH-002",
+      "family": "stacked_marks",
+      "profile": "expanded",
+      "seed": 91591676492407,
+      "svg_sha256": "6af8edd34bb846527a8bc2778949ec330d2f0c66cfa660b4589842d99cb8300f",
+      "pixel_sha256": "9185a92862fcd96741bf4c90f9cd66fc2bd24bdd7e90c74e9facae228b7ef515",
+      "authoring_parameters": {
+        "gap": 6.5
+      },
+      "recipe": "stacked_marks/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.0129,
+      "file": "GLYPH-002.svg"
+    },
+    {
+      "index": 3,
+      "glyph_id": "GLYPH-003",
+      "family": "diagonal_lozenge",
+      "profile": "expanded",
+      "seed": 91591676597136,
+      "svg_sha256": "97355b9167c66ddf044c5c23870461f20e08ca060c33f53f41a3708444ebad4b",
+      "pixel_sha256": "d48834eef71346cec6a5a9b4919420cd5469ce9c04fc94f9001f5877511e34d0",
+      "authoring_parameters": {
+        "gap": 11,
+        "weight": 1.08
+      },
+      "recipe": "diagonal_lozenge/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.7861,
+      "file": "GLYPH-003.svg"
+    },
+    {
+      "index": 4,
+      "glyph_id": "GLYPH-004",
+      "family": "roofed_curves",
+      "profile": "expanded",
+      "seed": 91591676701865,
+      "svg_sha256": "5705a724d74fd4095f70474fdf11961985a6b6fae5ca5282554a585a1db0ec93",
+      "pixel_sha256": "68a146aa117fdac84cd2e4539cce327289247bf0663625312667f53d5e2d16fa",
+      "authoring_parameters": {
+        "weight": 0.94
+      },
+      "recipe": "roofed_curves/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.1252,
+      "file": "GLYPH-004.svg"
+    },
+    {
+      "index": 5,
+      "glyph_id": "GLYPH-005",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591676806594,
+      "svg_sha256": "83ef0e018feaeb8001ca75a022c62386205dd73d4b818784a98e4edddb33e83b",
+      "pixel_sha256": "b484e9a845bf9bc9c81419d39fb5dafa329a20d59e2f1d74b74a3eacd7019680",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 11.9985,
+      "file": "GLYPH-005.svg"
+    },
+    {
+      "index": 6,
+      "glyph_id": "GLYPH-006",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591676911323,
+      "svg_sha256": "eb501ebfa1ef1292821136d007e7e9c1d9b4e5e0f102e00409b99343250e682b",
+      "pixel_sha256": "3de34ca6c3958248a2b0f456459173a54c04c06f1982cd1baa36876042afdfc1",
+      "authoring_parameters": {
+        "counter_scale": 0.65
+      },
+      "recipe": "mixed/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.0612,
+      "file": "GLYPH-006.svg"
+    },
+    {
+      "index": 7,
+      "glyph_id": "GLYPH-007",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591677016052,
+      "svg_sha256": "1935a3fa7d985c8cd047633e54a61b1dcef47b7b5c57bf5b7d2712eb0dcb000b",
+      "pixel_sha256": "923b27e78c9306856968228570503cbeba553845ad56b3c0b75dc2aab72917ca",
+      "authoring_parameters": {
+        "weight": 1.08
+      },
+      "recipe": "bar_hook/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.7002,
+      "file": "GLYPH-007.svg"
+    },
+    {
+      "index": 8,
+      "glyph_id": "GLYPH-008",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591677120781,
+      "svg_sha256": "861894245a6c1b3c5f20f1354b4382946715c9466e9371b0f8ebe0be684c424b",
+      "pixel_sha256": "a3d983947019aacf893e93583dc4a52ea6aa953d689545ba42b7d9f149c9f755",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.6932,
+      "file": "GLYPH-008.svg"
+    },
+    {
+      "index": 9,
+      "glyph_id": "GLYPH-009",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591677225510,
+      "svg_sha256": "320628da88e98e07bfe97e967da8ae07b3089aee662f6356b569c2217d6b4c7d",
+      "pixel_sha256": "5822ff6f1aeea75d26edd50d09c4603b31e4f363896b5ddeadd6cb0d5e702ff6",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.7607,
+      "file": "GLYPH-009.svg"
+    },
+    {
+      "index": 10,
+      "glyph_id": "GLYPH-010",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591677330239,
+      "svg_sha256": "f9fb92b5fa61063f77a62242c52fea832821a81375c6e6c28016d3d571a98c87",
+      "pixel_sha256": "eafc70e8db6e7da9944e1af08d200fa2512263b05588aea0ca4f116679012ca7",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.8635,
+      "file": "GLYPH-010.svg"
+    },
+    {
+      "index": 11,
+      "glyph_id": "GLYPH-011",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591677434968,
+      "svg_sha256": "b133add5b94090ae56335bcfeaf9968495ec394e31536c79d5378e9ec8fc7e1e",
+      "pixel_sha256": "a0694d058da6b328ec6871794bd01078b55d8e97ba4825bd0fe8cafd277a7d4e",
+      "authoring_parameters": {
+        "counter_scale": 0.65
+      },
+      "recipe": "mixed/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.1613,
+      "file": "GLYPH-011.svg"
+    },
+    {
+      "index": 12,
+      "glyph_id": "GLYPH-012",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591677539697,
+      "svg_sha256": "c16cf170504f6733ba681f292c07a32d46bebee9341c3482f46bf6c744872aab",
+      "pixel_sha256": "a93fed77f3fb9d14c4afd34653e2f7d0c466dd26afe0c77a18cd5f7c0ab851f4",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.9719,
+      "file": "GLYPH-012.svg"
+    },
+    {
+      "index": 13,
+      "glyph_id": "GLYPH-013",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591677644426,
+      "svg_sha256": "9137caea6dc56df24c193eced66340483a94fa145d81d7f0fa4ad2af718aa702",
+      "pixel_sha256": "e881b75cb14795b2f7d99a8ac7e38d22051b91102e1f62c0bcd30aa5c0539362",
+      "authoring_parameters": {
+        "weight": 0.94
+      },
+      "recipe": "rounded_loop_interlock/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.125,
+      "file": "GLYPH-013.svg"
+    },
+    {
+      "index": 14,
+      "glyph_id": "GLYPH-014",
+      "family": "diagonal_lozenge",
+      "profile": "expanded",
+      "seed": 91591677749155,
+      "svg_sha256": "1591a23cf93645711c48d19fc4bf64fecd0acb9ed147c0a122b59996cc2798c6",
+      "pixel_sha256": "fdfa94a40942aac62db2869b1c107dcdfa62866bd8cee951652e959784bee45b",
+      "authoring_parameters": {
+        "weight": 1.16
+      },
+      "recipe": "diagonal_lozenge/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.4996,
+      "file": "GLYPH-014.svg"
+    },
+    {
+      "index": 15,
+      "glyph_id": "GLYPH-015",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591677853884,
+      "svg_sha256": "8ccadaafb4f3541554143484cecc3bb42ca522eba3f8477b5635d3fe6c459715",
+      "pixel_sha256": "370058b2ad9442d374cb6978bd57722e49d7cd8d599c0e1d7c743334ea031150",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/3",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.4038,
+      "file": "GLYPH-015.svg"
+    },
+    {
+      "index": 16,
+      "glyph_id": "GLYPH-016",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591677958613,
+      "svg_sha256": "bb7a38f17b4b37f84de0ed7c50ca6d22a83bf3978a52a439f565ee6b2c4e1c2d",
+      "pixel_sha256": "98f49e01228ca371803366203e7bbccfb9950b1169d613d7e482db809651dab2",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/3",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.6238,
+      "file": "GLYPH-016.svg"
+    },
+    {
+      "index": 17,
+      "glyph_id": "GLYPH-017",
+      "family": "roofed_curves",
+      "profile": "expanded",
+      "seed": 91591678063342,
+      "svg_sha256": "73b2c276f5e02213fda7eb56ec9d32bee3e758f920924ebd0b768a4f767e4453",
+      "pixel_sha256": "9ccdc861511126e0b592704637d5ddce7bce8984abd26cb3bce4d71941318d3b",
+      "authoring_parameters": {},
+      "recipe": "roofed_curves/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.4526,
+      "file": "GLYPH-017.svg"
+    },
+    {
+      "index": 18,
+      "glyph_id": "GLYPH-018",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591678168071,
+      "svg_sha256": "b67b15a8c12dc9a3ad123019bcb014b2376fd8d1a303439aaf2909d1b9b3c647",
+      "pixel_sha256": "b689b2fe84bbd0d18784710ca027bee50578d11ce769551198e0d7e4e1f3c7a5",
+      "authoring_parameters": {
+        "counter_scale": 0.65,
+        "structure": "offset-double-counter"
+      },
+      "recipe": "rounded_loop_interlock/offset-double-counter",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.5737,
+      "file": "GLYPH-018.svg"
+    },
+    {
+      "index": 19,
+      "glyph_id": "GLYPH-019",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591678272800,
+      "svg_sha256": "c8e4d5a7cc57de3cb52b9b2b889e8ec9e2df4cfb52e0589df41328ad9f128674",
+      "pixel_sha256": "303421b424b581d2b586e24b3ba932cd62a069453c99867a51e6c26420cd0bab",
+      "authoring_parameters": {
+        "weight": 1.16
+      },
+      "recipe": "bar_hook/4",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.8794,
+      "file": "GLYPH-019.svg"
+    },
+    {
+      "index": 20,
+      "glyph_id": "GLYPH-020",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591678377529,
+      "svg_sha256": "2323e3cae2ffcba2f831ef6740c354a4dcfc07df8022f29d8906d5d73208db12",
+      "pixel_sha256": "79b1bc6d0f47d7e8bf6132d991a1047d2c86d9a85968a1e1a9f43ad3248f65bd",
+      "authoring_parameters": {},
+      "recipe": "mixed/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.0642,
+      "file": "GLYPH-020.svg"
+    },
+    {
+      "index": 21,
+      "glyph_id": "GLYPH-021",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591678482258,
+      "svg_sha256": "5bc60f859c4f6b6593cceddf4e9636d47fd97964601e3d1ea4711326d8b5fd94",
+      "pixel_sha256": "c7c9b379b0da742b36c9ad06e66da49c5b34f291b671e0ec96bd8186619140a6",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/4",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.4888,
+      "file": "GLYPH-021.svg"
+    },
+    {
+      "index": 22,
+      "glyph_id": "GLYPH-022",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591678586987,
+      "svg_sha256": "4a2914020db1fbce3a86bbcf85b3cbaba5129f6b682f01ee680d9e22996730ad",
+      "pixel_sha256": "146aef31cca03cb89bad587add8fd4c4a079201e29a1f2f3aa89bb108baceb25",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/5",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.3445,
+      "file": "GLYPH-022.svg"
+    },
+    {
+      "index": 23,
+      "glyph_id": "GLYPH-023",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591678691716,
+      "svg_sha256": "4097e8cba3112637b27e75104096ccd5f5a8d314d620d4ef904ce89f686b8831",
+      "pixel_sha256": "2b054eecd94955beae6cbfc2157b68bc4dba59da190f1b493411868cc0d03a36",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/4",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 11.8879,
+      "file": "GLYPH-023.svg"
+    },
+    {
+      "index": 24,
+      "glyph_id": "GLYPH-024",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591678796445,
+      "svg_sha256": "ba2082c71336ef3fb87f650d2f55e430d7c124d6237d173dc258ff0377c005d5",
+      "pixel_sha256": "4b009196bc04bae584f1dc089bc687ccbf915b688bd6b0ff0185c5b06e080162",
+      "authoring_parameters": {
+        "weight": 1.08
+      },
+      "recipe": "numeral_operator/5",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.3151,
+      "file": "GLYPH-024.svg"
+    },
+    {
+      "index": 25,
+      "glyph_id": "GLYPH-025",
+      "family": "diagonal_lozenge",
+      "profile": "expanded",
+      "seed": 91591678901174,
+      "svg_sha256": "4b7c7a9bf0a982b3e21f95b1881dc1b8fce5cc4723e8a1c2512f74ed25da3d4f",
+      "pixel_sha256": "7e19f56e1abbe2a99b29c0c419dba448903ba5648c6fbde4ea8b0729dd32aa1c",
+      "authoring_parameters": {
+        "weight": 1.24
+      },
+      "recipe": "diagonal_lozenge/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.8867,
+      "file": "GLYPH-025.svg"
+    },
+    {
+      "index": 26,
+      "glyph_id": "GLYPH-026",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591681005909,
+      "svg_sha256": "9fad21ad56d079a7eefbf115897de0eec5588a62f6c224a9162b890aec9fcab9",
+      "pixel_sha256": "c657e4de2d62aa5b0f88004ada69436b6f0c8fed6820720f096cf9eddcbfdc7a",
+      "authoring_parameters": {
+        "seed_offset": 2
+      },
+      "recipe": "bar_hook/6",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.5278,
+      "file": "GLYPH-026.svg"
+    },
+    {
+      "index": 27,
+      "glyph_id": "GLYPH-027",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591679110632,
+      "svg_sha256": "e45d407974da7b19e5cc8799d19cf07b6ef86bfd279a13f74a1f86e01fd02cb4",
+      "pixel_sha256": "085c5456d4c0920b86358019baf6607c6313afe2a127a62a0c77a4108a9d0f45",
+      "authoring_parameters": {
+        "counter_scale": 1.5
+      },
+      "recipe": "mixed/3",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.7329,
+      "file": "GLYPH-027.svg"
+    },
+    {
+      "index": 28,
+      "glyph_id": "GLYPH-028",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591680215364,
+      "svg_sha256": "dc54e1f68c2fb8baa962e2b27fa23cb8ccd95e1c0f0c2e256e55a97f88b960bc",
+      "pixel_sha256": "334d43b5f27f7a25126e89f7986276525a76020692d3f1f55e73eca8c4c33c66",
+      "authoring_parameters": {
+        "seed_offset": 1
+      },
+      "recipe": "rounded_loop_interlock/5",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.5753,
+      "file": "GLYPH-028.svg"
+    },
+    {
+      "index": 29,
+      "glyph_id": "GLYPH-029",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591679320090,
+      "svg_sha256": "296e4735a12d4db73278b2ee43e7fc364a4e1c816a99033d1d5c9f2797c01f26",
+      "pixel_sha256": "d72566cc5d5532d460cb2cadcac5d7c13566ac2e40af1b614d23299249960e75",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/6",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.5167,
+      "file": "GLYPH-029.svg"
+    },
+    {
+      "index": 30,
+      "glyph_id": "GLYPH-030",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591679424819,
+      "svg_sha256": "4ac903d1ef7ce9482c9f8f58121d1376a1a01e2e5e9e565016035651c59d30b6",
+      "pixel_sha256": "c9eb10daf7f3897796b41dececf2840aa2ba5de8891e1b59b5a950d2447d70ae",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/7",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.6026,
+      "file": "GLYPH-030.svg"
+    },
+    {
+      "index": 31,
+      "glyph_id": "GLYPH-031",
+      "family": "roofed_curves",
+      "profile": "expanded",
+      "seed": 91591679529548,
+      "svg_sha256": "9b3cb81275d709ce222168984f42dbc4c587153b3bfb347bf1a2c5479d7f9217",
+      "pixel_sha256": "539ad8a53f4f4d9177d19a45f3d5decb77ef1279cffb70f21ee022665271b278",
+      "authoring_parameters": {},
+      "recipe": "roofed_curves/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.2964,
+      "file": "GLYPH-031.svg"
+    },
+    {
+      "index": 32,
+      "glyph_id": "GLYPH-032",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591679634277,
+      "svg_sha256": "c8c53f1e51099e46cecd13711951a159af51d6aefc0968b225856525d3caf324",
+      "pixel_sha256": "a88bf1bc551479294d335ce5a7d6701ec600f65da3b2a3be708de56ad24a3c23",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/6",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.619,
+      "file": "GLYPH-032.svg"
+    },
+    {
+      "index": 33,
+      "glyph_id": "GLYPH-033",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591687739030,
+      "svg_sha256": "4631099d7f516851c2467b3d19c0efad423f4d56dcdf9473069aaf076723a9d7",
+      "pixel_sha256": "d19604e87c215f3ca893be1791db59edb425b218174d38d105c6a78a88581bd7",
+      "authoring_parameters": {
+        "seed_offset": 8
+      },
+      "recipe": "numeral_operator/7",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.6411,
+      "file": "GLYPH-033.svg"
+    },
+    {
+      "index": 34,
+      "glyph_id": "GLYPH-034",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591679843735,
+      "svg_sha256": "63555f27f6ab82ae69f837c77daa618bf80804aabd97b65bbf23127001519916",
+      "pixel_sha256": "c152773824769b77be199cb2dcc45315417942908eb7c24d1b7c5df9535da6c5",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/8",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.2275,
+      "file": "GLYPH-034.svg"
+    },
+    {
+      "index": 35,
+      "glyph_id": "GLYPH-035",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591679948464,
+      "svg_sha256": "31f39e6cff1c21d4b17bdd20ae28a64209e108f14fc0197013587b8ce426387b",
+      "pixel_sha256": "1c496bbf45fc68e3e66439b78a8c189e231cd97501f9fc7578e1f64b4e5e3c7e",
+      "authoring_parameters": {
+        "counter_scale": 1.8
+      },
+      "recipe": "mixed/4",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.8479,
+      "file": "GLYPH-035.svg"
+    },
+    {
+      "index": 36,
+      "glyph_id": "GLYPH-036",
+      "family": "diagonal_lozenge",
+      "profile": "expanded",
+      "seed": 91591680053193,
+      "svg_sha256": "8338c771f77378429507fc868af277a42c80559fa62629b936a02ca98962f80f",
+      "pixel_sha256": "b1709c5da7b9dfb434b9999e1b9dd539038ccf28400cf7a2480d8dd0b492de68",
+      "authoring_parameters": {},
+      "recipe": "diagonal_lozenge/3",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.8307,
+      "file": "GLYPH-036.svg"
+    },
+    {
+      "index": 37,
+      "glyph_id": "GLYPH-037",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591680157922,
+      "svg_sha256": "7f7418ec137d2996aeba937a7181e14dcc1ed3eb6ddbde8a68fc6e00a618421e",
+      "pixel_sha256": "438cf8ac45614c0fb974c05a6b0c7ff65dae9ebea41fa199eec0c32631836815",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/8",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.7549,
+      "file": "GLYPH-037.svg"
+    },
+    {
+      "index": 38,
+      "glyph_id": "GLYPH-038",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591680262651,
+      "svg_sha256": "9eeba3d8b0e36acae0071466236d523446c1cb3e0e83abd1dcd436584e5dcc9f",
+      "pixel_sha256": "d5471d9d7ccf5f8181caf57351a0ba7986cab02a1663c1571265015bacf9f474",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/7",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.2293,
+      "file": "GLYPH-038.svg"
+    },
+    {
+      "index": 39,
+      "glyph_id": "GLYPH-039",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591680367380,
+      "svg_sha256": "67421bf1876f38dc9145b1c3902617b2b599cb095aaccad4a43e3706bbc0ace8",
+      "pixel_sha256": "2bf6155d7560f19cee41b8fcb799577566bbde6adf9ef2d52372cb5fa309f837",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/9",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.5878,
+      "file": "GLYPH-039.svg"
+    },
+    {
+      "index": 40,
+      "glyph_id": "GLYPH-040",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591680472109,
+      "svg_sha256": "72b689baadbcb163848dc99af8ac251f77058e2f00529e4213173c1218976561",
+      "pixel_sha256": "d86c8003ac448d33d558962e99be8ad1ac1855171db539cf854e5918caf9db95",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/9",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.7263,
+      "file": "GLYPH-040.svg"
+    },
+    {
+      "index": 41,
+      "glyph_id": "GLYPH-041",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591683576847,
+      "svg_sha256": "1806a13ecaa055d0a980dbd0b21f175a6b92e92a030ddbf64e781f2ba129a409",
+      "pixel_sha256": "39dd1ef6f2af2e6c8e17e4e9046891dc741b7e2d999ca48f95e2f782f246b476",
+      "authoring_parameters": {
+        "seed_offset": 3
+      },
+      "recipe": "bar_hook/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.795,
+      "file": "GLYPH-041.svg"
+    },
+    {
+      "index": 42,
+      "glyph_id": "GLYPH-042",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591680681567,
+      "svg_sha256": "90c2a90f0c61b19843e09a57b66bedec646cd503d85cb1d16dee5d0137e77b5c",
+      "pixel_sha256": "561d84b6673836b09dd887b1ebe285211ac1342c5eacbb256abda09ae8757507",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/8",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 11.8747,
+      "file": "GLYPH-042.svg"
+    },
+    {
+      "index": 43,
+      "glyph_id": "GLYPH-043",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591680786296,
+      "svg_sha256": "eaac06c64580293988a524fc9c3b81643c7997fc4361ebe79be14ff6f28b0891",
+      "pixel_sha256": "f338b4480da8d6d75e37e1c7cd7e78d24cc9ff6b2ff7e5427461d051522cb960",
+      "authoring_parameters": {
+        "counter_scale": 1.25
+      },
+      "recipe": "mixed/5",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.4695,
+      "file": "GLYPH-043.svg"
+    },
+    {
+      "index": 44,
+      "glyph_id": "GLYPH-044",
+      "family": "roofed_curves",
+      "profile": "expanded",
+      "seed": 91591680891025,
+      "svg_sha256": "93d0c497eb18652195c83ac301c83b1a51f14fd8dd5d3aecd01d673d93c2ac03",
+      "pixel_sha256": "367ed5f351ebce66f8427a24acc3e3e3e4932174d4eb1ca4b5c48ead7bd96b74",
+      "authoring_parameters": {
+        "structure": "split-roof-sweep"
+      },
+      "recipe": "roofed_curves/split-roof-sweep",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.8475,
+      "file": "GLYPH-044.svg"
+    },
+    {
+      "index": 45,
+      "glyph_id": "GLYPH-045",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591680995754,
+      "svg_sha256": "275ff77c0e8ffe3c7891962a74d9fdd4d50955a1683c1494af76261680f9e276",
+      "pixel_sha256": "82f63bb4604d3206fdbb0cd5d148f4f3e2946caaf148d8f9137f88121c6c1ecf",
+      "authoring_parameters": {
+        "gap": 10,
+        "weight": 1.16
+      },
+      "recipe": "bar_hook/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 17.3291,
+      "file": "GLYPH-045.svg"
+    },
+    {
+      "index": 46,
+      "glyph_id": "GLYPH-046",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591681100483,
+      "svg_sha256": "44da992e78e25aa2c82e5332dca914bd3ca9f85e5f0ed91e7efbf77d5b6b8fb8",
+      "pixel_sha256": "7265ca84699aa578618b4cb4da66558785c81ab2b96750852461cd1bfe2736f7",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/10",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.9473,
+      "file": "GLYPH-046.svg"
+    },
+    {
+      "index": 47,
+      "glyph_id": "GLYPH-047",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591681205212,
+      "svg_sha256": "0eacbe925726d927084c8a1a5b6351eb0b990fad2dbcc429c2e8b4f46b2da0bd",
+      "pixel_sha256": "693c29cfebcb2b8c63d389cb09595ef01e4e97b2201d140770274da9212472fb",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/9",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.1918,
+      "file": "GLYPH-047.svg"
+    },
+    {
+      "index": 48,
+      "glyph_id": "GLYPH-048",
+      "family": "diagonal_lozenge",
+      "profile": "expanded",
+      "seed": 91591681309941,
+      "svg_sha256": "0010d43a957f159fb298f109daab12c91e6ab0fcde34cf8d26fbb74ffecf5655",
+      "pixel_sha256": "05092a8b5163457aab7fb1d23dbd3df092d57f027e3f0497e8bb9f33d6054b82",
+      "authoring_parameters": {
+        "structure": "diagonal-bracket-fork",
+        "weight": 1.08
+      },
+      "recipe": "diagonal_lozenge/diagonal-bracket-fork",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.4225,
+      "file": "GLYPH-048.svg"
+    },
+    {
+      "index": 49,
+      "glyph_id": "GLYPH-049",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591681414670,
+      "svg_sha256": "e7b446336cd6d5ae191e9ef189bd78622c32162e7b69baadbc08b336454171c0",
+      "pixel_sha256": "af31859ada307c29bceea2d7afdb696a1a7fcfcbfae052f853d462bb7681d529",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.6803,
+      "file": "GLYPH-049.svg"
+    },
+    {
+      "index": 50,
+      "glyph_id": "GLYPH-050",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591681519399,
+      "svg_sha256": "ab51da406c0e5dcb17a0af3f485ad0306d1a9a26ff9c9b6f65df6677992e1248",
+      "pixel_sha256": "0e3c768b2cdead363648f01c3de180e4df5fbfb5b8c34bee914a3ed028578752",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/11",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.7975,
+      "file": "GLYPH-050.svg"
+    },
+    {
+      "index": 51,
+      "glyph_id": "GLYPH-051",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591689624152,
+      "svg_sha256": "974fee452646c781cb6374ad9f6c8f4b23c592e7ad7212958723a6b84fbc8846",
+      "pixel_sha256": "5fc94504fb8feb89217d896267fc82303d1c780d395d0c6fbda16fc75c39a217",
+      "authoring_parameters": {
+        "seed_offset": 8
+      },
+      "recipe": "mixed/6",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 11.9354,
+      "file": "GLYPH-051.svg"
+    },
+    {
+      "index": 52,
+      "glyph_id": "GLYPH-052",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591681728857,
+      "svg_sha256": "b364b8b16a3e17e7662f8e58d7c6742a8b41ae7b2e7f79f0b11cb4a6ca86a4d6",
+      "pixel_sha256": "1df9dfa33757ac0695b0b75ae85ae8e30b7c93c4b0f7d9a9354b021973df6ddc",
+      "authoring_parameters": {
+        "weight": 0.94
+      },
+      "recipe": "rounded_loop_interlock/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 11.7698,
+      "file": "GLYPH-052.svg"
+    },
+    {
+      "index": 53,
+      "glyph_id": "GLYPH-053",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591681833586,
+      "svg_sha256": "4958f31f2acdaf44698cfe1725adbeea01628ce7a15097693f91c79b67aeac96",
+      "pixel_sha256": "16d4b6763026e85933c87e9216199009d46ca191bafc0c919241368d7903888f",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/3",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.9625,
+      "file": "GLYPH-053.svg"
+    },
+    {
+      "index": 54,
+      "glyph_id": "GLYPH-054",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591681938315,
+      "svg_sha256": "9f4880a9aa97b0e96e9015167e6abcc32d55430c95cc846d04e8e3e5d21e740b",
+      "pixel_sha256": "05e63837942a7fc806e0b1df48cab2825da2eaa471df314163d82a632d0a30b0",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/12",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.1636,
+      "file": "GLYPH-054.svg"
+    },
+    {
+      "index": 55,
+      "glyph_id": "GLYPH-055",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591682043044,
+      "svg_sha256": "50e27cfa07ef85ea4aeb045326c6074aebf1762302ac8821b95996c61a099f5d",
+      "pixel_sha256": "408d2e36f78d03ff264ac5883100c72971c46eee9a4acb080d086ca1ddb2cddb",
+      "authoring_parameters": {
+        "structure": "crossing-fork"
+      },
+      "recipe": "bar_hook/crossing-fork",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.0821,
+      "file": "GLYPH-055.svg"
+    },
+    {
+      "index": 56,
+      "glyph_id": "GLYPH-056",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591685147782,
+      "svg_sha256": "fa327f72247f5c735f94bed09a389d51a9dbcf42a5cc56ee26b01347e1b7ea88",
+      "pixel_sha256": "ee8648ce253ec86308c1d4b31fc8dda8ded19540077d9285170c89cd586db8aa",
+      "authoring_parameters": {
+        "seed_offset": 3
+      },
+      "recipe": "rounded_loop_interlock/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.5934,
+      "file": "GLYPH-056.svg"
+    },
+    {
+      "index": 57,
+      "glyph_id": "GLYPH-057",
+      "family": "roofed_curves",
+      "profile": "expanded",
+      "seed": 91591682252502,
+      "svg_sha256": "7341e8f7093fb96de585619b1d3432ef602fbc01ddc29d213cf8ba55a1a98619",
+      "pixel_sha256": "b781a9f525241e6b85a28bca50e86632e6793f73d04ec4b6aee3bc68ea2467a0",
+      "authoring_parameters": {
+        "weight": 0.94
+      },
+      "recipe": "roofed_curves/4",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 11.8659,
+      "file": "GLYPH-057.svg"
+    },
+    {
+      "index": 58,
+      "glyph_id": "GLYPH-058",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591685357240,
+      "svg_sha256": "ae675219a6c2beb6fd4dd96932b151d54efda6fb68322273513f212dbdbdf51d",
+      "pixel_sha256": "2aafeaced08e89b7da8057abefc9c1e325687fbdf9a478ff29c99784e6ae997d",
+      "authoring_parameters": {
+        "seed_offset": 3
+      },
+      "recipe": "numeral_operator/13",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.8901,
+      "file": "GLYPH-058.svg"
+    },
+    {
+      "index": 59,
+      "glyph_id": "GLYPH-059",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591682461960,
+      "svg_sha256": "7cc8f254c3a86cca8317a6ecf72be27ff6a9b6e215a4911b5eb933e1724bc254",
+      "pixel_sha256": "d18c271df40c083682c534e7dda063994842302a68e479dbb55a236921b66cf7",
+      "authoring_parameters": {
+        "counter_scale": 0.65,
+        "structure": "counter-with-left-prong"
+      },
+      "recipe": "mixed/counter-with-left-prong",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.4966,
+      "file": "GLYPH-059.svg"
+    },
+    {
+      "index": 60,
+      "glyph_id": "GLYPH-060",
+      "family": "diagonal_lozenge",
+      "profile": "expanded",
+      "seed": 91591682566689,
+      "svg_sha256": "f085b0414eedabf709cf757ab027a2d41b42bf7871310bf76fc5db345672393a",
+      "pixel_sha256": "b544ff33d072a87cde0a492c08fa5a5acb8666b4f02964f543fcd1f04e0125d1",
+      "authoring_parameters": {},
+      "recipe": "diagonal_lozenge/5",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.4141,
+      "file": "GLYPH-060.svg"
+    },
+    {
+      "index": 61,
+      "glyph_id": "GLYPH-061",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591682671418,
+      "svg_sha256": "a6ec45047505f8c520f724d84d3529695c53c7c747cd29dbdf0ea07c0bf9c607",
+      "pixel_sha256": "72468a58ec3af869dd1c0625a622d84348c0f8db139962676aa6f534c8370390",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/5",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.8932,
+      "file": "GLYPH-061.svg"
+    },
+    {
+      "index": 62,
+      "glyph_id": "GLYPH-062",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591682776147,
+      "svg_sha256": "dfd0203022d2ae8c1d74a64bc72cf7a2b9d38cfb36385f2525e42e19ebaa28c9",
+      "pixel_sha256": "d4b8176fda9bbaf90b0b6742a45bfddee5f69969e5db96b1907a376fa589a2e6",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.3553,
+      "file": "GLYPH-062.svg"
+    },
+    {
+      "index": 63,
+      "glyph_id": "GLYPH-063",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591682880876,
+      "svg_sha256": "85e16d8f169d2e58620027fdbc1946a1a36d9f0dafdde2c72b9be1e75eea4d20",
+      "pixel_sha256": "df981c5cb1003e769b5da4bb0e194ce814c0bf86a24d6df7cd21f640716318b8",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/14",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.5172,
+      "file": "GLYPH-063.svg"
+    },
+    {
+      "index": 64,
+      "glyph_id": "GLYPH-064",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591690985629,
+      "svg_sha256": "a9944068fd2e9a7dc47a0dab1f3992330033f9d432525a0ae06062ec65daa03b",
+      "pixel_sha256": "e3513a52507f348ac104a8471bdf833a40f73e7c9ad1bf72975970df45ec93d3",
+      "authoring_parameters": {
+        "seed_offset": 8
+      },
+      "recipe": "bar_hook/6",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.3816,
+      "file": "GLYPH-064.svg"
+    },
+    {
+      "index": 65,
+      "glyph_id": "GLYPH-065",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591683090334,
+      "svg_sha256": "393f11fc7ad2a47649895498df7f94f0df2381f6a473771ce71ad528946b7ade",
+      "pixel_sha256": "6041f3a2ff18397c9a663a05345ed827b39d777378378b0b3d474aaa975007e3",
+      "authoring_parameters": {
+        "structure": "three-offset-bars"
+      },
+      "recipe": "numeral_operator/three-offset-bars",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.706,
+      "file": "GLYPH-065.svg"
+    },
+    {
+      "index": 66,
+      "glyph_id": "GLYPH-066",
+      "family": "stacked_marks",
+      "profile": "expanded",
+      "seed": 91591683195063,
+      "svg_sha256": "ea61245f012dbc26b36636e0cc236ddd1dc2990caaa50f441fbc37f02902f35a",
+      "pixel_sha256": "a02f4db2a3383c8ad4e425bf0c7486676fd5810b49840049fe6e6f93968e0422",
+      "authoring_parameters": {
+        "gap": 6.5
+      },
+      "recipe": "stacked_marks/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.2087,
+      "file": "GLYPH-066.svg"
+    },
+    {
+      "index": 67,
+      "glyph_id": "GLYPH-067",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591683299792,
+      "svg_sha256": "dc67550e6563648f2be22362c9af8924642bd466cf248567f9def8ac82b7f9cd",
+      "pixel_sha256": "a8302727b55118b2757696e803a0e9f1879f434528801421995d386901f33e02",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/3",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.1532,
+      "file": "GLYPH-067.svg"
+    },
+    {
+      "index": 68,
+      "glyph_id": "GLYPH-068",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591683404521,
+      "svg_sha256": "b5ee1a6a6023f5b25a1222ced5221b3cc6b60fee973bc78f39ff9dca62dcf7cc",
+      "pixel_sha256": "8f5decc760ab23c87993aacd84259de53d179d8d7c28ed6ffda297fb465cc22e",
+      "authoring_parameters": {
+        "structure": "double-stem-sweep",
+        "weight": 0.94
+      },
+      "recipe": "mixed/double-stem-sweep",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 11.2748,
+      "file": "GLYPH-068.svg"
+    },
+    {
+      "index": 69,
+      "glyph_id": "GLYPH-069",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591683509250,
+      "svg_sha256": "a4ff675e45aee33ffff348d8fbab72233a64249df68db7d109490380228badae",
+      "pixel_sha256": "79df9fdb30139bca2210c8812e6eb9a900421e0697601c67a2a036d8b00d1c44",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/7",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.6635,
+      "file": "GLYPH-069.svg"
+    },
+    {
+      "index": 70,
+      "glyph_id": "GLYPH-070",
+      "family": "diagonal_lozenge",
+      "profile": "expanded",
+      "seed": 91591685613985,
+      "svg_sha256": "8a9ed903dafbda9003ec1c3839bb302ac45be1d5bf531f0c2750837c9658dd39",
+      "pixel_sha256": "c71f5df172c0837da220f271fc863ba1d3b6192b12ba50229c1c8ac2e2fb8255",
+      "authoring_parameters": {
+        "seed_offset": 2
+      },
+      "recipe": "diagonal_lozenge/6",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.7451,
+      "file": "GLYPH-070.svg"
+    },
+    {
+      "index": 71,
+      "glyph_id": "GLYPH-071",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591683718708,
+      "svg_sha256": "ca6daf4c52c7ac5563f605532271607f64898d118fc50192363257d8b0eca8da",
+      "pixel_sha256": "552fc500aa912ebbcf846cbb9125145f9c278dced4391f1beae41108569e6ff0",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.2641,
+      "file": "GLYPH-071.svg"
+    },
+    {
+      "index": 72,
+      "glyph_id": "GLYPH-072",
+      "family": "roofed_curves",
+      "profile": "expanded",
+      "seed": 91591683823437,
+      "svg_sha256": "89cad41e6065e61e83032cc676b8d4198be1ff80794625a49c4184c67f18fcc6",
+      "pixel_sha256": "c958c00de67228e191f5fe420a346d70f55094a8d3563fed3c904281a38533ba",
+      "authoring_parameters": {},
+      "recipe": "roofed_curves/5",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.7234,
+      "file": "GLYPH-072.svg"
+    },
+    {
+      "index": 73,
+      "glyph_id": "GLYPH-073",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591683928166,
+      "svg_sha256": "8b4664a0dd47d5fd88629306e08988e06a6e3624d2d522a1a0e9551b437204ac",
+      "pixel_sha256": "2b0736a9f58a220340a4a8a533b500d29b5ef8a31a4a543e29d702f139f50db3",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/4",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.4989,
+      "file": "GLYPH-073.svg"
+    },
+    {
+      "index": 74,
+      "glyph_id": "GLYPH-074",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591684032895,
+      "svg_sha256": "78810cafb3ab96cb5d4dfad1658f2883776a61f6f2a4e88b703696f3adaa3132",
+      "pixel_sha256": "72a91666259a5377e97e2c8a65d0c4b7c2a4e9f234baab78af44e858692e235b",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/8",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.9256,
+      "file": "GLYPH-074.svg"
+    },
+    {
+      "index": 75,
+      "glyph_id": "GLYPH-075",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591684137624,
+      "svg_sha256": "0842601c326b8c1929952cd36a6228b6ae9081e44d9ef7abe980dfb070c81982",
+      "pixel_sha256": "63d855cdc3af3b52099706c8558ebae5db51c903aff74d7fb363305a5a8f8804",
+      "authoring_parameters": {
+        "structure": "upper-arc-lower-fork"
+      },
+      "recipe": "mixed/upper-arc-lower-fork",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.2928,
+      "file": "GLYPH-075.svg"
+    },
+    {
+      "index": 76,
+      "glyph_id": "GLYPH-076",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591684242353,
+      "svg_sha256": "9131067813268af5ad0499bd42f0887ec439dd2c35810167012257395c9f6fa9",
+      "pixel_sha256": "b9bf5cd12c9e84377c96975a231e410e5086452477ecdf2f9828564813f39ce2",
+      "authoring_parameters": {
+        "weight": 1.24
+      },
+      "recipe": "numeral_operator/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 18.5719,
+      "file": "GLYPH-076.svg"
+    },
+    {
+      "index": 77,
+      "glyph_id": "GLYPH-077",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591684347082,
+      "svg_sha256": "df5efa0201511ab51cd9b24851942de9528c0b42a2784ead3d1bfbe6db1d22c5",
+      "pixel_sha256": "2c46efbf792c4c63d3feac176aac523a72eb0f38ddf2495cd864f82466065c4f",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/9",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.0178,
+      "file": "GLYPH-077.svg"
+    },
+    {
+      "index": 78,
+      "glyph_id": "GLYPH-078",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591684451811,
+      "svg_sha256": "d8e2a0b411b6248ab8ad456072895f38dc1be55a9ee68eb69871a58e7d3aad7c",
+      "pixel_sha256": "6a3715f16a8b21286bd221c489c5f9ad85bf041044b35e6648b8042909d154dd",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/5",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.5046,
+      "file": "GLYPH-078.svg"
+    },
+    {
+      "index": 79,
+      "glyph_id": "GLYPH-079",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591692556564,
+      "svg_sha256": "935755ddca7713f3c868ede0ad816e39763e4e6050941f95ee4e0613f3003a5c",
+      "pixel_sha256": "64cf2dc78347a19f285a46a339e983511be94203992d9e11cd235d55c7c8d05a",
+      "authoring_parameters": {
+        "seed_offset": 8,
+        "weight": 1.24
+      },
+      "recipe": "numeral_operator/3",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 18.6316,
+      "file": "GLYPH-079.svg"
+    },
+    {
+      "index": 80,
+      "glyph_id": "GLYPH-080",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591684661269,
+      "svg_sha256": "7f8f2019ce5ca26d54df22221936b193fb629322874c1cd92f61aaa8d9f21166",
+      "pixel_sha256": "2ccdd8d875dd65f8fb1d68aec887ba736dccf3d730865fe68ea043b38a3bd1da",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.1083,
+      "file": "GLYPH-080.svg"
+    },
+    {
+      "index": 81,
+      "glyph_id": "GLYPH-081",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591684765998,
+      "svg_sha256": "516656dae1f5ff943fb4c2fc7e6f51bb402ad2cec14741ad551b52be2d89ed71",
+      "pixel_sha256": "d4386d07094242e35374bf81118cc79feb17a4462c181aabd2e62cbb56a9620a",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/6",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.184,
+      "file": "GLYPH-081.svg"
+    },
+    {
+      "index": 82,
+      "glyph_id": "GLYPH-082",
+      "family": "diagonal_lozenge",
+      "profile": "expanded",
+      "seed": 91591684870727,
+      "svg_sha256": "3c5a67cb1ed4fe0388fffc15a21b77d614756a15a7cd570e462f98f179649808",
+      "pixel_sha256": "707f025b5376d7719505ef54c81f0d5e485d58d800b12bf38241b20f7ee5c8b4",
+      "authoring_parameters": {},
+      "recipe": "diagonal_lozenge/7",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.2828,
+      "file": "GLYPH-082.svg"
+    },
+    {
+      "index": 83,
+      "glyph_id": "GLYPH-083",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591684975456,
+      "svg_sha256": "516deaf8693a365d9ccf5e0c525cf3ed400751b4e4e4d0e7134d20a3024c77dd",
+      "pixel_sha256": "02783a269c0a727ba456c5dd8b46c6e995a6b24894e1e8a8f6496537b398e0b6",
+      "authoring_parameters": {
+        "counter_scale": 0.65,
+        "structure": "diagonal-ascender-loop"
+      },
+      "recipe": "mixed/diagonal-ascender-loop",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.5157,
+      "file": "GLYPH-083.svg"
+    },
+    {
+      "index": 84,
+      "glyph_id": "GLYPH-084",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591685080185,
+      "svg_sha256": "80964f855f7e0657ccd003e3e2752fa1cccc9e8b349d13220ed9d38f8ff1da1c",
+      "pixel_sha256": "10d5133eac5e496c8e65d60726583d09de8b395fe3ddd8eb1f6b68caf263caa0",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.6965,
+      "file": "GLYPH-084.svg"
+    },
+    {
+      "index": 85,
+      "glyph_id": "GLYPH-085",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591685184914,
+      "svg_sha256": "50dbc9b3d5eb95bd7a935126e065cfc86664c187f02fa7d140b31ee27bc4d34c",
+      "pixel_sha256": "d6e9802a0c4847f9eedbfc8505100b0826a3a5ab53f95a71b79910127fb45827",
+      "authoring_parameters": {
+        "weight": 1.08
+      },
+      "recipe": "numeral_operator/4",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.9177,
+      "file": "GLYPH-085.svg"
+    },
+    {
+      "index": 86,
+      "glyph_id": "GLYPH-086",
+      "family": "roofed_curves",
+      "profile": "expanded",
+      "seed": 91591685289643,
+      "svg_sha256": "57f38e5733c938c2dfcf8cce34c46706edbb191132c053d2496ca938f89a641d",
+      "pixel_sha256": "46a3287e187f0bae6c961f376966c14914c957329ab06407b5ab92ff687b08be",
+      "authoring_parameters": {},
+      "recipe": "roofed_curves/6",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.5453,
+      "file": "GLYPH-086.svg"
+    },
+    {
+      "index": 87,
+      "glyph_id": "GLYPH-087",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591685394372,
+      "svg_sha256": "d12f9bfd245c7bec7061e69ec051077230ce813893202872e861d0abe45465ee",
+      "pixel_sha256": "b04e0c609faed4b9bd13b9d663fa2a25dbb5c97c55b369410a6bf91f7c894d4e",
+      "authoring_parameters": {
+        "apertures": [
+          [
+            47,
+            58,
+            7
+          ]
+        ]
+      },
+      "recipe": "rounded_loop_interlock/7",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.2883,
+      "file": "GLYPH-087.svg"
+    },
+    {
+      "index": 88,
+      "glyph_id": "GLYPH-088",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591685499101,
+      "svg_sha256": "ac720aff2d2c3d91b9a2946122d6c0ca1032b3652b08b623faf2b1d63b04004d",
+      "pixel_sha256": "05bad67ceceab68c25726985aa1b4ff8f20f470f69fc8d15cf04059351e323a3",
+      "authoring_parameters": {
+        "weight": 1.24
+      },
+      "recipe": "bar_hook/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 16.905,
+      "file": "GLYPH-088.svg"
+    },
+    {
+      "index": 89,
+      "glyph_id": "GLYPH-089",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591686603833,
+      "svg_sha256": "ab4a91e7a87c4d5646fb2173558ddcfa8c0416f7648a9f364e771a681146ae28",
+      "pixel_sha256": "0df53a185bc59511b41d32ba9dd56c7c905f08488074f46ad832441eac9279d1",
+      "authoring_parameters": {
+        "seed_offset": 1,
+        "weight": 1.16
+      },
+      "recipe": "numeral_operator/5",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 17.0774,
+      "file": "GLYPH-089.svg"
+    },
+    {
+      "index": 90,
+      "glyph_id": "GLYPH-090",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591685708559,
+      "svg_sha256": "e4a0eaa5bbc8553024d8ffb8171559fd0527f238cade74638b457a1a37a73371",
+      "pixel_sha256": "71f3714021a3120fe29a0babe90a7f260b1b4546f4abd4ed8a1da21a320b4834",
+      "authoring_parameters": {
+        "counter_scale": 0.65,
+        "structure": "lower-counter-ascender"
+      },
+      "recipe": "mixed/lower-counter-ascender",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.256,
+      "file": "GLYPH-090.svg"
+    },
+    {
+      "index": 91,
+      "glyph_id": "GLYPH-091",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591685813288,
+      "svg_sha256": "333fb8b8f4fee4c1a3df7876590adedf396b84c3bd6f15fb156ef345cfe5ecf0",
+      "pixel_sha256": "df66305433a52c606837215d6e851d23e21f7dc1f3791e78e71d67523896ca35",
+      "authoring_parameters": {
+        "structure": "crook-with-floating-square"
+      },
+      "recipe": "bar_hook/crook-with-floating-square",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.6144,
+      "file": "GLYPH-091.svg"
+    },
+    {
+      "index": 92,
+      "glyph_id": "GLYPH-092",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591685918017,
+      "svg_sha256": "9d2b5664464dd726dc28397e819e3934ef9fd527e927b2cb09ee056b96e94c21",
+      "pixel_sha256": "4d627c0c064ca77faf4fc6d35bca508f33681bab9e64b7525a62d7c46e723231",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/8",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.0782,
+      "file": "GLYPH-092.svg"
+    },
+    {
+      "index": 93,
+      "glyph_id": "GLYPH-093",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591686022746,
+      "svg_sha256": "636b5c1d6727372f6d2324b439f5f7b2763e1b7735e63896df34f956b6963762",
+      "pixel_sha256": "2fee6a78c8e5c3e7d8be02c21641597e59e2bf4933dc0da567546188f26c49ed",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/6",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.8228,
+      "file": "GLYPH-093.svg"
+    },
+    {
+      "index": 94,
+      "glyph_id": "GLYPH-094",
+      "family": "diagonal_lozenge",
+      "profile": "expanded",
+      "seed": 91591686127475,
+      "svg_sha256": "155159f276b8ff1e5effa4a79d31dd3a5618ea22346ca671f3ed05a30f164bd8",
+      "pixel_sha256": "1ab336fb7daad07f5bc7f7ce2afbe789fc94253aeb28990f18463d19a0827a78",
+      "authoring_parameters": {
+        "gap": 6.5
+      },
+      "recipe": "diagonal_lozenge/8",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.4166,
+      "file": "GLYPH-094.svg"
+    },
+    {
+      "index": 95,
+      "glyph_id": "GLYPH-095",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591686232204,
+      "svg_sha256": "7346eb930f514bcb24956836e24de4603ecea3b2b92ca3f614f0a550c94fcef8",
+      "pixel_sha256": "de4abad3d7400ecec95ef7377f39c1912c46da76691e1416de22be5f92dfda33",
+      "authoring_parameters": {
+        "structure": "open-triple-prong"
+      },
+      "recipe": "bar_hook/open-triple-prong",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.1146,
+      "file": "GLYPH-095.svg"
+    },
+    {
+      "index": 96,
+      "glyph_id": "GLYPH-096",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591686336933,
+      "svg_sha256": "23d9790367ed0be7c7a4da18d1868ac01ae710214fac98e50acacfa20205164f",
+      "pixel_sha256": "a6c7a6da6ce55805959cc6807f7519bf15f2bd84472532e7b8281392fd66d963",
+      "authoring_parameters": {
+        "apertures": [
+          [
+            54.297,
+            56.641,
+            6.0
+          ]
+        ]
+      },
+      "recipe": "rounded_loop_interlock/9",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.6919,
+      "file": "GLYPH-096.svg"
+    },
+    {
+      "index": 97,
+      "glyph_id": "GLYPH-097",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591686441662,
+      "svg_sha256": "eae3d1158fda2e24ede834b516a9d38d0f9b519492bee5128130eefbb85171a3",
+      "pixel_sha256": "4ac92db40c45a496582c9c8ec61c833e91f0bbde4dc5cacf72a8184982c4370c",
+      "authoring_parameters": {
+        "weight": 1.16
+      },
+      "recipe": "numeral_operator/7",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 17.5912,
+      "file": "GLYPH-097.svg"
+    },
+    {
+      "index": 98,
+      "glyph_id": "GLYPH-098",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591686546391,
+      "svg_sha256": "13e272aeae61aff2467eb7fa73c49661191fd120004fdeda1a2158b6902e56ac",
+      "pixel_sha256": "27c7e6b4690592b120dae3f419fd41ce90aa4133d54e92eefe59b61b5e1a41e5",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/5",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.5335,
+      "file": "GLYPH-098.svg"
+    },
+    {
+      "index": 99,
+      "glyph_id": "GLYPH-099",
+      "family": "roofed_curves",
+      "profile": "expanded",
+      "seed": 91591686651120,
+      "svg_sha256": "dea82560831aaabc396b711b3f356db4eaa0ccecbfe9f829fe954af65f75c5fe",
+      "pixel_sha256": "a8d916300e02aeb88fca3e5160277f162a6ca3bef4eb3aa6b5a77dca363c813f",
+      "authoring_parameters": {
+        "apertures": [
+          [
+            33.984,
+            65.234,
+            6.0
+          ]
+        ],
+        "structure": "roof-with-left-descender"
+      },
+      "recipe": "roofed_curves/roof-with-left-descender",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.8382,
+      "file": "GLYPH-099.svg"
+    },
+    {
+      "index": 100,
+      "glyph_id": "GLYPH-100",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591686755849,
+      "svg_sha256": "02398342d61cc812a96d54b7bcdf2e846a81703f4a2d56474a6d5e72d2f118fc",
+      "pixel_sha256": "03b4a4fd00edfdcf9a13f42e57c865d0265755847861bd68faed4e3fa27e6b0e",
+      "authoring_parameters": {
+        "weight": 1.08
+      },
+      "recipe": "mixed/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.8123,
+      "file": "GLYPH-100.svg"
+    },
+    {
+      "index": 101,
+      "glyph_id": "GLYPH-101",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591686860578,
+      "svg_sha256": "e94028cb759c435f2d5b71079938818c0907bc1c48b31f98260d452ffb9f0b24",
+      "pixel_sha256": "1753efd86eed78ddc6911ed120eafdfc6fccbe72b9f5e20e9fdb891946255b15",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/8",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.9865,
+      "file": "GLYPH-101.svg"
+    },
+    {
+      "index": 102,
+      "glyph_id": "GLYPH-102",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591686965307,
+      "svg_sha256": "5e7523e3c9647a6d0f22352664f33605f14dcdd50c60ecbe3cc9350c1cc805d6",
+      "pixel_sha256": "c7dca9662062e4db8579c612ba4e9c35344c346094c2690cb5570df7cde83218",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.8465,
+      "file": "GLYPH-102.svg"
+    },
+    {
+      "index": 103,
+      "glyph_id": "GLYPH-103",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591687070036,
+      "svg_sha256": "a14f916e9390c7b8b8bf103d509c5368c6eb94f527f1e475d08b889c25e9dedf",
+      "pixel_sha256": "3965e788f54e5a47cbfe0b7361adda2a0aa3fc4874d44710aa4b1172707bcce4",
+      "authoring_parameters": {
+        "gap": 10
+      },
+      "recipe": "bar_hook/6",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.3747,
+      "file": "GLYPH-103.svg"
+    },
+    {
+      "index": 104,
+      "glyph_id": "GLYPH-104",
+      "family": "diagonal_lozenge",
+      "profile": "expanded",
+      "seed": 91591687174765,
+      "svg_sha256": "23cb639ec62d6e57a63a4e1860b748446c255860e21356e4b3a1b0af547e2aa4",
+      "pixel_sha256": "31857e2eeec094f7d54e3749091097d700805b405773a771af6a24d5bb99dee2",
+      "authoring_parameters": {},
+      "recipe": "diagonal_lozenge/9",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.5356,
+      "file": "GLYPH-104.svg"
+    },
+    {
+      "index": 105,
+      "glyph_id": "GLYPH-105",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591687279494,
+      "svg_sha256": "ed9788d33d8c216a8ba4121f14611ee7c305aa731908562d7666a2a15666e2d5",
+      "pixel_sha256": "a91585404e10229f1f786754be8f18eb71eaa847bce509aa0621225a6066219b",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/9",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.6845,
+      "file": "GLYPH-105.svg"
+    },
+    {
+      "index": 106,
+      "glyph_id": "GLYPH-106",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591687384223,
+      "svg_sha256": "770eab9a5a019f485bc66690258e9be3dc56c7493176e232fc36945dbec93aae",
+      "pixel_sha256": "bbb8ea930d0d7fb3bae8812c136e521e0d777b2826da1a2b0edd5a73d9e4fece",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.7295,
+      "file": "GLYPH-106.svg"
+    },
+    {
+      "index": 107,
+      "glyph_id": "GLYPH-107",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591687488952,
+      "svg_sha256": "ca610ab3e9b2c56d205a81c401374bc0910962b932d7f7c235720bbd1690b442",
+      "pixel_sha256": "64f0f983bae8d3e263a8cb7182bf514d19b0ab1cce784fa82a8f8089c4134023",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/7",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.1882,
+      "file": "GLYPH-107.svg"
+    },
+    {
+      "index": 108,
+      "glyph_id": "GLYPH-108",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591687593681,
+      "svg_sha256": "f08542f54537e2dc62a4a74f1caa2bc764d94ad68e95eb93ae2943e2f0d68f5a",
+      "pixel_sha256": "bff22a4550a6a8c8fdb0f1ca31c5b81ee0e4d85b44354fd0de645c7184b5d349",
+      "authoring_parameters": {
+        "counter_scale": 0.65,
+        "structure": "upper-counter-descender",
+        "weight": 0.87
+      },
+      "recipe": "mixed/upper-counter-descender",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 11.1517,
+      "file": "GLYPH-108.svg"
+    },
+    {
+      "index": 109,
+      "glyph_id": "GLYPH-109",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591687698410,
+      "svg_sha256": "4fd40f052af5305b6bdda0d7c64ead0c4e426d44213701e1acc14ece115dae62",
+      "pixel_sha256": "1de5a033f8f7f47407f2ec3ba54a84516dfb14cefddf5ed22118089a5460d319",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/10",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.0142,
+      "file": "GLYPH-109.svg"
+    },
+    {
+      "index": 110,
+      "glyph_id": "GLYPH-110",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591687803139,
+      "svg_sha256": "bee20ab25956d1bb95161995509fb6bde38a1f96b19a44be2400571f9112b137",
+      "pixel_sha256": "77f8fb5287668b34f407638af0fb39ceda82ebe8a1d963280c543da35e83dff8",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/8",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.9397,
+      "file": "GLYPH-110.svg"
+    },
+    {
+      "index": 111,
+      "glyph_id": "GLYPH-111",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591687907868,
+      "svg_sha256": "6d313a8223b723027c9b9f696059bff93b8b1541d28e2afab69dc73ca2b925c0",
+      "pixel_sha256": "4f91c55e64ad73419e47df01fc85ee26f74908e911988b519da72fbaf4f87bcb",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.8597,
+      "file": "GLYPH-111.svg"
+    },
+    {
+      "index": 112,
+      "glyph_id": "GLYPH-112",
+      "family": "roofed_curves",
+      "profile": "expanded",
+      "seed": 91591688012597,
+      "svg_sha256": "d644a000b97570871dd9402c6bdbe2b02a582613259b533d1584b31bbafbc364",
+      "pixel_sha256": "527642cacfe6c6ce4c9a51224230463fa7f29a6ca1fd261d0365d459a7a32e57",
+      "authoring_parameters": {
+        "structure": "roof-with-two-shoulders"
+      },
+      "recipe": "roofed_curves/roof-with-two-shoulders",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.2766,
+      "file": "GLYPH-112.svg"
+    },
+    {
+      "index": 113,
+      "glyph_id": "GLYPH-113",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591688117326,
+      "svg_sha256": "fee344bb4871cece337a287eaa61215b4871bfd0bb00c58d156c03f7bc31716e",
+      "pixel_sha256": "da859f1d4b5565e2eff35baf7a1f3cbedc666ec97ed4dd42df8b0e3276b78de4",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/11",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.9222,
+      "file": "GLYPH-113.svg"
+    },
+    {
+      "index": 114,
+      "glyph_id": "GLYPH-114",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591688222055,
+      "svg_sha256": "12969b68bf6aaed899619b8e6841bba366be8de4ee00bebfd029b7663b283f9e",
+      "pixel_sha256": "5edcf427f84b588ce03ed395c27d84d84078e0fe67f09419fbe05986fba5321b",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/9",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.8575,
+      "file": "GLYPH-114.svg"
+    },
+    {
+      "index": 115,
+      "glyph_id": "GLYPH-115",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591688326784,
+      "svg_sha256": "08406d811927854d51d2abeb5f18881698b48ac1ccfe58f234e4e5056084c06e",
+      "pixel_sha256": "ba3635e615e42f2a67f0ee65d58d1f39025ce6c5e63f1c644471aea224b2e19f",
+      "authoring_parameters": {
+        "opening": 1.8,
+        "structure": "counter-and-lower-crook"
+      },
+      "recipe": "mixed/counter-and-lower-crook",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.4287,
+      "file": "GLYPH-115.svg"
+    },
+    {
+      "index": 116,
+      "glyph_id": "GLYPH-116",
+      "family": "diagonal_lozenge",
+      "profile": "expanded",
+      "seed": 91591691431522,
+      "svg_sha256": "ba163c04c4d7b3a42db451f561200a60ca966b12963d9d427a67038630243c7b",
+      "pixel_sha256": "b6524cd39ea276b27aabce6a94b7830d343683209c671c33a979942501e4f617",
+      "authoring_parameters": {
+        "seed_offset": 3,
+        "weight": 1.08
+      },
+      "recipe": "diagonal_lozenge/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.3375,
+      "file": "GLYPH-116.svg"
+    },
+    {
+      "index": 117,
+      "glyph_id": "GLYPH-117",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591688536242,
+      "svg_sha256": "93300ab4992b784d0d3419371b312c8f3bf46281d57660b10139f2b5ec38804b",
+      "pixel_sha256": "d635447a46333012f3724eee97f6f23efe44607038e5859e8742105ea74c2814",
+      "authoring_parameters": {
+        "structure": "side-open-loop-with-diagonal"
+      },
+      "recipe": "rounded_loop_interlock/side-open-loop-with-diagonal",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 11.8616,
+      "file": "GLYPH-117.svg"
+    },
+    {
+      "index": 118,
+      "glyph_id": "GLYPH-118",
+      "family": "numeral_operator",
+      "profile": "classic",
+      "seed": 91591688640971,
+      "svg_sha256": "6231158412344b96c57acb8a9e0f6d1b530ac6d096f8346dd365847b7b9c7f51",
+      "pixel_sha256": "4aab7409b36fc20a2e64c0343b548ab5eb49ed535beff8dc268f320f9f3d396b",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/12",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.8242,
+      "file": "GLYPH-118.svg"
+    },
+    {
+      "index": 119,
+      "glyph_id": "GLYPH-119",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591696745724,
+      "svg_sha256": "51f73d82ff1d311a2f8a321ab033482cd4d73862584ece09e0014a286a461dbc",
+      "pixel_sha256": "2819f35c047a453ca9ed9006f99dbe394b79c16711ad8c2355bf834cbf1d8c37",
+      "authoring_parameters": {
+        "seed_offset": 8
+      },
+      "recipe": "bar_hook/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.9261,
+      "file": "GLYPH-119.svg"
+    },
+    {
+      "index": 120,
+      "glyph_id": "GLYPH-120",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591688850429,
+      "svg_sha256": "9217ab5b674cec90de83e6aa205c5215b16d3836abefe49f6d1f5c403f492bb8",
+      "pixel_sha256": "ff4bf177e661fd759179d42e28c9654854c56cbd1550f46e465421666b16bd2b",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/4",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.8939,
+      "file": "GLYPH-120.svg"
+    },
+    {
+      "index": 121,
+      "glyph_id": "GLYPH-121",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591688955158,
+      "svg_sha256": "9508b585425dca675a4b90904bdc4d7cff41959551f87267ff0dc5910212324e",
+      "pixel_sha256": "0a29dab004bf8a8d9a67ec776a1b25b2e775f88c810e801606b7c865612da4c2",
+      "authoring_parameters": {
+        "apertures": [
+          [
+            69.141,
+            69.141,
+            6.0
+          ]
+        ]
+      },
+      "recipe": "bar_hook/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.6504,
+      "file": "GLYPH-121.svg"
+    },
+    {
+      "index": 122,
+      "glyph_id": "GLYPH-122",
+      "family": "numeral_operator",
+      "profile": "expanded",
+      "seed": 91591689059887,
+      "svg_sha256": "42c05b5126c97219f42f24bf74a4d06caf6b1de6e91068e2ba65426df64dd730",
+      "pixel_sha256": "f60cb78f0130b95200055e56ce7bd7b95dfff36202587e01791560519c771930",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/13",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.1327,
+      "file": "GLYPH-122.svg"
+    },
+    {
+      "index": 123,
+      "glyph_id": "GLYPH-123",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591689164616,
+      "svg_sha256": "60a0882ad7d37beda7b80039674c0c86baa56e62fdd077ae2fe9ac83cd082585",
+      "pixel_sha256": "9676c02195630e31e23d743f4b588d82b99d5040c6ce6d5c543ebe732f0a8d6f",
+      "authoring_parameters": {
+        "structure": "open-crossing-crook"
+      },
+      "recipe": "mixed/open-crossing-crook",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.2201,
+      "file": "GLYPH-123.svg"
+    },
+    {
+      "index": 124,
+      "glyph_id": "GLYPH-124",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591689269345,
+      "svg_sha256": "578e21fda3ed22e0460ac346db83aa41e8e44e948f5627a003290126db563f41",
+      "pixel_sha256": "93fcedb2ceb71d60438d455be5923eb0c255cef9148fbf3e01f174272843b907",
+      "authoring_parameters": {
+        "weight": 1.24
+      },
+      "recipe": "bar_hook/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 18.9658,
+      "file": "GLYPH-124.svg"
+    },
+    {
+      "index": 125,
+      "glyph_id": "GLYPH-125",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591689374074,
+      "svg_sha256": "7eeb6514b87edbe0baa15f9e5bb352a07e812e28e43190b01f702c3d0cd74986",
+      "pixel_sha256": "395ab152c3214cc3cafc2c26d9311b69983416a376cd36962ae82c0a4432266c",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/5",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.6745,
+      "file": "GLYPH-125.svg"
+    },
+    {
+      "index": 126,
+      "glyph_id": "GLYPH-126",
+      "family": "roofed_curves",
+      "profile": "expanded",
+      "seed": 91591689478803,
+      "svg_sha256": "5a795264637eddeb8b68d737990995af31432ecaba16edabbcffc1f926500495",
+      "pixel_sha256": "48f16499c0178feceaf55890f6b5579a4530f0039423068ec4c42f750437929f",
+      "authoring_parameters": {
+        "structure": "roof-with-descending-loop"
+      },
+      "recipe": "roofed_curves/roof-with-descending-loop",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.8465,
+      "file": "GLYPH-126.svg"
+    },
+    {
+      "index": 127,
+      "glyph_id": "GLYPH-127",
+      "family": "numeral_operator",
+      "profile": "expanded",
+      "seed": 91591689583532,
+      "svg_sha256": "42b8c5e0d618f75c2eb7c8dc4064150b77b81deaaa494cc3ee7ac4c176408a84",
+      "pixel_sha256": "a7cf8fd111543bf10d01d0399277afe7dbdc7656a2879c3578d29715278a4b99",
+      "authoring_parameters": {
+        "weight": 1.16
+      },
+      "recipe": "numeral_operator/14",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.3712,
+      "file": "GLYPH-127.svg"
+    },
+    {
+      "index": 128,
+      "glyph_id": "GLYPH-128",
+      "family": "diagonal_lozenge",
+      "profile": "expanded",
+      "seed": 91591690688264,
+      "svg_sha256": "363ebae5bdd174d35d995f39e06d7e7a0887ab5ddc5ad756d08808695fa0067a",
+      "pixel_sha256": "145f0b5855db45d3eccb34cad17701a26e9bc61c29205a8f54ccb5df65f32c85",
+      "authoring_parameters": {
+        "gap": 8,
+        "seed_offset": 1
+      },
+      "recipe": "diagonal_lozenge/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.6469,
+      "file": "GLYPH-128.svg"
+    },
+    {
+      "index": 129,
+      "glyph_id": "GLYPH-129",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591689792990,
+      "svg_sha256": "deb1aaafe381d15c43939ad992413d02409cece8174150cf468e6bbbc8847086",
+      "pixel_sha256": "0e77b904edb62b4f90fc3ba78fb49491bff4a111ca373bcb00b6dfb7b637e0ae",
+      "authoring_parameters": {
+        "apertures": [
+          [
+            66.016,
+            63.672,
+            8.5
+          ]
+        ]
+      },
+      "recipe": "bar_hook/3",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.6896,
+      "file": "GLYPH-129.svg"
+    },
+    {
+      "index": 130,
+      "glyph_id": "GLYPH-130",
+      "family": "numeral_operator",
+      "profile": "expanded",
+      "seed": 91591689897719,
+      "svg_sha256": "c2a323e1299378b3f3fc6004066127323ed439b1f6fadd3513ccb082daeb7209",
+      "pixel_sha256": "d25922266808088b650f598a59e28455b8cbcdf4c7fb6c8d23290e9b9bb74a5f",
+      "authoring_parameters": {
+        "weight": 1.16
+      },
+      "recipe": "numeral_operator/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.1713,
+      "file": "GLYPH-130.svg"
+    },
+    {
+      "index": 131,
+      "glyph_id": "GLYPH-131",
+      "family": "stacked_marks",
+      "profile": "expanded",
+      "seed": 91591690002448,
+      "svg_sha256": "46e444c3d162211ee53eda083b4b9dc8e334c1cf44b494d5792e185f92b77855",
+      "pixel_sha256": "6dd976e938e1f507babde0522c771c25575858c7cb71bd9c2973d9e6516389c1",
+      "authoring_parameters": {
+        "gap": 9.5
+      },
+      "recipe": "stacked_marks/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.1346,
+      "file": "GLYPH-131.svg"
+    },
+    {
+      "index": 132,
+      "glyph_id": "GLYPH-132",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591690107177,
+      "svg_sha256": "4e64dc72980fd3523f82e804fcb3245299fc734ec55c7e4bf6fe819e14687656",
+      "pixel_sha256": "35dfd19d3ba038a7296f766c241aff858e13a31847849c8cd0aa8e77999c3457",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/6",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.3149,
+      "file": "GLYPH-132.svg"
+    },
+    {
+      "index": 133,
+      "glyph_id": "GLYPH-133",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591690211906,
+      "svg_sha256": "a086cafbef3ffc07c8d4c6ffd0a67b91af173985e225ede720a69252cb71d26c",
+      "pixel_sha256": "8472c8779ba29989e6fddbddf0d9ff9177b49a521ddb7ae532e0c181b1472fce",
+      "authoring_parameters": {
+        "counter_scale": 0.65,
+        "structure": "interlocked-counters"
+      },
+      "recipe": "mixed/interlocked-counters",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.074,
+      "file": "GLYPH-133.svg"
+    },
+    {
+      "index": 134,
+      "glyph_id": "GLYPH-134",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591690316635,
+      "svg_sha256": "53ff7347d8651a15a0cc8fc275c76f2951c482ed5dc4d7a7c52c91e408d5f16e",
+      "pixel_sha256": "042f1bc4df9317d86cd968b9415e5ab76b956603caaf095c2ce3a12eaa0fe49f",
+      "authoring_parameters": {
+        "structure": "sloped-ladder-hook"
+      },
+      "recipe": "bar_hook/sloped-ladder-hook",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.459,
+      "file": "GLYPH-134.svg"
+    },
+    {
+      "index": 135,
+      "glyph_id": "GLYPH-135",
+      "family": "numeral_operator",
+      "profile": "expanded",
+      "seed": 91591698421388,
+      "svg_sha256": "4c230114e887e54b613e4a8cef3537e865fa51b4313084dff1cdbaac2c10383e",
+      "pixel_sha256": "fc344fda746b11109508bc286665b9c34b15519d02181dd243f1515781f308b8",
+      "authoring_parameters": {
+        "gap": 6.5,
+        "seed_offset": 8
+      },
+      "recipe": "numeral_operator/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.6882,
+      "file": "GLYPH-135.svg"
+    },
+    {
+      "index": 136,
+      "glyph_id": "GLYPH-136",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591690526093,
+      "svg_sha256": "aab873a380afa13c3955cd173d86bd67b5aba47dfdaa744ca867165c95f1818e",
+      "pixel_sha256": "e8e64e1db39516fb5693cc765ef8e7d852b29f9e1dbff59fa5deb6648ffb8a26",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/7",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.9548,
+      "file": "GLYPH-136.svg"
+    },
+    {
+      "index": 137,
+      "glyph_id": "GLYPH-137",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591690630822,
+      "svg_sha256": "3e6e46de34c3a2e148783e938c0bc27d564fb32c0e701a965babeb52c989d981",
+      "pixel_sha256": "963bdbac99cadb67206d8a008d72e67ce8f27bb4b23424b37488686f03162a0c",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/5",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.3291,
+      "file": "GLYPH-137.svg"
+    },
+    {
+      "index": 138,
+      "glyph_id": "GLYPH-138",
+      "family": "diagonal_lozenge",
+      "profile": "expanded",
+      "seed": 91591690735551,
+      "svg_sha256": "e6924ef6370180503e783b8d49d27f70b5af54fdc7fa67b4f563a5269c851af0",
+      "pixel_sha256": "d5272ca7f2617aee6c412e27fb97badb81ab47be11748d1fe70149312fca4770",
+      "authoring_parameters": {
+        "weight": 1.24
+      },
+      "recipe": "diagonal_lozenge/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 16.193,
+      "file": "GLYPH-138.svg"
+    },
+    {
+      "index": 139,
+      "glyph_id": "GLYPH-139",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591690840280,
+      "svg_sha256": "30ae56379f596bfe41e98c23bf79c4e0b1cbd15e8d27545490397553b31245e6",
+      "pixel_sha256": "a070a99af7a0c62b6dd7ac641a9f53355a7535bc0662138fe3df6c2a46878a1f",
+      "authoring_parameters": {
+        "structure": "open-bowl-descender"
+      },
+      "recipe": "mixed/open-bowl-descender",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.597,
+      "file": "GLYPH-139.svg"
+    },
+    {
+      "index": 140,
+      "glyph_id": "GLYPH-140",
+      "family": "numeral_operator",
+      "profile": "expanded",
+      "seed": 91591690945009,
+      "svg_sha256": "c9e020846c32b2bbe6cb43c053ced920f3a835a328c4e6f4d5cda91aeaab8614",
+      "pixel_sha256": "5582e60f81b7ac5cd3bbe5fda52091f5bb4be6118377a26421e5774e1c0a68a2",
+      "authoring_parameters": {
+        "weight": 1.16
+      },
+      "recipe": "numeral_operator/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.3842,
+      "file": "GLYPH-140.svg"
+    },
+    {
+      "index": 141,
+      "glyph_id": "GLYPH-141",
+      "family": "roofed_curves",
+      "profile": "expanded",
+      "seed": 91591691049738,
+      "svg_sha256": "53a460e2bbdb153a62360af152df43f6e0abf1553b3ffb0e0828ca472d58725c",
+      "pixel_sha256": "9012abcb5d15e412d59af8108efeb4c71fe06cbe69da3bd85de353cb0a9b6d6c",
+      "authoring_parameters": {},
+      "recipe": "roofed_curves/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.638,
+      "file": "GLYPH-141.svg"
+    },
+    {
+      "index": 142,
+      "glyph_id": "GLYPH-142",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591691154467,
+      "svg_sha256": "aecfb0475ff4cbc605084babd5032c284bff291df87a01834b6fab27df8e7e54",
+      "pixel_sha256": "710663ecec8420c1acf7fee76735f26c2dba68cf3dc6badc0f8f0e1d191b4f78",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/8",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.4566,
+      "file": "GLYPH-142.svg"
+    },
+    {
+      "index": 143,
+      "glyph_id": "GLYPH-143",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591691259196,
+      "svg_sha256": "2ca03ee585ec15539dc8a4c2bfe61d66aedf59da36bbad24c468256d5665ec75",
+      "pixel_sha256": "10f7e152f15e488020d570c9bf6f8d20ea7a0a6ad1788fecd322394b0b4102d8",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/6",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.619,
+      "file": "GLYPH-143.svg"
+    },
+    {
+      "index": 144,
+      "glyph_id": "GLYPH-144",
+      "family": "numeral_operator",
+      "profile": "expanded",
+      "seed": 91591691363925,
+      "svg_sha256": "088e9e727da610fdab8dacda6aabe620b7c4831814e39718904df0a5a5c4415b",
+      "pixel_sha256": "74971ca221be6d73ed70106d8cac493e007e1fac621e2b44a415a2ac4c741bd5",
+      "authoring_parameters": {
+        "weight": 0.87
+      },
+      "recipe": "numeral_operator/3",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 10.4604,
+      "file": "GLYPH-144.svg"
+    },
+    {
+      "index": 145,
+      "glyph_id": "GLYPH-145",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591691468654,
+      "svg_sha256": "a93b5e2ec510d9fd841a03b350bb7118c49524325652d3306f32633c11410652",
+      "pixel_sha256": "03fbcaaa0c8c7dbf2eb73573592ebbb343d0a092aacf8bd6b6e61d4f1d07b3b1",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/7",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.6147,
+      "file": "GLYPH-145.svg"
+    },
+    {
+      "index": 146,
+      "glyph_id": "GLYPH-146",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591691573383,
+      "svg_sha256": "55eca32cd76fa0150f88881836d3dc78fb9e1ac170fcebc94edd97790ce47635",
+      "pixel_sha256": "c6b102d23ee541d639f28a912dc394b7b05e859242d06a5d5cc7d64626d39a2f",
+      "authoring_parameters": {
+        "structure": "upright-loop-side-crook"
+      },
+      "recipe": "rounded_loop_interlock/upright-loop-side-crook",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.8611,
+      "file": "GLYPH-146.svg"
+    },
+    {
+      "index": 147,
+      "glyph_id": "GLYPH-147",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591691678112,
+      "svg_sha256": "5e62f6df512881d4cafa003496ed85d4d724b66f3c98d2491ed6fdced02bfd41",
+      "pixel_sha256": "96541f67feb9a17f9f50ed6be04ab0d9624f315dbf50cf30f26c7f43732a9d97",
+      "authoring_parameters": {
+        "structure": "sweep-with-lozenge"
+      },
+      "recipe": "mixed/sweep-with-lozenge",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.9103,
+      "file": "GLYPH-147.svg"
+    },
+    {
+      "index": 148,
+      "glyph_id": "GLYPH-148",
+      "family": "numeral_operator",
+      "profile": "expanded",
+      "seed": 91591691782841,
+      "svg_sha256": "faa67f57220ebd6a83a6592f89a9b76e959a53d873017bc5e6e32d16e70a52bf",
+      "pixel_sha256": "5bb41cc1fa675f33f7146d2a35e81230d69478026b5147d0c6c0ef899d7617e6",
+      "authoring_parameters": {
+        "gap": 11,
+        "weight": 1.24
+      },
+      "recipe": "numeral_operator/4",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.3078,
+      "file": "GLYPH-148.svg"
+    },
+    {
+      "index": 149,
+      "glyph_id": "GLYPH-149",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591691887570,
+      "svg_sha256": "3ba59c872e21a20de27fad7da93f587759061fadd01676be644eb790378dccd4",
+      "pixel_sha256": "d3ccbeec6e6a509a16de1344b214da943185b93e2c431598b645d2479ed42e14",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/8",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.5209,
+      "file": "GLYPH-149.svg"
+    },
+    {
+      "index": 150,
+      "glyph_id": "GLYPH-150",
+      "family": "diagonal_lozenge",
+      "profile": "expanded",
+      "seed": 91591692992302,
+      "svg_sha256": "55370475b84c2f3b6c6dccba691217485178f9564b7ef2c1092aaca4aa3a7448",
+      "pixel_sha256": "9183cfdd8b7bbe35bf522a64a1aa8204c1e97b4eb58300e39219e43b00437319",
+      "authoring_parameters": {
+        "gap": 11,
+        "seed_offset": 1,
+        "weight": 1.16
+      },
+      "recipe": "diagonal_lozenge/3",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.5021,
+      "file": "GLYPH-150.svg"
+    },
+    {
+      "index": 151,
+      "glyph_id": "GLYPH-151",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591692097028,
+      "svg_sha256": "565900819ef10b90904d40c485df782f2293cc389b1964d29bb91f58b29f491f",
+      "pixel_sha256": "1e02ca6e13c70fc199c54851fb1a7f016479f83231dc45baee3b4ead9d7c0a8d",
+      "authoring_parameters": {
+        "apertures": [
+          [
+            67.578,
+            66.016,
+            6.0
+          ]
+        ]
+      },
+      "recipe": "rounded_loop_interlock/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.8091,
+      "file": "GLYPH-151.svg"
+    },
+    {
+      "index": 152,
+      "glyph_id": "GLYPH-152",
+      "family": "numeral_operator",
+      "profile": "expanded",
+      "seed": 91591697201772,
+      "svg_sha256": "d6caeec31f4e70bbd4890e0f0847eb9ea40181253e0949155144f12f2537e262",
+      "pixel_sha256": "6c7d89085eb113d2752c10c10eb1f154dc218d1fcab73385daeb09810e12e413",
+      "authoring_parameters": {
+        "gap": 10,
+        "mark_size": 10.5,
+        "seed_offset": 5
+      },
+      "recipe": "numeral_operator/5",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.121,
+      "file": "GLYPH-152.svg"
+    },
+    {
+      "index": 153,
+      "glyph_id": "GLYPH-153",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591692306486,
+      "svg_sha256": "97c1c9e662d2215bb586efd4f94ef2b0fbc30dfc3dde265a4b5850996bf7e07a",
+      "pixel_sha256": "c0514b82a3e318db290e0e21f13d2ae651ff4c4fb01589263eef373c97066f49",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/9",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.7604,
+      "file": "GLYPH-153.svg"
+    },
+    {
+      "index": 154,
+      "glyph_id": "GLYPH-154",
+      "family": "roofed_curves",
+      "profile": "expanded",
+      "seed": 91591692411215,
+      "svg_sha256": "be79f83dedab6175305886f4526dbec4c982e71df005b674137954808610c094",
+      "pixel_sha256": "fd6e890e02bb1d7e42ff06b5ba4b973973dd3b725e5601ec105ee6ee05f313cf",
+      "authoring_parameters": {},
+      "recipe": "roofed_curves/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.8544,
+      "file": "GLYPH-154.svg"
+    },
+    {
+      "index": 155,
+      "glyph_id": "GLYPH-155",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591692515944,
+      "svg_sha256": "4ea6581473869a2452b13b677cba548d2dca4f33c35740de7d61976ec90c6ec3",
+      "pixel_sha256": "0233f283be6af07a6b85b2e0f4d1cdeca69a4b898214b83a71323030b170cdf7",
+      "authoring_parameters": {
+        "structure": "crooked-upper-counter"
+      },
+      "recipe": "mixed/crooked-upper-counter",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.4265,
+      "file": "GLYPH-155.svg"
+    },
+    {
+      "index": 156,
+      "glyph_id": "GLYPH-156",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591695620682,
+      "svg_sha256": "71055c8254ca5f0ec88269a8db7933e139a5f3ba1cd11cedf037860923499e6b",
+      "pixel_sha256": "d17b5bfeb712a0fee52b33aef01d03c0dea37cbeb8faf450c5d00c5fd5418e54",
+      "authoring_parameters": {
+        "apertures": [
+          [
+            67.578,
+            66.797,
+            6.0
+          ]
+        ],
+        "seed_offset": 3
+      },
+      "recipe": "rounded_loop_interlock/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.2942,
+      "file": "GLYPH-156.svg"
+    },
+    {
+      "index": 157,
+      "glyph_id": "GLYPH-157",
+      "family": "numeral_operator",
+      "profile": "expanded",
+      "seed": 91591692725402,
+      "svg_sha256": "2576327d90d0f63a27324de4c2136958bbb7a87c111d8b86c7bbcaa409ffe289",
+      "pixel_sha256": "7cc79aa20326d86cf1bc4be1a5e9b71f87ee75483aca020327921cbe563e0fdb",
+      "authoring_parameters": {
+        "weight": 1.08
+      },
+      "recipe": "numeral_operator/6",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.2604,
+      "file": "GLYPH-157.svg"
+    },
+    {
+      "index": 158,
+      "glyph_id": "GLYPH-158",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591692830131,
+      "svg_sha256": "43bd639521cea049fd177c5f8c3cdc4cefafa785032e34b1b0383d63dfdc4dfa",
+      "pixel_sha256": "ad0d608a9dde91caa8270f642f1d14fdbd245a847dc94de5cb5c8315d666626a",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.1578,
+      "file": "GLYPH-158.svg"
+    },
+    {
+      "index": 159,
+      "glyph_id": "GLYPH-159",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591692934860,
+      "svg_sha256": "a99d3f6ca95d01f41d35828e165f7b3d4c713442c622b3a50f44cee6271729f9",
+      "pixel_sha256": "65de4705425fa6e1397c7b6dbf2e7960efcfcee0267ab13e5314597d7c3dba76",
+      "authoring_parameters": {
+        "weight": 1.16
+      },
+      "recipe": "bar_hook/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 17.2982,
+      "file": "GLYPH-159.svg"
+    },
+    {
+      "index": 160,
+      "glyph_id": "GLYPH-160",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591693039589,
+      "svg_sha256": "da190b435986bb8268d54455b608d630c713ad77619f4a18d54a4ca048f1c330",
+      "pixel_sha256": "84b23ed019ffbcb815f29d092b7cb7dcce3da1461d5c589395af28aa88795bf7",
+      "authoring_parameters": {
+        "counter_scale": 0.65,
+        "structure": "rounded-counter-with-fork"
+      },
+      "recipe": "rounded_loop_interlock/rounded-counter-with-fork",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 11.8147,
+      "file": "GLYPH-160.svg"
+    },
+    {
+      "index": 161,
+      "glyph_id": "GLYPH-161",
+      "family": "numeral_operator",
+      "profile": "expanded",
+      "seed": 91591694144321,
+      "svg_sha256": "eb4911c9f6089b0f45aa910b5270e08f3f868e8c608764143790d9971de47e99",
+      "pixel_sha256": "396bba6b2cc689efede3e6f6edd3e5fbbe3e20697c52f685b0fd32b81f5c99ca",
+      "authoring_parameters": {
+        "seed_offset": 1
+      },
+      "recipe": "numeral_operator/7",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.5814,
+      "file": "GLYPH-161.svg"
+    },
+    {
+      "index": 162,
+      "glyph_id": "GLYPH-162",
+      "family": "diagonal_lozenge",
+      "profile": "expanded",
+      "seed": 91591693249047,
+      "svg_sha256": "07da05fc09a7a9be2803293aa2561345f06a11b9f4bf2e92bdd9e2fcbc562ae7",
+      "pixel_sha256": "62276ca3429875e7220987bb2dff5141e0d841d9e4d88a40d6090be696b8a743",
+      "authoring_parameters": {
+        "apertures": [
+          [
+            47.266,
+            41.797,
+            6.0
+          ],
+          [
+            48.047,
+            55.078,
+            6.0
+          ]
+        ],
+        "structure": "diagonal-switchback"
+      },
+      "recipe": "diagonal_lozenge/diagonal-switchback",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.7657,
+      "file": "GLYPH-162.svg"
+    },
+    {
+      "index": 163,
+      "glyph_id": "GLYPH-163",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591693353776,
+      "svg_sha256": "2fb2c68293fb6fa5364b644d566bbe77c5b09a63dcaf42ac19e5565712359577",
+      "pixel_sha256": "0c60b1f3bc6361a9de8e57a0230d65dc58aef20d9bef67e8ef53238c70bba633",
+      "authoring_parameters": {},
+      "recipe": "mixed/0",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.4417,
+      "file": "GLYPH-163.svg"
+    },
+    {
+      "index": 164,
+      "glyph_id": "GLYPH-164",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591693458505,
+      "svg_sha256": "f80ff66f8eaf81dfc9a468e52f46bc8bdb7a7fb274c199d90419f6630e678fd9",
+      "pixel_sha256": "d084b1cba0b8bda134da1e2d8a30c9e9c895f3d174d496c878d100be1724e98b",
+      "authoring_parameters": {
+        "weight": 1.16
+      },
+      "recipe": "bar_hook/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 18.1181,
+      "file": "GLYPH-164.svg"
+    },
+    {
+      "index": 165,
+      "glyph_id": "GLYPH-165",
+      "family": "numeral_operator",
+      "profile": "expanded",
+      "seed": 91591693563234,
+      "svg_sha256": "6379f3dc14981a7c45e9e527894c6633f537986ccaf0839eecd34ba2ff13f3c4",
+      "pixel_sha256": "33ab9a6acdd76bfc4eff45c7cab59037af4bc25d388b4027627dae56d8618a8a",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/8",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.4905,
+      "file": "GLYPH-165.svg"
+    },
+    {
+      "index": 166,
+      "glyph_id": "GLYPH-166",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591693667963,
+      "svg_sha256": "c0522b0c8e2de48a43303e9a3ad9057d74e4058eb873feb2a5e846f116733220",
+      "pixel_sha256": "edc7465b66d320d6ea66209f1bc0d645f10baf3a7a5804012100c66761ee040c",
+      "authoring_parameters": {
+        "apertures": [
+          [
+            67,
+            66,
+            8.5
+          ]
+        ]
+      },
+      "recipe": "rounded_loop_interlock/3",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.8775,
+      "file": "GLYPH-166.svg"
+    },
+    {
+      "index": 167,
+      "glyph_id": "GLYPH-167",
+      "family": "roofed_curves",
+      "profile": "expanded",
+      "seed": 91591693772692,
+      "svg_sha256": "e54e166d88032e08781d1d0a1107c8768f9688ca2a35a4b156516b1f73c324b7",
+      "pixel_sha256": "4d3e88da8ec0bb2555dd38f0b6357f0b468fc9cf3ccfe05ebbf3bc4d2aaea822",
+      "authoring_parameters": {},
+      "recipe": "roofed_curves/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.6425,
+      "file": "GLYPH-167.svg"
+    },
+    {
+      "index": 168,
+      "glyph_id": "GLYPH-168",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591693877421,
+      "svg_sha256": "06a2214eddebea2a9f57e0bc5347cbcb2fc0f97d43255a42ad5b0acf67c5d134",
+      "pixel_sha256": "101fce684c45d8e09ef397a1a7260291ef2c8f13a5e7f6d6d827b62b89491902",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/3",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.6497,
+      "file": "GLYPH-168.svg"
+    },
+    {
+      "index": 169,
+      "glyph_id": "GLYPH-169",
+      "family": "numeral_operator",
+      "profile": "expanded",
+      "seed": 91591693982150,
+      "svg_sha256": "0cb0411aa2c189d783ad01dae8aa9fa7bbb3abfc33b3bbdff5408bff69191746",
+      "pixel_sha256": "dfa390cc1f0e35d995d686d37c6aa5a3ecf4332f173c06c06b9e787201c86be5",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/9",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.753,
+      "file": "GLYPH-169.svg"
+    },
+    {
+      "index": 170,
+      "glyph_id": "GLYPH-170",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591694086879,
+      "svg_sha256": "acb9f101e7fe2d9646fd3b96791c67eb4dd4bbf3786b692d93386c85faa970b0",
+      "pixel_sha256": "334163400cc6f4789ec7fdc11dc317052ab8805f1280666702f654f486859949",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/4",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.0371,
+      "file": "GLYPH-170.svg"
+    },
+    {
+      "index": 171,
+      "glyph_id": "GLYPH-171",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591694191608,
+      "svg_sha256": "ac4369098a64a069f62118bd7a38d3c5f2c79d988b9fd84b02aea16a52c89b85",
+      "pixel_sha256": "6f07d81f4afe71e08a070d6ff9b5dd19a944304f144a9607e2bd3a2d09482956",
+      "authoring_parameters": {},
+      "recipe": "mixed/1",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.2657,
+      "file": "GLYPH-171.svg"
+    },
+    {
+      "index": 172,
+      "glyph_id": "GLYPH-172",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591702296361,
+      "svg_sha256": "35869f54b51c151b711d7e5745177008a171c8d42ef5ede1fb9bfac8afdd4a52",
+      "pixel_sha256": "45876eee6340172f81946859fa5a6593af53b7558900af78cd88dc891ae8b6df",
+      "authoring_parameters": {
+        "seed_offset": 8
+      },
+      "recipe": "bar_hook/4",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.7064,
+      "file": "GLYPH-172.svg"
+    },
+    {
+      "index": 173,
+      "glyph_id": "GLYPH-173",
+      "family": "diagonal_lozenge",
+      "profile": "expanded",
+      "seed": 91591694401066,
+      "svg_sha256": "6f4ff448cb7fbc50a61d4d055aeb2d830da6713da4ec97ff36b8d8e9193983dd",
+      "pixel_sha256": "268286b56253c681a5cfb653d1b6b72ca0805b5f50b6cb4b9148a6a92b304af6",
+      "authoring_parameters": {
+        "apertures": [
+          [
+            51.953,
+            27.734,
+            8.5
+          ]
+        ],
+        "structure": "open-diamond-hook"
+      },
+      "recipe": "diagonal_lozenge/open-diamond-hook",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.4742,
+      "file": "GLYPH-173.svg"
+    },
+    {
+      "index": 174,
+      "glyph_id": "GLYPH-174",
+      "family": "numeral_operator",
+      "profile": "expanded",
+      "seed": 91591694505795,
+      "svg_sha256": "2a63c66b26a4fecaa0acfa5e2797eaa821d364304792175ec284cd2abf68452b",
+      "pixel_sha256": "040780a031d04c4f937eb524b1fcf1e7d183cde613ba05a08cf1f623747560e8",
+      "authoring_parameters": {
+        "structure": "split-numeral-hook"
+      },
+      "recipe": "numeral_operator/split-numeral-hook",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.5498,
+      "file": "GLYPH-174.svg"
+    },
+    {
+      "index": 175,
+      "glyph_id": "GLYPH-175",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591694610524,
+      "svg_sha256": "1fbce399f08c22b58ec83a7831907c98887127f407d7797ffcf93329431c8e92",
+      "pixel_sha256": "110fb6f00257576dfca3639f8ee82cee6a44ec9b68ddc35c499ed29a24cf614b",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/5",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.6111,
+      "file": "GLYPH-175.svg"
+    },
+    {
+      "index": 176,
+      "glyph_id": "GLYPH-176",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591694715253,
+      "svg_sha256": "4faaf22bd19e73311ed115b24477fee0dd7694d296846e734c9534b56195acf0",
+      "pixel_sha256": "47bee11acec2aa88d059bded269f412bcae9db800c8530e2121d66f7f2de8071",
+      "authoring_parameters": {
+        "structure": "double-elbow-operator"
+      },
+      "recipe": "bar_hook/double-elbow-operator",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.4726,
+      "file": "GLYPH-176.svg"
+    },
+    {
+      "index": 177,
+      "glyph_id": "GLYPH-177",
+      "family": "numeral_operator",
+      "profile": "expanded",
+      "seed": 91591694819982,
+      "svg_sha256": "0b476f0774437dcf53701ae2a3e45be5669ea2af73237247b06987b37b5aadce",
+      "pixel_sha256": "0eac7d1988a54fd1dec8d220c05259eb5bd11f0f518642b22f039bc3670c88ff",
+      "authoring_parameters": {},
+      "recipe": "numeral_operator/11",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 11.8535,
+      "file": "GLYPH-177.svg"
+    },
+    {
+      "index": 178,
+      "glyph_id": "GLYPH-178",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591694924711,
+      "svg_sha256": "925206b2da1fe1e0aad6eebb8d0d83f1529b49f2f93954284f2e15b56cecedfc",
+      "pixel_sha256": "044ad2cf34df20a07aa0a3d5d2b40350db3f8a02cfdcc440c3fd596affd49815",
+      "authoring_parameters": {
+        "counter_scale": 1.25,
+        "gap": 6.5
+      },
+      "recipe": "mixed/2",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.3206,
+      "file": "GLYPH-178.svg"
+    },
+    {
+      "index": 179,
+      "glyph_id": "GLYPH-179",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591695029440,
+      "svg_sha256": "368f88143ea8105672fe1b0e3b94e7f8ba18b94ab2550eb20b2ddb235fcd6112",
+      "pixel_sha256": "5578cb86fb1cdeb161665156fd80446a0063c9c6cca91a7f295d90b6a1e331c0",
+      "authoring_parameters": {
+        "structure": "split-crossbar-crook"
+      },
+      "recipe": "bar_hook/split-crossbar-crook",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 15.4276,
+      "file": "GLYPH-179.svg"
+    },
+    {
+      "index": 180,
+      "glyph_id": "GLYPH-180",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591695134169,
+      "svg_sha256": "30d6cb36436f91b4cbbe97c50d7085c75ba84aba1d85cf6fffc30d950601ca1c",
+      "pixel_sha256": "5ec01ccd445e231bc913982eb1c20c55facf71abb423874448cb003f50cf3d82",
+      "authoring_parameters": {
+        "apertures": [
+          [
+            51.172,
+            71.484,
+            6.0
+          ]
+        ],
+        "structure": "crossed-open-bowls"
+      },
+      "recipe": "rounded_loop_interlock/crossed-open-bowls",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.8383,
+      "file": "GLYPH-180.svg"
+    },
+    {
+      "index": 181,
+      "glyph_id": "GLYPH-181",
+      "family": "roofed_curves",
+      "profile": "expanded",
+      "seed": 91591698238907,
+      "svg_sha256": "f7897f1ead5fc5e2c9d0e8532306c60d182c54377cc3371d8b0b4a88317e8c0a",
+      "pixel_sha256": "df6990295adae0a2f488d5fabfa9738bf2194a9579c5dfcd4e6774cf90cb7434",
+      "authoring_parameters": {
+        "apertures": [
+          [
+            41.797,
+            62.891,
+            6.0
+          ]
+        ],
+        "seed_offset": 3,
+        "structure": "roof-and-reversed-crook"
+      },
+      "recipe": "roofed_curves/roof-and-reversed-crook",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 11.9909,
+      "file": "GLYPH-181.svg"
+    },
+    {
+      "index": 182,
+      "glyph_id": "GLYPH-182",
+      "family": "numeral_operator",
+      "profile": "expanded",
+      "seed": 91591695343627,
+      "svg_sha256": "08e1f883446fda9e47d5be51fe590eb009bc48a455e2cf6c5b9f6e37a848b62d",
+      "pixel_sha256": "8ce5cf297d356ce9ea00f7b587fa9dea7e685cdd9df66881e762486a2d3cfcc8",
+      "authoring_parameters": {
+        "counter_scale": 0.65,
+        "gap": 10,
+        "structure": "tilted-counter-descender",
+        "weight": 0.87
+      },
+      "recipe": "numeral_operator/tilted-counter-descender",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 10.7509,
+      "file": "GLYPH-182.svg"
+    },
+    {
+      "index": 183,
+      "glyph_id": "GLYPH-183",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591698448365,
+      "svg_sha256": "9c69ee57bdce85330f07c2904efaef5f4c7189525992cd227fa5ff49bbce03a6",
+      "pixel_sha256": "63907a4d246d884212208b9033a8374572e3912b67254a92d7ca4e3686d266cd",
+      "authoring_parameters": {
+        "seed_offset": 3
+      },
+      "recipe": "bar_hook/7",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.7132,
+      "file": "GLYPH-183.svg"
+    },
+    {
+      "index": 184,
+      "glyph_id": "GLYPH-184",
+      "family": "diagonal_lozenge",
+      "profile": "expanded",
+      "seed": 91591695553085,
+      "svg_sha256": "6a911709a3e2c5ddc43455f9e7f5b900d984a6290780761dc76ca8b74490438e",
+      "pixel_sha256": "0d1e5cb786aca23aaf09060144cc576ec9fe579d3568723665763254f6023fbf",
+      "authoring_parameters": {
+        "structure": "pierced-chevron",
+        "weight": 1.08
+      },
+      "recipe": "diagonal_lozenge/pierced-chevron",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.5142,
+      "file": "GLYPH-184.svg"
+    },
+    {
+      "index": 185,
+      "glyph_id": "GLYPH-185",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591695657814,
+      "svg_sha256": "d5ada6e57ae7f2d8a22987641d3f1d1dfbe00874b23f1adef22934cf571d54a2",
+      "pixel_sha256": "eaf920be9bcb336e932da1eb71a73c1d4bb5e5f368ae00b07e3c667622b5c16b",
+      "authoring_parameters": {},
+      "recipe": "rounded_loop_interlock/7",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.041,
+      "file": "GLYPH-185.svg"
+    },
+    {
+      "index": 186,
+      "glyph_id": "GLYPH-186",
+      "family": "numeral_operator",
+      "profile": "expanded",
+      "seed": 91591695762543,
+      "svg_sha256": "62a8018a23a9b8fc4ae9492f2503bbfd7e1aa99589b48f9c7868f1977d75abf7",
+      "pixel_sha256": "44390f0429f3bc830c239c7f84498bcf28d8d36b649fbf5b272a71362094ac6b",
+      "authoring_parameters": {
+        "structure": "open-rounded-ladder"
+      },
+      "recipe": "numeral_operator/open-rounded-ladder",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.106,
+      "file": "GLYPH-186.svg"
+    },
+    {
+      "index": 187,
+      "glyph_id": "GLYPH-187",
+      "family": "mixed",
+      "profile": "expanded",
+      "seed": 91591695867272,
+      "svg_sha256": "b187ed77449913ecc38ca1ae063b189ee7e5483fe5f1f23223b3c44310892a48",
+      "pixel_sha256": "451d4f728ed3280922a1a90fecbd176184f6ff162f52ca614a191876dd0663d6",
+      "authoring_parameters": {},
+      "recipe": "mixed/3",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 12.5209,
+      "file": "GLYPH-187.svg"
+    },
+    {
+      "index": 188,
+      "glyph_id": "GLYPH-188",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591695972001,
+      "svg_sha256": "46e19191f9c588e406eeec8aaaf5ea693db25f0e98d64d6d4ee7ecbe864ed4c4",
+      "pixel_sha256": "c85a43a9d758717c3ca5313f3c593a70d92302a656491d7fb99e4f30f0df37a4",
+      "authoring_parameters": {
+        "structure": "stepped-stem-with-hook"
+      },
+      "recipe": "bar_hook/stepped-stem-with-hook",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.8835,
+      "file": "GLYPH-188.svg"
+    },
+    {
+      "index": 189,
+      "glyph_id": "GLYPH-189",
+      "family": "rounded_loop_interlock",
+      "profile": "expanded",
+      "seed": 91591696076730,
+      "svg_sha256": "db1caa36330f9e83768ef083f91199e33f68abd0c5d70a543b2cf2e816f44e72",
+      "pixel_sha256": "ff72a75594a026b6286ab75447d0db3d2466cb85e493e4d9053cf1fa9f3057e1",
+      "authoring_parameters": {
+        "gap": 11,
+        "structure": "lower-loop-overhanging-arc"
+      },
+      "recipe": "rounded_loop_interlock/lower-loop-overhanging-arc",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 13.8141,
+      "file": "GLYPH-189.svg"
+    },
+    {
+      "index": 190,
+      "glyph_id": "GLYPH-190",
+      "family": "numeral_operator",
+      "profile": "expanded",
+      "seed": 91591696181459,
+      "svg_sha256": "bc6c14e80c44294ab6e5eacf71bee58071f04dacd6ed8a0c16f5fdc3804c7ad0",
+      "pixel_sha256": "7de3ab98f313d8341aec83a9612a2275d6fa23499a3785bfc4f22246e854eae2",
+      "authoring_parameters": {
+        "weight": 1.08
+      },
+      "recipe": "numeral_operator/14",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.8133,
+      "file": "GLYPH-190.svg"
+    },
+    {
+      "index": 191,
+      "glyph_id": "GLYPH-191",
+      "family": "bar_hook",
+      "profile": "classic",
+      "seed": 91591696286188,
+      "svg_sha256": "1d668e7b5d18423758a26045ae481efafac4bbd8b62bbe4508ff19bdc64470a4",
+      "pixel_sha256": "ea03da1ee09dd6dfb9ed62fcac6f3cbe7d2ebfe94e6a62b8b26ee7190678c1b8",
+      "authoring_parameters": {},
+      "recipe": "bar_hook/9",
+      "attempt": 0,
+      "version": "glyph-svg-v1",
+      "authoring_weight": 14.2933,
+      "file": "GLYPH-191.svg"
+    }
+  ],
+  "review_artifacts": {
+    "contact-sheet.png": {
+      "sha256": "2504be2a3a8274ba0dd3d1dea46f37b5fe445309521deed81a25d546384b7130",
+      "bytes": 558790
+    },
+    "calibration-sheet.png": {
+      "sha256": "eba1a4599f8ba65bc15e1618bceb3c4c448574468b6057ed1a723ad29ec53a2c",
+      "bytes": 64233
+    },
+    "style-measurements.json": {
+      "sha256": "07b555539991a029208896f5fd61778d0462297be8b8b24fe2824e19bdfb3c2f",
+      "bytes": 527813
+    },
+    "style-acceptance.json": {
+      "sha256": "d5152206e365914e2b9c08aaf586487c37204abf8f8cc598731671dc9b6739dd",
+      "bytes": 166965
+    }
+  }
+}

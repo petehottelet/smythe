@@ -1,0 +1,192 @@
+{
+  "catalog_count": 192,
+  "sizes": {
+    "16": {
+      "count": 192,
+      "blank_glyphs": [],
+      "missing_components": [],
+      "missing_counters": [],
+      "extra_enclosures": [
+        {
+          "glyph_id": "GLYPH-015",
+          "count": 1,
+          "smallest_extra_hole_areas_px": [
+            1
+          ],
+          "raw_hole_areas_px": [
+            1
+          ],
+          "source128_holes": 0
+        },
+        {
+          "glyph_id": "GLYPH-017",
+          "count": 1,
+          "smallest_extra_hole_areas_px": [
+            3
+          ],
+          "raw_hole_areas_px": [
+            3
+          ],
+          "source128_holes": 0
+        },
+        {
+          "glyph_id": "GLYPH-027",
+          "count": 1,
+          "smallest_extra_hole_areas_px": [
+            2
+          ],
+          "raw_hole_areas_px": [
+            23,
+            5,
+            2
+          ],
+          "source128_holes": 2
+        },
+        {
+          "glyph_id": "GLYPH-047",
+          "count": 1,
+          "smallest_extra_hole_areas_px": [
+            1
+          ],
+          "raw_hole_areas_px": [
+            5,
+            1
+          ],
+          "source128_holes": 1
+        },
+        {
+          "glyph_id": "GLYPH-058",
+          "count": 1,
+          "smallest_extra_hole_areas_px": [
+            3
+          ],
+          "raw_hole_areas_px": [
+            3
+          ],
+          "source128_holes": 0
+        },
+        {
+          "glyph_id": "GLYPH-095",
+          "count": 1,
+          "smallest_extra_hole_areas_px": [
+            2
+          ],
+          "raw_hole_areas_px": [
+            2
+          ],
+          "source128_holes": 0
+        },
+        {
+          "glyph_id": "GLYPH-109",
+          "count": 1,
+          "smallest_extra_hole_areas_px": [
+            1
+          ],
+          "raw_hole_areas_px": [
+            7,
+            1
+          ],
+          "source128_holes": 1
+        },
+        {
+          "glyph_id": "GLYPH-136",
+          "count": 1,
+          "smallest_extra_hole_areas_px": [
+            1
+          ],
+          "raw_hole_areas_px": [
+            9,
+            2,
+            1
+          ],
+          "source128_holes": 2
+        },
+        {
+          "glyph_id": "GLYPH-180",
+          "count": 3,
+          "smallest_extra_hole_areas_px": [
+            2,
+            2,
+            3
+          ],
+          "raw_hole_areas_px": [
+            3,
+            2,
+            2
+          ],
+          "source128_holes": 0
+        }
+      ],
+      "visible_entrance_failures": [],
+      "passed": true
+    },
+    "32": {
+      "count": 192,
+      "blank_glyphs": [],
+      "missing_components": [],
+      "missing_counters": [],
+      "extra_enclosures": [],
+      "visible_entrance_failures": [],
+      "passed": true
+    },
+    "64": {
+      "count": 192,
+      "blank_glyphs": [],
+      "missing_components": [],
+      "missing_counters": [],
+      "extra_enclosures": [
+        {
+          "glyph_id": "GLYPH-128",
+          "count": 1,
+          "smallest_extra_hole_areas_px": [
+            1
+          ],
+          "raw_hole_areas_px": [
+            1
+          ],
+          "source128_holes": 0
+        },
+        {
+          "glyph_id": "GLYPH-150",
+          "count": 1,
+          "smallest_extra_hole_areas_px": [
+            1
+          ],
+          "raw_hole_areas_px": [
+            1
+          ],
+          "source128_holes": 0
+        }
+      ],
+      "visible_entrance_failures": [],
+      "passed": true
+    },
+    "128": {
+      "count": 192,
+      "blank_glyphs": [],
+      "missing_components": [],
+      "missing_counters": [],
+      "extra_enclosures": [],
+      "visible_entrance_failures": [],
+      "passed": true
+    }
+  },
+  "method": "White composite; grayscale <128;8-connected ink;4-connected raw holes; no area exclusion.",
+  "acceptance": "No blank glyph, lost detached component, lost counter, or extra enclosure larger than3pixels at any review size. Single1\u20133pixel extra holes are retained as explicit raster diagnostics.",
+  "inspection_sheets": {
+    "128": "contact-sheet.png",
+    "64": "contact-sheet-64.png",
+    "32": "contact-sheet-32.png",
+    "16": "contact-sheet-16.png"
+  },
+  "sheet_magnification": {
+    "128": 1,
+    "64": 1,
+    "32": 2,
+    "16": 3
+  },
+  "magnification_method": "Native-size rendering first; nearest-neighbor enlargement for inspection only.",
+  "generator_sha256": "b1b26c987222c7f289567e3e1277bcaa0e269a4444ac7326bbb6425e29780732",
+  "passed": true,
+  "optical_review_status": "Pending owner sign-off; automated metrics cannot replace visual review."
+}

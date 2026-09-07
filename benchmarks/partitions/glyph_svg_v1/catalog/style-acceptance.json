@@ -1,0 +1,5298 @@
+{
+  "method_version": "svg-style-v1",
+  "status": "complete",
+  "count": 192,
+  "expected_count": 192,
+  "profiles": {
+    "classic": {
+      "n": 78,
+      "metrics": {
+        "bbox_ratio": {
+          "n": 78,
+          "min": 0.40217391304347827,
+          "p10": 0.8085106382978723,
+          "p25": 0.857910906298003,
+          "median": 0.9115995115995116,
+          "p75": 0.9636791300097752,
+          "p90": 1.0433231707317072,
+          "max": 2.4761904761904763
+        },
+        "canvas_ink_fraction": {
+          "n": 78,
+          "min": 0.0665283203125,
+          "p10": 0.1615234375,
+          "p25": 0.200164794921875,
+          "median": 0.238067626953125,
+          "p75": 0.2570343017578125,
+          "p90": 0.271514892578125,
+          "max": 0.31256103515625
+        },
+        "bbox_ink_fraction": {
+          "n": 78,
+          "min": 0.3112847884102173,
+          "p10": 0.42564626961441987,
+          "p25": 0.501920906566635,
+          "median": 0.5319672906031386,
+          "p75": 0.5847316726252259,
+          "p90": 0.6009925318089618,
+          "max": 0.9981684981684982
+        },
+        "bbox_width_fraction": {
+          "n": 78,
+          "min": 0.2890625,
+          "p10": 0.55,
+          "p25": 0.611328125,
+          "median": 0.640625,
+          "p75": 0.6640625,
+          "p90": 0.6796875,
+          "max": 0.6953125
+        },
+        "bbox_height_fraction": {
+          "n": 78,
+          "min": 0.1640625,
+          "p10": 0.6359375,
+          "p25": 0.6953125,
+          "median": 0.7109375,
+          "p75": 0.71875,
+          "p90": 0.72890625,
+          "max": 0.7421875
+        },
+        "stroke_width_median_canvas_fraction": {
+          "n": 78,
+          "min": 0.11899645477912357,
+          "p10": 0.12597277731716483,
+          "p25": 0.140625,
+          "median": 0.140625,
+          "p75": 0.15625,
+          "p90": 0.171875,
+          "max": 0.1875
+        },
+        "horizontal_mirror_iou": {
+          "n": 78,
+          "min": 0.16932330827067668,
+          "p10": 0.3018362457434828,
+          "p25": 0.4112924374955279,
+          "median": 0.5030591944148529,
+          "p75": 0.5925051607574043,
+          "p90": 0.7631580286492124,
+          "max": 0.9963369963369964
+        },
+        "vertical_mirror_iou": {
+          "n": 78,
+          "min": 0.2272416153319644,
+          "p10": 0.3217240414406205,
+          "p25": 0.39124215239019455,
+          "median": 0.47754561465825573,
+          "p75": 0.5656255443231746,
+          "p90": 0.6791964945553641,
+          "max": 1.0
+        },
+        "rotation_180_iou": {
+          "n": 78,
+          "min": 0.16337522441651706,
+          "p10": 0.22923471112381605,
+          "p25": 0.3085394880692582,
+          "median": 0.4062187864416632,
+          "p75": 0.5006634163278036,
+          "p90": 0.592569038303364,
+          "max": 0.9963369963369964
+        },
+        "horizontal_skeleton_fraction": {
+          "n": 78,
+          "min": 0.0,
+          "p10": 0.20159457478005866,
+          "p25": 0.2738909693216189,
+          "median": 0.3774891774891775,
+          "p75": 0.49554655870445347,
+          "p90": 0.6224816190404001,
+          "max": 1.0
+        },
+        "vertical_skeleton_fraction": {
+          "n": 78,
+          "min": 0.0,
+          "p10": 0.028323699421965325,
+          "p25": 0.1340909090909091,
+          "median": 0.2633092130766249,
+          "p75": 0.34273113646949227,
+          "p90": 0.4394910941475827,
+          "max": 0.8
+        },
+        "diagonal_skeleton_fraction": {
+          "n": 78,
+          "min": 0.0,
+          "p10": 0.0,
+          "p25": 0.018804786156496715,
+          "median": 0.08355360618119499,
+          "p75": 0.13766233766233765,
+          "p90": 0.22204991607677146,
+          "max": 0.34415584415584416
+        },
+        "padding_left_fraction": {
+          "n": 78,
+          "min": 0.1484375,
+          "p10": 0.15625,
+          "p25": 0.1640625,
+          "median": 0.1796875,
+          "p75": 0.1953125,
+          "p90": 0.22890624999999998,
+          "max": 0.3515625
+        },
+        "padding_right_fraction": {
+          "n": 78,
+          "min": 0.140625,
+          "p10": 0.16171875,
+          "p25": 0.171875,
+          "median": 0.1796875,
+          "p75": 0.1953125,
+          "p90": 0.2265625,
+          "max": 0.359375
+        },
+        "padding_top_fraction": {
+          "n": 78,
+          "min": 0.125,
+          "p10": 0.1328125,
+          "p25": 0.140625,
+          "median": 0.1484375,
+          "p75": 0.15625,
+          "p90": 0.18203124999999998,
+          "max": 0.4140625
+        },
+        "padding_bottom_fraction": {
+          "n": 78,
+          "min": 0.125,
+          "p10": 0.1328125,
+          "p25": 0.140625,
+          "median": 0.1484375,
+          "p75": 0.15625,
+          "p90": 0.18203124999999998,
+          "max": 0.421875
+        },
+        "component_gap_center_distance_min_canvas_fraction": {
+          "n": 25,
+          "min": 0.0703125,
+          "p10": 0.0703125,
+          "p25": 0.078125,
+          "median": 0.09943689110435824,
+          "p75": 0.11535018015807344,
+          "p90": 0.1296875,
+          "max": 0.2109375
+        },
+        "counter_width_median_canvas_fraction": {
+          "n": 9,
+          "min": 0.09375,
+          "p10": 0.09375,
+          "p25": 0.09375,
+          "median": 0.109375,
+          "p75": 0.15625,
+          "p90": 0.171875,
+          "max": 0.234375
+        },
+        "stroke_width_p90_p10_ratio": {
+          "n": 78,
+          "min": 1.0,
+          "p10": 1.118999294355572,
+          "p25": 1.2923250892857143,
+          "median": 1.5371321869150107,
+          "p75": 1.893358048245614,
+          "p90": 2.4807282368026127,
+          "max": 5.335204211610205
+        },
+        "threshold_96_160_ink_change_fraction": {
+          "n": 78,
+          "min": 0.005660377358490566,
+          "p10": 0.013840631996591172,
+          "p25": 0.017695279148465182,
+          "median": 0.025200593441721833,
+          "p75": 0.04164063554077281,
+          "p90": 0.04963755945339389,
+          "max": 0.06649616368286446
+        }
+      },
+      "component_counts": {
+        "1": 53,
+        "2": 22,
+        "3": 3
+      },
+      "hole_counts": {
+        "0": 69,
+        "1": 9
+      },
+      "qualified_orientation_samples": 13337,
+      "pooled_direction_fractions": {
+        "horizontal_skeleton_fraction": 0.39341681037714626,
+        "vertical_skeleton_fraction": 0.25530479118242483,
+        "diagonal_skeleton_fraction": 0.09274949388918048
+      },
+      "gates": {
+        "bbox_ratio": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.8717948717948718,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 0.40217391304347827,
+            "p10": 0.8085106382978723,
+            "p25": 0.857910906298003,
+            "median": 0.9115995115995116,
+            "p75": 0.9636791300097752,
+            "p90": 1.0433231707317072,
+            "max": 2.4761904761904763
+          },
+          "reference": {
+            "min": 0.23913,
+            "p10": 0.75725,
+            "p25": 0.86957,
+            "median": 0.93478,
+            "p75": 1.0,
+            "p90": 1.15263,
+            "max": 6.42857
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "canvas_ink_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9487179487179487,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 0.0665283203125,
+            "p10": 0.1615234375,
+            "p25": 0.200164794921875,
+            "median": 0.238067626953125,
+            "p75": 0.2570343017578125,
+            "p90": 0.271514892578125,
+            "max": 0.31256103515625
+          },
+          "reference": {
+            "min": 0.03174,
+            "p10": 0.11475,
+            "p25": 0.18558,
+            "median": 0.25488,
+            "p75": 0.28067,
+            "p90": 0.3056,
+            "max": 0.38641
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "bbox_ink_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.8205128205128205,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 0.3112847884102173,
+            "p10": 0.42564626961441987,
+            "p25": 0.501920906566635,
+            "median": 0.5319672906031386,
+            "p75": 0.5847316726252259,
+            "p90": 0.6009925318089618,
+            "max": 0.9981684981684982
+          },
+          "reference": {
+            "min": 0.37923,
+            "p10": 0.48276,
+            "p25": 0.52096,
+            "median": 0.57519,
+            "p75": 0.67854,
+            "p90": 0.76741,
+            "max": 1.0
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "bbox_width_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9487179487179487,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 0.2890625,
+            "p10": 0.55,
+            "p25": 0.611328125,
+            "median": 0.640625,
+            "p75": 0.6640625,
+            "p90": 0.6796875,
+            "max": 0.6953125
+          },
+          "reference": {
+            "min": 0.17188,
+            "p10": 0.4375,
+            "p25": 0.61719,
+            "median": 0.65625,
+            "p75": 0.67188,
+            "p90": 0.71094,
+            "max": 0.76562
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "bbox_height_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9615384615384616,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 0.1640625,
+            "p10": 0.6359375,
+            "p25": 0.6953125,
+            "median": 0.7109375,
+            "p75": 0.71875,
+            "p90": 0.72890625,
+            "max": 0.7421875
+          },
+          "reference": {
+            "min": 0.10938,
+            "p10": 0.46875,
+            "p25": 0.67188,
+            "median": 0.71875,
+            "p75": 0.71875,
+            "p90": 0.74219,
+            "max": 0.85938
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "stroke_width_median_canvas_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9615384615384616,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 0.11899645477912357,
+            "p10": 0.12597277731716483,
+            "p25": 0.140625,
+            "median": 0.140625,
+            "p75": 0.15625,
+            "p90": 0.171875,
+            "max": 0.1875
+          },
+          "reference": {
+            "min": 0.04688,
+            "p10": 0.12426,
+            "p25": 0.14062,
+            "median": 0.14406,
+            "p75": 0.16532,
+            "p90": 0.17846,
+            "max": 0.25
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "horizontal_mirror_iou": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.8461538461538461,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 0.16932330827067668,
+            "p10": 0.3018362457434828,
+            "p25": 0.4112924374955279,
+            "median": 0.5030591944148529,
+            "p75": 0.5925051607574043,
+            "p90": 0.7631580286492124,
+            "max": 0.9963369963369964
+          },
+          "reference": {
+            "min": 0.17753,
+            "p10": 0.35539,
+            "p25": 0.4798,
+            "median": 0.60143,
+            "p75": 0.86782,
+            "p90": 1.0,
+            "max": 1.0
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "vertical_mirror_iou": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.8846153846153846,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 0.2272416153319644,
+            "p10": 0.3217240414406205,
+            "p25": 0.39124215239019455,
+            "median": 0.47754561465825573,
+            "p75": 0.5656255443231746,
+            "p90": 0.6791964945553641,
+            "max": 1.0
+          },
+          "reference": {
+            "min": 0.26617,
+            "p10": 0.32715,
+            "p25": 0.39462,
+            "median": 0.53496,
+            "p75": 0.86496,
+            "p90": 1.0,
+            "max": 1.0
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "rotation_180_iou": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.8589743589743589,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 0.16337522441651706,
+            "p10": 0.22923471112381605,
+            "p25": 0.3085394880692582,
+            "median": 0.4062187864416632,
+            "p75": 0.5006634163278036,
+            "p90": 0.592569038303364,
+            "max": 0.9963369963369964
+          },
+          "reference": {
+            "min": 0.16406,
+            "p10": 0.28036,
+            "p25": 0.3375,
+            "median": 0.42754,
+            "p75": 0.83514,
+            "p90": 1.0,
+            "max": 1.0
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "horizontal_skeleton_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9743589743589743,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 0.0,
+            "p10": 0.20159457478005866,
+            "p25": 0.2738909693216189,
+            "median": 0.3774891774891775,
+            "p75": 0.49554655870445347,
+            "p90": 0.6224816190404001,
+            "max": 1.0
+          },
+          "reference": {
+            "min": 0.0,
+            "p10": 0.0957,
+            "p25": 0.25145,
+            "median": 0.39073,
+            "p75": 0.55621,
+            "p90": 1.0,
+            "max": 1.0
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "vertical_skeleton_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.8717948717948718,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 0.0,
+            "p10": 0.028323699421965325,
+            "p25": 0.1340909090909091,
+            "median": 0.2633092130766249,
+            "p75": 0.34273113646949227,
+            "p90": 0.4394910941475827,
+            "max": 0.8
+          },
+          "reference": {
+            "min": 0.0,
+            "p10": 0.0,
+            "p25": 0.05845,
+            "median": 0.18667,
+            "p75": 0.35001,
+            "p90": 0.4255,
+            "max": 1.0
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "diagonal_skeleton_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9743589743589743,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 0.0,
+            "p10": 0.0,
+            "p25": 0.018804786156496715,
+            "median": 0.08355360618119499,
+            "p75": 0.13766233766233765,
+            "p90": 0.22204991607677146,
+            "max": 0.34415584415584416
+          },
+          "reference": {
+            "min": 0.0,
+            "p10": 0.0,
+            "p25": 0.02477,
+            "median": 0.0999,
+            "p75": 0.16542,
+            "p90": 0.27321,
+            "max": 0.50649
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "padding_left_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9615384615384616,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 0.1484375,
+            "p10": 0.15625,
+            "p25": 0.1640625,
+            "median": 0.1796875,
+            "p75": 0.1953125,
+            "p90": 0.22890624999999998,
+            "max": 0.3515625
+          },
+          "reference": {
+            "min": 0.10938,
+            "p10": 0.14453,
+            "p25": 0.16406,
+            "median": 0.17188,
+            "p75": 0.19141,
+            "p90": 0.28125,
+            "max": 0.41406
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "padding_right_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9358974358974359,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 0.140625,
+            "p10": 0.16171875,
+            "p25": 0.171875,
+            "median": 0.1796875,
+            "p75": 0.1953125,
+            "p90": 0.2265625,
+            "max": 0.359375
+          },
+          "reference": {
+            "min": 0.11719,
+            "p10": 0.14453,
+            "p25": 0.16406,
+            "median": 0.17188,
+            "p75": 0.19141,
+            "p90": 0.28125,
+            "max": 0.41406
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "padding_top_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9615384615384616,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 0.125,
+            "p10": 0.1328125,
+            "p25": 0.140625,
+            "median": 0.1484375,
+            "p75": 0.15625,
+            "p90": 0.18203124999999998,
+            "max": 0.4140625
+          },
+          "reference": {
+            "min": 0.07031,
+            "p10": 0.12109,
+            "p25": 0.14062,
+            "median": 0.14062,
+            "p75": 0.16406,
+            "p90": 0.26562,
+            "max": 0.44531
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "padding_bottom_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9487179487179487,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 0.125,
+            "p10": 0.1328125,
+            "p25": 0.140625,
+            "median": 0.1484375,
+            "p75": 0.15625,
+            "p90": 0.18203124999999998,
+            "max": 0.421875
+          },
+          "reference": {
+            "min": 0.07031,
+            "p10": 0.12891,
+            "p25": 0.14062,
+            "median": 0.14062,
+            "p75": 0.16406,
+            "p90": 0.26562,
+            "max": 0.44531
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "component_gap_center_distance_min_canvas_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 1.0,
+          "required_band_fraction": 0.8,
+          "eligible_count": 25,
+          "ineligible_count": 53,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 25,
+          "summary": {
+            "n": 25,
+            "min": 0.0703125,
+            "p10": 0.0703125,
+            "p25": 0.078125,
+            "median": 0.09943689110435824,
+            "p75": 0.11535018015807344,
+            "p90": 0.1296875,
+            "max": 0.2109375
+          },
+          "reference": {
+            "min": 0.0546875,
+            "p10": 0.060999140625,
+            "p25": 0.076533828125,
+            "median": 0.08984375,
+            "p75": 0.145911171875,
+            "p90": 0.213710625,
+            "max": 0.3671875
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "counter_width_median_canvas_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.8888888888888888,
+          "required_band_fraction": 0.8,
+          "eligible_count": 9,
+          "ineligible_count": 69,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 9,
+          "summary": {
+            "n": 9,
+            "min": 0.09375,
+            "p10": 0.09375,
+            "p25": 0.09375,
+            "median": 0.109375,
+            "p75": 0.15625,
+            "p90": 0.171875,
+            "max": 0.234375
+          },
+          "reference": {
+            "min": 0.022097109375,
+            "p10": 0.042298515625,
+            "p25": 0.0625,
+            "median": 0.109375,
+            "p75": 0.1796875,
+            "p90": 0.1953125,
+            "max": 0.203125
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "stroke_width_p90_p10_ratio": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.8589743589743589,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 1.0,
+            "p10": 1.118999294355572,
+            "p25": 1.2923250892857143,
+            "median": 1.5371321869150107,
+            "p75": 1.893358048245614,
+            "p90": 2.4807282368026127,
+            "max": 5.335204211610205
+          },
+          "reference": {
+            "min": 1.0,
+            "p10": 1.0,
+            "p25": 1.44444,
+            "median": 1.78963,
+            "p75": 2.16667,
+            "p90": 2.36667,
+            "max": 4.5
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "threshold_96_160_ink_change_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.8076923076923077,
+          "required_band_fraction": 0.8,
+          "eligible_count": 78,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 78,
+          "summary": {
+            "n": 78,
+            "min": 0.005660377358490566,
+            "p10": 0.013840631996591172,
+            "p25": 0.017695279148465182,
+            "median": 0.025200593441721833,
+            "p75": 0.04164063554077281,
+            "p90": 0.04963755945339389,
+            "max": 0.06649616368286446
+          },
+          "reference": {
+            "min": 0.0,
+            "p10": 0.01159,
+            "p25": 0.02213,
+            "median": 0.03163,
+            "p75": 0.04306,
+            "p90": 0.04851,
+            "max": 0.07309
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        }
+      },
+      "frequency_gates": {
+        "component_counts": {
+          "passed": true,
+          "allowed_difference_pp": 10,
+          "bins": {
+            "1": {
+              "actual_fraction": 0.6794871794871795,
+              "reference_fraction": 0.7142857142857143,
+              "difference_pp": 3.4798534798534786,
+              "passed": true
+            },
+            "2": {
+              "actual_fraction": 0.28205128205128205,
+              "reference_fraction": 0.23214285714285715,
+              "difference_pp": 4.99084249084249,
+              "passed": true
+            },
+            "3": {
+              "actual_fraction": 0.038461538461538464,
+              "reference_fraction": 0.05357142857142857,
+              "difference_pp": 1.5109890109890105,
+              "passed": true
+            }
+          }
+        },
+        "hole_counts": {
+          "passed": true,
+          "allowed_difference_pp": 10,
+          "bins": {
+            "0": {
+              "actual_fraction": 0.8846153846153846,
+              "reference_fraction": 0.8928571428571429,
+              "difference_pp": 0.8241758241758323,
+              "passed": true
+            },
+            "1": {
+              "actual_fraction": 0.11538461538461539,
+              "reference_fraction": 0.03571428571428571,
+              "difference_pp": 7.967032967032968,
+              "passed": true
+            },
+            "2": {
+              "actual_fraction": 0.0,
+              "reference_fraction": 0.07142857142857142,
+              "difference_pp": 7.142857142857142,
+              "passed": true
+            }
+          }
+        }
+      }
+    },
+    "new-only": {
+      "n": 114,
+      "metrics": {
+        "bbox_ratio": {
+          "n": 114,
+          "min": 0.5287356321839081,
+          "p10": 0.8220430107526883,
+          "p25": 0.8670329670329671,
+          "median": 0.9139784946236559,
+          "p75": 0.9555555555555556,
+          "p90": 1.0199589603283175,
+          "max": 1.4705882352941178
+        },
+        "canvas_ink_fraction": {
+          "n": 114,
+          "min": 0.08123779296875,
+          "p10": 0.16669921875,
+          "p25": 0.206573486328125,
+          "median": 0.2454833984375,
+          "p75": 0.2716217041015625,
+          "p90": 0.296990966796875,
+          "max": 0.3302001953125
+        },
+        "bbox_ink_fraction": {
+          "n": 114,
+          "min": 0.3379063156593746,
+          "p10": 0.4171813321813322,
+          "p25": 0.46229499694191356,
+          "median": 0.5318373453012376,
+          "p75": 0.5980008704936324,
+          "p90": 0.6310683908584523,
+          "max": 0.6859173126614987
+        },
+        "bbox_width_fraction": {
+          "n": 114,
+          "min": 0.359375,
+          "p10": 0.58828125,
+          "p25": 0.625,
+          "median": 0.65625,
+          "p75": 0.671875,
+          "p90": 0.6796875,
+          "max": 0.6953125
+        },
+        "bbox_height_fraction": {
+          "n": 114,
+          "min": 0.3984375,
+          "p10": 0.64765625,
+          "p25": 0.703125,
+          "median": 0.7109375,
+          "p75": 0.724609375,
+          "p90": 0.734375,
+          "max": 0.7421875
+        },
+        "stroke_width_median_canvas_fraction": {
+          "n": 114,
+          "min": 0.09375,
+          "p10": 0.11114184739975354,
+          "p25": 0.125,
+          "median": 0.1335000585205864,
+          "p75": 0.140625,
+          "p90": 0.15625,
+          "max": 0.171875
+        },
+        "horizontal_mirror_iou": {
+          "n": 114,
+          "min": 0.06778981147212194,
+          "p10": 0.35821602859170837,
+          "p25": 0.40409361226000695,
+          "median": 0.5440023779612347,
+          "p75": 0.6427418403908358,
+          "p90": 0.7162703551280561,
+          "max": 0.9193781634128706
+        },
+        "vertical_mirror_iou": {
+          "n": 114,
+          "min": 0.20232558139534884,
+          "p10": 0.2994607495373727,
+          "p25": 0.367212178759927,
+          "median": 0.4442689881184834,
+          "p75": 0.5524418624294848,
+          "p90": 0.6222115856597797,
+          "max": 0.9042324246771879
+        },
+        "rotation_180_iou": {
+          "n": 114,
+          "min": 0.04968454258675079,
+          "p10": 0.28064832338999773,
+          "p25": 0.3623393462345398,
+          "median": 0.43799022073077065,
+          "p75": 0.5543089744103628,
+          "p90": 0.6587450930312707,
+          "max": 0.951638689048761
+        },
+        "horizontal_skeleton_fraction": {
+          "n": 114,
+          "min": 0.03428571428571429,
+          "p10": 0.08456805947193027,
+          "p25": 0.17223877817098157,
+          "median": 0.2859432056561262,
+          "p75": 0.3570597582430055,
+          "p90": 0.42574090247452695,
+          "max": 1.0
+        },
+        "vertical_skeleton_fraction": {
+          "n": 114,
+          "min": 0.0,
+          "p10": 0.05673758865248227,
+          "p25": 0.12569444444444444,
+          "median": 0.19126970379352157,
+          "p75": 0.28341605968045114,
+          "p90": 0.3589672131147541,
+          "max": 0.8776978417266187
+        },
+        "diagonal_skeleton_fraction": {
+          "n": 114,
+          "min": 0.0,
+          "p10": 0.056679328901551126,
+          "p25": 0.10125475224433723,
+          "median": 0.14735833750453078,
+          "p75": 0.20906054729584142,
+          "p90": 0.3366816723337005,
+          "max": 0.5722543352601156
+        },
+        "padding_left_fraction": {
+          "n": 114,
+          "min": 0.140625,
+          "p10": 0.15625,
+          "p25": 0.1640625,
+          "median": 0.171875,
+          "p75": 0.1875,
+          "p90": 0.2109375,
+          "max": 0.3125
+        },
+        "padding_right_fraction": {
+          "n": 114,
+          "min": 0.1484375,
+          "p10": 0.15625,
+          "p25": 0.1640625,
+          "median": 0.171875,
+          "p75": 0.1875,
+          "p90": 0.20859375000000002,
+          "max": 0.328125
+        },
+        "padding_top_fraction": {
+          "n": 114,
+          "min": 0.125,
+          "p10": 0.1328125,
+          "p25": 0.134765625,
+          "median": 0.140625,
+          "p75": 0.1484375,
+          "p90": 0.171875,
+          "max": 0.3046875
+        },
+        "padding_bottom_fraction": {
+          "n": 114,
+          "min": 0.125,
+          "p10": 0.1328125,
+          "p25": 0.140625,
+          "median": 0.1484375,
+          "p75": 0.15625,
+          "p90": 0.17734375000000002,
+          "max": 0.296875
+        },
+        "component_gap_center_distance_min_canvas_fraction": {
+          "n": 35,
+          "min": 0.0625,
+          "p10": 0.0703125,
+          "p25": 0.07694420157653206,
+          "median": 0.0859375,
+          "p75": 0.1015625,
+          "p90": 0.11614116208842583,
+          "max": 0.12597277731716483
+        },
+        "counter_width_median_canvas_fraction": {
+          "n": 53,
+          "min": 0.046875,
+          "p10": 0.0625,
+          "p25": 0.078125,
+          "median": 0.109375,
+          "p75": 0.140625,
+          "p90": 0.16342384419058437,
+          "max": 0.234375
+        },
+        "stroke_width_p90_p10_ratio": {
+          "n": 114,
+          "min": 1.0,
+          "p10": 1.3422613901536296,
+          "p25": 1.4285714285714286,
+          "median": 1.5714285714285714,
+          "p75": 1.763434281470852,
+          "p90": 2.0,
+          "max": 2.761342443232541
+        },
+        "threshold_96_160_ink_change_fraction": {
+          "n": 114,
+          "min": 0.008899436369029961,
+          "p10": 0.018069337170968775,
+          "p25": 0.02476943577658241,
+          "median": 0.03079261259740625,
+          "p75": 0.038134808489070054,
+          "p90": 0.04973680591496315,
+          "max": 0.07793575566087414
+        }
+      },
+      "component_counts": {
+        "1": 79,
+        "2": 29,
+        "3": 6
+      },
+      "hole_counts": {
+        "0": 61,
+        "1": 41,
+        "2": 12
+      },
+      "qualified_orientation_samples": 23724,
+      "pooled_direction_fractions": {
+        "horizontal_skeleton_fraction": 0.2729725172820772,
+        "vertical_skeleton_fraction": 0.22095767998651156,
+        "diagonal_skeleton_fraction": 0.16696172652166583
+      },
+      "gates": {
+        "bbox_ratio": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9210526315789473,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 0.5287356321839081,
+            "p10": 0.8220430107526883,
+            "p25": 0.8670329670329671,
+            "median": 0.9139784946236559,
+            "p75": 0.9555555555555556,
+            "p90": 1.0199589603283175,
+            "max": 1.4705882352941178
+          },
+          "reference": {
+            "min": 0.38298,
+            "p10": 0.6087,
+            "p25": 0.79167,
+            "median": 0.91304,
+            "p75": 0.98876,
+            "p90": 1.06977,
+            "max": 1.39683
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "canvas_ink_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.8947368421052632,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 0.08123779296875,
+            "p10": 0.16669921875,
+            "p25": 0.206573486328125,
+            "median": 0.2454833984375,
+            "p75": 0.2716217041015625,
+            "p90": 0.296990966796875,
+            "max": 0.3302001953125
+          },
+          "reference": {
+            "min": 0.02295,
+            "p10": 0.12085,
+            "p25": 0.19232,
+            "median": 0.23877,
+            "p75": 0.27722,
+            "p90": 0.30298,
+            "max": 0.33429
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "bbox_ink_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.8333333333333334,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 0.3379063156593746,
+            "p10": 0.4171813321813322,
+            "p25": 0.46229499694191356,
+            "median": 0.5318373453012376,
+            "p75": 0.5980008704936324,
+            "p90": 0.6310683908584523,
+            "max": 0.6859173126614987
+          },
+          "reference": {
+            "min": 0.38489,
+            "p10": 0.44211,
+            "p25": 0.48932,
+            "median": 0.57466,
+            "p75": 0.64868,
+            "p90": 0.72881,
+            "max": 0.9697
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "bbox_width_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9824561403508771,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 0.359375,
+            "p10": 0.58828125,
+            "p25": 0.625,
+            "median": 0.65625,
+            "p75": 0.671875,
+            "p90": 0.6796875,
+            "max": 0.6953125
+          },
+          "reference": {
+            "min": 0.17188,
+            "p10": 0.32812,
+            "p25": 0.53125,
+            "median": 0.64062,
+            "p75": 0.67188,
+            "p90": 0.6875,
+            "max": 0.71875
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "bbox_height_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9912280701754386,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 0.3984375,
+            "p10": 0.64765625,
+            "p25": 0.703125,
+            "median": 0.7109375,
+            "p75": 0.724609375,
+            "p90": 0.734375,
+            "max": 0.7421875
+          },
+          "reference": {
+            "min": 0.17188,
+            "p10": 0.49219,
+            "p25": 0.67188,
+            "median": 0.71875,
+            "p75": 0.73438,
+            "p90": 0.75,
+            "max": 0.85938
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "stroke_width_median_canvas_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9385964912280702,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 0.09375,
+            "p10": 0.11114184739975354,
+            "p25": 0.125,
+            "median": 0.1335000585205864,
+            "p75": 0.140625,
+            "p90": 0.15625,
+            "max": 0.171875
+          },
+          "reference": {
+            "min": 0.04688,
+            "p10": 0.10938,
+            "p25": 0.125,
+            "median": 0.1335,
+            "p75": 0.14062,
+            "p90": 0.15625,
+            "max": 0.17969
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "horizontal_mirror_iou": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.8771929824561403,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 0.06778981147212194,
+            "p10": 0.35821602859170837,
+            "p25": 0.40409361226000695,
+            "median": 0.5440023779612347,
+            "p75": 0.6427418403908358,
+            "p90": 0.7162703551280561,
+            "max": 0.9193781634128706
+          },
+          "reference": {
+            "min": 0.16748,
+            "p10": 0.35623,
+            "p25": 0.41474,
+            "median": 0.53371,
+            "p75": 0.67704,
+            "p90": 0.78519,
+            "max": 1.0
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "vertical_mirror_iou": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9298245614035088,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 0.20232558139534884,
+            "p10": 0.2994607495373727,
+            "p25": 0.367212178759927,
+            "median": 0.4442689881184834,
+            "p75": 0.5524418624294848,
+            "p90": 0.6222115856597797,
+            "max": 0.9042324246771879
+          },
+          "reference": {
+            "min": 0.20887,
+            "p10": 0.28331,
+            "p25": 0.39195,
+            "median": 0.48698,
+            "p75": 0.69294,
+            "p90": 0.9821,
+            "max": 1.0
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "rotation_180_iou": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.8421052631578947,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 0.04968454258675079,
+            "p10": 0.28064832338999773,
+            "p25": 0.3623393462345398,
+            "median": 0.43799022073077065,
+            "p75": 0.5543089744103628,
+            "p90": 0.6587450930312707,
+            "max": 0.951638689048761
+          },
+          "reference": {
+            "min": 0.19933,
+            "p10": 0.28833,
+            "p25": 0.37589,
+            "median": 0.45436,
+            "p75": 0.65546,
+            "p90": 0.80168,
+            "max": 1.0
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "horizontal_skeleton_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.8421052631578947,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 0.03428571428571429,
+            "p10": 0.08456805947193027,
+            "p25": 0.17223877817098157,
+            "median": 0.2859432056561262,
+            "p75": 0.3570597582430055,
+            "p90": 0.42574090247452695,
+            "max": 1.0
+          },
+          "reference": {
+            "min": 0.0,
+            "p10": 0.03457,
+            "p25": 0.10448,
+            "median": 0.22222,
+            "p75": 0.32386,
+            "p90": 0.40262,
+            "max": 1.0
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "vertical_skeleton_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9035087719298246,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 0.0,
+            "p10": 0.05673758865248227,
+            "p25": 0.12569444444444444,
+            "median": 0.19126970379352157,
+            "p75": 0.28341605968045114,
+            "p90": 0.3589672131147541,
+            "max": 0.8776978417266187
+          },
+          "reference": {
+            "min": 0.0,
+            "p10": 0.01233,
+            "p25": 0.14961,
+            "median": 0.27979,
+            "p75": 0.36496,
+            "p90": 0.52793,
+            "max": 1.0
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "diagonal_skeleton_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9122807017543859,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 0.0,
+            "p10": 0.056679328901551126,
+            "p25": 0.10125475224433723,
+            "median": 0.14735833750453078,
+            "p75": 0.20906054729584142,
+            "p90": 0.3366816723337005,
+            "max": 0.5722543352601156
+          },
+          "reference": {
+            "min": 0.0,
+            "p10": 0.04075,
+            "p25": 0.06751,
+            "median": 0.12048,
+            "p75": 0.1716,
+            "p90": 0.59909,
+            "max": 0.85586
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "padding_left_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9210526315789473,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 0.140625,
+            "p10": 0.15625,
+            "p25": 0.1640625,
+            "median": 0.171875,
+            "p75": 0.1875,
+            "p90": 0.2109375,
+            "max": 0.3125
+          },
+          "reference": {
+            "min": 0.14062,
+            "p10": 0.15625,
+            "p25": 0.16406,
+            "median": 0.17969,
+            "p75": 0.23438,
+            "p90": 0.34375,
+            "max": 0.41406
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "padding_right_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9473684210526315,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 0.1484375,
+            "p10": 0.15625,
+            "p25": 0.1640625,
+            "median": 0.171875,
+            "p75": 0.1875,
+            "p90": 0.20859375000000002,
+            "max": 0.328125
+          },
+          "reference": {
+            "min": 0.14062,
+            "p10": 0.15625,
+            "p25": 0.16406,
+            "median": 0.17969,
+            "p75": 0.21875,
+            "p90": 0.33594,
+            "max": 0.41406
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "padding_top_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9912280701754386,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 0.125,
+            "p10": 0.1328125,
+            "p25": 0.134765625,
+            "median": 0.140625,
+            "p75": 0.1484375,
+            "p90": 0.171875,
+            "max": 0.3046875
+          },
+          "reference": {
+            "min": 0.07031,
+            "p10": 0.125,
+            "p25": 0.13281,
+            "median": 0.14062,
+            "p75": 0.17188,
+            "p90": 0.29688,
+            "max": 0.49219
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "padding_bottom_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.9824561403508771,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 0.125,
+            "p10": 0.1328125,
+            "p25": 0.140625,
+            "median": 0.1484375,
+            "p75": 0.15625,
+            "p90": 0.17734375000000002,
+            "max": 0.296875
+          },
+          "reference": {
+            "min": 0.0625,
+            "p10": 0.11719,
+            "p25": 0.13281,
+            "median": 0.14062,
+            "p75": 0.14844,
+            "p90": 0.21875,
+            "max": 0.41406
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "component_gap_center_distance_min_canvas_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.8571428571428571,
+          "required_band_fraction": 0.8,
+          "eligible_count": 35,
+          "ineligible_count": 79,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 35,
+          "summary": {
+            "n": 35,
+            "min": 0.0625,
+            "p10": 0.0703125,
+            "p25": 0.07694420157653206,
+            "median": 0.0859375,
+            "p75": 0.1015625,
+            "p90": 0.11614116208842583,
+            "max": 0.12597277731716483
+          },
+          "reference": {
+            "min": 0.015625,
+            "p10": 0.053979375,
+            "p25": 0.0625,
+            "median": 0.0703125,
+            "p75": 0.088388359375,
+            "p90": 0.10691625,
+            "max": 0.149257578125
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "counter_width_median_canvas_fraction": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.8301886792452831,
+          "required_band_fraction": 0.8,
+          "eligible_count": 53,
+          "ineligible_count": 61,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 53,
+          "summary": {
+            "n": 53,
+            "min": 0.046875,
+            "p10": 0.0625,
+            "p25": 0.078125,
+            "median": 0.109375,
+            "p75": 0.140625,
+            "p90": 0.16342384419058437,
+            "max": 0.234375
+          },
+          "reference": {
+            "min": 0.03125,
+            "p10": 0.0625,
+            "p25": 0.078125,
+            "median": 0.09375,
+            "p75": 0.11102421875,
+            "p90": 0.16736578125,
+            "max": 0.21875
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "stroke_width_p90_p10_ratio": {
+          "passed": true,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.8508771929824561,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 1.0,
+            "p10": 1.3422613901536296,
+            "p25": 1.4285714285714286,
+            "median": 1.5714285714285714,
+            "p75": 1.763434281470852,
+            "p90": 2.0,
+            "max": 2.761342443232541
+          },
+          "reference": {
+            "min": 1.0,
+            "p10": 1.4,
+            "p25": 1.51636,
+            "median": 1.85714,
+            "p75": 2.18282,
+            "p90": 2.8,
+            "max": 8.5
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        },
+        "threshold_96_160_ink_change_fraction": {
+          "passed": false,
+          "median_in_reference_iqr": true,
+          "fraction_in_reference_p10_p90": 0.7894736842105263,
+          "required_band_fraction": 0.8,
+          "eligible_count": 114,
+          "ineligible_count": 0,
+          "invalid_count": 0,
+          "missing_count": 0,
+          "expected_eligible_count": 114,
+          "summary": {
+            "n": 114,
+            "min": 0.008899436369029961,
+            "p10": 0.018069337170968775,
+            "p25": 0.02476943577658241,
+            "median": 0.03079261259740625,
+            "p75": 0.038134808489070054,
+            "p90": 0.04973680591496315,
+            "max": 0.07793575566087414
+          },
+          "reference": {
+            "min": 0.0,
+            "p10": 0.01703,
+            "p25": 0.02255,
+            "median": 0.0292,
+            "p75": 0.03634,
+            "p90": 0.04712,
+            "max": 0.09991
+          },
+          "reason": "median must lie inside reference IQR; at least 80% must lie inside P10–P90"
+        }
+      },
+      "frequency_gates": {
+        "component_counts": {
+          "passed": true,
+          "allowed_difference_pp": 10,
+          "bins": {
+            "1": {
+              "actual_fraction": 0.6929824561403509,
+              "reference_fraction": 0.691358024691358,
+              "difference_pp": 0.16244314489929357,
+              "passed": true
+            },
+            "2": {
+              "actual_fraction": 0.2543859649122807,
+              "reference_fraction": 0.2222222222222222,
+              "difference_pp": 3.2163742690058506,
+              "passed": true
+            },
+            "3": {
+              "actual_fraction": 0.05263157894736842,
+              "reference_fraction": 0.08641975308641975,
+              "difference_pp": 3.378817413905133,
+              "passed": true
+            }
+          }
+        },
+        "hole_counts": {
+          "passed": true,
+          "allowed_difference_pp": 10,
+          "bins": {
+            "0": {
+              "actual_fraction": 0.5350877192982456,
+              "reference_fraction": 0.5679012345679012,
+              "difference_pp": 3.281351526965559,
+              "passed": true
+            },
+            "1": {
+              "actual_fraction": 0.35964912280701755,
+              "reference_fraction": 0.35802469135802467,
+              "difference_pp": 0.16244314489928802,
+              "passed": true
+            },
+            "2": {
+              "actual_fraction": 0.10526315789473684,
+              "reference_fraction": 0.06172839506172839,
+              "difference_pp": 4.353476283300845,
+              "passed": true
+            },
+            "3": {
+              "actual_fraction": 0.0,
+              "reference_fraction": 0.012345679012345678,
+              "difference_pp": 1.2345679012345678,
+              "passed": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "families": {
+    "numeral_operator": {
+      "n": 45,
+      "metrics": {
+        "bbox_ratio": {
+          "n": 45,
+          "min": 0.40217391304347827,
+          "p10": 0.6932367149758454,
+          "p25": 0.8351648351648352,
+          "median": 0.9120879120879121,
+          "p75": 1.0114942528735633,
+          "p90": 1.1962564102564102,
+          "max": 2.4761904761904763
+        },
+        "canvas_ink_fraction": {
+          "n": 45,
+          "min": 0.0665283203125,
+          "p10": 0.11685791015625,
+          "p25": 0.16119384765625,
+          "median": 0.19488525390625,
+          "p75": 0.231201171875,
+          "p90": 0.25208740234375,
+          "max": 0.31256103515625
+        },
+        "bbox_ink_fraction": {
+          "n": 45,
+          "min": 0.3112847884102173,
+          "p10": 0.40205715761701816,
+          "p25": 0.4392156862745098,
+          "median": 0.5043818466353678,
+          "p75": 0.5568965517241379,
+          "p90": 0.5955663923405858,
+          "max": 0.9981684981684982
+        },
+        "bbox_width_fraction": {
+          "n": 45,
+          "min": 0.2890625,
+          "p10": 0.4390625,
+          "p25": 0.5546875,
+          "median": 0.6171875,
+          "p75": 0.65625,
+          "p90": 0.6796875,
+          "max": 0.6875
+        },
+        "bbox_height_fraction": {
+          "n": 45,
+          "min": 0.1640625,
+          "p10": 0.4796875,
+          "p25": 0.671875,
+          "median": 0.703125,
+          "p75": 0.7109375,
+          "p90": 0.7234375,
+          "max": 0.734375
+        },
+        "stroke_width_median_canvas_fraction": {
+          "n": 45,
+          "min": 0.109375,
+          "p10": 0.125,
+          "p25": 0.13258252147247765,
+          "median": 0.140625,
+          "p75": 0.15625,
+          "p90": 0.15625,
+          "max": 0.171875
+        },
+        "horizontal_mirror_iou": {
+          "n": 45,
+          "min": 0.16932330827067668,
+          "p10": 0.321802324600857,
+          "p25": 0.3843137254901961,
+          "median": 0.4490051980641692,
+          "p75": 0.5704256252742431,
+          "p90": 0.7379898901371295,
+          "max": 0.9963369963369964
+        },
+        "vertical_mirror_iou": {
+          "n": 45,
+          "min": 0.21285878300803673,
+          "p10": 0.27552032633384327,
+          "p25": 0.39802201903340173,
+          "median": 0.5151209677419355,
+          "p75": 0.5945819710415694,
+          "p90": 0.7494084393548253,
+          "max": 1.0
+        },
+        "rotation_180_iou": {
+          "n": 45,
+          "min": 0.16243299930086227,
+          "p10": 0.19704757689836327,
+          "p25": 0.2980361956103196,
+          "median": 0.3734093900833699,
+          "p75": 0.4721949302416978,
+          "p90": 0.5899389337385492,
+          "max": 0.9963369963369964
+        },
+        "horizontal_skeleton_fraction": {
+          "n": 45,
+          "min": 0.08633093525179857,
+          "p10": 0.15569943569943573,
+          "p25": 0.2426470588235294,
+          "median": 0.35260115606936415,
+          "p75": 0.4745762711864407,
+          "p90": 0.7599494949494953,
+          "max": 1.0
+        },
+        "vertical_skeleton_fraction": {
+          "n": 45,
+          "min": 0.0,
+          "p10": 0.0,
+          "p25": 0.07051282051282051,
+          "median": 0.2669491525423729,
+          "p75": 0.44274809160305345,
+          "p90": 0.6568940493468797,
+          "max": 0.8776978417266187
+        },
+        "diagonal_skeleton_fraction": {
+          "n": 45,
+          "min": 0.0,
+          "p10": 0.0,
+          "p25": 0.0,
+          "median": 0.09885931558935361,
+          "p75": 0.14594594594594595,
+          "p90": 0.24364973262032086,
+          "max": 0.32653061224489793
+        },
+        "padding_left_fraction": {
+          "n": 45,
+          "min": 0.1484375,
+          "p10": 0.15625,
+          "p25": 0.1640625,
+          "median": 0.1875,
+          "p75": 0.2265625,
+          "p90": 0.278125,
+          "max": 0.3515625
+        },
+        "padding_right_fraction": {
+          "n": 45,
+          "min": 0.1484375,
+          "p10": 0.1640625,
+          "p25": 0.171875,
+          "median": 0.1875,
+          "p75": 0.2265625,
+          "p90": 0.2734375,
+          "max": 0.359375
+        },
+        "padding_top_fraction": {
+          "n": 45,
+          "min": 0.125,
+          "p10": 0.1359375,
+          "p25": 0.140625,
+          "median": 0.1484375,
+          "p75": 0.1640625,
+          "p90": 0.2625,
+          "max": 0.4140625
+        },
+        "padding_bottom_fraction": {
+          "n": 45,
+          "min": 0.1328125,
+          "p10": 0.140625,
+          "p25": 0.140625,
+          "median": 0.1484375,
+          "p75": 0.1640625,
+          "p90": 0.2578125,
+          "max": 0.421875
+        },
+        "component_gap_center_distance_min_canvas_fraction": {
+          "n": 20,
+          "min": 0.0625,
+          "p10": 0.07185617196534061,
+          "p25": 0.083984375,
+          "median": 0.09972642221149089,
+          "p75": 0.10473918496311416,
+          "p90": 0.12812500000000004,
+          "max": 0.2109375
+        },
+        "counter_width_median_canvas_fraction": {
+          "n": 6,
+          "min": 0.0625,
+          "p10": 0.06688713135006899,
+          "p25": 0.07689319702510349,
+          "median": 0.11762019639169857,
+          "p75": 0.2111538481958493,
+          "p90": 0.234375,
+          "max": 0.234375
+        },
+        "stroke_width_p90_p10_ratio": {
+          "n": 45,
+          "min": 1.0,
+          "p10": 1.1156186443936602,
+          "p25": 1.25,
+          "median": 1.518592142857143,
+          "p75": 1.8313879446345351,
+          "p90": 2.0,
+          "max": 3.70887125
+        },
+        "threshold_96_160_ink_change_fraction": {
+          "n": 45,
+          "min": 0.005660377358490566,
+          "p10": 0.012982995722416658,
+          "p25": 0.02238388360380526,
+          "median": 0.029617211511595416,
+          "p75": 0.042445274959957285,
+          "p90": 0.05921850754690366,
+          "max": 0.07793575566087414
+        }
+      },
+      "component_counts": {
+        "1": 25,
+        "2": 17,
+        "3": 3
+      },
+      "hole_counts": {
+        "0": 39,
+        "1": 5,
+        "2": 1
+      },
+      "qualified_orientation_samples": 6836,
+      "pooled_direction_fractions": {
+        "horizontal_skeleton_fraction": 0.3573727325921592,
+        "vertical_skeleton_fraction": 0.2764774722059684,
+        "diagonal_skeleton_fraction": 0.11322410766530135
+      },
+      "reference_metrics": {
+        "bbox_width": {
+          "min": 22.0,
+          "p10": 26.0,
+          "p25": 41.5,
+          "median": 56.0,
+          "p75": 80.0,
+          "p90": 82.0,
+          "max": 90.0
+        },
+        "bbox_height": {
+          "min": 14.0,
+          "p10": 42.2,
+          "p25": 58.75,
+          "median": 91.5,
+          "p75": 92.0,
+          "p90": 96.0,
+          "max": 110.0
+        },
+        "bbox_ratio": {
+          "min": 0.23913,
+          "p10": 0.45474,
+          "p25": 0.54167,
+          "median": 0.83062,
+          "p75": 1.04773,
+          "p90": 1.245,
+          "max": 6.42857
+        },
+        "canvas_ink_fraction": {
+          "min": 0.03101,
+          "p10": 0.06543,
+          "p25": 0.11346,
+          "median": 0.14801,
+          "p75": 0.25592,
+          "p90": 0.27726,
+          "max": 0.31427
+        },
+        "bbox_ink_fraction": {
+          "min": 0.37923,
+          "p10": 0.4831,
+          "p25": 0.58083,
+          "median": 0.69857,
+          "p75": 0.81246,
+          "p90": 0.86406,
+          "max": 1.0
+        },
+        "bbox_width_fraction": {
+          "min": 0.17188,
+          "p10": 0.20312,
+          "p25": 0.32422,
+          "median": 0.4375,
+          "p75": 0.625,
+          "p90": 0.64062,
+          "max": 0.70312
+        },
+        "bbox_height_fraction": {
+          "min": 0.10938,
+          "p10": 0.32969,
+          "p25": 0.45898,
+          "median": 0.71484,
+          "p75": 0.71875,
+          "p90": 0.75,
+          "max": 0.85938
+        },
+        "stroke_width_median_canvas_fraction": {
+          "min": 0.04688,
+          "p10": 0.09542,
+          "p25": 0.12062,
+          "median": 0.14277,
+          "p75": 0.15625,
+          "p90": 0.17188,
+          "max": 0.25
+        },
+        "horizontal_mirror_iou": {
+          "min": 0.17753,
+          "p10": 0.41054,
+          "p25": 0.48599,
+          "median": 0.72926,
+          "p75": 1.0,
+          "p90": 1.0,
+          "max": 1.0
+        },
+        "vertical_mirror_iou": {
+          "min": 0.25292,
+          "p10": 0.44685,
+          "p25": 0.58626,
+          "median": 0.82874,
+          "p75": 1.0,
+          "p90": 1.0,
+          "max": 1.0
+        },
+        "rotation_180_iou": {
+          "min": 0.16406,
+          "p10": 0.24254,
+          "p25": 0.4442,
+          "median": 0.69749,
+          "p75": 0.93224,
+          "p90": 1.0,
+          "max": 1.0
+        },
+        "horizontal_skeleton_fraction": {
+          "min": 0.0,
+          "p10": 0.0,
+          "p25": 0.10487,
+          "median": 0.27273,
+          "p75": 0.48378,
+          "p90": 1.0,
+          "max": 1.0
+        },
+        "vertical_skeleton_fraction": {
+          "min": 0.0,
+          "p10": 0.0,
+          "p25": 0.00246,
+          "median": 0.17333,
+          "p75": 0.5035,
+          "p90": 0.7931,
+          "max": 1.0
+        },
+        "diagonal_skeleton_fraction": {
+          "min": 0.0,
+          "p10": 0.0,
+          "p25": 0.0,
+          "median": 0.08264,
+          "p75": 0.1645,
+          "p90": 0.36709,
+          "max": 0.50649
+        },
+        "threshold_96_160_ink_change_fraction": {
+          "min": 0.0,
+          "p10": 0.00027,
+          "p25": 0.02006,
+          "median": 0.02526,
+          "p75": 0.04256,
+          "p90": 0.04971,
+          "max": 0.09991
+        },
+        "padding_left_fraction": {
+          "min": 0.14844,
+          "p10": 0.17969,
+          "p25": 0.1875,
+          "median": 0.26953,
+          "p75": 0.3457,
+          "p90": 0.39844,
+          "max": 0.41406
+        },
+        "padding_right_fraction": {
+          "min": 0.14844,
+          "p10": 0.17969,
+          "p25": 0.1875,
+          "median": 0.25,
+          "p75": 0.33789,
+          "p90": 0.39844,
+          "max": 0.41406
+        },
+        "padding_top_fraction": {
+          "min": 0.07031,
+          "p10": 0.125,
+          "p25": 0.14062,
+          "median": 0.14844,
+          "p75": 0.2832,
+          "p90": 0.40625,
+          "max": 0.49219
+        },
+        "padding_bottom_fraction": {
+          "min": 0.07031,
+          "p10": 0.125,
+          "p25": 0.13867,
+          "median": 0.14062,
+          "p75": 0.26562,
+          "p90": 0.33359,
+          "max": 0.44531
+        },
+        "component_gap_center_distance_min_px": {
+          "min": 6.0,
+          "p10": 6.9,
+          "p25": 8.25,
+          "median": 9.44975,
+          "p75": 13.75,
+          "p90": 18.2,
+          "max": 29.0
+        },
+        "counter_width_median_px": {
+          "min": 2.82843,
+          "p10": 5.04853,
+          "p25": 7.5,
+          "median": 8.0,
+          "p75": 21.5,
+          "p90": 26.0,
+          "max": 26.0
+        },
+        "stroke_width_p90_p10_ratio": {
+          "min": 1.0,
+          "p10": 1.0,
+          "p25": 1.37009,
+          "median": 1.72611,
+          "p75": 2.52541,
+          "p90": 3.63333,
+          "max": 8.5
+        },
+        "component_gap_center_distance_min_canvas_fraction": {
+          "min": 0.046875,
+          "p10": 0.05390625,
+          "p25": 0.064453125,
+          "median": 0.073826171875,
+          "p75": 0.107421875,
+          "p90": 0.1421875,
+          "max": 0.2265625
+        },
+        "counter_width_median_canvas_fraction": {
+          "min": 0.022097109375,
+          "p10": 0.039441640625,
+          "p25": 0.05859375,
+          "median": 0.0625,
+          "p75": 0.16796875,
+          "p90": 0.203125,
+          "max": 0.203125
+        }
+      },
+      "proposed_quota": 45,
+      "quota_matches": true,
+      "percentile_gates_applied": false,
+      "rationale": "Art-direction group for optical review; profile gates govern numeric acceptance."
+    },
+    "bar_hook": {
+      "n": 50,
+      "metrics": {
+        "bbox_ratio": {
+          "n": 50,
+          "min": 0.8085106382978723,
+          "p10": 0.8482117812061711,
+          "p25": 0.8784420289855073,
+          "median": 0.907168458781362,
+          "p75": 0.95675292449486,
+          "p90": 0.9908456486042694,
+          "max": 1.1153846153846154
+        },
+        "canvas_ink_fraction": {
+          "n": 50,
+          "min": 0.17510986328125,
+          "p10": 0.217578125,
+          "p25": 0.225250244140625,
+          "median": 0.24371337890625,
+          "p75": 0.263153076171875,
+          "p90": 0.27698974609375,
+          "max": 0.3011474609375
+        },
+        "bbox_ink_fraction": {
+          "n": 50,
+          "min": 0.39458741089766824,
+          "p10": 0.4817367391948995,
+          "p25": 0.5054999657123014,
+          "median": 0.5336903053904489,
+          "p75": 0.5853834758444953,
+          "p90": 0.5937798476033771,
+          "max": 0.6598544232922733
+        },
+        "bbox_width_fraction": {
+          "n": 50,
+          "min": 0.578125,
+          "p10": 0.61640625,
+          "p25": 0.626953125,
+          "median": 0.65234375,
+          "p75": 0.6640625,
+          "p90": 0.6796875,
+          "max": 0.6953125
+        },
+        "bbox_height_fraction": {
+          "n": 50,
+          "min": 0.609375,
+          "p10": 0.66328125,
+          "p25": 0.6953125,
+          "median": 0.7109375,
+          "p75": 0.7265625,
+          "p90": 0.734375,
+          "max": 0.7421875
+        },
+        "stroke_width_median_canvas_fraction": {
+          "n": 50,
+          "min": 0.11899645477912357,
+          "p10": 0.12587549958544836,
+          "p25": 0.140625,
+          "median": 0.140625,
+          "p75": 0.15625,
+          "p90": 0.171875,
+          "max": 0.1875
+        },
+        "horizontal_mirror_iou": {
+          "n": 50,
+          "min": 0.19508070714834744,
+          "p10": 0.34278460077015244,
+          "p25": 0.4360820654675026,
+          "median": 0.534836496314546,
+          "p75": 0.5925051607574043,
+          "p90": 0.680213811186236,
+          "max": 0.8643510912931237
+        },
+        "vertical_mirror_iou": {
+          "n": 50,
+          "min": 0.2272416153319644,
+          "p10": 0.31834457295589585,
+          "p25": 0.3634195069149293,
+          "median": 0.4430682025163917,
+          "p75": 0.5364423369724727,
+          "p90": 0.606902718390129,
+          "max": 0.9021199819576003
+        },
+        "rotation_180_iou": {
+          "n": 50,
+          "min": 0.1730020951810835,
+          "p10": 0.27608151975059403,
+          "p25": 0.3085394880692582,
+          "median": 0.4010314132753672,
+          "p75": 0.4909819810210777,
+          "p90": 0.5728255143585005,
+          "max": 0.7254764819024305
+        },
+        "horizontal_skeleton_fraction": {
+          "n": 50,
+          "min": 0.0,
+          "p10": 0.2147009940731914,
+          "p25": 0.3122863978127136,
+          "median": 0.37115534738485556,
+          "p75": 0.49554655870445347,
+          "p90": 0.583482142857143,
+          "max": 0.7352941176470589
+        },
+        "vertical_skeleton_fraction": {
+          "n": 50,
+          "min": 0.06666666666666667,
+          "p10": 0.1109845327405761,
+          "p25": 0.19573932500466157,
+          "median": 0.26959139958776224,
+          "p75": 0.33547707217144657,
+          "p90": 0.39864881850175965,
+          "max": 0.46919431279620855
+        },
+        "diagonal_skeleton_fraction": {
+          "n": 50,
+          "min": 0.0,
+          "p10": 0.0,
+          "p25": 0.018804786156496715,
+          "median": 0.06666571314148406,
+          "p75": 0.13121639784946237,
+          "p90": 0.18752052545155992,
+          "max": 0.34415584415584416
+        },
+        "padding_left_fraction": {
+          "n": 50,
+          "min": 0.1484375,
+          "p10": 0.15625,
+          "p25": 0.1640625,
+          "median": 0.171875,
+          "p75": 0.1875,
+          "p90": 0.19609375,
+          "max": 0.2109375
+        },
+        "padding_right_fraction": {
+          "n": 50,
+          "min": 0.140625,
+          "p10": 0.15625,
+          "p25": 0.171875,
+          "median": 0.1796875,
+          "p75": 0.1875,
+          "p90": 0.1953125,
+          "max": 0.2109375
+        },
+        "padding_top_fraction": {
+          "n": 50,
+          "min": 0.125,
+          "p10": 0.1328125,
+          "p25": 0.140625,
+          "median": 0.140625,
+          "p75": 0.154296875,
+          "p90": 0.171875,
+          "max": 0.203125
+        },
+        "padding_bottom_fraction": {
+          "n": 50,
+          "min": 0.125,
+          "p10": 0.1328125,
+          "p25": 0.140625,
+          "median": 0.1484375,
+          "p75": 0.15625,
+          "p90": 0.16484375,
+          "max": 0.1875
+        },
+        "component_gap_center_distance_min_canvas_fraction": {
+          "n": 15,
+          "min": 0.0703125,
+          "p10": 0.0703125,
+          "p25": 0.078125,
+          "median": 0.0859375,
+          "p75": 0.11236259007903672,
+          "p90": 0.125,
+          "max": 0.1328125
+        },
+        "counter_width_median_canvas_fraction": {
+          "n": 7,
+          "min": 0.09375,
+          "p10": 0.09375,
+          "p25": 0.1015625,
+          "median": 0.109375,
+          "p75": 0.140625,
+          "p90": 0.15625,
+          "max": 0.15625
+        },
+        "stroke_width_p90_p10_ratio": {
+          "n": 50,
+          "min": 1.1111111111111112,
+          "p10": 1.186291280898947,
+          "p25": 1.3476889657784745,
+          "median": 1.5764318297721533,
+          "p75": 1.9594101625218516,
+          "p90": 2.445012485714286,
+          "max": 5.335204211610205
+        },
+        "threshold_96_160_ink_change_fraction": {
+          "n": 50,
+          "min": 0.006898313745528871,
+          "p10": 0.014415140710586118,
+          "p25": 0.016642511846415967,
+          "median": 0.02411595551402319,
+          "p75": 0.03979713168325132,
+          "p90": 0.04817522225574242,
+          "max": 0.06051310652537646
+        }
+      },
+      "component_counts": {
+        "1": 35,
+        "2": 13,
+        "3": 2
+      },
+      "hole_counts": {
+        "0": 43,
+        "1": 7
+      },
+      "qualified_orientation_samples": 9348,
+      "pooled_direction_fractions": {
+        "horizontal_skeleton_fraction": 0.39473684210526316,
+        "vertical_skeleton_fraction": 0.2616602481814292,
+        "diagonal_skeleton_fraction": 0.0821566110397946
+      },
+      "reference_metrics": {
+        "bbox_width": {
+          "min": 22.0,
+          "p10": 80.0,
+          "p25": 82.0,
+          "median": 85.0,
+          "p75": 89.25,
+          "p90": 92.0,
+          "max": 98.0
+        },
+        "bbox_height": {
+          "min": 18.0,
+          "p10": 84.5,
+          "p25": 89.5,
+          "median": 92.0,
+          "p75": 92.0,
+          "p90": 98.5,
+          "max": 110.0
+        },
+        "bbox_ratio": {
+          "min": 0.72727,
+          "p10": 0.80769,
+          "p25": 0.8907,
+          "median": 0.94466,
+          "p75": 1.0,
+          "p90": 1.02353,
+          "max": 4.55556
+        },
+        "canvas_ink_fraction": {
+          "min": 0.02295,
+          "p10": 0.19894,
+          "p25": 0.23561,
+          "median": 0.2637,
+          "p75": 0.28481,
+          "p90": 0.30774,
+          "max": 0.38641
+        },
+        "bbox_ink_fraction": {
+          "min": 0.43333,
+          "p10": 0.49264,
+          "p25": 0.51271,
+          "median": 0.55724,
+          "p75": 0.59016,
+          "p90": 0.68653,
+          "max": 1.0
+        },
+        "bbox_width_fraction": {
+          "min": 0.17188,
+          "p10": 0.625,
+          "p25": 0.64062,
+          "median": 0.66406,
+          "p75": 0.69727,
+          "p90": 0.71875,
+          "max": 0.76562
+        },
+        "bbox_height_fraction": {
+          "min": 0.14062,
+          "p10": 0.66016,
+          "p25": 0.69922,
+          "median": 0.71875,
+          "p75": 0.71875,
+          "p90": 0.76953,
+          "max": 0.85938
+        },
+        "stroke_width_median_canvas_fraction": {
+          "min": 0.125,
+          "p10": 0.1335,
+          "p25": 0.14062,
+          "median": 0.14594,
+          "p75": 0.17188,
+          "p90": 0.17328,
+          "max": 0.20312
+        },
+        "horizontal_mirror_iou": {
+          "min": 0.24492,
+          "p10": 0.35539,
+          "p25": 0.42104,
+          "median": 0.60143,
+          "p75": 0.71148,
+          "p90": 1.0,
+          "max": 1.0
+        },
+        "vertical_mirror_iou": {
+          "min": 0.26617,
+          "p10": 0.31849,
+          "p25": 0.34245,
+          "median": 0.41362,
+          "p75": 0.67237,
+          "p90": 0.95239,
+          "max": 1.0
+        },
+        "rotation_180_iou": {
+          "min": 0.21435,
+          "p10": 0.2901,
+          "p25": 0.32048,
+          "median": 0.37065,
+          "p75": 0.55505,
+          "p90": 0.9243,
+          "max": 1.0
+        },
+        "horizontal_skeleton_fraction": {
+          "min": 0.0,
+          "p10": 0.19574,
+          "p25": 0.27712,
+          "median": 0.41887,
+          "p75": 0.56763,
+          "p90": 0.81539,
+          "max": 1.0
+        },
+        "vertical_skeleton_fraction": {
+          "min": 0.0,
+          "p10": 0.02326,
+          "p25": 0.11794,
+          "median": 0.22711,
+          "p75": 0.35056,
+          "p90": 0.38739,
+          "max": 0.52083
+        },
+        "diagonal_skeleton_fraction": {
+          "min": 0.0,
+          "p10": 0.00659,
+          "p25": 0.04446,
+          "median": 0.09811,
+          "p75": 0.15442,
+          "p90": 0.20054,
+          "max": 0.31325
+        },
+        "threshold_96_160_ink_change_fraction": {
+          "min": 0.00139,
+          "p10": 0.01621,
+          "p25": 0.02698,
+          "median": 0.03558,
+          "p75": 0.04358,
+          "p90": 0.0534,
+          "max": 0.07309
+        },
+        "padding_left_fraction": {
+          "min": 0.10938,
+          "p10": 0.14062,
+          "p25": 0.1543,
+          "median": 0.17188,
+          "p75": 0.17969,
+          "p90": 0.1875,
+          "max": 0.41406
+        },
+        "padding_right_fraction": {
+          "min": 0.11719,
+          "p10": 0.14062,
+          "p25": 0.14844,
+          "median": 0.16797,
+          "p75": 0.17969,
+          "p90": 0.1875,
+          "max": 0.41406
+        },
+        "padding_top_fraction": {
+          "min": 0.07031,
+          "p10": 0.10547,
+          "p25": 0.14062,
+          "median": 0.14062,
+          "p75": 0.15039,
+          "p90": 0.17188,
+          "max": 0.42969
+        },
+        "padding_bottom_fraction": {
+          "min": 0.07031,
+          "p10": 0.11719,
+          "p25": 0.14062,
+          "median": 0.14062,
+          "p75": 0.15625,
+          "p90": 0.16797,
+          "max": 0.42969
+        },
+        "component_gap_center_distance_min_px": {
+          "min": 7.61577,
+          "p10": 7.96158,
+          "p25": 9.61512,
+          "median": 11.5,
+          "p75": 21.5299,
+          "p90": 27.83893,
+          "max": 47.0
+        },
+        "counter_width_median_px": {
+          "min": 24.0,
+          "p10": 24.0,
+          "p25": 24.0,
+          "median": 24.0,
+          "p75": 24.0,
+          "p90": 24.0,
+          "max": 24.0
+        },
+        "stroke_width_p90_p10_ratio": {
+          "min": 1.0,
+          "p10": 1.05,
+          "p25": 1.44444,
+          "median": 1.78963,
+          "p75": 2.16667,
+          "p90": 2.23278,
+          "max": 3.04168
+        },
+        "component_gap_center_distance_min_canvas_fraction": {
+          "min": 0.059498203125,
+          "p10": 0.06219984375,
+          "p25": 0.075118125,
+          "median": 0.08984375,
+          "p75": 0.16820234375,
+          "p90": 0.217491640625,
+          "max": 0.3671875
+        },
+        "counter_width_median_canvas_fraction": {
+          "min": 0.1875,
+          "p10": 0.1875,
+          "p25": 0.1875,
+          "median": 0.1875,
+          "p75": 0.1875,
+          "p90": 0.1875,
+          "max": 0.1875
+        }
+      },
+      "proposed_quota": 50,
+      "quota_matches": true,
+      "percentile_gates_applied": false,
+      "rationale": "Art-direction group for optical review; profile gates govern numeric acceptance."
+    },
+    "stacked_marks": {
+      "n": 3,
+      "metrics": {
+        "bbox_ratio": {
+          "n": 3,
+          "min": 0.5287356321839081,
+          "p10": 0.5608263435849643,
+          "p25": 0.6089624106865485,
+          "median": 0.6891891891891891,
+          "p75": 0.6918168168168168,
+          "p90": 0.6933933933933933,
+          "max": 0.6944444444444444
+        },
+        "canvas_ink_fraction": {
+          "n": 3,
+          "min": 0.08123779296875,
+          "p10": 0.08377685546875,
+          "p25": 0.08758544921875,
+          "median": 0.09393310546875,
+          "p75": 0.10198974609375,
+          "p90": 0.10682373046875,
+          "max": 0.11004638671875
+        },
+        "bbox_ink_fraction": {
+          "n": 3,
+          "min": 0.3526762056173821,
+          "p10": 0.3676409644939057,
+          "p25": 0.39008810280869105,
+          "median": 0.4275,
+          "p75": 0.4390123688155922,
+          "p90": 0.44591979010494753,
+          "max": 0.4505247376311844
+        },
+        "bbox_width_fraction": {
+          "n": 3,
+          "min": 0.359375,
+          "p10": 0.365625,
+          "p25": 0.375,
+          "median": 0.390625,
+          "p75": 0.39453125,
+          "p90": 0.396875,
+          "max": 0.3984375
+        },
+        "bbox_height_fraction": {
+          "n": 3,
+          "min": 0.5625,
+          "p10": 0.565625,
+          "p25": 0.5703125,
+          "median": 0.578125,
+          "p75": 0.62890625,
+          "p90": 0.659375,
+          "max": 0.6796875
+        },
+        "stroke_width_median_canvas_fraction": {
+          "n": 3,
+          "min": 0.140625,
+          "p10": 0.140625,
+          "p25": 0.140625,
+          "median": 0.140625,
+          "p75": 0.1484375,
+          "p90": 0.153125,
+          "max": 0.15625
+        },
+        "horizontal_mirror_iou": {
+          "n": 3,
+          "min": 0.06778981147212194,
+          "p10": 0.12613997638617813,
+          "p25": 0.21366522375726238,
+          "median": 0.35954063604240283,
+          "p75": 0.44246067335115064,
+          "p90": 0.49221269573639936,
+          "max": 0.5253807106598984
+        },
+        "vertical_mirror_iou": {
+          "n": 3,
+          "min": 0.33456698741672836,
+          "p10": 0.37824894815739885,
+          "p25": 0.4437718892684045,
+          "median": 0.5529767911200807,
+          "p75": 0.5782956244757029,
+          "p90": 0.5934869244890764,
+          "max": 0.6036144578313253
+        },
+        "rotation_180_iou": {
+          "n": 3,
+          "min": 0.04968454258675079,
+          "p10": 0.08999153650842504,
+          "p25": 0.15045202739093638,
+          "median": 0.25121951219512195,
+          "p75": 0.3158854069398275,
+          "p90": 0.3546849437866507,
+          "max": 0.38055130168453294
+        },
+        "horizontal_skeleton_fraction": {
+          "n": 3,
+          "min": 0.717391304347826,
+          "p10": 0.7739130434782608,
+          "p25": 0.8586956521739131,
+          "median": 1.0,
+          "p75": 1.0,
+          "p90": 1.0,
+          "max": 1.0
+        },
+        "vertical_skeleton_fraction": {
+          "n": 3,
+          "min": 0.0,
+          "p10": 0.0,
+          "p25": 0.0,
+          "median": 0.0,
+          "p75": 0.0,
+          "p90": 0.0,
+          "max": 0.0
+        },
+        "diagonal_skeleton_fraction": {
+          "n": 3,
+          "min": 0.0,
+          "p10": 0.0,
+          "p25": 0.0,
+          "median": 0.0,
+          "p75": 0.14130434782608695,
+          "p90": 0.22608695652173913,
+          "max": 0.2826086956521739
+        },
+        "padding_left_fraction": {
+          "n": 3,
+          "min": 0.296875,
+          "p10": 0.2984375,
+          "p25": 0.30078125,
+          "median": 0.3046875,
+          "p75": 0.30859375,
+          "p90": 0.3109375,
+          "max": 0.3125
+        },
+        "padding_right_fraction": {
+          "n": 3,
+          "min": 0.296875,
+          "p10": 0.3,
+          "p25": 0.3046875,
+          "median": 0.3125,
+          "p75": 0.3203125,
+          "p90": 0.325,
+          "max": 0.328125
+        },
+        "padding_top_fraction": {
+          "n": 3,
+          "min": 0.1640625,
+          "p10": 0.1734375,
+          "p25": 0.1875,
+          "median": 0.2109375,
+          "p75": 0.21875,
+          "p90": 0.2234375,
+          "max": 0.2265625
+        },
+        "padding_bottom_fraction": {
+          "n": 3,
+          "min": 0.15625,
+          "p10": 0.1671875,
+          "p25": 0.18359375,
+          "median": 0.2109375,
+          "p75": 0.2109375,
+          "p90": 0.2109375,
+          "max": 0.2109375
+        },
+        "component_gap_center_distance_min_canvas_fraction": {
+          "n": 3,
+          "min": 0.0703125,
+          "p10": 0.07163884031530642,
+          "p25": 0.07362835078826603,
+          "median": 0.07694420157653206,
+          "p75": 0.08925335078826603,
+          "p90": 0.09663884031530641,
+          "max": 0.1015625
+        },
+        "counter_width_median_canvas_fraction": null,
+        "stroke_width_p90_p10_ratio": {
+          "n": 3,
+          "min": 1.0,
+          "p10": 1.0173913043478262,
+          "p25": 1.0434782608695654,
+          "median": 1.0869565217391306,
+          "p75": 1.4350521741301225,
+          "p90": 1.6439095655647176,
+          "max": 1.7831478265211143
+        },
+        "threshold_96_160_ink_change_fraction": {
+          "n": 3,
+          "min": 0.03216860787576262,
+          "p10": 0.03847042886071406,
+          "p25": 0.047923160338141216,
+          "median": 0.06367771280051981,
+          "p75": 0.06902893904488801,
+          "p90": 0.07223967479150892,
+          "max": 0.0743801652892562
+        }
+      },
+      "component_counts": {
+        "3": 3
+      },
+      "hole_counts": {
+        "0": 3
+      },
+      "qualified_orientation_samples": 86,
+      "pooled_direction_fractions": {
+        "horizontal_skeleton_fraction": 0.8488372093023255,
+        "vertical_skeleton_fraction": 0.0,
+        "diagonal_skeleton_fraction": 0.1511627906976744
+      },
+      "reference_metrics": {
+        "bbox_width": {
+          "min": 38.0,
+          "p10": 38.0,
+          "p25": 38.0,
+          "median": 38.0,
+          "p75": 38.0,
+          "p90": 38.0,
+          "max": 38.0
+        },
+        "bbox_height": {
+          "min": 90.0,
+          "p10": 90.0,
+          "p25": 90.0,
+          "median": 90.0,
+          "p75": 90.0,
+          "p90": 90.0,
+          "max": 90.0
+        },
+        "bbox_ratio": {
+          "min": 0.42222,
+          "p10": 0.42222,
+          "p25": 0.42222,
+          "median": 0.42222,
+          "p75": 0.42222,
+          "p90": 0.42222,
+          "max": 0.42222
+        },
+        "canvas_ink_fraction": {
+          "min": 0.09229,
+          "p10": 0.09229,
+          "p25": 0.09229,
+          "median": 0.09229,
+          "p75": 0.09229,
+          "p90": 0.09229,
+          "max": 0.09229
+        },
+        "bbox_ink_fraction": {
+          "min": 0.44211,
+          "p10": 0.44211,
+          "p25": 0.44211,
+          "median": 0.44211,
+          "p75": 0.44211,
+          "p90": 0.44211,
+          "max": 0.44211
+        },
+        "bbox_width_fraction": {
+          "min": 0.29688,
+          "p10": 0.29688,
+          "p25": 0.29688,
+          "median": 0.29688,
+          "p75": 0.29688,
+          "p90": 0.29688,
+          "max": 0.29688
+        },
+        "bbox_height_fraction": {
+          "min": 0.70312,
+          "p10": 0.70312,
+          "p25": 0.70312,
+          "median": 0.70312,
+          "p75": 0.70312,
+          "p90": 0.70312,
+          "max": 0.70312
+        },
+        "stroke_width_median_canvas_fraction": {
+          "min": 0.17188,
+          "p10": 0.17188,
+          "p25": 0.17188,
+          "median": 0.17188,
+          "p75": 0.17188,
+          "p90": 0.17188,
+          "max": 0.17188
+        },
+        "horizontal_mirror_iou": {
+          "min": 0.38971,
+          "p10": 0.38971,
+          "p25": 0.38971,
+          "median": 0.38971,
+          "p75": 0.38971,
+          "p90": 0.38971,
+          "max": 0.38971
+        },
+        "vertical_mirror_iou": {
+          "min": 0.38971,
+          "p10": 0.38971,
+          "p25": 0.38971,
+          "median": 0.38971,
+          "p75": 0.38971,
+          "p90": 0.38971,
+          "max": 0.38971
+        },
+        "rotation_180_iou": {
+          "min": 1.0,
+          "p10": 1.0,
+          "p25": 1.0,
+          "median": 1.0,
+          "p75": 1.0,
+          "p90": 1.0,
+          "max": 1.0
+        },
+        "horizontal_skeleton_fraction": null,
+        "vertical_skeleton_fraction": null,
+        "diagonal_skeleton_fraction": null,
+        "threshold_96_160_ink_change_fraction": {
+          "min": 0.0291,
+          "p10": 0.0291,
+          "p25": 0.0291,
+          "median": 0.0291,
+          "p75": 0.0291,
+          "p90": 0.0291,
+          "max": 0.0291
+        },
+        "padding_left_fraction": {
+          "min": 0.35156,
+          "p10": 0.35156,
+          "p25": 0.35156,
+          "median": 0.35156,
+          "p75": 0.35156,
+          "p90": 0.35156,
+          "max": 0.35156
+        },
+        "padding_right_fraction": {
+          "min": 0.35156,
+          "p10": 0.35156,
+          "p25": 0.35156,
+          "median": 0.35156,
+          "p75": 0.35156,
+          "p90": 0.35156,
+          "max": 0.35156
+        },
+        "padding_top_fraction": {
+          "min": 0.14844,
+          "p10": 0.14844,
+          "p25": 0.14844,
+          "median": 0.14844,
+          "p75": 0.14844,
+          "p90": 0.14844,
+          "max": 0.14844
+        },
+        "padding_bottom_fraction": {
+          "min": 0.14844,
+          "p10": 0.14844,
+          "p25": 0.14844,
+          "median": 0.14844,
+          "p75": 0.14844,
+          "p90": 0.14844,
+          "max": 0.14844
+        },
+        "component_gap_center_distance_min_px": {
+          "min": 13.0,
+          "p10": 13.0,
+          "p25": 13.0,
+          "median": 13.0,
+          "p75": 13.0,
+          "p90": 13.0,
+          "max": 13.0
+        },
+        "counter_width_median_px": null,
+        "stroke_width_p90_p10_ratio": {
+          "min": 1.0,
+          "p10": 1.0,
+          "p25": 1.0,
+          "median": 1.0,
+          "p75": 1.0,
+          "p90": 1.0,
+          "max": 1.0
+        },
+        "component_gap_center_distance_min_canvas_fraction": {
+          "min": 0.1015625,
+          "p10": 0.1015625,
+          "p25": 0.1015625,
+          "median": 0.1015625,
+          "p75": 0.1015625,
+          "p90": 0.1015625,
+          "max": 0.1015625
+        },
+        "counter_width_median_canvas_fraction": null
+      },
+      "proposed_quota": 3,
+      "quota_matches": true,
+      "percentile_gates_applied": false,
+      "rationale": "Art-direction group for optical review; profile gates govern numeric acceptance. Its two reference examples cannot support percentile gates."
+    },
+    "diagonal_lozenge": {
+      "n": 17,
+      "metrics": {
+        "bbox_ratio": {
+          "n": 17,
+          "min": 0.7444444444444445,
+          "p10": 0.8268817204301075,
+          "p25": 0.8936170212765957,
+          "median": 0.9770114942528736,
+          "p75": 1.0493827160493827,
+          "p90": 1.1141727092946605,
+          "max": 1.1971830985915493
+        },
+        "canvas_ink_fraction": {
+          "n": 17,
+          "min": 0.14990234375,
+          "p10": 0.15152587890625,
+          "p25": 0.16900634765625,
+          "median": 0.1875,
+          "p75": 0.20294189453125,
+          "p90": 0.21204833984375,
+          "max": 0.22113037109375
+        },
+        "bbox_ink_fraction": {
+          "n": 17,
+          "min": 0.3379063156593746,
+          "p10": 0.37692624460868246,
+          "p25": 0.39785788923719956,
+          "median": 0.43007407407407405,
+          "p75": 0.4458791208791209,
+          "p90": 0.46302673064784483,
+          "max": 0.4829339143064633
+        },
+        "bbox_width_fraction": {
+          "n": 17,
+          "min": 0.5234375,
+          "p10": 0.590625,
+          "p25": 0.65625,
+          "median": 0.671875,
+          "p75": 0.6796875,
+          "p90": 0.6875,
+          "max": 0.6875
+        },
+        "bbox_height_fraction": {
+          "n": 17,
+          "min": 0.5546875,
+          "p10": 0.6109375,
+          "p25": 0.640625,
+          "median": 0.6875,
+          "p75": 0.7109375,
+          "p90": 0.7265625,
+          "max": 0.734375
+        },
+        "stroke_width_median_canvas_fraction": {
+          "n": 17,
+          "min": 0.109375,
+          "p10": 0.1137517170200081,
+          "p25": 0.125,
+          "median": 0.1288470508005519,
+          "p75": 0.13441133229754104,
+          "p90": 0.14199715285808054,
+          "max": 0.14823176532039278
+        },
+        "horizontal_mirror_iou": {
+          "n": 17,
+          "min": 0.19470003680529996,
+          "p10": 0.3185030208100246,
+          "p25": 0.37131846958436554,
+          "median": 0.40982788725367925,
+          "p75": 0.5296037296037296,
+          "p90": 0.6348178995409195,
+          "max": 0.6841828691539674
+        },
+        "vertical_mirror_iou": {
+          "n": 17,
+          "min": 0.2033898305084746,
+          "p10": 0.28253055467875116,
+          "p25": 0.30353595550258244,
+          "median": 0.3656299840510367,
+          "p75": 0.4861612515042118,
+          "p90": 0.6108347835258134,
+          "max": 0.6661918328584995
+        },
+        "rotation_180_iou": {
+          "n": 17,
+          "min": 0.13950617283950617,
+          "p10": 0.23175416133162613,
+          "p25": 0.2804733727810651,
+          "median": 0.34945054945054943,
+          "p75": 0.4094650205761317,
+          "p90": 0.5143180570447988,
+          "max": 0.6103717301514456
+        },
+        "horizontal_skeleton_fraction": {
+          "n": 17,
+          "min": 0.03428571428571429,
+          "p10": 0.035069699192956716,
+          "p25": 0.05421686746987952,
+          "median": 0.09826589595375723,
+          "p75": 0.15028901734104047,
+          "p90": 0.23772489290813897,
+          "max": 0.2553191489361702
+        },
+        "vertical_skeleton_fraction": {
+          "n": 17,
+          "min": 0.0,
+          "p10": 0.00623370735577468,
+          "p25": 0.021739130434782608,
+          "median": 0.05673758865248227,
+          "p75": 0.08391608391608392,
+          "p90": 0.0876020942408377,
+          "max": 0.10857142857142857
+        },
+        "diagonal_skeleton_fraction": {
+          "n": 17,
+          "min": 0.1968503937007874,
+          "p10": 0.2325963009317202,
+          "p25": 0.26,
+          "median": 0.3930635838150289,
+          "p75": 0.49137931034482757,
+          "p90": 0.5562310030395137,
+          "max": 0.5722543352601156
+        },
+        "padding_left_fraction": {
+          "n": 17,
+          "min": 0.1484375,
+          "p10": 0.153125,
+          "p25": 0.15625,
+          "median": 0.1640625,
+          "p75": 0.1796875,
+          "p90": 0.2015625,
+          "max": 0.234375
+        },
+        "padding_right_fraction": {
+          "n": 17,
+          "min": 0.1484375,
+          "p10": 0.1484375,
+          "p25": 0.15625,
+          "median": 0.1640625,
+          "p75": 0.1796875,
+          "p90": 0.20625,
+          "max": 0.2421875
+        },
+        "padding_top_fraction": {
+          "n": 17,
+          "min": 0.1328125,
+          "p10": 0.140625,
+          "p25": 0.140625,
+          "median": 0.15625,
+          "p75": 0.171875,
+          "p90": 0.2,
+          "max": 0.21875
+        },
+        "padding_bottom_fraction": {
+          "n": 17,
+          "min": 0.125,
+          "p10": 0.1375,
+          "p25": 0.1484375,
+          "median": 0.15625,
+          "p75": 0.1796875,
+          "p90": 0.19375,
+          "max": 0.2265625
+        },
+        "component_gap_center_distance_min_canvas_fraction": {
+          "n": 7,
+          "min": 0.0703125,
+          "p10": 0.07259452959611784,
+          "p25": 0.0761204413300982,
+          "median": 0.08734640537108554,
+          "p75": 0.09633556167847891,
+          "p90": 0.1015625,
+          "max": 0.1015625
+        },
+        "counter_width_median_canvas_fraction": {
+          "n": 2,
+          "min": 0.0625,
+          "p10": 0.07099059551883845,
+          "p25": 0.0837264887970961,
+          "median": 0.10495297759419221,
+          "p75": 0.12617946639128833,
+          "p90": 0.138915359669546,
+          "max": 0.14740595518838442
+        },
+        "stroke_width_p90_p10_ratio": {
+          "n": 17,
+          "min": 1.11803375,
+          "p10": 1.2712014657519508,
+          "p25": 1.4277465104169194,
+          "median": 1.617914748025622,
+          "p75": 1.7950549999999998,
+          "p90": 1.9415262,
+          "max": 2.761342443232541
+        },
+        "threshold_96_160_ink_change_fraction": {
+          "n": 17,
+          "min": 0.021678040947410677,
+          "p10": 0.023492757934237923,
+          "p25": 0.024661654135338346,
+          "median": 0.028345016763181956,
+          "p75": 0.035257410296411856,
+          "p90": 0.044867060511367095,
+          "max": 0.05171009771986971
+        }
+      },
+      "component_counts": {
+        "1": 10,
+        "2": 7
+      },
+      "hole_counts": {
+        "0": 15,
+        "1": 2
+      },
+      "qualified_orientation_samples": 2697,
+      "pooled_direction_fractions": {
+        "horizontal_skeleton_fraction": 0.1171672228401928,
+        "vertical_skeleton_fraction": 0.05524657026325547,
+        "diagonal_skeleton_fraction": 0.38079347423062665
+      },
+      "reference_metrics": {
+        "bbox_width": {
+          "min": 74.0,
+          "p10": 85.1,
+          "p25": 86.0,
+          "median": 87.0,
+          "p75": 88.0,
+          "p90": 89.8,
+          "max": 92.0
+        },
+        "bbox_height": {
+          "min": 56.0,
+          "p10": 63.9,
+          "p25": 72.75,
+          "median": 85.5,
+          "p75": 88.25,
+          "p90": 89.0,
+          "max": 92.0
+        },
+        "bbox_ratio": {
+          "min": 0.93478,
+          "p10": 0.97842,
+          "p25": 0.98876,
+          "median": 1.05253,
+          "p75": 1.18217,
+          "p90": 1.30873,
+          "max": 1.39683
+        },
+        "canvas_ink_fraction": {
+          "min": 0.10077,
+          "p10": 0.15757,
+          "p25": 0.16829,
+          "median": 0.19168,
+          "p75": 0.20636,
+          "p90": 0.22205,
+          "max": 0.22369
+        },
+        "bbox_ink_fraction": {
+          "min": 0.38489,
+          "p10": 0.39866,
+          "p25": 0.40197,
+          "median": 0.42946,
+          "p75": 0.46395,
+          "p90": 0.46662,
+          "max": 0.49838
+        },
+        "bbox_width_fraction": {
+          "min": 0.57812,
+          "p10": 0.66484,
+          "p25": 0.67188,
+          "median": 0.67969,
+          "p75": 0.6875,
+          "p90": 0.70156,
+          "max": 0.71875
+        },
+        "bbox_height_fraction": {
+          "min": 0.4375,
+          "p10": 0.49922,
+          "p25": 0.56836,
+          "median": 0.66797,
+          "p75": 0.68945,
+          "p90": 0.69531,
+          "max": 0.71875
+        },
+        "stroke_width_median_canvas_fraction": {
+          "min": 0.09504,
+          "p10": 0.10109,
+          "p25": 0.11294,
+          "median": 0.12204,
+          "p75": 0.13258,
+          "p90": 0.13341,
+          "max": 0.17969
+        },
+        "horizontal_mirror_iou": {
+          "min": 0.16748,
+          "p10": 0.25874,
+          "p25": 0.38231,
+          "median": 0.40787,
+          "p75": 0.45015,
+          "p90": 0.45593,
+          "max": 0.48628
+        },
+        "vertical_mirror_iou": {
+          "min": 0.24441,
+          "p10": 0.25865,
+          "p25": 0.3131,
+          "median": 0.37921,
+          "p75": 0.43236,
+          "p90": 0.46655,
+          "max": 0.48698
+        },
+        "rotation_180_iou": {
+          "min": 0.29633,
+          "p10": 0.30752,
+          "p25": 0.33535,
+          "median": 0.37523,
+          "p75": 0.53476,
+          "p90": 0.68501,
+          "max": 0.97754
+        },
+        "horizontal_skeleton_fraction": {
+          "min": 0.0,
+          "p10": 0.01482,
+          "p25": 0.02983,
+          "median": 0.03969,
+          "p75": 0.04641,
+          "p90": 0.0604,
+          "max": 0.09023
+        },
+        "vertical_skeleton_fraction": {
+          "min": 0.0,
+          "p10": 0.0,
+          "p25": 0.0,
+          "median": 0.01027,
+          "p75": 0.03793,
+          "p90": 0.13888,
+          "max": 0.22069
+        },
+        "diagonal_skeleton_fraction": {
+          "min": 0.32414,
+          "p10": 0.34877,
+          "p25": 0.54855,
+          "median": 0.69577,
+          "p75": 0.7688,
+          "p90": 0.80692,
+          "max": 0.85586
+        },
+        "threshold_96_160_ink_change_fraction": {
+          "min": 0.01949,
+          "p10": 0.02272,
+          "p25": 0.02636,
+          "median": 0.02785,
+          "p75": 0.03045,
+          "p90": 0.0335,
+          "max": 0.03634
+        },
+        "padding_left_fraction": {
+          "min": 0.14062,
+          "p10": 0.14922,
+          "p25": 0.15625,
+          "median": 0.16016,
+          "p75": 0.16406,
+          "p90": 0.16406,
+          "max": 0.21094
+        },
+        "padding_right_fraction": {
+          "min": 0.14062,
+          "p10": 0.14922,
+          "p25": 0.15625,
+          "median": 0.16016,
+          "p75": 0.16406,
+          "p90": 0.17109,
+          "max": 0.21094
+        },
+        "padding_top_fraction": {
+          "min": 0.14062,
+          "p10": 0.16406,
+          "p25": 0.16992,
+          "median": 0.1875,
+          "p75": 0.29102,
+          "p90": 0.36016,
+          "max": 0.42188
+        },
+        "padding_bottom_fraction": {
+          "min": 0.14062,
+          "p10": 0.14062,
+          "p25": 0.14062,
+          "median": 0.14062,
+          "p75": 0.14062,
+          "p90": 0.14062,
+          "max": 0.14844
+        },
+        "component_gap_center_distance_min_px": {
+          "min": 7.2111,
+          "p10": 8.48528,
+          "p25": 8.57306,
+          "median": 10.7234,
+          "p75": 12.56673,
+          "p90": 17.43826,
+          "max": 19.10497
+        },
+        "counter_width_median_px": {
+          "min": 10.0,
+          "p10": 10.0,
+          "p25": 10.0,
+          "median": 10.0,
+          "p75": 10.0,
+          "p90": 10.0,
+          "max": 10.0
+        },
+        "stroke_width_p90_p10_ratio": {
+          "min": 1.66987,
+          "p10": 1.826,
+          "p25": 1.87076,
+          "median": 1.98821,
+          "p75": 2.19962,
+          "p90": 2.66547,
+          "max": 2.85515
+        },
+        "component_gap_center_distance_min_canvas_fraction": {
+          "min": 0.05633671875,
+          "p10": 0.06629125,
+          "p25": 0.06697703125,
+          "median": 0.0837765625,
+          "p75": 0.098177578125,
+          "p90": 0.13623640625,
+          "max": 0.149257578125
+        },
+        "counter_width_median_canvas_fraction": {
+          "min": 0.078125,
+          "p10": 0.078125,
+          "p25": 0.078125,
+          "median": 0.078125,
+          "p75": 0.078125,
+          "p90": 0.078125,
+          "max": 0.078125
+        }
+      },
+      "proposed_quota": 17,
+      "quota_matches": true,
+      "percentile_gates_applied": false,
+      "rationale": "Art-direction group for optical review; profile gates govern numeric acceptance."
+    },
+    "roofed_curves": {
+      "n": 14,
+      "metrics": {
+        "bbox_ratio": {
+          "n": 14,
+          "min": 0.8936170212765957,
+          "p10": 0.9021739130434783,
+          "p25": 0.914207275223061,
+          "median": 0.9285024154589372,
+          "p75": 0.952020202020202,
+          "p90": 0.9787121212121213,
+          "max": 1.0235294117647058
+        },
+        "canvas_ink_fraction": {
+          "n": 14,
+          "min": 0.22259521484375,
+          "p10": 0.234149169921875,
+          "p25": 0.2482757568359375,
+          "median": 0.270904541015625,
+          "p75": 0.2909393310546875,
+          "p90": 0.296051025390625,
+          "max": 0.3114013671875
+        },
+        "bbox_ink_fraction": {
+          "n": 14,
+          "min": 0.4912486938349007,
+          "p10": 0.502553076402975,
+          "p25": 0.5368032413341308,
+          "median": 0.5853498780705406,
+          "p75": 0.6158779329843092,
+          "p90": 0.6287984902197262,
+          "max": 0.6311232063334983
+        },
+        "bbox_width_fraction": {
+          "n": 14,
+          "min": 0.6484375,
+          "p10": 0.6484375,
+          "p25": 0.650390625,
+          "median": 0.6640625,
+          "p75": 0.671875,
+          "p90": 0.67734375,
+          "max": 0.6796875
+        },
+        "bbox_height_fraction": {
+          "n": 14,
+          "min": 0.6640625,
+          "p10": 0.6875,
+          "p25": 0.703125,
+          "median": 0.703125,
+          "p75": 0.71875,
+          "p90": 0.73203125,
+          "max": 0.734375
+        },
+        "stroke_width_median_canvas_fraction": {
+          "n": 14,
+          "min": 0.11899645477912357,
+          "p10": 0.125,
+          "p25": 0.1252431943292912,
+          "median": 0.140625,
+          "p75": 0.140625,
+          "p90": 0.140625,
+          "max": 0.14405538214520136
+        },
+        "horizontal_mirror_iou": {
+          "n": 14,
+          "min": 0.36987798215261336,
+          "p10": 0.5060460146683696,
+          "p25": 0.5711694050286283,
+          "median": 0.6046790123456791,
+          "p75": 0.6844586262660495,
+          "p90": 0.7037489044609918,
+          "max": 0.7120805369127516
+        },
+        "vertical_mirror_iou": {
+          "n": 14,
+          "min": 0.2937736498108015,
+          "p10": 0.31121632409393507,
+          "p25": 0.34672326941826453,
+          "median": 0.4087861747097416,
+          "p75": 0.4648875508488569,
+          "p90": 0.48619909621462004,
+          "max": 0.5145143574454731
+        },
+        "rotation_180_iou": {
+          "n": 14,
+          "min": 0.2841549295774648,
+          "p10": 0.3348138916499228,
+          "p25": 0.3594071434018964,
+          "median": 0.43579707024728026,
+          "p75": 0.460797644510837,
+          "p90": 0.49064629542619204,
+          "max": 0.5348837209302325
+        },
+        "horizontal_skeleton_fraction": {
+          "n": 14,
+          "min": 0.2510460251046025,
+          "p10": 0.2618585732165207,
+          "p25": 0.314375,
+          "median": 0.3585916570991198,
+          "p75": 0.4124224316249138,
+          "p90": 0.4562296650717703,
+          "max": 0.4830188679245283
+        },
+        "vertical_skeleton_fraction": {
+          "n": 14,
+          "min": 0.11353711790393013,
+          "p10": 0.12192211055276382,
+          "p25": 0.14941319851945473,
+          "median": 0.18804457953394124,
+          "p75": 0.27008051846032993,
+          "p90": 0.30960784313725487,
+          "max": 0.4476987447698745
+        },
+        "diagonal_skeleton_fraction": {
+          "n": 14,
+          "min": 0.04602510460251046,
+          "p10": 0.07285686949866055,
+          "p25": 0.10308176100628931,
+          "median": 0.11820095693779904,
+          "p75": 0.15497504678727386,
+          "p90": 0.20287374371859293,
+          "max": 0.2393617021276596
+        },
+        "padding_left_fraction": {
+          "n": 14,
+          "min": 0.15625,
+          "p10": 0.15625,
+          "p25": 0.1640625,
+          "median": 0.1640625,
+          "p75": 0.171875,
+          "p90": 0.1796875,
+          "max": 0.1875
+        },
+        "padding_right_fraction": {
+          "n": 14,
+          "min": 0.1484375,
+          "p10": 0.15859375,
+          "p25": 0.1640625,
+          "median": 0.171875,
+          "p75": 0.171875,
+          "p90": 0.1875,
+          "max": 0.1875
+        },
+        "padding_top_fraction": {
+          "n": 14,
+          "min": 0.125,
+          "p10": 0.12734375,
+          "p25": 0.134765625,
+          "median": 0.1484375,
+          "p75": 0.1484375,
+          "p90": 0.15390625,
+          "max": 0.1640625
+        },
+        "padding_bottom_fraction": {
+          "n": 14,
+          "min": 0.1328125,
+          "p10": 0.140625,
+          "p25": 0.140625,
+          "median": 0.1484375,
+          "p75": 0.154296875,
+          "p90": 0.16171875,
+          "max": 0.171875
+        },
+        "component_gap_center_distance_min_canvas_fraction": {
+          "n": 2,
+          "min": 0.07694420157653206,
+          "p10": 0.07784353141887886,
+          "p25": 0.07919252618239905,
+          "median": 0.08144085078826603,
+          "p75": 0.08368917539413301,
+          "p90": 0.0850381701576532,
+          "max": 0.0859375
+        },
+        "counter_width_median_canvas_fraction": {
+          "n": 4,
+          "min": 0.0625,
+          "p10": 0.0625,
+          "p25": 0.0625,
+          "median": 0.0703125,
+          "p75": 0.08203125,
+          "p90": 0.0890625,
+          "max": 0.09375
+        },
+        "stroke_width_p90_p10_ratio": {
+          "n": 14,
+          "min": 1.34371,
+          "p10": 1.408814626908936,
+          "p25": 1.432521171984654,
+          "median": 1.5277733579097816,
+          "p75": 1.8675934769013776,
+          "p90": 2.051220536049181,
+          "max": 2.121320625
+        },
+        "threshold_96_160_ink_change_fraction": {
+          "n": 14,
+          "min": 0.012459720730397422,
+          "p10": 0.014945925535641688,
+          "p25": 0.018564313775893005,
+          "median": 0.02409978317541919,
+          "p75": 0.041690885225073096,
+          "p90": 0.05061912109987506,
+          "max": 0.05510879848628193
+        }
+      },
+      "component_counts": {
+        "1": 12,
+        "2": 1,
+        "3": 1
+      },
+      "hole_counts": {
+        "0": 10,
+        "1": 2,
+        "2": 2
+      },
+      "qualified_orientation_samples": 3197,
+      "pooled_direction_fractions": {
+        "horizontal_skeleton_fraction": 0.3619017829214889,
+        "vertical_skeleton_fraction": 0.22208320300281514,
+        "diagonal_skeleton_fraction": 0.1257428839537066
+      },
+      "reference_metrics": {
+        "bbox_width": {
+          "min": 80.0,
+          "p10": 81.8,
+          "p25": 83.0,
+          "median": 88.0,
+          "p75": 89.5,
+          "p90": 90.0,
+          "max": 90.0
+        },
+        "bbox_height": {
+          "min": 90.0,
+          "p10": 90.0,
+          "p25": 90.0,
+          "median": 91.5,
+          "p75": 93.5,
+          "p90": 98.0,
+          "max": 98.0
+        },
+        "bbox_ratio": {
+          "min": 0.86957,
+          "p10": 0.89512,
+          "p25": 0.90125,
+          "median": 0.92295,
+          "p75": 0.96464,
+          "p90": 1.0,
+          "max": 1.0
+        },
+        "canvas_ink_fraction": {
+          "min": 0.21741,
+          "p10": 0.22361,
+          "p25": 0.22786,
+          "median": 0.25082,
+          "p75": 0.28693,
+          "p90": 0.30332,
+          "max": 0.3064
+        },
+        "bbox_ink_fraction": {
+          "min": 0.44764,
+          "p10": 0.45954,
+          "p25": 0.46673,
+          "median": 0.52154,
+          "p75": 0.5564,
+          "p90": 0.63145,
+          "max": 0.67263
+        },
+        "bbox_width_fraction": {
+          "min": 0.625,
+          "p10": 0.63906,
+          "p25": 0.64844,
+          "median": 0.6875,
+          "p75": 0.69922,
+          "p90": 0.70312,
+          "max": 0.70312
+        },
+        "bbox_height_fraction": {
+          "min": 0.70312,
+          "p10": 0.70312,
+          "p25": 0.70312,
+          "median": 0.71484,
+          "p75": 0.73047,
+          "p90": 0.76562,
+          "max": 0.76562
+        },
+        "stroke_width_median_canvas_fraction": {
+          "min": 0.14062,
+          "p10": 0.14062,
+          "p25": 0.14062,
+          "median": 0.14062,
+          "p75": 0.15566,
+          "p90": 0.15625,
+          "max": 0.15625
+        },
+        "horizontal_mirror_iou": {
+          "min": 0.50927,
+          "p10": 0.52303,
+          "p25": 0.53327,
+          "median": 0.54033,
+          "p75": 0.57762,
+          "p90": 0.58896,
+          "max": 0.60234
+        },
+        "vertical_mirror_iou": {
+          "min": 0.20887,
+          "p10": 0.21614,
+          "p25": 0.26162,
+          "median": 0.38896,
+          "p75": 0.42519,
+          "p90": 0.47209,
+          "max": 0.51295
+        },
+        "rotation_180_iou": {
+          "min": 0.19933,
+          "p10": 0.23426,
+          "p25": 0.27295,
+          "median": 0.32699,
+          "p75": 0.38761,
+          "p90": 0.43344,
+          "max": 0.4446
+        },
+        "horizontal_skeleton_fraction": {
+          "min": 0.22222,
+          "p10": 0.2448,
+          "p25": 0.27309,
+          "median": 0.32617,
+          "p75": 0.3956,
+          "p90": 0.4412,
+          "max": 0.49495
+        },
+        "vertical_skeleton_fraction": {
+          "min": 0.06566,
+          "p10": 0.16978,
+          "p25": 0.28151,
+          "median": 0.32639,
+          "p75": 0.35612,
+          "p90": 0.38482,
+          "max": 0.50538
+        },
+        "diagonal_skeleton_fraction": {
+          "min": 0.02151,
+          "p10": 0.03735,
+          "p25": 0.04421,
+          "median": 0.05542,
+          "p75": 0.06439,
+          "p90": 0.06774,
+          "max": 0.07117
+        },
+        "threshold_96_160_ink_change_fraction": {
+          "min": 0.01511,
+          "p10": 0.0167,
+          "p25": 0.01934,
+          "median": 0.0234,
+          "p75": 0.0351,
+          "p90": 0.03708,
+          "max": 0.04773
+        },
+        "padding_left_fraction": {
+          "min": 0.14844,
+          "p10": 0.14844,
+          "p25": 0.15039,
+          "median": 0.15625,
+          "p75": 0.17578,
+          "p90": 0.18047,
+          "max": 0.1875
+        },
+        "padding_right_fraction": {
+          "min": 0.14844,
+          "p10": 0.14844,
+          "p25": 0.15039,
+          "median": 0.15625,
+          "p75": 0.17578,
+          "p90": 0.18047,
+          "max": 0.1875
+        },
+        "padding_top_fraction": {
+          "min": 0.11719,
+          "p10": 0.11719,
+          "p25": 0.13477,
+          "median": 0.14062,
+          "p75": 0.14844,
+          "p90": 0.14844,
+          "max": 0.14844
+        },
+        "padding_bottom_fraction": {
+          "min": 0.11719,
+          "p10": 0.11719,
+          "p25": 0.13477,
+          "median": 0.14453,
+          "p75": 0.14844,
+          "p90": 0.14844,
+          "max": 0.14844
+        },
+        "component_gap_center_distance_min_px": null,
+        "counter_width_median_px": {
+          "min": 11.6619,
+          "p10": 12.27579,
+          "p25": 13.19663,
+          "median": 13.8541,
+          "p75": 14.15394,
+          "p90": 14.43104,
+          "max": 14.61577
+        },
+        "stroke_width_p90_p10_ratio": {
+          "min": 1.42857,
+          "p10": 1.42857,
+          "p25": 1.48182,
+          "median": 2.00535,
+          "p75": 2.64302,
+          "p90": 3.0,
+          "max": 3.0
+        },
+        "component_gap_center_distance_min_canvas_fraction": null,
+        "counter_width_median_canvas_fraction": {
+          "min": 0.09110859375,
+          "p10": 0.095904609375,
+          "p25": 0.103098671875,
+          "median": 0.10823515625,
+          "p75": 0.11057765625,
+          "p90": 0.1127425,
+          "max": 0.114185703125
+        }
+      },
+      "proposed_quota": 14,
+      "quota_matches": true,
+      "percentile_gates_applied": false,
+      "rationale": "Art-direction group for optical review; profile gates govern numeric acceptance."
+    },
+    "rounded_loop_interlock": {
+      "n": 39,
+      "metrics": {
+        "bbox_ratio": {
+          "n": 39,
+          "min": 0.8444444444444444,
+          "p10": 0.8583848089681995,
+          "p25": 0.8755552957680617,
+          "median": 0.9021739130434783,
+          "p75": 0.9441323345817727,
+          "p90": 0.9555555555555556,
+          "max": 1.0609756097560976
+        },
+        "canvas_ink_fraction": {
+          "n": 39,
+          "min": 0.20306396484375,
+          "p10": 0.234619140625,
+          "p25": 0.24554443359375,
+          "median": 0.26678466796875,
+          "p75": 0.288818359375,
+          "p90": 0.31336669921875004,
+          "max": 0.3302001953125
+        },
+        "bbox_ink_fraction": {
+          "n": 39,
+          "min": 0.48640350877192984,
+          "p10": 0.5077648978570019,
+          "p25": 0.5375051051263322,
+          "median": 0.5770948253217757,
+          "p75": 0.6068809997278402,
+          "p90": 0.6650125390645227,
+          "max": 0.6859173126614987
+        },
+        "bbox_width_fraction": {
+          "n": 39,
+          "min": 0.59375,
+          "p10": 0.625,
+          "p25": 0.6328125,
+          "median": 0.65625,
+          "p75": 0.6640625,
+          "p90": 0.671875,
+          "max": 0.6796875
+        },
+        "bbox_height_fraction": {
+          "n": 39,
+          "min": 0.640625,
+          "p10": 0.703125,
+          "p25": 0.703125,
+          "median": 0.71875,
+          "p75": 0.73046875,
+          "p90": 0.734375,
+          "max": 0.734375
+        },
+        "stroke_width_median_canvas_fraction": {
+          "n": 39,
+          "min": 0.09882117688026186,
+          "p10": 0.11729425073537847,
+          "p25": 0.125,
+          "median": 0.13975424859373686,
+          "p75": 0.14169894373214964,
+          "p90": 0.1543607225224513,
+          "max": 0.15934435979977452
+        },
+        "horizontal_mirror_iou": {
+          "n": 39,
+          "min": 0.2894385026737968,
+          "p10": 0.4104786262567139,
+          "p25": 0.4948783744179231,
+          "median": 0.5916795069337443,
+          "p75": 0.6684530694924004,
+          "p90": 0.7460826820352394,
+          "max": 0.9193781634128706
+        },
+        "vertical_mirror_iou": {
+          "n": 39,
+          "min": 0.37195876288659796,
+          "p10": 0.39499885609700297,
+          "p25": 0.4270351944817298,
+          "median": 0.4839554682383759,
+          "p75": 0.613193544999475,
+          "p90": 0.6812871125943714,
+          "max": 0.9042324246771879
+        },
+        "rotation_180_iou": {
+          "n": 39,
+          "min": 0.37128885784142507,
+          "p10": 0.3990237929360103,
+          "p25": 0.4293743055776007,
+          "median": 0.5382815112002675,
+          "p75": 0.609054762923801,
+          "p90": 0.6894735735521067,
+          "max": 0.9090255303847536
+        },
+        "horizontal_skeleton_fraction": {
+          "n": 39,
+          "min": 0.038461538461538464,
+          "p10": 0.08495257626249679,
+          "p25": 0.1567775571002979,
+          "median": 0.27312775330396477,
+          "p75": 0.3406115417743325,
+          "p90": 0.3898134334907068,
+          "max": 0.4128787878787879
+        },
+        "vertical_skeleton_fraction": {
+          "n": 39,
+          "min": 0.09486166007905138,
+          "p10": 0.13508133530858515,
+          "p25": 0.16297935103244837,
+          "median": 0.22790697674418606,
+          "p75": 0.2816758693609023,
+          "p90": 0.3322797684243468,
+          "max": 0.44052863436123346
+        },
+        "diagonal_skeleton_fraction": {
+          "n": 39,
+          "min": 0.053497942386831275,
+          "p10": 0.08596491228070176,
+          "p25": 0.1073517723732316,
+          "median": 0.14624505928853754,
+          "p75": 0.18301435406698563,
+          "p90": 0.2695534823681277,
+          "max": 0.35071090047393366
+        },
+        "padding_left_fraction": {
+          "n": 39,
+          "min": 0.1484375,
+          "p10": 0.15625,
+          "p25": 0.1640625,
+          "median": 0.1796875,
+          "p75": 0.1796875,
+          "p90": 0.1953125,
+          "max": 0.1953125
+        },
+        "padding_right_fraction": {
+          "n": 39,
+          "min": 0.1484375,
+          "p10": 0.15625,
+          "p25": 0.16796875,
+          "median": 0.171875,
+          "p75": 0.1796875,
+          "p90": 0.1953125,
+          "max": 0.2109375
+        },
+        "padding_top_fraction": {
+          "n": 39,
+          "min": 0.125,
+          "p10": 0.1328125,
+          "p25": 0.1328125,
+          "median": 0.140625,
+          "p75": 0.14453125,
+          "p90": 0.1484375,
+          "max": 0.1796875
+        },
+        "padding_bottom_fraction": {
+          "n": 39,
+          "min": 0.125,
+          "p10": 0.1328125,
+          "p25": 0.140625,
+          "median": 0.140625,
+          "p75": 0.1484375,
+          "p90": 0.15625,
+          "max": 0.1796875
+        },
+        "component_gap_center_distance_min_canvas_fraction": {
+          "n": 10,
+          "min": 0.0667500292602932,
+          "p10": 0.07149992489136993,
+          "p25": 0.07753610314420897,
+          "median": 0.0859375,
+          "p75": 0.0939937182351111,
+          "p90": 0.11796875,
+          "max": 0.125
+        },
+        "counter_width_median_canvas_fraction": {
+          "n": 25,
+          "min": 0.046875,
+          "p10": 0.06690102160373745,
+          "p25": 0.08190769000568193,
+          "median": 0.09439658226795483,
+          "p75": 0.13662715355716165,
+          "p90": 0.16875,
+          "max": 0.18288593610499415
+        },
+        "stroke_width_p90_p10_ratio": {
+          "n": 39,
+          "min": 1.183871875,
+          "p10": 1.3810783725184232,
+          "p25": 1.4985344801951437,
+          "median": 1.673314559535316,
+          "p75": 1.7946039142595578,
+          "p90": 2.0,
+          "max": 2.5
+        },
+        "threshold_96_160_ink_change_fraction": {
+          "n": 39,
+          "min": 0.012219156484036263,
+          "p10": 0.021687175203240577,
+          "p25": 0.02685817609117508,
+          "median": 0.03184386235233693,
+          "p75": 0.0358426939665387,
+          "p90": 0.0408132492075403,
+          "max": 0.043264689212167015
+        }
+      },
+      "component_counts": {
+        "1": 29,
+        "2": 10
+      },
+      "hole_counts": {
+        "0": 14,
+        "1": 21,
+        "2": 4
+      },
+      "qualified_orientation_samples": 9389,
+      "pooled_direction_fractions": {
+        "horizontal_skeleton_fraction": 0.25423367770795613,
+        "vertical_skeleton_fraction": 0.22931089572904462,
+        "diagonal_skeleton_fraction": 0.1569922249440835
+      },
+      "reference_metrics": {
+        "bbox_width": {
+          "min": 64.0,
+          "p10": 77.4,
+          "p25": 80.0,
+          "median": 83.0,
+          "p75": 86.0,
+          "p90": 88.0,
+          "max": 92.0
+        },
+        "bbox_height": {
+          "min": 75.0,
+          "p10": 76.0,
+          "p25": 85.25,
+          "median": 92.0,
+          "p75": 94.0,
+          "p90": 96.6,
+          "max": 98.0
+        },
+        "bbox_ratio": {
+          "min": 0.66667,
+          "p10": 0.82946,
+          "p25": 0.89304,
+          "median": 0.92893,
+          "p75": 0.98045,
+          "p90": 1.05263,
+          "max": 1.15789
+        },
+        "canvas_ink_fraction": {
+          "min": 0.19049,
+          "p10": 0.23085,
+          "p25": 0.24191,
+          "median": 0.27316,
+          "p75": 0.30037,
+          "p90": 0.30753,
+          "max": 0.33429
+        },
+        "bbox_ink_fraction": {
+          "min": 0.48932,
+          "p10": 0.51178,
+          "p25": 0.56688,
+          "median": 0.60334,
+          "p75": 0.65054,
+          "p90": 0.68696,
+          "max": 0.73367
+        },
+        "bbox_width_fraction": {
+          "min": 0.5,
+          "p10": 0.60469,
+          "p25": 0.625,
+          "median": 0.64844,
+          "p75": 0.67188,
+          "p90": 0.6875,
+          "max": 0.71875
+        },
+        "bbox_height_fraction": {
+          "min": 0.58594,
+          "p10": 0.59375,
+          "p25": 0.66602,
+          "median": 0.71875,
+          "p75": 0.73438,
+          "p90": 0.75469,
+          "max": 0.76562
+        },
+        "stroke_width_median_canvas_fraction": {
+          "min": 0.10938,
+          "p10": 0.10938,
+          "p25": 0.125,
+          "median": 0.12741,
+          "p75": 0.14062,
+          "p90": 0.14062,
+          "max": 0.15389
+        },
+        "horizontal_mirror_iou": {
+          "min": 0.24388,
+          "p10": 0.35085,
+          "p25": 0.44832,
+          "median": 0.6259,
+          "p75": 0.68535,
+          "p90": 0.77414,
+          "max": 0.82883
+        },
+        "vertical_mirror_iou": {
+          "min": 0.23284,
+          "p10": 0.36111,
+          "p25": 0.51079,
+          "median": 0.57793,
+          "p75": 0.76311,
+          "p90": 0.89679,
+          "max": 0.98589
+        },
+        "rotation_180_iou": {
+          "min": 0.27858,
+          "p10": 0.37174,
+          "p25": 0.42249,
+          "median": 0.51424,
+          "p75": 0.66664,
+          "p90": 0.71197,
+          "max": 0.79378
+        },
+        "horizontal_skeleton_fraction": {
+          "min": 0.09058,
+          "p10": 0.15622,
+          "p25": 0.18159,
+          "median": 0.23872,
+          "p75": 0.28788,
+          "p90": 0.3697,
+          "max": 0.50602
+        },
+        "vertical_skeleton_fraction": {
+          "min": 0.10101,
+          "p10": 0.16148,
+          "p25": 0.21803,
+          "median": 0.3005,
+          "p75": 0.36444,
+          "p90": 0.47786,
+          "max": 0.59694
+        },
+        "diagonal_skeleton_fraction": {
+          "min": 0.04184,
+          "p10": 0.08793,
+          "p25": 0.09869,
+          "median": 0.11931,
+          "p75": 0.15282,
+          "p90": 0.19924,
+          "max": 0.45427
+        },
+        "threshold_96_160_ink_change_fraction": {
+          "min": 0.01114,
+          "p10": 0.01662,
+          "p25": 0.02102,
+          "median": 0.02922,
+          "p75": 0.03368,
+          "p90": 0.0425,
+          "max": 0.06306
+        },
+        "padding_left_fraction": {
+          "min": 0.14062,
+          "p10": 0.15625,
+          "p25": 0.16406,
+          "median": 0.17578,
+          "p75": 0.1875,
+          "p90": 0.19766,
+          "max": 0.25
+        },
+        "padding_right_fraction": {
+          "min": 0.14062,
+          "p10": 0.15625,
+          "p25": 0.16406,
+          "median": 0.17578,
+          "p75": 0.1875,
+          "p90": 0.19766,
+          "max": 0.25
+        },
+        "padding_top_fraction": {
+          "min": 0.11719,
+          "p10": 0.12266,
+          "p25": 0.13281,
+          "median": 0.14062,
+          "p75": 0.15039,
+          "p90": 0.20312,
+          "max": 0.20312
+        },
+        "padding_bottom_fraction": {
+          "min": 0.0625,
+          "p10": 0.11719,
+          "p25": 0.13086,
+          "median": 0.14062,
+          "p75": 0.16797,
+          "p90": 0.21719,
+          "max": 0.26562
+        },
+        "component_gap_center_distance_min_px": {
+          "min": 2.0,
+          "p10": 2.6,
+          "p25": 3.5,
+          "median": 5.0,
+          "p75": 6.5,
+          "p90": 7.4,
+          "max": 8.0
+        },
+        "counter_width_median_px": {
+          "min": 4.0,
+          "p10": 6.43366,
+          "p25": 10.0,
+          "median": 13.5,
+          "p75": 17.5,
+          "p90": 25.65764,
+          "max": 28.0
+        },
+        "stroke_width_p90_p10_ratio": {
+          "min": 1.37437,
+          "p10": 1.42857,
+          "p25": 1.49128,
+          "median": 1.82996,
+          "p75": 2.0,
+          "p90": 2.31111,
+          "max": 2.8
+        },
+        "component_gap_center_distance_min_canvas_fraction": {
+          "min": 0.015625,
+          "p10": 0.0203125,
+          "p25": 0.02734375,
+          "median": 0.0390625,
+          "p75": 0.05078125,
+          "p90": 0.0578125,
+          "max": 0.0625
+        },
+        "counter_width_median_canvas_fraction": {
+          "min": 0.03125,
+          "p10": 0.05026296875,
+          "p25": 0.078125,
+          "median": 0.10546875,
+          "p75": 0.13671875,
+          "p90": 0.2004503125,
+          "max": 0.21875
+        }
+      },
+      "proposed_quota": 39,
+      "quota_matches": true,
+      "percentile_gates_applied": false,
+      "rationale": "Art-direction group for optical review; profile gates govern numeric acceptance."
+    },
+    "mixed": {
+      "n": 24,
+      "metrics": {
+        "bbox_ratio": {
+          "n": 24,
+          "min": 0.7582417582417582,
+          "p10": 0.8069995222169135,
+          "p25": 0.8578150572831423,
+          "median": 0.9075386978612785,
+          "p75": 0.943976279650437,
+          "p90": 0.9741254372813594,
+          "max": 1.0113636363636365
+        },
+        "canvas_ink_fraction": {
+          "n": 24,
+          "min": 0.16864013671875,
+          "p10": 0.214434814453125,
+          "p25": 0.22564697265625,
+          "median": 0.25396728515625,
+          "p75": 0.2703399658203125,
+          "p90": 0.28436279296875,
+          "max": 0.3009033203125
+        },
+        "bbox_ink_fraction": {
+          "n": 24,
+          "min": 0.42545292545292546,
+          "p10": 0.4627321646135102,
+          "p25": 0.49403450930965165,
+          "median": 0.5503270966931897,
+          "p75": 0.6052112229200323,
+          "p90": 0.6355563846521504,
+          "max": 0.6439393939393939
+        },
+        "bbox_width_fraction": {
+          "n": 24,
+          "min": 0.5390625,
+          "p10": 0.5828125,
+          "p25": 0.6171875,
+          "median": 0.6484375,
+          "p75": 0.6640625,
+          "p90": 0.6796875,
+          "max": 0.6953125
+        },
+        "bbox_height_fraction": {
+          "n": 24,
+          "min": 0.6796875,
+          "p10": 0.68984375,
+          "p25": 0.703125,
+          "median": 0.7109375,
+          "p75": 0.720703125,
+          "p90": 0.734375,
+          "max": 0.7421875
+        },
+        "stroke_width_median_canvas_fraction": {
+          "n": 24,
+          "min": 0.09375,
+          "p10": 0.109375,
+          "p25": 0.12191836933956242,
+          "median": 0.13071478613651477,
+          "p75": 0.14453125,
+          "p90": 0.16606124644194384,
+          "max": 0.171875
+        },
+        "horizontal_mirror_iou": {
+          "n": 24,
+          "min": 0.299338146811071,
+          "p10": 0.3255223232356788,
+          "p25": 0.3949071895251113,
+          "median": 0.4858228394960029,
+          "p75": 0.6041323151706132,
+          "p90": 0.7440562240365287,
+          "max": 0.7996231155778895
+        },
+        "vertical_mirror_iou": {
+          "n": 24,
+          "min": 0.20232558139534884,
+          "p10": 0.301989187153938,
+          "p25": 0.34561826648322574,
+          "median": 0.4223292831301577,
+          "p75": 0.4999767193458614,
+          "p90": 0.567121937324154,
+          "max": 0.6004548900682335
+        },
+        "rotation_180_iou": {
+          "n": 24,
+          "min": 0.19274767968918627,
+          "p10": 0.2984251371995414,
+          "p25": 0.3911984720175615,
+          "median": 0.5158731123276981,
+          "p75": 0.5665172332779981,
+          "p90": 0.6539044257366774,
+          "max": 0.951638689048761
+        },
+        "horizontal_skeleton_fraction": {
+          "n": 24,
+          "min": 0.1242603550295858,
+          "p10": 0.21066832710668326,
+          "p25": 0.28277079220667756,
+          "median": 0.30940089900266887,
+          "p75": 0.3265619532677579,
+          "p90": 0.35992812701137095,
+          "max": 0.4434782608695652
+        },
+        "vertical_skeleton_fraction": {
+          "n": 24,
+          "min": 0.13636363636363635,
+          "p10": 0.16218760142810776,
+          "p25": 0.178163971651986,
+          "median": 0.21723948524795983,
+          "p75": 0.2814990964235182,
+          "p90": 0.3051505118050596,
+          "max": 0.3857677902621723
+        },
+        "diagonal_skeleton_fraction": {
+          "n": 24,
+          "min": 0.06956521739130435,
+          "p10": 0.07838146983128395,
+          "p25": 0.09304217941858392,
+          "median": 0.12491576008472127,
+          "p75": 0.17482730597318163,
+          "p90": 0.19897260273972603,
+          "max": 0.3181818181818182
+        },
+        "padding_left_fraction": {
+          "n": 24,
+          "min": 0.140625,
+          "p10": 0.1484375,
+          "p25": 0.162109375,
+          "median": 0.171875,
+          "p75": 0.1953125,
+          "p90": 0.21640625,
+          "max": 0.2421875
+        },
+        "padding_right_fraction": {
+          "n": 24,
+          "min": 0.15625,
+          "p10": 0.1640625,
+          "p25": 0.171875,
+          "median": 0.1796875,
+          "p75": 0.1875,
+          "p90": 0.203125,
+          "max": 0.21875
+        },
+        "padding_top_fraction": {
+          "n": 24,
+          "min": 0.125,
+          "p10": 0.1328125,
+          "p25": 0.138671875,
+          "median": 0.140625,
+          "p75": 0.1484375,
+          "p90": 0.15625,
+          "max": 0.1640625
+        },
+        "padding_bottom_fraction": {
+          "n": 24,
+          "min": 0.125,
+          "p10": 0.1328125,
+          "p25": 0.1328125,
+          "median": 0.14453125,
+          "p75": 0.1484375,
+          "p90": 0.15390625,
+          "max": 0.15625
+        },
+        "component_gap_center_distance_min_canvas_fraction": {
+          "n": 3,
+          "min": 0.0703125,
+          "p10": 0.07947823241768516,
+          "p25": 0.09322683104421292,
+          "median": 0.11614116208842583,
+          "p75": 0.12105696970279534,
+          "p90": 0.12400645427141703,
+          "max": 0.12597277731716483
+        },
+        "counter_width_median_canvas_fraction": {
+          "n": 18,
+          "min": 0.046875,
+          "p10": 0.0625,
+          "p25": 0.06640625,
+          "median": 0.125,
+          "p75": 0.14040731214843422,
+          "p90": 0.15763576628587658,
+          "max": 0.1875
+        },
+        "stroke_width_p90_p10_ratio": {
+          "n": 24,
+          "min": 1.24226,
+          "p10": 1.3706629602381357,
+          "p25": 1.4286792187500001,
+          "median": 1.5277384912942484,
+          "p75": 1.6166666666666667,
+          "p90": 1.7665368567851505,
+          "max": 2.418233
+        },
+        "threshold_96_160_ink_change_fraction": {
+          "n": 24,
+          "min": 0.01178524661719773,
+          "p10": 0.02185797238992685,
+          "p25": 0.027199753755386337,
+          "median": 0.03241890214778401,
+          "p75": 0.03960430700394107,
+          "p90": 0.04930069599098448,
+          "max": 0.0547112462006079
+        }
+      },
+      "component_counts": {
+        "1": 21,
+        "2": 3
+      },
+      "hole_counts": {
+        "0": 6,
+        "1": 13,
+        "2": 5
+      },
+      "qualified_orientation_samples": 5508,
+      "pooled_direction_fractions": {
+        "horizontal_skeleton_fraction": 0.3008351488743646,
+        "vertical_skeleton_fraction": 0.23583877995642702,
+        "diagonal_skeleton_fraction": 0.13435003631082063
+      },
+      "reference_metrics": {
+        "bbox_width": {
+          "min": 36.0,
+          "p10": 59.6,
+          "p25": 62.0,
+          "median": 76.0,
+          "p75": 84.0,
+          "p90": 86.8,
+          "max": 88.0
+        },
+        "bbox_height": {
+          "min": 92.0,
+          "p10": 92.0,
+          "p25": 92.0,
+          "median": 92.0,
+          "p75": 92.0,
+          "p90": 96.0,
+          "max": 100.0
+        },
+        "bbox_ratio": {
+          "min": 0.38298,
+          "p10": 0.64783,
+          "p25": 0.67391,
+          "median": 0.8,
+          "p75": 0.91304,
+          "p90": 0.94348,
+          "max": 0.95652
+        },
+        "canvas_ink_fraction": {
+          "min": 0.14771,
+          "p10": 0.18535,
+          "p25": 0.21436,
+          "median": 0.24084,
+          "p75": 0.26831,
+          "p90": 0.29784,
+          "max": 0.31464
+        },
+        "bbox_ink_fraction": {
+          "min": 0.45212,
+          "p10": 0.49447,
+          "p25": 0.54825,
+          "median": 0.57539,
+          "p75": 0.63673,
+          "p90": 0.68083,
+          "max": 0.7365
+        },
+        "bbox_width_fraction": {
+          "min": 0.28125,
+          "p10": 0.46563,
+          "p25": 0.48438,
+          "median": 0.59375,
+          "p75": 0.65625,
+          "p90": 0.67812,
+          "max": 0.6875
+        },
+        "bbox_height_fraction": {
+          "min": 0.71875,
+          "p10": 0.71875,
+          "p25": 0.71875,
+          "median": 0.71875,
+          "p75": 0.71875,
+          "p90": 0.75,
+          "max": 0.78125
+        },
+        "stroke_width_median_canvas_fraction": {
+          "min": 0.09375,
+          "p10": 0.10822,
+          "p25": 0.125,
+          "median": 0.1335,
+          "p75": 0.14406,
+          "p90": 0.15081,
+          "max": 0.17188
+        },
+        "horizontal_mirror_iou": {
+          "min": 0.31289,
+          "p10": 0.35225,
+          "p25": 0.41569,
+          "median": 0.52155,
+          "p75": 0.62456,
+          "p90": 0.72214,
+          "max": 1.0
+        },
+        "vertical_mirror_iou": {
+          "min": 0.34062,
+          "p10": 0.3597,
+          "p25": 0.42025,
+          "median": 0.48034,
+          "p75": 0.57095,
+          "p90": 0.66642,
+          "max": 1.0
+        },
+        "rotation_180_iou": {
+          "min": 0.26312,
+          "p10": 0.34692,
+          "p25": 0.43462,
+          "median": 0.45123,
+          "p75": 0.52789,
+          "p90": 0.59311,
+          "max": 1.0
+        },
+        "horizontal_skeleton_fraction": {
+          "min": 0.00746,
+          "p10": 0.08482,
+          "p25": 0.10619,
+          "median": 0.25967,
+          "p75": 0.34138,
+          "p90": 0.3724,
+          "max": 0.40084
+        },
+        "vertical_skeleton_fraction": {
+          "min": 0.13592,
+          "p10": 0.1586,
+          "p25": 0.22727,
+          "median": 0.28649,
+          "p75": 0.35517,
+          "p90": 0.48622,
+          "max": 0.57051
+        },
+        "diagonal_skeleton_fraction": {
+          "min": 0.05862,
+          "p10": 0.06439,
+          "p25": 0.1027,
+          "median": 0.12684,
+          "p75": 0.16842,
+          "p90": 0.23585,
+          "max": 0.25373
+        },
+        "threshold_96_160_ink_change_fraction": {
+          "min": 0.00811,
+          "p10": 0.02033,
+          "p25": 0.02568,
+          "median": 0.03594,
+          "p75": 0.03974,
+          "p90": 0.05007,
+          "max": 0.05972
+        },
+        "padding_left_fraction": {
+          "min": 0.15625,
+          "p10": 0.16094,
+          "p25": 0.17188,
+          "median": 0.20312,
+          "p75": 0.25781,
+          "p90": 0.26719,
+          "max": 0.35938
+        },
+        "padding_right_fraction": {
+          "min": 0.15625,
+          "p10": 0.16094,
+          "p25": 0.17188,
+          "median": 0.20312,
+          "p75": 0.25781,
+          "p90": 0.26719,
+          "max": 0.35938
+        },
+        "padding_top_fraction": {
+          "min": 0.10938,
+          "p10": 0.125,
+          "p25": 0.14062,
+          "median": 0.14062,
+          "p75": 0.14062,
+          "p90": 0.14062,
+          "max": 0.14062
+        },
+        "padding_bottom_fraction": {
+          "min": 0.10938,
+          "p10": 0.125,
+          "p25": 0.14062,
+          "median": 0.14062,
+          "p75": 0.14062,
+          "p90": 0.14062,
+          "max": 0.14062
+        },
+        "component_gap_center_distance_min_px": {
+          "min": 6.7082,
+          "p10": 7.22492,
+          "p25": 8.0,
+          "median": 8.48528,
+          "p75": 9.0,
+          "p90": 10.2,
+          "max": 11.0
+        },
+        "counter_width_median_px": {
+          "min": 8.0,
+          "p10": 10.0,
+          "p25": 10.0,
+          "median": 12.0,
+          "p75": 13.25,
+          "p90": 14.37998,
+          "max": 16.30847
+        },
+        "stroke_width_p90_p10_ratio": {
+          "min": 1.4,
+          "p10": 1.42786,
+          "p25": 1.55635,
+          "median": 1.83333,
+          "p75": 2.04265,
+          "p90": 2.29164,
+          "max": 3.80788
+        },
+        "component_gap_center_distance_min_canvas_fraction": {
+          "min": 0.0524078125,
+          "p10": 0.0564446875,
+          "p25": 0.0625,
+          "median": 0.06629125,
+          "p75": 0.0703125,
+          "p90": 0.0796875,
+          "max": 0.0859375
+        },
+        "counter_width_median_canvas_fraction": {
+          "min": 0.0625,
+          "p10": 0.078125,
+          "p25": 0.078125,
+          "median": 0.09375,
+          "p75": 0.103515625,
+          "p90": 0.11234359375,
+          "max": 0.127409921875
+        }
+      },
+      "proposed_quota": 24,
+      "quota_matches": true,
+      "percentile_gates_applied": false,
+      "rationale": "Art-direction group for optical review; profile gates govern numeric acceptance."
+    }
+  },
+  "all": {
+    "n": 192,
+    "metrics": {
+      "bbox_ratio": {
+        "n": 192,
+        "min": 0.40217391304347827,
+        "p10": 0.8131868131868132,
+        "p25": 0.8617021276595744,
+        "median": 0.9130434782608695,
+        "p75": 0.9556776556776557,
+        "p90": 1.0243041606886658,
+        "max": 2.4761904761904763
+      },
+      "canvas_ink_fraction": {
+        "n": 192,
+        "min": 0.0665283203125,
+        "p10": 0.163604736328125,
+        "p25": 0.203033447265625,
+        "median": 0.24237060546875,
+        "p75": 0.2673187255859375,
+        "p90": 0.287200927734375,
+        "max": 0.3302001953125
+      },
+      "bbox_ink_fraction": {
+        "n": 192,
+        "min": 0.3112847884102173,
+        "p10": 0.41940243540243544,
+        "p25": 0.48269985500975454,
+        "median": 0.5319672906031386,
+        "p75": 0.5896798462974934,
+        "p90": 0.6274879929221436,
+        "max": 0.9981684981684982
+      },
+      "bbox_width_fraction": {
+        "n": 192,
+        "min": 0.2890625,
+        "p10": 0.578125,
+        "p25": 0.6171875,
+        "median": 0.65234375,
+        "p75": 0.671875,
+        "p90": 0.6796875,
+        "max": 0.6953125
+      },
+      "bbox_height_fraction": {
+        "n": 192,
+        "min": 0.1640625,
+        "p10": 0.640625,
+        "p25": 0.6953125,
+        "median": 0.7109375,
+        "p75": 0.720703125,
+        "p90": 0.734375,
+        "max": 0.7421875
+      },
+      "stroke_width_median_canvas_fraction": {
+        "n": 192,
+        "min": 0.09375,
+        "p10": 0.11930032441981536,
+        "p25": 0.12597277731716483,
+        "median": 0.140625,
+        "p75": 0.14489302540599713,
+        "p90": 0.15625,
+        "max": 0.1875
+      },
+      "horizontal_mirror_iou": {
+        "n": 192,
+        "min": 0.06778981147212194,
+        "p10": 0.3341529405848764,
+        "p25": 0.4097697865597326,
+        "median": 0.5297631051119422,
+        "p75": 0.6259286412881797,
+        "p90": 0.7250538316229291,
+        "max": 0.9963369963369964
+      },
+      "vertical_mirror_iou": {
+        "n": 192,
+        "min": 0.20232558139534884,
+        "p10": 0.30581015598499456,
+        "p25": 0.37191656162451153,
+        "median": 0.46076891922051433,
+        "p75": 0.5561547693412595,
+        "p90": 0.6517612322367242,
+        "max": 1.0
+      },
+      "rotation_180_iou": {
+        "n": 192,
+        "min": 0.04968454258675079,
+        "p10": 0.2599189021142105,
+        "p25": 0.33494469697046614,
+        "median": 0.42973183391003456,
+        "p75": 0.5388462685353357,
+        "p90": 0.6101057222662256,
+        "max": 0.9963369963369964
+      },
+      "horizontal_skeleton_fraction": {
+        "n": 192,
+        "min": 0.0,
+        "p10": 0.10862932248474418,
+        "p25": 0.2099817990228949,
+        "median": 0.32028708133971295,
+        "p75": 0.4073739546967606,
+        "p90": 0.5468907440309587,
+        "max": 1.0
+      },
+      "vertical_skeleton_fraction": {
+        "n": 192,
+        "min": 0.0,
+        "p10": 0.05207936232888581,
+        "p25": 0.12708333333333333,
+        "median": 0.22170716112531969,
+        "p75": 0.30338100880162494,
+        "p90": 0.4025921658986175,
+        "max": 0.8776978417266187
+      },
+      "diagonal_skeleton_fraction": {
+        "n": 192,
+        "min": 0.0,
+        "p10": 0.00042194092827004817,
+        "p25": 0.06268731268731269,
+        "median": 0.12053811659192826,
+        "p75": 0.18275213896810993,
+        "p90": 0.2749409094100302,
+        "max": 0.5722543352601156
+      },
+      "padding_left_fraction": {
+        "n": 192,
+        "min": 0.140625,
+        "p10": 0.15625,
+        "p25": 0.1640625,
+        "median": 0.171875,
+        "p75": 0.1953125,
+        "p90": 0.21796875000000004,
+        "max": 0.3515625
+      },
+      "padding_right_fraction": {
+        "n": 192,
+        "min": 0.140625,
+        "p10": 0.15625,
+        "p25": 0.1640625,
+        "median": 0.1796875,
+        "p75": 0.1875,
+        "p90": 0.2109375,
+        "max": 0.359375
+      },
+      "padding_top_fraction": {
+        "n": 192,
+        "min": 0.125,
+        "p10": 0.1328125,
+        "p25": 0.140625,
+        "median": 0.14453125,
+        "p75": 0.15625,
+        "p90": 0.17890625000000004,
+        "max": 0.4140625
+      },
+      "padding_bottom_fraction": {
+        "n": 192,
+        "min": 0.125,
+        "p10": 0.1328125,
+        "p25": 0.140625,
+        "median": 0.1484375,
+        "p75": 0.15625,
+        "p90": 0.1796875,
+        "max": 0.421875
+      },
+      "component_gap_center_distance_min_canvas_fraction": {
+        "n": 60,
+        "min": 0.0625,
+        "p10": 0.0703125,
+        "p25": 0.07792870104806966,
+        "median": 0.08664195268554277,
+        "p75": 0.10222981262524675,
+        "p90": 0.125,
+        "max": 0.2109375
+      },
+      "counter_width_median_canvas_fraction": {
+        "n": 62,
+        "min": 0.046875,
+        "p10": 0.0625,
+        "p25": 0.078125,
+        "median": 0.109375,
+        "p75": 0.140625,
+        "p90": 0.16374317209529218,
+        "max": 0.234375
+      },
+      "stroke_width_p90_p10_ratio": {
+        "n": 192,
+        "min": 1.0,
+        "p10": 1.2012589999999999,
+        "p25": 1.4166962500000002,
+        "median": 1.567751572195496,
+        "p75": 1.8128814371568782,
+        "p90": 2.0187821605735303,
+        "max": 5.335204211610205
+      },
+      "threshold_96_160_ink_change_fraction": {
+        "n": 192,
+        "min": 0.005660377358490566,
+        "p10": 0.015595901855991542,
+        "p25": 0.02243368738587755,
+        "median": 0.029570045190986792,
+        "p75": 0.038731522308764296,
+        "p90": 0.049974237300956306,
+        "max": 0.07793575566087414
+      }
+    },
+    "component_counts": {
+      "1": 132,
+      "2": 51,
+      "3": 9
+    },
+    "hole_counts": {
+      "0": 130,
+      "1": 50,
+      "2": 12
+    },
+    "qualified_orientation_samples": 37061,
+    "pooled_direction_fractions": {
+      "horizontal_skeleton_fraction": 0.31631634332586817,
+      "vertical_skeleton_fraction": 0.23331804322603275,
+      "diagonal_skeleton_fraction": 0.14025525485011198
+    }
+  },
+  "passes_numeric_shape_gates": true,
+  "accepted": true,
+  "optical_review_required": false,
+  "optical_review": {
+    "passed": true,
+    "reviewer": "Codex AI visual review; independent second AI review by native_windows_mac",
+    "reviewed_at": "2026-09-07T09:12:41.256803+00:00",
+    "reviewed_near_pairs": [],
+    "reviewed_sizes_px": [
+      16,
+      32,
+      64,
+      128
+    ],
+    "catalog_count": 192,
+    "glyph_svg_sha256": {
+      "GLYPH-000": "f518cf74bf57df859da5dea9832a6a55130ef84dfda159bd54cccfcd6632dc65",
+      "GLYPH-001": "d16206e90eabcd43d366e71ea36551dcab2c3b5d97f2de5d4ec49878664b726b",
+      "GLYPH-002": "6af8edd34bb846527a8bc2778949ec330d2f0c66cfa660b4589842d99cb8300f",
+      "GLYPH-003": "97355b9167c66ddf044c5c23870461f20e08ca060c33f53f41a3708444ebad4b",
+      "GLYPH-004": "5705a724d74fd4095f70474fdf11961985a6b6fae5ca5282554a585a1db0ec93",
+      "GLYPH-005": "83ef0e018feaeb8001ca75a022c62386205dd73d4b818784a98e4edddb33e83b",
+      "GLYPH-006": "eb501ebfa1ef1292821136d007e7e9c1d9b4e5e0f102e00409b99343250e682b",
+      "GLYPH-007": "1935a3fa7d985c8cd047633e54a61b1dcef47b7b5c57bf5b7d2712eb0dcb000b",
+      "GLYPH-008": "861894245a6c1b3c5f20f1354b4382946715c9466e9371b0f8ebe0be684c424b",
+      "GLYPH-009": "320628da88e98e07bfe97e967da8ae07b3089aee662f6356b569c2217d6b4c7d",
+      "GLYPH-010": "f9fb92b5fa61063f77a62242c52fea832821a81375c6e6c28016d3d571a98c87",
+      "GLYPH-011": "b133add5b94090ae56335bcfeaf9968495ec394e31536c79d5378e9ec8fc7e1e",
+      "GLYPH-012": "c16cf170504f6733ba681f292c07a32d46bebee9341c3482f46bf6c744872aab",
+      "GLYPH-013": "9137caea6dc56df24c193eced66340483a94fa145d81d7f0fa4ad2af718aa702",
+      "GLYPH-014": "1591a23cf93645711c48d19fc4bf64fecd0acb9ed147c0a122b59996cc2798c6",
+      "GLYPH-015": "8ccadaafb4f3541554143484cecc3bb42ca522eba3f8477b5635d3fe6c459715",
+      "GLYPH-016": "bb7a38f17b4b37f84de0ed7c50ca6d22a83bf3978a52a439f565ee6b2c4e1c2d",
+      "GLYPH-017": "73b2c276f5e02213fda7eb56ec9d32bee3e758f920924ebd0b768a4f767e4453",
+      "GLYPH-018": "b67b15a8c12dc9a3ad123019bcb014b2376fd8d1a303439aaf2909d1b9b3c647",
+      "GLYPH-019": "c8e4d5a7cc57de3cb52b9b2b889e8ec9e2df4cfb52e0589df41328ad9f128674",
+      "GLYPH-020": "2323e3cae2ffcba2f831ef6740c354a4dcfc07df8022f29d8906d5d73208db12",
+      "GLYPH-021": "5bc60f859c4f6b6593cceddf4e9636d47fd97964601e3d1ea4711326d8b5fd94",
+      "GLYPH-022": "4a2914020db1fbce3a86bbcf85b3cbaba5129f6b682f01ee680d9e22996730ad",
+      "GLYPH-023": "4097e8cba3112637b27e75104096ccd5f5a8d314d620d4ef904ce89f686b8831",
+      "GLYPH-024": "ba2082c71336ef3fb87f650d2f55e430d7c124d6237d173dc258ff0377c005d5",
+      "GLYPH-025": "4b7c7a9bf0a982b3e21f95b1881dc1b8fce5cc4723e8a1c2512f74ed25da3d4f",
+      "GLYPH-026": "9fad21ad56d079a7eefbf115897de0eec5588a62f6c224a9162b890aec9fcab9",
+      "GLYPH-027": "e45d407974da7b19e5cc8799d19cf07b6ef86bfd279a13f74a1f86e01fd02cb4",
+      "GLYPH-028": "dc54e1f68c2fb8baa962e2b27fa23cb8ccd95e1c0f0c2e256e55a97f88b960bc",
+      "GLYPH-029": "296e4735a12d4db73278b2ee43e7fc364a4e1c816a99033d1d5c9f2797c01f26",
+      "GLYPH-030": "4ac903d1ef7ce9482c9f8f58121d1376a1a01e2e5e9e565016035651c59d30b6",
+      "GLYPH-031": "9b3cb81275d709ce222168984f42dbc4c587153b3bfb347bf1a2c5479d7f9217",
+      "GLYPH-032": "c8c53f1e51099e46cecd13711951a159af51d6aefc0968b225856525d3caf324",
+      "GLYPH-033": "4631099d7f516851c2467b3d19c0efad423f4d56dcdf9473069aaf076723a9d7",
+      "GLYPH-034": "63555f27f6ab82ae69f837c77daa618bf80804aabd97b65bbf23127001519916",
+      "GLYPH-035": "31f39e6cff1c21d4b17bdd20ae28a64209e108f14fc0197013587b8ce426387b",
+      "GLYPH-036": "8338c771f77378429507fc868af277a42c80559fa62629b936a02ca98962f80f",
+      "GLYPH-037": "7f7418ec137d2996aeba937a7181e14dcc1ed3eb6ddbde8a68fc6e00a618421e",
+      "GLYPH-038": "9eeba3d8b0e36acae0071466236d523446c1cb3e0e83abd1dcd436584e5dcc9f",
+      "GLYPH-039": "67421bf1876f38dc9145b1c3902617b2b599cb095aaccad4a43e3706bbc0ace8",
+      "GLYPH-040": "72b689baadbcb163848dc99af8ac251f77058e2f00529e4213173c1218976561",
+      "GLYPH-041": "1806a13ecaa055d0a980dbd0b21f175a6b92e92a030ddbf64e781f2ba129a409",
+      "GLYPH-042": "90c2a90f0c61b19843e09a57b66bedec646cd503d85cb1d16dee5d0137e77b5c",
+      "GLYPH-043": "eaac06c64580293988a524fc9c3b81643c7997fc4361ebe79be14ff6f28b0891",
+      "GLYPH-044": "93d0c497eb18652195c83ac301c83b1a51f14fd8dd5d3aecd01d673d93c2ac03",
+      "GLYPH-045": "275ff77c0e8ffe3c7891962a74d9fdd4d50955a1683c1494af76261680f9e276",
+      "GLYPH-046": "44da992e78e25aa2c82e5332dca914bd3ca9f85e5f0ed91e7efbf77d5b6b8fb8",
+      "GLYPH-047": "0eacbe925726d927084c8a1a5b6351eb0b990fad2dbcc429c2e8b4f46b2da0bd",
+      "GLYPH-048": "0010d43a957f159fb298f109daab12c91e6ab0fcde34cf8d26fbb74ffecf5655",
+      "GLYPH-049": "e7b446336cd6d5ae191e9ef189bd78622c32162e7b69baadbc08b336454171c0",
+      "GLYPH-050": "ab51da406c0e5dcb17a0af3f485ad0306d1a9a26ff9c9b6f65df6677992e1248",
+      "GLYPH-051": "974fee452646c781cb6374ad9f6c8f4b23c592e7ad7212958723a6b84fbc8846",
+      "GLYPH-052": "b364b8b16a3e17e7662f8e58d7c6742a8b41ae7b2e7f79f0b11cb4a6ca86a4d6",
+      "GLYPH-053": "4958f31f2acdaf44698cfe1725adbeea01628ce7a15097693f91c79b67aeac96",
+      "GLYPH-054": "9f4880a9aa97b0e96e9015167e6abcc32d55430c95cc846d04e8e3e5d21e740b",
+      "GLYPH-055": "50e27cfa07ef85ea4aeb045326c6074aebf1762302ac8821b95996c61a099f5d",
+      "GLYPH-056": "fa327f72247f5c735f94bed09a389d51a9dbcf42a5cc56ee26b01347e1b7ea88",
+      "GLYPH-057": "7341e8f7093fb96de585619b1d3432ef602fbc01ddc29d213cf8ba55a1a98619",
+      "GLYPH-058": "ae675219a6c2beb6fd4dd96932b151d54efda6fb68322273513f212dbdbdf51d",
+      "GLYPH-059": "7cc8f254c3a86cca8317a6ecf72be27ff6a9b6e215a4911b5eb933e1724bc254",
+      "GLYPH-060": "f085b0414eedabf709cf757ab027a2d41b42bf7871310bf76fc5db345672393a",
+      "GLYPH-061": "a6ec45047505f8c520f724d84d3529695c53c7c747cd29dbdf0ea07c0bf9c607",
+      "GLYPH-062": "dfd0203022d2ae8c1d74a64bc72cf7a2b9d38cfb36385f2525e42e19ebaa28c9",
+      "GLYPH-063": "85e16d8f169d2e58620027fdbc1946a1a36d9f0dafdde2c72b9be1e75eea4d20",
+      "GLYPH-064": "a9944068fd2e9a7dc47a0dab1f3992330033f9d432525a0ae06062ec65daa03b",
+      "GLYPH-065": "393f11fc7ad2a47649895498df7f94f0df2381f6a473771ce71ad528946b7ade",
+      "GLYPH-066": "ea61245f012dbc26b36636e0cc236ddd1dc2990caaa50f441fbc37f02902f35a",
+      "GLYPH-067": "dc67550e6563648f2be22362c9af8924642bd466cf248567f9def8ac82b7f9cd",
+      "GLYPH-068": "b5ee1a6a6023f5b25a1222ced5221b3cc6b60fee973bc78f39ff9dca62dcf7cc",
+      "GLYPH-069": "a4ff675e45aee33ffff348d8fbab72233a64249df68db7d109490380228badae",
+      "GLYPH-070": "8a9ed903dafbda9003ec1c3839bb302ac45be1d5bf531f0c2750837c9658dd39",
+      "GLYPH-071": "ca6daf4c52c7ac5563f605532271607f64898d118fc50192363257d8b0eca8da",
+      "GLYPH-072": "89cad41e6065e61e83032cc676b8d4198be1ff80794625a49c4184c67f18fcc6",
+      "GLYPH-073": "8b4664a0dd47d5fd88629306e08988e06a6e3624d2d522a1a0e9551b437204ac",
+      "GLYPH-074": "78810cafb3ab96cb5d4dfad1658f2883776a61f6f2a4e88b703696f3adaa3132",
+      "GLYPH-075": "0842601c326b8c1929952cd36a6228b6ae9081e44d9ef7abe980dfb070c81982",
+      "GLYPH-076": "9131067813268af5ad0499bd42f0887ec439dd2c35810167012257395c9f6fa9",
+      "GLYPH-077": "df5efa0201511ab51cd9b24851942de9528c0b42a2784ead3d1bfbe6db1d22c5",
+      "GLYPH-078": "d8e2a0b411b6248ab8ad456072895f38dc1be55a9ee68eb69871a58e7d3aad7c",
+      "GLYPH-079": "935755ddca7713f3c868ede0ad816e39763e4e6050941f95ee4e0613f3003a5c",
+      "GLYPH-080": "7f8f2019ce5ca26d54df22221936b193fb629322874c1cd92f61aaa8d9f21166",
+      "GLYPH-081": "516656dae1f5ff943fb4c2fc7e6f51bb402ad2cec14741ad551b52be2d89ed71",
+      "GLYPH-082": "3c5a67cb1ed4fe0388fffc15a21b77d614756a15a7cd570e462f98f179649808",
+      "GLYPH-083": "516deaf8693a365d9ccf5e0c525cf3ed400751b4e4e4d0e7134d20a3024c77dd",
+      "GLYPH-084": "80964f855f7e0657ccd003e3e2752fa1cccc9e8b349d13220ed9d38f8ff1da1c",
+      "GLYPH-085": "50dbc9b3d5eb95bd7a935126e065cfc86664c187f02fa7d140b31ee27bc4d34c",
+      "GLYPH-086": "57f38e5733c938c2dfcf8cce34c46706edbb191132c053d2496ca938f89a641d",
+      "GLYPH-087": "d12f9bfd245c7bec7061e69ec051077230ce813893202872e861d0abe45465ee",
+      "GLYPH-088": "ac720aff2d2c3d91b9a2946122d6c0ca1032b3652b08b623faf2b1d63b04004d",
+      "GLYPH-089": "ab4a91e7a87c4d5646fb2173558ddcfa8c0416f7648a9f364e771a681146ae28",
+      "GLYPH-090": "e4a0eaa5bbc8553024d8ffb8171559fd0527f238cade74638b457a1a37a73371",
+      "GLYPH-091": "333fb8b8f4fee4c1a3df7876590adedf396b84c3bd6f15fb156ef345cfe5ecf0",
+      "GLYPH-092": "9d2b5664464dd726dc28397e819e3934ef9fd527e927b2cb09ee056b96e94c21",
+      "GLYPH-093": "636b5c1d6727372f6d2324b439f5f7b2763e1b7735e63896df34f956b6963762",
+      "GLYPH-094": "155159f276b8ff1e5effa4a79d31dd3a5618ea22346ca671f3ed05a30f164bd8",
+      "GLYPH-095": "7346eb930f514bcb24956836e24de4603ecea3b2b92ca3f614f0a550c94fcef8",
+      "GLYPH-096": "23d9790367ed0be7c7a4da18d1868ac01ae710214fac98e50acacfa20205164f",
+      "GLYPH-097": "eae3d1158fda2e24ede834b516a9d38d0f9b519492bee5128130eefbb85171a3",
+      "GLYPH-098": "13e272aeae61aff2467eb7fa73c49661191fd120004fdeda1a2158b6902e56ac",
+      "GLYPH-099": "dea82560831aaabc396b711b3f356db4eaa0ccecbfe9f829fe954af65f75c5fe",
+      "GLYPH-100": "02398342d61cc812a96d54b7bcdf2e846a81703f4a2d56474a6d5e72d2f118fc",
+      "GLYPH-101": "e94028cb759c435f2d5b71079938818c0907bc1c48b31f98260d452ffb9f0b24",
+      "GLYPH-102": "5e7523e3c9647a6d0f22352664f33605f14dcdd50c60ecbe3cc9350c1cc805d6",
+      "GLYPH-103": "a14f916e9390c7b8b8bf103d509c5368c6eb94f527f1e475d08b889c25e9dedf",
+      "GLYPH-104": "23cb639ec62d6e57a63a4e1860b748446c255860e21356e4b3a1b0af547e2aa4",
+      "GLYPH-105": "ed9788d33d8c216a8ba4121f14611ee7c305aa731908562d7666a2a15666e2d5",
+      "GLYPH-106": "770eab9a5a019f485bc66690258e9be3dc56c7493176e232fc36945dbec93aae",
+      "GLYPH-107": "ca610ab3e9b2c56d205a81c401374bc0910962b932d7f7c235720bbd1690b442",
+      "GLYPH-108": "f08542f54537e2dc62a4a74f1caa2bc764d94ad68e95eb93ae2943e2f0d68f5a",
+      "GLYPH-109": "4fd40f052af5305b6bdda0d7c64ead0c4e426d44213701e1acc14ece115dae62",
+      "GLYPH-110": "bee20ab25956d1bb95161995509fb6bde38a1f96b19a44be2400571f9112b137",
+      "GLYPH-111": "6d313a8223b723027c9b9f696059bff93b8b1541d28e2afab69dc73ca2b925c0",
+      "GLYPH-112": "d644a000b97570871dd9402c6bdbe2b02a582613259b533d1584b31bbafbc364",
+      "GLYPH-113": "fee344bb4871cece337a287eaa61215b4871bfd0bb00c58d156c03f7bc31716e",
+      "GLYPH-114": "12969b68bf6aaed899619b8e6841bba366be8de4ee00bebfd029b7663b283f9e",
+      "GLYPH-115": "08406d811927854d51d2abeb5f18881698b48ac1ccfe58f234e4e5056084c06e",
+      "GLYPH-116": "ba163c04c4d7b3a42db451f561200a60ca966b12963d9d427a67038630243c7b",
+      "GLYPH-117": "93300ab4992b784d0d3419371b312c8f3bf46281d57660b10139f2b5ec38804b",
+      "GLYPH-118": "6231158412344b96c57acb8a9e0f6d1b530ac6d096f8346dd365847b7b9c7f51",
+      "GLYPH-119": "51f73d82ff1d311a2f8a321ab033482cd4d73862584ece09e0014a286a461dbc",
+      "GLYPH-120": "9217ab5b674cec90de83e6aa205c5215b16d3836abefe49f6d1f5c403f492bb8",
+      "GLYPH-121": "9508b585425dca675a4b90904bdc4d7cff41959551f87267ff0dc5910212324e",
+      "GLYPH-122": "42c05b5126c97219f42f24bf74a4d06caf6b1de6e91068e2ba65426df64dd730",
+      "GLYPH-123": "60a0882ad7d37beda7b80039674c0c86baa56e62fdd077ae2fe9ac83cd082585",
+      "GLYPH-124": "578e21fda3ed22e0460ac346db83aa41e8e44e948f5627a003290126db563f41",
+      "GLYPH-125": "7eeb6514b87edbe0baa15f9e5bb352a07e812e28e43190b01f702c3d0cd74986",
+      "GLYPH-126": "5a795264637eddeb8b68d737990995af31432ecaba16edabbcffc1f926500495",
+      "GLYPH-127": "42b8c5e0d618f75c2eb7c8dc4064150b77b81deaaa494cc3ee7ac4c176408a84",
+      "GLYPH-128": "363ebae5bdd174d35d995f39e06d7e7a0887ab5ddc5ad756d08808695fa0067a",
+      "GLYPH-129": "deb1aaafe381d15c43939ad992413d02409cece8174150cf468e6bbbc8847086",
+      "GLYPH-130": "c2a323e1299378b3f3fc6004066127323ed439b1f6fadd3513ccb082daeb7209",
+      "GLYPH-131": "46e444c3d162211ee53eda083b4b9dc8e334c1cf44b494d5792e185f92b77855",
+      "GLYPH-132": "4e64dc72980fd3523f82e804fcb3245299fc734ec55c7e4bf6fe819e14687656",
+      "GLYPH-133": "a086cafbef3ffc07c8d4c6ffd0a67b91af173985e225ede720a69252cb71d26c",
+      "GLYPH-134": "53ff7347d8651a15a0cc8fc275c76f2951c482ed5dc4d7a7c52c91e408d5f16e",
+      "GLYPH-135": "4c230114e887e54b613e4a8cef3537e865fa51b4313084dff1cdbaac2c10383e",
+      "GLYPH-136": "aab873a380afa13c3955cd173d86bd67b5aba47dfdaa744ca867165c95f1818e",
+      "GLYPH-137": "3e6e46de34c3a2e148783e938c0bc27d564fb32c0e701a965babeb52c989d981",
+      "GLYPH-138": "e6924ef6370180503e783b8d49d27f70b5af54fdc7fa67b4f563a5269c851af0",
+      "GLYPH-139": "30ae56379f596bfe41e98c23bf79c4e0b1cbd15e8d27545490397553b31245e6",
+      "GLYPH-140": "c9e020846c32b2bbe6cb43c053ced920f3a835a328c4e6f4d5cda91aeaab8614",
+      "GLYPH-141": "53a460e2bbdb153a62360af152df43f6e0abf1553b3ffb0e0828ca472d58725c",
+      "GLYPH-142": "aecfb0475ff4cbc605084babd5032c284bff291df87a01834b6fab27df8e7e54",
+      "GLYPH-143": "2ca03ee585ec15539dc8a4c2bfe61d66aedf59da36bbad24c468256d5665ec75",
+      "GLYPH-144": "088e9e727da610fdab8dacda6aabe620b7c4831814e39718904df0a5a5c4415b",
+      "GLYPH-145": "a93b5e2ec510d9fd841a03b350bb7118c49524325652d3306f32633c11410652",
+      "GLYPH-146": "55eca32cd76fa0150f88881836d3dc78fb9e1ac170fcebc94edd97790ce47635",
+      "GLYPH-147": "5e62f6df512881d4cafa003496ed85d4d724b66f3c98d2491ed6fdced02bfd41",
+      "GLYPH-148": "faa67f57220ebd6a83a6592f89a9b76e959a53d873017bc5e6e32d16e70a52bf",
+      "GLYPH-149": "3ba59c872e21a20de27fad7da93f587759061fadd01676be644eb790378dccd4",
+      "GLYPH-150": "55370475b84c2f3b6c6dccba691217485178f9564b7ef2c1092aaca4aa3a7448",
+      "GLYPH-151": "565900819ef10b90904d40c485df782f2293cc389b1964d29bb91f58b29f491f",
+      "GLYPH-152": "d6caeec31f4e70bbd4890e0f0847eb9ea40181253e0949155144f12f2537e262",
+      "GLYPH-153": "97c1c9e662d2215bb586efd4f94ef2b0fbc30dfc3dde265a4b5850996bf7e07a",
+      "GLYPH-154": "be79f83dedab6175305886f4526dbec4c982e71df005b674137954808610c094",
+      "GLYPH-155": "4ea6581473869a2452b13b677cba548d2dca4f33c35740de7d61976ec90c6ec3",
+      "GLYPH-156": "71055c8254ca5f0ec88269a8db7933e139a5f3ba1cd11cedf037860923499e6b",
+      "GLYPH-157": "2576327d90d0f63a27324de4c2136958bbb7a87c111d8b86c7bbcaa409ffe289",
+      "GLYPH-158": "43bd639521cea049fd177c5f8c3cdc4cefafa785032e34b1b0383d63dfdc4dfa",
+      "GLYPH-159": "a99d3f6ca95d01f41d35828e165f7b3d4c713442c622b3a50f44cee6271729f9",
+      "GLYPH-160": "da190b435986bb8268d54455b608d630c713ad77619f4a18d54a4ca048f1c330",
+      "GLYPH-161": "eb4911c9f6089b0f45aa910b5270e08f3f868e8c608764143790d9971de47e99",
+      "GLYPH-162": "07da05fc09a7a9be2803293aa2561345f06a11b9f4bf2e92bdd9e2fcbc562ae7",
+      "GLYPH-163": "2fb2c68293fb6fa5364b644d566bbe77c5b09a63dcaf42ac19e5565712359577",
+      "GLYPH-164": "f80ff66f8eaf81dfc9a468e52f46bc8bdb7a7fb274c199d90419f6630e678fd9",
+      "GLYPH-165": "6379f3dc14981a7c45e9e527894c6633f537986ccaf0839eecd34ba2ff13f3c4",
+      "GLYPH-166": "c0522b0c8e2de48a43303e9a3ad9057d74e4058eb873feb2a5e846f116733220",
+      "GLYPH-167": "e54e166d88032e08781d1d0a1107c8768f9688ca2a35a4b156516b1f73c324b7",
+      "GLYPH-168": "06a2214eddebea2a9f57e0bc5347cbcb2fc0f97d43255a42ad5b0acf67c5d134",
+      "GLYPH-169": "0cb0411aa2c189d783ad01dae8aa9fa7bbb3abfc33b3bbdff5408bff69191746",
+      "GLYPH-170": "acb9f101e7fe2d9646fd3b96791c67eb4dd4bbf3786b692d93386c85faa970b0",
+      "GLYPH-171": "ac4369098a64a069f62118bd7a38d3c5f2c79d988b9fd84b02aea16a52c89b85",
+      "GLYPH-172": "35869f54b51c151b711d7e5745177008a171c8d42ef5ede1fb9bfac8afdd4a52",
+      "GLYPH-173": "6f4ff448cb7fbc50a61d4d055aeb2d830da6713da4ec97ff36b8d8e9193983dd",
+      "GLYPH-174": "2a63c66b26a4fecaa0acfa5e2797eaa821d364304792175ec284cd2abf68452b",
+      "GLYPH-175": "1fbce399f08c22b58ec83a7831907c98887127f407d7797ffcf93329431c8e92",
+      "GLYPH-176": "4faaf22bd19e73311ed115b24477fee0dd7694d296846e734c9534b56195acf0",
+      "GLYPH-177": "0b476f0774437dcf53701ae2a3e45be5669ea2af73237247b06987b37b5aadce",
+      "GLYPH-178": "925206b2da1fe1e0aad6eebb8d0d83f1529b49f2f93954284f2e15b56cecedfc",
+      "GLYPH-179": "368f88143ea8105672fe1b0e3b94e7f8ba18b94ab2550eb20b2ddb235fcd6112",
+      "GLYPH-180": "30d6cb36436f91b4cbbe97c50d7085c75ba84aba1d85cf6fffc30d950601ca1c",
+      "GLYPH-181": "f7897f1ead5fc5e2c9d0e8532306c60d182c54377cc3371d8b0b4a88317e8c0a",
+      "GLYPH-182": "08e1f883446fda9e47d5be51fe590eb009bc48a455e2cf6c5b9f6e37a848b62d",
+      "GLYPH-183": "9c69ee57bdce85330f07c2904efaef5f4c7189525992cd227fa5ff49bbce03a6",
+      "GLYPH-184": "6a911709a3e2c5ddc43455f9e7f5b900d984a6290780761dc76ca8b74490438e",
+      "GLYPH-185": "d5ada6e57ae7f2d8a22987641d3f1d1dfbe00874b23f1adef22934cf571d54a2",
+      "GLYPH-186": "62a8018a23a9b8fc4ae9492f2503bbfd7e1aa99589b48f9c7868f1977d75abf7",
+      "GLYPH-187": "b187ed77449913ecc38ca1ae063b189ee7e5483fe5f1f23223b3c44310892a48",
+      "GLYPH-188": "46e19191f9c588e406eeec8aaaf5ea693db25f0e98d64d6d4ee7ecbe864ed4c4",
+      "GLYPH-189": "db1caa36330f9e83768ef083f91199e33f68abd0c5d70a543b2cf2e816f44e72",
+      "GLYPH-190": "bc6c14e80c44294ab6e5eacf71bee58071f04dacd6ed8a0c16f5fdc3804c7ad0",
+      "GLYPH-191": "1d668e7b5d18423758a26045ae481efafac4bbd8b62bbe4508ff19bdc64470a4"
+    },
+    "findings": [
+      "All 192 silhouettes reviewed at four sizes on black-on-white sheets. Heavy strokes, controlled corners and separated structural families are consistent across the catalog.",
+      "Corrected apertures remain open at small sizes; no blank glyphs or lost components/counters in the bound size audit.",
+      "1-3-pixel extra enclosed specks remain in nine glyphs at 16px and two at 64px; none at 32px or 128px. These do not obstruct the reviewed silhouettes.",
+      "Numeric shape matching and visual review do not establish legal originality or exact equivalence to the reference artwork."
+    ],
+    "size_review_sha256": "518a353e72713fef2576dc1fcc6988ade52119d6ff6e2bcc4bbf88d1991a0bfd"
+  },
+  "failed_gates": [],
+  "strict_all_continuous_failed_gates": [
+    "new-only.threshold_96_160_ink_change_fraction"
+  ],
+  "raster_sensitivity_failed_gates": [
+    "new-only.threshold_96_160_ink_change_fraction"
+  ],
+  "raster_sensitivity_policy": "Reported explicitly; anti-alias distribution is not a geometry-style gate.",
+  "topology_threshold_failures": [],
+  "exact_duplicate_silhouettes": [],
+  "measurement_resolution_failures": [],
+  "unknown_profiles": [],
+  "unknown_families": [],
+  "distinctness": {
+    "method": "tight crop; longest dimension uniform-scaled; centered; bounded translation; x/y reflections",
+    "comparison_size": 64,
+    "translation_radius": 2,
+    "threshold": 0.85,
+    "count": 192,
+    "compared_pairs": 18336,
+    "exact_duplicates": [],
+    "normalized_duplicates": [],
+    "reflected_duplicates": [],
+    "aligned_exact_pairs": [],
+    "near_matches": [],
+    "requires_optical_review": false,
+    "originality_claim": false
+  },
+  "findings": [
+    "classic.counter_width_median_canvas_fraction: only 9 eligible glyphs; inspect optically."
+  ],
+  "acceptance_rationale": "Complete catalog, declared family quotas, every profile shape median within its reference IQR, at least 80% in each reference P10–P90 band, topology frequencies within 10 percentage points, stable threshold topology, distinct silhouettes, and separate optical review. Numeric acceptance does not assert an exact style match or establish originality."
+}

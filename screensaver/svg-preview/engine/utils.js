@@ -1,0 +1,166 @@
+const makePassTexture = (regl, halfFloat) =>
+	regl.texture({
+		width: 1,
+		height: 1,
+		type: halfFloat ? "half float" : "uint8",
+		wrap: "clamp",
+		min: "linear",
+		mag: "linear",
+	});
+
+const makePassFBO = (regl, halfFloat) => regl.framebuffer({ color: makePassTexture(regl, halfFloat) });
+
+const makeDoubleBuffer = (regl, props) => {
+	const state = Array(2)
+		.fill()
+		.map(() =>
+			regl.framebuffer({
+				color: regl.texture(props),
+				depthStencil: false,
+			})
+		);
+	return {
+		front: ({ rainTick, tick }) => state[(rainTick ?? tick) % 2],
+		back: ({ rainTick, tick }) => state[((rainTick ?? tick) + 1) % 2],
+	};
+};
+
+const isPowerOfTwo = (x) => Math.log2(x) % 1 == 0;
+
+const loadImage = (regl, url, mipmap) => {
+	let texture = regl.texture([[0]]);
+	let loaded = false;
+	return {
+		texture: () => {
+			if (!loaded && url != null) {
+				console.warn(`texture still loading: ${url}`);
+			}
+			return texture;
+		},
+		width: () => {
+			if (!loaded && url != null) {
+				console.warn(`texture still loading: ${url}`);
+			}
+			return loaded ? texture.width : 1;
+		},
+		height: () => {
+			if (!loaded && url != null) {
+				console.warn(`texture still loading: ${url}`);
+			}
+			return loaded ? texture.height : 1;
+		},
+		loaded: (async () => {
+			if (url != null) {
+				const data = new Image();
+				data.crossOrigin = "anonymous";
+				data.src = url;
+				await data.decode();
+				loaded = true;
+				if (mipmap) {
+					if (!isPowerOfTwo(data.width) || !isPowerOfTwo(data.height)) {
+						console.warn(`Can't mipmap a non-power-of-two image: ${url}`);
+					}
+					mipmap = false;
+				}
+				texture = regl.texture({
+					data,
+					mag: "linear",
+					min: mipmap ? "mipmap" : "linear",
+					flipY: true,
+				});
+			}
+		})(),
+	};
+};
+
+const loadText = (url) => {
+	let text = "";
+	let loaded = false;
+	return {
+		text: () => {
+			if (!loaded) {
+				console.warn(`text still loading: ${url}`);
+			}
+			return text;
+		},
+		loaded: (async () => {
+			if (url != null) {
+				const response = await fetch(new URL(url, import.meta.url));
+				if (!response.ok) {
+					throw new Error(`Shader load failed (${response.status}): ${url}`);
+				}
+				text = await response.text();
+				loaded = true;
+			}
+		})(),
+	};
+};
+
+const makeFullScreenQuad = (regl, uniforms = {}, context = {}) =>
+	regl({
+		vert: `
+		precision mediump float;
+		attribute vec2 aPosition;
+		varying vec2 vUV;
+		void main() {
+			vUV = 0.5 * (aPosition + 1.0);
+			gl_Position = vec4(aPosition, 0, 1);
+		}
+	`,
+
+		frag: `
+		precision mediump float;
+		varying vec2 vUV;
+		uniform sampler2D tex;
+		void main() {
+			gl_FragColor = texture2D(tex, vUV);
+		}
+	`,
+
+		attributes: {
+			aPosition: [-4, -4, 4, -4, 0, 4],
+		},
+		count: 3,
+
+		uniforms: {
+			time: regl.context("time"),
+			tick: regl.context("tick"),
+			...uniforms,
+		},
+
+		context,
+
+		depth: { enable: false },
+	});
+
+// Advance tick/time only for simulation updates. Camera-only draws reuse the
+// current compute front buffer and freeze every time-driven postprocess.
+const makeSimulationScope = (regl, simulation) => makeFullScreenQuad(
+	regl,
+	{ time: regl.context("rainTime"), tick: regl.context("rainTick") },
+	{ rainTime: () => simulation.time, rainTick: () => simulation.tick }
+);
+
+const make1DTexture = (regl, rgbas) => {
+	const data = rgbas.map((rgba) => rgba.map((f) => Math.floor(f * 0xff))).flat();
+	return regl.texture({
+		data,
+		width: data.length / 4,
+		height: 1,
+		format: "rgba",
+		mag: "linear",
+		min: "linear",
+	});
+};
+
+const makePass = (outputs, ready, setSize, execute) => ({
+	outputs: outputs ?? {},
+	ready: ready ?? Promise.resolve(),
+	setSize: setSize ?? (() => {}),
+	execute: execute ?? (() => {}),
+});
+
+const makePipeline = (context, steps) =>
+	steps.filter((f) => f != null).reduce((pipeline, f, i) => [...pipeline, f(context, i == 0 ? null : pipeline[i - 1].outputs)], []);
+
+export { makePassTexture, makePassFBO, makeDoubleBuffer, loadImage, loadText, makeFullScreenQuad, makeSimulationScope, make1DTexture, makePass, makePipeline };

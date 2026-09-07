@@ -1,0 +1,176 @@
+{
+  "version": "matrix-rain-regl-adaptation-v1",
+  "source_repository": "https://github.com/m8e/matrix-rain",
+  "source_commit": "5ba90490453ceceb6812d6b1bc658a99a92411d0",
+  "license": "MIT",
+  "license_path": "LICENSE",
+  "files": [
+    {
+      "source_path": "js/regl/rainPass.js",
+      "path": "rainPass.js",
+      "source_sha256": "a10bb53583d2423feb9d10adcafcd368eca299b6065646e111c09d2e37af931f",
+      "source_git_blob": "f423473d79872599294b3f23bc3392bb1a74f5ee",
+      "sha256": "70c51df478d33a73ebe9e9ca6fef1ed09f7a1a9ffd64b68911a67f0963cce93d",
+      "changes": [
+        "Resolve shaders relative to the vendored engine.",
+        "Add the separate generated MSDF atlas and weighted catalog uniforms.",
+        "Read interactive camera offsets without changing rain state.",
+        "Await the effect shader and generated atlas before readiness.",
+        "Allow camera-only draws to skip simulation compute passes."
+      ]
+    },
+    {
+      "source_path": "js/regl/bloomPass.js",
+      "path": "bloomPass.js",
+      "source_sha256": "2898275321650645eed25b5467c08bcf446bfbcd7058089c225038d3ebf1a9ee",
+      "source_git_blob": "11e2710cbb729aeea5765788d37dcfd3a6f72b8d",
+      "sha256": "79f6009f6d6eaa2844bad93c78f1fdfd20204dd83ac9bc4560f9ff40b7d86c30",
+      "changes": [
+        "Resolve shaders relative to the vendored engine.",
+        "Await the combine shader before readiness.",
+        "Clamp bloom pyramid dimensions to at least one pixel."
+      ]
+    },
+    {
+      "source_path": "js/regl/palettePass.js",
+      "path": "palettePass.js",
+      "source_sha256": "2f5de631f4526c4b3e3cd578bbd540e53477e5f9d5c9f63311535afd859d3761",
+      "source_git_blob": "7c9a548eac165a5b9633a6adc98ecffbd58c5402",
+      "sha256": "9913f36fa9db86e405088bc975bf69f731c7019cca45f98de2d6a5c83e583e94",
+      "changes": [
+        "Adapt flattened color utility import and engine-relative shader URLs."
+      ]
+    },
+    {
+      "source_path": "js/regl/utils.js",
+      "path": "utils.js",
+      "source_sha256": "c3cc09ae73f7046f490db820ff5fecb0f4997507ca3ecad5f2c5a7f92407f916",
+      "source_git_blob": "efbb284b7d426befb65b6b5d30b49138561abf16",
+      "sha256": "5018541245bf7d8556fd43089b09110ff4c145db7352b102b62a7e29e426569e",
+      "changes": [
+        "Resolve shader URLs relative to this module and reject failed HTTP responses.",
+        "Add explicit simulation time/tick scope and honor supplied uniform overrides.",
+        "Key double buffers by simulation tick so paused draws retain the computed front."
+      ]
+    },
+    {
+      "source_path": "js/colorToRGB.js",
+      "path": "colorToRGB.js",
+      "source_sha256": "cc868a9b4047c2c325ade036fb9bad79f4985705b58af338de10349370a0b9a9",
+      "source_git_blob": "54f3f16bcbbd0a9a512258ddb013e00d9f9f5fe2",
+      "sha256": "cc868a9b4047c2c325ade036fb9bad79f4985705b58af338de10349370a0b9a9",
+      "changes": []
+    },
+    {
+      "source_path": "shaders/glsl/rainPass.intro.frag.glsl",
+      "path": "shaders/rainPass.intro.frag.glsl",
+      "source_sha256": "d409f1f2fe372b6ce2b4a7aaaab00ce85c43853b87011e1c0030a3f45a70bb9e",
+      "source_git_blob": "431ae54c7a7d88db7d250457a0495ccc6e5da802",
+      "sha256": "d409f1f2fe372b6ce2b4a7aaaab00ce85c43853b87011e1c0030a3f45a70bb9e",
+      "changes": []
+    },
+    {
+      "source_path": "shaders/glsl/rainPass.raindrop.frag.glsl",
+      "path": "shaders/rainPass.raindrop.frag.glsl",
+      "source_sha256": "8f8ce9164ff8bf2005f10ad981959e75e4cb153b6f6a12d347586f3813820213",
+      "source_git_blob": "870f3aea006c949a7e60fe2b6f3c2194822557a7",
+      "sha256": "8f8ce9164ff8bf2005f10ad981959e75e4cb153b6f6a12d347586f3813820213",
+      "changes": []
+    },
+    {
+      "source_path": "shaders/glsl/rainPass.symbol.frag.glsl",
+      "path": "shaders/rainPass.symbol.frag.glsl",
+      "source_sha256": "8dc87266bfdfbba635975fd65c48208ae7165f38e13851c04b55f92585ca85f0",
+      "source_git_blob": "00d62c0d697532a39ca1f376e24baf3addaf8e1c",
+      "sha256": "08f5220fce20c9191170086615061556401db5484994a153335aeda5569ca99c",
+      "changes": [
+        "Store catalog selector in previously unused blue channel.",
+        "Select base or original catalog at glyph reset/cycle boundaries; zero mix preserves base random sequence."
+      ]
+    },
+    {
+      "source_path": "shaders/glsl/rainPass.effect.frag.glsl",
+      "path": "shaders/rainPass.effect.frag.glsl",
+      "source_sha256": "6c0ee969bd62a7d313a69e19d8a29a0febf2884b5534a706685717496a3289b4",
+      "source_git_blob": "b10044866ec3fa03f3ea1412395e25fe680b23bb",
+      "sha256": "6c0ee969bd62a7d313a69e19d8a29a0febf2884b5534a706685717496a3289b4",
+      "changes": []
+    },
+    {
+      "source_path": "shaders/glsl/rainPass.vert.glsl",
+      "path": "shaders/rainPass.vert.glsl",
+      "source_sha256": "2b6f0230c9123045a60e33391516d54a89f35cf864aaccb741a857ef0988cb0b",
+      "source_git_blob": "42b40ebc7646b8f52a0d75bd4944c94d9cb39c8d",
+      "sha256": "365b7bb1f7c165103472adaea6198cb2ac5889141f2ef4f20ca62baa863b5adf",
+      "changes": [
+        "Use high precision for atlas coordinates and matched varyings.",
+        "Apply independent user camera offsets in volumetric mode with per-column wrapping."
+      ]
+    },
+    {
+      "source_path": "shaders/glsl/rainPass.frag.glsl",
+      "path": "shaders/rainPass.frag.glsl",
+      "source_sha256": "563bdefa84e119778eba4d63748292d823cf64e623a7d3a4c9687b7b50413b0d",
+      "source_git_blob": "60891b199be1a5b55e251f392fe126d5885bd521",
+      "sha256": "1cd3c2fbdb887965e0906b5a55cf16c0e95385f2deb15008fd8e1433b1000fa5",
+      "changes": [
+        "Use high precision for 2048 by 1536 generated atlas coordinates.",
+        "Select the base or generated MSDF atlas, grid and pixel range from glyph state.",
+        "Initialize glint coverage to zero and exclude generated glyphs from base-only glint artwork."
+      ]
+    },
+    {
+      "source_path": "shaders/glsl/bloomPass.highPass.frag.glsl",
+      "path": "shaders/bloomPass.highPass.frag.glsl",
+      "source_sha256": "727979238690fc06a8fcc14065468e43bd23d6710ab0b8fc4dbf985f6fa00034",
+      "source_git_blob": "9a246377f2c3934efb1f1221b6417b0d488b1c7d",
+      "sha256": "727979238690fc06a8fcc14065468e43bd23d6710ab0b8fc4dbf985f6fa00034",
+      "changes": []
+    },
+    {
+      "source_path": "shaders/glsl/bloomPass.blur.frag.glsl",
+      "path": "shaders/bloomPass.blur.frag.glsl",
+      "source_sha256": "c1a2b01ad593d1d5bf95cbe2eb3a957c85840c0ede6fe893c61baf81fe610faa",
+      "source_git_blob": "f094050293d1eb2b38aa4f024c0f9212fb91eb3c",
+      "sha256": "c1a2b01ad593d1d5bf95cbe2eb3a957c85840c0ede6fe893c61baf81fe610faa",
+      "changes": []
+    },
+    {
+      "source_path": "shaders/glsl/bloomPass.combine.frag.glsl",
+      "path": "shaders/bloomPass.combine.frag.glsl",
+      "source_sha256": "a2cebf40734ecba772668548816a32235ef7e48439ee1c2ddb9fb20582060b0b",
+      "source_git_blob": "431c0ce6222f2dc32b3e40b7ff008dbb72b64511",
+      "sha256": "a2cebf40734ecba772668548816a32235ef7e48439ee1c2ddb9fb20582060b0b",
+      "changes": []
+    },
+    {
+      "source_path": "shaders/glsl/palettePass.frag.glsl",
+      "path": "shaders/palettePass.frag.glsl",
+      "source_sha256": "d58298cd551be59495289463e93bf306a345eae7693617c147e7b332b7714e82",
+      "source_git_blob": "6fda8624907d56f87fc6f70b63a08e7449bea7d2",
+      "sha256": "d58298cd551be59495289463e93bf306a345eae7693617c147e7b332b7714e82",
+      "changes": []
+    }
+  ],
+  "runtime_contract": {
+    "simulation": "Fixed nominal 60 Hz controlled by host; initialize tick0 before advancing. Camera-only draws reuse the same tick and skip compute.",
+    "camera_units": {
+      "horizontal_world_span": 140,
+      "depth_world_span": 60
+    },
+    "generated_atlas": {
+      "count": 192,
+      "grid": [
+        16,
+        12
+      ],
+      "cell_pixels": 128,
+      "distance_range": 16,
+      "sampling": "median of RGB channels"
+    },
+    "default_original_share": 0.1,
+    "fragment_precision": "highp required",
+    "source_hash_basis": "Unmodified git blob bytes at the pinned upstream commit; authored files normalized LF."
+  },
+  "license_sha256": "65333257cebb87e8af86201a65f0e550d65b3cf5a468bfee2a69c9d2b5d21123"
+}

@@ -1,0 +1,33 @@
+# Preserve byte hashes for the original SVG campaign across Windows and Unix.
+/benchmarks/*svg*.py text eol=lf
+/benchmarks/results/glyph_svg_v1*.json text eol=lf
+/benchmarks/partitions/glyph_svg_v1/**/*.json text eol=lf
+/benchmarks/partitions/glyph_svg_v1/**/*.svg text eol=lf
+/benchmarks/partitions/glyph_svg_v1/**/*.png -text
+/docs/data/glyph-style-summary.json text eol=lf
+/screensaver/svg-preview/*.js text eol=lf
+/screensaver/svg-preview/*.mjs text eol=lf
+/screensaver/svg-preview/*.html text eol=lf
+/screensaver/svg-preview/*.css text eol=lf
+
+# Preserve pinned reference notices, code, and artwork bytes.
+/screensaver/import_reference_glyphs.py text eol=lf
+/screensaver/svg-preview/reference/* text eol=lf
+/screensaver/svg-preview/reference/*.png -text
+/screensaver/svg-preview/engine/** text eol=lf
+/screensaver/svg-preview/lib/** text eol=lf
+/screensaver/svg-preview/*.png -text
+/screensaver/export_generated_sdf.py text eol=lf
+/screensaver/svg-preview/generated-sdf.json text eol=lf
+
+# Preserve the outlined explorer logo and bundled font provenance.
+/screensaver/svg-preview/wordmark.svg text eol=lf
+/screensaver/svg-preview/fonts/*.ttf -text
+/screensaver/svg-preview/fonts/*.txt text eol=lf
+/screensaver/svg-preview/fonts/*.json text eol=lf
+
+# These measured files include original CRLF bytes. Preserve their recorded hashes.
+/screensaver/svg-preview/settings.css -text
+/assets/wordmark.svg -text
+/benchmarks/partitions/glyph_rain_reference_v1/*.json -text
+/benchmarks/partitions/glyph_svg_v1/renderer-v1/** -text

@@ -4,14 +4,46 @@
 three depth planes. Bold angular strokes, luminous green bodies, and varied
 bloom give each stream a distinct weight against black space.
 
-Every port uses the [glyph benchmark's](../benchmarks/glyph_screensaver_benchmark.md)
+The native ports and original web view use the [glyph benchmark's](../benchmarks/glyph_screensaver_benchmark.md)
 original stroke programs, speeds, and trail lengths. The renderer draws each
 bounded trail from cached sprites, keeping glyphs sharp as the code falls.
 
-The [next-version design plan](../docs/glyph-rain-plan.md) specifies measured
-glyph styling, independently drawn SVGs, and arrow-key exploration through
-3D code rain. Those changes are planned; the downloads below are the verified
-current renderers.
+The separate [web explorer](svg-preview/README.md) adapts the MIT-licensed
+rain, bloom, and palette renderer from m8e/Rezmason. It combines the reference's
+56 visible base glyphs and blank slot with Smythe's 192 original SVGs, using
+the originals for 10% of selections by default. Its
+[renderer interaction checkpoint](../benchmarks/partitions/glyph_rain_reference_v1/pixel-preview-review.json)
+passed before the final borderless styling; rendering performance remains unmeasured.
+The native downloads below retain the earlier stroke
+catalog and renderer.
+
+## Reference-based web explorer
+
+Classic uses the reference's fixed 2D grid. The 3D preset adds arrow-key travel;
+Operator is a separate visual preset. S opens settings, Space pauses playback,
+R resets the viewpoint, and F toggles fullscreen. Settings edit a draft and
+apply together; the URL retains the selected configuration.
+Simple VT323 pixel controls and a Trajan Bold outline logo sit within generous black
+padding. The interface uses Hottelet green `#37FF6E` and bright `#9CFFBC`, with
+borderless text controls and no glow or corner ornaments. The rain retains its 137°
+Matrix green grade and mint `#A2FFD8` highlights; Reference body colors remain
+selectable.
+
+The renderer and reference artwork are licensed imports. Smythe's original
+192-glyph catalog remains an independently generated artifact, with separate
+hashes and acceptance records.
+
+[Complete 192-glyph contact sheet](../benchmarks/partitions/glyph_svg_v1/catalog/contact-sheet.png) ·
+[24-glyph calibration sheet](../benchmarks/partitions/glyph_svg_v1/catalog/calibration-sheet.png) ·
+[Individual SVGs and manifest](../benchmarks/partitions/glyph_svg_v1/catalog/) ·
+[Run the explorer](svg-preview/README.md).
+
+The [new benchmark](../benchmarks/svg_glyph_benchmark.md) measures fresh original
+SVG geometry, style validation, duplicate detection, and catalog assembly
+through Smythe. Its 4.03-second median workflow result excludes imported base
+artwork and browser rendering. The adapted renderer has not been timed; the
+[previous renderer's records](../benchmarks/partitions/glyph_svg_v1/renderer-v1/)
+remain superseded diagnostics.
 
 ## From goal to screensaver
 
@@ -20,7 +52,7 @@ uniqueness, and assembles the accepted artifacts:
 
 ![Glyph generation workflow](../assets/glyph_rain/glyph_pipeline.svg)
 
-Twelve specimens from the current 192-glyph catalog:
+Twelve specimens from the native ports' 192-glyph stroke catalog:
 
 ![Original glyph specimens](../assets/glyph_rain/glyph_specimens.svg)
 
@@ -28,12 +60,13 @@ Twelve specimens from the current 192-glyph catalog:
 
 | Port | Where | Run it |
 |---|---|---|
-| Web (this directory) | [index.html](index.html) + [glyphs.js](glyphs.js) | open `index.html` directly or deploy this static directory |
+| Legacy web (this directory) | [index.html](index.html) + [glyphs.js](glyphs.js) | open `index.html` directly or deploy this static directory |
+| Reference-based web explorer | [svg-preview/](svg-preview/README.md) | serve the repository locally; Classic, 3D, and Operator presets; browser interaction checks pass |
 | Windows 11 (`.scr`) | source [windows/](windows/), binary [dist/SmytheGlyphRain.scr](dist/SmytheGlyphRain.scr) | download the `.scr`, right-click → **Install** |
 | macOS 12+ (`.saver`) | source [macos/](macos/), [universal ZIP](dist/GlyphRain-macos-universal.zip) | unzip, then double-click `GlyphRain.saver`; build locally with `macos/build_macos.sh` |
 | Linux x86-64 / X11 | source and setup [linux/](linux/README.md), [compiled archive](dist/SmytheGlyphRain-linux-x86_64.tar.gz) | extract and run `./smythe-glyph-rain-linux-x86_64 --window`; build with `sh screensaver/linux/build_linux.sh` |
 
-The ports share layer sizes, column spacing, stroke weights, colors, and
+The native ports and legacy web view share layer sizes, column spacing, stroke weights, colors, and
 motion rules. Foreground glyphs are larger and brighter; distant streams are
 finer and slower. Trail brightness depends on position within the stream,
 so display refresh rate does not accumulate glow or leave faded ghost columns.
@@ -90,7 +123,7 @@ Each check produces a rendering receipt. These checks validate native execution;
 OS installation policy and session locking remain separate concerns.
 Windows `/s` multi-monitor dispatch is not covered by these checks.
 
-## Web controls
+## Legacy web controls
 
 - **Click / F** — toggle fullscreen
 - **Space** — pause
@@ -123,17 +156,20 @@ artifacts retain their original renderings and hash-bound receipts.
 
 ## Credits and references
 
-Visual and technical research for Glyph Rain's next version draws on
+Glyph Rain's current web explorer adapts the renderer and classic artwork from
 [m8e/matrix-rain](https://github.com/m8e/matrix-rain), a fork of
 [Rezmason/matrix](https://github.com/Rezmason/matrix). Credit to Rezmason and
 the project's contributors for the reference implementation of glyph
 presentation, traveling illumination, green palettes, bloom, and depth.
 
-We studied [revision 5ba9049](https://github.com/m8e/matrix-rain/tree/5ba90490453ceceb6812d6b1bc658a99a92411d0).
+The imported source is pinned to [revision 5ba9049](https://github.com/m8e/matrix-rain/tree/5ba90490453ceceb6812d6b1bc658a99a92411d0).
 Its [MIT license](https://github.com/m8e/matrix-rain/blob/5ba90490453ceceb6812d6b1bc658a99a92411d0/LICENSE)
-credits **Copyright (c) 2018 Rezmason**. Smythe uses independently authored
-code and glyphs; no source code, glyph outlines, textures, or fonts from the
-reference project are included.
+credits **Copyright (c) 2018 Rezmason**. Copies of the notice accompany the
+[engine](svg-preview/engine/LICENSE) and [base artwork](svg-preview/reference/LICENSE).
+The [artwork provenance](svg-preview/reference/provenance.json) identifies the
+source atlas and extracted outlines. The REGL rain, bloom, and palette passes
+are adapted licensed code; the additional 192 Smythe glyphs are independently
+authored and retain their own generation receipts.
 
 The [style and implementation plan](../docs/glyph-rain-plan.md) records the
 reference measurements and the specification for new original SVG glyphs.

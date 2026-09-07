@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-07T09:40:56.7647966Z",
+  "status": "frozen",
+  "sourceDirectory": "screensaver/svg-preview",
+  "purpose": "Byte-preserved renderer v1, browser harnesses, and captured image backing the original 192-glyph renderer/soak/visual receipts before the next behavior revision.",
+  "files": {
+    "browser-command.mjs": "8b98aa31695467a0a72d3ebb15853f2ea7740fc0ba849628ace21a102218530e",
+    "catalog.html": "8eb87e3900c445f900fb58b6ba3b765bdc643dbb00e8e85e467f487038e67c2c",
+    "glyphs.js": "63967d8b1fe5c7dfb46ec665851b675682d88bd5c18e39a6a7f44ac692cbaabd",
+    "index.html": "a0bcc557335832710afd7da9cf0e3ec911a3a46a0f648f6dfa09add4e8769c48",
+    "measure.mjs": "921e6cbb08d5824bf1db2399e8df5d391591477fe9fffe71837dfbd594911c48",
+    "model.mjs": "90c18929d1449b248114104c1af2163047b2163536cea0ee45f90ee2466a9511",
+    "preview.png": "a25f66f55019338e3647ccb4b3b6290d07697e35cdb7d8436ecc318a7ea4e9d7",
+    "provenance.mjs": "327debb738aa27a06f5c033a76d710889b7fada5057a6d4a8446ffde4ff1f420",
+    "rain.js": "f6fc17c38f71f7e0ef02a1bf007b0b0e6d8e9b211cf006683dcf1a6bdd8a58b7",
+    "review.mjs": "9a7eab054dc24641cf24299dd18f2a1bca64ad7614b3b74d5540389b4d870f1d",
+    "soak.mjs": "10f1d80ea03927224dccfb0ca8ceae13761b18e90406d96e967531d64a4b3f25",
+    "style.css": "80e91a4f46984b5119e454948aa3211dd3e3f5c0fa84c17587bb35ee962c7cdc",
+    "verify-browser-command.mjs": "9d60c40623d2ad04512ba842bce0562e3997847aae2bbee65f858cd8b1fc9fbf",
+    "verify-measure-guard.mjs": "8d1cedd1ec25237d8758ce7f99c71236c56d67f17d9d47d01098acc3a853a007",
+    "verify-model.mjs": "037b4fcb160dee7bdeb2d6a25e052642c6e782e0dab6897e10ccd6d259581ab6",
+    "verify-provenance.mjs": "39587265439919bd18905978671ddd73b5ced2eb9694e781857a582fe6fcfb20"
+  },
+  "verifiedReceipts": [
+    "benchmarks/results/glyph_svg_v1_renderer_r1.json",
+    "benchmarks/results/glyph_svg_v1_renderer_r2.json",
+    "benchmarks/results/glyph_svg_v1_renderer_r3.json",
+    "benchmarks/results/glyph_svg_v1_soak.json",
+    "benchmarks/partitions/glyph_svg_v1/preview-review.json"
+  ]
+}

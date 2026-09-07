@@ -76,6 +76,26 @@ jobs:
           --latency-s 0
           --out "$RUNNER_TEMP/glyph-artifacts"
           --results "$RUNNER_TEMP/glyph.json"
+      - name: Exercise original SVG generation and validation offline
+        run: >-
+          python benchmarks/run_svg_glyph_benchmark.py
+          --glyphs 4 --concurrencies 1,2 --executors process
+          --repeats 1 --render-sizes 64
+          --out "$RUNNER_TEMP/svg-glyph-artifacts"
+          --results "$RUNNER_TEMP/svg-glyph.json"
+      - name: Verify the persistent 3D world and camera
+        run: node screensaver/svg-preview/verify-model.mjs
+      - name: Verify reference presets and settings
+        run: |
+          node screensaver/svg-preview/verify-settings.mjs
+          node screensaver/svg-preview/verify-config.mjs
+          node screensaver/svg-preview/verify-timing.mjs
+      - name: Verify browser receipt provenance checks
+        run: node screensaver/svg-preview/verify-provenance.mjs
+      - name: Verify browser helper process handling
+        run: node screensaver/svg-preview/verify-browser-command.mjs
+      - name: Verify benchmark receipt overwrite protection
+        run: node screensaver/svg-preview/verify-measure-guard.mjs
 
   package-smoke:
     runs-on: ubuntu-latest

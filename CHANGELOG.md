@@ -23,20 +23,41 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Added
 
+- **GPT-6 Astra quickstart and campaign plan**: the README uses `gpt-6-astra`
+  for text-only planning and execution. The planned live comparison separates
+  model capability from orchestration and requires complete usage accounting.
+- **Original SVG glyph workflow**: filled-contour generation, per-profile
+  measurements against the numeric style brief, complete silhouette comparisons,
+  and a repeated thread/process benchmark that includes validation and assembly.
+  Published contact sheets and browser data are exported from measured files.
+- **Reference-based web explorer** (`screensaver/svg-preview/`): MIT-licensed
+  m8e/Rezmason REGL rain, bloom, and palette adaptation, pinned to `5ba9049`.
+  Its 56 visible base glyphs and blank slot are combined with the independently
+  generated 192-glyph catalog; originals account for 10% of selections by default.
+  Classic 2D, 3D, and Operator presets use a URL-backed settings sheet with
+  batched Apply, keyboard access, and focus restoration. A cooler Matrix-green
+  rain palette and mint highlights accompany simple VT323 pixel controls,
+  a Trajan Bold outline logo, and generous black padding. The UI uses Hottelet
+  greens `#37FF6E` and `#9CFFBC`, borderless text controls, and no interface glow
+  or corner ornaments. Browser interaction checks pass; performance and
+  quantified reference parity remain unmeasured.
+  Native downloads retain the earlier
+  stroke catalog. The previous Canvas renderer, screenshot, and hash-bound
+  timing/soak receipts are preserved as superseded evidence.
 - **Glyph Rain screensaver ports** (`screensaver/`): a static fullscreen web
   app with three depth layers and bounded luminous trails; a native Windows
   `.scr` in C#/GDI+; a universal macOS `.saver` in Swift; and a Linux x86-64
   X11 executable in C/Cairo. Compiled downloads, SHA-256 checksums, build
   provenance, and native verification receipts are committed in
-  `screensaver/dist/`. Every port uses the same 192-glyph catalog exported by
+  `screensaver/dist/`. Every native port and the legacy web view use the same 192-glyph catalog exported by
   `screensaver/export_glyphs.py`.
 - **README benchmark charts** rendered deterministically from committed
   result records by `benchmarks/render_readme_charts.py` into
   `assets/benchmarks/`.
 - **Glyph Rain example showcase** using the supplied full-resolution screenshot,
   direct Windows/macOS/source links, a 64-to-256-node scaling chart, and diagrams
-  rendered from the committed glyph catalog. Framework and task-shape charts
-  appear before the example and remain bound to their committed result records.
+  rendered from the committed glyph catalog. The example leads into generation,
+  recovery, framework, and task-shape evidence, each bound to committed records.
 - **Partitioned 64- and 128-glyph benchmarks** extend the controlled width
   comparison without altering the 192-glyph screensaver or 256-glyph partition;
   every measured output is valid and unique across concurrency 1–64.
@@ -128,17 +149,16 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Changed
 
-- **Glyph Rain credits** acknowledge `m8e/matrix-rain`, its upstream project
-  `Rezmason/matrix`, and the reference's MIT license in the README, screensaver
-  guide, and design plan. The credit identifies the visual and technical study;
-  no reference code or artwork is included.
+- **Glyph Rain credits** identify the adapted code and imported base artwork
+  from `m8e/matrix-rain` and upstream `Rezmason/matrix`. MIT notices accompany
+  both the engine and artwork, with pinned source provenance. The original
+  192-glyph generation benchmark excludes those imports and remains unchanged.
 - **README flow** now introduces Glyph Rain before the full benchmark section,
   while the opening retains the matched 77% token and 28% wall-time results.
   The benchmark narrative moves from artifact scaling and recovery to framework
   efficiency and generated plans.
-- **Glyph Rain design plan** records reference characteristics and acceptance
-  criteria for independently drawn SVG glyphs and future 3D navigation.
-  This documentation change does not replace the shipped renderers or binaries.
+- **Glyph Rain design plan** records reference characteristics, original SVG
+  acceptance criteria, web explorer behavior, and the remaining native porting work.
 
 - **README** highlights the matched framework results: 77% fewer tokens
   and 28% less mean wall time than CrewAI. Charts remain strictly black and

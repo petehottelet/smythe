@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "status": "failed-before-sampling",
+  "evidenceStatus": "diagnostic",
+  "attemptedOutput": "benchmarks/results/glyph_svg_v1_renderer_r1.json",
+  "browserSession": "smythe-svg-measure-1788772887716",
+  "failure": "The browser open command returned success JSON, but Windows daemon output-handle inheritance caused Node execFileSync to time out after 45 seconds.",
+  "rendererSamplesCollected": 0,
+  "resolution": "Measurement and soak helpers now redirect command output to temporary files so daemon descendants cannot retain a captured pipe. No renderer source changed.",
+  "timingUse": "Excluded from renderer performance results."
+}

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<title>BASE-054 — imported classic reference glyph</title>
+<desc>Artwork from m8e/matrix-rain, fork of Rezmason/matrix, commit 5ba90490453ceceb6812d6b1bc658a99a92411d0. See LICENSE and README.md in this directory for attribution and stated origins. Source atlas slot 55; cell translated and uniformly scaled 100/64 without redrawing.</desc>
+<path fill="#000000" fill-rule="nonzero" d="M16.093734375 86.406234375 L16.093734375 73.593765625 L48.906234375 73.593765625 C56.40621875 73.593765625 62.65621875 65.93753125 62.65621875 58.59375 L62.65621875 43.593734375 L16.093734375 43.593734375 L16.093734375 29.99996875 L63.28125 29.99996875 L63.28125 13.749984375 L84.062484375 13.749984375 L84.062484375 59.062484375 C84.062484375 78.28121875 72.812515625 86.406234375 58.4375 86.406234375 L16.093734375 86.406234375 Z"/>
+</svg>

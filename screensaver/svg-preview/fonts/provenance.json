@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "ui_font": {
+    "family": "VT323",
+    "style": "Regular",
+    "license": "SIL Open Font License 1.1",
+    "repository": "https://github.com/google/fonts",
+    "commit": "2da41909d08a7bfeab32cfc163edb7be0c34395d",
+    "files": [
+      {
+        "path": "VT323-Regular.ttf",
+        "source_url": "https://raw.githubusercontent.com/google/fonts/2da41909d08a7bfeab32cfc163edb7be0c34395d/ofl/vt323/VT323-Regular.ttf",
+        "sha256": "cf4de751ada78ceac033dbe16a687742939995b77bc2a052ae17a4957958594d",
+        "bytes": 153116,
+        "modified": false
+      },
+      {
+        "path": "VT323.OFL.txt",
+        "source_url": "https://raw.githubusercontent.com/google/fonts/2da41909d08a7bfeab32cfc163edb7be0c34395d/ofl/vt323/OFL.txt",
+        "sha256": "27d9af34210253e7ca1251fbace86c6f65b40031d6ce1a75493a1b2093631298",
+        "bytes": 4367,
+        "modified": false
+      }
+    ],
+    "cmap_coverage": {
+      "U+2190": false,
+      "U+2191": false,
+      "U+2192": false,
+      "U+2193": false,
+      "U+00D7": true
+    }
+  },
+  "wordmark": {
+    "path": "../wordmark.svg",
+    "sha256": "e9b13d24a04522248a7f6cf11ae8b94840ffb4c8c30fbdd4fb3f130e1fbfd789",
+    "text": "SMYTHE",
+    "source_font_family": "Trajan Pro",
+    "source_font_style": "Bold",
+    "source_font_full_name": "Trajan Pro Bold",
+    "source_font_postscript_name": "TrajanPro-Bold",
+    "source_font_sha256": "fbde6eef85b71f632112932bace7242ced46c928bfa85002e328cbe52c031b91",
+    "source_font_distributed": false,
+    "outline_tool": "fontTools 4.58.1 SVGPathPen + TransformPen",
+    "units_per_em": 1000,
+    "layout": "hmtx advances plus 140 font units between letters; no kerning adjustment",
+    "tracking_font_units": 140,
+    "margin_font_units": 5,
+    "view_box": [
+      0,
+      0,
+      5165,
+      802
+    ],
+    "fill": "#37ff6e",
+    "geometry": "Single compound filled path; outlines translated and Y-reflected into SVG coordinates; no font dependency."
+  },
+  "existing_readme_wordmark": {
+    "path": "../../../assets/wordmark.svg",
+    "sha256": "5de843a21683b3a59c8e7bb04d52138438a9735ca543d6b3873ee807a3ff4cfe",
+    "changed": false
+  }
+}

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Smythe — Original SVG Catalog</title><link rel="icon" href="data:,"><link rel="stylesheet" href="style.css"></head>
+<body class="catalog"><div class="catalog-heading"><div><h1>Glyph catalog</h1><p id="catalog-status">Loading the catalog…</p><nav aria-label="Character set"><button id="originals" type="button" aria-pressed="true">192 originals</button><button id="reference" type="button" aria-pressed="false">56 reference glyphs</button></nav></div><a href="index.html">Explore the rain</a></div>
+<main id="catalog" aria-label="All original glyphs"></main><script src="glyphs.js"></script><script src="base-glyphs.js"></script><script type="module">
+const status = document.getElementById('catalog-status');
+function render(reference=false){
+const catalog=reference?globalThis.BASE_GLYPHS:globalThis.SVG_GLYPHS;
+document.getElementById('catalog').replaceChildren();
+document.getElementById('originals').setAttribute('aria-pressed',String(!reference));document.getElementById('reference').setAttribute('aria-pressed',String(reference));
+document.getElementById('catalog').setAttribute('aria-label',reference?'All imported reference glyphs':'All original glyphs');
+if (!catalog?.glyphs?.length) status.textContent='The generated catalog is not available yet.';
+else {
+  status.textContent=reference?'56 reference shapes from m8e / Rezmason, plus a blank in the rain sequence. Select an ID to open its SVG.':`${catalog.glyphs.length} independently drawn glyphs. Select an ID to open its original SVG.`;
+  for (const glyph of catalog.glyphs) {
+    const figure=document.createElement('figure'); figure.className='specimen';
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'); svg.setAttribute('viewBox','0 0 100 100'); svg.setAttribute('role','img'); svg.setAttribute('aria-label',glyph.glyph_id);
+    for (const d of glyph.paths ?? [glyph.path]) { const path=document.createElementNS(svg.namespaceURI,'path'); path.setAttribute('d',d); path.setAttribute('fill-rule','nonzero'); svg.append(path); }
+    const caption=document.createElement('figcaption'), link=document.createElement('a');
+    link.href=`${reference?'reference/':'../../benchmarks/partitions/glyph_svg_v1/catalog/'}${encodeURIComponent(glyph.glyph_id)}.svg`;link.textContent=glyph.glyph_id;
+    caption.append(link,document.createTextNode(reference?'Reference artwork':glyph.family ?? 'Original glyph'));figure.append(svg,caption);document.getElementById('catalog').append(figure);
+  }
+}
+}
+document.getElementById('originals').addEventListener('click',()=>render());document.getElementById('reference').addEventListener('click',()=>render(true));render();
+</script></body></html>
