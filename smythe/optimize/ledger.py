@@ -22,7 +22,11 @@ from typing import Any, Iterator
 from smythe.optimize.contracts import Candidate, ExperimentContract, canonical_json_bytes
 
 
-LEDGER_VERSION = 3
+LEDGER_VERSION = 4
+_WRITER_FUNCTION = "smythe_autotune_writer_version"
+_OWNED_TABLES = ("ledger_meta", "campaigns", "candidates", "trials", "trial_events",
+                 "promotion_decisions", "campaign_lease_epochs", "campaign_leases",
+                 "trial_dispatch_owners")
 _SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _HOLDOUT_NONCE_BYTES = 32
@@ -68,6 +72,59 @@ class TrialStateError(ExperimentLedgerError):
 
 class UnknownTrialError(TrialStateError):
     """Raised when code attempts to reuse an ambiguously billed trial."""
+
+
+class CampaignLeaseError(ExperimentLedgerError):
+    """Campaign ownership is unavailable, invalid, or no longer live."""
+
+
+class CampaignLeaseConflict(CampaignLeaseError):
+    """Another live runner owns this campaign."""
+
+
+@dataclass(frozen=True, slots=True)
+class CampaignLease:
+    """An immutable local ownership token; persisted expiry is authoritative."""
+
+    campaign_id: str
+    owner_id: str
+    epoch: int
+    acquired_at_ns: int
+    heartbeat_at_ns: int
+    expires_at_ns: int
+
+    def __post_init__(self) -> None:
+        for name in ("campaign_id", "owner_id"):
+            value = getattr(self, name)
+            if type(value) is not str or _safe_id(value, name) != value:
+                raise CampaignLeaseError(f"Invalid lease {name}")
+        for name in ("epoch", "acquired_at_ns", "heartbeat_at_ns", "expires_at_ns"):
+            value = getattr(self, name)
+            if type(value) is not int or not 0 <= value <= _SQLITE_INT_MAX:
+                raise CampaignLeaseError(f"Invalid lease {name}")
+        if (self.epoch < 1 or not
+                self.acquired_at_ns <= self.heartbeat_at_ns < self.expires_at_ns):
+            raise CampaignLeaseError("Invalid lease epoch or timestamp ordering")
+
+
+def _lease_duration_ns(ttl_s: float) -> int:
+    if type(ttl_s) not in (int, float):
+        raise ValueError("lease TTL must be finite and positive")
+    try:
+        valid = math.isfinite(ttl_s) and ttl_s > 0
+        duration = int(ttl_s * 1_000_000_000) if valid else 0
+    except (OverflowError, ValueError):
+        duration = 0
+    if not 0 < duration <= _SQLITE_INT_MAX:
+        raise ValueError("lease TTL must fit positive signed-64-bit nanoseconds")
+    return duration
+
+
+def _lease_now_ns() -> int:
+    now = time.time_ns()
+    if type(now) is not int or not 0 <= now <= _SQLITE_INT_MAX:
+        raise CampaignLeaseError("Invalid lease clock")
+    return now
 
 
 class TrialStatus(StrEnum):
@@ -459,9 +516,8 @@ class ExperimentLedger:
                     self._connection.execute("PRAGMA query_only = ON")
                     self._verify_version()
                 else:
-                    # Reject an older ledger before journal-mode or schema writes.
-                    # Autotune is unreleased, so older schemas are intentionally
-                    # not migrated: callers must create a fresh version-3 ledger.
+                    self._connection.create_function(_WRITER_FUNCTION, 0, lambda: LEDGER_VERSION)
+                    # Reject unsupported evidence before journal or schema changes.
                     self._guard_existing_version_before_write()
                     self._connection.execute("PRAGMA journal_mode = WAL")
                     synchronous = "FULL" if durability == "full" else "NORMAL"
@@ -527,17 +583,16 @@ class ExperimentLedger:
         ).fetchone()
         if table is None:
             return
-        row = self._connection.execute("SELECT version FROM ledger_meta").fetchone()
-        if row is None or row["version"] != LEDGER_VERSION:
-            observed = None if row is None else row["version"]
+        rows = self._connection.execute("SELECT version FROM ledger_meta").fetchall()
+        if len(rows) != 1 or rows[0]["version"] not in (3, LEDGER_VERSION):
+            observed = [row["version"] for row in rows]
             raise ExperimentLedgerError(
                 f"unsupported experiment ledger version {observed}; "
                 f"create a fresh version-{LEDGER_VERSION} ledger"
             )
 
     def _create_schema(self) -> None:
-        self._connection.executescript(
-            """
+        schema = """
             CREATE TABLE IF NOT EXISTS ledger_meta (
                 version INTEGER PRIMARY KEY,
                 created_at_ns INTEGER NOT NULL
@@ -614,36 +669,127 @@ class ExperimentLedger:
                 ON trial_events(trial_key, created_at_ns);
             CREATE INDEX IF NOT EXISTS decisions_by_campaign
                 ON promotion_decisions(campaign_id, created_at_ns);
+
+            CREATE TABLE IF NOT EXISTS campaign_lease_epochs (
+                campaign_id TEXT PRIMARY KEY REFERENCES campaigns(campaign_id),
+                last_epoch INTEGER NOT NULL CHECK(typeof(last_epoch) = 'integer' AND last_epoch > 0)
+            );
+            CREATE TABLE IF NOT EXISTS campaign_leases (
+                campaign_id TEXT PRIMARY KEY REFERENCES campaigns(campaign_id),
+                owner_id TEXT NOT NULL,
+                epoch INTEGER NOT NULL CHECK(typeof(epoch) = 'integer' AND epoch > 0),
+                acquired_at_ns INTEGER NOT NULL CHECK(typeof(acquired_at_ns) = 'integer' AND acquired_at_ns >= 0),
+                heartbeat_at_ns INTEGER NOT NULL CHECK(typeof(heartbeat_at_ns) = 'integer' AND heartbeat_at_ns >= acquired_at_ns),
+                expires_at_ns INTEGER NOT NULL CHECK(typeof(expires_at_ns) = 'integer' AND expires_at_ns > heartbeat_at_ns)
+            );
+            CREATE TABLE IF NOT EXISTS trial_dispatch_owners (
+                trial_key TEXT PRIMARY KEY REFERENCES trials(trial_key),
+                owner_id TEXT NOT NULL,
+                epoch INTEGER NOT NULL CHECK(typeof(epoch) = 'integer' AND epoch > 0)
+            );
             """
-        )
-        row = self._connection.execute("SELECT version FROM ledger_meta").fetchone()
-        if row is None:
-            self._connection.execute(
-                "INSERT INTO ledger_meta (version, created_at_ns) VALUES (?, ?)",
-                (LEDGER_VERSION, time.time_ns()),
-            )
-        elif row["version"] != LEDGER_VERSION:
-            raise ExperimentLedgerError(
-                f"unsupported experiment ledger version {row['version']}"
-            )
+        cursor = self._connection.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        try:
+            self._guard_existing_version_before_write()
+            exists = cursor.execute("SELECT 1 FROM sqlite_master WHERE name='ledger_meta'").fetchone()
+            version = cursor.execute("SELECT version FROM ledger_meta").fetchone()[0] if exists else None
+            if version == LEDGER_VERSION:
+                self._verify_barrier(cursor)
+            else:
+                if version == 3:
+                    self._verify_legacy_tables(cursor)
+                for statement in schema.split(";"):
+                    if statement.strip():
+                        cursor.execute(statement)
+                for sql in self._barrier_sql().values():
+                    cursor.execute(sql)
+                if version is None:
+                    cursor.execute("INSERT INTO ledger_meta VALUES (?, ?)", (LEDGER_VERSION, time.time_ns()))
+                else:
+                    cursor.execute("UPDATE ledger_meta SET version = ?", (LEDGER_VERSION,))
+                self._verify_barrier(cursor)
+            cursor.execute("COMMIT")
+        except BaseException:
+            cursor.execute("ROLLBACK")
+            raise
+        finally:
+            cursor.close()
+
+    @staticmethod
+    def _barrier_sql() -> dict[str, str]:
+        return {
+            f"autotune_v4_{table}_{operation.lower()}":
+                f"CREATE TRIGGER autotune_v4_{table}_{operation.lower()} BEFORE {operation} ON {table} "
+                f"BEGIN SELECT CASE WHEN {_WRITER_FUNCTION}() != 4 "
+                "THEN RAISE(ABORT, 'Autotune schema v4 writer required') END; END"
+            for table in _OWNED_TABLES for operation in ("INSERT", "UPDATE", "DELETE")
+        }
+
+    @staticmethod
+    def _verify_legacy_tables(cursor: sqlite3.Cursor) -> None:
+        expected = {
+            "ledger_meta": {"version", "created_at_ns"},
+            "campaigns": {"campaign_id", "contract_hash", "contract_json", "incumbent_candidate_id",
+                          "plan_hash", "ordered_candidate_ids_json", "ordered_policy_hashes_json",
+                          "candidate_inventory_json", "holdout_nonce", "holdout_commitment", "created_at_ns"},
+            "candidates": {"campaign_id", "candidate_id", "policy_hash", "candidate_json", "created_at_ns"},
+            "trials": {"trial_key", "campaign_id", "candidate_id", "split", "phase", "seed",
+                       "evaluator_hash", "ceiling_microusd", "prepared_json", "prepared_at_ns"},
+            "trial_events": {"event_id", "trial_key", "event_type", "payload_json", "created_at_ns"},
+            "promotion_decisions": {"decision_id", "campaign_id", "candidate_id", "payload_json", "created_at_ns"},
+        }
+        for table, columns in expected.items():
+            if {row["name"] for row in cursor.execute(f"PRAGMA table_info({table})")} != columns:
+                raise ExperimentLedgerError(f"Invalid experiment ledger table {table}")
+        if cursor.execute("PRAGMA foreign_key_check").fetchone() is not None:
+            raise ExperimentLedgerError("Experiment ledger has invalid foreign keys")
+
+    @classmethod
+    def _verify_barrier(cls, cursor: sqlite3.Cursor) -> None:
+        cls._verify_legacy_tables(cursor)
+        expected_columns = {
+            "campaign_lease_epochs": {"campaign_id", "last_epoch"},
+            "campaign_leases": set(CampaignLease.__dataclass_fields__),
+            "trial_dispatch_owners": {"trial_key", "owner_id", "epoch"},
+        }
+        for table, columns in expected_columns.items():
+            if {row["name"] for row in cursor.execute(f"PRAGMA table_info({table})")} != columns:
+                raise ExperimentLedgerError(f"Invalid ownership table {table}")
+        for name, sql in cls._barrier_sql().items():
+            row = cursor.execute("SELECT sql FROM sqlite_master WHERE type='trigger' AND name=?", (name,)).fetchone()
+            if row is None or " ".join(row["sql"].split()) != " ".join(sql.split()):
+                raise ExperimentLedgerError(f"Missing or altered schema v4 writer barrier: {name}")
 
     def _verify_version(self) -> None:
         try:
-            row = self._connection.execute("SELECT version FROM ledger_meta").fetchone()
+            rows = self._connection.execute("SELECT version FROM ledger_meta").fetchall()
         except sqlite3.Error as exc:
             raise ExperimentLedgerError("not a Smythe experiment ledger") from exc
-        if row is None or row["version"] != LEDGER_VERSION:
-            observed = None if row is None else row["version"]
+        if len(rows) != 1 or rows[0]["version"] not in (3, LEDGER_VERSION):
+            observed = [row["version"] for row in rows]
             raise ExperimentLedgerError(
                 f"unsupported experiment ledger version {observed}"
             )
+        cursor = self._connection.cursor()
+        try:
+            self._verify_legacy_tables(cursor)
+            if rows[0]["version"] == LEDGER_VERSION:
+                self._verify_barrier(cursor)
+        finally:
+            cursor.close()
 
     @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Cursor]:
         with self._lock:
+            if self.read_only:
+                raise sqlite3.OperationalError("attempt to write a readonly experiment ledger")
             cursor = self._connection.cursor()
             cursor.execute("BEGIN IMMEDIATE")
             try:
+                rows = cursor.execute("SELECT version FROM ledger_meta").fetchall()
+                if len(rows) != 1 or rows[0]["version"] != LEDGER_VERSION:
+                    raise ExperimentLedgerError("Writable operations require experiment ledger schema v4")
                 yield cursor
             except BaseException:
                 cursor.execute("ROLLBACK")
@@ -669,6 +815,158 @@ class ExperimentLedger:
             "seed": _seed(seed),
         }
         return _deterministic_id("trial_v1_", payload)
+
+    @staticmethod
+    def _lease_from_row(cursor: sqlite3.Cursor, row: sqlite3.Row) -> CampaignLease:
+        try:
+            lease = CampaignLease(**dict(row))
+        except (TypeError, ValueError) as exc:
+            raise CampaignLeaseError("Malformed campaign lease") from exc
+        counter = cursor.execute("SELECT last_epoch FROM campaign_lease_epochs WHERE campaign_id=?",
+                                 (lease.campaign_id,)).fetchone()
+        if counter is None or type(counter[0]) is not int or counter[0] != lease.epoch:
+            raise CampaignLeaseError("Campaign lease epoch counter is inconsistent")
+        return lease
+
+    @classmethod
+    def _require_lease(cls, cursor: sqlite3.Cursor, lease: CampaignLease,
+                       *, campaign_id: str | None = None) -> CampaignLease:
+        if type(lease) is not CampaignLease:
+            raise CampaignLeaseError("An explicit CampaignLease token is required")
+        lease.__post_init__()
+        if campaign_id is not None and campaign_id != lease.campaign_id:
+            raise CampaignLeaseError("Lease belongs to a different campaign")
+        row = cursor.execute("SELECT * FROM campaign_leases WHERE campaign_id=?",
+                             (lease.campaign_id,)).fetchone()
+        if row is None:
+            raise CampaignLeaseError("Campaign lease was released or is missing")
+        current = cls._lease_from_row(cursor, row)
+        now = _lease_now_ns()
+        if ((current.owner_id, current.epoch) != (lease.owner_id, lease.epoch)
+                or now < current.heartbeat_at_ns or now >= current.expires_at_ns):
+            raise CampaignLeaseError("Campaign lease is expired or belongs to another owner/epoch")
+        return current
+
+    @contextmanager
+    def _leased_transaction(self, lease: CampaignLease, *, campaign_id: str | None = None,
+                            trial_key: str | None = None) -> Iterator[sqlite3.Cursor]:
+        with self._transaction() as cursor:
+            if trial_key is not None:
+                campaign_id = self._require_trial(cursor, trial_key)["campaign_id"]
+            self._require_lease(cursor, lease, campaign_id=campaign_id)
+            yield cursor
+            # Validation may be expensive; expiry still matters before commit.
+            self._require_lease(cursor, lease, campaign_id=campaign_id)
+
+    def acquire_campaign_lease(self, campaign_id: str, owner_id: str, *, ttl_s: float = 30.0) -> CampaignLease:
+        campaign = _safe_id(campaign_id, "campaign_id")
+        owner = _safe_id(owner_id, "owner_id")
+        duration = _lease_duration_ns(ttl_s)
+        with self._transaction() as cursor:
+            self._require_campaign(cursor, campaign)
+            now = _lease_now_ns()
+            row = cursor.execute("SELECT * FROM campaign_leases WHERE campaign_id=?", (campaign,)).fetchone()
+            if row is not None:
+                current = self._lease_from_row(cursor, row)
+                if now < current.expires_at_ns:
+                    raise CampaignLeaseConflict(f"Campaign {campaign!r} is owned by a live runner")
+            counter = cursor.execute("SELECT last_epoch FROM campaign_lease_epochs WHERE campaign_id=?",
+                                     (campaign,)).fetchone()
+            previous = 0 if counter is None else counter[0]
+            if (type(previous) is not int or not 0 <= previous < _SQLITE_INT_MAX
+                    or (counter is not None and previous == 0)):
+                raise CampaignLeaseError("Invalid or exhausted campaign lease epoch")
+            for dispatch in cursor.execute(
+                "SELECT d.owner_id, d.epoch FROM trial_dispatch_owners d JOIN trials t "
+                "ON t.trial_key=d.trial_key WHERE t.campaign_id=?", (campaign,),
+            ).fetchall():
+                if (type(dispatch["epoch"]) is not int or not 1 <= dispatch["epoch"] <= previous
+                        or type(dispatch["owner_id"]) is not str
+                        or _safe_id(dispatch["owner_id"], "dispatch owner") != dispatch["owner_id"]):
+                    raise CampaignLeaseError("Campaign epoch counter contradicts immutable dispatch provenance")
+            lease = CampaignLease(campaign, owner, previous + 1, now, now, now + duration)
+            cursor.execute("INSERT INTO campaign_lease_epochs VALUES (?, ?) ON CONFLICT(campaign_id) "
+                           "DO UPDATE SET last_epoch=excluded.last_epoch", (campaign, lease.epoch))
+            cursor.execute("INSERT INTO campaign_leases VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(campaign_id) "
+                           "DO UPDATE SET owner_id=excluded.owner_id, epoch=excluded.epoch, "
+                           "acquired_at_ns=excluded.acquired_at_ns, heartbeat_at_ns=excluded.heartbeat_at_ns, "
+                           "expires_at_ns=excluded.expires_at_ns",
+                           (campaign, owner, lease.epoch, now, now, lease.expires_at_ns))
+            self._require_lease(cursor, lease)
+            return lease
+
+    def heartbeat_campaign_lease(self, lease: CampaignLease, *, ttl_s: float = 30.0) -> CampaignLease:
+        duration = _lease_duration_ns(ttl_s)
+        with self._leased_transaction(lease) as cursor:
+            current = self._require_lease(cursor, lease)
+            now = _lease_now_ns()
+            if not current.heartbeat_at_ns <= now < current.expires_at_ns:
+                raise CampaignLeaseError("Campaign lease expired before heartbeat renewal")
+            renewed = CampaignLease(current.campaign_id, current.owner_id, current.epoch,
+                                    current.acquired_at_ns, now, now + duration)
+            cursor.execute("UPDATE campaign_leases SET heartbeat_at_ns=?, expires_at_ns=? WHERE campaign_id=?",
+                           (now, renewed.expires_at_ns, current.campaign_id))
+            return renewed
+
+    def assert_campaign_lease(self, lease: CampaignLease) -> None:
+        with self._leased_transaction(lease):
+            pass
+
+    def release_campaign_lease(self, lease: CampaignLease) -> None:
+        with self._transaction() as cursor:
+            self._require_lease(cursor, lease)
+            cursor.execute("DELETE FROM campaign_leases WHERE campaign_id=? AND owner_id=? AND epoch=?",
+                           (lease.campaign_id, lease.owner_id, lease.epoch))
+
+    @property
+    def lease_supported(self) -> bool:
+        with self._lock:
+            rows = self._connection.execute("SELECT version FROM ledger_meta").fetchall()
+            if len(rows) != 1 or rows[0][0] not in (3, LEDGER_VERSION):
+                raise ExperimentLedgerError("Unsupported experiment ledger version")
+            return rows[0][0] == LEDGER_VERSION
+
+    def get_campaign_lease(self, campaign_id: str) -> CampaignLease | None:
+        campaign = _safe_id(campaign_id, "campaign_id")
+        with self._lock:
+            cursor = self._connection.cursor()
+            try:
+                cursor.execute("BEGIN")
+                self._require_campaign(cursor, campaign)
+                if not self.lease_supported:
+                    result = None
+                else:
+                    row = cursor.execute("SELECT * FROM campaign_leases WHERE campaign_id=?", (campaign,)).fetchone()
+                    result = self._lease_from_row(cursor, row) if row is not None else None
+                cursor.execute("COMMIT")
+                return result
+            except BaseException:
+                if self._connection.in_transaction:
+                    cursor.execute("ROLLBACK")
+                raise
+            finally:
+                cursor.close()
+
+    @staticmethod
+    def _require_dispatch_owner(cursor: sqlite3.Cursor, trial_key: str, lease: CampaignLease) -> None:
+        row = cursor.execute("SELECT * FROM trial_dispatch_owners WHERE trial_key=?", (trial_key,)).fetchone()
+        if row is None or (row["owner_id"], row["epoch"]) != (lease.owner_id, lease.epoch):
+            raise CampaignLeaseError("Trial dispatch belongs to another or an unbound historical owner")
+
+    @classmethod
+    def _require_admission(cls, cursor: sqlite3.Cursor, lease: CampaignLease) -> None:
+        for row in cursor.execute("SELECT trial_key FROM trials WHERE campaign_id=?", (lease.campaign_id,)).fetchall():
+            key = row[0]
+            status = cls._status(cursor, key)
+            if status is TrialStatus.UNKNOWN:
+                raise UnknownTrialError("Campaign contains an unknown trial; new admission is forbidden")
+            if status is TrialStatus.DISPATCHED:
+                cls._require_dispatch_owner(cursor, key, lease)
+
+    @staticmethod
+    def _bind_dispatch_owner(cursor: sqlite3.Cursor, trial_key: str, lease: CampaignLease) -> None:
+        cursor.execute("INSERT INTO trial_dispatch_owners VALUES (?, ?, ?)",
+                       (trial_key, lease.owner_id, lease.epoch))
 
     def create_campaign(
         self,
@@ -1045,6 +1343,7 @@ class ExperimentLedger:
         phase: str,
         seed: int,
         *,
+        lease: CampaignLease,
         evaluator_hash: str,
         ceiling_microusd: int,
     ) -> str:
@@ -1069,7 +1368,7 @@ class ExperimentLedger:
             "ceiling_microusd": ceiling,
         }
         prepared_json = _json_text(prepared_payload)
-        with self._transaction() as cursor:
+        with self._leased_transaction(lease, campaign_id=identifier) as cursor:
             self._require_candidate(cursor, identifier, candidate)
             existing = cursor.execute(
                 "SELECT * FROM trials WHERE trial_key = ?", (trial_key,)
@@ -1083,7 +1382,10 @@ class ExperimentLedger:
                     raise UnknownTrialError(
                         f"trial {trial_key!r} has an unknown outcome and cannot be reused"
                     )
+                if self._status(cursor, trial_key) is TrialStatus.PREPARED:
+                    self._require_admission(cursor, lease)
                 return trial_key
+            self._require_admission(cursor, lease)
             campaign = self._require_campaign(cursor, identifier)
             terminal = cursor.execute(
                 "SELECT decision_id FROM promotion_decisions WHERE campaign_id = ?",
@@ -1131,13 +1433,17 @@ class ExperimentLedger:
             )
         return trial_key
 
-    def mark_trial_dispatched(self, trial_key: str) -> TrialRecord:
+    def mark_trial_dispatched(self, trial_key: str, *, lease: CampaignLease) -> TrialRecord:
         key = _nonempty(trial_key, "trial_key", maximum=128)
-        with self._transaction() as cursor:
+        with self._leased_transaction(lease, trial_key=key) as cursor:
             self._require_trial(cursor, key)
             status = self._status(cursor, key)
             if status is TrialStatus.PREPARED:
+                self._require_admission(cursor, lease)
+                self._bind_dispatch_owner(cursor, key, lease)
                 self._insert_event(cursor, key, "dispatched", {})
+            elif status is TrialStatus.DISPATCHED:
+                self._require_dispatch_owner(cursor, key, lease)
             elif status is TrialStatus.UNKNOWN:
                 raise UnknownTrialError(
                     f"trial {key!r} has an unknown outcome and cannot be dispatched again"
@@ -1146,7 +1452,7 @@ class ExperimentLedger:
                 raise TrialStateError(f"completed trial {key!r} cannot be dispatched again")
         return self.get_trial(key)
 
-    def claim_trial_dispatch(self, trial_key: str) -> TrialRecord:
+    def claim_trial_dispatch(self, trial_key: str, *, lease: CampaignLease) -> TrialRecord:
         """Atomically claim a prepared trial for exactly one dispatcher.
 
         Unlike :meth:`mark_trial_dispatched`, this operation is intentionally not
@@ -1156,7 +1462,7 @@ class ExperimentLedger:
         """
 
         key = _nonempty(trial_key, "trial_key", maximum=128)
-        with self._transaction() as cursor:
+        with self._leased_transaction(lease, trial_key=key) as cursor:
             trial = self._require_trial(cursor, key)
             status = self._status(cursor, key)
             if status is TrialStatus.UNKNOWN:
@@ -1167,6 +1473,8 @@ class ExperimentLedger:
                 raise TrialStateError(
                     f"trial {key!r} cannot be claimed from {status.value!r} state"
                 )
+            self._require_admission(cursor, lease)
+            self._bind_dispatch_owner(cursor, key, lease)
             self._insert_event(cursor, key, "dispatched", {})
             return self._materialize(cursor, trial)
 
@@ -1174,6 +1482,7 @@ class ExperimentLedger:
         self,
         trial_key: str,
         *,
+        lease: CampaignLease,
         metrics: Mapping[str, int | float],
         gates: Mapping[str, bool],
         actual_cost_microusd: int,
@@ -1195,7 +1504,7 @@ class ExperimentLedger:
             "artifact_hashes": list(hashes),
         }
         payload_json = _json_text(payload)
-        with self._transaction() as cursor:
+        with self._leased_transaction(lease, trial_key=key) as cursor:
             trial = self._require_trial(cursor, key)
             if evaluator_hash is not None and trial["evaluator_hash"] != _sha256(
                 evaluator_hash, "evaluator_hash"
@@ -1215,15 +1524,16 @@ class ExperimentLedger:
                 )
             if status is not TrialStatus.DISPATCHED:
                 raise TrialStateError(f"trial {key!r} must be dispatched before completion")
+            self._require_dispatch_owner(cursor, key, lease)
             self._insert_event(cursor, key, "completed", payload)
         return self.get_trial(key)
 
-    def mark_trial_unknown(self, trial_key: str, error: str) -> TrialRecord:
+    def mark_trial_unknown(self, trial_key: str, error: str, *, lease: CampaignLease) -> TrialRecord:
         key = _nonempty(trial_key, "trial_key", maximum=128)
         message = _nonempty(error, "error", maximum=4096)
         payload = {"error": message}
         payload_json = _json_text(payload)
-        with self._transaction() as cursor:
+        with self._leased_transaction(lease, trial_key=key) as cursor:
             trial = self._require_trial(cursor, key)
             status = self._status(cursor, key)
             if status is TrialStatus.UNKNOWN:
@@ -1237,10 +1547,11 @@ class ExperimentLedger:
                 raise TrialStateError(f"completed trial {key!r} cannot become unknown")
             if status is not TrialStatus.DISPATCHED:
                 raise TrialStateError(f"trial {key!r} must be dispatched before unknown")
+            self._require_dispatch_owner(cursor, key, lease)
             self._insert_event(cursor, key, "unknown", payload)
         return self.get_trial(key)
 
-    def append_trial(self, record: TrialRecord) -> TrialRecord:
+    def append_trial(self, record: TrialRecord, *, lease: CampaignLease) -> TrialRecord:
         """Append a completed record only after its dispatch boundary exists."""
         if not isinstance(record, TrialRecord):
             raise TypeError("record must be a TrialRecord")
@@ -1257,6 +1568,7 @@ class ExperimentLedger:
             raise LedgerConflictError("TrialRecord.trial_key does not match its key fields")
         return self.complete_trial(
             key,
+            lease=lease,
             metrics=record.metrics,
             gates=record.gates,
             actual_cost_microusd=record.actual_cost_microusd or 0,
@@ -1505,7 +1817,7 @@ class ExperimentLedger:
             finally:
                 cursor.close()
 
-    def append_decision(self, decision: PromotionDecision) -> str:
+    def append_decision(self, decision: PromotionDecision, *, lease: CampaignLease) -> str:
         if not isinstance(decision, PromotionDecision):
             raise TypeError("decision must be a PromotionDecision")
         # The canonical payload and ID were computed together before any caller
@@ -1516,7 +1828,7 @@ class ExperimentLedger:
         payload = json.loads(payload_json)
         campaign_id = payload["campaign_id"]
         candidate_id = payload["candidate_id"]
-        with self._transaction() as cursor:
+        with self._leased_transaction(lease, campaign_id=campaign_id) as cursor:
             campaign = self._require_campaign(cursor, campaign_id)
             self._require_candidate(cursor, campaign_id, candidate_id)
             self._validate_decision_payload(cursor, campaign, payload)
@@ -1749,6 +2061,9 @@ class ExperimentLedger:
 
 
 __all__ = [
+    "CampaignLease",
+    "CampaignLeaseError",
+    "CampaignLeaseConflict",
     "CampaignNotFoundError",
     "CandidateNotFoundError",
     "ExperimentLedger",

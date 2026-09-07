@@ -5,6 +5,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 import math
 import sqlite3
+import uuid
 from threading import Barrier
 
 import pytest
@@ -25,6 +26,32 @@ from smythe.optimize.ledger import (
     TrialStatus,
     UnknownTrialError,
 )
+
+
+_TEST_LEASES = {}
+
+
+@pytest.fixture(autouse=True)
+def _close_fixture_ledgers(monkeypatch):
+    opened = []
+    original = ExperimentLedger.__init__
+
+    def initialize(self, *args, **kwargs):
+        original(self, *args, **kwargs)
+        opened.append(self)
+
+    monkeypatch.setattr(ExperimentLedger, "__init__", initialize)
+    yield
+    for ledger in reversed(opened):
+        ledger.close()
+    _TEST_LEASES.clear()
+
+
+def _lease(ledger, campaign_id):
+    key = (str(ledger.path), campaign_id)
+    if key not in _TEST_LEASES:
+        _TEST_LEASES[key] = ledger.acquire_campaign_lease(campaign_id, uuid.uuid4().hex, ttl_s=3600)
+    return _TEST_LEASES[key]
 
 
 PLAN_HASH = "sha256:" + "a" * 64
@@ -105,7 +132,7 @@ def _prepared(
         seed,
         evaluator_hash="sha256:" + "e" * 64,
         ceiling_microusd=1_000,
-    )
+    lease=_lease(ledger, campaign_id))
 
 
 def test_campaign_is_hash_bound_idempotent_and_resume_safe(tmp_path):
@@ -242,8 +269,8 @@ def test_trial_lifecycle_is_idempotent_and_snapshot_separates_cost_states(tmp_pa
         "total_exposure_microusd": 1_000,
     }
 
-    assert ledger.mark_trial_dispatched(trial_key).status is TrialStatus.DISPATCHED
-    assert ledger.mark_trial_dispatched(trial_key).status is TrialStatus.DISPATCHED
+    assert ledger.mark_trial_dispatched(trial_key, lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id)).status is TrialStatus.DISPATCHED
+    assert ledger.mark_trial_dispatched(trial_key, lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id)).status is TrialStatus.DISPATCHED
     completed = ledger.complete_trial(
         trial_key,
         metrics={"quality": 8.5},
@@ -252,7 +279,7 @@ def test_trial_lifecycle_is_idempotent_and_snapshot_separates_cost_states(tmp_pa
         duration_ms=12.5,
         artifact_hashes=("sha256:" + "a" * 64,),
         evaluator_hash="sha256:" + "e" * 64,
-    )
+    lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
     assert completed.status is TrialStatus.COMPLETED
     assert completed.metrics == {"quality": 8.5}
     assert ledger.complete_trial(
@@ -262,7 +289,7 @@ def test_trial_lifecycle_is_idempotent_and_snapshot_separates_cost_states(tmp_pa
         actual_cost_microusd=625,
         duration_ms=12.5,
         artifact_hashes=("sha256:" + "a" * 64,),
-    ).trial_key == trial_key
+    lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id)).trial_key == trial_key
 
     snapshot = ledger.snapshot(campaign_id)
     assert snapshot["spent_microusd"] == 625
@@ -287,7 +314,7 @@ def test_dispatch_claim_is_atomic_across_ledger_connections(tmp_path):
         with ExperimentLedger(path) as ledger:
             barrier.wait()
             try:
-                return ledger.claim_trial_dispatch(trial_key).status.value
+                return ledger.claim_trial_dispatch(trial_key, lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id)).status.value
             except TrialStateError:
                 return "rejected"
 
@@ -308,14 +335,14 @@ def test_list_trials_materializes_every_row_before_nested_event_queries(tmp_path
         ledger.register_candidate(campaign_id, candidate)
         for seed in (100, 101, 102):
             trial_key = _prepared(ledger, campaign_id, candidate, seed=seed)
-            ledger.claim_trial_dispatch(trial_key)
+            ledger.claim_trial_dispatch(trial_key, lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
             ledger.complete_trial(
                 trial_key,
                 metrics={"quality": 8},
                 gates={"format": True},
                 actual_cost_microusd=0,
                 duration_ms=1,
-            )
+            lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
 
         assert len(ledger.list_trials(campaign_id)) == 3
         assert ledger.snapshot(campaign_id)["trial_counts"] == {"completed": 3}
@@ -426,7 +453,7 @@ def test_older_ledger_fails_closed_before_schema_mutation(tmp_path, version):
     ).fetchall()
     connection.close()
 
-    with pytest.raises(ExperimentLedgerError, match="fresh version-3"):
+    with pytest.raises(ExperimentLedgerError, match="fresh version-4"):
         ExperimentLedger(path)
 
     connection = sqlite3.connect(path)
@@ -452,15 +479,15 @@ def test_unknown_trial_retains_ceiling_and_can_never_be_reused(tmp_path):
                 gates={},
                 actual_cost_microusd=0,
                 duration_ms=1,
-            )
-        ledger.mark_trial_dispatched(trial_key)
-        unknown = ledger.mark_trial_unknown(trial_key, "connection lost after dispatch")
+            lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
+        ledger.mark_trial_dispatched(trial_key, lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
+        unknown = ledger.mark_trial_unknown(trial_key, "connection lost after dispatch", lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
         assert unknown.status is TrialStatus.UNKNOWN
         assert ledger.mark_trial_unknown(
             trial_key, "connection lost after dispatch"
-        ).status is TrialStatus.UNKNOWN
+        , lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id)).status is TrialStatus.UNKNOWN
         with pytest.raises(LedgerConflictError, match="different error"):
-            ledger.mark_trial_unknown(trial_key, "different failure")
+            ledger.mark_trial_unknown(trial_key, "different failure", lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
 
     with ExperimentLedger(path) as reopened:
         with pytest.raises(UnknownTrialError, match="cannot be reused"):
@@ -477,7 +504,7 @@ def test_trial_results_reject_nonfinite_or_conflicting_payloads(tmp_path):
     campaign_id = _seal(ledger, contract, candidate)
     ledger.register_candidate(campaign_id, candidate)
     trial_key = _prepared(ledger, campaign_id, candidate)
-    ledger.mark_trial_dispatched(trial_key)
+    ledger.mark_trial_dispatched(trial_key, lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
 
     for value in (math.nan, math.inf, -math.inf):
         with pytest.raises(ValueError, match="finite"):
@@ -487,7 +514,7 @@ def test_trial_results_reject_nonfinite_or_conflicting_payloads(tmp_path):
                 gates={},
                 actual_cost_microusd=0,
                 duration_ms=1,
-            )
+            lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
 
     ledger.complete_trial(
         trial_key,
@@ -495,7 +522,7 @@ def test_trial_results_reject_nonfinite_or_conflicting_payloads(tmp_path):
         gates={},
         actual_cost_microusd=500,
         duration_ms=1,
-    )
+    lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
     with pytest.raises(LedgerConflictError, match="different result"):
         ledger.complete_trial(
             trial_key,
@@ -503,7 +530,7 @@ def test_trial_results_reject_nonfinite_or_conflicting_payloads(tmp_path):
             gates={},
             actual_cost_microusd=500,
             duration_ms=1,
-        )
+        lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
 
 
 def test_trial_results_reject_integers_too_large_for_finite_metrics(tmp_path):
@@ -513,7 +540,7 @@ def test_trial_results_reject_integers_too_large_for_finite_metrics(tmp_path):
     campaign_id = _seal(ledger, contract, candidate)
     ledger.register_candidate(campaign_id, candidate)
     trial_key = _prepared(ledger, campaign_id, candidate)
-    ledger.claim_trial_dispatch(trial_key)
+    ledger.claim_trial_dispatch(trial_key, lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
 
     with pytest.raises(ValueError, match="finite"):
         ledger.complete_trial(
@@ -522,7 +549,7 @@ def test_trial_results_reject_integers_too_large_for_finite_metrics(tmp_path):
             gates={},
             actual_cost_microusd=0,
             duration_ms=1,
-        )
+        lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
     with pytest.raises(ValueError, match="signed 64-bit"):
         ledger.complete_trial(
             trial_key,
@@ -530,7 +557,7 @@ def test_trial_results_reject_integers_too_large_for_finite_metrics(tmp_path):
             gates={},
             actual_cost_microusd=2**63,
             duration_ms=1,
-        )
+        lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
     with pytest.raises(ValueError, match="finite"):
         ledger.complete_trial(
             trial_key,
@@ -538,7 +565,7 @@ def test_trial_results_reject_integers_too_large_for_finite_metrics(tmp_path):
             gates={},
             actual_cost_microusd=0,
             duration_ms=10**10_000,
-        )
+        lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
     with pytest.raises(ValueError, match="signed 64-bit"):
         ledger.prepare_trial(
             campaign_id,
@@ -548,7 +575,7 @@ def test_trial_results_reject_integers_too_large_for_finite_metrics(tmp_path):
             101,
             evaluator_hash="sha256:" + "e" * 64,
             ceiling_microusd=2**63,
-        )
+        lease=_lease(ledger, campaign_id))
     assert ledger.get_trial(trial_key).status is TrialStatus.DISPATCHED
 
 
@@ -565,14 +592,14 @@ def test_promotion_decision_is_append_only_and_evidence_bound(tmp_path):
         seed=99,
         phase="incumbent.plan_" + "a" * 64,
     )
-    ledger.mark_trial_dispatched(incumbent_trial)
+    ledger.mark_trial_dispatched(incumbent_trial, lease=_lease(ledger, ledger.get_trial(incumbent_trial).campaign_id))
     ledger.complete_trial(
         incumbent_trial,
         metrics={"quality": 8},
         gates={"format": True},
         actual_cost_microusd=500,
         duration_ms=1,
-    )
+    lease=_lease(ledger, ledger.get_trial(incumbent_trial).campaign_id))
     trial_key = _prepared(
         ledger,
         campaign_id,
@@ -580,14 +607,14 @@ def test_promotion_decision_is_append_only_and_evidence_bound(tmp_path):
         seed=99,
         phase="challenger.plan_" + "a" * 64,
     )
-    ledger.mark_trial_dispatched(trial_key)
+    ledger.mark_trial_dispatched(trial_key, lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
     ledger.complete_trial(
         trial_key,
         metrics={"quality": 9},
         gates={"format": True},
         actual_cost_microusd=500,
         duration_ms=1,
-    )
+    lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
     decision = PromotionDecision(
         campaign_id=campaign_id,
         candidate_id=candidate.candidate_id,
@@ -610,7 +637,7 @@ def test_promotion_decision_is_append_only_and_evidence_bound(tmp_path):
         assessment=decision.to_dict()["assessment"],
     )
     with pytest.raises(LedgerConflictError, match="non-empty evidence"):
-        ledger.append_decision(empty)
+        ledger.append_decision(empty, lease=_lease(ledger, empty.campaign_id))
 
     unrelated_campaign = _seal(
         ledger,
@@ -626,14 +653,14 @@ def test_promotion_decision_is_append_only_and_evidence_bound(tmp_path):
         seed=99,
         phase="incumbent.plan_" + "a" * 64,
     )
-    ledger.claim_trial_dispatch(unrelated_trial)
+    ledger.claim_trial_dispatch(unrelated_trial, lease=_lease(ledger, ledger.get_trial(unrelated_trial).campaign_id))
     ledger.complete_trial(
         unrelated_trial,
         metrics={"quality": 8},
         gates={"format": True},
         actual_cost_microusd=0,
         duration_ms=1,
-    )
+    lease=_lease(ledger, ledger.get_trial(unrelated_trial).campaign_id))
     unrelated = PromotionDecision(
         campaign_id=campaign_id,
         candidate_id=candidate.candidate_id,
@@ -643,10 +670,10 @@ def test_promotion_decision_is_append_only_and_evidence_bound(tmp_path):
         assessment=decision.to_dict()["assessment"],
     )
     with pytest.raises(LedgerConflictError, match="exactly cover"):
-        ledger.append_decision(unrelated)
+        ledger.append_decision(unrelated, lease=_lease(ledger, unrelated.campaign_id))
 
-    assert ledger.append_decision(decision) == decision.decision_id
-    assert ledger.append_promotion_decision(decision) == decision.decision_id
+    assert ledger.append_decision(decision, lease=_lease(ledger, decision.campaign_id)) == decision.decision_id
+    assert ledger.append_promotion_decision(decision, lease=_lease(ledger, decision.campaign_id)) == decision.decision_id
     assert (
         _prepared(
             ledger,
@@ -674,7 +701,7 @@ def test_promotion_decision_is_append_only_and_evidence_bound(tmp_path):
         assessment=decision.to_dict()["assessment"],
     )
     with pytest.raises(LedgerConflictError, match="different terminal decision"):
-        ledger.append_decision(conflicting)
+        ledger.append_decision(conflicting, lease=_lease(ledger, conflicting.campaign_id))
     snapshot = ledger.snapshot(campaign_id)
     assert snapshot["decision_count"] == 1
     assert snapshot["decisions"][0]["promoted"] is False
@@ -754,14 +781,14 @@ def test_contract_candidate_trial_and_budget_limits_are_enforced(tmp_path):
         ledger.register_candidate(campaign_id, _candidate(contract, "alternate"))
 
     trial_key = _prepared(ledger, campaign_id, candidate)
-    ledger.mark_trial_dispatched(trial_key)
+    ledger.mark_trial_dispatched(trial_key, lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
     ledger.complete_trial(
         trial_key,
         metrics={"quality": 8},
         gates={},
         actual_cost_microusd=6_500,
         duration_ms=1,
-    )
+    lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
     with pytest.raises(LedgerBudgetError, match="budget"):
         _prepared(ledger, campaign_id, candidate, seed=101)
 
@@ -782,7 +809,7 @@ def test_prepare_rejects_ceiling_drift_from_immutable_contract(tmp_path):
             100,
             evaluator_hash="sha256:" + "e" * 64,
             ceiling_microusd=999,
-        )
+        lease=_lease(ledger, campaign_id))
 
 
 def test_evaluator_and_artifact_evidence_require_canonical_sha256(tmp_path):
@@ -801,10 +828,10 @@ def test_evaluator_and_artifact_evidence_require_canonical_sha256(tmp_path):
             100,
             evaluator_hash="evaluator-v1",
             ceiling_microusd=1_000,
-        )
+        lease=_lease(ledger, campaign_id))
 
     trial_key = _prepared(ledger, campaign_id, candidate)
-    ledger.claim_trial_dispatch(trial_key)
+    ledger.claim_trial_dispatch(trial_key, lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
     with pytest.raises(ValueError, match="sha256"):
         ledger.complete_trial(
             trial_key,
@@ -813,7 +840,7 @@ def test_evaluator_and_artifact_evidence_require_canonical_sha256(tmp_path):
             actual_cost_microusd=0,
             duration_ms=1,
             artifact_hashes=("looks-hashed",),
-        )
+        lease=_lease(ledger, ledger.get_trial(trial_key).campaign_id))
 
 
 def test_read_only_ledger_inspection_never_creates_or_mutates(tmp_path):
