@@ -1,13 +1,8 @@
 # Verification that gates
 
-Smythe could always *score* work — a red-team node, a vision judge. What
-it could not do was act on the score. A judge that found a misspelling
-baked into a generated ad recorded its verdict, and the pipeline carried
-on regardless.
-
-A verifier closes that loop. Verification is an ordinary node, so it is
-planned, budgeted, traced, and checkpointed like any other work. It just
-declares which node it judges:
+A verifier can reject an output and trigger bounded regeneration. Verification
+is an ordinary node: planned, budgeted, traced, and checkpointed. It declares
+which node it judges:
 
 > **Lead with objective checks.** Image dimensions, schema conformance,
 > required sections, hashes, and domain rules have definitive verdicts and no
@@ -29,10 +24,35 @@ check = Node(
 )
 ```
 
-When `check` fails `draft`, the executor resets `draft` **and everything
-downstream of it** to pending and runs them again. Resetting only the
-draft would leave a summary that was written from a rejected draft — the
-run would be internally inconsistent.
+When `check` fails `draft`, the executor records the rejection, cancels and
+awaits affected active work, then resets `draft` **and everything downstream
+of it** to pending. Regeneration starts after that reset is saved. Completed
+charges remain recorded; outputs and artifact references from the rejected
+generation are cleared.
+
+## Recovery and concurrent work
+
+A completed judge records the generation it inspected. A rejection produces
+an idempotent regeneration intent before cancellation begins. The intent binds
+the affected nodes and the next regeneration count, so resuming it cannot
+renew the allowance or increment it twice.
+
+Control transitions force checkpoints even when ordinary node snapshots are
+batched. Resume processes unfinished verification decisions and regeneration
+intents before dispatching work or returning a stored final output. A second
+judge whose input was invalidated cannot apply its stale verdict.
+
+The executor waits for billed artifact finalization before resetting an
+affected node. Invalid accounting and persistence failures stop the current
+run; regeneration cannot hide them. After repairing a local write failure,
+an explicit resume may regenerate the output while retaining its earlier
+charge. Unresolved accounting blocks resume. Cancellation alone does not prove that a remote
+provider issued no charge. See [Cost guardrails](budgets.md).
+
+A judge skipped after a provider failure has no completed verdict and does
+not trigger regeneration from its error text. Advisory and exhausted gates
+retain their existing policy. Checkpoint-version compatibility is documented
+in the [recovery guide](checkpoint-format.md#version-compatibility).
 
 ## Reading a verdict
 

@@ -82,16 +82,11 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   planned ones. `LLMSupervisor` reviews when a pending fan-in becomes
   ready and when the graph finishes, or at explicit `review_after` targets.
   New: `docs/supervisor.md`, `examples/13_adaptive_supervision.py`.
-- **Verification that gates.** A node can now declare `verifies=`
-  and `max_regenerations=`: when its verdict fails, the judged node
-  and everything downstream of it are reset and re-run, bounded per
-  verifier and billed like any other work. Verification is an
-  ordinary node, so it is planned, budgeted, traced, and
-  checkpointed for free. `TokenVerifier` (default) reads JSON or a
-  PASS/FAIL keyword and treats an unreadable verdict as a pass, so a
-  confused judge cannot burn the regeneration budget in a loop;
-  `CallableVerifier` gates on any objective rule with no model at
-  all. This is select-from-N generalised beyond images.
+- **Bounded verification.** Nodes declare `verifies=` and
+  `max_regenerations=` to reject an output and regenerate its descendants.
+  Judge calls and regenerated work use normal execution accounting.
+  `TokenVerifier` reads JSON or PASS/FAIL keywords; an unreadable verdict
+  passes without regeneration. `CallableVerifier` evaluates a local rule.
 - **`Task(done_when=[...])`** records acceptance criteria — what the
   deliverable must satisfy, as opposed to what steps exist. A
   supervisor reads them when deciding whether more work is needed.
@@ -232,6 +227,10 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Fixed
 
+- **Verification and active work:** persisted verdict receipts and regeneration
+  intents prevent rejected generations from surviving cancellation or resume.
+  Active descendants settle before reset, completed charges remain recorded,
+  and stale artifact references and overlapping verdicts are invalidated.
 - **Serial halt:** terminal node errors now stop later independent calls
   immediately. Completed results and costs remain intact; queued nodes stay
   pending for an explicit resume. Exhausted retries also halt; `SKIP` continues.

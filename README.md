@@ -158,7 +158,7 @@ documents each comparison, its scope, and its evidence status.
 | Generate a DAG from the goal with `LLMArchitect` | Bound active calls with `max_concurrency` |
 | Select approved templates with `ConstrainedArchitect` | Reserve execution spend and reject invalid usage |
 | Build exact workflows with `DeterministicArchitect` | Save node results and resume from checkpoints |
-| Inspect and export plans before execution | Validate artifacts and gate results |
+| Inspect and export plans before execution | Validate artifacts and recover verification decisions |
 | Reuse successful graphs as templates | Trace calls, costs, failures, and revisions |
 
 Agents use MCP tools, generate images, and pass artifacts to downstream nodes.
@@ -228,8 +228,7 @@ team challenges the draft, and a final node writes the decision memo.
 
 - **Complete workflow cost accounting:** include planning and supervision in
   one spend ledger, then publish repeated cost comparisons from native usage.
-- **Runtime hardening:** synchronize verification with active descendants
-  and carry the full task context through planning, execution, and resume.
+- **Task context:** carry the full task through planning, execution, and resume.
 - **Operator tools:** inspect runs, detach long jobs, and approve durable pauses.
 - **Native exploration:** bring the web exposure pipeline, camera controls,
   and settings to Windows, macOS, and Linux, then verify them against the

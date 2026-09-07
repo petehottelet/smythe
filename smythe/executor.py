@@ -8,6 +8,7 @@ import time
 from smythe.budget import BudgetValidationError, SentinelAlert
 from smythe.executor_base import ExecutorBase, NodeFinalizationError
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
+from smythe.verifier import VerificationRecoveryError
 
 
 class Executor(ExecutorBase):
@@ -20,6 +21,7 @@ class Executor(ExecutorBase):
     def run(self, graph: ExecutionGraph) -> ExecutionGraph:
         """Execute in dependency order; stop immediately on a terminal failure."""
         self.prepare_graph(graph)
+        self.recover_verification(graph)
         visited: set[str] = set()
         # The walk is recomputed each step rather than taken once, so a
         # supervisor revision that adds or drops pending work is picked
@@ -92,6 +94,7 @@ class Executor(ExecutorBase):
             if delay:
                 time.sleep(delay)
             node.status = NodeStatus.RUNNING
+            self.begin_verification(node, graph)
             self._tracer.on_node_start(node)
 
             try:
@@ -103,8 +106,13 @@ class Executor(ExecutorBase):
                     raise NodeFinalizationError(node.id, exc) from exc
                 node.status = NodeStatus.COMPLETED
                 self._tracer.on_node_end(node)
+                self.complete_verification(node)
                 self.notify_update(node)
                 return
+            except VerificationRecoveryError:
+                # Keep the paid verdict and pending receipt intact. A local
+                # control-write failure must never cause another provider call.
+                raise
             except (BudgetValidationError, NodeFinalizationError, SentinelAlert) as exc:
                 # Invalid post-call accounting is terminal. Retain any held
                 # reservation: an unusable bill is not evidence of a free call.

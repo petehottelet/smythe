@@ -12,7 +12,7 @@ remain unchanged; new measurements receive new records and explicit scope.
 | Numeric cost and usage validation | Completed | 1,666 offline tests passed, 4 skipped; Ruff and independent review passed; strict provider, ledger, admission, Jobs, and checkpoint boundaries |
 | Cross-platform evidence checks | Completed | 1,681 offline tests passed, 4 skipped; 66 targeted Linux checks passed; [all CI jobs](https://github.com/petehottelet/smythe/actions/runs/34128905987) and [native verification](https://github.com/petehottelet/smythe/actions/runs/34128905943) passed for `5ab8578`; measurements and artwork unchanged |
 | Serial halt | Completed | 1,705 offline tests passed, 4 skipped; 24 shared serial/parallel failure-policy cases; independent review passed |
-| Active-descendant verification | Queued | Cancellation, settled charges, generation identity, and crash/resume regressions |
+| Active-descendant verification | Completed | 1,765 offline tests passed, 4 skipped; 60 new cancellation, settled-charge, generation-identity, and crash/resume cases; independent review passed |
 | Complete Task propagation | Queued | Equivalent execution, inspected-graph handoff, supervision, memory, and resume inputs |
 | Complete workflow accounting | Queued | One lifecycle ledger with phase costs, reservations, failed attempts, and durable exposure |
 | Astra Responses and native usage | Queued | Explicit endpoint/effort/tier, native token categories, tool continuation, offline contracts |

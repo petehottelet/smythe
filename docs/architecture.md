@@ -96,7 +96,10 @@ The graph runs through one set of controls regardless of who designed it.
 Both executors stop new work on a terminal failure. The parallel executor also
 cancels and awaits active siblings. Completed results and charges remain
 available to an explicit resume. See [Execution policies](execution.md).
-Verification of active descendants remains in [Coming soon](../ROADMAP.md#coming-soon).
+Verification records pending decisions and regeneration intents before
+cancelling affected work. Those control checkpoints bypass node batching;
+resume completes them before dispatch or cached-output return.
+See [Verification](verifier.md#recovery-and-concurrent-work).
 
 ## Artifacts and jobs
 
@@ -135,7 +138,8 @@ prompt mutation.
 ## Public boundaries
 
 - The graph is the planning and inspection boundary.
-- The node is the checkpoint, retry, timeout, trace, and budget-accounting boundary.
+- Nodes carry retries, timeouts, traces, and cost records. Node results and
+  verification control transitions form the checkpoint boundaries.
 - The run budget governs execution and synthesis.
 - Planning and model-based supervision currently call providers outside that
   budget. Complete workflow accounting is a [planned extension](../ROADMAP.md#coming-soon).
@@ -145,5 +149,4 @@ prompt mutation.
 
 The [cost guardrails](budgets.md) reject malformed usage and block unresolved
 accounting on resume. The [repository review](project-review-2026-09-06.md)
-records the original defects and remaining task-context and concurrent
-verification work.
+records the original defects and remaining task-context work.
