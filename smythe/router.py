@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 
+from smythe.budget import validate_completion_usage
 from smythe.planner import Architect, ArchitectError, DeterministicArchitect
 from smythe.provider import Provider
 from smythe.task import Task
@@ -66,6 +67,7 @@ class WhiteRabbit:
         result = await self._classifier_provider.complete(
             system, prompt, model=self._classifier_model
         )
+        validate_completion_usage(result)
 
         return self._parse_classification(result.text.strip())
 

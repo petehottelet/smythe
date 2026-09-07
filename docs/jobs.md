@@ -213,6 +213,13 @@ A completed run starts zero new operations. Safe pre-dispatch interruptions
 return to pending. Dispatched-but-uncommitted calls remain `unknown_outcome`,
 and the run becomes `needs_attention`.
 
+Invalid provider cost or token usage also becomes `unknown_outcome` and stops
+queued dispatches. Already-dispatched calls finish and retain their charges.
+This stop survives process restart: ordinary resume dispatches no further work
+while an invalid-accounting outcome remains unresolved. Repair the provider
+adapter and investigate the charge before explicitly acknowledging a reroll.
+The earlier unknown exposure remains in the ledger after that reroll.
+
 Do not resolve an unknown outcome by ordinary `resume`; that is intentionally a
 no-op for the ambiguous operation. First investigate the provider account and
 artifact destination. If a duplicate call is acceptable, acknowledge that

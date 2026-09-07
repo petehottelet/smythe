@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 
-from smythe.budget import BudgetEstimateRequired, SentinelAlert
+from smythe.budget import BudgetEstimateRequired, BudgetValidationError, SentinelAlert
 from smythe.executor_base import ExecutorBase, NodeFinalizationError
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
 
@@ -36,6 +36,10 @@ class Executor(ExecutorBase):
             visited.add(node.id)
             try:
                 self._execute_node(node, graph)
+            except BudgetValidationError as exc:
+                self.mark_accounting_invalid(node, exc)
+                self.notify_update(node)
+                raise
             except (BudgetEstimateRequired, NodeFinalizationError, SentinelAlert):
                 # Budget admission/reconciliation failures are global safety
                 # stops, as is a post-billing finalization failure. Never let
@@ -111,7 +115,11 @@ class Executor(ExecutorBase):
                 self._tracer.on_node_end(node)
                 self.notify_update(node)
                 return
-            except (NodeFinalizationError, SentinelAlert) as exc:
+            except (BudgetValidationError, NodeFinalizationError, SentinelAlert) as exc:
+                # Invalid post-call accounting is terminal. Retain any held
+                # reservation: an unusable bill is not evidence of a free call.
+                if isinstance(exc, BudgetValidationError):
+                    self.mark_accounting_invalid(node, exc)
                 self._tracer.on_node_error(node, exc)
                 self._tracer.on_node_end(node)
                 node.status = NodeStatus.FAILED

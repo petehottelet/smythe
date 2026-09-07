@@ -76,7 +76,7 @@ The graph runs through one set of controls regardless of who designed it.
 | Component | Responsibility |
 |---|---|
 | `Executor` / `AsyncExecutor` | Dependency scheduling, failure policies, retries, timeouts, and bounded parallelism |
-| `Sentinel` | Reserve cost before dispatch, reconcile completed calls, and stop new work at the ceiling |
+| `Sentinel` | Validate usage, reserve cost before dispatch, reconcile completed calls, and stop new work at the ceiling |
 | `Tracer` | Record node lifecycle, tool use, revisions, regenerations, and cost metadata |
 | `CheckpointStore` | Persist graph, results, agents, task, control counters, and spend for resume |
 | `Supervisor` | Review completed results and revise only the unexecuted remainder |
@@ -143,6 +143,7 @@ prompt mutation.
 - A verifier may reset only its target and downstream dependents.
 - A resumed run keeps completed results, recorded spend, and consumed control allowances.
 
-The [repository review](project-review-2026-09-06.md) documents current gaps in
-task-context propagation, numeric cost validation, and concurrent verification,
-with reproductions and acceptance criteria for each fix.
+The [cost guardrails](budgets.md) reject malformed usage and block unresolved
+accounting on resume. The [repository review](project-review-2026-09-06.md)
+records the original defects and remaining task-context and concurrent
+verification work.

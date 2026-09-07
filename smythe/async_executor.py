@@ -7,7 +7,7 @@ from collections import deque
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-from smythe.budget import Sentinel, SentinelAlert
+from smythe.budget import BudgetValidationError, Sentinel, SentinelAlert, validate_token_count
 from smythe.executor_base import (
     DEFAULT_MAX_TOOL_ITERATIONS,
     ExecutorBase,
@@ -73,7 +73,9 @@ class AsyncExecutor(ExecutorBase):
             max_revisions=max_revisions, task=task, verifier=verifier,
             revisions_used=revisions_used,
         )
-        self._estimated_tokens_per_node = estimated_tokens_per_node
+        self._estimated_tokens_per_node = validate_token_count(
+            estimated_tokens_per_node, "estimated_tokens_per_node",
+        )
         if max_concurrency is not None and max_concurrency < 1:
             raise ValueError(f"max_concurrency must be >= 1, got {max_concurrency}")
         self._max_concurrency = max_concurrency
@@ -142,6 +144,9 @@ class AsyncExecutor(ExecutorBase):
                         # No provider call has started for this node. Stop
                         # admitting work, settle/cancel what is already in
                         # flight, then surface the admission failure.
+                        if isinstance(exc, BudgetValidationError):
+                            self.mark_accounting_invalid(node, exc)
+                            self.notify_update(node)
                         ready.appendleft(node)
                         admission_error = exc
                         break
@@ -282,10 +287,13 @@ class AsyncExecutor(ExecutorBase):
                 node.result = None
                 self._tracer.on_node_end(node)
                 raise
-            except (NodeFinalizationError, SentinelAlert) as exc:
+            except (BudgetValidationError, NodeFinalizationError, SentinelAlert) as exc:
                 # A reconciliation alert or post-billing persistence failure
                 # is non-retryable here: another provider call would compound
-                # the spend rather than repair the local failure.
+                # the spend rather than repair the local failure. Invalid
+                # accounting also retains its reservation until reconciled.
+                if isinstance(exc, BudgetValidationError):
+                    self.mark_accounting_invalid(node, exc)
                 node.status = NodeStatus.FAILED
                 node.result = str(exc)
                 self._tracer.on_node_error(node, exc)

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from smythe.budget import BudgetValidationError, validate_completion_usage
 from smythe.jobs.artifact_io import (
     MAX_ARTIFACT_BYTES,
     atomic_write_bytes,
@@ -41,6 +42,7 @@ from smythe.jobs.store import (
     MAX_ARTIFACTS_PER_CALL,
     MAX_SQLITE_INTEGER,
     JobBudgetError,
+    OperationStatus,
     RunLeaseError,
     SQLiteRunStore,
 )
@@ -51,6 +53,7 @@ from smythe.tools import ChatMessage
 _SAFE_COMPONENT = re.compile(r"[^A-Za-z0-9._-]+")
 _SAFE_RUN_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 MAX_TOTAL_ARTIFACT_BYTES_PER_CALL = 128 * 1024 * 1024
+_INVALID_ACCOUNTING_PREFIX = "invalid provider accounting: "
 
 
 @dataclass(frozen=True, slots=True)
@@ -284,6 +287,16 @@ class JobRunner:
         root: Path,
     ) -> dict[str, Any]:
         pending = self.store.pending_operations(run_id)
+        # Unknown numeric accounting is terminal until explicitly acknowledged
+        # through the existing reroll flow. Persisted classification prevents a
+        # fresh runner from resuming other paid work with an invalid ledger.
+        snapshot = self.store.snapshot(run_id)
+        if any(
+            item["status"] == OperationStatus.UNKNOWN_OUTCOME.value
+            and (item["error"] or "").startswith(_INVALID_ACCOUNTING_PREFIX)
+            for item in snapshot["operations"]
+        ):
+            pending = []
         if not pending:
             self.store.finalize_run(run_id)
             snapshot = self.store.snapshot(run_id)
@@ -297,6 +310,7 @@ class JobRunner:
         peak_active = 0
         started = 0
         counter_lock = asyncio.Lock()
+        stop_dispatch = asyncio.Event()
         start = time.perf_counter()
 
         async def producer() -> None:
@@ -312,13 +326,17 @@ class JobRunner:
                 try:
                     if record is None:
                         return
+                    if stop_dispatch.is_set():
+                        continue
                     operation = operations[record["operation_id"]]
                     async with counter_lock:
                         active += 1
                         started += 1
                         peak_active = max(peak_active, active)
                     try:
-                        await self._execute_operation(run_id, operation, root, plan)
+                        await self._execute_operation(
+                            run_id, operation, root, plan, stop_dispatch=stop_dispatch,
+                        )
                     finally:
                         async with counter_lock:
                             active -= 1
@@ -350,6 +368,8 @@ class JobRunner:
         operation: PlannedOperationV1,
         root: Path,
         plan: JobPlanV1,
+        *,
+        stop_dispatch: asyncio.Event,
     ) -> None:
         try:
             attempt = self.store.begin_attempt(run_id, operation.operation_id)
@@ -375,6 +395,15 @@ class JobRunner:
             raise
         except Exception as exc:
             self.store.fail_pre_dispatch(permit.call_id, str(exc))
+            return
+
+        if stop_dispatch.is_set():
+            # Attachment loading can yield while a sibling reports bad usage.
+            # This call is still safe to release and has consumed no retry.
+            self.store.fail_pre_dispatch(
+                permit.call_id, "dispatch stopped after invalid provider accounting",
+                retryable=True,
+            )
             return
 
         try:
@@ -417,8 +446,19 @@ class JobRunner:
                 f"provider call exceeded its {call_timeout:g}s deadline after dispatch",
             )
             return
+        except BudgetValidationError as exc:
+            # Result construction itself can reject malformed provider usage.
+            stop_dispatch.set()
+            self.store.mark_unknown_outcome(
+                permit.call_id, f"{_INVALID_ACCOUNTING_PREFIX}{exc}",
+            )
+            return
         except Exception as exc:
-            self.store.mark_unknown_outcome(permit.call_id, str(exc))
+            # Prefix untrusted exception text so it cannot impersonate our
+            # persisted invalid-accounting classification on a later resume.
+            self.store.mark_unknown_outcome(
+                permit.call_id, f"provider failure after dispatch: {exc}",
+            )
             return
 
         try:
@@ -456,6 +496,12 @@ class JobRunner:
                 )
             finally:
                 raise
+        except BudgetValidationError as exc:
+            stop_dispatch.set()
+            self.store.mark_unknown_outcome(
+                permit.call_id, f"{_INVALID_ACCOUNTING_PREFIX}{exc}",
+            )
+            return
         except Exception as exc:
             # The provider returned but trustworthy final accounting did not.
             # Preserve a conservative ambiguity state and never auto-rerun.
@@ -490,6 +536,8 @@ class JobRunner:
         result: CompletionResult,
         operation: PlannedOperationV1,
     ) -> tuple[int, bool, bool]:
+        # Custom adapters may mutate a valid result after its constructor ran.
+        validate_completion_usage(result)
         if operation.provider is ProviderKind.OFFLINE:
             return 0, True, False
         ceiling = usd_to_micros(operation.max_cost_per_call_usd)
@@ -501,9 +549,14 @@ class JobRunner:
                 raise ValueError("provider cost_usd is not a valid decimal") from exc
             if not value.is_finite() or value < 0:
                 raise ValueError("provider cost_usd must be finite and non-negative")
-            observed = usd_to_micros(value)
+            try:
+                observed = usd_to_micros(value)
+            except ValueError as exc:
+                raise BudgetValidationError(
+                    f"provider cost_usd cannot be recorded: {exc}"
+                ) from exc
             if observed > MAX_SQLITE_INTEGER:
-                raise ValueError("provider cost_usd exceeds the durable integer limit")
+                raise BudgetValidationError("provider cost_usd exceeds the durable integer limit")
         if result.cost_usd_unknown:
             return (
                 max(ceiling, observed or 0),

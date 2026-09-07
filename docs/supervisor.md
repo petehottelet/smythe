@@ -51,13 +51,14 @@ Four guardrails do that:
    checks every rule — no unknown nodes, no orphaned dependents, no
    cycles, no touching finished work — and mutates nothing if any check
    fails. A malformed proposal costs a trace entry, not a corrupt run.
-3. **Contained failure.** A supervisor that raises, returns junk, or
-   proposes an invalid change is recorded and ignored. Supervision is an
-   optional improvement; it can never fail a run that would otherwise
-   succeed.
+3. **Contained proposal failure.** Ordinary supervisor errors and invalid
+   revisions are recorded and ignored. Invalid provider accounting raises
+   `BudgetValidationError`, stops the run, and blocks resume until the charge
+   is reconciled. An optional review cannot bypass cost validation.
 4. **Budget still rules.** Revision-added nodes are admitted through the
-   same Sentinel reservation as planned ones. A supervisor cannot spend
-   past `max_budget_usd` — it can only make the run stop sooner.
+   same Sentinel reservation as planned ones. Model-based review calls remain
+   outside the current execution ledger; [complete workflow accounting](budgets.md#current-scope)
+   is tracked separately.
 
 ## Triggering reviews
 

@@ -13,7 +13,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
 from smythe.agent import Agent
-from smythe.budget import BudgetEstimateRequired, Sentinel
+from smythe.budget import (
+    BudgetEstimateRequired,
+    BudgetValidationError,
+    Sentinel,
+    validate_completion_usage,
+    validate_token_count,
+)
 from smythe.graph import ExecutionGraph, Node, NodeStatus, RevisionError
 from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
@@ -145,11 +151,10 @@ class ExecutorBase:
         """Let the supervisor revise the plan after *node* completed.
 
         Returns True when the graph changed, so the caller can refresh
-        any scheduling state it derived from it.  Every failure mode
-        here — a supervisor that raises, returns junk, or proposes an
-        invalid change — is contained and traced: supervision is an
-        optional improvement and must never be able to fail a run that
-        would otherwise succeed.
+        any scheduling state it derived from it. Ordinary supervisor
+        errors and invalid changes are contained and traced. Invalid
+        provider accounting is terminal because continuing would spend
+        more while the supervisor's charge remains unresolved.
         """
         if self._supervisor is None:
             return False
@@ -161,6 +166,13 @@ class ExecutorBase:
             revision = await self._supervisor.review(
                 graph, node, task=self._task, revisions_remaining=remaining,
             )
+        except BudgetValidationError as exc:
+            self.mark_accounting_invalid(node, exc)
+            self._tracer.on_revision(
+                node, None, applied=False, detail=f"supervisor accounting invalid: {exc}",
+            )
+            self.notify_update(node)
+            raise
         except Exception as exc:
             self._tracer.on_revision(
                 node, None, applied=False, detail=f"supervisor raised: {exc}",
@@ -323,13 +335,18 @@ class ExecutorBase:
         if estimate is not None:
             self._budget.reserve(
                 node.id,
-                float(estimate),
+                estimate,
                 hard_ceiling=requires_explicit,
             )
         elif default_estimated_tokens is not None:
+            tokens = validate_token_count(default_estimated_tokens, "default_estimated_tokens")
+            try:
+                estimate = tokens * self._budget.cost_per_token
+            except OverflowError as exc:
+                raise BudgetValidationError("Token-derived estimate must remain finite") from exc
             self._budget.reserve(
                 node.id,
-                default_estimated_tokens * self._budget.cost_per_token,
+                estimate,
             )
         else:
             self._budget.check(node.id)
@@ -342,6 +359,12 @@ class ExecutorBase:
         """
         if self._on_node_update is not None:
             self._on_node_update(node)
+
+    @staticmethod
+    def mark_accounting_invalid(node: Node, error: BudgetValidationError) -> None:
+        """Persist the need for reconciliation before this run can resume."""
+        node.metadata["accounting_invalid"] = True
+        node.metadata["accounting_error"] = str(error)
 
     def prepare_graph(self, graph: ExecutionGraph) -> None:
         """Cache immutable graph structure used throughout an execution.
@@ -477,6 +500,11 @@ class ExecutorBase:
                     started = time.monotonic()
                     try:
                         outcome = await session.call(tc)
+                    except BudgetValidationError:
+                        # A tool may itself call a paid provider. Numeric
+                        # accounting failures must not become retryable model
+                        # feedback that dispatches another provider turn.
+                        raise
                     except Exception as exc:
                         # Tool failures go back to the model, not up the stack —
                         # it can adapt or try another tool.
@@ -493,6 +521,9 @@ class ExecutorBase:
         )
 
     def _record_cost(self, node: Node, result: CompletionResult) -> None:
+        # Custom providers can mutate CompletionResult after construction.
+        # Reject malformed usage even when this executor has no Sentinel.
+        validate_completion_usage(result)
         if self._budget:
             cost = self._budget.add_cost(node.id, result)
             if result.cost_usd_unknown:

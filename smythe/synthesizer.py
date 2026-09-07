@@ -8,7 +8,9 @@ import logging
 from enum import Enum
 from typing import Any
 
-from smythe.budget import BudgetEstimateRequired, Sentinel
+from smythe.budget import (
+    BudgetEstimateRequired, BudgetValidationError, Sentinel, validate_completion_usage,
+)
 from smythe.graph import ExecutionGraph, Node, NodeStatus
 from smythe.provider import Provider
 from smythe.tracer import Tracer
@@ -229,6 +231,7 @@ class Synthesizer:
             result = await resolved_provider.complete(
                 MERGE_SYSTEM_PROMPT, prompt, model=resolved_model
             )
+            validate_completion_usage(result)
 
             if resolved_budget:
                 cost = resolved_budget.record("__synthesis__", result)
@@ -237,7 +240,7 @@ class Synthesizer:
             synth_node.status = NodeStatus.COMPLETED
             return result.text
         except Exception as exc:
-            if resolved_budget:
+            if resolved_budget and not isinstance(exc, BudgetValidationError):
                 resolved_budget.release("__synthesis__")
             synth_node.status = NodeStatus.FAILED
             if resolved_tracer:

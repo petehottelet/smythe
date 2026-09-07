@@ -3,6 +3,11 @@
 **Rating: 7/10. Keep the architecture and harden the runtime. A complete rewrite
 would discard useful work without addressing the main problems.**
 
+Follow-up: [strict numeric cost validation](budgets.md) now addresses the first
+finding, including invalid-report recovery. The remaining work is tracked in
+the [completion campaign](../plans/coming-soon-2026-09-07.md). This review's
+reproductions and counts describe the original reviewed commit.
+
 Smythe has a clear product: generate an inspectable execution graph for a goal,
 then run it within a durable execution envelope. The repository implements
 both ideas, with working provider adapters, tools, checkpoints, artifact jobs,

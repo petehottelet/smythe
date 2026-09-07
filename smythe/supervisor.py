@@ -30,6 +30,7 @@ import json
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from smythe.budget import validate_completion_usage
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Revision
 
 if TYPE_CHECKING:
@@ -161,6 +162,7 @@ class LLMSupervisor(Supervisor):
             self._build_prompt(graph, node, task, revisions_remaining),
             model,
         )
+        validate_completion_usage(result)
         return self._parse(result.text)
 
     @staticmethod

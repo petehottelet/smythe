@@ -76,8 +76,8 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   History is immutable - completed, running, and failed nodes are never
   touched, so a revision cannot invalidate a banked result.
   Guardrails: off by default (`max_revisions=0`), full validation
-  before any mutation, contained failure (a supervisor that raises or
-  proposes nonsense is traced and ignored, never fails the run), and
+  before any mutation, contained proposal failure (ordinary supervisor errors
+  are traced and ignored; invalid accounting is terminal), and
   revision-added nodes go through the same budget reservation as
   planned ones. `LLMSupervisor` reviews when a pending fan-in becomes
   ready and when the graph finishes, or at explicit `review_after` targets.
@@ -232,6 +232,10 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Fixed
 
+- **Cost and usage integrity:** finite nonnegative USD and integer nonnegative
+  tokens are validated at provider construction, admission, reconciliation,
+  and checkpoint restore. Invalid accounting stops serial and parallel work,
+  retains reservations and accrued spend, and blocks unresolved resume.
 - Concurrent Windows artifact finalization now treats regular and extended
   (`\\?\`) path namespaces as the same location during confinement checks.
   Valid job runs no longer enter `needs_attention` when directory creation

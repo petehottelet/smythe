@@ -5,6 +5,7 @@ import pytest
 from smythe.budget import (
     BudgetEstimateRequired,
     BudgetReconciliationError,
+    BudgetValidationError,
     SentinelAlert,
     Sentinel,
 )
@@ -232,10 +233,13 @@ def test_explicit_cost_accumulates_via_add_cost():
     assert abs(tracker.total_cost_usd - expected) < 1e-10
 
 
-def test_negative_explicit_cost_is_clamped_to_zero():
+def test_negative_explicit_cost_is_rejected_without_erasing_valid_cost():
     tracker = Sentinel(max_budget_usd=1.0)
     tracker.record("n1", CompletionResult(text="x", cost_usd=0.5))
-    tracker.add_cost("n1", CompletionResult(text="x", cost_usd=-0.4))
+    result = CompletionResult(text="x", cost_usd=0.0)
+    result.cost_usd = -0.4  # Custom providers may mutate a valid result.
+    with pytest.raises(BudgetValidationError, match="cost_usd"):
+        tracker.add_cost("n1", result)
     assert tracker.total_cost_usd == pytest.approx(0.5)
 
 

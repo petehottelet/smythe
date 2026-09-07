@@ -40,6 +40,12 @@ def _is_nonnegative_finite_number(value: object) -> bool:
     )
 
 
+def _usage_tokens(usage: object, field_name: str) -> int:
+    """Default absent legacy usage only; malformed falsy values must reach validation."""
+    value = getattr(usage, field_name, None)
+    return 0 if value is None else value
+
+
 @dataclass
 class Artifact:
     """A binary output from a provider call (e.g. a generated image).
@@ -81,6 +87,11 @@ class CompletionResult:
     should inspect both this flag and ``cost_usd_is_estimate``.
     """
 
+    def __post_init__(self) -> None:
+        from smythe.budget import validate_completion_usage
+
+        validate_completion_usage(self)
+
     @property
     def total_tokens(self) -> int:
         return self.prompt_tokens + self.completion_tokens
@@ -108,7 +119,8 @@ class Provider(ABC):
         # Compatibility for custom providers that implemented the original
         # property-only hint before this model-aware hook existed.
         hint = getattr(self, "cost_estimate_per_call", None)
-        return float(hint) if hint is not None else None
+        # Keep the original type so admission can reject booleans and strings.
+        return hint
 
     def requires_explicit_budget_estimate(self, model: str) -> bool:
         """Whether a hard-budget call must have an explicit USD ceiling."""
@@ -309,8 +321,8 @@ class AnthropicProvider(Provider):
 
         return CompletionResult(
             text="\n".join(text_parts),
-            prompt_tokens=getattr(response.usage, "input_tokens", 0) or 0,
-            completion_tokens=getattr(response.usage, "output_tokens", 0) or 0,
+            prompt_tokens=_usage_tokens(response.usage, "input_tokens"),
+            completion_tokens=_usage_tokens(response.usage, "output_tokens"),
             tool_calls=tool_calls,
             stop_reason=stop,
         )
@@ -489,10 +501,8 @@ class OpenAIProvider(Provider):
         usage = response.usage
         return CompletionResult(
             text=text,
-            prompt_tokens=(getattr(usage, "prompt_tokens", 0) or 0) if usage else 0,
-            completion_tokens=(
-                getattr(usage, "completion_tokens", 0) or 0
-            ) if usage else 0,
+            prompt_tokens=_usage_tokens(usage, "prompt_tokens"),
+            completion_tokens=_usage_tokens(usage, "completion_tokens"),
             tool_calls=tool_calls,
             stop_reason=stop,
         )
@@ -717,8 +727,8 @@ class OpenAIImageProvider(OpenAIProvider):
             cost_usd_unknown = True
         return CompletionResult(
             text=f"Generated {len(artifacts)} image artifact(s) with {model}.",
-            prompt_tokens=getattr(usage, "input_tokens", 0) if usage else 0,
-            completion_tokens=getattr(usage, "output_tokens", 0) if usage else 0,
+            prompt_tokens=_usage_tokens(usage, "input_tokens"),
+            completion_tokens=_usage_tokens(usage, "output_tokens"),
             artifacts=artifacts,
             cost_usd=cost_usd,
             cost_usd_is_estimate=cost_usd_is_estimate,
@@ -889,10 +899,8 @@ class GeminiProvider(Provider):
         # image-only responses), so coerce before arithmetic downstream.
         return CompletionResult(
             text=text,
-            prompt_tokens=(getattr(usage, "prompt_token_count", 0) or 0) if usage else 0,
-            completion_tokens=(
-                getattr(usage, "candidates_token_count", 0) or 0
-            ) if usage else 0,
+            prompt_tokens=_usage_tokens(usage, "prompt_token_count"),
+            completion_tokens=_usage_tokens(usage, "candidates_token_count"),
             tool_calls=tool_calls,
             stop_reason="tool_use" if tool_calls else "end_turn",
             artifacts=artifacts,
