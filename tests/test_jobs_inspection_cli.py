@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import closing
 import hashlib
 import json
 from pathlib import Path
@@ -93,7 +94,7 @@ def test_missing_read_store_is_not_created(tmp_path, capsys, monkeypatch, comman
 
 def test_foreign_sqlite_database_is_rejected_without_schema_changes(tmp_path, capsys):
     path = tmp_path / "other.sqlite3"
-    with sqlite3.connect(path) as connection:
+    with closing(sqlite3.connect(path)) as connection, connection:
         connection.execute("CREATE TABLE unrelated (value TEXT)")
         connection.execute("INSERT INTO unrelated VALUES ('keep')")
     original = path.read_bytes()

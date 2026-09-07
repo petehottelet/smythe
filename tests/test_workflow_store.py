@@ -1,5 +1,6 @@
 """Offline crash, accounting and fencing checks for the workflow journal."""
 
+from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 import hashlib
@@ -267,7 +268,7 @@ def test_conflicting_response_is_retained_and_latches_without_replacing_original
         store.append_response(permit, envelope(call, response(text="different")))
     assert store.load_replay(call["call_id"])["evidence_id"] == original
     assert store.inspect_run("run")["blocked_reason"] == "evidence_conflict"
-    with sqlite3.connect(store.path) as db:
+    with closing(sqlite3.connect(store.path)) as db, db:
         assert db.execute("SELECT COUNT(*) FROM workflow_evidence WHERE operation='response'").fetchone()[0] == 2
     store.settle_call(lease, call["call_id"], original)
     assert store.inspect_run("run")["blocked_reason"] == "evidence_conflict"
@@ -348,7 +349,7 @@ def test_reservation_money_above_sqlite_integer_range_remains_exact(journal):
     q = quote(store, huge_lease, call, count=10**80)
     store.reserve_call(huge_lease, call["call_id"], q["quote_id"])
     assert store.audit("huge")["reserved_nanousd"] == 10**80 * 25_000 + 100 * 75_000
-    with sqlite3.connect(store.path) as db:
+    with closing(sqlite3.connect(store.path)) as db, db:
         assert db.execute("SELECT typeof(reserved) FROM workflow_runs WHERE run_id='huge'").fetchone()[0] == "text"
 
 
@@ -359,7 +360,7 @@ def test_corrupt_persisted_data_fails_audit(journal, mutation):
     store.begin_operation(lease, "o", "planning", {})
     store.complete_operation(lease, "o", {})
     store.save_checkpoint(lease, 0, {})
-    with sqlite3.connect(store.path) as db:
+    with closing(sqlite3.connect(store.path)) as db, db:
         statements = {
             "aggregate": "UPDATE workflow_runs SET confirmed='0'",
             "money": "UPDATE workflow_runs SET confirmed='01'",
@@ -379,7 +380,7 @@ def test_corrupt_persisted_data_fails_audit(journal, mutation):
 
 def test_foreign_database_is_rejected_without_mutation(tmp_path):
     path = tmp_path / "jobs.sqlite"
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db, db:
         db.execute("CREATE TABLE runs(id TEXT)")
     before = path.read_bytes()
     with pytest.raises(WorkflowCorruptionError):
@@ -488,7 +489,7 @@ def test_completed_checkpoint_rejects_even_zero_dollar_active_offline_call(journ
 def test_saved_result_and_receipt_hashes_detect_replay_mutation(journal, column):
     store, lease, _ = journal
     call = accepted(store, lease)
-    with sqlite3.connect(store.path) as db:
+    with closing(sqlite3.connect(store.path)) as db, db:
         db.execute(f"UPDATE workflow_calls SET {column}='{{}}'")
     with pytest.raises(WorkflowCorruptionError):
         store.load_replay(call["call_id"])
@@ -544,11 +545,11 @@ def test_offline_quote_version_is_type_sensitive(journal, version):
 
 def test_missing_journal_table_is_never_recreated_silently(journal):
     store, _, _ = journal
-    with sqlite3.connect(store.path) as db:
+    with closing(sqlite3.connect(store.path)) as db, db:
         db.execute("DROP TABLE workflow_invocations")
     with pytest.raises(WorkflowCorruptionError):
         SQLiteWorkflowStore(store.path)
-    with sqlite3.connect(store.path) as db:
+    with closing(sqlite3.connect(store.path)) as db, db:
         assert db.execute("SELECT 1 FROM sqlite_master WHERE name='workflow_invocations'").fetchone() is None
 
 
@@ -572,7 +573,7 @@ def test_read_only_run_discovery_contains_resume_ids_and_exact_balances_only(jou
     store.reserve_call(lease, call["call_id"], q["quote_id"])
     store.create_run(None, {}, None, run_id="another")
     monkeypatch.setattr(OpenAIResponsesProvider, "_get_client", lambda *args: pytest.fail("SDK constructed"))
-    with sqlite3.connect(store.path) as db:
+    with closing(sqlite3.connect(store.path)) as db, db:
         before = list(db.iterdump())
     with SQLiteWorkflowStore(store.path, read_only=True) as reader:
         runs = {row["run_id"]: row for row in reader.list_runs()}
@@ -582,7 +583,7 @@ def test_read_only_run_discovery_contains_resume_ids_and_exact_balances_only(jou
     assert runs["another"]["budget_nanousd"] is None
     assert "PRIVATE" not in canonical(runs) and "private goal" not in canonical(runs)
     assert "task" not in runs["run"] and "config" not in runs["run"]
-    with sqlite3.connect(store.path) as db:
+    with closing(sqlite3.connect(store.path)) as db, db:
         assert list(db.iterdump()) == before
 
 

@@ -1,5 +1,6 @@
 """Read-only discovery sees live Jobs journals without advancing their state."""
 
+from contextlib import closing
 import json
 import sqlite3
 from threading import Event, Thread
@@ -34,7 +35,7 @@ def journal(tmp_path):
 
 
 def logical_dump(path):
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db, db:
         return list(db.iterdump())
 
 
@@ -94,14 +95,14 @@ def test_read_only_rejects_foreign_or_invalid_schema_without_repair(tmp_path, ki
     if kind == "corrupt":
         path.write_bytes(b"not a sqlite database")
     elif kind in ("foreign", "empty"):
-        with sqlite3.connect(path) as db:
+        with closing(sqlite3.connect(path)) as db, db:
             if kind == "foreign":
                 db.execute("CREATE TABLE workflow_runs(run_id TEXT)")
                 db.execute("PRAGMA user_version=2")
     else:
         with SQLiteRunStore(path) as store:
             create_run(store, tmp_path)
-        with sqlite3.connect(path) as db:
+        with closing(sqlite3.connect(path)) as db, db:
             if kind == "missing_table":
                 db.execute("DROP TABLE run_leases")
             elif kind == "missing_column":
@@ -118,7 +119,7 @@ def test_version_one_is_never_upgraded_by_reader_but_writable_upgrade_remains(tm
     path = tmp_path / "legacy.db"
     with SQLiteRunStore(path) as store:
         create_run(store, tmp_path)
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db, db:
         db.execute("DROP TABLE run_controls")
         db.execute("ALTER TABLE runs DROP COLUMN artifact_namespace")
         db.execute("ALTER TABLE runs DROP COLUMN artifact_owner_id")
@@ -139,7 +140,7 @@ def test_version_one_is_never_upgraded_by_reader_but_writable_upgrade_remains(tm
 
 def test_foreign_writable_database_is_not_overwritten(tmp_path):
     path = tmp_path / "workflow.db"
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db, db:
         db.execute("CREATE TABLE workflow_runs(run_id TEXT)")
     before = path.read_bytes()
     with pytest.raises(RunStoreError):
@@ -199,7 +200,7 @@ def test_bounded_pages_status_and_tie_order_are_stable(journal):
     create_run(journal, journal.path.parent, "new", name="Newer", count=1)
     create_run(journal, journal.path.parent, "tie-b", name="Tie-B", count=3)
     create_run(journal, journal.path.parent, "tie-a", name="Tie-A", count=4)
-    with sqlite3.connect(journal.path) as db:
+    with closing(sqlite3.connect(journal.path)) as db, db:
         db.execute("UPDATE runs SET created_at_ns=20 WHERE run_id LIKE 'tie-%'")
         db.execute("UPDATE runs SET created_at_ns=30 WHERE run_id='new'")
         db.execute("UPDATE runs SET created_at_ns=10 WHERE run_id='run'")
@@ -238,7 +239,7 @@ def test_listing_does_not_load_prompts_results_or_artifact_rows(journal):
     assert not any("FROM artifacts" in sql or "spec_json" in sql or "result_text" in sql or "SELECT *" in sql for sql in statements)
     # A corrupt plan outside the selected page cannot force an unbounded parse.
     create_run(journal, journal.path.parent, "older")
-    with sqlite3.connect(journal.path) as db:
+    with closing(sqlite3.connect(journal.path)) as db, db:
         db.execute("UPDATE runs SET plan_json='bad JSON',created_at_ns=0 WHERE run_id='older'")
     assert journal.list_runs(limit=1)[0]["run_id"] == "run"
     with pytest.raises(RunStoreError):
@@ -248,7 +249,7 @@ def test_listing_does_not_load_prompts_results_or_artifact_rows(journal):
 @pytest.mark.parametrize("column,value", [("plan_json", '{"name":123}'), ("status", "nonsense"),
     ("confirmed_microusd", -1), ("created_at_ns", -1)])
 def test_corrupt_summary_data_fails_closed(journal, column, value):
-    with sqlite3.connect(journal.path) as db:
+    with closing(sqlite3.connect(journal.path)) as db, db:
         db.execute(f"UPDATE runs SET {column}=?", (value,))
     with pytest.raises(RunStoreError):
         journal.list_runs()
@@ -326,7 +327,7 @@ def test_inspection_rejects_missing_or_ambiguous_operation(journal):
     with pytest.raises(ValueError, match="No operation"):
         journal.inspection_snapshot("run", operation="absent")
     operations = journal.pending_operations("run")
-    with sqlite3.connect(journal.path) as db:
+    with closing(sqlite3.connect(journal.path)) as db, db:
         db.execute("UPDATE operations SET operation_key=? WHERE operation_id=?",
                    (operations[0]["operation_id"], operations[1]["operation_id"]))
     with pytest.raises(ValueError, match="more than one"):
@@ -349,7 +350,7 @@ def test_inspection_validates_bounds_before_queries(journal, kwargs):
 
 def test_inspection_does_not_parse_off_page_operation_specs(journal):
     operations = journal.pending_operations("run")
-    with sqlite3.connect(journal.path) as db:
+    with closing(sqlite3.connect(journal.path)) as db, db:
         db.execute("UPDATE operations SET spec_json='invalid json' WHERE operation_id=?", (operations[1]["operation_id"],))
     page = journal.inspection_snapshot("run", limit=1)
     assert page["operations"][0]["operation_id"] == operations[0]["operation_id"]
@@ -357,7 +358,7 @@ def test_inspection_does_not_parse_off_page_operation_specs(journal):
 
 
 def test_maximum_list_page_has_exact_more_indicator(journal):
-    with sqlite3.connect(journal.path) as db:
+    with closing(sqlite3.connect(journal.path)) as db, db:
         fields = [row[1] for row in db.execute("PRAGMA table_info(runs)") if row[1] != "run_id"]
         columns = ",".join(fields)
         db.executemany(f"INSERT INTO runs(run_id,{columns}) SELECT ?,{columns} FROM runs WHERE run_id='run'",
@@ -376,17 +377,17 @@ def test_selected_json_corruption_is_a_store_error_for_inspection_and_export(jou
         '{"extra":[1e999]}', '{"extra":{"same":1,"same":2}}',
         '[]', 'null', '"text"', '{bad JSON', b'{"extra":"BLOB"}',
     ]
-    with sqlite3.connect(journal.path) as db:
+    with closing(sqlite3.connect(journal.path)) as db, db:
         original = db.execute(f"SELECT {column} FROM {table} LIMIT 1").fetchone()[0]
     with SQLiteRunStore(journal.path, read_only=True) as reader:
         for value in invalid_values:
-            with sqlite3.connect(journal.path) as db:
+            with closing(sqlite3.connect(journal.path)) as db, db:
                 db.execute(f"UPDATE {table} SET {column}=?", (value,))
             for read in (lambda: reader.inspection_snapshot("run"),
                          lambda: reader.snapshot("run", include_events=True)):
                 with pytest.raises(RunStoreError, match=f"{table}.{column}"):
                     read()
-        with sqlite3.connect(journal.path) as db:
+        with closing(sqlite3.connect(journal.path)) as db, db:
             db.execute(f"UPDATE {table} SET {column}=?", (original,))
         # A failed read must also release its snapshot/transaction.
         assert reader.inspection_snapshot("run")["counts"] == {"pending": 2}
@@ -397,7 +398,7 @@ def test_nontext_job_name_is_rejected_by_all_public_projections(journal):
                       '{"name":null}', b'{"name":"BLOB"}']
     with SQLiteRunStore(journal.path, read_only=True) as reader:
         for value in invalid_values:
-            with sqlite3.connect(journal.path) as db:
+            with closing(sqlite3.connect(journal.path)) as db, db:
                 db.execute("UPDATE runs SET plan_json=?", (value,))
             for read in (reader.list_runs, lambda: reader.inspection_snapshot("run"),
                          lambda: reader.snapshot("run", include_events=True)):
@@ -417,7 +418,7 @@ def test_nontext_job_name_is_rejected_by_all_public_projections(journal):
 def test_selected_scalar_corruption_cannot_escape_into_json(journal, table, column, value):
     operation = journal.pending_operations("run")[0]
     complete_operation(journal, operation["operation_id"])
-    with sqlite3.connect(journal.path) as db:
+    with closing(sqlite3.connect(journal.path)) as db, db:
         db.execute(f"UPDATE {table} SET {column}=?", (value,))
     with SQLiteRunStore(journal.path, read_only=True) as reader:
         with pytest.raises(RunStoreError, match=f"{table}.{column}"):
@@ -431,7 +432,7 @@ def test_selected_scalar_corruption_cannot_escape_into_json(journal, table, colu
 def test_valid_nested_json_remains_lossless_and_strictly_serializable(journal):
     value = {"prompt": "source data", "extra": [None, True, 1, 1.25, {"unicode": "雨"}]}
     encoded = json.dumps(value, ensure_ascii=False, allow_nan=False)
-    with sqlite3.connect(journal.path) as db:
+    with closing(sqlite3.connect(journal.path)) as db, db:
         db.execute("UPDATE operations SET spec_json=?", (encoded,))
         db.execute("UPDATE events SET payload_json=?", (encoded,))
     with SQLiteRunStore(journal.path, read_only=True) as reader:

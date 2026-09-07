@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import closing
 import asyncio
 import base64
 import sqlite3
@@ -251,7 +252,7 @@ def make_legacy(path, root, clock, *, leased=False, prepared=False):
         if leased:
             store.acquire_run_lease("run", "legacy-owner")
     # Reconstruct the historical v2 shape, including its lack of fencing columns.
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db, db:
         db.execute("DROP TABLE run_controls")
         db.execute("ALTER TABLE runs DROP COLUMN artifact_namespace")
         db.execute("ALTER TABLE runs DROP COLUMN artifact_owner_id")
@@ -291,11 +292,11 @@ def test_open_v2_reader_reports_migration_in_its_next_snapshot(tmp_path):
 def test_v2_migration_rejects_live_legacy_lease_then_preserves_history(tmp_path):
     path, clock = tmp_path / "legacy.db", Clock()
     make_legacy(path, tmp_path, clock, leased=True, prepared=True)
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db, db:
         before = list(db.iterdump())
     with pytest.raises(RunLeaseError, match="Stop legacy"):
         SQLiteRunStore(path, clock_ns=clock)
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db, db:
         assert list(db.iterdump()) == before
     clock.expire()
     with SQLiteRunStore(path, clock_ns=clock) as store:
@@ -317,7 +318,7 @@ def test_v2_migration_rejects_live_legacy_lease_then_preserves_history(tmp_path)
 def test_migration_retains_ever_leased_fence_after_legacy_release(tmp_path):
     path, clock = tmp_path / "legacy.db", Clock()
     make_legacy(path, tmp_path, clock, leased=True)
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db, db:
         db.execute("DELETE FROM run_leases")  # Legacy release leaves its acquisition event.
     with SQLiteRunStore(path, clock_ns=clock) as store:
         assert store.get_run("run")["lease_epoch"] == 1
