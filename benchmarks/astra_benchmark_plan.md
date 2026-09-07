@@ -6,8 +6,11 @@ new comparison. It does not update, reprice, or replace historical results.
 ## API and accounting prerequisites
 
 Use the exact model ID `gpt-6-astra`. It supports text generation through
-Chat Completions and Responses. Astra function calling requires Responses;
-the current Smythe Chat Completions tool loop cannot run an Astra tool study.
+Chat Completions and Responses. Astra function calling requires Responses.
+The current checkout provides an explicit
+[`OpenAIResponsesProvider`](../docs/openai-responses.md) with function-tool
+continuation, native usage receipts, and model-specific prices. Automatic
+provider selection and the published 0.6.0 package still use Chat Completions.
 For this campaign, use text-only requests with supplied source material.
 Astra supports `low`, `medium`, `high`, `xhigh`, and `max` reasoning effort.
 Remove unsupported sampling parameters, including `temperature`, `top_p`,
@@ -36,10 +39,11 @@ deprecated. [Chat Completions API reference](https://developers.openai.com/api/r
 
 Smythe's [execution ledger](../smythe/budget.py) and the existing
 [benchmark usage wrapper](provider_usage.py) use a blended $3 per million
-tokens when the provider supplies no explicit cost. Planning is separate from
-the execution budget. Neither is a native Astra billing calculation. Omit a
-numeric USD demonstration from the Astra Quickstart until native accounting
-is implemented; do not present `max_budget_usd` as a ceiling on the full API bill.
+tokens when the provider supplies no explicit cost. The native Responses
+provider supplies a dated token price instead. Model-based routing, planning,
+and successful supervision remain separate from the execution ledger. Do not present
+`max_budget_usd` as a ceiling on the full API bill until every phase and
+attempt shares durable admission and accounting.
 
 Before a cost campaign, preserve endpoint-native usage for every request:
 ordinary input, cache reads, cache writes, output, reasoning-token detail when
@@ -47,9 +51,12 @@ available, effective service tier, requested and returned model IDs, response
 ID, and attempt status. Validate the endpoint's usage fields rather than
 assuming that Chat Completions and Responses have identical schemas. Output
 accounting must include billed reasoning tokens exactly once. Explicitly
-configure reasoning effort and service tier in every adapter. Reconcile the
-request ledger against provider usage; retain missing usage as unknown,
-never zero. This work is a prerequisite, not part of the current README edit.
+configure reasoning effort and service tier in every adapter. The native
+provider now preserves these categories, prices integer nanoUSD, and retains
+raw bytes before validation or decoding. Its offline contracts cover cache
+categories, context thresholds, tool continuation, and unusable or unpriced
+responses. Complete-workflow persistence and reconciliation remain campaign
+prerequisites; missing usage remains unknown, never zero.
 
 ## Published prices and cost formula
 
@@ -157,15 +164,15 @@ Missing billing evidence blocks cost headlines even when latency is usable.
   differ, label it an idiomatic framework comparison, not an isolated scheduler
   test. The existing [framework harness](run_framework_h2h.py) needs these
   controls before use with Astra.
-- **Tool workflows:** first implement and test an Astra Responses adapter,
-  including tool-result continuation and retained reasoning state. Follow the
+- **Tool workflows:** the explicit Astra Responses adapter preserves tool-result
+  continuation and reasoning state. Complete durable tool-attempt accounting,
+  then freeze a separate tool task pack and count tool charges and failures. Follow the
   [Astra tool restriction](https://developers.openai.com/api/docs/guides/reasoning#reasoning-effort)
   and the [Responses migration guide](https://developers.openai.com/api/docs/guides/migrate-to-responses).
-  Then freeze a separate tool task pack and count tool charges and failures.
 
 Before any live run, offline contract tests should verify Astra provider
 selection, the exact model ID and token-cap field, absence of unsupported
 parameters, and complete usage-category reconciliation. Test ordinary,
 cached-read, cache-write, long-context, missing-usage, retry, and partial-failure
-receipts. A tool-enabled Astra request must fail clearly until a compatible
-Responses path exists. No paid provider calls belong in the test suite.
+receipts. Astra tool workflows must select the compatible Responses provider
+explicitly. No paid provider calls belong in the test suite.

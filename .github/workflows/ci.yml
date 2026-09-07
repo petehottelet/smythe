@@ -99,6 +99,22 @@ jobs:
       - name: Verify benchmark receipt overwrite protection
         run: node screensaver/svg-preview/verify-measure-guard.mjs
 
+  openai-responses-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install the tested native Responses SDK baseline
+        run: pip install -e ".[dev,openai]" "openai==3.8.0"
+      - name: Verify native wire, pricing, and failure accounting without network calls
+        run: >-
+          python -m pytest -q
+          tests/test_provider_responses.py
+          tests/test_native_pricing.py
+          tests/test_native_response_accounting.py
+
   package-smoke:
     runs-on: ubuntu-latest
     steps:

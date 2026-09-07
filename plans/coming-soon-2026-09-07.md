@@ -14,7 +14,7 @@ remain unchanged; new measurements receive new records and explicit scope.
 | Serial halt | Completed | 1,705 offline tests passed, 4 skipped; 24 shared serial/parallel failure-policy cases; independent review passed |
 | Active-descendant verification | Completed | 1,765 offline tests passed, 4 skipped; 60 new cancellation, settled-charge, generation-identity, and crash/resume cases; independent review and [all CI jobs](https://github.com/petehottelet/smythe/actions/runs/34132523693) passed for `ec632bb` |
 | Complete Task propagation | Completed | 1,877 offline tests passed, 4 skipped; 112 new snapshot, consumer, handoff, mutation, and recovery cases; independent review passed; Jobs heartbeat regression now uses an event barrier and rejects injected inline finalization |
-| Astra Responses and native usage | Queued | Explicit endpoint/effort/tier, native token categories, tool continuation, offline contracts |
+| Astra Responses and native usage | Completed | 2,253 offline tests passed, 7 skipped; all 379 new native tests passed with isolated OpenAI SDK 3.8.0; exact pricing, raw failure receipts, pooled sessions, cancellation, grouped errors, and resume guards; independent review passed |
 | Complete workflow accounting | Queued | One lifecycle ledger with phase costs, reservations, failed attempts, and durable exposure |
 | Astra pilot and matched campaign | Awaiting API-spend ceiling; offline preparation continues | 12 pilot workflows, then a frozen 200-workflow design if the ceiling permits; retain failures and judge evidence |
 | Jobs list and inspection | Queued | Read-only human and structured inspection, escaped output, attempt lineage, native cost records |

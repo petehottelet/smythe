@@ -8,6 +8,7 @@ import time
 from smythe.budget import BudgetValidationError, SentinelAlert
 from smythe.executor_base import ExecutorBase, NodeFinalizationError
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
+from smythe.provider import ProviderResponseError
 from smythe.verifier import VerificationRecoveryError
 
 
@@ -113,7 +114,7 @@ class Executor(ExecutorBase):
                 # Keep the paid verdict and pending receipt intact. A local
                 # control-write failure must never cause another provider call.
                 raise
-            except (BudgetValidationError, NodeFinalizationError, SentinelAlert) as exc:
+            except (BudgetValidationError, NodeFinalizationError, SentinelAlert, ProviderResponseError) as exc:
                 # Invalid post-call accounting is terminal. Retain any held
                 # reservation: an unusable bill is not evidence of a free call.
                 if isinstance(exc, BudgetValidationError):

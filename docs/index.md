@@ -30,6 +30,7 @@ verification, trace, artifact, and recovery controls.
 ## Connect models and tools
 
 - [GPT-6 Astra quickstart](../README.md#quickstart) — text-only planning and execution
+- [Native OpenAI Responses](openai-responses.md) — Astra/Sol function tools, exact token prices, request quotes, and retained failure receipts
 - [Astra benchmark plan](../benchmarks/astra_benchmark_plan.md) — compatibility, complete usage accounting, and matched comparisons
 - [MCP](mcp.md) — tool discovery, allowlists, secrets, budgets, and timeouts
 - [Style](style.md) — visual language for diagrams and public assets

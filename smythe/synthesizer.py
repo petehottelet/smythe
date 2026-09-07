@@ -12,7 +12,10 @@ from smythe.budget import (
     BudgetEstimateRequired, BudgetValidationError, Sentinel, validate_completion_usage,
 )
 from smythe.graph import ExecutionGraph, Node, NodeStatus
-from smythe.provider import Provider
+from smythe.provider import (
+    Provider, ProviderResponseError, _native_receipt, _native_response_errors,
+    _settle_response_error, _settle_response_group,
+)
 from smythe.task import Task, render_task
 from smythe.tracer import Tracer
 
@@ -242,13 +245,33 @@ class Synthesizer:
                 MERGE_SYSTEM_PROMPT, prompt, model=resolved_model
             )
             validate_completion_usage(result)
+            _native_receipt(synth_node.metadata, result.native_receipt, phase="synthesis")
 
             if resolved_budget:
-                cost = resolved_budget.record("__synthesis__", result)
+                cost = resolved_budget.add_cost("__synthesis__", result)
                 synth_node.metadata["cost_usd"] = cost
 
             synth_node.status = NodeStatus.COMPLETED
             return result.text
+        except BaseExceptionGroup as exc:
+            synth_node.status = NodeStatus.FAILED
+            if resolved_tracer:
+                resolved_tracer.on_node_error(synth_node, exc)
+            if not _native_response_errors(exc) and resolved_budget:
+                resolved_budget.release("__synthesis__")
+            _settle_response_group(exc, lambda error: _settle_response_error(
+                error, budget=resolved_budget, node_id="__synthesis__",
+                metadata=synth_node.metadata, phase="synthesis",
+            ))
+        except ProviderResponseError as exc:
+            synth_node.status = NodeStatus.FAILED
+            if resolved_tracer:
+                resolved_tracer.on_node_error(synth_node, exc)
+            _settle_response_error(
+                exc, budget=resolved_budget, node_id="__synthesis__",
+                metadata=synth_node.metadata, phase="synthesis",
+            )
+            raise
         except Exception as exc:
             if resolved_budget and not isinstance(exc, BudgetValidationError):
                 resolved_budget.release("__synthesis__")

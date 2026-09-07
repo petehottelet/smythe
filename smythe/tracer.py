@@ -57,6 +57,8 @@ class Tracer:
         if span:
             span.end_time = time.time()
             span.status = node.status.value
+            if "native_receipts" in node.metadata:
+                span.metadata["native_receipts"] = list(node.metadata["native_receipts"])
             self.spans.append(span)
             logger.debug(
                 "Node finished: %s (%s) — %.1fms",
@@ -176,5 +178,7 @@ class Tracer:
                 entry["revision"] = s.metadata["revision"]
             if "regeneration" in s.metadata:
                 entry["regeneration"] = s.metadata["regeneration"]
+            if "native_receipts" in s.metadata:
+                entry["native_receipts"] = s.metadata["native_receipts"]
             out.append(entry)
         return out

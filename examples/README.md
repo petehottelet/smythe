@@ -23,7 +23,8 @@ smythe jobs run examples/12_jobs_manifest.yaml --approve approve_v1_...
 
 | Example | What it shows |
 |---|---|
-| [GPT-6 Astra quickstart](../README.md#quickstart) | Generate, inspect, and execute a text-only task graph with `gpt-6-astra`. The [Astra campaign plan](../benchmarks/astra_benchmark_plan.md) covers live measurement and tool-support prerequisites. |
+| [GPT-6 Astra quickstart](../README.md#quickstart) | Generate, inspect, and execute a text-only task graph with `gpt-6-astra` using the published package. |
+| [Native Astra/Sol Responses](../docs/openai-responses.md) | Count and quote an exact request before generation, inspect native token prices, and retain function-tool continuation and failed-response receipts. Requires the current repository checkout. |
 | [Glyph Rain](../screensaver/README.md) | A 192-node artifact workflow with verified native downloads using 56 reference and 192 original SVG shapes, mixed 90/10. The [web explorer](../screensaver/svg-preview/README.md) adapts the MIT reference renderer and base artwork, mixes in 10% original glyphs, and adds Matrix green rain, presets, VT323 pixel controls, and a Trajan Bold outline logo. Browser interaction checks pass; performance remains unmeasured. [Fresh-generation measurements](../benchmarks/svg_glyph_benchmark.md) cover the original catalog; [controlled 64–256-node scaling](../benchmarks/glyph_screensaver_benchmark.md) has its own protocol. |
 | [01_quickstart_yaml.py](01_quickstart_yaml.py) | Load a declarative YAML DAG ([01_pipeline.yaml](01_pipeline.yaml)) with [halt, retry, and skip policies](../docs/execution.md) and per-node timeouts, execute it in parallel. |
 | [02_dynamic_planning.py](02_dynamic_planning.py) | The `LLMArchitect` designs the execution graph from the task itself. Inspect it, then execute with the [complete task snapshot](../docs/tasks.md). |

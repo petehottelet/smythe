@@ -24,6 +24,8 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 from smythe.skills import SkillRef
+from smythe.budget import BudgetValidationError
+from smythe.provider import ProviderResponseError, _native_response_errors
 from smythe.tools import ToolCall, ToolResult, ToolRuntime, ToolSession, ToolSpec, content_to_text
 
 if TYPE_CHECKING:
@@ -162,6 +164,12 @@ class MCPToolSession(ToolSession):
                 tool_call.arguments,
                 read_timeout_seconds=timedelta(seconds=entry.timeout_s),
             )
+        except BaseExceptionGroup as exc:
+            if _native_response_errors(exc):
+                raise
+            return ToolResult(tool_call_id=tool_call.id, content=str(exc), is_error=True)
+        except (BudgetValidationError, ProviderResponseError):
+            raise
         except Exception as exc:
             return ToolResult(tool_call_id=tool_call.id, content=str(exc), is_error=True)
         return ToolResult(
@@ -280,6 +288,12 @@ class MCPToolRuntime(ToolRuntime):
             # reaped before the node fails.
             try:
                 await stack.aclose()
+            except BaseExceptionGroup as exc:
+                if _native_response_errors(exc):
+                    raise
+                logger.warning("MCP teardown failed: %s", exc)
+            except (BudgetValidationError, ProviderResponseError):
+                raise
             except Exception:
                 logger.warning("MCP session teardown failed", exc_info=True)
 

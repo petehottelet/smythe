@@ -32,7 +32,7 @@ smythe = "smythe.cli:main"
 
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.40"]
-openai = ["openai>=1.50"]
+openai = ["openai>=3.8"]
 gemini = ["google-genai>=1.0"]
 openclaw = ["openclaw-sdk>=0.1"]
 # Capped: mcp 2.0 moved mcp.server.fastmcp and
@@ -46,7 +46,7 @@ jobs = ["pillow>=10.0"]
 glyphs = ["pillow==11.1.0", "numpy>=2.0,<3", "scipy>=1.14,<2", "shapely==2.1.2"]
 benchmarks = [
     "anthropic>=0.40",
-    "openai>=1.50",
+    "openai>=3.8",
     "google-genai>=1.0",
     "pillow>=10.0",
     "langgraph>=1.0",

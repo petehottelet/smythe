@@ -192,6 +192,10 @@ class Sentinel:
         """Whether the total contains provider/configured cost estimates."""
         return bool(self._estimated_cost_nodes)
 
+    def mark_unknown(self, node_id: str) -> None:
+        """Mark unresolved billing without inventing usage or releasing exposure."""
+        self._unknown_cost_nodes.add(node_id)
+
     def check(self, node_id: str) -> None:
         """Raise SentinelAlert if the budget is already exhausted.
 
@@ -267,6 +271,7 @@ class Sentinel:
         result: CompletionResult,
         *,
         accumulate: bool,
+        preserve_reservation: bool = False,
     ) -> float:
         """Replace a reservation with reconciled cost and validate the ceiling.
 
@@ -279,9 +284,9 @@ class Sentinel:
         # reservation, cost, or completeness flag. Invalid reporting must not
         # release a held ceiling or erase an earlier valid charge.
         total_tokens, explicit = validate_completion_usage(result)
-        had_reservation = node_id in self._reservations
-        reserved = self._reservations.get(node_id, 0.0)
-        was_hard_ceiling = node_id in self._hard_reservations
+        had_reservation = node_id in self._reservations and not preserve_reservation
+        reserved = self._reservations.get(node_id, 0.0) if had_reservation else 0.0
+        was_hard_ceiling = node_id in self._hard_reservations and not preserve_reservation
         unknown_cost_nodes = set(self._unknown_cost_nodes)
         estimated_cost_nodes = set(self._estimated_cost_nodes)
 
@@ -312,12 +317,14 @@ class Sentinel:
         node_costs = dict(self._node_costs)
         node_costs[node_id] = node_cost
         reservations = dict(self._reservations)
-        reservations.pop(node_id, None)
+        if not preserve_reservation:
+            reservations.pop(node_id, None)
         total = _sum_costs(chain(node_costs.values(), reservations.values()))
 
         self._node_costs = node_costs
         self._reservations = reservations
-        self._hard_reservations.discard(node_id)
+        if not preserve_reservation:
+            self._hard_reservations.discard(node_id)
         self._unknown_cost_nodes = unknown_cost_nodes
         self._estimated_cost_nodes = estimated_cost_nodes
         self._spent = total
@@ -348,14 +355,19 @@ class Sentinel:
         """
         return self._reconcile(node_id, result, accumulate=False)
 
-    def add_cost(self, node_id: str, result: CompletionResult) -> float:
+    def add_cost(
+        self, node_id: str, result: CompletionResult, *, preserve_reservation: bool = False,
+    ) -> float:
         """Accumulate cost for a node across multiple provider calls.
 
         The first call for a node also releases any outstanding
         reservation (the estimate is superseded by actuals).  Returns
-        the node's cumulative cost.
+        the node's cumulative cost. ``preserve_reservation`` records a separate
+        known call without consuming a ceiling held for unresolved billing.
         """
-        return self._reconcile(node_id, result, accumulate=True)
+        return self._reconcile(
+            node_id, result, accumulate=True, preserve_reservation=preserve_reservation,
+        )
 
     def breakdown(self) -> dict[str, float]:
         """Per-node cost map in USD."""

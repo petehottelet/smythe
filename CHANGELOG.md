@@ -23,6 +23,13 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Added
 
+- **Native Astra/Sol Responses provider**: explicit Standard/global requests,
+  native function-tool continuation, request-bound input-count quotes, and a
+  dated token price table with exact cache-read, cache-write, long-context,
+  and reasoning accounting. Billed but unusable responses retain receipts and
+  charges; unknown billing retains exposure and blocks ordinary resume.
+  Capped execution reserves an inclusive ceiling before each native tool turn.
+  The optional OpenAI SDK dependency now requires the tested 3.8.0 baseline.
 - **GPT-6 Astra quickstart and campaign plan**: the README uses `gpt-6-astra`
   for text-only planning and execution. The planned live comparison separates
   model capability from orchestration and requires complete usage accounting.

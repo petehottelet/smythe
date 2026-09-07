@@ -21,7 +21,10 @@ from smythe.budget import (
     validate_token_count,
 )
 from smythe.graph import ExecutionGraph, Node, NodeStatus, RevisionError
-from smythe.provider import CompletionResult, Provider
+from smythe.provider import (
+    CompletionResult, Provider, ProviderResponseError, _native_receipt, _settle_response_error,
+    _native_response_errors, _settle_response_group,
+)
 from smythe.registry import Registry
 from smythe.task import render_task, snapshot_task
 from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
@@ -124,6 +127,9 @@ class ExecutorBase:
         on_control_update: Callable[[], None] | None = None,
     ) -> None:
         self._provider = provider
+        self._reserved_node_ids: set[str] = set()
+        self._settled_response_errors: list[tuple[str, Exception]] = []
+        self._response_settlement_failures: dict[str, Exception] = {}
         self._registry = registry
         self._tracer = tracer
         self._budget = budget
@@ -174,6 +180,17 @@ class ExecutorBase:
                 graph, node, task=snapshot_task(self._task) if self._task is not None else None,
                 revisions_remaining=remaining,
             )
+        except BaseExceptionGroup as exc:
+            if _native_response_errors(exc):
+                _settle_response_group(
+                    exc, lambda error: self._record_response_error(node, error, phase="supervision"),
+                )
+            self._tracer.on_revision(node, None, applied=False, detail=str(exc))
+            return False
+        except ProviderResponseError as exc:
+            self._record_response_error(node, exc, phase="supervision")
+            self.notify_update(node)
+            raise
         except BudgetValidationError as exc:
             self.mark_accounting_invalid(node, exc)
             self._tracer.on_revision(
@@ -342,6 +359,8 @@ class ExecutorBase:
         reset = [n for n in graph.nodes if n.id in intent["affected_generations"]]
         if any(n.metadata.get("accounting_invalid") for n in reset):
             raise BudgetValidationError("Cannot regenerate unresolved provider accounting")
+        if any("response_error" in n.metadata for n in reset):
+            raise ProviderResponseError("Cannot regenerate an unresolved native response failure")
         for candidate in reset:
             candidate.status = NodeStatus.PENDING
             candidate.result = None
@@ -468,6 +487,7 @@ class ExecutorBase:
                 estimate,
                 hard_ceiling=requires_explicit,
             )
+            self._reserved_node_ids.add(node.id)
         elif default_estimated_tokens is not None:
             tokens = validate_token_count(default_estimated_tokens, "default_estimated_tokens")
             try:
@@ -478,6 +498,7 @@ class ExecutorBase:
                 node.id,
                 estimate,
             )
+            self._reserved_node_ids.add(node.id)
         else:
             self._budget.check(node.id)
 
@@ -526,6 +547,13 @@ class ExecutorBase:
 
     def prepare_execution(self, graph: ExecutionGraph) -> None:
         """Bind a new run even when a caller reuses the same graph object."""
+        if any("response_error" in node.metadata for node in graph.nodes):
+            raise ProviderResponseError(
+                "Native response failure requires explicit accounting reconciliation and local repair"
+            )
+        self._reserved_node_ids.clear()
+        self._settled_response_errors.clear()
+        self._response_settlement_failures.clear()
         self._prepared_graph = None
         self.prepare_graph(graph)
 
@@ -585,14 +613,32 @@ class ExecutorBase:
         Sentinel.add_cost, so executors must not record costs again.
         """
         coro = self._run_node_conversation(node, graph)
-        if node.timeout_s is None:
-            return await coro
         try:
+            if node.timeout_s is None:
+                return await coro
             return await asyncio.wait_for(coro, timeout=node.timeout_s)
-        except TimeoutError:
+        except BaseExceptionGroup as exc:
+            if not _native_response_errors(exc):
+                self._raise_unresolved_response(node)
+            _settle_response_group(
+                exc, lambda error: self._record_response_error(node, error, phase="tool"),
+            )
+        except ProviderResponseError as exc:
+            # Provider and tool-call boundaries already settled their errors.
+            # A tool context can also fail during connection or teardown.
+            self._record_response_error(node, exc, phase="tool")
+            raise
+        except TimeoutError as exc:
+            # wait_for can wrap a native CancelledError subclass on timeout.
+            # Its unknown bill remains terminal, regardless of retry policy.
+            if isinstance(exc.__cause__, ProviderResponseError):
+                raise exc.__cause__
             raise TimeoutError(
                 f"Node {node.id!r} timed out after {node.timeout_s}s"
             ) from None
+        except Exception:
+            self._raise_unresolved_response(node)
+            raise
 
     async def _run_node_conversation(
         self, node: Node, graph: ExecutionGraph,
@@ -612,7 +658,7 @@ class ExecutorBase:
         messages = [ChatMessage(role="user", content=prompt, attachments=attachments)]
 
         if self._tool_runtime is None:
-            result = await self._provider.chat(system, messages, model)
+            result = await self._provider_chat(node, system, messages, model)
             self._record_cost(node, result)
             return result
 
@@ -621,9 +667,12 @@ class ExecutorBase:
             tools = list(session.tools) or None
             limit = node.max_tool_iterations or self._max_tool_iterations
             for _ in range(limit):
-                if self._budget:
-                    self._budget.check(node.id)
-                result = await self._provider.chat(system, messages, model, tools=tools)
+                if self._budget and node.id not in self._reserved_node_ids:
+                    if self._provider.requires_explicit_budget_estimate(model):
+                        self.reserve_node_budget(node)
+                    else:
+                        self._budget.check(node.id)
+                result = await self._provider_chat(node, system, messages, model, tools=tools)
                 self._record_cost(node, result)
                 # Artifacts on intermediate turns are already billed —
                 # carry them to the final result so they get persisted.
@@ -632,7 +681,10 @@ class ExecutorBase:
 
                 if result.stop_reason == "pause_turn" and not result.tool_calls:
                     # Provider paused a server-side loop; re-send to continue.
-                    messages.append(ChatMessage(role="assistant", content=result.text))
+                    messages.append(ChatMessage(
+                        role="assistant", content=result.text,
+                        provider_continuation=result.provider_continuation,
+                    ))
                     continue
                 if not result.tool_calls:
                     if len(collected_artifacts) != len(result.artifacts):
@@ -643,12 +695,20 @@ class ExecutorBase:
                     role="assistant",
                     content=result.text,
                     tool_calls=list(result.tool_calls),
+                    provider_continuation=result.provider_continuation,
                 ))
                 tool_results: list[ToolResult] = []
                 for tc in result.tool_calls:
                     started = time.monotonic()
                     try:
                         outcome = await session.call(tc)
+                    except BaseExceptionGroup as exc:
+                        if _native_response_errors(exc):
+                            raise  # acall_node settles grouped accounting.
+                        outcome = ToolResult(tool_call_id=tc.id, content=str(exc), is_error=True)
+                    except ProviderResponseError as exc:
+                        self._record_response_error(node, exc, phase="tool")
+                        raise
                     except BudgetValidationError:
                         # A tool may itself call a paid provider. Numeric
                         # accounting failures must not become retryable model
@@ -665,16 +725,66 @@ class ExecutorBase:
                     tool_results.append(outcome)
                 messages.append(ChatMessage(role="user", tool_results=tool_results))
 
+        self._raise_unresolved_response(node)
         raise ToolLoopLimitError(
             f"Node {node.id!r} hit max_tool_iterations={limit} without completing"
         )
+
+    async def _provider_chat(self, node, system, messages, model, tools=None):
+        self._raise_unresolved_response(node)
+        phase = "verification" if node.verifies else "execution"
+        try:
+            if tools is None:
+                return await self._provider.chat(system, messages, model)
+            return await self._provider.chat(system, messages, model, tools=tools)
+        except BaseExceptionGroup as exc:
+            _settle_response_group(
+                exc, lambda error: self._record_response_error(node, error, phase=phase),
+            )
+        except ProviderResponseError as exc:
+            self._record_response_error(node, exc, phase=phase)
+            raise
+
+    def _raise_unresolved_response(self, node):
+        if "response_error" not in node.metadata and not node.metadata.get("accounting_invalid"):
+            return
+        if node.id in self._response_settlement_failures:
+            raise self._response_settlement_failures[node.id]
+        for node_id, error in reversed(self._settled_response_errors):
+            if node_id == node.id:
+                raise error
+        if node.metadata.get("accounting_invalid"):
+            raise BudgetValidationError("Unresolved provider accounting requires reconciliation")
+        raise ProviderResponseError("Unresolved native response requires reconciliation and repair")
+
+    def _record_response_error(self, node, error, *, phase):
+        if any(node_id == node.id and settled is error
+               for node_id, settled in self._settled_response_errors):
+            return
+        # Hold the actual objects: re-used Python ids must not hide another
+        # failure, and a distinct teardown failure carries its own bill.
+        self._settled_response_errors.append((node.id, error))
+        try:
+            _settle_response_error(
+                error, budget=self._budget, node_id=node.id, metadata=node.metadata, phase=phase,
+            )
+        except Exception as exc:
+            self._response_settlement_failures[node.id] = exc
+            raise
+        if error.billing_result is not None:
+            self._reserved_node_ids.discard(node.id)
 
     def _record_cost(self, node: Node, result: CompletionResult) -> None:
         # Custom providers can mutate CompletionResult after construction.
         # Reject malformed usage even when this executor has no Sentinel.
         validate_completion_usage(result)
+        _native_receipt(
+            node.metadata, result.native_receipt,
+            phase="verification" if node.verifies else "execution",
+        )
         if self._budget:
             cost = self._budget.add_cost(node.id, result)
+            self._reserved_node_ids.discard(node.id)
             if result.cost_usd_unknown:
                 node.metadata["cost_usd_unknown"] = True
             if result.cost_usd_is_estimate:
