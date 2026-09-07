@@ -14,14 +14,14 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 from uuid import uuid4
 
 from smythe.jobs.artifact_io import MAX_ARTIFACT_BYTES, MAX_IMAGE_PIXELS
 from smythe.jobs.preflight import JobApprovalV1, JobPlanV1, verify_approval
 
 
-STORE_VERSION = 2
+STORE_VERSION = 3
 DEFAULT_RUN_LEASE_TTL_S = 30.0
 MAX_SQLITE_INTEGER = (1 << 63) - 1
 MAX_ARTIFACTS_PER_CALL = 10
@@ -31,14 +31,16 @@ _RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 # Jobs predates an explicit format-kind table. Verify its complete table
 # shape and user_version before opening it for inspection or migration.
 _SCHEMA_COLUMNS = {
-    "runs": "run_id manifest_hash plan_hash manifest_json plan_json approval_json approval_token manifest_root output_directory max_concurrency status approved_microusd confirmed_microusd exposure_microusd reserved_microusd created_at_ns updated_at_ns",
+    "runs": "run_id manifest_hash plan_hash manifest_json plan_json approval_json approval_token manifest_root output_directory max_concurrency status approved_microusd confirmed_microusd exposure_microusd reserved_microusd created_at_ns updated_at_ns lease_epoch",
     "operations": "run_id operation_id operation_key spec_json status attempt_count max_attempts accepted_attempt_id result_text error updated_at_ns",
-    "attempts": "attempt_id run_id operation_id attempt_number parent_attempt_id reason status result_text error started_at_ns completed_at_ns",
+    "attempts": "attempt_id run_id operation_id attempt_number parent_attempt_id reason status result_text error started_at_ns completed_at_ns lease_owner_id lease_epoch",
     "calls": "call_id attempt_id run_id operation_id status idempotency_key ceiling_microusd confirmed_microusd exposure_microusd cost_is_complete cost_is_estimate provider_request_id error created_at_ns dispatched_at_ns completed_at_ns",
     "artifacts": "artifact_id attempt_id run_id operation_id relative_path mime_type sha256 size_bytes width height accepted created_at_ns",
     "events": "sequence run_id operation_id event_type payload_json created_at_ns",
-    "run_leases": "run_id owner_id acquired_at_ns heartbeat_at_ns expires_at_ns",
+    "run_leases": "run_id owner_id acquired_at_ns heartbeat_at_ns expires_at_ns epoch",
 }
+_FENCING_COLUMNS = {"runs": {"lease_epoch"}, "attempts": {"lease_owner_id", "lease_epoch"},
+                    "run_leases": {"epoch"}}
 
 
 class RunStatus(str, Enum):
@@ -81,7 +83,7 @@ class _BudgetAdmissionClosed(JobBudgetError):
 
 
 class RunLeaseError(RunStoreError):
-    """Raised when another worker owns an unexpired run lease."""
+    """Raised when a mutation lacks its current live lease generation."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,13 +104,19 @@ class CallPermit:
 
 @dataclass(frozen=True, slots=True)
 class RunLease:
-    """One renewable, crash-expiring ownership claim for a durable run."""
+    """Immutable owner/generation token; expiry is checked against SQLite.
+
+    Epoch zero appears only when inspecting a legacy journal and never grants
+    write access. Heartbeats retain the generation, so callers may keep the
+    originally acquired token while SQLite records renewed expiration times.
+    """
 
     run_id: str
     owner_id: str
     acquired_at_ns: int
     heartbeat_at_ns: int
     expires_at_ns: int
+    epoch: int = 0
 
 
 def _lease_duration_ns(ttl_s: float) -> int:
@@ -159,6 +167,7 @@ def _run_lease(row: sqlite3.Row) -> RunLease:
         acquired_at_ns=row["acquired_at_ns"],
         heartbeat_at_ns=row["heartbeat_at_ns"],
         expires_at_ns=row["expires_at_ns"],
+        epoch=row["epoch"] if "epoch" in row.keys() else 0,
     )
 
 
@@ -205,11 +214,12 @@ def _validate_read_row(row, table: str) -> None:
         "attempt_number", "started_at_ns", "completed_at_ns", "ceiling_microusd", "cost_is_complete",
         "cost_is_estimate", "dispatched_at_ns", "size_bytes", "width", "height", "accepted", "sequence",
         "cost_contains_estimates", "count", "acquired_at_ns", "heartbeat_at_ns", "expires_at_ns",
+        "lease_epoch", "epoch",
     }
     nullable = {
         "runs": set(),
         "operations": {"accepted_attempt_id", "result_text", "error"},
-        "attempts": {"parent_attempt_id", "reason", "result_text", "error", "completed_at_ns"},
+        "attempts": {"parent_attempt_id", "reason", "result_text", "error", "completed_at_ns", "lease_owner_id"},
         "calls": {"provider_request_id", "error", "dispatched_at_ns", "completed_at_ns"},
         "artifacts": {"width", "height"},
         "events": {"operation_id"},
@@ -227,13 +237,21 @@ def _validate_read_row(row, table: str) -> None:
 
 
 class SQLiteRunStore:
-    """Incremental local run state with a durable pre-dispatch boundary."""
+    """Incremental local run state with a durable pre-dispatch boundary.
 
-    def __init__(self, path: str | Path, *, read_only: bool = False) -> None:
+    Every mutation of a run that has ever been leased requires ``lease=`` with
+    the token returned by acquisition. Manual unleased use remains supported
+    for runs that have never had an owner. Attempt ownership never changes;
+    a replacement owner must recover old attempts before creating new ones.
+    """
+
+    def __init__(self, path: str | Path, *, read_only: bool = False,
+                 clock_ns: Callable[[], int] | None = None) -> None:
         if type(read_only) is not bool:
             raise TypeError("read_only must be a boolean")
         self.path = Path(path).resolve()
         self.read_only = read_only
+        self._clock_ns = time.time_ns if clock_ns is None else clock_ns
         self._lock = threading.RLock()
         if not read_only:
             self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -256,8 +274,11 @@ class SQLiteRunStore:
             if not read_only:
                 self._connection.execute("PRAGMA journal_mode = WAL")
                 self._connection.execute("PRAGMA synchronous = FULL")
-                if not existing or self._connection.execute("PRAGMA user_version").fetchone()[0] < STORE_VERSION:
+                if not existing:
                     self._create_schema()
+                elif self.schema_version < STORE_VERSION:
+                    self._migrate_schema()
+                self.schema_version = STORE_VERSION
         except sqlite3.Error as exc:
             self._connection.close()
             raise RunStoreError("Invalid or unreadable Jobs database schema") from exc
@@ -269,21 +290,63 @@ class SQLiteRunStore:
         with self._read_transaction() as cursor:
             tables = {row[0] for row in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             version = cursor.execute("PRAGMA user_version").fetchone()[0]
+            self.schema_version = version
             if not tables and version == 0 and allow_empty:
                 return False
-            supported_versions = (1, STORE_VERSION) if not self.read_only else (STORE_VERSION,)
+            supported_versions = (1, 2, STORE_VERSION) if not self.read_only else (2, STORE_VERSION)
             if version not in supported_versions:
                 raise RunStoreError("Unsupported Jobs database version")
             expected = dict(_SCHEMA_COLUMNS)
-            if version == 1 and not self.read_only:
+            if version < STORE_VERSION:
+                expected = {table: " ".join(field for field in columns.split()
+                            if field not in _FENCING_COLUMNS.get(table, set()))
+                            for table, columns in expected.items()}
+            if version == 1 and not self.read_only and "run_leases" not in tables:
                 expected.pop("run_leases")  # Preserve the existing writable v1 upgrade.
             if not expected.keys() <= tables:
                 raise RunStoreError("Database does not contain the required Jobs schema")
             for table, columns in expected.items():
                 found = {row[1] for row in cursor.execute(f"PRAGMA table_info({table})")}
+                if version < STORE_VERSION and found & _FENCING_COLUMNS.get(table, set()):
+                    raise RunStoreError("Mixed Jobs lease-fencing schema; stop old writers before upgrading")
                 if not set(columns.split()) <= found:
                     raise RunStoreError("Jobs database has an incomplete " + table + " table")
         return True
+
+    def _migrate_schema(self) -> None:
+        """Upgrade quiescent legacy journals without changing historical attempts.
+
+        Already-running legacy binaries cannot enforce new fences. Operators
+        must stop them before upgrading; a live legacy lease blocks migration.
+        Read-only v2 inspection never enters this path.
+        """
+        with self._transaction(upgrading=True) as cursor:
+            version = cursor.execute("PRAGMA user_version").fetchone()[0]
+            if version == STORE_VERSION:
+                return  # Another opener completed the same migration.
+            if version not in (1, 2):
+                raise RunStoreError("Unsupported Jobs database version for migration")
+            tables = {row[0] for row in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            if "run_leases" in tables:
+                if cursor.execute("SELECT 1 FROM run_leases WHERE expires_at_ns > ? LIMIT 1",
+                                  (self._clock_ns(),)).fetchone():
+                    raise RunLeaseError("Stop legacy Jobs workers before upgrading a database with live leases")
+                cursor.execute("ALTER TABLE run_leases ADD COLUMN epoch INTEGER NOT NULL DEFAULT 1")
+            else:
+                cursor.execute("""CREATE TABLE run_leases (
+                    run_id TEXT PRIMARY KEY REFERENCES runs(run_id) ON DELETE CASCADE,
+                    owner_id TEXT NOT NULL, acquired_at_ns INTEGER NOT NULL,
+                    heartbeat_at_ns INTEGER NOT NULL, expires_at_ns INTEGER NOT NULL,
+                    epoch INTEGER NOT NULL DEFAULT 1)""")
+                cursor.execute("CREATE INDEX run_leases_by_expiry ON run_leases(expires_at_ns)")
+            cursor.execute("ALTER TABLE runs ADD COLUMN lease_epoch INTEGER NOT NULL DEFAULT 0")
+            cursor.execute("ALTER TABLE attempts ADD COLUMN lease_owner_id TEXT")
+            cursor.execute("ALTER TABLE attempts ADD COLUMN lease_epoch INTEGER NOT NULL DEFAULT 0")
+            cursor.execute("""UPDATE runs SET lease_epoch=1 WHERE
+                EXISTS(SELECT 1 FROM run_leases WHERE run_leases.run_id=runs.run_id) OR
+                EXISTS(SELECT 1 FROM events WHERE events.run_id=runs.run_id
+                       AND event_type IN ('run_lease_acquired','run_lease_renewed'))""")
+            cursor.execute("PRAGMA user_version = 3")
 
     def close(self) -> None:
         with self._lock:
@@ -315,7 +378,8 @@ class SQLiteRunStore:
                 exposure_microusd INTEGER NOT NULL DEFAULT 0,
                 reserved_microusd INTEGER NOT NULL DEFAULT 0,
                 created_at_ns INTEGER NOT NULL,
-                updated_at_ns INTEGER NOT NULL
+                updated_at_ns INTEGER NOT NULL,
+                lease_epoch INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS operations (
@@ -346,6 +410,8 @@ class SQLiteRunStore:
                 error TEXT,
                 started_at_ns INTEGER NOT NULL,
                 completed_at_ns INTEGER,
+                lease_owner_id TEXT,
+                lease_epoch INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY (run_id, operation_id)
                     REFERENCES operations(run_id, operation_id) ON DELETE CASCADE,
                 UNIQUE (run_id, operation_id, attempt_number)
@@ -399,7 +465,8 @@ class SQLiteRunStore:
                 owner_id TEXT NOT NULL,
                 acquired_at_ns INTEGER NOT NULL,
                 heartbeat_at_ns INTEGER NOT NULL,
-                expires_at_ns INTEGER NOT NULL
+                expires_at_ns INTEGER NOT NULL,
+                epoch INTEGER NOT NULL
             );
 
             CREATE INDEX IF NOT EXISTS operations_by_status
@@ -412,18 +479,20 @@ class SQLiteRunStore:
                 ON artifacts(run_id, operation_id, accepted);
             CREATE INDEX IF NOT EXISTS run_leases_by_expiry
                 ON run_leases(expires_at_ns);
-            PRAGMA user_version = 2;
+            PRAGMA user_version = 3;
             """
         )
 
     @contextmanager
-    def _transaction(self) -> Iterator[sqlite3.Cursor]:
+    def _transaction(self, *, upgrading: bool = False) -> Iterator[sqlite3.Cursor]:
         if self.read_only:
             raise RunStoreError("Jobs database is read-only")
         with self._lock:
             cursor = self._connection.cursor()
             cursor.execute("BEGIN IMMEDIATE")
             try:
+                if not upgrading and cursor.execute("PRAGMA user_version").fetchone()[0] != STORE_VERSION:
+                    raise RunStoreError("Jobs write requires the current schema; close mixed-version writers")
                 yield cursor
             except _BudgetAdmissionClosed:
                 # `_assert_budget_open` may have reconstructed an overrun from
@@ -469,12 +538,12 @@ class SQLiteRunStore:
             field="approved_max_cost_microusd",
         )
         run_id = _safe_run_id(uuid4().hex if run_id is None else run_id)
-        now = time.time_ns()
         plan_json = json.dumps(plan.to_dict(), sort_keys=True, separators=(",", ":"))
         approval_json = json.dumps(
             approval.to_dict(), sort_keys=True, separators=(",", ":")
         )
         with self._transaction() as cursor:
+            now = self._clock_ns()
             cursor.execute(
                 """
                 INSERT INTO runs (
@@ -542,12 +611,11 @@ class SQLiteRunStore:
 
         owner = _lease_owner(owner_id)
         duration_ns = _lease_duration_ns(ttl_s)
-        now = time.time_ns()
-        expires = now + duration_ns
         with self._transaction() as cursor:
-            if cursor.execute(
-                "SELECT 1 FROM runs WHERE run_id = ?", (run_id,)
-            ).fetchone() is None:
+            now = self._clock_ns()
+            expires = _microusd(now + duration_ns, field="lease expiry")
+            run = cursor.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+            if run is None:
                 raise JobNotFoundError(run_id)
             current = cursor.execute(
                 "SELECT * FROM run_leases WHERE run_id = ?", (run_id,)
@@ -566,21 +634,31 @@ class SQLiteRunStore:
                 and current["owner_id"] == owner
                 and current["expires_at_ns"] > now
             )
+            prior_epoch = _microusd(run["lease_epoch"], field="run lease epoch")
+            if current is not None:
+                current_epoch = _microusd(current["epoch"], field="lease epoch")
+                if current_epoch < 1 or current_epoch != prior_epoch:
+                    raise RunStoreError("Jobs run and lease epochs disagree")
+            if not same_active_owner and prior_epoch == MAX_SQLITE_INTEGER:
+                raise RunLeaseError("Jobs lease epoch is exhausted")
+            epoch = prior_epoch if same_active_owner else prior_epoch + 1
             acquired_at = current["acquired_at_ns"] if same_active_owner else now
             previous_owner = current["owner_id"] if current is not None else None
             cursor.execute(
                 """
                 INSERT INTO run_leases (
-                    run_id, owner_id, acquired_at_ns, heartbeat_at_ns, expires_at_ns
-                ) VALUES (?, ?, ?, ?, ?)
+                    run_id, owner_id, acquired_at_ns, heartbeat_at_ns, expires_at_ns, epoch
+                ) VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(run_id) DO UPDATE SET
                     owner_id = excluded.owner_id,
                     acquired_at_ns = excluded.acquired_at_ns,
                     heartbeat_at_ns = excluded.heartbeat_at_ns,
-                    expires_at_ns = excluded.expires_at_ns
+                    expires_at_ns = excluded.expires_at_ns,
+                    epoch = excluded.epoch
                 """,
-                (run_id, owner, acquired_at, now, expires),
+                (run_id, owner, acquired_at, now, expires, epoch),
             )
+            cursor.execute("UPDATE runs SET lease_epoch = ? WHERE run_id = ?", (epoch, run_id))
             row = cursor.execute(
                 "SELECT * FROM run_leases WHERE run_id = ?", (run_id,)
             ).fetchone()
@@ -594,6 +672,7 @@ class SQLiteRunStore:
                     "owner_id": owner,
                     "previous_owner_id": previous_owner,
                     "expires_at_ns": expires,
+                    "epoch": epoch,
                 },
                 now,
             )
@@ -605,15 +684,18 @@ class SQLiteRunStore:
         owner_id: str,
         *,
         ttl_s: float = DEFAULT_RUN_LEASE_TTL_S,
+        lease: RunLease | None = None,
     ) -> RunLease:
         """Extend a live lease, failing if it expired or changed owners."""
 
         owner = _lease_owner(owner_id)
         duration_ns = _lease_duration_ns(ttl_s)
-        now = time.time_ns()
-        expires = now + duration_ns
         with self._transaction() as cursor:
-            self._assert_run_lease(cursor, run_id, owner, now)
+            now = self._clock_ns()
+            expires = _microusd(now + duration_ns, field="lease expiry")
+            self._assert_run_lease(cursor, run_id, lease, now)
+            if lease.owner_id != owner:
+                raise RunLeaseError("Lease token does not match owner_id")
             cursor.execute(
                 """UPDATE run_leases SET heartbeat_at_ns = ?, expires_at_ns = ?
                    WHERE run_id = ? AND owner_id = ?""",
@@ -625,28 +707,38 @@ class SQLiteRunStore:
             assert row is not None
             return _run_lease(row)
 
-    def release_run_lease(self, run_id: str, owner_id: str) -> bool:
+    def release_run_lease(self, run_id: str, owner_id: str, *, lease: RunLease | None = None) -> bool:
         """Release a run lease. Missing leases are an idempotent no-op."""
 
         owner = _lease_owner(owner_id)
-        now = time.time_ns()
         with self._transaction() as cursor:
+            now = self._clock_ns()
             current = cursor.execute(
                 "SELECT * FROM run_leases WHERE run_id = ?", (run_id,)
             ).fetchone()
             if current is None:
+                run = cursor.execute("SELECT lease_epoch FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+                if run is None:
+                    raise JobNotFoundError(run_id)
+                epoch = _microusd(run["lease_epoch"], field="run lease epoch")
+                if lease is None and epoch == 0:
+                    return False
+                if (not isinstance(lease, RunLease) or lease.run_id != run_id
+                        or lease.owner_id != owner or type(lease.epoch) is not int
+                        or not 1 <= lease.epoch <= MAX_SQLITE_INTEGER
+                        or lease.epoch != epoch):
+                    raise RunLeaseError("Lease token is missing or was superseded")
                 return False
-            if current["owner_id"] != owner:
-                raise RunLeaseError(
-                    f"run {run_id!r} is leased by {current['owner_id']!r}"
-                )
+            self._assert_run_lease(cursor, run_id, lease, now)
+            if lease.owner_id != owner:
+                raise RunLeaseError("Lease token does not match owner_id")
             cursor.execute("DELETE FROM run_leases WHERE run_id = ?", (run_id,))
             self._event(
                 cursor,
                 run_id,
                 None,
                 "run_lease_released",
-                {"owner_id": owner},
+                {"owner_id": owner, "epoch": lease.epoch},
                 now,
             )
             return True
@@ -758,9 +850,11 @@ class SQLiteRunStore:
         operation_id: str,
         *,
         reason: str | None = None,
+        lease: RunLease | None = None,
     ) -> dict[str, Any]:
-        now = time.time_ns()
         with self._transaction() as cursor:
+            now = self._clock_ns()
+            self._assert_write_owner(cursor, run_id, lease, now)
             self._assert_budget_open(cursor, run_id, now)
             operation = cursor.execute(
                 """SELECT * FROM operations
@@ -794,8 +888,8 @@ class SQLiteRunStore:
                 """
                 INSERT INTO attempts (
                     attempt_id, run_id, operation_id, attempt_number,
-                    parent_attempt_id, reason, status, started_at_ns
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    parent_attempt_id, reason, status, started_at_ns, lease_owner_id, lease_epoch
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     attempt_id,
@@ -806,6 +900,8 @@ class SQLiteRunStore:
                     reason,
                     OperationStatus.RUNNING.value,
                     now,
+                    lease.owner_id if lease is not None else None,
+                    lease.epoch if lease is not None else 0,
                 ),
             )
             cursor.execute(
@@ -845,17 +941,18 @@ class SQLiteRunStore:
             "operation_id": operation_id,
         }
 
-    def prepare_call(self, attempt_id: str, ceiling_microusd: int) -> CallPermit:
+    def prepare_call(self, attempt_id: str, ceiling_microusd: int, *, lease: RunLease | None = None) -> CallPermit:
         ceiling_microusd = _microusd(
             ceiling_microusd, field="ceiling_microusd"
         )
-        now = time.time_ns()
         with self._transaction() as cursor:
+            now = self._clock_ns()
             attempt = cursor.execute(
                 "SELECT * FROM attempts WHERE attempt_id = ?", (attempt_id,)
             ).fetchone()
             if attempt is None:
                 raise JobNotFoundError(attempt_id)
+            self._assert_attempt_owner(cursor, attempt, lease, now)
             if attempt["status"] != OperationStatus.RUNNING.value:
                 raise InvalidTransitionError("call requires a running attempt")
             run = self._assert_budget_open(cursor, attempt["run_id"], now)
@@ -911,11 +1008,12 @@ class SQLiteRunStore:
         return CallPermit(call_id, attempt_id, idempotency_key, ceiling_microusd)
 
     def mark_call_dispatched(
-        self, call_id: str, *, provider_request_id: str | None = None
+        self, call_id: str, *, provider_request_id: str | None = None, lease: RunLease | None = None,
     ) -> None:
-        now = time.time_ns()
         with self._transaction() as cursor:
+            now = self._clock_ns()
             call = self._call(cursor, call_id)
+            self._assert_call_owner(cursor, call, lease, now)
             if call["status"] != "prepared":
                 raise InvalidTransitionError("only a prepared call can be dispatched")
             self._assert_budget_open(cursor, call["run_id"], now)
@@ -944,6 +1042,7 @@ class SQLiteRunStore:
         result_text: str,
         accepted: bool = True,
         error: str | None = None,
+        lease: RunLease | None = None,
     ) -> None:
         cost_microusd = _microusd(cost_microusd, field="cost_microusd")
         if not isinstance(cost_is_complete, bool):
@@ -977,9 +1076,10 @@ class SQLiteRunStore:
                     or width * height > MAX_IMAGE_PIXELS
                 ):
                     raise ValueError("artifact dimensions exceed the persistence limits")
-        now = time.time_ns()
         with self._transaction() as cursor:
+            now = self._clock_ns()
             call = self._call(cursor, call_id)
+            self._assert_call_owner(cursor, call, lease, now)
             if call["status"] != "dispatched":
                 raise InvalidTransitionError("only a dispatched call can complete")
             attempt = cursor.execute(
@@ -1115,19 +1215,21 @@ class SQLiteRunStore:
             )
 
     def fail_pre_dispatch(
-        self, call_id: str, error: str, *, retryable: bool = False
+        self, call_id: str, error: str, *, retryable: bool = False, lease: RunLease | None = None,
     ) -> None:
-        now = time.time_ns()
         with self._transaction() as cursor:
+            now = self._clock_ns()
             call = self._call(cursor, call_id)
+            self._assert_call_owner(cursor, call, lease, now)
             if call["status"] != "prepared":
                 raise InvalidTransitionError("call was already dispatched")
             self._fail_safe_call(cursor, call, error, now, retryable=retryable)
 
-    def mark_unknown_outcome(self, call_id: str, error: str) -> None:
-        now = time.time_ns()
+    def mark_unknown_outcome(self, call_id: str, error: str, *, lease: RunLease | None = None) -> None:
         with self._transaction() as cursor:
+            now = self._clock_ns()
             call = self._call(cursor, call_id)
+            self._assert_call_owner(cursor, call, lease, now)
             if call["status"] != "dispatched":
                 raise InvalidTransitionError(
                     "unknown outcome requires a dispatched provider call"
@@ -1139,26 +1241,15 @@ class SQLiteRunStore:
         run_id: str,
         *,
         lease_owner_id: str | None = None,
+        lease: RunLease | None = None,
     ) -> dict[str, list[str]]:
         self.get_run(run_id)
-        owner = _lease_owner(lease_owner_id) if lease_owner_id is not None else None
+        self._check_legacy_owner_argument(lease_owner_id, lease)
         safe: list[str] = []
         unknown: list[str] = []
-        now = time.time_ns()
         with self._transaction() as cursor:
-            if owner is not None:
-                self._assert_run_lease(cursor, run_id, owner, now)
-            else:
-                active_lease = cursor.execute(
-                    """SELECT owner_id FROM run_leases
-                       WHERE run_id = ? AND expires_at_ns > ?""",
-                    (run_id, now),
-                ).fetchone()
-                if active_lease is not None:
-                    raise RunLeaseError(
-                        f"run {run_id!r} is leased by {active_lease['owner_id']!r}; "
-                        "recovery requires that lease owner"
-                    )
+            now = self._clock_ns()
+            self._assert_write_owner(cursor, run_id, lease, now)
 
             # A crash can land after the attempt transaction commits but before
             # its call is prepared. Such an attempt has no possible upstream
@@ -1218,28 +1309,17 @@ class SQLiteRunStore:
         acknowledge_unknown: bool = False,
         reason: str,
         lease_owner_id: str | None = None,
+        lease: RunLease | None = None,
     ) -> list[str]:
         keys = list(dict.fromkeys(operation_keys))
         if not keys:
             raise ValueError("at least one operation key is required")
-        owner = _lease_owner(lease_owner_id) if lease_owner_id is not None else None
+        self._check_legacy_owner_argument(lease_owner_id, lease)
         queued: list[str] = []
-        now = time.time_ns()
         with self._transaction() as cursor:
+            now = self._clock_ns()
+            self._assert_write_owner(cursor, run_id, lease, now)
             self._assert_budget_open(cursor, run_id, now)
-            if owner is not None:
-                self._assert_run_lease(cursor, run_id, owner, now)
-            else:
-                active_lease = cursor.execute(
-                    """SELECT owner_id FROM run_leases
-                       WHERE run_id = ? AND expires_at_ns > ?""",
-                    (run_id, now),
-                ).fetchone()
-                if active_lease is not None:
-                    raise RunLeaseError(
-                        f"run {run_id!r} is leased by {active_lease['owner_id']!r}; "
-                        "reroll requires that lease owner"
-                    )
             for key in keys:
                 operation = cursor.execute(
                     """SELECT * FROM operations WHERE run_id = ?
@@ -1292,14 +1372,10 @@ class SQLiteRunStore:
             )
         return queued
 
-    def finalize_run(self, run_id: str) -> str:
-        now = time.time_ns()
+    def finalize_run(self, run_id: str, *, lease: RunLease | None = None) -> str:
         with self._transaction() as cursor:
-            run = cursor.execute(
-                "SELECT * FROM runs WHERE run_id = ?", (run_id,)
-            ).fetchone()
-            if run is None:
-                raise JobNotFoundError(run_id)
+            now = self._clock_ns()
+            run = self._assert_write_owner(cursor, run_id, lease, now)
             if self._latch_budget_overrun(cursor, run, now):
                 return RunStatus.BUDGET_OVERRUN.value
             rows = cursor.execute(
@@ -1329,6 +1405,7 @@ class SQLiteRunStore:
 
     def snapshot(self, run_id: str, *, include_events: bool = False) -> dict[str, Any]:
         with self._read_transaction() as cursor:
+            schema_version = self._read_schema_version(cursor)
             run_row = cursor.execute(
                 "SELECT * FROM runs WHERE run_id = ?", (run_id,)
             ).fetchone()
@@ -1357,10 +1434,19 @@ class SQLiteRunStore:
             call_rows = cursor.execute(
                 "SELECT cost_is_estimate FROM calls WHERE run_id = ?", (run_id,)
             ).fetchall()
-        return self._snapshot_projection(run_row, operations, attempts, artifacts, events, call_rows)
+        return self._snapshot_projection(run_row, operations, attempts, artifacts, events, call_rows,
+                                         schema_version=schema_version)
 
     @staticmethod
-    def _snapshot_projection(run_row, operations, attempts, artifacts, events, call_rows):
+    def _read_schema_version(cursor: sqlite3.Cursor) -> int:
+        version = cursor.execute("PRAGMA user_version").fetchone()[0]
+        if version not in (2, STORE_VERSION):
+            raise RunStoreError("Unsupported Jobs database version")
+        return version
+
+    @staticmethod
+    def _snapshot_projection(run_row, operations, attempts, artifacts, events, call_rows,
+                             *, schema_version=STORE_VERSION):
         run = dict(run_row)
         _validate_read_row(run, "runs")
         for table, rows in (("operations", operations), ("attempts", attempts), ("artifacts", artifacts),
@@ -1375,7 +1461,8 @@ class SQLiteRunStore:
             counts[operation["status"]] = counts.get(operation["status"], 0) + 1
         exposure = run["exposure_microusd"]
         return {
-            "version": STORE_VERSION,
+            "version": schema_version,
+            "lease_fencing_supported": schema_version >= 3,
             "run_id": run["run_id"],
             "name": name,
             "status": run["status"],
@@ -1440,6 +1527,7 @@ class SQLiteRunStore:
             raise ValueError("operation must be a nonempty operation key or ID")
         try:
             with self._read_transaction() as cursor:
+                schema_version = self._read_schema_version(cursor)
                 run = cursor.execute("""SELECT run_id,json_extract(plan_json,'$.name') AS name,
                     json_type(plan_json,'$.name') AS name_type,typeof(plan_json) AS plan_storage,
                     status,manifest_hash,plan_hash,manifest_root,output_directory,max_concurrency,
@@ -1492,7 +1580,8 @@ class SQLiteRunStore:
                 estimates = cursor.execute("SELECT EXISTS(SELECT 1 FROM calls WHERE run_id=? AND cost_is_estimate=1)",
                                            (run_id,)).fetchone()[0]
                 result = self._snapshot_projection(run, operations, attempts, artifacts, events,
-                                                   [{"cost_is_estimate": estimates}])
+                                                   [{"cost_is_estimate": estimates}],
+                                                   schema_version=schema_version)
                 for call in calls:
                     _validate_read_row(call, "calls")
                 result.update(counts=counts, calls=[dict(row) for row in calls], operation_filter=operation,
@@ -1613,19 +1702,65 @@ class SQLiteRunStore:
     def _assert_run_lease(
         cursor: sqlite3.Cursor,
         run_id: str,
-        owner_id: str,
+        lease: RunLease | None,
         now: int,
     ) -> sqlite3.Row:
+        if (not isinstance(lease, RunLease) or lease.run_id != run_id
+                or type(lease.epoch) is not int or not 1 <= lease.epoch <= MAX_SQLITE_INTEGER):
+            raise RunLeaseError(f"run {run_id!r} requires a current lease token with an epoch")
         row = cursor.execute(
             "SELECT * FROM run_leases WHERE run_id = ?", (run_id,)
         ).fetchone()
         if row is None:
             raise RunLeaseError(f"run {run_id!r} has no active lease")
-        if row["owner_id"] != owner_id:
+        if row["owner_id"] != lease.owner_id:
             raise RunLeaseError(f"run {run_id!r} is leased by {row['owner_id']!r}")
+        run = cursor.execute("SELECT lease_epoch FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+        if (run is None or _microusd(row["epoch"], field="lease epoch") != lease.epoch
+                or _microusd(run["lease_epoch"], field="run lease epoch") != lease.epoch):
+            raise RunLeaseError(f"run {run_id!r} lease epoch was superseded")
         if row["expires_at_ns"] <= now:
-            raise RunLeaseError(f"run {run_id!r} lease for {owner_id!r} expired")
+            raise RunLeaseError(f"run {run_id!r} lease for {lease.owner_id!r} expired")
         return row
+
+    @staticmethod
+    def _check_legacy_owner_argument(owner_id: str | None, lease: RunLease | None) -> None:
+        if owner_id is not None:
+            owner = _lease_owner(owner_id)
+            if not isinstance(lease, RunLease) or lease.owner_id != owner:
+                raise RunLeaseError("lease_owner_id requires the matching current lease token")
+
+    def _assert_write_owner(self, cursor: sqlite3.Cursor, run_id: str,
+                            lease: RunLease | None, now: int) -> sqlite3.Row:
+        run = cursor.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+        if run is None:
+            raise JobNotFoundError(run_id)
+        epoch = _microusd(run["lease_epoch"], field="run lease epoch")
+        if lease is None:
+            # Compatibility for explicit manual store use before any lease has
+            # existed. Dropping a stale token never restores this privilege.
+            if epoch != 0 or cursor.execute("SELECT 1 FROM run_leases WHERE run_id = ?",
+                                             (run_id,)).fetchone():
+                raise RunLeaseError(f"run {run_id!r} requires a current lease token")
+        else:
+            self._assert_run_lease(cursor, run_id, lease, now)
+        return run
+
+    def _assert_attempt_owner(self, cursor: sqlite3.Cursor, attempt: sqlite3.Row,
+                              lease: RunLease | None, now: int) -> None:
+        self._assert_write_owner(cursor, attempt["run_id"], lease, now)
+        expected = (lease.owner_id, lease.epoch) if lease is not None else (None, 0)
+        if (attempt["lease_owner_id"], _microusd(attempt["lease_epoch"], field="attempt lease epoch")) != expected:
+            raise RunLeaseError("Attempt belongs to an earlier lease; recover it before new work")
+
+    def _assert_call_owner(self, cursor: sqlite3.Cursor, call: sqlite3.Row,
+                           lease: RunLease | None, now: int) -> None:
+        attempt = cursor.execute("SELECT * FROM attempts WHERE attempt_id = ?",
+                                 (call["attempt_id"],)).fetchone()
+        if (attempt is None or attempt["run_id"] != call["run_id"]
+                or attempt["operation_id"] != call["operation_id"]):
+            raise RunStoreError("Call does not match its attempt")
+        self._assert_attempt_owner(cursor, attempt, lease, now)
 
     def _recover_orphan_attempt(
         self,

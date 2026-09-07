@@ -145,6 +145,10 @@ The current unreleased work hardens the guarantees users depend on before a
     retries, and regeneration to the durable workflow recipe. Plan replay,
     handoffs, recovery, and revisions enforce the same limits.
     [Graph policy guide](docs/workflow-accounting.md#freeze-graph-limits).
+22. **Jobs ownership fencing** — bind every worker mutation to a live lease
+    epoch so expired workers cannot alter recovered journal state. Schema
+    upgrades preserve historical attempt provenance and reject live legacy
+    leases. [Upgrade and ownership scope](docs/jobs.md#jobs-database-upgrades).
 
 ## Coming soon
 

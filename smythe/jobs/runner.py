@@ -43,6 +43,7 @@ from smythe.jobs.store import (
     MAX_SQLITE_INTEGER,
     JobBudgetError,
     OperationStatus,
+    RunLease,
     RunLeaseError,
     SQLiteRunStore,
 )
@@ -205,7 +206,7 @@ class JobRunner:
         """Own the run for recovery, state transitions, and provider execution."""
 
         owner_id = f"runner-{uuid4().hex}"
-        self.store.acquire_run_lease(run_id, owner_id, ttl_s=self.lease_ttl_s)
+        lease = self.store.acquire_run_lease(run_id, owner_id, ttl_s=self.lease_ttl_s)
         execution_task: asyncio.Task[dict[str, Any]] | None = None
         heartbeat_task: asyncio.Task[None] | None = None
         primary_error: BaseException | None = None
@@ -217,10 +218,10 @@ class JobRunner:
                     operation_keys,
                     acknowledge_unknown=acknowledge_unknown,
                     reason=reason,
-                    lease_owner_id=owner_id,
+                    lease=lease,
                 )
             if recover:
-                self.store.recover_inflight(run_id, lease_owner_id=owner_id)
+                self.store.recover_inflight(run_id, lease=lease)
 
             wall_timeout = _plan_timeout(
                 plan,
@@ -230,11 +231,11 @@ class JobRunner:
             )
             execution_task = asyncio.create_task(
                 asyncio.wait_for(
-                    self._execute(run_id, plan, root),
+                    self._execute(run_id, plan, root, lease=lease),
                     timeout=wall_timeout,
                 )
             )
-            heartbeat_task = asyncio.create_task(self._heartbeat_lease(run_id, owner_id))
+            heartbeat_task = asyncio.create_task(self._heartbeat_lease(lease))
             done, _ = await asyncio.wait(
                 {execution_task, heartbeat_task},
                 return_when=asyncio.FIRST_COMPLETED,
@@ -250,7 +251,7 @@ class JobRunner:
             # ``wait_for`` has already cancelled and awaited the execution
             # task. Every dispatched child therefore had a chance to journal
             # an unknown outcome before the aggregate status is derived.
-            self.store.finalize_run(run_id)
+            self.store.finalize_run(run_id, lease=lease)
             raise TimeoutError(
                 f"job run {run_id!r} exceeded its {wall_timeout:g}s wall deadline"
             ) from exc
@@ -266,17 +267,18 @@ class JobRunner:
                 return_exceptions=True,
             )
             try:
-                self.store.release_run_lease(run_id, owner_id)
+                self.store.release_run_lease(run_id, owner_id, lease=lease)
             except RunLeaseError:
                 if primary_error is None:
                     raise
 
-    async def _heartbeat_lease(self, run_id: str, owner_id: str) -> None:
+    async def _heartbeat_lease(self, lease: RunLease) -> None:
         while True:
             await asyncio.sleep(self.lease_heartbeat_s)
             self.store.heartbeat_run_lease(
-                run_id,
-                owner_id,
+                lease.run_id,
+                lease.owner_id,
+                lease=lease,
                 ttl_s=self.lease_ttl_s,
             )
 
@@ -285,6 +287,8 @@ class JobRunner:
         run_id: str,
         plan: JobPlanV1,
         root: Path,
+        *,
+        lease: RunLease,
     ) -> dict[str, Any]:
         pending = self.store.pending_operations(run_id)
         # Unknown numeric accounting is terminal until explicitly acknowledged
@@ -298,7 +302,7 @@ class JobRunner:
         ):
             pending = []
         if not pending:
-            self.store.finalize_run(run_id)
+            self.store.finalize_run(run_id, lease=lease)
             snapshot = self.store.snapshot(run_id)
             snapshot["execution_metrics"] = JobExecutionMetrics(0, 0, 0.0).to_dict()
             return snapshot
@@ -336,6 +340,7 @@ class JobRunner:
                     try:
                         await self._execute_operation(
                             run_id, operation, root, plan, stop_dispatch=stop_dispatch,
+                            lease=lease,
                         )
                     finally:
                         async with counter_lock:
@@ -357,7 +362,7 @@ class JobRunner:
             wall_s = time.perf_counter() - start
             self.last_metrics = JobExecutionMetrics(started, peak_active, wall_s)
 
-        self.store.finalize_run(run_id)
+        self.store.finalize_run(run_id, lease=lease)
         snapshot = self.store.snapshot(run_id)
         snapshot["execution_metrics"] = self.last_metrics.to_dict()
         return snapshot
@@ -370,11 +375,12 @@ class JobRunner:
         plan: JobPlanV1,
         *,
         stop_dispatch: asyncio.Event,
+        lease: RunLease,
     ) -> None:
         try:
-            attempt = self.store.begin_attempt(run_id, operation.operation_id)
+            attempt = self.store.begin_attempt(run_id, operation.operation_id, lease=lease)
             ceiling = usd_to_micros(operation.max_cost_per_call_usd)
-            permit = self.store.prepare_call(attempt["attempt_id"], ceiling)
+            permit = self.store.prepare_call(attempt["attempt_id"], ceiling, lease=lease)
         except JobBudgetError:
             # A sibling call can discover and latch an overrun while queued
             # operations are waiting. No new attempt is admitted after that.
@@ -387,14 +393,19 @@ class JobRunner:
                 else []
             )
         except asyncio.CancelledError:
-            self.store.fail_pre_dispatch(
-                permit.call_id,
-                "execution cancelled before provider dispatch",
-                retryable=True,
-            )
+            try:
+                self.store.fail_pre_dispatch(
+                    permit.call_id,
+                    "execution cancelled before provider dispatch",
+                    retryable=True,
+                    lease=lease,
+                )
+            except RunLeaseError:
+                # Only the current owner may recover this attempt now.
+                pass
             raise
         except Exception as exc:
-            self.store.fail_pre_dispatch(permit.call_id, str(exc))
+            self.store.fail_pre_dispatch(permit.call_id, str(exc), lease=lease)
             return
 
         if stop_dispatch.is_set():
@@ -403,13 +414,14 @@ class JobRunner:
             self.store.fail_pre_dispatch(
                 permit.call_id, "dispatch stopped after invalid provider accounting",
                 retryable=True,
+                lease=lease,
             )
             return
 
         try:
-            self.store.mark_call_dispatched(permit.call_id)
+            self.store.mark_call_dispatched(permit.call_id, lease=lease)
         except JobBudgetError as exc:
-            self.store.fail_pre_dispatch(permit.call_id, str(exc))
+            self.store.fail_pre_dispatch(permit.call_id, str(exc), lease=lease)
             return
 
         call_timeout = _plan_timeout(
@@ -436,14 +448,16 @@ class JobRunner:
         except asyncio.CancelledError:
             try:
                 self.store.mark_unknown_outcome(
-                    permit.call_id, "execution cancelled after provider dispatch"
+                    permit.call_id, "execution cancelled after provider dispatch", lease=lease,
                 )
-            finally:
-                raise
+            except RunLeaseError:
+                pass
+            raise
         except TimeoutError:
             self.store.mark_unknown_outcome(
                 permit.call_id,
                 f"provider call exceeded its {call_timeout:g}s deadline after dispatch",
+                lease=lease,
             )
             return
         except BudgetValidationError as exc:
@@ -451,6 +465,7 @@ class JobRunner:
             stop_dispatch.set()
             self.store.mark_unknown_outcome(
                 permit.call_id, f"{_INVALID_ACCOUNTING_PREFIX}{exc}",
+                lease=lease,
             )
             return
         except Exception as exc:
@@ -458,6 +473,7 @@ class JobRunner:
             # persisted invalid-accounting classification on a later resume.
             self.store.mark_unknown_outcome(
                 permit.call_id, f"provider failure after dispatch: {exc}",
+                lease=lease,
             )
             return
 
@@ -487,19 +503,26 @@ class JobRunner:
                 result_text=result.text,
                 accepted=accepted,
                 error="; ".join(errors) if errors else None,
+                lease=lease,
             )
         except asyncio.CancelledError:
             try:
                 self.store.mark_unknown_outcome(
                     permit.call_id,
                     "execution cancelled during post-response finalization",
+                    lease=lease,
                 )
-            finally:
-                raise
+            except RunLeaseError:
+                pass
+            raise
+        except RunLeaseError:
+            # A late response cannot settle or reclassify another owner's work.
+            raise
         except BudgetValidationError as exc:
             stop_dispatch.set()
             self.store.mark_unknown_outcome(
                 permit.call_id, f"{_INVALID_ACCOUNTING_PREFIX}{exc}",
+                lease=lease,
             )
             return
         except Exception as exc:
@@ -507,7 +530,7 @@ class JobRunner:
             # Preserve a conservative ambiguity state and never auto-rerun.
             try:
                 self.store.mark_unknown_outcome(
-                    permit.call_id, f"post-response finalization failure: {exc}"
+                    permit.call_id, f"post-response finalization failure: {exc}", lease=lease,
                 )
             except Exception:
                 raise exc

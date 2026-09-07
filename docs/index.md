@@ -25,7 +25,7 @@ verification, trace, artifact, and recovery controls.
 - [Durable text workflows](workflow-accounting.md) — phase-wide native costs, saved graph limits, exact request quotes, fenced ownership, and local response replay
 - [Checkpoint format](checkpoint-format.md) — saved state and resume semantics
 - [Cost guardrails](budgets.md) — strict usage validation, reservations, and failed-accounting recovery
-- [Jobs](jobs.md) — preflight, approval, read-only run lists and HTML inspection, recovery, rerolls, and exports
+- [Jobs](jobs.md) — preflight, approval, fenced worker ownership, database upgrades, read-only inspection, recovery, rerolls, and exports
 - [Optimization](optimize.md) — bounded concurrency experiments and evidence ledgers
 
 ## Connect models and tools

@@ -539,8 +539,8 @@ def test_invalid_accounting_preserves_already_dispatched_sibling_cost(tmp_path, 
     store = SQLiteRunStore(tmp_path / "jobs.db")
     original_mark_unknown = store.mark_unknown_outcome
 
-    def mark_unknown(call_id, error):
-        original_mark_unknown(call_id, error)
+    def mark_unknown(call_id, error, **kwargs):
+        original_mark_unknown(call_id, error, **kwargs)
         classified.set()
 
     monkeypatch.setattr(store, "mark_unknown_outcome", mark_unknown)
