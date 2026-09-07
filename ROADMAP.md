@@ -170,6 +170,15 @@ It adds the following runtime guarantees and measured evidence:
     call identities, and zero-cost balances pass independent reconciliation.
     [Scope and retained evidence](benchmarks/jobs_scale_5000_20260907_results.md).
 
+## Implemented after 0.7.0 (Unreleased)
+
+- **Autotune campaign ownership** — one live owner and epoch govern trial
+  mutations and decisions. Heartbeats survive event-loop statistical work;
+  cancellation drains evaluators before release. Transactional v3-to-v4
+  migration preserves evidence and blocks already-open legacy writers.
+  Explicit `lease=` tokens are a new low-level API requirement.
+  [Ownership and migration scope](docs/optimize.md#campaign-ownership-unreleased).
+
 ## Coming soon
 
 The [GPT-6 Astra campaign plan](benchmarks/astra_benchmark_plan.md) specifies
@@ -226,8 +235,8 @@ Linux port targets X11; the macOS bundle uses an ad-hoc signature.
    repeated k=25 cells, repeated glyph live cells, and held-out
    brand-consistency comparisons; save delivered text and judge reasoning so
    independent reviewers can rescore each quality result
-8. **Autotune generalization**: add campaign-wide leases, calibrated
-   sample-size and repeated-comparison guidance, richer reports, process-
+8. **Autotune generalization**: add calibrated sample-size and
+   repeated-comparison guidance, richer reports, process-
    supervised evaluator isolation, and conservative live-evaluator adapters
    after the offline campaign
 
