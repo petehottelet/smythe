@@ -6,12 +6,13 @@ The explorer adapts the MIT-licensed rain, bloom, and palette renderer from
 2D grid. The reference's base glyphs carry the effect; Smythe's original SVGs
 appear in 10% of selections by default.
 
-This is the current local preview. The
-[renderer interaction checkpoint](../../benchmarks/partitions/glyph_rain_reference_v1/pixel-preview-review.json)
-passed before the final borderless styling. The
-[current style review](../../benchmarks/partitions/glyph_rain_reference_v1/style-pixel-simple-review.json)
-covers the pixel controls and bold logo. Rendering performance and quantified
-reference parity have not been measured.
+The [current browser review](../../benchmarks/partitions/glyph_rain_reference_v1/performance-preview-review-20260907.json)
+passes 31 checks and binds the current source and README screenshot. It covers
+fixed-step output, both catalogs, navigation/reset, and measurement interruption.
+The earlier [interaction](../../benchmarks/partitions/glyph_rain_reference_v1/pixel-preview-review.json)
+and [pixel-style](../../benchmarks/partitions/glyph_rain_reference_v1/style-pixel-simple-review.json)
+receipts remain historical checkpoints. Quantified reference parity remains
+unmeasured; rendering performance has a separate protocol below.
 
 ## Run and controls
 

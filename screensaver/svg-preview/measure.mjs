@@ -1,6 +1,7 @@
 // Local, single-attempt collection. Never replaces a receipt or starts a provider.
 import {browserCommand} from './browser-command.mjs';
 import {browserMetadata} from './browser-metadata.mjs';
+import {browserArguments} from './browser-launch.mjs';
 import {existsSync,mkdirSync,writeFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {dirname,resolve,join} from 'node:path';
@@ -48,7 +49,7 @@ export async function measureRun({url,output,durationSeconds=60,warmupSeconds=5,
     if(!command){
       const browser=process.env.AGENT_BROWSER_BINARY||(process.platform==='win32'
         ?join(process.env.APPDATA||'','npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe'):'agent-browser');
-      command=(...args)=>browserCommand(browser,['--session',session,'--json',...args]);
+      command=(...args)=>browserCommand(browser,browserArguments(session,args));
       receipt.harness.browserToolVersion=execFileSync(browser,['--version'],{encoding:'utf8',timeout:10000,windowsHide:true}).trim();
     }else receipt.harness.browserToolVersion='injected test boundary';
     command('open','about:blank');command('set','media','reduced-motion');command('set','viewport','1920','1080');

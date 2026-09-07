@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict';
 import {browserMetadata,normalizeLaunchArguments} from './browser-metadata.mjs';
+import {browserArguments} from './browser-launch.mjs';
+
+assert.deepEqual(browserArguments('fresh-session',['open','about:blank']),
+  ['--session','fresh-session','--args','--enable-automation','--json','open','about:blank']);
+for(const args of [['open','http://localhost/'],['get','cdp-url'],['eval','1'],['close']]){
+  assert.deepEqual(browserArguments('fresh-session',args),['--session','fresh-session','--json',...args]);
+}
 
 let lastSocket,rejectMethod=null;
 class Socket extends EventTarget{

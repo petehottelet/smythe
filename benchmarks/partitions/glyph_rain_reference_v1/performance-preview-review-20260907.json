@@ -1,0 +1,2279 @@
+{
+  "schemaVersion": 2,
+  "status": "passed",
+  "createdAt": "2026-09-07T18:44:10.554Z",
+  "evidenceStatus": "automated-visual-and-interaction-review",
+  "scope": "Actual browser checks at fixed simulation steps. Not a timing campaign or human visual-preference judgment.",
+  "rendererVersion": "2",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+  "viewport": {
+    "dpr": 1,
+    "height": 1080,
+    "reduced": true,
+    "width": 1920
+  },
+  "sourceSha256": {
+    "base-glyphs.js": "8722d0bf011b22878695699b2e3cbe7b6ae27397cd3dcd88317024d80eff787e",
+    "catalog.html": "fd5f9d2cc6a75b0f32e7d50f026f6cf46089149e8cf4d2a20a5d2dc25492d4e0",
+    "config.mjs": "f823471fc6cc40a5193f9470bb5012d1edefbfc5ca73ec73a451e2f1203a6613",
+    "engine/bloomPass.js": "79f6009f6d6eaa2844bad93c78f1fdfd20204dd83ac9bc4560f9ff40b7d86c30",
+    "engine/colorToRGB.js": "cc868a9b4047c2c325ade036fb9bad79f4985705b58af338de10349370a0b9a9",
+    "engine/manifest.json": "708a7f9c1cb5e1c8fd15d14566c83109c868d24dd3fd8cc385b36068ba7b4a90",
+    "engine/palettePass.js": "9913f36fa9db86e405088bc975bf69f731c7019cca45f98de2d6a5c83e583e94",
+    "engine/rainPass.js": "70c51df478d33a73ebe9e9ca6fef1ed09f7a1a9ffd64b68911a67f0963cce93d",
+    "engine/shaders/bloomPass.blur.frag.glsl": "c1a2b01ad593d1d5bf95cbe2eb3a957c85840c0ede6fe893c61baf81fe610faa",
+    "engine/shaders/bloomPass.combine.frag.glsl": "a2cebf40734ecba772668548816a32235ef7e48439ee1c2ddb9fb20582060b0b",
+    "engine/shaders/bloomPass.highPass.frag.glsl": "727979238690fc06a8fcc14065468e43bd23d6710ab0b8fc4dbf985f6fa00034",
+    "engine/shaders/palettePass.frag.glsl": "d58298cd551be59495289463e93bf306a345eae7693617c147e7b332b7714e82",
+    "engine/shaders/rainPass.effect.frag.glsl": "6c0ee969bd62a7d313a69e19d8a29a0febf2884b5534a706685717496a3289b4",
+    "engine/shaders/rainPass.frag.glsl": "1cd3c2fbdb887965e0906b5a55cf16c0e95385f2deb15008fd8e1433b1000fa5",
+    "engine/shaders/rainPass.intro.frag.glsl": "d409f1f2fe372b6ce2b4a7aaaab00ce85c43853b87011e1c0030a3f45a70bb9e",
+    "engine/shaders/rainPass.raindrop.frag.glsl": "8f8ce9164ff8bf2005f10ad981959e75e4cb153b6f6a12d347586f3813820213",
+    "engine/shaders/rainPass.symbol.frag.glsl": "08f5220fce20c9191170086615061556401db5484994a153335aeda5569ca99c",
+    "engine/shaders/rainPass.vert.glsl": "365b7bb1f7c165103472adaea6198cb2ac5889141f2ef4f20ca62baa863b5adf",
+    "engine/upstream-config.mjs": "10a09629ba28592998e8e00054db13d17be1656fd57f632205e3c24b61ecc132",
+    "engine/utils.js": "5018541245bf7d8556fd43089b09110ff4c145db7352b102b62a7e29e426569e",
+    "fonts/VT323-Regular.ttf": "cf4de751ada78ceac033dbe16a687742939995b77bc2a052ae17a4957958594d",
+    "fonts/VT323.OFL.txt": "27d9af34210253e7ca1251fbace86c6f65b40031d6ce1a75493a1b2093631298",
+    "fonts/provenance.json": "820d9d15bc495c6125c915187b3b2c8edbc2ea7ad1069e62b768ed5d088c8beb",
+    "generated-sdf.json": "5ebafb2c0df7e475f237e689f0b382fd86bd28b7b107c981e1cd4d87aa1a0d99",
+    "generated-sdf.png": "0e8e3e43cc7f6c1973db06840ea1c69a390b5cb78329fb312bbe39aebf6a7c38",
+    "glyphs.js": "63967d8b1fe5c7dfb46ec665851b675682d88bd5c18e39a6a7f44ac692cbaabd",
+    "index.html": "df3ccdd32d2c6279c7ecd7773dbb544d830ee5211225329fa2425a672c47c573",
+    "lib/gl-matrix.js": "07855fa64096dbc30c3cf9088be433f29c8e344665c87b66c7463443d38c15a7",
+    "lib/regl.min.js": "1e85c84ef254125921378d82f4da4e457a0a399bc315880c8c997dd5af8c534d",
+    "rain.js": "590a027fb8891b1a042832992cd0731318beac7e1000952768d68384da8bc9d3",
+    "reference/LICENSE": "65333257cebb87e8af86201a65f0e550d65b3cf5a468bfee2a69c9d2b5d21123",
+    "reference/catalog.json": "6befd44f62a114b8627728b13c8300026e0d1f3c51c4b2b033f3ff1ea985e090",
+    "reference/matrixcode_msdf.png": "1fd4ed52f8e9cc4af6eaad69d28cd289bf6486f15f00c952548ff0533d6a83ab",
+    "reference/provenance.json": "b2d911aef1c5b6440a32ae4bee42c9f0566332db86dcdb1b698262c5d3f483b6",
+    "settings.css": "f722eb1588483d31b81513f42f8e4428b81b39aca0625e41a330068569ce0222",
+    "settings.mjs": "d660a83d282f411474458821e175dd89b5777941c0e4410528ab455051aa76ed",
+    "style.css": "7beb1ab4e5db96b992ea3a8e7a951b760497ea4ee9982d3e93af422a94960164",
+    "timing.mjs": "1a7ae6897b0564d71b897f1ee8129c7c9b914b9cf0a390236f2336487860d3f5",
+    "wordmark.svg": "e9b13d24a04522248a7f6cf11ae8b94840ffb4c8c30fbdd4fb3f130e1fbfd789"
+  },
+  "servedSourceSha256": {
+    "base-glyphs.js": "8722d0bf011b22878695699b2e3cbe7b6ae27397cd3dcd88317024d80eff787e",
+    "catalog.html": "fd5f9d2cc6a75b0f32e7d50f026f6cf46089149e8cf4d2a20a5d2dc25492d4e0",
+    "config.mjs": "f823471fc6cc40a5193f9470bb5012d1edefbfc5ca73ec73a451e2f1203a6613",
+    "engine/bloomPass.js": "79f6009f6d6eaa2844bad93c78f1fdfd20204dd83ac9bc4560f9ff40b7d86c30",
+    "engine/colorToRGB.js": "cc868a9b4047c2c325ade036fb9bad79f4985705b58af338de10349370a0b9a9",
+    "engine/manifest.json": "708a7f9c1cb5e1c8fd15d14566c83109c868d24dd3fd8cc385b36068ba7b4a90",
+    "engine/palettePass.js": "9913f36fa9db86e405088bc975bf69f731c7019cca45f98de2d6a5c83e583e94",
+    "engine/rainPass.js": "70c51df478d33a73ebe9e9ca6fef1ed09f7a1a9ffd64b68911a67f0963cce93d",
+    "engine/shaders/bloomPass.blur.frag.glsl": "c1a2b01ad593d1d5bf95cbe2eb3a957c85840c0ede6fe893c61baf81fe610faa",
+    "engine/shaders/bloomPass.combine.frag.glsl": "a2cebf40734ecba772668548816a32235ef7e48439ee1c2ddb9fb20582060b0b",
+    "engine/shaders/bloomPass.highPass.frag.glsl": "727979238690fc06a8fcc14065468e43bd23d6710ab0b8fc4dbf985f6fa00034",
+    "engine/shaders/palettePass.frag.glsl": "d58298cd551be59495289463e93bf306a345eae7693617c147e7b332b7714e82",
+    "engine/shaders/rainPass.effect.frag.glsl": "6c0ee969bd62a7d313a69e19d8a29a0febf2884b5534a706685717496a3289b4",
+    "engine/shaders/rainPass.frag.glsl": "1cd3c2fbdb887965e0906b5a55cf16c0e95385f2deb15008fd8e1433b1000fa5",
+    "engine/shaders/rainPass.intro.frag.glsl": "d409f1f2fe372b6ce2b4a7aaaab00ce85c43853b87011e1c0030a3f45a70bb9e",
+    "engine/shaders/rainPass.raindrop.frag.glsl": "8f8ce9164ff8bf2005f10ad981959e75e4cb153b6f6a12d347586f3813820213",
+    "engine/shaders/rainPass.symbol.frag.glsl": "08f5220fce20c9191170086615061556401db5484994a153335aeda5569ca99c",
+    "engine/shaders/rainPass.vert.glsl": "365b7bb1f7c165103472adaea6198cb2ac5889141f2ef4f20ca62baa863b5adf",
+    "engine/upstream-config.mjs": "10a09629ba28592998e8e00054db13d17be1656fd57f632205e3c24b61ecc132",
+    "engine/utils.js": "5018541245bf7d8556fd43089b09110ff4c145db7352b102b62a7e29e426569e",
+    "fonts/VT323-Regular.ttf": "cf4de751ada78ceac033dbe16a687742939995b77bc2a052ae17a4957958594d",
+    "fonts/VT323.OFL.txt": "27d9af34210253e7ca1251fbace86c6f65b40031d6ce1a75493a1b2093631298",
+    "fonts/provenance.json": "820d9d15bc495c6125c915187b3b2c8edbc2ea7ad1069e62b768ed5d088c8beb",
+    "generated-sdf.json": "5ebafb2c0df7e475f237e689f0b382fd86bd28b7b107c981e1cd4d87aa1a0d99",
+    "generated-sdf.png": "0e8e3e43cc7f6c1973db06840ea1c69a390b5cb78329fb312bbe39aebf6a7c38",
+    "glyphs.js": "63967d8b1fe5c7dfb46ec665851b675682d88bd5c18e39a6a7f44ac692cbaabd",
+    "index.html": "df3ccdd32d2c6279c7ecd7773dbb544d830ee5211225329fa2425a672c47c573",
+    "lib/gl-matrix.js": "07855fa64096dbc30c3cf9088be433f29c8e344665c87b66c7463443d38c15a7",
+    "lib/regl.min.js": "1e85c84ef254125921378d82f4da4e457a0a399bc315880c8c997dd5af8c534d",
+    "rain.js": "590a027fb8891b1a042832992cd0731318beac7e1000952768d68384da8bc9d3",
+    "reference/LICENSE": "65333257cebb87e8af86201a65f0e550d65b3cf5a468bfee2a69c9d2b5d21123",
+    "reference/catalog.json": "6befd44f62a114b8627728b13c8300026e0d1f3c51c4b2b033f3ff1ea985e090",
+    "reference/matrixcode_msdf.png": "1fd4ed52f8e9cc4af6eaad69d28cd289bf6486f15f00c952548ff0533d6a83ab",
+    "reference/provenance.json": "b2d911aef1c5b6440a32ae4bee42c9f0566332db86dcdb1b698262c5d3f483b6",
+    "settings.css": "f722eb1588483d31b81513f42f8e4428b81b39aca0625e41a330068569ce0222",
+    "settings.mjs": "d660a83d282f411474458821e175dd89b5777941c0e4410528ab455051aa76ed",
+    "style.css": "7beb1ab4e5db96b992ea3a8e7a951b760497ea4ee9982d3e93af422a94960164",
+    "timing.mjs": "1a7ae6897b0564d71b897f1ee8129c7c9b914b9cf0a390236f2336487860d3f5",
+    "wordmark.svg": "e9b13d24a04522248a7f6cf11ae8b94840ffb4c8c30fbdd4fb3f130e1fbfd789"
+  },
+  "harnessSha256": {
+    "review.mjs": "b4070ef64ee274583aa5773c1b1682e097d5e79585bb502ac4859e606b8b80db",
+    "browser-command.mjs": "8b98aa31695467a0a72d3ebb15853f2ea7740fc0ba849628ace21a102218530e",
+    "provenance.mjs": "327debb738aa27a06f5c033a76d710889b7fada5057a6d4a8446ffde4ff1f420",
+    "source-files.mjs": "466394893888dfc3d4fcad1c0fc28cde12c77a292d646c35cd645f63de56a999"
+  },
+  "sourceStable": true,
+  "harnessStable": true,
+  "originalProvenance": {
+    "catalogSha256": "9667056dfcbfd34558b0db4b2e3f044aa6d91d6bb7df52e92bf4d6719dea511a",
+    "count": 192,
+    "version": "glyph-svg-v1"
+  },
+  "baseProvenance": {
+    "canvas": [
+      100,
+      100
+    ],
+    "count": 56,
+    "fillRule": "nonzero",
+    "source": {
+      "asset": "svg sources/texture_simplified.svg",
+      "blank_sequence_indices": [
+        4
+      ],
+      "cell": [
+        64,
+        64
+      ],
+      "commit": "5ba90490453ceceb6812d6b1bc658a99a92411d0",
+      "grid": [
+        8,
+        8
+      ],
+      "license_sha256": "65333257cebb87e8af86201a65f0e550d65b3cf5a468bfee2a69c9d2b5d21123",
+      "repository": "https://github.com/m8e/matrix-rain",
+      "sequence_length": 57,
+      "sha256": "37bf6ef51382e4a29a236a7067772cca2eeaac26ff9682d34534f8d932fb8a89",
+      "unused_sequence_indices": [
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63
+      ],
+      "upstream_repository": "https://github.com/Rezmason/matrix",
+      "view_box": [
+        0,
+        0,
+        512,
+        512
+      ]
+    }
+  },
+  "checks": [
+    {
+      "name": "servedSources",
+      "passed": true,
+      "expected": "Every declared source and asset matches local bytes",
+      "actual": 39
+    },
+    {
+      "name": "viewport",
+      "passed": true,
+      "expected": "1920x1080 DPR 1 with reduced motion",
+      "actual": {
+        "dpr": 1,
+        "height": 1080,
+        "reduced": true,
+        "width": 1920
+      }
+    },
+    {
+      "name": "startup/classic/0",
+      "passed": true,
+      "expected": "Reduced-motion startup, paused at tick 0 with requested preset and mix",
+      "actual": {
+        "camera": {
+          "x": 0,
+          "z": 0
+        },
+        "catalogCount": 192,
+        "config": {
+          "animationSpeed": 1,
+          "autoTravel": false,
+          "backgroundColor": "#000000",
+          "bloomSize": 0.4,
+          "bloomStrength": 0.7,
+          "cursorColor": "#a2ffd8",
+          "cursorIntensity": 2,
+          "cycleSpeed": 0.03,
+          "density": 1,
+          "fallSpeed": 0.3,
+          "flip": false,
+          "forwardSpeed": 0.25,
+          "fps": 60,
+          "numColumns": 80,
+          "originalMix": 0,
+          "palette": "matrix",
+          "preset": "classic",
+          "raindropLength": 0.75,
+          "resolution": 0.75,
+          "rotation": 0,
+          "skipIntro": true,
+          "slant": 0
+        },
+        "cpuSubmissionMs": 0,
+        "frames": 1,
+        "glyphMix": 0,
+        "gpu": {
+          "renderer": "WebKit WebGL",
+          "vendor": "WebKit",
+          "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+        },
+        "paused": true,
+        "rainTime": 0,
+        "referenceGlyphCount": 56,
+        "referenceSequenceLength": 57,
+        "renderer": "REGL adapted from m8e/matrix-rain",
+        "simulationTick": 0,
+        "totalVisibleShapes": 248,
+        "version": "2",
+        "viewport": {
+          "dpr": 1,
+          "height": 1080,
+          "physicalHeight": 810,
+          "physicalWidth": 1440,
+          "renderScale": 0.75,
+          "width": 1920
+        }
+      }
+    },
+    {
+      "name": "frame/classic/0",
+      "passed": true,
+      "expected": "Nonblank frame after 228 fixed 60Hz steps; 0 < dark fraction < 0.99",
+      "actual": {
+        "camera": {
+          "x": 0,
+          "z": 0
+        },
+        "catalogCount": 192,
+        "config": {
+          "animationSpeed": 1,
+          "autoTravel": false,
+          "backgroundColor": "#000000",
+          "bloomSize": 0.4,
+          "bloomStrength": 0.7,
+          "cursorColor": "#a2ffd8",
+          "cursorIntensity": 2,
+          "cycleSpeed": 0.03,
+          "density": 1,
+          "fallSpeed": 0.3,
+          "flip": false,
+          "forwardSpeed": 0.25,
+          "fps": 60,
+          "numColumns": 80,
+          "originalMix": 0,
+          "palette": "matrix",
+          "preset": "classic",
+          "raindropLength": 0.75,
+          "resolution": 0.75,
+          "rotation": 0,
+          "skipIntro": true,
+          "slant": 0
+        },
+        "cpuSubmissionMs": 0,
+        "darkFraction": 0.6783933470507545,
+        "frames": 2,
+        "glyphMix": 0,
+        "gpu": {
+          "renderer": "WebKit WebGL",
+          "vendor": "WebKit",
+          "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+        },
+        "nearWhiteFraction": 0.002962105624142661,
+        "paused": true,
+        "pixels": 1166400,
+        "rainTime": 3.7999999999999914,
+        "referenceGlyphCount": 56,
+        "referenceSequenceLength": 57,
+        "renderer": "REGL adapted from m8e/matrix-rain",
+        "simulationTick": 228,
+        "source": "WebGL drawing buffer, controls excluded",
+        "totalVisibleShapes": 248,
+        "version": "2",
+        "viewport": {
+          "dpr": 1,
+          "height": 1080,
+          "physicalHeight": 810,
+          "physicalWidth": 1440,
+          "renderScale": 0.75,
+          "width": 1920
+        }
+      }
+    },
+    {
+      "name": "startup/classic/10",
+      "passed": true,
+      "expected": "Reduced-motion startup, paused at tick 0 with requested preset and mix",
+      "actual": {
+        "camera": {
+          "x": 0,
+          "z": 0
+        },
+        "catalogCount": 192,
+        "config": {
+          "animationSpeed": 1,
+          "autoTravel": false,
+          "backgroundColor": "#000000",
+          "bloomSize": 0.4,
+          "bloomStrength": 0.7,
+          "cursorColor": "#a2ffd8",
+          "cursorIntensity": 2,
+          "cycleSpeed": 0.03,
+          "density": 1,
+          "fallSpeed": 0.3,
+          "flip": false,
+          "forwardSpeed": 0.25,
+          "fps": 60,
+          "numColumns": 80,
+          "originalMix": 10,
+          "palette": "matrix",
+          "preset": "classic",
+          "raindropLength": 0.75,
+          "resolution": 0.75,
+          "rotation": 0,
+          "skipIntro": true,
+          "slant": 0
+        },
+        "cpuSubmissionMs": 0,
+        "frames": 1,
+        "glyphMix": 0.1,
+        "gpu": {
+          "renderer": "WebKit WebGL",
+          "vendor": "WebKit",
+          "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+        },
+        "paused": true,
+        "rainTime": 0,
+        "referenceGlyphCount": 56,
+        "referenceSequenceLength": 57,
+        "renderer": "REGL adapted from m8e/matrix-rain",
+        "simulationTick": 0,
+        "totalVisibleShapes": 248,
+        "version": "2",
+        "viewport": {
+          "dpr": 1,
+          "height": 1080,
+          "physicalHeight": 810,
+          "physicalWidth": 1440,
+          "renderScale": 0.75,
+          "width": 1920
+        }
+      }
+    },
+    {
+      "name": "frame/classic/10",
+      "passed": true,
+      "expected": "Nonblank frame after 228 fixed 60Hz steps; 0 < dark fraction < 0.99",
+      "actual": {
+        "camera": {
+          "x": 0,
+          "z": 0
+        },
+        "catalogCount": 192,
+        "config": {
+          "animationSpeed": 1,
+          "autoTravel": false,
+          "backgroundColor": "#000000",
+          "bloomSize": 0.4,
+          "bloomStrength": 0.7,
+          "cursorColor": "#a2ffd8",
+          "cursorIntensity": 2,
+          "cycleSpeed": 0.03,
+          "density": 1,
+          "fallSpeed": 0.3,
+          "flip": false,
+          "forwardSpeed": 0.25,
+          "fps": 60,
+          "numColumns": 80,
+          "originalMix": 10,
+          "palette": "matrix",
+          "preset": "classic",
+          "raindropLength": 0.75,
+          "resolution": 0.75,
+          "rotation": 0,
+          "skipIntro": true,
+          "slant": 0
+        },
+        "cpuSubmissionMs": 0,
+        "darkFraction": 0.6778094993141289,
+        "frames": 2,
+        "glyphMix": 0.1,
+        "gpu": {
+          "renderer": "WebKit WebGL",
+          "vendor": "WebKit",
+          "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+        },
+        "nearWhiteFraction": 0.002910665294924554,
+        "paused": true,
+        "pixels": 1166400,
+        "rainTime": 3.7999999999999914,
+        "referenceGlyphCount": 56,
+        "referenceSequenceLength": 57,
+        "renderer": "REGL adapted from m8e/matrix-rain",
+        "simulationTick": 228,
+        "source": "WebGL drawing buffer, controls excluded",
+        "totalVisibleShapes": 248,
+        "version": "2",
+        "viewport": {
+          "dpr": 1,
+          "height": 1080,
+          "physicalHeight": 810,
+          "physicalWidth": 1440,
+          "renderScale": 0.75,
+          "width": 1920
+        }
+      }
+    },
+    {
+      "name": "startup/classic/100",
+      "passed": true,
+      "expected": "Reduced-motion startup, paused at tick 0 with requested preset and mix",
+      "actual": {
+        "camera": {
+          "x": 0,
+          "z": 0
+        },
+        "catalogCount": 192,
+        "config": {
+          "animationSpeed": 1,
+          "autoTravel": false,
+          "backgroundColor": "#000000",
+          "bloomSize": 0.4,
+          "bloomStrength": 0.7,
+          "cursorColor": "#a2ffd8",
+          "cursorIntensity": 2,
+          "cycleSpeed": 0.03,
+          "density": 1,
+          "fallSpeed": 0.3,
+          "flip": false,
+          "forwardSpeed": 0.25,
+          "fps": 60,
+          "numColumns": 80,
+          "originalMix": 100,
+          "palette": "matrix",
+          "preset": "classic",
+          "raindropLength": 0.75,
+          "resolution": 0.75,
+          "rotation": 0,
+          "skipIntro": true,
+          "slant": 0
+        },
+        "cpuSubmissionMs": 0,
+        "frames": 1,
+        "glyphMix": 1,
+        "gpu": {
+          "renderer": "WebKit WebGL",
+          "vendor": "WebKit",
+          "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+        },
+        "paused": true,
+        "rainTime": 0,
+        "referenceGlyphCount": 56,
+        "referenceSequenceLength": 57,
+        "renderer": "REGL adapted from m8e/matrix-rain",
+        "simulationTick": 0,
+        "totalVisibleShapes": 248,
+        "version": "2",
+        "viewport": {
+          "dpr": 1,
+          "height": 1080,
+          "physicalHeight": 810,
+          "physicalWidth": 1440,
+          "renderScale": 0.75,
+          "width": 1920
+        }
+      }
+    },
+    {
+      "name": "frame/classic/100",
+      "passed": true,
+      "expected": "Nonblank frame after 228 fixed 60Hz steps; 0 < dark fraction < 0.99",
+      "actual": {
+        "camera": {
+          "x": 0,
+          "z": 0
+        },
+        "catalogCount": 192,
+        "config": {
+          "animationSpeed": 1,
+          "autoTravel": false,
+          "backgroundColor": "#000000",
+          "bloomSize": 0.4,
+          "bloomStrength": 0.7,
+          "cursorColor": "#a2ffd8",
+          "cursorIntensity": 2,
+          "cycleSpeed": 0.03,
+          "density": 1,
+          "fallSpeed": 0.3,
+          "flip": false,
+          "forwardSpeed": 0.25,
+          "fps": 60,
+          "numColumns": 80,
+          "originalMix": 100,
+          "palette": "matrix",
+          "preset": "classic",
+          "raindropLength": 0.75,
+          "resolution": 0.75,
+          "rotation": 0,
+          "skipIntro": true,
+          "slant": 0
+        },
+        "cpuSubmissionMs": 0,
+        "darkFraction": 0.679565329218107,
+        "frames": 2,
+        "glyphMix": 1,
+        "gpu": {
+          "renderer": "WebKit WebGL",
+          "vendor": "WebKit",
+          "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+        },
+        "nearWhiteFraction": 0.0027597736625514404,
+        "paused": true,
+        "pixels": 1166400,
+        "rainTime": 3.7999999999999914,
+        "referenceGlyphCount": 56,
+        "referenceSequenceLength": 57,
+        "renderer": "REGL adapted from m8e/matrix-rain",
+        "simulationTick": 228,
+        "source": "WebGL drawing buffer, controls excluded",
+        "totalVisibleShapes": 248,
+        "version": "2",
+        "viewport": {
+          "dpr": 1,
+          "height": 1080,
+          "physicalHeight": 810,
+          "physicalWidth": 1440,
+          "renderScale": 0.75,
+          "width": 1920
+        }
+      }
+    },
+    {
+      "name": "startup/operator/10",
+      "passed": true,
+      "expected": "Reduced-motion startup, paused at tick 0 with requested preset and mix",
+      "actual": {
+        "camera": {
+          "x": 0,
+          "z": 0
+        },
+        "catalogCount": 192,
+        "config": {
+          "animationSpeed": 1,
+          "autoTravel": false,
+          "backgroundColor": "#000000",
+          "bloomSize": 0.6,
+          "bloomStrength": 0.75,
+          "cursorColor": "#a2ffd8",
+          "cursorIntensity": 3,
+          "cycleSpeed": 0.01,
+          "density": 1,
+          "fallSpeed": 0.6,
+          "flip": false,
+          "forwardSpeed": 0.25,
+          "fps": 60,
+          "numColumns": 108,
+          "originalMix": 10,
+          "palette": "matrix",
+          "preset": "operator",
+          "raindropLength": 1.5,
+          "resolution": 0.75,
+          "rotation": 0,
+          "skipIntro": true,
+          "slant": 0
+        },
+        "cpuSubmissionMs": 0,
+        "frames": 1,
+        "glyphMix": 0.1,
+        "gpu": {
+          "renderer": "WebKit WebGL",
+          "vendor": "WebKit",
+          "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+        },
+        "paused": true,
+        "rainTime": 0,
+        "referenceGlyphCount": 56,
+        "referenceSequenceLength": 57,
+        "renderer": "REGL adapted from m8e/matrix-rain",
+        "simulationTick": 0,
+        "totalVisibleShapes": 248,
+        "version": "2",
+        "viewport": {
+          "dpr": 1,
+          "height": 1080,
+          "physicalHeight": 810,
+          "physicalWidth": 1440,
+          "renderScale": 0.75,
+          "width": 1920
+        }
+      }
+    },
+    {
+      "name": "frame/operator/10",
+      "passed": true,
+      "expected": "Nonblank frame after 228 fixed 60Hz steps; 0 < dark fraction < 0.99",
+      "actual": {
+        "camera": {
+          "x": 0,
+          "z": 0
+        },
+        "catalogCount": 192,
+        "config": {
+          "animationSpeed": 1,
+          "autoTravel": false,
+          "backgroundColor": "#000000",
+          "bloomSize": 0.6,
+          "bloomStrength": 0.75,
+          "cursorColor": "#a2ffd8",
+          "cursorIntensity": 3,
+          "cycleSpeed": 0.01,
+          "density": 1,
+          "fallSpeed": 0.6,
+          "flip": false,
+          "forwardSpeed": 0.25,
+          "fps": 60,
+          "numColumns": 108,
+          "originalMix": 10,
+          "palette": "matrix",
+          "preset": "operator",
+          "raindropLength": 1.5,
+          "resolution": 0.75,
+          "rotation": 0,
+          "skipIntro": true,
+          "slant": 0
+        },
+        "cpuSubmissionMs": 0,
+        "darkFraction": 0.38329475308641975,
+        "frames": 2,
+        "glyphMix": 0.1,
+        "gpu": {
+          "renderer": "WebKit WebGL",
+          "vendor": "WebKit",
+          "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+        },
+        "nearWhiteFraction": 0.0034199245541838134,
+        "paused": true,
+        "pixels": 1166400,
+        "rainTime": 3.7999999999999914,
+        "referenceGlyphCount": 56,
+        "referenceSequenceLength": 57,
+        "renderer": "REGL adapted from m8e/matrix-rain",
+        "simulationTick": 228,
+        "source": "WebGL drawing buffer, controls excluded",
+        "totalVisibleShapes": 248,
+        "version": "2",
+        "viewport": {
+          "dpr": 1,
+          "height": 1080,
+          "physicalHeight": 810,
+          "physicalWidth": 1440,
+          "renderScale": 0.75,
+          "width": 1920
+        }
+      }
+    },
+    {
+      "name": "startup/3d/10",
+      "passed": true,
+      "expected": "Reduced-motion startup, paused at tick 0 with requested preset and mix",
+      "actual": {
+        "camera": {
+          "x": 0,
+          "z": 0
+        },
+        "catalogCount": 192,
+        "config": {
+          "animationSpeed": 1,
+          "autoTravel": true,
+          "backgroundColor": "#000000",
+          "bloomSize": 0.4,
+          "bloomStrength": 0.7,
+          "cursorColor": "#a2ffd8",
+          "cursorIntensity": 2,
+          "cycleSpeed": 0.03,
+          "density": 1,
+          "fallSpeed": 0.5,
+          "flip": false,
+          "forwardSpeed": 0.25,
+          "fps": 60,
+          "numColumns": 80,
+          "originalMix": 10,
+          "palette": "matrix",
+          "preset": "3d",
+          "raindropLength": 0.3,
+          "resolution": 0.75,
+          "rotation": 0,
+          "skipIntro": true,
+          "slant": 0
+        },
+        "cpuSubmissionMs": 0,
+        "frames": 1,
+        "glyphMix": 0.1,
+        "gpu": {
+          "renderer": "WebKit WebGL",
+          "vendor": "WebKit",
+          "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+        },
+        "paused": true,
+        "rainTime": 0,
+        "referenceGlyphCount": 56,
+        "referenceSequenceLength": 57,
+        "renderer": "REGL adapted from m8e/matrix-rain",
+        "simulationTick": 0,
+        "totalVisibleShapes": 248,
+        "version": "2",
+        "viewport": {
+          "dpr": 1,
+          "height": 1080,
+          "physicalHeight": 810,
+          "physicalWidth": 1440,
+          "renderScale": 0.75,
+          "width": 1920
+        }
+      }
+    },
+    {
+      "name": "frame/3d/10",
+      "passed": true,
+      "expected": "Nonblank frame after 228 fixed 60Hz steps; 0 < dark fraction < 0.99",
+      "actual": {
+        "camera": {
+          "x": 0,
+          "z": 0
+        },
+        "catalogCount": 192,
+        "config": {
+          "animationSpeed": 1,
+          "autoTravel": true,
+          "backgroundColor": "#000000",
+          "bloomSize": 0.4,
+          "bloomStrength": 0.7,
+          "cursorColor": "#a2ffd8",
+          "cursorIntensity": 2,
+          "cycleSpeed": 0.03,
+          "density": 1,
+          "fallSpeed": 0.5,
+          "flip": false,
+          "forwardSpeed": 0.25,
+          "fps": 60,
+          "numColumns": 80,
+          "originalMix": 10,
+          "palette": "matrix",
+          "preset": "3d",
+          "raindropLength": 0.3,
+          "resolution": 0.75,
+          "rotation": 0,
+          "skipIntro": true,
+          "slant": 0
+        },
+        "cpuSubmissionMs": 0,
+        "darkFraction": 0.8763906035665295,
+        "frames": 2,
+        "glyphMix": 0.1,
+        "gpu": {
+          "renderer": "WebKit WebGL",
+          "vendor": "WebKit",
+          "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+        },
+        "nearWhiteFraction": 0.0030949931412894375,
+        "paused": true,
+        "pixels": 1166400,
+        "rainTime": 3.7999999999999914,
+        "referenceGlyphCount": 56,
+        "referenceSequenceLength": 57,
+        "renderer": "REGL adapted from m8e/matrix-rain",
+        "simulationTick": 228,
+        "source": "WebGL drawing buffer, controls excluded",
+        "totalVisibleShapes": 248,
+        "version": "2",
+        "viewport": {
+          "dpr": 1,
+          "height": 1080,
+          "physicalHeight": 810,
+          "physicalWidth": 1440,
+          "renderScale": 0.75,
+          "width": 1920
+        }
+      }
+    },
+    {
+      "name": "paused3DMovement",
+      "passed": true,
+      "expected": "Move to (12,18), change pixels, preserve paused time",
+      "actual": {
+        "camera": {
+          "x": 12,
+          "z": 18
+        },
+        "catalogCount": 192,
+        "changed": true,
+        "config": {
+          "animationSpeed": 1,
+          "autoTravel": true,
+          "backgroundColor": "#000000",
+          "bloomSize": 0.4,
+          "bloomStrength": 0.7,
+          "cursorColor": "#a2ffd8",
+          "cursorIntensity": 2,
+          "cycleSpeed": 0.03,
+          "density": 1,
+          "fallSpeed": 0.5,
+          "flip": false,
+          "forwardSpeed": 0.25,
+          "fps": 60,
+          "numColumns": 80,
+          "originalMix": 10,
+          "palette": "matrix",
+          "preset": "3d",
+          "raindropLength": 0.3,
+          "resolution": 0.75,
+          "rotation": 0,
+          "skipIntro": true,
+          "slant": 0
+        },
+        "cpuSubmissionMs": 0,
+        "frames": 3,
+        "glyphMix": 0.1,
+        "gpu": {
+          "renderer": "WebKit WebGL",
+          "vendor": "WebKit",
+          "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+        },
+        "paused": true,
+        "rainTime": 3.7999999999999914,
+        "referenceGlyphCount": 56,
+        "referenceSequenceLength": 57,
+        "renderer": "REGL adapted from m8e/matrix-rain",
+        "simulationTick": 228,
+        "totalVisibleShapes": 248,
+        "version": "2",
+        "viewport": {
+          "dpr": 1,
+          "height": 1080,
+          "physicalHeight": 810,
+          "physicalWidth": 1440,
+          "renderScale": 0.75,
+          "width": 1920
+        }
+      }
+    },
+    {
+      "name": "reset",
+      "passed": true,
+      "expected": "R restores exact drawing-buffer PNG bytes and origin without advancing time",
+      "actual": {
+        "camera": {
+          "x": 0,
+          "z": 0
+        },
+        "catalogCount": 192,
+        "config": {
+          "animationSpeed": 1,
+          "autoTravel": true,
+          "backgroundColor": "#000000",
+          "bloomSize": 0.4,
+          "bloomStrength": 0.7,
+          "cursorColor": "#a2ffd8",
+          "cursorIntensity": 2,
+          "cycleSpeed": 0.03,
+          "density": 1,
+          "fallSpeed": 0.5,
+          "flip": false,
+          "forwardSpeed": 0.25,
+          "fps": 60,
+          "numColumns": 80,
+          "originalMix": 10,
+          "palette": "matrix",
+          "preset": "3d",
+          "raindropLength": 0.3,
+          "resolution": 0.75,
+          "rotation": 0,
+          "skipIntro": true,
+          "slant": 0
+        },
+        "cpuSubmissionMs": 0,
+        "exactPixels": true,
+        "frames": 4,
+        "glyphMix": 0.1,
+        "gpu": {
+          "renderer": "WebKit WebGL",
+          "vendor": "WebKit",
+          "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+        },
+        "heldKeys": [],
+        "paused": true,
+        "pointerCount": 0,
+        "rainTime": 3.7999999999999914,
+        "referenceGlyphCount": 56,
+        "referenceSequenceLength": 57,
+        "renderer": "REGL adapted from m8e/matrix-rain",
+        "simulationTick": 228,
+        "totalVisibleShapes": 248,
+        "version": "2",
+        "viewport": {
+          "dpr": 1,
+          "height": 1080,
+          "physicalHeight": 810,
+          "physicalWidth": 1440,
+          "renderScale": 0.75,
+          "width": 1920
+        }
+      }
+    },
+    {
+      "name": "originalCatalog",
+      "passed": true,
+      "expected": "Default catalog displays 192 nonempty original SVGs",
+      "actual": {
+        "active": "originals",
+        "emptyGlyphs": 0,
+        "emptyPaths": 0,
+        "paths": 262,
+        "svgs": 192
+      }
+    },
+    {
+      "name": "referenceCatalog",
+      "passed": true,
+      "expected": "Reference button displays 56 nonempty imported SVGs",
+      "actual": {
+        "active": "reference",
+        "emptyGlyphs": 0,
+        "emptyPaths": 0,
+        "paths": 56,
+        "svgs": 56
+      }
+    },
+    {
+      "name": "startup/classic/10",
+      "passed": true,
+      "expected": "Reduced-motion startup, paused at tick 0 with requested preset and mix",
+      "actual": {
+        "camera": {
+          "x": 0,
+          "z": 0
+        },
+        "catalogCount": 192,
+        "config": {
+          "animationSpeed": 1,
+          "autoTravel": false,
+          "backgroundColor": "#000000",
+          "bloomSize": 0.4,
+          "bloomStrength": 0.7,
+          "cursorColor": "#a2ffd8",
+          "cursorIntensity": 2,
+          "cycleSpeed": 0.03,
+          "density": 1,
+          "fallSpeed": 0.3,
+          "flip": false,
+          "forwardSpeed": 0.25,
+          "fps": 60,
+          "numColumns": 80,
+          "originalMix": 10,
+          "palette": "matrix",
+          "preset": "classic",
+          "raindropLength": 0.75,
+          "resolution": 0.75,
+          "rotation": 0,
+          "skipIntro": true,
+          "slant": 0
+        },
+        "cpuSubmissionMs": 0,
+        "frames": 1,
+        "glyphMix": 0.1,
+        "gpu": {
+          "renderer": "WebKit WebGL",
+          "vendor": "WebKit",
+          "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+        },
+        "paused": true,
+        "rainTime": 0,
+        "referenceGlyphCount": 56,
+        "referenceSequenceLength": 57,
+        "renderer": "REGL adapted from m8e/matrix-rain",
+        "simulationTick": 0,
+        "totalVisibleShapes": 248,
+        "version": "2",
+        "viewport": {
+          "dpr": 1,
+          "height": 1080,
+          "physicalHeight": 810,
+          "physicalWidth": 1440,
+          "renderScale": 0.75,
+          "width": 1920
+        }
+      }
+    },
+    {
+      "name": "screenshotState",
+      "passed": true,
+      "expected": "Normal idle chrome at paused 3.8 seconds",
+      "actual": {
+        "focused": "BODY",
+        "idle": true,
+        "paused": true,
+        "rainTime": 3.7999999999999914
+      }
+    },
+    {
+      "name": "screenshotDimensions",
+      "passed": true,
+      "expected": "Actual 1920x1080 browser screenshot",
+      "actual": {
+        "width": 1920,
+        "height": 1080
+      }
+    },
+    {
+      "name": "startup/3d/10",
+      "passed": true,
+      "expected": "Reduced-motion startup, paused at tick 0 with requested preset and mix",
+      "actual": {
+        "camera": {
+          "x": 0,
+          "z": 0
+        },
+        "catalogCount": 192,
+        "config": {
+          "animationSpeed": 1,
+          "autoTravel": true,
+          "backgroundColor": "#000000",
+          "bloomSize": 0.4,
+          "bloomStrength": 0.7,
+          "cursorColor": "#a2ffd8",
+          "cursorIntensity": 2,
+          "cycleSpeed": 0.03,
+          "density": 1,
+          "fallSpeed": 0.5,
+          "flip": false,
+          "forwardSpeed": 0.25,
+          "fps": 60,
+          "numColumns": 80,
+          "originalMix": 10,
+          "palette": "matrix",
+          "preset": "3d",
+          "raindropLength": 0.3,
+          "resolution": 0.75,
+          "rotation": 0,
+          "skipIntro": true,
+          "slant": 0
+        },
+        "cpuSubmissionMs": 0,
+        "frames": 1,
+        "glyphMix": 0.1,
+        "gpu": {
+          "renderer": "WebKit WebGL",
+          "vendor": "WebKit",
+          "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+        },
+        "paused": true,
+        "rainTime": 0,
+        "referenceGlyphCount": 56,
+        "referenceSequenceLength": 57,
+        "renderer": "REGL adapted from m8e/matrix-rain",
+        "simulationTick": 0,
+        "totalVisibleShapes": 248,
+        "version": "2",
+        "viewport": {
+          "dpr": 1,
+          "height": 1080,
+          "physicalHeight": 810,
+          "physicalWidth": 1440,
+          "renderScale": 0.75,
+          "width": 1920
+        }
+      }
+    },
+    {
+      "name": "settingsBenchmarkStarted",
+      "passed": true,
+      "expected": "Start a 60-second benchmark from paused state",
+      "actual": {
+        "priorPaused": true,
+        "running": true
+      }
+    },
+    {
+      "name": "settingsInterrupt",
+      "passed": true,
+      "expected": "Measurement invalidated for the tested action and prior pause restored",
+      "actual": {
+        "paused": true,
+        "priorPaused": true,
+        "result": {
+          "averageFramesPerSecond": 55.86592178770953,
+          "catalogCount": 192,
+          "catalogSha256": "9667056dfcbfd34558b0db4b2e3f044aa6d91d6bb7df52e92bf4d6719dea511a",
+          "cpuSubmissionMs": {
+            "max": 0.4000000953674317,
+            "mean": 0.3199999570846558,
+            "median": 0.2999999523162842,
+            "p95": 0.4000000953674317,
+            "samples": 10
+          },
+          "createdAt": "2026-09-07T18:44:06.138Z",
+          "evidenceStatus": "diagnostic",
+          "exclusions": [
+            "GPU execution time",
+            "physical display timing",
+            "power",
+            "total process/GPU memory",
+            "generation time"
+          ],
+          "finalStats": {
+            "camera": {
+              "x": 0,
+              "z": 0
+            },
+            "catalogCount": 192,
+            "config": {
+              "animationSpeed": 1,
+              "autoTravel": true,
+              "backgroundColor": "#000000",
+              "bloomSize": 0.4,
+              "bloomStrength": 0.7,
+              "cursorColor": "#a2ffd8",
+              "cursorIntensity": 2,
+              "cycleSpeed": 0.03,
+              "density": 1,
+              "fallSpeed": 0.5,
+              "flip": false,
+              "forwardSpeed": 0.25,
+              "fps": 60,
+              "numColumns": 80,
+              "originalMix": 10,
+              "palette": "matrix",
+              "preset": "3d",
+              "raindropLength": 0.3,
+              "resolution": 0.75,
+              "rotation": 0,
+              "skipIntro": true,
+              "slant": 0
+            },
+            "cpuSubmissionMs": 0.2999999523162842,
+            "frames": 13,
+            "glyphMix": 0.1,
+            "gpu": {
+              "renderer": "WebKit WebGL",
+              "vendor": "WebKit",
+              "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+            },
+            "paused": false,
+            "rainTime": 3.9666666666666575,
+            "referenceGlyphCount": 56,
+            "referenceSequenceLength": 57,
+            "renderer": "REGL adapted from m8e/matrix-rain",
+            "simulationTick": 238,
+            "totalVisibleShapes": 248,
+            "version": "2",
+            "viewport": {
+              "dpr": 1,
+              "height": 1080,
+              "physicalHeight": 810,
+              "physicalWidth": 1440,
+              "renderScale": 0.75,
+              "width": 1920
+            }
+          },
+          "frameIntervalMs": {
+            "max": 18.59999999999991,
+            "mean": 17.89999999999999,
+            "median": 18,
+            "p95": 18.39999999999991,
+            "samples": 9
+          },
+          "initialStats": {
+            "camera": {
+              "x": 0,
+              "z": 0
+            },
+            "catalogCount": 192,
+            "config": {
+              "animationSpeed": 1,
+              "autoTravel": true,
+              "backgroundColor": "#000000",
+              "bloomSize": 0.4,
+              "bloomStrength": 0.7,
+              "cursorColor": "#a2ffd8",
+              "cursorIntensity": 2,
+              "cycleSpeed": 0.03,
+              "density": 1,
+              "fallSpeed": 0.5,
+              "flip": false,
+              "forwardSpeed": 0.25,
+              "fps": 60,
+              "numColumns": 80,
+              "originalMix": 10,
+              "palette": "matrix",
+              "preset": "3d",
+              "raindropLength": 0.3,
+              "resolution": 0.75,
+              "rotation": 0,
+              "skipIntro": true,
+              "slant": 0
+            },
+            "cpuSubmissionMs": 0,
+            "frames": 2,
+            "glyphMix": 0.1,
+            "gpu": {
+              "renderer": "WebKit WebGL",
+              "vendor": "WebKit",
+              "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+            },
+            "paused": false,
+            "rainTime": 3.7999999999999914,
+            "referenceGlyphCount": 56,
+            "referenceSequenceLength": 57,
+            "renderer": "REGL adapted from m8e/matrix-rain",
+            "simulationTick": 228,
+            "totalVisibleShapes": 248,
+            "version": "2",
+            "viewport": {
+              "dpr": 1,
+              "height": 1080,
+              "physicalHeight": 810,
+              "physicalWidth": 1440,
+              "renderScale": 0.75,
+              "width": 1920
+            }
+          },
+          "invalidReason": "Settings opened during measurement",
+          "measuredDurationSeconds": 0.1610999999999999,
+          "measurement": "Browser draw callback intervals and CPU WebGL command submission accumulated across all simulation callbacks between draws; not GPU completion or display presentation",
+          "referenceGlyphCount": 56,
+          "requestedDurationSeconds": 60,
+          "sampleBoundary": {
+            "first": {
+              "tick": 229,
+              "time": 3.816666666666658
+            },
+            "last": {
+              "tick": 238,
+              "time": 3.9666666666666575
+            }
+          },
+          "samples": {
+            "cpuSubmissionMs": [
+              0.4000000953674317,
+              0.19999980926513672,
+              0.39999985694885254,
+              0.2999999523162842,
+              0.2999999523162842,
+              0.4000000953674317,
+              0.4000000953674317,
+              0.19999980926513672,
+              0.2999999523162842,
+              0.2999999523162842
+            ],
+            "frameIntervalMs": [
+              18.09999999999991,
+              17.40000000000009,
+              18,
+              18,
+              18.59999999999991,
+              17.5,
+              17.90000000000009,
+              18.09999999999991,
+              17.5
+            ]
+          },
+          "schemaVersion": 2,
+          "status": "invalid",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+          "warmupSeconds": 0
+        },
+        "running": false
+      }
+    },
+    {
+      "name": "settingsOpened",
+      "passed": true,
+      "expected": "S opens settings",
+      "actual": true
+    },
+    {
+      "name": "settingsClosed",
+      "passed": true,
+      "expected": "Escape closes settings",
+      "actual": true
+    },
+    {
+      "name": "navigationBenchmarkStarted",
+      "passed": true,
+      "expected": "Start another benchmark from paused state",
+      "actual": {
+        "priorPaused": true,
+        "running": true
+      }
+    },
+    {
+      "name": "keyboardButtonInterrupt",
+      "passed": true,
+      "expected": "Measurement invalidated for the tested action and prior pause restored",
+      "actual": {
+        "paused": true,
+        "priorPaused": true,
+        "result": {
+          "averageFramesPerSecond": 56.426332288401255,
+          "catalogCount": 192,
+          "catalogSha256": "9667056dfcbfd34558b0db4b2e3f044aa6d91d6bb7df52e92bf4d6719dea511a",
+          "cpuSubmissionMs": {
+            "max": 0.2999999523162842,
+            "mean": 0.2299999475479126,
+            "median": 0.20000004768371585,
+            "p95": 0.2999999523162842,
+            "samples": 10
+          },
+          "createdAt": "2026-09-07T18:44:07.996Z",
+          "evidenceStatus": "diagnostic",
+          "exclusions": [
+            "GPU execution time",
+            "physical display timing",
+            "power",
+            "total process/GPU memory",
+            "generation time"
+          ],
+          "finalStats": {
+            "camera": {
+              "x": 0,
+              "z": 0
+            },
+            "catalogCount": 192,
+            "config": {
+              "animationSpeed": 1,
+              "autoTravel": true,
+              "backgroundColor": "#000000",
+              "bloomSize": 0.4,
+              "bloomStrength": 0.7,
+              "cursorColor": "#a2ffd8",
+              "cursorIntensity": 2,
+              "cycleSpeed": 0.03,
+              "density": 1,
+              "fallSpeed": 0.5,
+              "flip": false,
+              "forwardSpeed": 0.25,
+              "fps": 60,
+              "numColumns": 80,
+              "originalMix": 10,
+              "palette": "matrix",
+              "preset": "3d",
+              "raindropLength": 0.3,
+              "resolution": 0.75,
+              "rotation": 0,
+              "skipIntro": true,
+              "slant": 0
+            },
+            "cpuSubmissionMs": 0.2999999523162842,
+            "frames": 24,
+            "glyphMix": 0.1,
+            "gpu": {
+              "renderer": "WebKit WebGL",
+              "vendor": "WebKit",
+              "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+            },
+            "paused": false,
+            "rainTime": 4.133333333333324,
+            "referenceGlyphCount": 56,
+            "referenceSequenceLength": 57,
+            "renderer": "REGL adapted from m8e/matrix-rain",
+            "simulationTick": 248,
+            "totalVisibleShapes": 248,
+            "version": "2",
+            "viewport": {
+              "dpr": 1,
+              "height": 1080,
+              "physicalHeight": 810,
+              "physicalWidth": 1440,
+              "renderScale": 0.75,
+              "width": 1920
+            }
+          },
+          "frameIntervalMs": {
+            "max": 18.09999999999991,
+            "mean": 17.72222222222222,
+            "median": 17.59999999999991,
+            "p95": 18.059999999999945,
+            "samples": 9
+          },
+          "initialStats": {
+            "camera": {
+              "x": 0,
+              "z": 0
+            },
+            "catalogCount": 192,
+            "config": {
+              "animationSpeed": 1,
+              "autoTravel": true,
+              "backgroundColor": "#000000",
+              "bloomSize": 0.4,
+              "bloomStrength": 0.7,
+              "cursorColor": "#a2ffd8",
+              "cursorIntensity": 2,
+              "cycleSpeed": 0.03,
+              "density": 1,
+              "fallSpeed": 0.5,
+              "flip": false,
+              "forwardSpeed": 0.25,
+              "fps": 60,
+              "numColumns": 80,
+              "originalMix": 10,
+              "palette": "matrix",
+              "preset": "3d",
+              "raindropLength": 0.3,
+              "resolution": 0.75,
+              "rotation": 0,
+              "skipIntro": true,
+              "slant": 0
+            },
+            "cpuSubmissionMs": 0.2999999523162842,
+            "frames": 13,
+            "glyphMix": 0.1,
+            "gpu": {
+              "renderer": "WebKit WebGL",
+              "vendor": "WebKit",
+              "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+            },
+            "paused": false,
+            "rainTime": 3.9666666666666575,
+            "referenceGlyphCount": 56,
+            "referenceSequenceLength": 57,
+            "renderer": "REGL adapted from m8e/matrix-rain",
+            "simulationTick": 238,
+            "totalVisibleShapes": 248,
+            "version": "2",
+            "viewport": {
+              "dpr": 1,
+              "height": 1080,
+              "physicalHeight": 810,
+              "physicalWidth": 1440,
+              "renderScale": 0.75,
+              "width": 1920
+            }
+          },
+          "invalidReason": "Keyboard navigation during measurement",
+          "measuredDurationSeconds": 0.1595,
+          "measurement": "Browser draw callback intervals and CPU WebGL command submission accumulated across all simulation callbacks between draws; not GPU completion or display presentation",
+          "referenceGlyphCount": 56,
+          "requestedDurationSeconds": 60,
+          "sampleBoundary": {
+            "first": {
+              "tick": 239,
+              "time": 3.983333333333324
+            },
+            "last": {
+              "tick": 248,
+              "time": 4.133333333333324
+            }
+          },
+          "samples": {
+            "cpuSubmissionMs": [
+              0.19999980926513672,
+              0.19999980926513672,
+              0.2999999523162842,
+              0.09999990463256836,
+              0.20000004768371585,
+              0.20000004768371585,
+              0.2999999523162842,
+              0.2999999523162842,
+              0.20000004768371585,
+              0.2999999523162842
+            ],
+            "frameIntervalMs": [
+              17.59999999999991,
+              17.90000000000009,
+              18.09999999999991,
+              17.5,
+              18,
+              18,
+              17.5,
+              17.40000000000009,
+              17.5
+            ]
+          },
+          "schemaVersion": 2,
+          "status": "invalid",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+          "warmupSeconds": 0
+        },
+        "running": false
+      }
+    },
+    {
+      "name": "keyboardClickDetail",
+      "passed": true,
+      "expected": "Enter triggers the detail 0 movement-button path",
+      "actual": 0
+    },
+    {
+      "name": "contextLossInterrupt",
+      "passed": true,
+      "expected": "Measurement invalidated for the tested action and prior pause restored",
+      "actual": {
+        "paused": true,
+        "priorPaused": true,
+        "result": {
+          "averageFramesPerSecond": 55.97014925373128,
+          "catalogCount": 192,
+          "catalogSha256": "9667056dfcbfd34558b0db4b2e3f044aa6d91d6bb7df52e92bf4d6719dea511a",
+          "cpuSubmissionMs": {
+            "max": 0.3000001907348633,
+            "mean": 0.2500000476837158,
+            "median": 0.25,
+            "p95": 0.3000001907348633,
+            "samples": 10
+          },
+          "createdAt": "2026-09-07T18:44:09.137Z",
+          "evidenceStatus": "diagnostic",
+          "exclusions": [
+            "GPU execution time",
+            "physical display timing",
+            "power",
+            "total process/GPU memory",
+            "generation time"
+          ],
+          "finalStats": {
+            "camera": {
+              "x": 0,
+              "z": 1.4399999999999975
+            },
+            "catalogCount": 192,
+            "config": {
+              "animationSpeed": 1,
+              "autoTravel": true,
+              "backgroundColor": "#000000",
+              "bloomSize": 0.4,
+              "bloomStrength": 0.7,
+              "cursorColor": "#a2ffd8",
+              "cursorIntensity": 2,
+              "cycleSpeed": 0.03,
+              "density": 1,
+              "fallSpeed": 0.5,
+              "flip": false,
+              "forwardSpeed": 0.25,
+              "fps": 60,
+              "numColumns": 80,
+              "originalMix": 10,
+              "palette": "matrix",
+              "preset": "3d",
+              "raindropLength": 0.3,
+              "resolution": 0.75,
+              "rotation": 0,
+              "skipIntro": true,
+              "slant": 0
+            },
+            "cpuSubmissionMs": 0.3000001907348633,
+            "frames": 36,
+            "glyphMix": 0.1,
+            "gpu": {
+              "renderer": "WebKit WebGL",
+              "vendor": "WebKit",
+              "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+            },
+            "paused": false,
+            "rainTime": 4.29999999999999,
+            "referenceGlyphCount": 56,
+            "referenceSequenceLength": 57,
+            "renderer": "REGL adapted from m8e/matrix-rain",
+            "simulationTick": 258,
+            "totalVisibleShapes": 248,
+            "version": "2",
+            "viewport": {
+              "dpr": 1,
+              "height": 1080,
+              "physicalHeight": 810,
+              "physicalWidth": 1440,
+              "renderScale": 0.75,
+              "width": 1920
+            }
+          },
+          "frameIntervalMs": {
+            "max": 18.599999999999454,
+            "mean": 17.86666666666669,
+            "median": 17.900000000000546,
+            "p95": 18.479999999999745,
+            "samples": 9
+          },
+          "initialStats": {
+            "camera": {
+              "x": 0,
+              "z": 1.4399999999999975
+            },
+            "catalogCount": 192,
+            "config": {
+              "animationSpeed": 1,
+              "autoTravel": true,
+              "backgroundColor": "#000000",
+              "bloomSize": 0.4,
+              "bloomStrength": 0.7,
+              "cursorColor": "#a2ffd8",
+              "cursorIntensity": 2,
+              "cycleSpeed": 0.03,
+              "density": 1,
+              "fallSpeed": 0.5,
+              "flip": false,
+              "forwardSpeed": 0.25,
+              "fps": 60,
+              "numColumns": 80,
+              "originalMix": 10,
+              "palette": "matrix",
+              "preset": "3d",
+              "raindropLength": 0.3,
+              "resolution": 0.75,
+              "rotation": 0,
+              "skipIntro": true,
+              "slant": 0
+            },
+            "cpuSubmissionMs": 0.2999999523162842,
+            "frames": 25,
+            "glyphMix": 0.1,
+            "gpu": {
+              "renderer": "WebKit WebGL",
+              "vendor": "WebKit",
+              "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+            },
+            "paused": false,
+            "rainTime": 4.133333333333324,
+            "referenceGlyphCount": 56,
+            "referenceSequenceLength": 57,
+            "renderer": "REGL adapted from m8e/matrix-rain",
+            "simulationTick": 248,
+            "totalVisibleShapes": 248,
+            "version": "2",
+            "viewport": {
+              "dpr": 1,
+              "height": 1080,
+              "physicalHeight": 810,
+              "physicalWidth": 1440,
+              "renderScale": 0.75,
+              "width": 1920
+            }
+          },
+          "invalidReason": "WebGL context lost",
+          "measuredDurationSeconds": 0.1608000000000002,
+          "measurement": "Browser draw callback intervals and CPU WebGL command submission accumulated across all simulation callbacks between draws; not GPU completion or display presentation",
+          "referenceGlyphCount": 56,
+          "requestedDurationSeconds": 60,
+          "sampleBoundary": {
+            "first": {
+              "tick": 249,
+              "time": 4.149999999999991
+            },
+            "last": {
+              "tick": 258,
+              "time": 4.29999999999999
+            }
+          },
+          "samples": {
+            "cpuSubmissionMs": [
+              0.20000004768371585,
+              0.2999999523162842,
+              0.20000004768371585,
+              0.20000004768371585,
+              0.3000001907348633,
+              0.20000004768371585,
+              0.20000004768371585,
+              0.2999999523162842,
+              0.2999999523162842,
+              0.3000001907348633
+            ],
+            "frameIntervalMs": [
+              17.5,
+              17.400000000000546,
+              18.599999999999454,
+              17.900000000000546,
+              18.099999999999454,
+              18,
+              17.5,
+              17.5,
+              18.300000000000185
+            ]
+          },
+          "schemaVersion": 2,
+          "status": "invalid",
+          "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+          "warmupSeconds": 0
+        },
+        "running": false
+      }
+    },
+    {
+      "name": "contextLossStopsFrames",
+      "passed": true,
+      "expected": "No additional draw frames in 250ms after context loss",
+      "actual": {
+        "stoppedAt": 36,
+        "after": 36
+      }
+    },
+    {
+      "name": "sourceStability",
+      "passed": true,
+      "expected": "Renderer and catalog sources unchanged",
+      "actual": true
+    },
+    {
+      "name": "harnessStability",
+      "passed": true,
+      "expected": "Review harness unchanged",
+      "actual": true
+    }
+  ],
+  "samples": [
+    {
+      "preset": "classic",
+      "originalMix": 0,
+      "camera": {
+        "x": 0,
+        "z": 0
+      },
+      "catalogCount": 192,
+      "config": {
+        "animationSpeed": 1,
+        "autoTravel": false,
+        "backgroundColor": "#000000",
+        "bloomSize": 0.4,
+        "bloomStrength": 0.7,
+        "cursorColor": "#a2ffd8",
+        "cursorIntensity": 2,
+        "cycleSpeed": 0.03,
+        "density": 1,
+        "fallSpeed": 0.3,
+        "flip": false,
+        "forwardSpeed": 0.25,
+        "fps": 60,
+        "numColumns": 80,
+        "originalMix": 0,
+        "palette": "matrix",
+        "preset": "classic",
+        "raindropLength": 0.75,
+        "resolution": 0.75,
+        "rotation": 0,
+        "skipIntro": true,
+        "slant": 0
+      },
+      "cpuSubmissionMs": 0,
+      "darkFraction": 0.6783933470507545,
+      "frames": 2,
+      "glyphMix": 0,
+      "gpu": {
+        "renderer": "WebKit WebGL",
+        "vendor": "WebKit",
+        "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+      },
+      "nearWhiteFraction": 0.002962105624142661,
+      "paused": true,
+      "pixels": 1166400,
+      "rainTime": 3.7999999999999914,
+      "referenceGlyphCount": 56,
+      "referenceSequenceLength": 57,
+      "renderer": "REGL adapted from m8e/matrix-rain",
+      "simulationTick": 228,
+      "source": "WebGL drawing buffer, controls excluded",
+      "totalVisibleShapes": 248,
+      "version": "2",
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 810,
+        "physicalWidth": 1440,
+        "renderScale": 0.75,
+        "width": 1920
+      }
+    },
+    {
+      "preset": "classic",
+      "originalMix": 10,
+      "camera": {
+        "x": 0,
+        "z": 0
+      },
+      "catalogCount": 192,
+      "config": {
+        "animationSpeed": 1,
+        "autoTravel": false,
+        "backgroundColor": "#000000",
+        "bloomSize": 0.4,
+        "bloomStrength": 0.7,
+        "cursorColor": "#a2ffd8",
+        "cursorIntensity": 2,
+        "cycleSpeed": 0.03,
+        "density": 1,
+        "fallSpeed": 0.3,
+        "flip": false,
+        "forwardSpeed": 0.25,
+        "fps": 60,
+        "numColumns": 80,
+        "originalMix": 10,
+        "palette": "matrix",
+        "preset": "classic",
+        "raindropLength": 0.75,
+        "resolution": 0.75,
+        "rotation": 0,
+        "skipIntro": true,
+        "slant": 0
+      },
+      "cpuSubmissionMs": 0,
+      "darkFraction": 0.6778094993141289,
+      "frames": 2,
+      "glyphMix": 0.1,
+      "gpu": {
+        "renderer": "WebKit WebGL",
+        "vendor": "WebKit",
+        "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+      },
+      "nearWhiteFraction": 0.002910665294924554,
+      "paused": true,
+      "pixels": 1166400,
+      "rainTime": 3.7999999999999914,
+      "referenceGlyphCount": 56,
+      "referenceSequenceLength": 57,
+      "renderer": "REGL adapted from m8e/matrix-rain",
+      "simulationTick": 228,
+      "source": "WebGL drawing buffer, controls excluded",
+      "totalVisibleShapes": 248,
+      "version": "2",
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 810,
+        "physicalWidth": 1440,
+        "renderScale": 0.75,
+        "width": 1920
+      }
+    },
+    {
+      "preset": "classic",
+      "originalMix": 100,
+      "camera": {
+        "x": 0,
+        "z": 0
+      },
+      "catalogCount": 192,
+      "config": {
+        "animationSpeed": 1,
+        "autoTravel": false,
+        "backgroundColor": "#000000",
+        "bloomSize": 0.4,
+        "bloomStrength": 0.7,
+        "cursorColor": "#a2ffd8",
+        "cursorIntensity": 2,
+        "cycleSpeed": 0.03,
+        "density": 1,
+        "fallSpeed": 0.3,
+        "flip": false,
+        "forwardSpeed": 0.25,
+        "fps": 60,
+        "numColumns": 80,
+        "originalMix": 100,
+        "palette": "matrix",
+        "preset": "classic",
+        "raindropLength": 0.75,
+        "resolution": 0.75,
+        "rotation": 0,
+        "skipIntro": true,
+        "slant": 0
+      },
+      "cpuSubmissionMs": 0,
+      "darkFraction": 0.679565329218107,
+      "frames": 2,
+      "glyphMix": 1,
+      "gpu": {
+        "renderer": "WebKit WebGL",
+        "vendor": "WebKit",
+        "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+      },
+      "nearWhiteFraction": 0.0027597736625514404,
+      "paused": true,
+      "pixels": 1166400,
+      "rainTime": 3.7999999999999914,
+      "referenceGlyphCount": 56,
+      "referenceSequenceLength": 57,
+      "renderer": "REGL adapted from m8e/matrix-rain",
+      "simulationTick": 228,
+      "source": "WebGL drawing buffer, controls excluded",
+      "totalVisibleShapes": 248,
+      "version": "2",
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 810,
+        "physicalWidth": 1440,
+        "renderScale": 0.75,
+        "width": 1920
+      }
+    },
+    {
+      "preset": "operator",
+      "originalMix": 10,
+      "camera": {
+        "x": 0,
+        "z": 0
+      },
+      "catalogCount": 192,
+      "config": {
+        "animationSpeed": 1,
+        "autoTravel": false,
+        "backgroundColor": "#000000",
+        "bloomSize": 0.6,
+        "bloomStrength": 0.75,
+        "cursorColor": "#a2ffd8",
+        "cursorIntensity": 3,
+        "cycleSpeed": 0.01,
+        "density": 1,
+        "fallSpeed": 0.6,
+        "flip": false,
+        "forwardSpeed": 0.25,
+        "fps": 60,
+        "numColumns": 108,
+        "originalMix": 10,
+        "palette": "matrix",
+        "preset": "operator",
+        "raindropLength": 1.5,
+        "resolution": 0.75,
+        "rotation": 0,
+        "skipIntro": true,
+        "slant": 0
+      },
+      "cpuSubmissionMs": 0,
+      "darkFraction": 0.38329475308641975,
+      "frames": 2,
+      "glyphMix": 0.1,
+      "gpu": {
+        "renderer": "WebKit WebGL",
+        "vendor": "WebKit",
+        "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+      },
+      "nearWhiteFraction": 0.0034199245541838134,
+      "paused": true,
+      "pixels": 1166400,
+      "rainTime": 3.7999999999999914,
+      "referenceGlyphCount": 56,
+      "referenceSequenceLength": 57,
+      "renderer": "REGL adapted from m8e/matrix-rain",
+      "simulationTick": 228,
+      "source": "WebGL drawing buffer, controls excluded",
+      "totalVisibleShapes": 248,
+      "version": "2",
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 810,
+        "physicalWidth": 1440,
+        "renderScale": 0.75,
+        "width": 1920
+      }
+    },
+    {
+      "preset": "3d",
+      "originalMix": 10,
+      "camera": {
+        "x": 0,
+        "z": 0
+      },
+      "catalogCount": 192,
+      "config": {
+        "animationSpeed": 1,
+        "autoTravel": true,
+        "backgroundColor": "#000000",
+        "bloomSize": 0.4,
+        "bloomStrength": 0.7,
+        "cursorColor": "#a2ffd8",
+        "cursorIntensity": 2,
+        "cycleSpeed": 0.03,
+        "density": 1,
+        "fallSpeed": 0.5,
+        "flip": false,
+        "forwardSpeed": 0.25,
+        "fps": 60,
+        "numColumns": 80,
+        "originalMix": 10,
+        "palette": "matrix",
+        "preset": "3d",
+        "raindropLength": 0.3,
+        "resolution": 0.75,
+        "rotation": 0,
+        "skipIntro": true,
+        "slant": 0
+      },
+      "cpuSubmissionMs": 0,
+      "darkFraction": 0.8763906035665295,
+      "frames": 2,
+      "glyphMix": 0.1,
+      "gpu": {
+        "renderer": "WebKit WebGL",
+        "vendor": "WebKit",
+        "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+      },
+      "nearWhiteFraction": 0.0030949931412894375,
+      "paused": true,
+      "pixels": 1166400,
+      "rainTime": 3.7999999999999914,
+      "referenceGlyphCount": 56,
+      "referenceSequenceLength": 57,
+      "renderer": "REGL adapted from m8e/matrix-rain",
+      "simulationTick": 228,
+      "source": "WebGL drawing buffer, controls excluded",
+      "totalVisibleShapes": 248,
+      "version": "2",
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 810,
+        "physicalWidth": 1440,
+        "renderScale": 0.75,
+        "width": 1920
+      }
+    }
+  ],
+  "contextLoss": {
+    "available": true,
+    "result": {
+      "averageFramesPerSecond": 55.97014925373128,
+      "catalogCount": 192,
+      "catalogSha256": "9667056dfcbfd34558b0db4b2e3f044aa6d91d6bb7df52e92bf4d6719dea511a",
+      "cpuSubmissionMs": {
+        "max": 0.3000001907348633,
+        "mean": 0.2500000476837158,
+        "median": 0.25,
+        "p95": 0.3000001907348633,
+        "samples": 10
+      },
+      "createdAt": "2026-09-07T18:44:09.137Z",
+      "evidenceStatus": "diagnostic",
+      "exclusions": [
+        "GPU execution time",
+        "physical display timing",
+        "power",
+        "total process/GPU memory",
+        "generation time"
+      ],
+      "finalStats": {
+        "camera": {
+          "x": 0,
+          "z": 1.4399999999999975
+        },
+        "catalogCount": 192,
+        "config": {
+          "animationSpeed": 1,
+          "autoTravel": true,
+          "backgroundColor": "#000000",
+          "bloomSize": 0.4,
+          "bloomStrength": 0.7,
+          "cursorColor": "#a2ffd8",
+          "cursorIntensity": 2,
+          "cycleSpeed": 0.03,
+          "density": 1,
+          "fallSpeed": 0.5,
+          "flip": false,
+          "forwardSpeed": 0.25,
+          "fps": 60,
+          "numColumns": 80,
+          "originalMix": 10,
+          "palette": "matrix",
+          "preset": "3d",
+          "raindropLength": 0.3,
+          "resolution": 0.75,
+          "rotation": 0,
+          "skipIntro": true,
+          "slant": 0
+        },
+        "cpuSubmissionMs": 0.3000001907348633,
+        "frames": 36,
+        "glyphMix": 0.1,
+        "gpu": {
+          "renderer": "WebKit WebGL",
+          "vendor": "WebKit",
+          "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+        },
+        "paused": false,
+        "rainTime": 4.29999999999999,
+        "referenceGlyphCount": 56,
+        "referenceSequenceLength": 57,
+        "renderer": "REGL adapted from m8e/matrix-rain",
+        "simulationTick": 258,
+        "totalVisibleShapes": 248,
+        "version": "2",
+        "viewport": {
+          "dpr": 1,
+          "height": 1080,
+          "physicalHeight": 810,
+          "physicalWidth": 1440,
+          "renderScale": 0.75,
+          "width": 1920
+        }
+      },
+      "frameIntervalMs": {
+        "max": 18.599999999999454,
+        "mean": 17.86666666666669,
+        "median": 17.900000000000546,
+        "p95": 18.479999999999745,
+        "samples": 9
+      },
+      "initialStats": {
+        "camera": {
+          "x": 0,
+          "z": 1.4399999999999975
+        },
+        "catalogCount": 192,
+        "config": {
+          "animationSpeed": 1,
+          "autoTravel": true,
+          "backgroundColor": "#000000",
+          "bloomSize": 0.4,
+          "bloomStrength": 0.7,
+          "cursorColor": "#a2ffd8",
+          "cursorIntensity": 2,
+          "cycleSpeed": 0.03,
+          "density": 1,
+          "fallSpeed": 0.5,
+          "flip": false,
+          "forwardSpeed": 0.25,
+          "fps": 60,
+          "numColumns": 80,
+          "originalMix": 10,
+          "palette": "matrix",
+          "preset": "3d",
+          "raindropLength": 0.3,
+          "resolution": 0.75,
+          "rotation": 0,
+          "skipIntro": true,
+          "slant": 0
+        },
+        "cpuSubmissionMs": 0.2999999523162842,
+        "frames": 25,
+        "glyphMix": 0.1,
+        "gpu": {
+          "renderer": "WebKit WebGL",
+          "vendor": "WebKit",
+          "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+        },
+        "paused": false,
+        "rainTime": 4.133333333333324,
+        "referenceGlyphCount": 56,
+        "referenceSequenceLength": 57,
+        "renderer": "REGL adapted from m8e/matrix-rain",
+        "simulationTick": 248,
+        "totalVisibleShapes": 248,
+        "version": "2",
+        "viewport": {
+          "dpr": 1,
+          "height": 1080,
+          "physicalHeight": 810,
+          "physicalWidth": 1440,
+          "renderScale": 0.75,
+          "width": 1920
+        }
+      },
+      "invalidReason": "WebGL context lost",
+      "measuredDurationSeconds": 0.1608000000000002,
+      "measurement": "Browser draw callback intervals and CPU WebGL command submission accumulated across all simulation callbacks between draws; not GPU completion or display presentation",
+      "referenceGlyphCount": 56,
+      "requestedDurationSeconds": 60,
+      "sampleBoundary": {
+        "first": {
+          "tick": 249,
+          "time": 4.149999999999991
+        },
+        "last": {
+          "tick": 258,
+          "time": 4.29999999999999
+        }
+      },
+      "samples": {
+        "cpuSubmissionMs": [
+          0.20000004768371585,
+          0.2999999523162842,
+          0.20000004768371585,
+          0.20000004768371585,
+          0.3000001907348633,
+          0.20000004768371585,
+          0.20000004768371585,
+          0.2999999523162842,
+          0.2999999523162842,
+          0.3000001907348633
+        ],
+        "frameIntervalMs": [
+          17.5,
+          17.400000000000546,
+          18.599999999999454,
+          17.900000000000546,
+          18.099999999999454,
+          18,
+          17.5,
+          17.5,
+          18.300000000000185
+        ]
+      },
+      "schemaVersion": 2,
+      "status": "invalid",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+      "warmupSeconds": 0
+    },
+    "framesAtStop": 36,
+    "framesAfter250Ms": 36
+  },
+  "screenshot": {
+    "path": "screensaver/svg-preview/preview.png",
+    "sha256": "7c27b2a2c16abed59672fc5cc2ce8adf56eba165b022660b302b522d2afb1af8",
+    "width": 1920,
+    "height": 1080,
+    "state": {
+      "focused": "BODY",
+      "idle": true,
+      "paused": true,
+      "rainTime": 3.7999999999999914
+    },
+    "frame": {
+      "camera": {
+        "x": 0,
+        "z": 0
+      },
+      "catalogCount": 192,
+      "config": {
+        "animationSpeed": 1,
+        "autoTravel": false,
+        "backgroundColor": "#000000",
+        "bloomSize": 0.4,
+        "bloomStrength": 0.7,
+        "cursorColor": "#a2ffd8",
+        "cursorIntensity": 2,
+        "cycleSpeed": 0.03,
+        "density": 1,
+        "fallSpeed": 0.3,
+        "flip": false,
+        "forwardSpeed": 0.25,
+        "fps": 60,
+        "numColumns": 80,
+        "originalMix": 10,
+        "palette": "matrix",
+        "preset": "classic",
+        "raindropLength": 0.75,
+        "resolution": 0.75,
+        "rotation": 0,
+        "skipIntro": true,
+        "slant": 0
+      },
+      "cpuSubmissionMs": 0,
+      "darkFraction": 0.6778094993141289,
+      "frames": 2,
+      "glyphMix": 0.1,
+      "gpu": {
+        "renderer": "WebKit WebGL",
+        "vendor": "WebKit",
+        "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+      },
+      "nearWhiteFraction": 0.002910665294924554,
+      "paused": true,
+      "pixels": 1166400,
+      "rainTime": 3.7999999999999914,
+      "referenceGlyphCount": 56,
+      "referenceSequenceLength": 57,
+      "renderer": "REGL adapted from m8e/matrix-rain",
+      "simulationTick": 228,
+      "source": "WebGL drawing buffer, controls excluded",
+      "totalVisibleShapes": 248,
+      "version": "2",
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 810,
+        "physicalWidth": 1440,
+        "renderScale": 0.75,
+        "width": 1920
+      }
+    },
+    "method": "Actual browser screenshot after 228 fixed 60Hz steps; normal idle chrome, no compositing."
+  }
+}

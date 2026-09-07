@@ -56,6 +56,16 @@ assert.equal(classifyBackend({...browser,gl:{...browser.gl,unmaskedRenderer:'ANG
 assert.equal(classifyBackend({gl:{renderer:'WebKit'}}),'unknown');
 assert.equal(classifyBackend({...browser,gl:{...browser.gl,unmaskedRenderer:'WebKit WebGL'}}),'unknown');
 assert.equal(classifyBackend({...browser,gl:{...browser.gl,unmaskedRenderer:'ANGLE Intel'}}),'unknown','Unmasked vendor must match physical-device evidence');
+const observed=structuredClone(browser);
+observed.gl.unmaskedRenderer='ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11)';
+observed.systemInfo.gpu.devices=[{vendorId:4318,deviceString:'NVIDIA GeForce RTX 4090'},
+  {vendorId:5140,deviceString:'Microsoft Basic Render Driver'}];
+observed.systemInfo.gpu.auxAttributes={glRenderer:observed.gl.unmaskedRenderer};
+assert.equal(classifyBackend(observed),'hardware-reported','An unused fallback adapter must not override the actual RTX4090 context');
+observed.gl.unmaskedRenderer='WebKit WebGL';assert.equal(classifyBackend(observed),'unknown');
+observed.gl.unmaskedRenderer='ANGLE SwiftShader';assert.equal(classifyBackend(observed),'software');
+observed.gl.unmaskedRenderer='ANGLE NVIDIA';observed.systemInfo.gpu.auxAttributes.glRenderer='ANGLE Intel';
+assert.equal(classifyBackend(observed),'unknown','Conflicting active-context metadata must not qualify hardware');
 const campaign=SCHEDULE.map(([preset,repetition])=>fixture(preset,repetition));
 assert.equal(aggregateReceipts(campaign).targetPassed,true);
 const ephemeral=structuredClone(campaign);
