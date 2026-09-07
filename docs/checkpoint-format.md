@@ -1,4 +1,4 @@
-# Checkpoint format (version 2)
+# Checkpoint format (version 3)
 
 When a `Swarm` is constructed with a `checkpoint_store`, it persists the full
 execution state after planning and once more when the run finishes or fails.
@@ -8,7 +8,8 @@ write amplification; after a process crash, at most the completed but unflushed
 tail of that batch may replay. That replay can duplicate provider spend or tool
 side effects, so intervals above one are appropriate only when the write-saving
 tradeoff is worth the recovery window and affected operations are idempotent.
-The state is a single JSON document per execution, so you can inspect—or
+Verification decisions and regeneration transitions always force a save,
+regardless of the node interval. The state is a single JSON document per execution, so you can inspect—or
 repair—a checkpoint with any text editor.
 
 With the default `FileCheckpointStore`, checkpoints live at `~/.smythe/checkpoints/<execution_id>.json`. Writes are atomic (temp file + rename): a crash mid-write never corrupts the previous checkpoint.
@@ -17,7 +18,7 @@ With the default `FileCheckpointStore`, checkpoints live at `~/.smythe/checkpoin
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "execution_id": "9f2c4a…",
   "status": "running | completed | failed",
   "created_at": 1751600000.0,
@@ -74,13 +75,33 @@ Notes:
 - `control.revisions_used` is how much of the supervisor's `max_revisions` allowance the run has already spent. Resume seeds the executor from it, so the cap bounds the **run**, not each attempt: a crash-resume cycle cannot refill the allowance and revise past the limit the caller set.
 - `task.done_when` carries the acceptance criteria forward. A resumed run that had forgotten them could not hold its own output to them.
 
+## Verification state
+
+Node metadata carries the generation and disposition of each gating verdict:
+
+- `execution_generation` identifies the node's output generation; absent means `0`.
+- `verification_target_generation` binds a judge's request to the target it inspected.
+- `verification_receipt` records version `1`, state `pending` or `consumed`,
+  `judge_generation`, `target_id`, and `target_generation`. A completed gated
+  judge saves its pending receipt before ordinary completion can be checkpointed.
+- `regeneration_intent` records version `1`, the target and judge generations,
+  rejection reason, absolute `regenerations_used` count, and an
+  `affected_generations` map from node IDs to their old generations.
+
+The intent is saved before cancellation. After affected workers settle, a
+second forced save records the reset: results and stale artifact references
+are cleared, affected generations advance exactly once, and the intent is
+removed. Costs and consumed regeneration allowances survive the reset.
+Detached snapshot values prevent later metadata mutations from changing a
+checkpoint already handed to a custom store.
+
 ## Resume semantics
 
 `swarm.resume(execution_id)` (or `await swarm.aresume(...)`):
 
 1. Loads the state and rejects unknown ids (`KeyError`) and unreadable versions (`ValueError`).
-2. Validates saved budget policy and all charges, and rejects nodes marked `accounting_invalid` until operator reconciliation. If `status` is `completed` and `output` is present, returns the validated stored result without executing anything.
-3. Otherwise restores the graph, re-registers the recorded agents, and resets `running` / `failed` nodes to `pending`. `completed` and `skipped` nodes keep their recorded results and are **not** re-executed.
+2. Validates saved budget policy, charges, and verification state. Unresolved accounting markers or ambiguous verification decisions stop recovery. A completed snapshot with output and no pending verification work returns its validated stored result.
+3. Otherwise restores the graph, re-registers the recorded agents, and resets `running` / `failed` nodes to `pending`. It finishes saved regeneration intents and consumes pending verdicts before dispatch. A rejected generation invalidates affected `completed` and `skipped` results too; other finished nodes keep their recorded results.
 4. Restores per-node costs into the budget so the resumed run keeps counting against the original cap.
 5. Executes the remaining nodes (always on the parallel executor), synthesizes over the full graph, and writes the final checkpoint.
 
@@ -96,13 +117,21 @@ resume. See [Cost guardrails](budgets.md).
 
 ## Version compatibility
 
-This build writes version `2` and reads `SUPPORTED_CHECKPOINT_VERSIONS =
-(1, 2)`. Version 2 added `control` and `task.done_when`; both are
-additive, so a version 1 document still resumes — it loads with
-`revisions_used: 0` and no acceptance criteria, which is exactly the
-state it was written in. A version this build cannot read fails with a
-`ValueError` naming the versions it does read, rather than resuming
-against a schema it would misinterpret.
+This build writes version `3` and reads versions `1`, `2`, and `3`.
+Version 2 added `control` and `task.done_when`; version 1 loads their original
+defaults of zero revisions and no acceptance criteria.
+
+Version 3 makes verification dispositions durable. Older readers reject it
+instead of ignoring a rejection in progress. Completed legacy runs return
+their stored output. Exhausted legacy gates resume without renewing their
+allowance; advisory gates remain advisory. An incomplete version 1 or 2
+checkpoint with a completed gated judge, unused regeneration allowance, and
+no disposition is ambiguous: `VerificationRecoveryError` stops it before
+provider work. Reconcile that saved verdict or start a new workflow.
+
+Malformed generation identities, receipts, or regeneration intents also stop
+recovery. An unsupported checkpoint version raises `ValueError` naming the
+supported versions.
 
 ## Finding an execution id after a crash
 

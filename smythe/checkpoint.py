@@ -6,7 +6,7 @@ CheckpointStore.  A crashed or interrupted execution can then be picked
 up with ``swarm.resume(execution_id)``, re-running only the nodes that
 never completed.
 
-The state is a plain JSON document (version 1) so users can inspect or
+The state is a plain JSON document (version 3) so users can inspect or
 repair checkpoints by hand.  See docs/checkpoint-format.md for the full
 schema.
 """
@@ -27,20 +27,18 @@ from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topolo
 from smythe.registry import Registry
 from smythe.task import Task
 
-CHECKPOINT_VERSION = 2
-# Versions this build can still read. v1 predates the durable control
-# block and Task.done_when; both are additive, so a v1 document loads
-# with documented defaults rather than being rejected.
-SUPPORTED_CHECKPOINT_VERSIONS = (1, 2)
+CHECKPOINT_VERSION = 3
+# v3 adds mandatory verification dispositions. Older graphs without an
+# ambiguous unfinished gating decision remain readable.
+SUPPORTED_CHECKPOINT_VERSIONS = (1, 2, 3)
 
 _EXECUTION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
 def _jsonable(value: Any) -> Any:
-    """Return *value* if JSON-serializable, otherwise its str() form."""
+    """Take a detached JSON snapshot, falling back to str() for opaque values."""
     try:
-        json.dumps(value)
-        return value
+        return json.loads(json.dumps(value))
     except (TypeError, ValueError):
         return str(value)
 

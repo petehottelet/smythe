@@ -28,7 +28,7 @@ smythe jobs run examples/12_jobs_manifest.yaml --approve approve_v1_...
 | [01_quickstart_yaml.py](01_quickstart_yaml.py) | Load a declarative YAML DAG ([01_pipeline.yaml](01_pipeline.yaml)) with [halt, retry, and skip policies](../docs/execution.md) and per-node timeouts, execute it in parallel. |
 | [02_dynamic_planning.py](02_dynamic_planning.py) | The `LLMArchitect` designs the execution graph from the task itself. Inspect the plan before executing it. |
 | [03_parallel_budget.py](03_parallel_budget.py) | Eight-node broadcast under a USD budget cap with `max_concurrency=3`, a per-node cost breakdown, and [strict cost guardrails](../docs/budgets.md). |
-| [04_resume_after_crash.py](04_resume_after_crash.py) | Durable execution: the provider dies mid-run, the checkpoint survives, and `swarm.resume()` finishes the job without re-running completed nodes. |
+| [04_resume_after_crash.py](04_resume_after_crash.py) | Durable execution: resume preserves completed nodes and their costs. [Verification recovery](../docs/verifier.md#recovery-and-concurrent-work) also completes pending rejection and regeneration decisions before dispatch. |
 | [05_mcp_filesystem.py](05_mcp_filesystem.py) | MCP tool use, fully offline: an agent reads real files through a bundled MCP server ([mcp_file_server.py](mcp_file_server.py)) via the bounded tool loop. Needs `pip install smythe[mcp]`. |
 | [06_mcp_github.py](06_mcp_github.py) | The real GitHub MCP server with a mandatory tool allowlist and `env_passthrough` for the token. Env-gated: needs `GITHUB_PERSONAL_ACCESS_TOKEN`, an LLM key, and npx. |
 | [07_mcp_saas.py](07_mcp_saas.py) | Any SaaS MCP server over streamable HTTP (Linear, Notion, ...), configured entirely by environment variables. Env-gated. |

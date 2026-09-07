@@ -26,6 +26,8 @@ Cancellation does not establish that a remote provider issued no charge.
 An explicit [resume](checkpoint-format.md#resume-semantics) preserves completed
 nodes and their costs, resets failed or interrupted nodes, and continues the
 pending graph. Invalid-accounting markers require reconciliation first.
+Unfinished [verification transitions](verifier.md#recovery-and-concurrent-work)
+are recovered before new work or cached-output return.
 
 [YAML example](../examples/01_pipeline.yaml) ·
 [Crash and resume example](../examples/04_resume_after_crash.py) ·

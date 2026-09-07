@@ -25,7 +25,10 @@ from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
 from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
 from smythe.tracer import Tracer
-from smythe.verifier import TokenVerifier, Verifier
+from smythe.verifier import (
+    TokenVerifier, Verifier, VerificationRecoveryError, node_generation, verification_integer,
+    validate_verification_receipt,
+)
 
 if TYPE_CHECKING:
     from smythe.supervisor import Supervisor
@@ -117,12 +120,14 @@ class ExecutorBase:
         task: Task | None = None,
         verifier: Verifier | None = None,
         revisions_used: int = 0,
+        on_control_update: Callable[[], None] | None = None,
     ) -> None:
         self._provider = provider
         self._registry = registry
         self._tracer = tracer
         self._budget = budget
         self._on_node_update = on_node_update
+        self._on_control_update = on_control_update
         self._tool_runtime = tool_runtime
         self._max_tool_iterations = max_tool_iterations
         self._artifact_dir = Path(artifact_dir) if artifact_dir is not None else None
@@ -156,7 +161,7 @@ class ExecutorBase:
         provider accounting is terminal because continuing would spend
         more while the supervisor's charge remains unresolved.
         """
-        if self._supervisor is None:
+        if self._supervisor is None or node.status is not NodeStatus.COMPLETED:
             return False
         remaining = self._max_revisions - self._revisions_used
         if remaining <= 0:
@@ -194,49 +199,55 @@ class ExecutorBase:
         return True
 
     def maybe_regenerate(self, node: Node, graph: ExecutionGraph) -> bool:
-        """Act on *node*'s verdict when it is a verifier that failed.
-
-        Returns True when work was sent back, so the caller can refresh
-        any scheduling state.  Resets the judged node and everything
-        downstream of it — a failed draft invalidates the summary
-        written from it, so re-running only the draft would leave the
-        run internally inconsistent.
-        """
-        if not node.verifies or node.max_regenerations <= 0:
+        """Apply a durable rejection when the caller has no active descendants."""
+        intent = self.prepare_regeneration(node, graph)
+        if intent is None:
             return False
-        target = self._cached_node_by_id(node.verifies, graph)
-        if target is None or target.status is not NodeStatus.COMPLETED:
-            return False
-
-        used = node.metadata.get("regenerations_used", 0)
-        if used >= node.max_regenerations:
-            return False
-
-        verdict = self._verifier.verdict(node, target)
-        if verdict.passed:
-            return False
-
-        node.metadata["regenerations_used"] = used + 1
-        reset = self._reset_for_regeneration(target, graph)
-        self._tracer.on_regeneration(
-            node, target, reason=verdict.reason,
-            attempt=used + 1, limit=node.max_regenerations,
-            reset_ids=[n.id for n in reset],
-        )
-        for reset_node in reset:
-            self.notify_update(reset_node)
+        if any(n.status is NodeStatus.RUNNING for n in graph.nodes
+               if n.id in intent["affected_generations"]):
+            raise VerificationRecoveryError("Active descendants must settle before regeneration")
+        self.apply_regeneration(node, graph, intent)
         return True
 
-    def _reset_for_regeneration(
-        self, target: Node, graph: ExecutionGraph,
-    ) -> list[Node]:
-        """Send *target* and its finished descendants back to pending."""
-        by_id = {n.id: n for n in graph.nodes}
+    def notify_control_update(self, node: Node) -> None:
+        """Persist a control transition without batching or changing old hooks."""
+        try:
+            if self._on_control_update is not None:
+                self._on_control_update()
+            else:
+                self.notify_update(node)
+        except Exception as exc:
+            raise VerificationRecoveryError("Could not persist verification control") from exc
+
+    def begin_verification(self, node: Node, graph: ExecutionGraph) -> None:
+        """Bind the judge's request to the version of its target it observes."""
+        node_generation(node)
+        if node.verifies and node.max_regenerations > 0:
+            target = self._cached_node_by_id(node.verifies, graph)
+            node.metadata["verification_target_generation"] = (
+                node_generation(target) if target is not None else None
+            )
+
+    def complete_verification(self, node: Node) -> None:
+        """Stamp pending before any COMPLETED checkpoint can become visible."""
+        if node.status is not NodeStatus.COMPLETED or not node.verifies or node.max_regenerations <= 0:
+            return
+        node.metadata["verification_receipt"] = {
+            "version": 1, "state": "pending", "judge_generation": node_generation(node),
+            "target_id": node.verifies,
+            "target_generation": node.metadata.get("verification_target_generation"),
+        }
+        self.notify_control_update(node)
+
+    def _affected_nodes(self, target: Node, graph: ExecutionGraph) -> list[Node]:
         children: dict[str, list[str]] = {n.id: [] for n in graph.nodes}
         for candidate in graph.nodes:
             for dep_id in candidate.depends_on:
                 children.setdefault(dep_id, []).append(candidate.id)
-
+            # A judge also observes its target when a hand-built graph omitted
+            # the dependency edge. Its old verdict must never survive a reset.
+            if candidate.verifies:
+                children.setdefault(candidate.verifies, []).append(candidate.id)
         stack = [target.id]
         seen: set[str] = set()
         while stack:
@@ -245,17 +256,117 @@ class ExecutorBase:
                 continue
             seen.add(node_id)
             stack.extend(children.get(node_id, ()))
+        return [n for n in graph.nodes if n.id in seen]
 
-        reset: list[Node] = []
-        for node_id in seen:
-            candidate = by_id.get(node_id)
-            if candidate is None:
-                continue
-            if candidate.status in (NodeStatus.COMPLETED, NodeStatus.FAILED):
-                candidate.status = NodeStatus.PENDING
-                candidate.result = None
-                reset.append(candidate)
-        return reset
+    def prepare_regeneration(self, node: Node, graph: ExecutionGraph) -> dict | None:
+        """Persist one rejection intent before cancellation or graph mutation."""
+        existing = node.metadata.get("regeneration_intent")
+        if existing is not None:
+            self._validate_regeneration(node, graph, existing)
+            return existing
+        if node.status is not NodeStatus.COMPLETED or not node.verifies or node.max_regenerations <= 0:
+            return None
+        receipt = node.metadata.get("verification_receipt")
+        # Completed legacy/manual nodes are not silently rejudged.
+        if receipt is None:
+            return None
+        validate_verification_receipt(node, graph)
+        if receipt.get("state") == "consumed":
+            return None
+        if receipt.get("state") != "pending" or receipt.get("judge_generation") != node_generation(node):
+            raise VerificationRecoveryError(f"Stale verification receipt on {node.id!r}")
+        target = self._cached_node_by_id(node.verifies, graph)
+        used = verification_integer(node.metadata.get("regenerations_used", 0), "regenerations_used")
+        valid_target = target is not None and target.status is NodeStatus.COMPLETED
+        if valid_target and receipt.get("target_generation") != node_generation(target):
+            raise VerificationRecoveryError(f"Verifier {node.id!r} observed an obsolete target")
+        if receipt.get("target_id") != node.verifies:
+            raise VerificationRecoveryError(f"Verifier {node.id!r} target identity changed")
+        if not valid_target or used >= node.max_regenerations:
+            node.metadata["verification_receipt"] = dict(receipt, state="consumed", reason="unavailable or exhausted")
+            self.notify_control_update(node)
+            return None
+        verdict = self._verifier.verdict(node, target)
+        if verdict.passed:
+            node.metadata["verification_receipt"] = dict(receipt, state="consumed", passed=True, reason=verdict.reason)
+            self.notify_control_update(node)
+            return None
+        intent = {
+            "version": 1, "target_id": target.id, "target_generation": node_generation(target),
+            "judge_generation": node_generation(node), "reason": verdict.reason,
+            "regenerations_used": used + 1,
+            "affected_generations": {n.id: node_generation(n) for n in self._affected_nodes(target, graph)},
+        }
+        node.metadata["regenerations_used"] = used + 1
+        node.metadata["regeneration_intent"] = intent
+        self.notify_control_update(node)
+        return intent
+
+    def _validate_regeneration(self, node: Node, graph: ExecutionGraph, intent: dict) -> None:
+        if (not isinstance(intent, dict) or type(intent.get("version")) is not int
+                or intent["version"] != 1 or not isinstance(intent.get("reason"), str)
+                or not isinstance(intent.get("target_id"), str)):
+            raise VerificationRecoveryError("Invalid regeneration intent")
+        target = self._cached_node_by_id(intent.get("target_id"), graph)
+        if target is None or node.verifies != target.id:
+            raise VerificationRecoveryError("Regeneration target identity changed")
+        affected = intent.get("affected_generations")
+        if not isinstance(affected, dict) or set(affected) != {n.id for n in self._affected_nodes(target, graph)}:
+            raise VerificationRecoveryError("Regeneration affected-node inventory changed")
+        used = verification_integer(intent.get("regenerations_used"), "intent regenerations_used")
+        saved_used = verification_integer(node.metadata.get("regenerations_used"), "regenerations_used")
+        if used < 1 or used > node.max_regenerations or saved_used != used:
+            raise VerificationRecoveryError("Regeneration allowance differs from the saved intent")
+        for candidate in graph.nodes:
+            if candidate.id in affected:
+                old = verification_integer(affected[candidate.id], "source generation")
+                if node_generation(candidate) not in (old, old + 1):
+                    raise VerificationRecoveryError("Regeneration generation identity changed")
+                if (node_generation(candidate) == old + 1
+                        and (candidate.status is not NodeStatus.PENDING or candidate.result is not None)):
+                    raise VerificationRecoveryError("Regeneration intent would overwrite a newer result")
+                if candidate is not node and "regeneration_intent" in candidate.metadata:
+                    raise VerificationRecoveryError("Overlapping regeneration intents require reconciliation")
+        target_generation = verification_integer(intent.get("target_generation"), "intent target generation")
+        judge_generation = verification_integer(intent.get("judge_generation"), "intent judge generation")
+        if target_generation != affected[target.id] or judge_generation != affected[node.id]:
+            raise VerificationRecoveryError("Regeneration source identity is inconsistent")
+
+    def apply_regeneration(self, node: Node, graph: ExecutionGraph, intent: dict) -> None:
+        """Commit an idempotent reset after every affected worker has settled."""
+        self._validate_regeneration(node, graph, intent)
+        target = self._cached_node_by_id(intent["target_id"], graph)
+        reset = [n for n in graph.nodes if n.id in intent["affected_generations"]]
+        if any(n.metadata.get("accounting_invalid") for n in reset):
+            raise BudgetValidationError("Cannot regenerate unresolved provider accounting")
+        for candidate in reset:
+            candidate.status = NodeStatus.PENDING
+            candidate.result = None
+            candidate.metadata["execution_generation"] = intent["affected_generations"][candidate.id] + 1
+            for key in ("artifacts", "artifacts_discarded", "verification_receipt", "verification_target_generation"):
+                candidate.metadata.pop(key, None)
+        node.metadata.pop("regeneration_intent", None)
+        self.notify_control_update(node)
+        self._tracer.on_regeneration(
+            node, target, reason=intent["reason"], attempt=intent["regenerations_used"],
+            limit=node.max_regenerations, reset_ids=[n.id for n in reset],
+        )
+        for candidate in reset:
+            self.notify_update(candidate)
+
+    def recover_verification(self, graph: ExecutionGraph) -> None:
+        """Finish saved control transitions before initial scheduling."""
+        # Validate every saved intent before changing any node. In particular,
+        # malformed overlapping intents must not partially invalidate a graph.
+        for node in graph.nodes:
+            if "regeneration_intent" in node.metadata:
+                self._validate_regeneration(node, graph, node.metadata["regeneration_intent"])
+        for node in graph.nodes:
+            intent = node.metadata.get("regeneration_intent")
+            if intent is not None:
+                self.apply_regeneration(node, graph, intent)
+        for node in graph.nodes:
+            self.maybe_regenerate(node, graph)
 
     def _inherit_execution_context(
         self, new_nodes: tuple[Node, ...], graph: ExecutionGraph,
@@ -358,7 +469,12 @@ class ExecutorBase:
         SKIPPED, or FAILED.
         """
         if self._on_node_update is not None:
-            self._on_node_update(node)
+            try:
+                self._on_node_update(node)
+            except Exception as exc:
+                if node.status is NodeStatus.COMPLETED and "verification_receipt" in node.metadata:
+                    raise VerificationRecoveryError("Could not persist completed verifier") from exc
+                raise
 
     @staticmethod
     def mark_accounting_invalid(node: Node, error: BudgetValidationError) -> None:

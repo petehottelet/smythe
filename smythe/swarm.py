@@ -39,7 +39,7 @@ from smythe.supervisor import Supervisor
 from smythe.synthesizer import Synthesizer
 from smythe.task import Task
 from smythe.tracer import Tracer
-from smythe.verifier import Verifier
+from smythe.verifier import Verifier, validate_verification_checkpoint, verification_pending
 
 
 @dataclass
@@ -290,6 +290,9 @@ class Swarm:
             on_node_update=self._checkpointer(
                 execution_id, graph, budget, task, created_at,
             ),
+            on_control_update=self._control_checkpointer(
+                execution_id, graph, budget, task, created_at,
+            ),
         )
         self._active_executor = executor
         try:
@@ -358,6 +361,9 @@ class Swarm:
             task=task,
             verifier=self.verifier,
             on_node_update=self._checkpointer(
+                execution_id, graph, budget, task, created_at,
+            ),
+            on_control_update=self._control_checkpointer(
                 execution_id, graph, budget, task, created_at,
             ),
         )
@@ -465,6 +471,18 @@ class Swarm:
 
         return _on_node_update
 
+    def _control_checkpointer(self, execution_id, graph, budget, task, created_at):
+        """Control transitions must be durable even with batched node saves."""
+        if self._checkpoint_store is None:
+            return None
+
+        def _on_control_update() -> None:
+            self._save_checkpoint(
+                execution_id, "running", graph, budget, task, created_at,
+            )
+
+        return _on_control_update
+
     def resume(self, execution_id: str) -> SwarmResult:
         """Resume a checkpointed execution.  Sync wrapper around aresume()."""
         return asyncio.run(self.aresume(execution_id))
@@ -487,7 +505,7 @@ class Swarm:
         if state is None:
             raise KeyError(f"No checkpoint found for execution {execution_id!r}")
         version = state.get("version")
-        if version not in SUPPORTED_CHECKPOINT_VERSIONS:
+        if type(version) is not int or version not in SUPPORTED_CHECKPOINT_VERSIONS:
             raise ValueError(
                 f"Checkpoint version {version!r} cannot be read by this "
                 f"build of smythe, which writes version "
@@ -521,7 +539,9 @@ class Swarm:
                 "checkpoint before clearing its accounting markers."
             )
 
-        if state.get("status") == "completed" and state.get("output") is not None:
+        completed = state.get("status") == "completed" and state.get("output") is not None
+        validate_verification_checkpoint(graph, version=version, completed=completed)
+        if completed and not verification_pending(graph):
             return SwarmResult(
                 output=state["output"],
                 graph=graph,
@@ -560,6 +580,9 @@ class Swarm:
             task=task,
             verifier=self.verifier,
             on_node_update=self._checkpointer(
+                execution_id, graph, budget, task, created_at,
+            ),
+            on_control_update=self._control_checkpointer(
                 execution_id, graph, budget, task, created_at,
             ),
         )

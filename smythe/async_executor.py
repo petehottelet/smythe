@@ -18,6 +18,7 @@ from smythe.provider import Provider
 from smythe.registry import Registry
 from smythe.tools import ToolRuntime
 from smythe.tracer import Tracer
+from smythe.verifier import VerificationRecoveryError
 
 if TYPE_CHECKING:
     from smythe.supervisor import Supervisor
@@ -64,6 +65,7 @@ class AsyncExecutor(ExecutorBase):
         task: Task | None = None,
         verifier: Verifier | None = None,
         revisions_used: int = 0,
+        on_control_update: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(
             provider=provider, registry=registry, tracer=tracer, budget=budget,
@@ -72,6 +74,7 @@ class AsyncExecutor(ExecutorBase):
             retry_backoff_s=retry_backoff_s, supervisor=supervisor,
             max_revisions=max_revisions, task=task, verifier=verifier,
             revisions_used=revisions_used,
+            on_control_update=on_control_update,
         )
         self._estimated_tokens_per_node = validate_token_count(
             estimated_tokens_per_node, "estimated_tokens_per_node",
@@ -122,6 +125,7 @@ class AsyncExecutor(ExecutorBase):
     async def run(self, graph: ExecutionGraph) -> ExecutionGraph:
         """Execute every node, fanning out independent nodes concurrently."""
         self.prepare_graph(graph)
+        self.recover_verification(graph)
         active: dict[asyncio.Task[None], Node] = {}
         pending, resolved, dependents, unresolved, ready, order = self._schedule_state(
             graph, active,
@@ -191,7 +195,7 @@ class AsyncExecutor(ExecutorBase):
                 if first_error is None and just_completed:
                     revised = False
                     for node in just_completed:
-                        revised |= self.maybe_regenerate(node, graph)
+                        revised |= await self._regenerate_and_settle(node, graph, active)
                         if self._supervisor is not None:
                             revised |= await self.maybe_revise(node, graph)
                     if revised:
@@ -227,14 +231,24 @@ class AsyncExecutor(ExecutorBase):
 
     async def _cancel_and_settle(
         self, active: dict[asyncio.Task[None], Node],
-    ) -> None:
+        affected_ids: set[str] | None = None,
+    ) -> tuple[list[BaseException], bool]:
         """Cancel and await active node tasks, releasing unused reservations."""
-        if not active:
-            return
-        tasks = list(active)
+        tasks = [task for task, node in active.items()
+                 if affected_ids is None or node.id in affected_ids]
+        if not tasks:
+            return [], False
         for task in tasks:
             task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        settled = asyncio.gather(*tasks, return_exceptions=True)
+        interrupted = False
+        while not settled.done():
+            try:
+                await asyncio.shield(settled)
+            except asyncio.CancelledError:
+                # Repeated cancellation cannot detach a billed artifact write.
+                interrupted = True
+        errors = [result for result in settled.result() if isinstance(result, BaseException)]
         for task in tasks:
             node = active.pop(task)
             if node.status in (NodeStatus.PENDING, NodeStatus.RUNNING):
@@ -242,6 +256,29 @@ class AsyncExecutor(ExecutorBase):
                     self._budget.release(node.id)
                 node.status = NodeStatus.PENDING
                 node.result = None
+        return errors, interrupted
+
+    async def _regenerate_and_settle(
+        self, node: Node, graph: ExecutionGraph, active: dict[asyncio.Task[None], Node],
+    ) -> bool:
+        intent = self.prepare_regeneration(node, graph)
+        if intent is None:
+            return False
+        errors, interrupted = await self._cancel_and_settle(
+            active, set(intent["affected_generations"]),
+        )
+        for error in errors:
+            if isinstance(error, (
+                BudgetValidationError, NodeFinalizationError, SentinelAlert,
+                VerificationRecoveryError,
+            )):
+                # Retain the intent and all accounting: recovery must not hide
+                # an unusable bill or buy a replacement for a failed write.
+                raise error
+        if interrupted:
+            raise asyncio.CancelledError
+        self.apply_regeneration(node, graph, intent)
+        return True
 
     async def _execute_node(self, node: Node, graph: ExecutionGraph) -> None:
         """Run a single node through the provider, respecting its failure policy."""
@@ -253,6 +290,7 @@ class AsyncExecutor(ExecutorBase):
             if delay:
                 await asyncio.sleep(delay)
             node.status = NodeStatus.RUNNING
+            self.begin_verification(node, graph)
             self._tracer.on_node_start(node)
 
             try:
@@ -263,23 +301,26 @@ class AsyncExecutor(ExecutorBase):
                 finalize_task = asyncio.create_task(
                     asyncio.to_thread(self.finalize_node_result, node, result),
                 )
-                try:
-                    await asyncio.shield(finalize_task)
-                except asyncio.CancelledError:
-                    # A sibling can fail after this response has already been
-                    # billed. Finish the atomic write instead of abandoning a
-                    # worker thread that could mutate the node after run()
-                    # returns; this completed node remains a resumable result.
+                while not finalize_task.done():
                     try:
-                        await finalize_task
+                        await asyncio.shield(finalize_task)
+                    except asyncio.CancelledError:
+                        # Once billed, finish persistence even after repeated
+                        # cancels. The scheduler awaits us before invalidation.
+                        continue
                     except Exception as exc:
                         raise NodeFinalizationError(node.id, exc) from exc
+                try:
+                    finalize_task.result()
                 except Exception as exc:
                     raise NodeFinalizationError(node.id, exc) from exc
                 node.status = NodeStatus.COMPLETED
                 self._tracer.on_node_end(node)
+                self.complete_verification(node)
                 self.notify_update(node)
                 return
+            except VerificationRecoveryError:
+                raise
             except asyncio.CancelledError:
                 if self._budget:
                     self._budget.release(node.id)

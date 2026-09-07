@@ -43,6 +43,7 @@ from smythe.verifier import (
     TokenVerifier,
     Verdict,
     Verifier,
+    VerificationRecoveryError,
 )
 from smythe.tools import (
     ChatMessage,
@@ -110,6 +111,7 @@ __all__ = [
     "ToolSpec",
     "Verdict",
     "Verifier",
+    "VerificationRecoveryError",
     "WhiteRabbit",
     "design_verifier",
     "distill_template",
