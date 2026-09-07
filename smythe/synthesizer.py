@@ -13,6 +13,7 @@ from smythe.budget import (
 )
 from smythe.graph import ExecutionGraph, Node, NodeStatus
 from smythe.provider import Provider
+from smythe.task import Task, render_task
 from smythe.tracer import Tracer
 
 logger = logging.getLogger("smythe.synthesizer")
@@ -85,6 +86,7 @@ class Synthesizer:
             return asyncio.run(
                 self._llm_merge(
                     completed,
+                    task=graph.task,
                     provider=provider,
                     model=model,
                     budget=budget,
@@ -119,6 +121,7 @@ class Synthesizer:
         if self._strategy == SynthesisStrategy.LLM_MERGE:
             return await self._llm_merge(
                 completed,
+                task=graph.task,
                 provider=provider,
                 model=model,
                 budget=budget,
@@ -180,6 +183,7 @@ class Synthesizer:
         self,
         nodes: list[Node],
         *,
+        task: Task | None = None,
         provider: Provider | None = None,
         model: str | None = None,
         budget: Sentinel | None = None,
@@ -196,6 +200,12 @@ class Synthesizer:
             return self._concatenate(nodes)
 
         parts = []
+        if task is not None:
+            parts.append(
+                "## Original task\n\n" + render_task(task)
+                + "\n\nProduce the complete deliverable, satisfying the stated "
+                "constraints and acceptance criteria."
+            )
         for node in nodes:
             parts.append(f"## {node.label} (id: {node.id})\n\n{node.result}")
         prompt = "\n\n---\n\n".join(parts)

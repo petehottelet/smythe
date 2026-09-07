@@ -120,6 +120,10 @@ The current unreleased work hardens the guarantees users depend on before a
     regeneration intents, settle active descendants before resetting their
     generation, and resume unfinished control transitions before new calls.
     [Verification](docs/verifier.md).
+16. **Complete task propagation** — carry detached goal, constraints, source
+    context, and acceptance criteria through routing, planning, graph handoffs,
+    execution, supervision, synthesis, memory, and recovery.
+    [Tasks and handoffs](docs/tasks.md).
 
 ## Coming soon
 
@@ -133,7 +137,6 @@ the hardening work ahead of broader production claims:
 | Priority | Change | Acceptance criteria |
 |---|---|---|
 | P1 | Complete workflow accounting | Planning, routing, supervision, execution, and synthesis reserve and reconcile spend in one ledger; result completeness covers every provider call. Publish fresh cost comparisons with native usage, declared prices, and all optimization trials retained. |
-| P2 | Full task propagation | Preserve context, constraints, and acceptance criteria for single-node plans and inspected graph handoffs; supervisors, memory, and checkpoints receive the original task. |
 | P2 | Web renderer parity and presentation | With browser interaction checks passing, quantify reference-behavior tolerances and measure the adaptation on controlled display hardware against the 1080p P95 interval target of 16.7 ms. Archived Canvas v1 timings remain superseded diagnostics. |
 
 ### Product and scale

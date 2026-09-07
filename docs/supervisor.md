@@ -102,7 +102,9 @@ class AddVerifierWhenShort(Supervisor):
 
 Nodes a supervisor adds inherit the run's model and task context
 automatically — they never passed through `Swarm.plan`, so the executor
-stamps them.
+stamps them. Review receives the complete task, including source data and
+acceptance criteria, after an inspected-graph handoff or resume too.
+[Task snapshots](tasks.md).
 
 ## Observability
 

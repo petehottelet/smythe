@@ -8,6 +8,8 @@ from enum import Enum
 from typing import Any
 from uuid import uuid4
 
+from smythe.task import Task, task_to_dict
+
 
 def _escape_mermaid(text: str) -> str:
     """Escape characters that break Mermaid node labels."""
@@ -166,11 +168,13 @@ class ExecutionGraph:
         topology: The high-level pattern this graph follows.
         nodes: Ordered list of execution nodes.
         estimated_cost_usd: Pre-execution cost estimate set by the planner.
+        task: Detached Task snapshot carried through execution and recovery.
     """
 
     topology: list[Topology]
     nodes: list[Node] = field(default_factory=list)
     estimated_cost_usd: float | None = None
+    task: Task | None = None
 
     def roots(self) -> list[Node]:
         """Nodes with no dependencies — entry points for execution."""
@@ -305,6 +309,7 @@ class ExecutionGraph:
         return {
             "topology": [t.value for t in self.topology],
             "estimated_cost_usd": self.estimated_cost_usd,
+            "task": task_to_dict(self.task),
             "nodes": [
                 {
                     "id": n.id,

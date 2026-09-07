@@ -124,7 +124,7 @@ class AsyncExecutor(ExecutorBase):
 
     async def run(self, graph: ExecutionGraph) -> ExecutionGraph:
         """Execute every node, fanning out independent nodes concurrently."""
-        self.prepare_graph(graph)
+        self.prepare_execution(graph)
         self.recover_verification(graph)
         active: dict[asyncio.Task[None], Node] = {}
         pending, resolved, dependents, unresolved, ready, order = self._schedule_state(

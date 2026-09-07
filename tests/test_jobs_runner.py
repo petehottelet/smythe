@@ -6,7 +6,6 @@ import asyncio
 import io
 import os
 import threading
-import time
 
 import pytest
 import smythe.jobs.runner as runner_module
@@ -608,12 +607,17 @@ def test_slow_artifact_finalizer_does_not_starve_lease_heartbeat(
     import smythe.jobs.runner as runner_module
 
     entered = threading.Event()
+    release = threading.Event()
+    finished = threading.Event()
     original_write = runner_module.atomic_write_bytes
 
     def slow_write(path, data):
         entered.set()
-        time.sleep(0.25)
-        original_write(path, data)
+        try:
+            assert release.wait(timeout=15), "artifact writer was never released"
+            original_write(path, data)
+        finally:
+            finished.set()
 
     monkeypatch.setattr(runner_module, "atomic_write_bytes", slow_write)
 
@@ -634,17 +638,33 @@ def test_slow_artifact_finalizer_does_not_starve_lease_heartbeat(
                 run_id="slow-finalizer",
             )
         )
-        deadline = asyncio.get_running_loop().time() + 5
-        while not entered.is_set() and asyncio.get_running_loop().time() < deadline:
-            await asyncio.sleep(0.01)
-        assert entered.is_set()
-        before = store.get_run_lease("slow-finalizer")
-        assert before is not None
-        await asyncio.sleep(0.1)
-        after = store.get_run_lease("slow-finalizer")
-        assert after is not None
-        assert after.heartbeat_at_ns > before.heartbeat_at_ns
-        result = await asyncio.wait_for(task, timeout=5)
-        assert result["status"] == RunStatus.COMPLETED.value
+        try:
+            loop = asyncio.get_running_loop()
+            setup_deadline = loop.time() + 15
+            while not entered.is_set() and not task.done() and loop.time() < setup_deadline:
+                await asyncio.sleep(0.01)
+            assert entered.is_set(), "artifact writer did not start within the setup deadline"
+            assert not finished.is_set(), "artifact writer stopped before the heartbeat check"
+            before = store.get_run_lease("slow-finalizer")
+            assert before is not None
+            heartbeat_deadline = loop.time() + 2
+            after = before
+            while after.heartbeat_at_ns <= before.heartbeat_at_ns and loop.time() < heartbeat_deadline:
+                await asyncio.sleep(0.01)
+                after = store.get_run_lease("slow-finalizer")
+                assert after is not None
+            assert after.heartbeat_at_ns > before.heartbeat_at_ns
+            # The lease must advance while the writer remains blocked, not
+            # after a fixed delay happened to outlast the filesystem work.
+            assert not release.is_set() and not finished.is_set()
+            release.set()
+            result = await asyncio.wait_for(asyncio.shield(task), timeout=15)
+            assert result["status"] == RunStatus.COMPLETED.value
+        finally:
+            release.set()
+            try:
+                await asyncio.wait_for(asyncio.gather(task, return_exceptions=True), timeout=15)
+            finally:
+                store.close()
 
     asyncio.run(scenario())
