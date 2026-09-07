@@ -38,6 +38,39 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
 The [offline example](../examples/14_durable_text_workflow.py) exercises the same
 handoff and cached recovery with zero provider API charges.
 
+## Freeze graph limits
+
+Use `WorkflowGraphPolicy` to keep an experiment or production task within a
+declared graph size, execution model, retry limit, and regeneration limit:
+
+```python
+from smythe import WorkflowGraphPolicy
+
+policy = WorkflowGraphPolicy(
+    max_nodes=8,
+    node_model="gpt-6-astra",
+    max_retries=0,
+    max_regenerations=0,
+)
+# Pass graph_policy=policy alongside run_store=store when constructing Swarm.
+```
+
+The policy is part of the saved workflow recipe. It applies to generated
+plans, caller-built and YAML graphs, edited handoffs, recovered checkpoints,
+and replayed planning decisions. A revision is checked on a detached candidate
+before it can change the live graph. Oversized or otherwise disallowed plans
+fail before node execution; any planning charges remain in the ledger.
+
+`max_nodes` counts every node in the current graph, including verification,
+completed, and skipped nodes. Optional limits set to `None` add no restriction.
+`node_model` checks effective node models; configure the planner model separately
+when an experiment requires the same model in both phases. Resume requires the
+original policy and rejects an attempt to remove or weaken it. `graph_policy`
+requires a durable `run_store`; omitting it preserves existing recipe identities.
+`Node.max_retries` defaults to one. A zero-retry policy therefore requires the
+architect to declare `max_retries: 0` on every node, including `HALT` nodes.
+Include the graph limits in the planning instructions for a bounded experiment.
+
 ## Admission and cost
 
 Each native request is frozen before the input-token count. The resulting quote

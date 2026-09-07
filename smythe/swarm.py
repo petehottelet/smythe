@@ -42,6 +42,8 @@ from smythe.synthesizer import Synthesizer
 from smythe.task import Task, snapshot_task, task_snapshots_equal, task_to_dict
 from smythe.tracer import Tracer
 from smythe.verifier import Verifier, validate_verification_checkpoint, verification_pending
+from smythe.workflow_binding import WorkflowBindingError
+from smythe.workflow_policy import WorkflowGraphPolicy, snapshot_graph_policy
 from smythe.workflow_store import SQLiteWorkflowStore
 
 
@@ -124,8 +126,12 @@ class Swarm:
         max_revisions: int = 0,
         verifier: Verifier | None = None,
         run_store: SQLiteWorkflowStore | None = None,
+        graph_policy: WorkflowGraphPolicy | None = None,
     ) -> None:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
+        if graph_policy is not None and run_store is None:
+            raise WorkflowBindingError("graph_policy requires a durable run_store")
+        self._graph_policy = snapshot_graph_policy(graph_policy)
         self.model = model
         self.max_budget_usd = max_budget_usd
         self.parallel = parallel
@@ -672,6 +678,7 @@ class Swarm:
         provider: Provider | None = None,
         parallel: bool = False,
         run_store: SQLiteWorkflowStore | None = None,
+        graph_policy: WorkflowGraphPolicy | None = None,
     ) -> Swarm:
         """Create a Swarm pre-loaded with a YAML-defined execution graph.
 
@@ -690,7 +697,10 @@ class Swarm:
             architect=SimpleArchitect(),
             parallel=parallel,
             run_store=run_store,
+            graph_policy=graph_policy,
         )
+        if instance._graph_policy is not None:
+            instance._graph_policy.validate(graph, default_model=instance.model)
         instance._yaml_graph = graph
         instance._stamp_model(graph)
         return instance
@@ -744,4 +754,5 @@ class Swarm:
             checkpoint_every_n_nodes=self.checkpoint_every_n_nodes,
             retry_backoff_s=self.retry_backoff_s,
             max_concurrency=self.max_concurrency,
+            graph_policy=self._graph_policy,
         )

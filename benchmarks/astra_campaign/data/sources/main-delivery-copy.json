@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "id": "main-delivery-copy",
+  "provenance": "Original synthetic benchmark material; no real-world claims.",
+  "documents": [
+    {
+      "id": "draft",
+      "title": "Copy under review",
+      "content": "Dispatch packs contain 12 labels for 54 credits: only 4 credits per label. Recieve 15% off our single-label price of 5 credits. Delivery is always next-day to every district, including excluded island routes."
+    },
+    {
+      "id": "policy",
+      "title": "Authoritative product policy",
+      "content": "{\"delivery\": \"two business days on mainland routes; island routes unavailable\", \"labels_per_pack\": 12, \"pack_credits\": 54, \"single_label_credits\": 5}"
+    }
+  ]
+}

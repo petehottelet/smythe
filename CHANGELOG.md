@@ -23,6 +23,16 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Added
 
+- **Astra experiment preparation**: 13 original task/source packs, separate
+  factual checks and anchored rubrics, and seeded four-arm schedules for
+  12 pilot and 200 main workflows. Portable hashes bind every input and
+  preparation source. The package makes no provider calls and grants no
+  spending authorization or quality verdict.
+- **Saved graph policies**: optional `WorkflowGraphPolicy` caps graph size,
+  effective node models, retries, and regeneration in durable text workflows.
+  Fresh plans, edited handoffs, saved planning decisions, restored checkpoints,
+  and detached revision candidates all enforce the same recipe-bound limits.
+  Disallowed plans retain their planning charges and dispatch no execution nodes.
 - **Offline Jobs scale harness**: an owned subprocess, deterministic crash
   barrier, real lease expiry, pending-only resume, and explicit unknown rerolls.
   Identity, attempt lineage, call states, accounting, and every accepted PNG

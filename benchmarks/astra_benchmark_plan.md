@@ -1,7 +1,44 @@
 # Astra benchmark plan
 
-**Status: proposed; no paid Astra campaign has run.** This protocol defines a
+**Status: offline preparation verified; no paid Astra campaign has run.** This protocol defines a
 new comparison. It does not update, reprice, or replace historical results.
+
+## Prepared experiment
+
+The [offline preparation package](astra_campaign/) contains 13 original
+synthetic tasks with self-contained source packs: three pilot tasks and ten
+held-out tasks, two for each task shape. Rubrics and factual answer checks are
+stored separately from provider inputs. Deterministic checks cover format and
+facts; quality and overall acceptance remain unevaluated.
+
+The seeded schedule contains **12 pilot workflows and 200 main workflows**.
+Each task/repetition block contains all four model/strategy arms. A four-arm
+Williams design balances arm position and directed predecessor counts to
+within one across the main schedule. The ten held-out tasks remain the
+independent sampling units.
+
+```python
+from benchmarks.astra_campaign import prepare_campaign
+
+preparation = prepare_campaign(seed=14173)
+print(preparation["schedule_sha256"])
+print(preparation["blockers"])
+```
+
+This reads local files and makes no provider calls. The
+[preparation receipt](results/astra_preparation_20260907.json) binds source,
+task, rubric, protocol, and schedule hashes with portable LF normalization.
+It is a preparation record, not a paid-runtime freeze or benchmark result.
+The [task and source inventory](astra_campaign/data/pack-manifest.json) preserves
+every evaluator artifact for later review.
+
+[`WorkflowGraphPolicy`](../docs/workflow-accounting.md#freeze-graph-limits) now
+provides persisted node-count, execution-model, retry, and regeneration limits.
+The live campaign must bind that policy and complete phase-wide accounting in
+its runner, reserve a total allowance covering pilot, main, and judge work,
+and freeze judge identity and calibrated acceptance gates. A zero-retry recipe
+must instruct its architect to emit `max_retries: 0` on every node; the default
+node value is one. No paid execution starts without the total spending ceiling.
 
 ## API and accounting prerequisites
 

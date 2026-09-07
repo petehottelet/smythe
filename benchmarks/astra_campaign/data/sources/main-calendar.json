@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "id": "main-calendar",
+  "provenance": "Original synthetic benchmark material; no real-world claims.",
+  "documents": [
+    {
+      "id": "calendar",
+      "title": "Date input record",
+      "content": "{\"dates\": [\"29 Feb 2036\", \"03/12/2035\", \"April 7, 2033\", \"2037-10-21\", \"1 January 2034\", \"08/09/2032\"], \"slash_format\": \"DD/MM/YYYY\"}"
+    }
+  ]
+}

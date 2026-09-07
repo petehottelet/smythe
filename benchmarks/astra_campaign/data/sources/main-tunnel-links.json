@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "id": "main-tunnel-links",
+  "provenance": "Original synthetic benchmark material; no real-world claims.",
+  "documents": [
+    {
+      "id": "requirements",
+      "title": "Deployment requirements",
+      "content": "{\"maximum_energy_mj_per_message\": 30, \"minimum_range_m\": 800, \"ranking_rule\": \"Rank feasible candidates by energy ascending, then range descending. Exclude infeasible candidates from ranking.\"}"
+    },
+    {
+      "id": "amber",
+      "title": "Amber specification",
+      "content": "{\"energy_mj\": 16, \"range_m\": 900, \"weakness\": \"Manual pairing\"}"
+    },
+    {
+      "id": "cobalt",
+      "title": "Cobalt specification",
+      "content": "{\"energy_mj\": 24, \"range_m\": 1800, \"weakness\": \"Bulky mounting\"}"
+    },
+    {
+      "id": "ivory",
+      "title": "Ivory specification",
+      "content": "{\"energy_mj\": 11, \"range_m\": 500, \"weakness\": \"Short range\"}"
+    },
+    {
+      "id": "umber",
+      "title": "Umber specification",
+      "content": "{\"energy_mj\": 44, \"range_m\": 2400, \"weakness\": \"High energy draw\"}"
+    }
+  ]
+}

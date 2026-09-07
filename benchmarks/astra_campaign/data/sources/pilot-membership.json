@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "id": "pilot-membership",
+  "provenance": "Original synthetic benchmark material; no real-world claims.",
+  "documents": [
+    {
+      "id": "draft",
+      "title": "Copy under review",
+      "content": "Join for 30 credits monthly or 300 credits annually. Save 25%. Unlimited guest passes; members recieve three guest passes each month. Phone support 24/7."
+    },
+    {
+      "id": "policy",
+      "title": "Authoritative product policy",
+      "content": "{\"annual_credits\": 300, \"guest_passes_per_month\": 3, \"monthly_credits\": 30, \"phone_support\": \"weekdays 09:00-17:00\"}"
+    }
+  ]
+}

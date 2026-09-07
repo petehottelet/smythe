@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "id": "main-production-chain",
+  "provenance": "Original synthetic benchmark material; no real-world claims.",
+  "documents": [
+    {
+      "id": "production",
+      "title": "Production and order rules",
+      "content": "{\"coating_yield\": \"95% of units passing test\", \"decision_rule\": \"Use expedite if backlog exceeds 24 units; otherwise use normal.\", \"initial_units\": 1200, \"order_units\": 1020, \"partial_cartons_allowed\": false, \"reserve_units_after_coating\": 30, \"test_yield\": \"90%\", \"units_per_carton\": 24}"
+    }
+  ]
+}

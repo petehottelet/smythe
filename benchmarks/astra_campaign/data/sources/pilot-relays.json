@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "id": "pilot-relays",
+  "provenance": "Original synthetic benchmark material; no real-world claims.",
+  "documents": [
+    {
+      "id": "requirements",
+      "title": "Deployment requirements",
+      "content": "{\"maximum_energy_mj_per_message\": 30, \"minimum_range_m\": 1000, \"ranking_rule\": \"Rank feasible candidates by energy ascending, then range descending. Exclude infeasible candidates from ranking.\"}"
+    },
+    {
+      "id": "moss",
+      "title": "Moss specification",
+      "content": "{\"energy_mj\": 8, \"range_m\": 600, \"weakness\": \"No local storage\"}"
+    },
+    {
+      "id": "fern",
+      "title": "Fern specification",
+      "content": "{\"energy_mj\": 18, \"range_m\": 1800, \"weakness\": \"Fixed antenna\"}"
+    },
+    {
+      "id": "pine",
+      "title": "Pine specification",
+      "content": "{\"energy_mj\": 28, \"range_m\": 2200, \"weakness\": \"Heavy enclosure\"}"
+    },
+    {
+      "id": "ash",
+      "title": "Ash specification",
+      "content": "{\"energy_mj\": 35, \"range_m\": 3000, \"weakness\": \"High idle draw\"}"
+    }
+  ]
+}

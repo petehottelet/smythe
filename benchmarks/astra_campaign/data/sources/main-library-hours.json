@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "id": "main-library-hours",
+  "provenance": "Original synthetic benchmark material; no real-world claims.",
+  "documents": [
+    {
+      "id": "survey",
+      "title": "Survey",
+      "content": "Among 200 respondents to an optional online survey, 72% supported later hours. Total registered members: 18,000. No nonresponse adjustment was made."
+    },
+    {
+      "id": "pilot",
+      "title": "Single-branch pilot",
+      "content": "A downtown branch opened until 10pm for four weeks. Evening visits rose 28%; 60% of those visits occurred before 8pm. No control branch was measured."
+    },
+    {
+      "id": "cost",
+      "title": "Operating constraints",
+      "content": "Midnight staffing at all six branches would cost 180,000 credits per quarter. The approved additional staffing budget is 70,000 credits. Security coverage is contracted only until 10pm."
+    },
+    {
+      "id": "options",
+      "title": "Available decisions",
+      "content": "The board may extend the downtown 10pm pilot within 50,000 credits, commission a representative survey, or approve the full midnight rollout only after funding and security are secured."
+    },
+    {
+      "id": "claims",
+      "title": "Claims to evaluate",
+      "content": "{\"budget-gap\": \"The stated rollout staffing cost exceeds the approved additional budget.\", \"downtown-observation\": \"The downtown pilot recorded an increase in evening visits.\", \"funded-rollout\": \"The full rollout fits the approved extra staffing budget.\", \"universal-demand\": \"The survey proves that all registered members want midnight opening.\"}"
+    }
+  ]
+}

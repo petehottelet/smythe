@@ -167,6 +167,8 @@ selective rerolls, read-only run inspection, and portable exports. Inspect
 prompts, responses, costs, and artifact receipts in a local HTML report.
 Iterative graph traversal passes [5,000-node dependency-chain checks](docs/execution.md#deep-graphs),
 including complete offline serial execution and atomic revision validation.
+[Saved graph policies](docs/workflow-accounting.md#freeze-graph-limits) bound node
+count, execution models, retries, and regeneration across planning and recovery.
 
 [Architecture](docs/architecture.md) · [Task handoffs](docs/tasks.md) · [Jobs and CLI](docs/jobs.md) ·
 [Failure policies](docs/execution.md) · [Cost guardrails](docs/budgets.md) ·
@@ -244,7 +246,8 @@ team challenges the draft, and a final node writes the decision memo.
 - **Broader evidence:** larger stress tests, repeated live glyph sweeps, and
   human-calibrated quality comparisons with saved outputs and judge reasoning.
 - **Astra benchmarks:** matched model and orchestration comparisons with full
-  usage accounting, repeated runs, and blind quality scoring. See the
+  usage accounting and blind quality scoring. The 13-task pack and schedules
+  for 12 pilot and 200 main workflows are prepared. See the
   [campaign plan](benchmarks/astra_benchmark_plan.md).
 
 [Specifications and priorities](ROADMAP.md#coming-soon) ·

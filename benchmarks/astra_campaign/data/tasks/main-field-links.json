@@ -1,0 +1,275 @@
+{
+  "version": 1,
+  "id": "main-field-links",
+  "stage": "main",
+  "shape": "wide-parallel",
+  "task": {
+    "goal": "Profile each candidate independently, test both deployment requirements, and rank feasible candidates.",
+    "constraints": [
+      "Use only the supplied fictional source pack; do not search or add outside facts.",
+      "Return one bare JSON value with no Markdown fences.",
+      "Return an object with profiles, ranking and reasoning. profiles must map each candidate ID to energy_mj, range_m, feasible (boolean) and weakness (text).",
+      "ranking must be an array of feasible candidate IDs in the required order. reasoning must explain exclusions and cite numeric comparisons."
+    ],
+    "done_when": []
+  },
+  "source_file": "sources/main-field-links.json",
+  "rubric": [
+    {
+      "id": "criterion-1",
+      "criterion": "Keep all candidate measurements and weaknesses separate.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-2",
+      "criterion": "Apply both feasibility limits to every candidate.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-3",
+      "criterion": "Rank only feasible candidates using the stated rule.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-4",
+      "criterion": "Explain the result using supplied figures and acknowledge each excluded candidate.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "id": "check-1",
+      "kind": "keys",
+      "path": [],
+      "expected": [
+        "profiles",
+        "ranking",
+        "reasoning"
+      ]
+    },
+    {
+      "id": "check-2",
+      "kind": "keys",
+      "path": [
+        "profiles"
+      ],
+      "expected": [
+        "reed",
+        "spire",
+        "vale",
+        "crest"
+      ]
+    },
+    {
+      "id": "check-3",
+      "kind": "number",
+      "path": [
+        "profiles",
+        "reed",
+        "energy_mj"
+      ],
+      "expected": 12,
+      "tolerance": 0
+    },
+    {
+      "id": "check-4",
+      "kind": "number",
+      "path": [
+        "profiles",
+        "reed",
+        "range_m"
+      ],
+      "expected": 2200,
+      "tolerance": 0
+    },
+    {
+      "id": "check-5",
+      "kind": "equals",
+      "path": [
+        "profiles",
+        "reed",
+        "feasible"
+      ],
+      "expected": true
+    },
+    {
+      "id": "check-6",
+      "kind": "nonempty",
+      "path": [
+        "profiles",
+        "reed",
+        "weakness"
+      ],
+      "min_chars": 1
+    },
+    {
+      "id": "check-7",
+      "kind": "number",
+      "path": [
+        "profiles",
+        "spire",
+        "energy_mj"
+      ],
+      "expected": 9,
+      "tolerance": 0
+    },
+    {
+      "id": "check-8",
+      "kind": "number",
+      "path": [
+        "profiles",
+        "spire",
+        "range_m"
+      ],
+      "expected": 800,
+      "tolerance": 0
+    },
+    {
+      "id": "check-9",
+      "kind": "equals",
+      "path": [
+        "profiles",
+        "spire",
+        "feasible"
+      ],
+      "expected": false
+    },
+    {
+      "id": "check-10",
+      "kind": "nonempty",
+      "path": [
+        "profiles",
+        "spire",
+        "weakness"
+      ],
+      "min_chars": 1
+    },
+    {
+      "id": "check-11",
+      "kind": "number",
+      "path": [
+        "profiles",
+        "vale",
+        "energy_mj"
+      ],
+      "expected": 35,
+      "tolerance": 0
+    },
+    {
+      "id": "check-12",
+      "kind": "number",
+      "path": [
+        "profiles",
+        "vale",
+        "range_m"
+      ],
+      "expected": 5000,
+      "tolerance": 0
+    },
+    {
+      "id": "check-13",
+      "kind": "equals",
+      "path": [
+        "profiles",
+        "vale",
+        "feasible"
+      ],
+      "expected": true
+    },
+    {
+      "id": "check-14",
+      "kind": "nonempty",
+      "path": [
+        "profiles",
+        "vale",
+        "weakness"
+      ],
+      "min_chars": 1
+    },
+    {
+      "id": "check-15",
+      "kind": "number",
+      "path": [
+        "profiles",
+        "crest",
+        "energy_mj"
+      ],
+      "expected": 60,
+      "tolerance": 0
+    },
+    {
+      "id": "check-16",
+      "kind": "number",
+      "path": [
+        "profiles",
+        "crest",
+        "range_m"
+      ],
+      "expected": 3000,
+      "tolerance": 0
+    },
+    {
+      "id": "check-17",
+      "kind": "equals",
+      "path": [
+        "profiles",
+        "crest",
+        "feasible"
+      ],
+      "expected": false
+    },
+    {
+      "id": "check-18",
+      "kind": "nonempty",
+      "path": [
+        "profiles",
+        "crest",
+        "weakness"
+      ],
+      "min_chars": 1
+    },
+    {
+      "id": "check-19",
+      "kind": "equals",
+      "path": [
+        "ranking"
+      ],
+      "expected": [
+        "reed",
+        "vale"
+      ]
+    },
+    {
+      "id": "check-20",
+      "kind": "nonempty",
+      "path": [
+        "reasoning"
+      ],
+      "min_chars": 1
+    }
+  ]
+}

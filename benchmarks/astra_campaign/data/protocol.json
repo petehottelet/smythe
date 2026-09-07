@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "status": "offline-preparation-only",
+  "pack_manifest_sha256": "ac6a84f818cebcd28a7c57656bd4eb220da0784e97695070f1371023219b23db",
+  "models": [
+    "gpt-6-astra",
+    "gpt-5.6-sol"
+  ],
+  "strategies": [
+    "fixed_pipeline",
+    "smythe_dynamic"
+  ],
+  "pilot": {
+    "tasks": 3,
+    "repetitions": 1,
+    "workflow_runs": 12,
+    "included_in_main": false
+  },
+  "main": {
+    "tasks": 10,
+    "repetitions": 5,
+    "workflow_runs": 200,
+    "tasks_per_shape": 2
+  },
+  "request_policy": {
+    "endpoint": "responses",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "endpoint_scope": "global",
+    "max_output_tokens": 8192,
+    "sdk_retries": 0,
+    "tools": false,
+    "external_search": false,
+    "sampling_parameters": [],
+    "cache_policy": "Provider-managed; record actual usage; no cold-cache claim."
+  },
+  "execution_policy": {
+    "max_nodes": 8,
+    "max_concurrency": 8,
+    "workflow_concurrency": 1,
+    "same_model_for_planning_and_execution": true,
+    "graph_policy_persisted": false,
+    "node_retry_policy": null,
+    "regeneration_policy": null,
+    "planning_repairs": null,
+    "synthesis_policy": null
+  },
+  "evaluation_policy": {
+    "judge_model": null,
+    "judge_accounting": null,
+    "quality_noninferiority_margin": null,
+    "minimum_success_rate": null,
+    "pilot_completed": false,
+    "human_calibration_completed": false,
+    "rubric_scale": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "sampling_unit": "task",
+    "preserve_failures": true,
+    "cost_per_ordinal_score": false,
+    "judge_sees_arm_labels": false,
+    "judge_sees_reference_material": true
+  },
+  "price_snapshot": {
+    "version": "openai-native-standard-global-2026-09-07-v1",
+    "checked_on": "2026-09-07",
+    "unit": "nanousd_per_token",
+    "long_context_threshold": 272000,
+    "long_context_input_multiplier": 2,
+    "long_context_output_multiplier": "1.5",
+    "rates": {
+      "gpt-6-astra": {
+        "ordinary": 10000,
+        "cached": 1000,
+        "cache_write": 12500,
+        "output": 50000
+      },
+      "gpt-5.6-sol": {
+        "ordinary": 4000,
+        "cached": 400,
+        "cache_write": 5000,
+        "output": 20000
+      }
+    },
+    "source": "https://developers.openai.com/api/docs/pricing",
+    "scope": "Dated repository price snapshot; revalidate before authorizing paid execution."
+  },
+  "total_api_budget_nanousd": null
+}

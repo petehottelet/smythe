@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "id": "main-warehouse-routing",
+  "stage": "main",
+  "shape": "adversarial",
+  "task": {
+    "goal": "Make the strongest evidence-bounded case for this proposal, attack that case, then state the narrower actions the evidence supports: Replace every warehouse routing rule with the new automated router this month.",
+    "constraints": [
+      "Use only the supplied fictional source pack; do not search or add outside facts.",
+      "Return one bare JSON value with no Markdown fences.",
+      "Return case and critique as text; survivors as an object keyed by staffed-trial, broader-testing; unsupported_claims as the supplied claim IDs that the evidence does not establish; source_ids as an array of cited document IDs.",
+      "The critique must engage the strongest case, identify selection/coverage limits and operational constraints, and distinguish evidence from a proposed next step.",
+      "Evaluate every claim in the claims document. Return only unsupported claim IDs, in lexicographic order, in unsupported_claims; cite every source document used."
+    ],
+    "done_when": []
+  },
+  "source_file": "sources/main-warehouse-routing.json",
+  "rubric": [
+    {
+      "id": "criterion-1",
+      "criterion": "Present the strongest case using the actual favorable evidence.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-2",
+      "criterion": "Challenge inference limits and costs without inventing adverse evidence.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-3",
+      "criterion": "State supported bounded actions with their operational conditions.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-4",
+      "criterion": "Connect all conclusions to the supplied documents and identify the overclaims.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "id": "check-1",
+      "kind": "keys",
+      "path": [],
+      "expected": [
+        "case",
+        "critique",
+        "survivors",
+        "unsupported_claims",
+        "source_ids"
+      ]
+    },
+    {
+      "id": "check-2",
+      "kind": "nonempty",
+      "path": [
+        "case"
+      ],
+      "min_chars": 1
+    },
+    {
+      "id": "check-3",
+      "kind": "nonempty",
+      "path": [
+        "critique"
+      ],
+      "min_chars": 1
+    },
+    {
+      "id": "check-4",
+      "kind": "keys",
+      "path": [
+        "survivors"
+      ],
+      "expected": [
+        "staffed-trial",
+        "broader-testing"
+      ]
+    },
+    {
+      "id": "check-5",
+      "kind": "nonempty",
+      "path": [
+        "survivors",
+        "staffed-trial"
+      ],
+      "min_chars": 1
+    },
+    {
+      "id": "check-6",
+      "kind": "nonempty",
+      "path": [
+        "survivors",
+        "broader-testing"
+      ],
+      "min_chars": 1
+    },
+    {
+      "id": "check-7",
+      "kind": "equals",
+      "path": [
+        "unsupported_claims"
+      ],
+      "expected": [
+        "ready-this-month",
+        "universal-speedup"
+      ]
+    },
+    {
+      "id": "check-8",
+      "kind": "citations",
+      "path": [
+        "source_ids"
+      ],
+      "allowed": [
+        "trial",
+        "incidents",
+        "capacity",
+        "options",
+        "claims"
+      ],
+      "minimum": 4
+    }
+  ]
+}

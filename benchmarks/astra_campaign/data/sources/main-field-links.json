@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "id": "main-field-links",
+  "provenance": "Original synthetic benchmark material; no real-world claims.",
+  "documents": [
+    {
+      "id": "requirements",
+      "title": "Deployment requirements",
+      "content": "{\"maximum_energy_mj_per_message\": 40, \"minimum_range_m\": 1500, \"ranking_rule\": \"Rank feasible candidates by energy ascending, then range descending. Exclude infeasible candidates from ranking.\"}"
+    },
+    {
+      "id": "reed",
+      "title": "Reed specification",
+      "content": "{\"energy_mj\": 12, \"range_m\": 2200, \"weakness\": \"Requires mast\"}"
+    },
+    {
+      "id": "spire",
+      "title": "Spire specification",
+      "content": "{\"energy_mj\": 9, \"range_m\": 800, \"weakness\": \"Short range\"}"
+    },
+    {
+      "id": "vale",
+      "title": "Vale specification",
+      "content": "{\"energy_mj\": 35, \"range_m\": 5000, \"weakness\": \"Large battery\"}"
+    },
+    {
+      "id": "crest",
+      "title": "Crest specification",
+      "content": "{\"energy_mj\": 60, \"range_m\": 3000, \"weakness\": \"High energy draw\"}"
+    }
+  ]
+}
