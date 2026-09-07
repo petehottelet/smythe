@@ -85,6 +85,8 @@ jobs:
           --results "$RUNNER_TEMP/svg-glyph.json"
       - name: Verify the persistent 3D world and camera
         run: node screensaver/svg-preview/verify-model.mjs
+      - name: Verify all native catalog exports match the canonical SVGs
+        run: python screensaver/export_native_glyphs.py --check
       - name: Verify reference presets and settings
         run: |
           node screensaver/svg-preview/verify-settings.mjs

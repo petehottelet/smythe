@@ -1,0 +1,1798 @@
+{
+  "version": "native-mixed-svg-v1",
+  "catalog_sha256": "168fa9e14488e37d98af007abbd33792587ba52d9a97eeeffbf9839f60bed9a3",
+  "count": 249,
+  "reference_count": 57,
+  "reference_visible_count": 56,
+  "original_count": 192,
+  "original_offset": 57,
+  "blank_index": 4,
+  "original_share": 0.1,
+  "canvas": [
+    100,
+    100
+  ],
+  "fill_rule": "nonzero",
+  "command_codes": {
+    "M": 0,
+    "L": 1,
+    "C": 2,
+    "Z": 3
+  },
+  "coordinate_method": "Source-order absolute M/L/C/Z in double precision; no flattening, redrawing, fitting, mirroring, or winding changes. Fill once per glyph.",
+  "catalog_hash_basis": "SHA256 of UTF-8 JSON payload excluding catalog_sha256, sorted keys, compact separators, ensure_ascii=false, no trailing newline.",
+  "source_hash_basis": "Text sources use UTF-8 after CRLF-to-LF normalization. Per-glyph svg_sha256 and output_sha256 bind exact bytes.",
+  "motion": "Legacy web speeds/trails repeated by native index modulo 192; weighted 90% reference branch and 10% original branch belongs to native renderers.",
+  "source_sha256": {
+    "screensaver/export_native_glyphs.py": "deda0973e1e9a77f46441720eea15fd48cf90ac10423c590682eb8a48554eef2",
+    "screensaver/glyphs.js": "ed06b8702d87a80ae296c6eaeafb1aa3a014e82a6b3eada62784bc7e1c14cac1",
+    "LICENSE": "31ddadfea6fbccca7b9f7c2584e8bb2e1fa447576a8d004d1af6801576f5fc03",
+    "screensaver/svg-preview/reference/catalog.json": "6befd44f62a114b8627728b13c8300026e0d1f3c51c4b2b033f3ff1ea985e090",
+    "screensaver/svg-preview/reference/provenance.json": "b2d911aef1c5b6440a32ae4bee42c9f0566332db86dcdb1b698262c5d3f483b6",
+    "screensaver/svg-preview/reference/LICENSE": "65333257cebb87e8af86201a65f0e550d65b3cf5a468bfee2a69c9d2b5d21123",
+    "benchmarks/partitions/glyph_svg_v1/catalog/manifest.json": "9667056dfcbfd34558b0db4b2e3f044aa6d91d6bb7df52e92bf4d6719dea511a"
+  },
+  "source_glyphs": [
+    {
+      "index": 0,
+      "glyph_id": "BASE-000",
+      "file": "screensaver/svg-preview/reference/BASE-000.svg",
+      "svg_sha256": "804a2128e314c31b44f0c9b6213f72d776350216fa6d5f3d16f30d35af0c5bb0",
+      "command_count": 29
+    },
+    {
+      "index": 1,
+      "glyph_id": "BASE-001",
+      "file": "screensaver/svg-preview/reference/BASE-001.svg",
+      "svg_sha256": "4c06019fab333a86d004db87a0719ef5143721dc0bd2dda32934aff0711a5e40",
+      "command_count": 15
+    },
+    {
+      "index": 2,
+      "glyph_id": "BASE-002",
+      "file": "screensaver/svg-preview/reference/BASE-002.svg",
+      "svg_sha256": "9aa6a573598e453805f57afe2e0578baabfe8793d4c37153650b3dcec80b91bb",
+      "command_count": 27
+    },
+    {
+      "index": 3,
+      "glyph_id": "BASE-003",
+      "file": "screensaver/svg-preview/reference/BASE-003.svg",
+      "svg_sha256": "677cecb766ad306959534c749d22350916d08ba88b010ccf2cf0d0bdd46df0e9",
+      "command_count": 22
+    },
+    {
+      "index": 4,
+      "glyph_id": "BASE-BLANK",
+      "file": null,
+      "svg_sha256": null,
+      "command_count": 0
+    },
+    {
+      "index": 5,
+      "glyph_id": "BASE-004",
+      "file": "screensaver/svg-preview/reference/BASE-004.svg",
+      "svg_sha256": "ab1d7adf2eda0e891c940bfb32fb52c4661bce4c17e349ff61f1f8a0335f1f58",
+      "command_count": 26
+    },
+    {
+      "index": 6,
+      "glyph_id": "BASE-005",
+      "file": "screensaver/svg-preview/reference/BASE-005.svg",
+      "svg_sha256": "884fd6bd53ea7225077e8b6b096f2d8d99c1c15c0f4055f02e6928b0621e0ee2",
+      "command_count": 12
+    },
+    {
+      "index": 7,
+      "glyph_id": "BASE-006",
+      "file": "screensaver/svg-preview/reference/BASE-006.svg",
+      "svg_sha256": "a9041aff2983a26fb16fa3ae18cb7a41cc2498a7992aa3cae7676b5ba2806b3e",
+      "command_count": 13
+    },
+    {
+      "index": 8,
+      "glyph_id": "BASE-007",
+      "file": "screensaver/svg-preview/reference/BASE-007.svg",
+      "svg_sha256": "ee67ede26f1ab0246d5399fec914a02e4e7658aa87b7ac0267fc2732ec3ec83d",
+      "command_count": 12
+    },
+    {
+      "index": 9,
+      "glyph_id": "BASE-008",
+      "file": "screensaver/svg-preview/reference/BASE-008.svg",
+      "svg_sha256": "2c47f5026674bfa209852b62dc162f77bb53c79e5e4ea1211f9321e7ba45cb86",
+      "command_count": 12
+    },
+    {
+      "index": 10,
+      "glyph_id": "BASE-009",
+      "file": "screensaver/svg-preview/reference/BASE-009.svg",
+      "svg_sha256": "de5f7e0abcf08279dd79a3c504a83c3907cbb64a6d7b5325a8f5134beb1c22ce",
+      "command_count": 18
+    },
+    {
+      "index": 11,
+      "glyph_id": "BASE-010",
+      "file": "screensaver/svg-preview/reference/BASE-010.svg",
+      "svg_sha256": "1b039414b7d298f57676171ab0ca776a5a26088785f94017aebf7b858e7b09bb",
+      "command_count": 18
+    },
+    {
+      "index": 12,
+      "glyph_id": "BASE-011",
+      "file": "screensaver/svg-preview/reference/BASE-011.svg",
+      "svg_sha256": "819069b197a752974e67a347edbc04e4859afe92df213fa2413712244c102d40",
+      "command_count": 12
+    },
+    {
+      "index": 13,
+      "glyph_id": "BASE-012",
+      "file": "screensaver/svg-preview/reference/BASE-012.svg",
+      "svg_sha256": "6a14ba6805df0b591fdd641d6aa7cc897cc4398f1aacecf3527a6984932cc56b",
+      "command_count": 12
+    },
+    {
+      "index": 14,
+      "glyph_id": "BASE-013",
+      "file": "screensaver/svg-preview/reference/BASE-013.svg",
+      "svg_sha256": "807946bb2a0b53c9730055d85e6bf9af14698444303623a8f543c7b02d402c5b",
+      "command_count": 22
+    },
+    {
+      "index": 15,
+      "glyph_id": "BASE-014",
+      "file": "screensaver/svg-preview/reference/BASE-014.svg",
+      "svg_sha256": "e3f662eb61dab6a6f8aea9509b59473172cee87357ae5a43e668bc6a9318bea7",
+      "command_count": 17
+    },
+    {
+      "index": 16,
+      "glyph_id": "BASE-015",
+      "file": "screensaver/svg-preview/reference/BASE-015.svg",
+      "svg_sha256": "6d56b91619fbf2ea5be7ed2ee4e1ea13f41618e7c3a540bb22419fcedd98b696",
+      "command_count": 13
+    },
+    {
+      "index": 17,
+      "glyph_id": "BASE-016",
+      "file": "screensaver/svg-preview/reference/BASE-016.svg",
+      "svg_sha256": "2480c5698d6c66fe901be0d65a1ab2185c63c0ae5fa5fe5840606a1c1cafc85a",
+      "command_count": 13
+    },
+    {
+      "index": 18,
+      "glyph_id": "BASE-017",
+      "file": "screensaver/svg-preview/reference/BASE-017.svg",
+      "svg_sha256": "f566d872b8984b6e25d31d803cd2aa6858f06fd426e396a448256e762ce78ecf",
+      "command_count": 13
+    },
+    {
+      "index": 19,
+      "glyph_id": "BASE-018",
+      "file": "screensaver/svg-preview/reference/BASE-018.svg",
+      "svg_sha256": "3b7b9d5dbe4f11c284f28ebff44ef41e7608baa9796f45dcb2a34c2956731043",
+      "command_count": 6
+    },
+    {
+      "index": 20,
+      "glyph_id": "BASE-019",
+      "file": "screensaver/svg-preview/reference/BASE-019.svg",
+      "svg_sha256": "ebdeb80bc8d67910e78460930e200e4b545ff4cd0356729d34406776e76c2e4f",
+      "command_count": 6
+    },
+    {
+      "index": 21,
+      "glyph_id": "BASE-020",
+      "file": "screensaver/svg-preview/reference/BASE-020.svg",
+      "svg_sha256": "d7ec7da6c9e467178b319e075a332678b0eff92365b5df8c66667b202474fced",
+      "command_count": 8
+    },
+    {
+      "index": 22,
+      "glyph_id": "BASE-021",
+      "file": "screensaver/svg-preview/reference/BASE-021.svg",
+      "svg_sha256": "7811b4cd3acd77bbd209e624b05c799d9a7d8dee858ec1f80ff310a29ad25839",
+      "command_count": 8
+    },
+    {
+      "index": 23,
+      "glyph_id": "BASE-022",
+      "file": "screensaver/svg-preview/reference/BASE-022.svg",
+      "svg_sha256": "c4f9400177927ab8396eb3b7a3f4b7ed57187662166385f5c024db57f5cf00b8",
+      "command_count": 26
+    },
+    {
+      "index": 24,
+      "glyph_id": "BASE-023",
+      "file": "screensaver/svg-preview/reference/BASE-023.svg",
+      "svg_sha256": "a0a82056bddc87f41be4b163d4b6f74d4f8b8e643dbbdae2b1eae48774a82a6b",
+      "command_count": 6
+    },
+    {
+      "index": 25,
+      "glyph_id": "BASE-024",
+      "file": "screensaver/svg-preview/reference/BASE-024.svg",
+      "svg_sha256": "623d407e6f6e05e11b5c7d7f6d6118bb329f7936df653d10010952546dfb9d1c",
+      "command_count": 14
+    },
+    {
+      "index": 26,
+      "glyph_id": "BASE-025",
+      "file": "screensaver/svg-preview/reference/BASE-025.svg",
+      "svg_sha256": "e532a4d2ce902039741db03efd5938b269f99d248e4843dae734a97788197903",
+      "command_count": 20
+    },
+    {
+      "index": 27,
+      "glyph_id": "BASE-026",
+      "file": "screensaver/svg-preview/reference/BASE-026.svg",
+      "svg_sha256": "82a552b3e0313cee97b46de8ed9c140e1e4e4e460c2f9dcac8f0f3611957e5f6",
+      "command_count": 10
+    },
+    {
+      "index": 28,
+      "glyph_id": "BASE-027",
+      "file": "screensaver/svg-preview/reference/BASE-027.svg",
+      "svg_sha256": "aa27aa6732b1fada7abc70d1183e85656395c2b9029ea1a40a30fe0543a91de1",
+      "command_count": 19
+    },
+    {
+      "index": 29,
+      "glyph_id": "BASE-028",
+      "file": "screensaver/svg-preview/reference/BASE-028.svg",
+      "svg_sha256": "b4432452e6b280e2ff2c613eeb10a2a8dd35f655edb4f81db14228480d41aafd",
+      "command_count": 14
+    },
+    {
+      "index": 30,
+      "glyph_id": "BASE-029",
+      "file": "screensaver/svg-preview/reference/BASE-029.svg",
+      "svg_sha256": "775a0b3e8c2f601b08dd473d9ff3ac9878f25a14c211963c954abac832f6f847",
+      "command_count": 14
+    },
+    {
+      "index": 31,
+      "glyph_id": "BASE-030",
+      "file": "screensaver/svg-preview/reference/BASE-030.svg",
+      "svg_sha256": "5c61cba52408bfb97acb7358a309af8109a7c6f4b869e343b4cd5a3f119c59ef",
+      "command_count": 14
+    },
+    {
+      "index": 32,
+      "glyph_id": "BASE-031",
+      "file": "screensaver/svg-preview/reference/BASE-031.svg",
+      "svg_sha256": "29f6bd3686c8e0c7f0364bd2e97256e9ffc12c7c87106ea17b246ddc6ff5e404",
+      "command_count": 26
+    },
+    {
+      "index": 33,
+      "glyph_id": "BASE-032",
+      "file": "screensaver/svg-preview/reference/BASE-032.svg",
+      "svg_sha256": "355436ece6306486a76d4b3113c14651f093bfcb69f419c734e190584328f698",
+      "command_count": 14
+    },
+    {
+      "index": 34,
+      "glyph_id": "BASE-033",
+      "file": "screensaver/svg-preview/reference/BASE-033.svg",
+      "svg_sha256": "e27922317f98f320126128206ca6579fec46adf8a673f977e5030e9696af07fc",
+      "command_count": 20
+    },
+    {
+      "index": 35,
+      "glyph_id": "BASE-034",
+      "file": "screensaver/svg-preview/reference/BASE-034.svg",
+      "svg_sha256": "f42b09ea519906acea04858319cceac7ad432fae49a920893f703c3589fb3217",
+      "command_count": 22
+    },
+    {
+      "index": 36,
+      "glyph_id": "BASE-035",
+      "file": "screensaver/svg-preview/reference/BASE-035.svg",
+      "svg_sha256": "202c61aeb652822caf3a5c3d37bd9c5537d58f3cbf2767a316d04593e971ca21",
+      "command_count": 26
+    },
+    {
+      "index": 37,
+      "glyph_id": "BASE-036",
+      "file": "screensaver/svg-preview/reference/BASE-036.svg",
+      "svg_sha256": "a15ef35da22c09320dcb2c2c71da0d13c8d7bacaa2d4967aa777ed3e3890df73",
+      "command_count": 22
+    },
+    {
+      "index": 38,
+      "glyph_id": "BASE-037",
+      "file": "screensaver/svg-preview/reference/BASE-037.svg",
+      "svg_sha256": "20fbc1277a92795fe00bbde1bfa8524c10d19f7cf8df585da2fb0a31b5c5b647",
+      "command_count": 14
+    },
+    {
+      "index": 39,
+      "glyph_id": "BASE-038",
+      "file": "screensaver/svg-preview/reference/BASE-038.svg",
+      "svg_sha256": "7bf2e89fcc6cfea072d3db6b6dfe0f138dfb897c596f190bc7958a33d1a40f3f",
+      "command_count": 19
+    },
+    {
+      "index": 40,
+      "glyph_id": "BASE-039",
+      "file": "screensaver/svg-preview/reference/BASE-039.svg",
+      "svg_sha256": "f30ea8040a1cf6640140ee6cce194fc412fccea178d042d74234a40f40f51e1a",
+      "command_count": 27
+    },
+    {
+      "index": 41,
+      "glyph_id": "BASE-040",
+      "file": "screensaver/svg-preview/reference/BASE-040.svg",
+      "svg_sha256": "f68a79596754a3e3c863a7f7e7db03ec6a25b281eea74b95ef682ef5d83fa794",
+      "command_count": 15
+    },
+    {
+      "index": 42,
+      "glyph_id": "BASE-041",
+      "file": "screensaver/svg-preview/reference/BASE-041.svg",
+      "svg_sha256": "f48c6d28da9dc27810a8ba82fcbffc62f89d0cc3d92506365d0949bc1f89dd05",
+      "command_count": 12
+    },
+    {
+      "index": 43,
+      "glyph_id": "BASE-042",
+      "file": "screensaver/svg-preview/reference/BASE-042.svg",
+      "svg_sha256": "f49bf676bca3a1d592fa686ff39294656718186e005bc1c9b4c8cd0a87ed45f4",
+      "command_count": 9
+    },
+    {
+      "index": 44,
+      "glyph_id": "BASE-043",
+      "file": "screensaver/svg-preview/reference/BASE-043.svg",
+      "svg_sha256": "8ac1a310284a3c04f18b9d3a2a64184e27488f1a8a5be6082135f9553163ca8e",
+      "command_count": 26
+    },
+    {
+      "index": 45,
+      "glyph_id": "BASE-044",
+      "file": "screensaver/svg-preview/reference/BASE-044.svg",
+      "svg_sha256": "d8bb6150ab00146e63cd8ce4934bdf281bb70138994a79dcaae68907210b5307",
+      "command_count": 24
+    },
+    {
+      "index": 46,
+      "glyph_id": "BASE-045",
+      "file": "screensaver/svg-preview/reference/BASE-045.svg",
+      "svg_sha256": "f793213e32c3359cbc424d86d0d727338d95fe67c0e887dc7185349ee955cf38",
+      "command_count": 18
+    },
+    {
+      "index": 47,
+      "glyph_id": "BASE-046",
+      "file": "screensaver/svg-preview/reference/BASE-046.svg",
+      "svg_sha256": "107ecd5a02ae673fb838f1903ef4b13e975474988231befd21d979c7b4b2e49a",
+      "command_count": 16
+    },
+    {
+      "index": 48,
+      "glyph_id": "BASE-047",
+      "file": "screensaver/svg-preview/reference/BASE-047.svg",
+      "svg_sha256": "9a0ac83e376d796574eb805f6f43022def212e6a68ad2937bf7762e8c8f3ec4f",
+      "command_count": 15
+    },
+    {
+      "index": 49,
+      "glyph_id": "BASE-048",
+      "file": "screensaver/svg-preview/reference/BASE-048.svg",
+      "svg_sha256": "61e02ea167a7eee814c2599e22d538401386fa7c569af9271e180fe2de4dcb68",
+      "command_count": 16
+    },
+    {
+      "index": 50,
+      "glyph_id": "BASE-049",
+      "file": "screensaver/svg-preview/reference/BASE-049.svg",
+      "svg_sha256": "5c339978764cdb4b970ee450fdf9c3745c51d182cf3438294a6d8b90b97e4ef6",
+      "command_count": 28
+    },
+    {
+      "index": 51,
+      "glyph_id": "BASE-050",
+      "file": "screensaver/svg-preview/reference/BASE-050.svg",
+      "svg_sha256": "dac487cdf5aa8b479c192f99e249a18aa3f8b996d4576d0007abb7d314e7a114",
+      "command_count": 16
+    },
+    {
+      "index": 52,
+      "glyph_id": "BASE-051",
+      "file": "screensaver/svg-preview/reference/BASE-051.svg",
+      "svg_sha256": "c37d6d39a5cdc1f6a10f65fa0c06530d498111efd1c63a48eef5f85b06814bb8",
+      "command_count": 14
+    },
+    {
+      "index": 53,
+      "glyph_id": "BASE-052",
+      "file": "screensaver/svg-preview/reference/BASE-052.svg",
+      "svg_sha256": "7eb410ff514c135a804671ace427a2f995f5acee4fd1ce8ade1040b156b151cd",
+      "command_count": 32
+    },
+    {
+      "index": 54,
+      "glyph_id": "BASE-053",
+      "file": "screensaver/svg-preview/reference/BASE-053.svg",
+      "svg_sha256": "76ab848df3c8ff2f882aecae0d0769a50c1f365816937bd251a42a1055721ede",
+      "command_count": 33
+    },
+    {
+      "index": 55,
+      "glyph_id": "BASE-054",
+      "file": "screensaver/svg-preview/reference/BASE-054.svg",
+      "svg_sha256": "8af77a455ce6b9ee51b9a0146b2eba0075310927e9f03a71871f15e3e2c07730",
+      "command_count": 14
+    },
+    {
+      "index": 56,
+      "glyph_id": "BASE-055",
+      "file": "screensaver/svg-preview/reference/BASE-055.svg",
+      "svg_sha256": "ea12a046449ebeba6883a84793a9e86dcfeeaf981c86a8b947bdaba922a56f3f",
+      "command_count": 26
+    },
+    {
+      "index": 57,
+      "glyph_id": "GLYPH-000",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-000.svg",
+      "svg_sha256": "f518cf74bf57df859da5dea9832a6a55130ef84dfda159bd54cccfcd6632dc65",
+      "command_count": 106
+    },
+    {
+      "index": 58,
+      "glyph_id": "GLYPH-001",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-001.svg",
+      "svg_sha256": "d16206e90eabcd43d366e71ea36551dcab2c3b5d97f2de5d4ec49878664b726b",
+      "command_count": 471
+    },
+    {
+      "index": 59,
+      "glyph_id": "GLYPH-002",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-002.svg",
+      "svg_sha256": "6af8edd34bb846527a8bc2778949ec330d2f0c66cfa660b4589842d99cb8300f",
+      "command_count": 159
+    },
+    {
+      "index": 60,
+      "glyph_id": "GLYPH-003",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-003.svg",
+      "svg_sha256": "97355b9167c66ddf044c5c23870461f20e08ca060c33f53f41a3708444ebad4b",
+      "command_count": 425
+    },
+    {
+      "index": 61,
+      "glyph_id": "GLYPH-004",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-004.svg",
+      "svg_sha256": "5705a724d74fd4095f70474fdf11961985a6b6fae5ca5282554a585a1db0ec93",
+      "command_count": 515
+    },
+    {
+      "index": 62,
+      "glyph_id": "GLYPH-005",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-005.svg",
+      "svg_sha256": "83ef0e018feaeb8001ca75a022c62386205dd73d4b818784a98e4edddb33e83b",
+      "command_count": 582
+    },
+    {
+      "index": 63,
+      "glyph_id": "GLYPH-006",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-006.svg",
+      "svg_sha256": "eb501ebfa1ef1292821136d007e7e9c1d9b4e5e0f102e00409b99343250e682b",
+      "command_count": 746
+    },
+    {
+      "index": 64,
+      "glyph_id": "GLYPH-007",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-007.svg",
+      "svg_sha256": "1935a3fa7d985c8cd047633e54a61b1dcef47b7b5c57bf5b7d2712eb0dcb000b",
+      "command_count": 170
+    },
+    {
+      "index": 65,
+      "glyph_id": "GLYPH-008",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-008.svg",
+      "svg_sha256": "861894245a6c1b3c5f20f1354b4382946715c9466e9371b0f8ebe0be684c424b",
+      "command_count": 53
+    },
+    {
+      "index": 66,
+      "glyph_id": "GLYPH-009",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-009.svg",
+      "svg_sha256": "320628da88e98e07bfe97e967da8ae07b3089aee662f6356b569c2217d6b4c7d",
+      "command_count": 468
+    },
+    {
+      "index": 67,
+      "glyph_id": "GLYPH-010",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-010.svg",
+      "svg_sha256": "f9fb92b5fa61063f77a62242c52fea832821a81375c6e6c28016d3d571a98c87",
+      "command_count": 391
+    },
+    {
+      "index": 68,
+      "glyph_id": "GLYPH-011",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-011.svg",
+      "svg_sha256": "b133add5b94090ae56335bcfeaf9968495ec394e31536c79d5378e9ec8fc7e1e",
+      "command_count": 767
+    },
+    {
+      "index": 69,
+      "glyph_id": "GLYPH-012",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-012.svg",
+      "svg_sha256": "c16cf170504f6733ba681f292c07a32d46bebee9341c3482f46bf6c744872aab",
+      "command_count": 106
+    },
+    {
+      "index": 70,
+      "glyph_id": "GLYPH-013",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-013.svg",
+      "svg_sha256": "9137caea6dc56df24c193eced66340483a94fa145d81d7f0fa4ad2af718aa702",
+      "command_count": 737
+    },
+    {
+      "index": 71,
+      "glyph_id": "GLYPH-014",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-014.svg",
+      "svg_sha256": "1591a23cf93645711c48d19fc4bf64fecd0acb9ed147c0a122b59996cc2798c6",
+      "command_count": 345
+    },
+    {
+      "index": 72,
+      "glyph_id": "GLYPH-015",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-015.svg",
+      "svg_sha256": "8ccadaafb4f3541554143484cecc3bb42ca522eba3f8477b5635d3fe6c459715",
+      "command_count": 481
+    },
+    {
+      "index": 73,
+      "glyph_id": "GLYPH-016",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-016.svg",
+      "svg_sha256": "bb7a38f17b4b37f84de0ed7c50ca6d22a83bf3978a52a439f565ee6b2c4e1c2d",
+      "command_count": 131
+    },
+    {
+      "index": 74,
+      "glyph_id": "GLYPH-017",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-017.svg",
+      "svg_sha256": "73b2c276f5e02213fda7eb56ec9d32bee3e758f920924ebd0b768a4f767e4453",
+      "command_count": 469
+    },
+    {
+      "index": 75,
+      "glyph_id": "GLYPH-018",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-018.svg",
+      "svg_sha256": "b67b15a8c12dc9a3ad123019bcb014b2376fd8d1a303439aaf2909d1b9b3c647",
+      "command_count": 881
+    },
+    {
+      "index": 76,
+      "glyph_id": "GLYPH-019",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-019.svg",
+      "svg_sha256": "c8e4d5a7cc57de3cb52b9b2b889e8ec9e2df4cfb52e0589df41328ad9f128674",
+      "command_count": 301
+    },
+    {
+      "index": 77,
+      "glyph_id": "GLYPH-020",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-020.svg",
+      "svg_sha256": "2323e3cae2ffcba2f831ef6740c354a4dcfc07df8022f29d8906d5d73208db12",
+      "command_count": 811
+    },
+    {
+      "index": 78,
+      "glyph_id": "GLYPH-021",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-021.svg",
+      "svg_sha256": "5bc60f859c4f6b6593cceddf4e9636d47fd97964601e3d1ea4711326d8b5fd94",
+      "command_count": 209
+    },
+    {
+      "index": 79,
+      "glyph_id": "GLYPH-022",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-022.svg",
+      "svg_sha256": "4a2914020db1fbce3a86bbcf85b3cbaba5129f6b682f01ee680d9e22996730ad",
+      "command_count": 206
+    },
+    {
+      "index": 80,
+      "glyph_id": "GLYPH-023",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-023.svg",
+      "svg_sha256": "4097e8cba3112637b27e75104096ccd5f5a8d314d620d4ef904ce89f686b8831",
+      "command_count": 854
+    },
+    {
+      "index": 81,
+      "glyph_id": "GLYPH-024",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-024.svg",
+      "svg_sha256": "ba2082c71336ef3fb87f650d2f55e430d7c124d6237d173dc258ff0377c005d5",
+      "command_count": 184
+    },
+    {
+      "index": 82,
+      "glyph_id": "GLYPH-025",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-025.svg",
+      "svg_sha256": "4b7c7a9bf0a982b3e21f95b1881dc1b8fce5cc4723e8a1c2512f74ed25da3d4f",
+      "command_count": 436
+    },
+    {
+      "index": 83,
+      "glyph_id": "GLYPH-026",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-026.svg",
+      "svg_sha256": "9fad21ad56d079a7eefbf115897de0eec5588a62f6c224a9162b890aec9fcab9",
+      "command_count": 400
+    },
+    {
+      "index": 84,
+      "glyph_id": "GLYPH-027",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-027.svg",
+      "svg_sha256": "e45d407974da7b19e5cc8799d19cf07b6ef86bfd279a13f74a1f86e01fd02cb4",
+      "command_count": 875
+    },
+    {
+      "index": 85,
+      "glyph_id": "GLYPH-028",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-028.svg",
+      "svg_sha256": "dc54e1f68c2fb8baa962e2b27fa23cb8ccd95e1c0f0c2e256e55a97f88b960bc",
+      "command_count": 823
+    },
+    {
+      "index": 86,
+      "glyph_id": "GLYPH-029",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-029.svg",
+      "svg_sha256": "296e4735a12d4db73278b2ee43e7fc364a4e1c816a99033d1d5c9f2797c01f26",
+      "command_count": 209
+    },
+    {
+      "index": 87,
+      "glyph_id": "GLYPH-030",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-030.svg",
+      "svg_sha256": "4ac903d1ef7ce9482c9f8f58121d1376a1a01e2e5e9e565016035651c59d30b6",
+      "command_count": 478
+    },
+    {
+      "index": 88,
+      "glyph_id": "GLYPH-031",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-031.svg",
+      "svg_sha256": "9b3cb81275d709ce222168984f42dbc4c587153b3bfb347bf1a2c5479d7f9217",
+      "command_count": 578
+    },
+    {
+      "index": 89,
+      "glyph_id": "GLYPH-032",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-032.svg",
+      "svg_sha256": "c8c53f1e51099e46cecd13711951a159af51d6aefc0968b225856525d3caf324",
+      "command_count": 771
+    },
+    {
+      "index": 90,
+      "glyph_id": "GLYPH-033",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-033.svg",
+      "svg_sha256": "4631099d7f516851c2467b3d19c0efad423f4d56dcdf9473069aaf076723a9d7",
+      "command_count": 180
+    },
+    {
+      "index": 91,
+      "glyph_id": "GLYPH-034",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-034.svg",
+      "svg_sha256": "63555f27f6ab82ae69f837c77daa618bf80804aabd97b65bbf23127001519916",
+      "command_count": 364
+    },
+    {
+      "index": 92,
+      "glyph_id": "GLYPH-035",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-035.svg",
+      "svg_sha256": "31f39e6cff1c21d4b17bdd20ae28a64209e108f14fc0197013587b8ce426387b",
+      "command_count": 669
+    },
+    {
+      "index": 93,
+      "glyph_id": "GLYPH-036",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-036.svg",
+      "svg_sha256": "8338c771f77378429507fc868af277a42c80559fa62629b936a02ca98962f80f",
+      "command_count": 345
+    },
+    {
+      "index": 94,
+      "glyph_id": "GLYPH-037",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-037.svg",
+      "svg_sha256": "7f7418ec137d2996aeba937a7181e14dcc1ed3eb6ddbde8a68fc6e00a618421e",
+      "command_count": 488
+    },
+    {
+      "index": 95,
+      "glyph_id": "GLYPH-038",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-038.svg",
+      "svg_sha256": "9eeba3d8b0e36acae0071466236d523446c1cb3e0e83abd1dcd436584e5dcc9f",
+      "command_count": 670
+    },
+    {
+      "index": 96,
+      "glyph_id": "GLYPH-039",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-039.svg",
+      "svg_sha256": "67421bf1876f38dc9145b1c3902617b2b599cb095aaccad4a43e3706bbc0ace8",
+      "command_count": 363
+    },
+    {
+      "index": 97,
+      "glyph_id": "GLYPH-040",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-040.svg",
+      "svg_sha256": "72b689baadbcb163848dc99af8ac251f77058e2f00529e4213173c1218976561",
+      "command_count": 395
+    },
+    {
+      "index": 98,
+      "glyph_id": "GLYPH-041",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-041.svg",
+      "svg_sha256": "1806a13ecaa055d0a980dbd0b21f175a6b92e92a030ddbf64e781f2ba129a409",
+      "command_count": 506
+    },
+    {
+      "index": 99,
+      "glyph_id": "GLYPH-042",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-042.svg",
+      "svg_sha256": "90c2a90f0c61b19843e09a57b66bedec646cd503d85cb1d16dee5d0137e77b5c",
+      "command_count": 871
+    },
+    {
+      "index": 100,
+      "glyph_id": "GLYPH-043",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-043.svg",
+      "svg_sha256": "eaac06c64580293988a524fc9c3b81643c7997fc4361ebe79be14ff6f28b0891",
+      "command_count": 474
+    },
+    {
+      "index": 101,
+      "glyph_id": "GLYPH-044",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-044.svg",
+      "svg_sha256": "93d0c497eb18652195c83ac301c83b1a51f14fd8dd5d3aecd01d673d93c2ac03",
+      "command_count": 572
+    },
+    {
+      "index": 102,
+      "glyph_id": "GLYPH-045",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-045.svg",
+      "svg_sha256": "275ff77c0e8ffe3c7891962a74d9fdd4d50955a1683c1494af76261680f9e276",
+      "command_count": 320
+    },
+    {
+      "index": 103,
+      "glyph_id": "GLYPH-046",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-046.svg",
+      "svg_sha256": "44da992e78e25aa2c82e5332dca914bd3ca9f85e5f0ed91e7efbf77d5b6b8fb8",
+      "command_count": 482
+    },
+    {
+      "index": 104,
+      "glyph_id": "GLYPH-047",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-047.svg",
+      "svg_sha256": "0eacbe925726d927084c8a1a5b6351eb0b990fad2dbcc429c2e8b4f46b2da0bd",
+      "command_count": 718
+    },
+    {
+      "index": 105,
+      "glyph_id": "GLYPH-048",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-048.svg",
+      "svg_sha256": "0010d43a957f159fb298f109daab12c91e6ab0fcde34cf8d26fbb74ffecf5655",
+      "command_count": 257
+    },
+    {
+      "index": 106,
+      "glyph_id": "GLYPH-049",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-049.svg",
+      "svg_sha256": "e7b446336cd6d5ae191e9ef189bd78622c32162e7b69baadbc08b336454171c0",
+      "command_count": 223
+    },
+    {
+      "index": 107,
+      "glyph_id": "GLYPH-050",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-050.svg",
+      "svg_sha256": "ab51da406c0e5dcb17a0af3f485ad0306d1a9a26ff9c9b6f65df6677992e1248",
+      "command_count": 311
+    },
+    {
+      "index": 108,
+      "glyph_id": "GLYPH-051",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-051.svg",
+      "svg_sha256": "974fee452646c781cb6374ad9f6c8f4b23c592e7ad7212958723a6b84fbc8846",
+      "command_count": 544
+    },
+    {
+      "index": 109,
+      "glyph_id": "GLYPH-052",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-052.svg",
+      "svg_sha256": "b364b8b16a3e17e7662f8e58d7c6742a8b41ae7b2e7f79f0b11cb4a6ca86a4d6",
+      "command_count": 727
+    },
+    {
+      "index": 110,
+      "glyph_id": "GLYPH-053",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-053.svg",
+      "svg_sha256": "4958f31f2acdaf44698cfe1725adbeea01628ce7a15097693f91c79b67aeac96",
+      "command_count": 577
+    },
+    {
+      "index": 111,
+      "glyph_id": "GLYPH-054",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-054.svg",
+      "svg_sha256": "9f4880a9aa97b0e96e9015167e6abcc32d55430c95cc846d04e8e3e5d21e740b",
+      "command_count": 581
+    },
+    {
+      "index": 112,
+      "glyph_id": "GLYPH-055",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-055.svg",
+      "svg_sha256": "50e27cfa07ef85ea4aeb045326c6074aebf1762302ac8821b95996c61a099f5d",
+      "command_count": 289
+    },
+    {
+      "index": 113,
+      "glyph_id": "GLYPH-056",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-056.svg",
+      "svg_sha256": "fa327f72247f5c735f94bed09a389d51a9dbcf42a5cc56ee26b01347e1b7ea88",
+      "command_count": 609
+    },
+    {
+      "index": 114,
+      "glyph_id": "GLYPH-057",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-057.svg",
+      "svg_sha256": "7341e8f7093fb96de585619b1d3432ef602fbc01ddc29d213cf8ba55a1a98619",
+      "command_count": 544
+    },
+    {
+      "index": 115,
+      "glyph_id": "GLYPH-058",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-058.svg",
+      "svg_sha256": "ae675219a6c2beb6fd4dd96932b151d54efda6fb68322273513f212dbdbdf51d",
+      "command_count": 539
+    },
+    {
+      "index": 116,
+      "glyph_id": "GLYPH-059",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-059.svg",
+      "svg_sha256": "7cc8f254c3a86cca8317a6ecf72be27ff6a9b6e215a4911b5eb933e1724bc254",
+      "command_count": 586
+    },
+    {
+      "index": 117,
+      "glyph_id": "GLYPH-060",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-060.svg",
+      "svg_sha256": "f085b0414eedabf709cf757ab027a2d41b42bf7871310bf76fc5db345672393a",
+      "command_count": 118
+    },
+    {
+      "index": 118,
+      "glyph_id": "GLYPH-061",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-061.svg",
+      "svg_sha256": "a6ec45047505f8c520f724d84d3529695c53c7c747cd29dbdf0ea07c0bf9c607",
+      "command_count": 303
+    },
+    {
+      "index": 119,
+      "glyph_id": "GLYPH-062",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-062.svg",
+      "svg_sha256": "dfd0203022d2ae8c1d74a64bc72cf7a2b9d38cfb36385f2525e42e19ebaa28c9",
+      "command_count": 711
+    },
+    {
+      "index": 120,
+      "glyph_id": "GLYPH-063",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-063.svg",
+      "svg_sha256": "85e16d8f169d2e58620027fdbc1946a1a36d9f0dafdde2c72b9be1e75eea4d20",
+      "command_count": 284
+    },
+    {
+      "index": 121,
+      "glyph_id": "GLYPH-064",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-064.svg",
+      "svg_sha256": "a9944068fd2e9a7dc47a0dab1f3992330033f9d432525a0ae06062ec65daa03b",
+      "command_count": 470
+    },
+    {
+      "index": 122,
+      "glyph_id": "GLYPH-065",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-065.svg",
+      "svg_sha256": "393f11fc7ad2a47649895498df7f94f0df2381f6a473771ce71ad528946b7ade",
+      "command_count": 159
+    },
+    {
+      "index": 123,
+      "glyph_id": "GLYPH-066",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-066.svg",
+      "svg_sha256": "ea61245f012dbc26b36636e0cc236ddd1dc2990caaa50f441fbc37f02902f35a",
+      "command_count": 159
+    },
+    {
+      "index": 124,
+      "glyph_id": "GLYPH-067",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-067.svg",
+      "svg_sha256": "dc67550e6563648f2be22362c9af8924642bd466cf248567f9def8ac82b7f9cd",
+      "command_count": 734
+    },
+    {
+      "index": 125,
+      "glyph_id": "GLYPH-068",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-068.svg",
+      "svg_sha256": "b5ee1a6a6023f5b25a1222ced5221b3cc6b60fee973bc78f39ff9dca62dcf7cc",
+      "command_count": 587
+    },
+    {
+      "index": 126,
+      "glyph_id": "GLYPH-069",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-069.svg",
+      "svg_sha256": "a4ff675e45aee33ffff348d8fbab72233a64249df68db7d109490380228badae",
+      "command_count": 425
+    },
+    {
+      "index": 127,
+      "glyph_id": "GLYPH-070",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-070.svg",
+      "svg_sha256": "8a9ed903dafbda9003ec1c3839bb302ac45be1d5bf531f0c2750837c9658dd39",
+      "command_count": 170
+    },
+    {
+      "index": 128,
+      "glyph_id": "GLYPH-071",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-071.svg",
+      "svg_sha256": "ca6daf4c52c7ac5563f605532271607f64898d118fc50192363257d8b0eca8da",
+      "command_count": 146
+    },
+    {
+      "index": 129,
+      "glyph_id": "GLYPH-072",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-072.svg",
+      "svg_sha256": "89cad41e6065e61e83032cc676b8d4198be1ff80794625a49c4184c67f18fcc6",
+      "command_count": 547
+    },
+    {
+      "index": 130,
+      "glyph_id": "GLYPH-073",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-073.svg",
+      "svg_sha256": "8b4664a0dd47d5fd88629306e08988e06a6e3624d2d522a1a0e9551b437204ac",
+      "command_count": 798
+    },
+    {
+      "index": 131,
+      "glyph_id": "GLYPH-074",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-074.svg",
+      "svg_sha256": "78810cafb3ab96cb5d4dfad1658f2883776a61f6f2a4e88b703696f3adaa3132",
+      "command_count": 461
+    },
+    {
+      "index": 132,
+      "glyph_id": "GLYPH-075",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-075.svg",
+      "svg_sha256": "0842601c326b8c1929952cd36a6228b6ae9081e44d9ef7abe980dfb070c81982",
+      "command_count": 460
+    },
+    {
+      "index": 133,
+      "glyph_id": "GLYPH-076",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-076.svg",
+      "svg_sha256": "9131067813268af5ad0499bd42f0887ec439dd2c35810167012257395c9f6fa9",
+      "command_count": 232
+    },
+    {
+      "index": 134,
+      "glyph_id": "GLYPH-077",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-077.svg",
+      "svg_sha256": "df5efa0201511ab51cd9b24851942de9528c0b42a2784ead3d1bfbe6db1d22c5",
+      "command_count": 520
+    },
+    {
+      "index": 135,
+      "glyph_id": "GLYPH-078",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-078.svg",
+      "svg_sha256": "d8e2a0b411b6248ab8ad456072895f38dc1be55a9ee68eb69871a58e7d3aad7c",
+      "command_count": 799
+    },
+    {
+      "index": 136,
+      "glyph_id": "GLYPH-079",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-079.svg",
+      "svg_sha256": "935755ddca7713f3c868ede0ad816e39763e4e6050941f95ee4e0613f3003a5c",
+      "command_count": 275
+    },
+    {
+      "index": 137,
+      "glyph_id": "GLYPH-080",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-080.svg",
+      "svg_sha256": "7f8f2019ce5ca26d54df22221936b193fb629322874c1cd92f61aaa8d9f21166",
+      "command_count": 578
+    },
+    {
+      "index": 138,
+      "glyph_id": "GLYPH-081",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-081.svg",
+      "svg_sha256": "516656dae1f5ff943fb4c2fc7e6f51bb402ad2cec14741ad551b52be2d89ed71",
+      "command_count": 783
+    },
+    {
+      "index": 139,
+      "glyph_id": "GLYPH-082",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-082.svg",
+      "svg_sha256": "3c5a67cb1ed4fe0388fffc15a21b77d614756a15a7cd570e462f98f179649808",
+      "command_count": 339
+    },
+    {
+      "index": 140,
+      "glyph_id": "GLYPH-083",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-083.svg",
+      "svg_sha256": "516deaf8693a365d9ccf5e0c525cf3ed400751b4e4e4d0e7134d20a3024c77dd",
+      "command_count": 553
+    },
+    {
+      "index": 141,
+      "glyph_id": "GLYPH-084",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-084.svg",
+      "svg_sha256": "80964f855f7e0657ccd003e3e2752fa1cccc9e8b349d13220ed9d38f8ff1da1c",
+      "command_count": 209
+    },
+    {
+      "index": 142,
+      "glyph_id": "GLYPH-085",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-085.svg",
+      "svg_sha256": "50dbc9b3d5eb95bd7a935126e065cfc86664c187f02fa7d140b31ee27bc4d34c",
+      "command_count": 338
+    },
+    {
+      "index": 143,
+      "glyph_id": "GLYPH-086",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-086.svg",
+      "svg_sha256": "57f38e5733c938c2dfcf8cce34c46706edbb191132c053d2496ca938f89a641d",
+      "command_count": 480
+    },
+    {
+      "index": 144,
+      "glyph_id": "GLYPH-087",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-087.svg",
+      "svg_sha256": "d12f9bfd245c7bec7061e69ec051077230ce813893202872e861d0abe45465ee",
+      "command_count": 876
+    },
+    {
+      "index": 145,
+      "glyph_id": "GLYPH-088",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-088.svg",
+      "svg_sha256": "ac720aff2d2c3d91b9a2946122d6c0ca1032b3652b08b623faf2b1d63b04004d",
+      "command_count": 445
+    },
+    {
+      "index": 146,
+      "glyph_id": "GLYPH-089",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-089.svg",
+      "svg_sha256": "ab4a91e7a87c4d5646fb2173558ddcfa8c0416f7648a9f364e771a681146ae28",
+      "command_count": 402
+    },
+    {
+      "index": 147,
+      "glyph_id": "GLYPH-090",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-090.svg",
+      "svg_sha256": "e4a0eaa5bbc8553024d8ffb8171559fd0527f238cade74638b457a1a37a73371",
+      "command_count": 621
+    },
+    {
+      "index": 148,
+      "glyph_id": "GLYPH-091",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-091.svg",
+      "svg_sha256": "333fb8b8f4fee4c1a3df7876590adedf396b84c3bd6f15fb156ef345cfe5ecf0",
+      "command_count": 297
+    },
+    {
+      "index": 149,
+      "glyph_id": "GLYPH-092",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-092.svg",
+      "svg_sha256": "9d2b5664464dd726dc28397e819e3934ef9fd527e927b2cb09ee056b96e94c21",
+      "command_count": 923
+    },
+    {
+      "index": 150,
+      "glyph_id": "GLYPH-093",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-093.svg",
+      "svg_sha256": "636b5c1d6727372f6d2324b439f5f7b2763e1b7735e63896df34f956b6963762",
+      "command_count": 326
+    },
+    {
+      "index": 151,
+      "glyph_id": "GLYPH-094",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-094.svg",
+      "svg_sha256": "155159f276b8ff1e5effa4a79d31dd3a5618ea22346ca671f3ed05a30f164bd8",
+      "command_count": 208
+    },
+    {
+      "index": 152,
+      "glyph_id": "GLYPH-095",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-095.svg",
+      "svg_sha256": "7346eb930f514bcb24956836e24de4603ecea3b2b92ca3f614f0a550c94fcef8",
+      "command_count": 365
+    },
+    {
+      "index": 153,
+      "glyph_id": "GLYPH-096",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-096.svg",
+      "svg_sha256": "23d9790367ed0be7c7a4da18d1868ac01ae710214fac98e50acacfa20205164f",
+      "command_count": 911
+    },
+    {
+      "index": 154,
+      "glyph_id": "GLYPH-097",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-097.svg",
+      "svg_sha256": "eae3d1158fda2e24ede834b516a9d38d0f9b519492bee5128130eefbb85171a3",
+      "command_count": 338
+    },
+    {
+      "index": 155,
+      "glyph_id": "GLYPH-098",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-098.svg",
+      "svg_sha256": "13e272aeae61aff2467eb7fa73c49661191fd120004fdeda1a2158b6902e56ac",
+      "command_count": 364
+    },
+    {
+      "index": 156,
+      "glyph_id": "GLYPH-099",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-099.svg",
+      "svg_sha256": "dea82560831aaabc396b711b3f356db4eaa0ccecbfe9f829fe954af65f75c5fe",
+      "command_count": 507
+    },
+    {
+      "index": 157,
+      "glyph_id": "GLYPH-100",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-100.svg",
+      "svg_sha256": "02398342d61cc812a96d54b7bcdf2e846a81703f4a2d56474a6d5e72d2f118fc",
+      "command_count": 797
+    },
+    {
+      "index": 158,
+      "glyph_id": "GLYPH-101",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-101.svg",
+      "svg_sha256": "e94028cb759c435f2d5b71079938818c0907bc1c48b31f98260d452ffb9f0b24",
+      "command_count": 465
+    },
+    {
+      "index": 159,
+      "glyph_id": "GLYPH-102",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-102.svg",
+      "svg_sha256": "5e7523e3c9647a6d0f22352664f33605f14dcdd50c60ecbe3cc9350c1cc805d6",
+      "command_count": 587
+    },
+    {
+      "index": 160,
+      "glyph_id": "GLYPH-103",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-103.svg",
+      "svg_sha256": "a14f916e9390c7b8b8bf103d509c5368c6eb94f527f1e475d08b889c25e9dedf",
+      "command_count": 488
+    },
+    {
+      "index": 161,
+      "glyph_id": "GLYPH-104",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-104.svg",
+      "svg_sha256": "23cb639ec62d6e57a63a4e1860b748446c255860e21356e4b3a1b0af547e2aa4",
+      "command_count": 326
+    },
+    {
+      "index": 162,
+      "glyph_id": "GLYPH-105",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-105.svg",
+      "svg_sha256": "ed9788d33d8c216a8ba4121f14611ee7c305aa731908562d7666a2a15666e2d5",
+      "command_count": 535
+    },
+    {
+      "index": 163,
+      "glyph_id": "GLYPH-106",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-106.svg",
+      "svg_sha256": "770eab9a5a019f485bc66690258e9be3dc56c7493176e232fc36945dbec93aae",
+      "command_count": 352
+    },
+    {
+      "index": 164,
+      "glyph_id": "GLYPH-107",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-107.svg",
+      "svg_sha256": "ca610ab3e9b2c56d205a81c401374bc0910962b932d7f7c235720bbd1690b442",
+      "command_count": 555
+    },
+    {
+      "index": 165,
+      "glyph_id": "GLYPH-108",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-108.svg",
+      "svg_sha256": "f08542f54537e2dc62a4a74f1caa2bc764d94ad68e95eb93ae2943e2f0d68f5a",
+      "command_count": 491
+    },
+    {
+      "index": 166,
+      "glyph_id": "GLYPH-109",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-109.svg",
+      "svg_sha256": "4fd40f052af5305b6bdda0d7c64ead0c4e426d44213701e1acc14ece115dae62",
+      "command_count": 606
+    },
+    {
+      "index": 167,
+      "glyph_id": "GLYPH-110",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-110.svg",
+      "svg_sha256": "bee20ab25956d1bb95161995509fb6bde38a1f96b19a44be2400571f9112b137",
+      "command_count": 397
+    },
+    {
+      "index": 168,
+      "glyph_id": "GLYPH-111",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-111.svg",
+      "svg_sha256": "6d313a8223b723027c9b9f696059bff93b8b1541d28e2afab69dc73ca2b925c0",
+      "command_count": 545
+    },
+    {
+      "index": 169,
+      "glyph_id": "GLYPH-112",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-112.svg",
+      "svg_sha256": "d644a000b97570871dd9402c6bdbe2b02a582613259b533d1584b31bbafbc364",
+      "command_count": 665
+    },
+    {
+      "index": 170,
+      "glyph_id": "GLYPH-113",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-113.svg",
+      "svg_sha256": "fee344bb4871cece337a287eaa61215b4871bfd0bb00c58d156c03f7bc31716e",
+      "command_count": 302
+    },
+    {
+      "index": 171,
+      "glyph_id": "GLYPH-114",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-114.svg",
+      "svg_sha256": "12969b68bf6aaed899619b8e6841bba366be8de4ee00bebfd029b7663b283f9e",
+      "command_count": 432
+    },
+    {
+      "index": 172,
+      "glyph_id": "GLYPH-115",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-115.svg",
+      "svg_sha256": "08406d811927854d51d2abeb5f18881698b48ac1ccfe58f234e4e5056084c06e",
+      "command_count": 809
+    },
+    {
+      "index": 173,
+      "glyph_id": "GLYPH-116",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-116.svg",
+      "svg_sha256": "ba163c04c4d7b3a42db451f561200a60ca966b12963d9d427a67038630243c7b",
+      "command_count": 528
+    },
+    {
+      "index": 174,
+      "glyph_id": "GLYPH-117",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-117.svg",
+      "svg_sha256": "93300ab4992b784d0d3419371b312c8f3bf46281d57660b10139f2b5ec38804b",
+      "command_count": 511
+    },
+    {
+      "index": 175,
+      "glyph_id": "GLYPH-118",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-118.svg",
+      "svg_sha256": "6231158412344b96c57acb8a9e0f6d1b530ac6d096f8346dd365847b7b9c7f51",
+      "command_count": 545
+    },
+    {
+      "index": 176,
+      "glyph_id": "GLYPH-119",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-119.svg",
+      "svg_sha256": "51f73d82ff1d311a2f8a321ab033482cd4d73862584ece09e0014a286a461dbc",
+      "command_count": 415
+    },
+    {
+      "index": 177,
+      "glyph_id": "GLYPH-120",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-120.svg",
+      "svg_sha256": "9217ab5b674cec90de83e6aa205c5215b16d3836abefe49f6d1f5c403f492bb8",
+      "command_count": 729
+    },
+    {
+      "index": 178,
+      "glyph_id": "GLYPH-121",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-121.svg",
+      "svg_sha256": "9508b585425dca675a4b90904bdc4d7cff41959551f87267ff0dc5910212324e",
+      "command_count": 244
+    },
+    {
+      "index": 179,
+      "glyph_id": "GLYPH-122",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-122.svg",
+      "svg_sha256": "42c05b5126c97219f42f24bf74a4d06caf6b1de6e91068e2ba65426df64dd730",
+      "command_count": 652
+    },
+    {
+      "index": 180,
+      "glyph_id": "GLYPH-123",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-123.svg",
+      "svg_sha256": "60a0882ad7d37beda7b80039674c0c86baa56e62fdd077ae2fe9ac83cd082585",
+      "command_count": 589
+    },
+    {
+      "index": 181,
+      "glyph_id": "GLYPH-124",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-124.svg",
+      "svg_sha256": "578e21fda3ed22e0460ac346db83aa41e8e44e948f5627a003290126db563f41",
+      "command_count": 290
+    },
+    {
+      "index": 182,
+      "glyph_id": "GLYPH-125",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-125.svg",
+      "svg_sha256": "7eeb6514b87edbe0baa15f9e5bb352a07e812e28e43190b01f702c3d0cd74986",
+      "command_count": 772
+    },
+    {
+      "index": 183,
+      "glyph_id": "GLYPH-126",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-126.svg",
+      "svg_sha256": "5a795264637eddeb8b68d737990995af31432ecaba16edabbcffc1f926500495",
+      "command_count": 572
+    },
+    {
+      "index": 184,
+      "glyph_id": "GLYPH-127",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-127.svg",
+      "svg_sha256": "42b8c5e0d618f75c2eb7c8dc4064150b77b81deaaa494cc3ee7ac4c176408a84",
+      "command_count": 389
+    },
+    {
+      "index": 185,
+      "glyph_id": "GLYPH-128",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-128.svg",
+      "svg_sha256": "363ebae5bdd174d35d995f39e06d7e7a0887ab5ddc5ad756d08808695fa0067a",
+      "command_count": 455
+    },
+    {
+      "index": 186,
+      "glyph_id": "GLYPH-129",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-129.svg",
+      "svg_sha256": "deb1aaafe381d15c43939ad992413d02409cece8174150cf468e6bbbc8847086",
+      "command_count": 501
+    },
+    {
+      "index": 187,
+      "glyph_id": "GLYPH-130",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-130.svg",
+      "svg_sha256": "c2a323e1299378b3f3fc6004066127323ed439b1f6fadd3513ccb082daeb7209",
+      "command_count": 159
+    },
+    {
+      "index": 188,
+      "glyph_id": "GLYPH-131",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-131.svg",
+      "svg_sha256": "46e444c3d162211ee53eda083b4b9dc8e334c1cf44b494d5792e185f92b77855",
+      "command_count": 160
+    },
+    {
+      "index": 189,
+      "glyph_id": "GLYPH-132",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-132.svg",
+      "svg_sha256": "4e64dc72980fd3523f82e804fcb3245299fc734ec55c7e4bf6fe819e14687656",
+      "command_count": 799
+    },
+    {
+      "index": 190,
+      "glyph_id": "GLYPH-133",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-133.svg",
+      "svg_sha256": "a086cafbef3ffc07c8d4c6ffd0a67b91af173985e225ede720a69252cb71d26c",
+      "command_count": 947
+    },
+    {
+      "index": 191,
+      "glyph_id": "GLYPH-134",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-134.svg",
+      "svg_sha256": "53ff7347d8651a15a0cc8fc275c76f2951c482ed5dc4d7a7c52c91e408d5f16e",
+      "command_count": 444
+    },
+    {
+      "index": 192,
+      "glyph_id": "GLYPH-135",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-135.svg",
+      "svg_sha256": "4c230114e887e54b613e4a8cef3537e865fa51b4313084dff1cdbaac2c10383e",
+      "command_count": 106
+    },
+    {
+      "index": 193,
+      "glyph_id": "GLYPH-136",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-136.svg",
+      "svg_sha256": "aab873a380afa13c3955cd173d86bd67b5aba47dfdaa744ca867165c95f1818e",
+      "command_count": 790
+    },
+    {
+      "index": 194,
+      "glyph_id": "GLYPH-137",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-137.svg",
+      "svg_sha256": "3e6e46de34c3a2e148783e938c0bc27d564fb32c0e701a965babeb52c989d981",
+      "command_count": 212
+    },
+    {
+      "index": 195,
+      "glyph_id": "GLYPH-138",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-138.svg",
+      "svg_sha256": "e6924ef6370180503e783b8d49d27f70b5af54fdc7fa67b4f563a5269c851af0",
+      "command_count": 529
+    },
+    {
+      "index": 196,
+      "glyph_id": "GLYPH-139",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-139.svg",
+      "svg_sha256": "30ae56379f596bfe41e98c23bf79c4e0b1cbd15e8d27545490397553b31245e6",
+      "command_count": 522
+    },
+    {
+      "index": 197,
+      "glyph_id": "GLYPH-140",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-140.svg",
+      "svg_sha256": "c9e020846c32b2bbe6cb43c053ced920f3a835a328c4e6f4d5cda91aeaab8614",
+      "command_count": 214
+    },
+    {
+      "index": 198,
+      "glyph_id": "GLYPH-141",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-141.svg",
+      "svg_sha256": "53a460e2bbdb153a62360af152df43f6e0abf1553b3ffb0e0828ca472d58725c",
+      "command_count": 556
+    },
+    {
+      "index": 199,
+      "glyph_id": "GLYPH-142",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-142.svg",
+      "svg_sha256": "aecfb0475ff4cbc605084babd5032c284bff291df87a01834b6fab27df8e7e54",
+      "command_count": 791
+    },
+    {
+      "index": 200,
+      "glyph_id": "GLYPH-143",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-143.svg",
+      "svg_sha256": "2ca03ee585ec15539dc8a4c2bfe61d66aedf59da36bbad24c468256d5665ec75",
+      "command_count": 461
+    },
+    {
+      "index": 201,
+      "glyph_id": "GLYPH-144",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-144.svg",
+      "svg_sha256": "088e9e727da610fdab8dacda6aabe620b7c4831814e39718904df0a5a5c4415b",
+      "command_count": 184
+    },
+    {
+      "index": 202,
+      "glyph_id": "GLYPH-145",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-145.svg",
+      "svg_sha256": "a93b5e2ec510d9fd841a03b350bb7118c49524325652d3306f32633c11410652",
+      "command_count": 568
+    },
+    {
+      "index": 203,
+      "glyph_id": "GLYPH-146",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-146.svg",
+      "svg_sha256": "55eca32cd76fa0150f88881836d3dc78fb9e1ac170fcebc94edd97790ce47635",
+      "command_count": 815
+    },
+    {
+      "index": 204,
+      "glyph_id": "GLYPH-147",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-147.svg",
+      "svg_sha256": "5e62f6df512881d4cafa003496ed85d4d724b66f3c98d2491ed6fdced02bfd41",
+      "command_count": 445
+    },
+    {
+      "index": 205,
+      "glyph_id": "GLYPH-148",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-148.svg",
+      "svg_sha256": "faa67f57220ebd6a83a6592f89a9b76e959a53d873017bc5e6e32d16e70a52bf",
+      "command_count": 286
+    },
+    {
+      "index": 206,
+      "glyph_id": "GLYPH-149",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-149.svg",
+      "svg_sha256": "3ba59c872e21a20de27fad7da93f587759061fadd01676be644eb790378dccd4",
+      "command_count": 467
+    },
+    {
+      "index": 207,
+      "glyph_id": "GLYPH-150",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-150.svg",
+      "svg_sha256": "55370475b84c2f3b6c6dccba691217485178f9564b7ef2c1092aaca4aa3a7448",
+      "command_count": 482
+    },
+    {
+      "index": 208,
+      "glyph_id": "GLYPH-151",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-151.svg",
+      "svg_sha256": "565900819ef10b90904d40c485df782f2293cc389b1964d29bb91f58b29f491f",
+      "command_count": 637
+    },
+    {
+      "index": 209,
+      "glyph_id": "GLYPH-152",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-152.svg",
+      "svg_sha256": "d6caeec31f4e70bbd4890e0f0847eb9ea40181253e0949155144f12f2537e262",
+      "command_count": 189
+    },
+    {
+      "index": 210,
+      "glyph_id": "GLYPH-153",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-153.svg",
+      "svg_sha256": "97c1c9e662d2215bb586efd4f94ef2b0fbc30dfc3dde265a4b5850996bf7e07a",
+      "command_count": 475
+    },
+    {
+      "index": 211,
+      "glyph_id": "GLYPH-154",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-154.svg",
+      "svg_sha256": "be79f83dedab6175305886f4526dbec4c982e71df005b674137954808610c094",
+      "command_count": 522
+    },
+    {
+      "index": 212,
+      "glyph_id": "GLYPH-155",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-155.svg",
+      "svg_sha256": "4ea6581473869a2452b13b677cba548d2dca4f33c35740de7d61976ec90c6ec3",
+      "command_count": 646
+    },
+    {
+      "index": 213,
+      "glyph_id": "GLYPH-156",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-156.svg",
+      "svg_sha256": "71055c8254ca5f0ec88269a8db7933e139a5f3ba1cd11cedf037860923499e6b",
+      "command_count": 479
+    },
+    {
+      "index": 214,
+      "glyph_id": "GLYPH-157",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-157.svg",
+      "svg_sha256": "2576327d90d0f63a27324de4c2136958bbb7a87c111d8b86c7bbcaa409ffe289",
+      "command_count": 351
+    },
+    {
+      "index": 215,
+      "glyph_id": "GLYPH-158",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-158.svg",
+      "svg_sha256": "43bd639521cea049fd177c5f8c3cdc4cefafa785032e34b1b0383d63dfdc4dfa",
+      "command_count": 564
+    },
+    {
+      "index": 216,
+      "glyph_id": "GLYPH-159",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-159.svg",
+      "svg_sha256": "a99d3f6ca95d01f41d35828e165f7b3d4c713442c622b3a50f44cee6271729f9",
+      "command_count": 285
+    },
+    {
+      "index": 217,
+      "glyph_id": "GLYPH-160",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-160.svg",
+      "svg_sha256": "da190b435986bb8268d54455b608d630c713ad77619f4a18d54a4ca048f1c330",
+      "command_count": 651
+    },
+    {
+      "index": 218,
+      "glyph_id": "GLYPH-161",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-161.svg",
+      "svg_sha256": "eb4911c9f6089b0f45aa910b5270e08f3f868e8c608764143790d9971de47e99",
+      "command_count": 243
+    },
+    {
+      "index": 219,
+      "glyph_id": "GLYPH-162",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-162.svg",
+      "svg_sha256": "07da05fc09a7a9be2803293aa2561345f06a11b9f4bf2e92bdd9e2fcbc562ae7",
+      "command_count": 387
+    },
+    {
+      "index": 220,
+      "glyph_id": "GLYPH-163",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-163.svg",
+      "svg_sha256": "2fb2c68293fb6fa5364b644d566bbe77c5b09a63dcaf42ac19e5565712359577",
+      "command_count": 831
+    },
+    {
+      "index": 221,
+      "glyph_id": "GLYPH-164",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-164.svg",
+      "svg_sha256": "f80ff66f8eaf81dfc9a468e52f46bc8bdb7a7fb274c199d90419f6630e678fd9",
+      "command_count": 296
+    },
+    {
+      "index": 222,
+      "glyph_id": "GLYPH-165",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-165.svg",
+      "svg_sha256": "6379f3dc14981a7c45e9e527894c6633f537986ccaf0839eecd34ba2ff13f3c4",
+      "command_count": 572
+    },
+    {
+      "index": 223,
+      "glyph_id": "GLYPH-166",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-166.svg",
+      "svg_sha256": "c0522b0c8e2de48a43303e9a3ad9057d74e4058eb873feb2a5e846f116733220",
+      "command_count": 519
+    },
+    {
+      "index": 224,
+      "glyph_id": "GLYPH-167",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-167.svg",
+      "svg_sha256": "e54e166d88032e08781d1d0a1107c8768f9688ca2a35a4b156516b1f73c324b7",
+      "command_count": 675
+    },
+    {
+      "index": 225,
+      "glyph_id": "GLYPH-168",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-168.svg",
+      "svg_sha256": "06a2214eddebea2a9f57e0bc5347cbcb2fc0f97d43255a42ad5b0acf67c5d134",
+      "command_count": 556
+    },
+    {
+      "index": 226,
+      "glyph_id": "GLYPH-169",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-169.svg",
+      "svg_sha256": "0cb0411aa2c189d783ad01dae8aa9fa7bbb3abfc33b3bbdff5408bff69191746",
+      "command_count": 516
+    },
+    {
+      "index": 227,
+      "glyph_id": "GLYPH-170",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-170.svg",
+      "svg_sha256": "acb9f101e7fe2d9646fd3b96791c67eb4dd4bbf3786b692d93386c85faa970b0",
+      "command_count": 821
+    },
+    {
+      "index": 228,
+      "glyph_id": "GLYPH-171",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-171.svg",
+      "svg_sha256": "ac4369098a64a069f62118bd7a38d3c5f2c79d988b9fd84b02aea16a52c89b85",
+      "command_count": 846
+    },
+    {
+      "index": 229,
+      "glyph_id": "GLYPH-172",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-172.svg",
+      "svg_sha256": "35869f54b51c151b711d7e5745177008a171c8d42ef5ede1fb9bfac8afdd4a52",
+      "command_count": 458
+    },
+    {
+      "index": 230,
+      "glyph_id": "GLYPH-173",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-173.svg",
+      "svg_sha256": "6f4ff448cb7fbc50a61d4d055aeb2d830da6713da4ec97ff36b8d8e9193983dd",
+      "command_count": 289
+    },
+    {
+      "index": 231,
+      "glyph_id": "GLYPH-174",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-174.svg",
+      "svg_sha256": "2a63c66b26a4fecaa0acfa5e2797eaa821d364304792175ec284cd2abf68452b",
+      "command_count": 570
+    },
+    {
+      "index": 232,
+      "glyph_id": "GLYPH-175",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-175.svg",
+      "svg_sha256": "1fbce399f08c22b58ec83a7831907c98887127f407d7797ffcf93329431c8e92",
+      "command_count": 846
+    },
+    {
+      "index": 233,
+      "glyph_id": "GLYPH-176",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-176.svg",
+      "svg_sha256": "4faaf22bd19e73311ed115b24477fee0dd7694d296846e734c9534b56195acf0",
+      "command_count": 364
+    },
+    {
+      "index": 234,
+      "glyph_id": "GLYPH-177",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-177.svg",
+      "svg_sha256": "0b476f0774437dcf53701ae2a3e45be5669ea2af73237247b06987b37b5aadce",
+      "command_count": 338
+    },
+    {
+      "index": 235,
+      "glyph_id": "GLYPH-178",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-178.svg",
+      "svg_sha256": "925206b2da1fe1e0aad6eebb8d0d83f1529b49f2f93954284f2e15b56cecedfc",
+      "command_count": 795
+    },
+    {
+      "index": 236,
+      "glyph_id": "GLYPH-179",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-179.svg",
+      "svg_sha256": "368f88143ea8105672fe1b0e3b94e7f8ba18b94ab2550eb20b2ddb235fcd6112",
+      "command_count": 555
+    },
+    {
+      "index": 237,
+      "glyph_id": "GLYPH-180",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-180.svg",
+      "svg_sha256": "30d6cb36436f91b4cbbe97c50d7085c75ba84aba1d85cf6fffc30d950601ca1c",
+      "command_count": 689
+    },
+    {
+      "index": 238,
+      "glyph_id": "GLYPH-181",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-181.svg",
+      "svg_sha256": "f7897f1ead5fc5e2c9d0e8532306c60d182c54377cc3371d8b0b4a88317e8c0a",
+      "command_count": 542
+    },
+    {
+      "index": 239,
+      "glyph_id": "GLYPH-182",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-182.svg",
+      "svg_sha256": "08e1f883446fda9e47d5be51fe590eb009bc48a455e2cf6c5b9f6e37a848b62d",
+      "command_count": 604
+    },
+    {
+      "index": 240,
+      "glyph_id": "GLYPH-183",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-183.svg",
+      "svg_sha256": "9c69ee57bdce85330f07c2904efaef5f4c7189525992cd227fa5ff49bbce03a6",
+      "command_count": 495
+    },
+    {
+      "index": 241,
+      "glyph_id": "GLYPH-184",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-184.svg",
+      "svg_sha256": "6a911709a3e2c5ddc43455f9e7f5b900d984a6290780761dc76ca8b74490438e",
+      "command_count": 271
+    },
+    {
+      "index": 242,
+      "glyph_id": "GLYPH-185",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-185.svg",
+      "svg_sha256": "d5ada6e57ae7f2d8a22987641d3f1d1dfbe00874b23f1adef22934cf571d54a2",
+      "command_count": 782
+    },
+    {
+      "index": 243,
+      "glyph_id": "GLYPH-186",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-186.svg",
+      "svg_sha256": "62a8018a23a9b8fc4ae9492f2503bbfd7e1aa99589b48f9c7868f1977d75abf7",
+      "command_count": 511
+    },
+    {
+      "index": 244,
+      "glyph_id": "GLYPH-187",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-187.svg",
+      "svg_sha256": "b187ed77449913ecc38ca1ae063b189ee7e5483fe5f1f23223b3c44310892a48",
+      "command_count": 872
+    },
+    {
+      "index": 245,
+      "glyph_id": "GLYPH-188",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-188.svg",
+      "svg_sha256": "46e19191f9c588e406eeec8aaaf5ea693db25f0e98d64d6d4ee7ecbe864ed4c4",
+      "command_count": 554
+    },
+    {
+      "index": 246,
+      "glyph_id": "GLYPH-189",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-189.svg",
+      "svg_sha256": "db1caa36330f9e83768ef083f91199e33f68abd0c5d70a543b2cf2e816f44e72",
+      "command_count": 822
+    },
+    {
+      "index": 247,
+      "glyph_id": "GLYPH-190",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-190.svg",
+      "svg_sha256": "bc6c14e80c44294ab6e5eacf71bee58071f04dacd6ed8a0c16f5fdc3804c7ad0",
+      "command_count": 298
+    },
+    {
+      "index": 248,
+      "glyph_id": "GLYPH-191",
+      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-191.svg",
+      "svg_sha256": "1d668e7b5d18423758a26045ae481efafac4bbd8b62bbe4508ff19bdc64470a4",
+      "command_count": 537
+    }
+  ],
+  "output_sha256": {
+    "screensaver/windows/GlyphData.cs": "79be65eaa1cc6d1ab474f673a4839328549dfbb2839ccdb0d04ee42715228b9a",
+    "screensaver/macos/glyphs.json": "0dc50a9e86d5358b3d9e7a7d39d86e506e7b7223b0696c26b90707b3b2c1404f",
+    "screensaver/linux/glyph_data.h": "1c7d721225d24c809be8c0d87fe05e062e95fc9eddbc8a4ab46f154b1e96028f"
+  },
+  "licenses": [
+    {
+      "scope": "Reference artwork",
+      "source": "screensaver/svg-preview/reference/LICENSE",
+      "text": "MIT License\n\nCopyright (c) 2018 Rezmason\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+    },
+    {
+      "scope": "Smythe original catalog and native exporter",
+      "source": "LICENSE",
+      "text": "# MIT License \n\n# Copyright (c) 2026 Pete Hottelet\n\n# LICENSE\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+    }
+  ],
+  "reference_rights_scope": "The repository MIT notice is preserved as published. It is not a separate clearance or assertion of ownership of every underlying film or typeface element."
+}

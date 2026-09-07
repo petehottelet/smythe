@@ -31,3 +31,12 @@
 /assets/wordmark.svg -text
 /benchmarks/partitions/glyph_rain_reference_v1/*.json -text
 /benchmarks/partitions/glyph_svg_v1/renderer-v1/** -text
+
+# Native exports and receipts carry cross-platform catalog and package hashes.
+/screensaver/export_native_glyphs.py text eol=lf
+/screensaver/native-catalog.json text eol=lf
+/screensaver/windows/GlyphData.cs text eol=lf
+/screensaver/macos/glyphs.json text eol=lf
+/screensaver/linux/glyph_data.h text eol=lf
+/screensaver/dist/*.json text eol=lf
+/screensaver/dist/verification/*.json text eol=lf

@@ -13,7 +13,18 @@ permissions:
   contents: read
 
 jobs:
+  catalog-exports:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Verify all native data against both canonical SVG catalogs
+        run: python screensaver/export_native_glyphs.py --check
+
   windows-scr:
+    needs: catalog-exports
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,6 +47,7 @@ jobs:
           if-no-files-found: ignore
 
   macos-saver:
+    needs: catalog-exports
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -78,13 +90,14 @@ jobs:
           if-no-files-found: ignore
 
   linux-x11:
+    needs: catalog-exports
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - name: Install native build and virtual display dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libx11-dev libcairo2-dev xvfb xauth python3-pil
+          sudo apt-get install -y build-essential pkg-config libx11-dev libcairo2-dev librsvg2-2 xvfb xauth python3-pil
       - name: Build the Linux executable
         run: sh screensaver/linux/build_linux.sh
       - name: Verify compiled X11 rendering, embedding, and shutdown
@@ -99,6 +112,9 @@ jobs:
           mkdir -p "$package"
           cp screensaver/dist/smythe-glyph-rain-linux-x86_64 "$package/"
           cp screensaver/linux/README.md "$package/README.md"
+          cp screensaver/svg-preview/reference/LICENSE "$package/REFERENCE-LICENSE.txt"
+          cp LICENSE "$package/SMYTHE-LICENSE.txt"
+          cp screensaver/native-catalog.json "$package/native-catalog.json"
           cp screensaver/dist/linux-verification/verification.json "$package/verification.json"
           tar -czf screensaver/dist/SmytheGlyphRain-linux-x86_64.tar.gz -C "$package" .
       - uses: actions/upload-artifact@v4
@@ -125,7 +141,7 @@ jobs:
       - name: Install runtime and virtual display dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libx11-6 libcairo2 xvfb xauth python3-pil
+          sudo apt-get install -y libx11-6 libcairo2 librsvg2-2 xvfb xauth python3-pil
       - name: Verify the same compiled executable on Ubuntu 24.04
         run: |
           tar -xzf "$RUNNER_TEMP/linux-package/SmytheGlyphRain-linux-x86_64.tar.gz" -C "$RUNNER_TEMP/linux-package"

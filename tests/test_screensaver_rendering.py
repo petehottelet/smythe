@@ -127,7 +127,7 @@ console.log(JSON.stringify({ slow, fast, reducedMotionResize: true, pause: true,
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows GDI+ renderer")
-def test_windows_preserves_stroke_widths_and_disposes_resized_scene(tmp_path):
+def test_windows_fills_exact_svg_paths_and_disposes_resized_scene(tmp_path):
     compiler = Path(os.environ["WINDIR"]) / "Microsoft.NET/Framework64/v4.0.30319/csc.exe"
     if not compiler.is_file():
         pytest.skip("Windows .NET Framework compiler is unavailable")
@@ -137,6 +137,7 @@ def test_windows_preserves_stroke_widths_and_disposes_resized_scene(tmp_path):
 using System;
 using System.Collections;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Reflection;
 using SmytheGlyphRain;
 
@@ -154,14 +155,37 @@ internal class RenderCheck
     [STAThread]
     private static void Main()
     {
-        float[][] original = GlyphData.Strokes[0];
-        GlyphData.Strokes[0] = new float[][] { new float[] { 0, 20, 60, 80, 60, 4 } };
-        int thin;
-        using (Bitmap image = Sprites.Render(0, 140, 70, 1f, false)) { thin = Ink(image); }
-        GlyphData.Strokes[0][0][5] = 16;
-        using (Bitmap image = Sprites.Render(0, 140, 70, 1f, false))
-            if (Ink(image) < thin * 2) throw new Exception("Authored widths were flattened");
-        GlyphData.Strokes[0] = original;
+        var diagnostics = CatalogDiagnostics.Verify();
+        if ((int)diagnostics["visible_count"] != 248)
+            throw new Exception("The complete filled SVG catalog was not loaded");
+        using (Bitmap blank = Sprites.RenderMask(GlyphData.BlankIndex, 64))
+            if (Ink(blank) != 0) throw new Exception("Intentional reference blank was filled");
+
+        // Opposite inner contour winding must preserve an actual filled-path counter.
+        var ring = new double[][] {
+            new double[] { 0, 10, 10 }, new double[] { 1, 90, 10 },
+            new double[] { 1, 90, 90 }, new double[] { 1, 10, 90 }, new double[] { 3 },
+            new double[] { 0, 30, 30 }, new double[] { 1, 30, 70 },
+            new double[] { 1, 70, 70 }, new double[] { 1, 70, 30 }, new double[] { 3 }
+        };
+        using (GraphicsPath path = Sprites.BuildPath(ring))
+        using (var image = new Bitmap(100, 100))
+        using (Graphics graphics = Graphics.FromImage(image))
+        {
+            if (path.FillMode != FillMode.Winding) throw new Exception("SVG nonzero fill was lost");
+            graphics.FillPath(Brushes.White, path);
+            if (image.GetPixel(20, 50).A != 255 || image.GetPixel(50, 50).A != 0)
+                throw new Exception("Compound-path counter was lost");
+        }
+        using (GraphicsPath curve = Sprites.BuildPath(new double[][] {
+            new double[] { 0, 10, 50 }, new double[] { 2, 10, 0, 90, 0, 90, 50 },
+            new double[] { 1, 90, 90 }, new double[] { 1, 10, 90 }, new double[] { 3 }
+        }))
+            if (!curve.IsVisible(50, 25)) throw new Exception("Cubic SVG curves were flattened to lines");
+        bool invalidRejected = false;
+        try { using (var invalid = Sprites.BuildPath(new double[][] { new double[] { 1, 0, 0 } })) {} }
+        catch (InvalidOperationException) { invalidRejected = true; }
+        if (!invalidRejected) throw new Exception("Unopened SVG contours were accepted");
 
         using (var form = new SaverForm(new Rectangle(0, 0, 200, 150), true))
         {

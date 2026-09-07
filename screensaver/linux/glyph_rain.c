@@ -21,6 +21,7 @@ enum { LAYER_COUNT = 3, FPS = 40, MAX_SIZE = 8192 };
 typedef struct {
     double x, y, rate, accumulator, burst;
     int glyph, phase;
+    uint32_t seed;
 } Column;
 typedef struct {
     cairo_surface_t *trail[GLYPH_COUNT], *head[GLYPH_COUNT];
@@ -32,12 +33,14 @@ typedef struct {
     Layer layers[LAYER_COUNT];
     cairo_surface_t *image;
     int width, height;
+    uint64_t reference_cells, original_cells, blank_cells;
 } Scene;
 
 static volatile sig_atomic_t stopping = 0;
 static int x_error = 0;
 static Window live_window = 0;
 static uint32_t random_state = 0x534d5954u;
+static double original_mix = GLYPH_ORIGINAL_SHARE;
 
 static void stop_signal(int number) { (void)number; stopping = 1; }
 static int handle_x_error(Display *display, XErrorEvent *event) {
@@ -62,7 +65,27 @@ static double random_unit(void) {
     random_state ^= random_state << 5;
     return (double)random_state / 4294967296.0;
 }
-static int random_glyph(void) { return (int)(random_unit() * GLYPH_COUNT); }
+static int random_glyph(void) {
+    return random_unit() < original_mix
+        ? GLYPH_ORIGINAL_OFFSET + (int)(random_unit() * GLYPH_ORIGINAL_COUNT)
+        : (int)(random_unit() * GLYPH_REFERENCE_COUNT);
+}
+static uint32_t mix_bits(uint32_t value) {
+    value ^= value >> 16;
+    value *= 0x7feb352du;
+    value ^= value >> 15;
+    value *= 0x846ca68bu;
+    return value ^ (value >> 16);
+}
+static int cell_glyph(const Column *column, int tail) {
+    /* Decide the family first: a larger original catalog must not increase
+       its selection probability. A stable cell seed keeps redraws identical. */
+    uint32_t value = mix_bits(column->seed + (uint32_t)(column->phase - tail * 7));
+    uint32_t index = mix_bits(value ^ 0xa511e9b3u);
+    return (double)value / 4294967296.0 < original_mix
+        ? GLYPH_ORIGINAL_OFFSET + (int)(index % GLYPH_ORIGINAL_COUNT)
+        : (int)(index % GLYPH_REFERENCE_COUNT);
+}
 static double monotonic_seconds(void) {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
@@ -70,35 +93,26 @@ static double monotonic_seconds(void) {
 }
 
 static void draw_program(cairo_t *cr, int glyph, double ox, double oy,
-                         double unit, double factor,
+                         double unit,
                          double red, double green, double blue, double alpha) {
     const GlyphSpec *spec = &GLYPHS[glyph];
     cairo_set_source_rgba(cr, red / 255, green / 255, blue / 255, alpha);
-    cairo_set_line_cap(cr, CAIRO_LINE_CAP_SQUARE);
-    cairo_set_line_join(cr, CAIRO_LINE_JOIN_BEVEL);
+    cairo_set_fill_rule(cr, CAIRO_FILL_RULE_WINDING);
+    cairo_new_path(cr);
     for (int i = 0; i < spec->count; i++) {
-        const GlyphStroke *stroke = &GLYPH_STROKES[spec->offset + i];
-        const double *v = stroke->values;
-        double x1 = ox + v[0] * unit, y1 = oy + v[1] * unit;
-        cairo_new_path(cr);
-        if (stroke->kind == 2) {
-            cairo_arc(cr, x1, y1, fmax(.6, v[2] * unit * 1.2) * factor,
-                      0, 6.283185307179586);
-            cairo_fill(cr);
-            continue;
+        const GlyphCommand *command = &GLYPH_COMMANDS[spec->offset + i];
+        const double *v = command->values;
+        switch (command->kind) {
+            case 0: cairo_move_to(cr, ox + v[0] * unit, oy + v[1] * unit); break;
+            case 1: cairo_line_to(cr, ox + v[0] * unit, oy + v[1] * unit); break;
+            case 2: cairo_curve_to(cr, ox + v[0] * unit, oy + v[1] * unit,
+                                   ox + v[2] * unit, oy + v[3] * unit,
+                                   ox + v[4] * unit, oy + v[5] * unit); break;
+            case 3: cairo_close_path(cr); break;
         }
-        cairo_set_line_width(cr, fmax(.8, v[stroke->kind == 0 ? 4 : 6] * unit * 1.38) * factor);
-        cairo_move_to(cr, x1, y1);
-        if (stroke->kind == 0) {
-            cairo_line_to(cr, ox + v[2] * unit, oy + v[3] * unit);
-        } else {
-            double cx = ox + v[2] * unit, cy = oy + v[3] * unit;
-            double x2 = ox + v[4] * unit, y2 = oy + v[5] * unit;
-            cairo_curve_to(cr, x1 + 2.0 / 3 * (cx - x1), y1 + 2.0 / 3 * (cy - y1),
-                           x2 + 2.0 / 3 * (cx - x2), y2 + 2.0 / 3 * (cy - y2), x2, y2);
-        }
-        cairo_stroke(cr);
     }
+    /* One compound fill preserves holes, overlapping contours, and curves. */
+    cairo_fill(cr);
 }
 
 static cairo_surface_t *make_sprite(int glyph, double cell, double pad,
@@ -108,18 +122,21 @@ static cairo_surface_t *make_sprite(int glyph, double cell, double pad,
     cairo_t *cr = cairo_create(surface);
     double unit = cell / GLYPH_CANVAS_H;
     double ox = pad + (cell - GLYPH_CANVAS_W * unit) / 2;
-    if (head) {
-        double pulse = .65 + (glyph % 7) * .05;
-        /* The two soft stroke passes match the native Windows halo. */
-        draw_program(cr, glyph, ox, pad, unit, 1.5 + (glyph % 5) * .16,
-                     111, 255, 61, 28.0 / 255 * level);
-        draw_program(cr, glyph, ox, pad, unit, 1.2, 111, 255, 61, 42.0 / 255 * level);
-        draw_program(cr, glyph, ox, pad, unit, 1, (112 + 76 * pulse) * level,
-                     255 * level, (74 + 45 * pulse) * level, 1);
-    } else {
-        draw_program(cr, glyph, ox, pad, unit, 1.15, 86, 255, 48, 18.0 / 255 * level);
-        draw_program(cr, glyph, ox, pad, unit, 1, 92 * level, 238 * level, 48 * level, 1);
+    /* A small cached halo surrounds the original contour; the opaque core is
+       never stroked or enlarged. This is Cairo glow, not the REGL bloom pass. */
+    for (int pass = 0; pass < 2; pass++) {
+        double radius = (pass ? .75 : 1.5) * fmax(.5, cell / 24);
+        for (int direction = 0; direction < 8; direction++) {
+            double angle = direction * 6.283185307179586 / 8;
+            draw_program(cr, glyph, ox + cos(angle) * radius, pad + sin(angle) * radius,
+                         unit, 25.5, 229.5, 83.3, (head ? .025 : .012) * level);
+        }
     }
+    /* Body: HSL(137deg, 80%, 50%). Head: the web explorer's #A2FFD8 mint. */
+    draw_program(cr, glyph, ox, pad, unit,
+                 (head ? 162 : 25.5) * level,
+                 (head ? 255 : 229.5) * level,
+                 (head ? 216 : 83.3) * level, 1);
     cairo_destroy(cr);
     return surface;
 }
@@ -174,6 +191,7 @@ static int build_scene(Scene *scene, int width, int height) {
             col->x = i * lane + random_unit() * 7 - 3;
             col->glyph = random_glyph();
             col->phase = random_glyph();
+            col->seed = (uint32_t)(random_unit() * 4294967296.0);
             col->y = random_unit() * (height + GLYPHS[col->glyph].trail * layer->step);
             col->rate = GLYPHS[col->glyph].speed * 5.6 * layer->speed;
             col->accumulator = random_unit();
@@ -195,7 +213,7 @@ static void render_scene(Scene *scene, double dt) {
             while (col->accumulator >= 1) {
                 col->accumulator -= 1;
                 col->y += layer->step;
-                col->phase = (col->phase + 7) % GLYPH_COUNT;
+                col->phase = (col->phase + 7) % 1000000;
                 double past = col->y - GLYPHS[col->glyph].trail * layer->step * 1.15;
                 if (past > scene->height && random_unit() < .6) {
                     col->y = -layer->step * (int)(random_unit() * 7);
@@ -208,8 +226,10 @@ static void render_scene(Scene *scene, double dt) {
             for (int tail = length; tail >= 0; tail--) {
                 double y = col->y - tail * layer->step;
                 if (y < -layer->step || y > scene->height + layer->step) continue;
-                int glyph = (col->glyph + col->phase - tail * 7) % GLYPH_COUNT;
-                if (glyph < 0) glyph += GLYPH_COUNT;
+                int glyph = cell_glyph(col, tail);
+                if (glyph >= GLYPH_ORIGINAL_OFFSET) scene->original_cells++;
+                else scene->reference_cells++;
+                if (glyph == GLYPH_BLANK_INDEX) scene->blank_cells++;
                 double near = 1 - (double)tail / length;
                 double alpha = tail == 0 ? 1 : (.25 + .75 * sqrt(near)) * (.75 + (glyph % 5) * .0625);
                 cairo_set_source_surface(cr, tail == 0 ? layer->head[glyph] : layer->trail[glyph],
@@ -231,9 +251,46 @@ static int number(const char *text, unsigned long limit, unsigned long *value) {
     return 1;
 }
 
+static void print_catalog(void) {
+    printf("{\"version\":\"native-mixed-svg-v1\",\"catalog_sha256\":\"%s\","
+           "\"reference_sha256\":\"%s\",\"original_sha256\":\"%s\","
+           "\"glyph_count\":%d,\"reference_count\":%d,\"reference_visible_count\":%d,"
+           "\"original_count\":%d,\"original_offset\":%d,\"blank_index\":%d,"
+           "\"canvas\":[%d,%d],\"fill_rule\":\"%s\",\"default_original_mix\":%.1f}\n",
+           GLYPH_CATALOG_SHA256, GLYPH_REFERENCE_SHA256, GLYPH_ORIGINAL_SHA256,
+           GLYPH_COUNT, GLYPH_REFERENCE_COUNT, GLYPH_REFERENCE_VISIBLE_COUNT,
+           GLYPH_ORIGINAL_COUNT, GLYPH_ORIGINAL_OFFSET, GLYPH_BLANK_INDEX,
+           GLYPH_CANVAS_W, GLYPH_CANVAS_H, GLYPH_FILL_RULE, GLYPH_ORIGINAL_SHARE);
+}
+
+static int write_glyph_sheet(const char *path) {
+    enum { TILE = 128, COLUMNS = 16, MARGIN = 4 };
+    int rows = (GLYPH_COUNT + COLUMNS - 1) / COLUMNS;
+    cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24,
+                                                         COLUMNS * TILE, rows * TILE);
+    cairo_t *cr = cairo_create(surface);
+    cairo_set_source_rgb(cr, 1, 1, 1);
+    cairo_paint(cr);
+    for (int glyph = 0; glyph < GLYPH_COUNT; glyph++) {
+        draw_program(cr, glyph, (glyph % COLUMNS) * TILE + MARGIN,
+                     (glyph / COLUMNS) * TILE + MARGIN,
+                     (double)(TILE - 2 * MARGIN) / GLYPH_CANVAS_H, 0, 0, 0, 1);
+    }
+    cairo_status_t status = cairo_status(cr);
+    if (status == CAIRO_STATUS_SUCCESS) status = cairo_surface_write_to_png(surface, path);
+    cairo_destroy(cr);
+    cairo_surface_destroy(surface);
+    if (status != CAIRO_STATUS_SUCCESS) {
+        fprintf(stderr, "Glyph sheet: %s\n", cairo_status_to_string(status));
+        return 1;
+    }
+    print_catalog();
+    return 0;
+}
+
 static void usage(FILE *stream) {
     fprintf(stream,
-        "Smythe Glyph Rain — %d original glyphs, native X11 screensaver\n"
+        "Smythe Glyph Rain — %d reference slots + %d original SVGs, native X11\n"
         "Usage: smythe-glyph-rain [options]\n"
         "  --window                 Resizable preview window (default)\n"
         "  --fullscreen             Fullscreen standalone window\n"
@@ -243,21 +300,31 @@ static void usage(FILE *stream) {
         "  --width N --height N     Preview size (default 960x640)\n"
         "  --frames N --seed N      Bounded deterministic validation run\n"
         "  --snapshot FILE.png      Save final frame (requires --frames)\n"
+        "  --mix FRACTION           Original glyph share, 0 to 1 (default 0.1)\n"
+        "  --glyph-sheet FILE.png   Write all filled contours without X11\n"
+        "  --catalog | --license    Catalog hashes or included MIT notices\n"
         "  --help | --version       Print information and exit\n"
         "XSCREENSAVER_WINDOW is honored unless --window is explicit.\n"
-        "Escape closes standalone preview. SIGTERM exits cleanly.\n", GLYPH_COUNT);
+        "Escape closes standalone preview. SIGTERM exits cleanly.\n",
+        GLYPH_REFERENCE_COUNT, GLYPH_ORIGINAL_COUNT);
 }
 
 int main(int argc, char **argv) {
     int width = 960, height = 640, root_mode = 0, fullscreen = 0, explicit_window = 0;
     unsigned long window_id = 0, frames_limit = 0;
-    const char *display_name = NULL, *snapshot = NULL;
+    const char *display_name = NULL, *snapshot = NULL, *glyph_sheet = NULL;
     random_state = (uint32_t)time(NULL) ^ (uint32_t)clock();
     if (!random_state) random_state = 1;
     for (int i = 1; i < argc; i++) {
         const char *arg = argv[i];
         if (!strcmp(arg, "--help") || !strcmp(arg, "-help")) { usage(stdout); return 0; }
-        if (!strcmp(arg, "--version")) { printf("Smythe Glyph Rain X11; glyphs=%d\n", GLYPH_COUNT); return 0; }
+        if (!strcmp(arg, "--version")) {
+            printf("Smythe Glyph Rain X11; glyphs=%d reference=%d original=%d catalog=%s\n",
+                   GLYPH_COUNT, GLYPH_REFERENCE_COUNT, GLYPH_ORIGINAL_COUNT, GLYPH_CATALOG_SHA256);
+            return 0;
+        }
+        if (!strcmp(arg, "--catalog")) { print_catalog(); return 0; }
+        if (!strcmp(arg, "--license")) { puts(GLYPH_LICENSE_NOTICE); return 0; }
         if (!strcmp(arg, "-root") || !strcmp(arg, "--root")) { root_mode = 1; continue; }
         if (!strcmp(arg, "--window") || !strcmp(arg, "-window")) { explicit_window = 1; continue; }
         if (!strcmp(arg, "--fullscreen")) { fullscreen = 1; explicit_window = 1; continue; }
@@ -266,6 +333,14 @@ int main(int argc, char **argv) {
         unsigned long parsed;
         if (!strcmp(arg, "-display") || !strcmp(arg, "--display")) display_name = value;
         else if (!strcmp(arg, "--snapshot")) snapshot = value;
+        else if (!strcmp(arg, "--glyph-sheet")) glyph_sheet = value;
+        else if (!strcmp(arg, "--mix")) {
+            char *end;
+            errno = 0;
+            double result = strtod(value, &end);
+            if (errno || end == value || *end || !isfinite(result) || result < 0 || result > 1) goto invalid;
+            original_mix = result;
+        }
         else if (!strcmp(arg, "-window-id") || !strcmp(arg, "--window-id")) {
             if (!number(value, ULONG_MAX, &window_id) || !window_id) goto invalid;
         } else if (!strcmp(arg, "--width") || !strcmp(arg, "--height")) {
@@ -282,6 +357,7 @@ invalid:
         fprintf(stderr, "Invalid value for %s: %s\n", arg, value);
         return 2;
     }
+    if (glyph_sheet) return write_glyph_sheet(glyph_sheet);
     if (snapshot && !frames_limit) { fprintf(stderr, "--snapshot requires --frames\n"); return 2; }
     if (!window_id && !explicit_window) {
         const char *parent = getenv("XSCREENSAVER_WINDOW");
@@ -394,6 +470,9 @@ invalid:
         if (status != CAIRO_STATUS_SUCCESS) { fprintf(stderr, "Snapshot: %s\n", cairo_status_to_string(status)); result = 1; }
     }
     printf("frames=%lu width=%d height=%d stopped=%d\n", frames, scene.width, scene.height, stopping ? 1 : 0);
+    printf("selected_reference=%llu selected_original=%llu selected_blank=%llu mix=%.6f\n",
+           (unsigned long long)scene.reference_cells, (unsigned long long)scene.original_cells,
+           (unsigned long long)scene.blank_cells, original_mix);
 cleanup:
     free_scene(&scene);
     cairo_surface_destroy(surface);

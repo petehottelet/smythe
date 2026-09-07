@@ -1,9 +1,8 @@
-"""Export the benchmark's generated glyph catalog for every screensaver port.
+"""Export the historical stroke catalog for the legacy web view only.
 
-One command regenerates the web data (glyphs.js), the Windows C# data file
-(windows/GlyphData.cs), the macOS resource (macos/glyphs.json), and the Linux
-C header (linux/glyph_data.h), so every port uses the same catalog. Run from the
-repository root after any glyph grammar change:
+Native ports use the current SVG catalogs. Export those separately with
+``python screensaver/export_native_glyphs.py``. This command cannot overwrite
+native data with the historical stroke programs:
 
     python screensaver/export_glyphs.py
 """
@@ -36,66 +35,6 @@ def _write(destination: Path, content: str) -> None:
     print(f"wrote {destination} ({destination.stat().st_size} bytes)")
 
 
-def _csharp(data: dict) -> str:
-    # Strokes become jagged float arrays; the kind is encoded as
-    # 0 = line, 1 = quadratic, 2 = dot, followed by the numeric values.
-    kind_codes = {"l": 0, "q": 1, "d": 2}
-    glyphs = []
-    for strokes in data["strokes"]:
-        rows = []
-        for stroke in strokes:
-            values = [str(kind_codes[stroke[0]])] + [f"{v}f" for v in stroke[1:]]
-            rows.append("new float[]{" + ",".join(values) + "}")
-        glyphs.append("new float[][]{" + ",".join(rows) + "}")
-    speeds = ",".join(f"{v}f" for v in data["speeds"])
-    trails = ",".join(str(v) for v in data["trails"])
-    return (
-        f"// {HEADER}benchmark's GLYPH_SPECS. Do not edit by hand.\n"
-        "namespace SmytheGlyphRain\n{\n"
-        "    internal static class GlyphData\n    {\n"
-        f"        public const float CanvasW = {data['canvas'][0]}f;\n"
-        f"        public const float CanvasH = {data['canvas'][1]}f;\n"
-        "        public static readonly float[][][] Strokes = new float[][][]\n"
-        "        {\n            " + ",\n            ".join(glyphs) + "\n        };\n"
-        f"        public static readonly float[] Speeds = new float[]{{{speeds}}};\n"
-        f"        public static readonly int[] Trails = new int[]{{{trails}}};\n"
-        "    }\n}\n"
-    )
-
-
-def _c_header(data: dict) -> str:
-    """Flatten the shared stroke program without a runtime JSON dependency."""
-    kind_codes = {"l": 0, "q": 1, "d": 2}
-    strokes = []
-    glyphs = []
-    for index, program in enumerate(data["strokes"]):
-        glyphs.append(
-            "    {%d, %d, %.8g, %d}"
-            % (len(strokes), len(program), data["speeds"][index], data["trails"][index])
-        )
-        for stroke in program:
-            values = [float(value) for value in stroke[1:]]
-            values.extend([0.0] * (7 - len(values)))
-            strokes.append(
-                "    {%d, {%s}}"
-                % (kind_codes[stroke[0]], ", ".join(f"{value:.8g}" for value in values))
-            )
-    return (
-        f"/* {HEADER}benchmark's GLYPH_SPECS. Do not edit by hand. */\n"
-        "#ifndef SMYTHE_GLYPH_DATA_H\n#define SMYTHE_GLYPH_DATA_H\n\n"
-        "typedef struct { int kind; double values[7]; } GlyphStroke;\n"
-        "typedef struct { int offset, count; double speed; int trail; } GlyphSpec;\n"
-        f"#define GLYPH_COUNT {len(glyphs)}\n"
-        f"#define GLYPH_CANVAS_W {float(data['canvas'][0]):.8g}\n"
-        f"#define GLYPH_CANVAS_H {float(data['canvas'][1]):.8g}\n"
-        "static const GlyphStroke GLYPH_STROKES[] = {\n"
-        + ",\n".join(strokes)
-        + "\n};\nstatic const GlyphSpec GLYPHS[] = {\n"
-        + ",\n".join(glyphs)
-        + "\n};\n#endif\n"
-    )
-
-
 def main() -> None:
     root = Path(__file__).parent
     data = _payload()
@@ -105,9 +44,6 @@ def main() -> None:
         f"// {HEADER}benchmark's GLYPH_SPECS. Do not edit by hand.\n"
         f"const GLYPHS={compact};\n",
     )
-    _write(root / "windows" / "GlyphData.cs", _csharp(data))
-    _write(root / "macos" / "glyphs.json", compact + "\n")
-    _write(root / "linux" / "glyph_data.h", _c_header(data))
 
 
 if __name__ == "__main__":
