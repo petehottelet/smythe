@@ -3,6 +3,7 @@
 from smythe.budget import (
     BudgetEstimateRequired,
     BudgetReconciliationError,
+    BudgetValidationError,
     Sentinel,
     SentinelAlert,
 )
@@ -59,6 +60,7 @@ __all__ = [
     "Artifact",
     "BudgetEstimateRequired",
     "BudgetReconciliationError",
+    "BudgetValidationError",
     "CallableVerifier",
     "CapabilityHydrationMode",
     "CapabilityMapper",

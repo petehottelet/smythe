@@ -156,7 +156,7 @@ documents each comparison, its scope, and its evidence status.
 | Generated execution topology | Durable execution envelope |
 |---|---|
 | Generate a DAG from the goal with `LLMArchitect` | Bound active calls with `max_concurrency` |
-| Select approved templates with `ConstrainedArchitect` | Reserve execution spend before dispatch |
+| Select approved templates with `ConstrainedArchitect` | Reserve execution spend and reject invalid usage |
 | Build exact workflows with `DeterministicArchitect` | Save node results and resume from checkpoints |
 | Inspect and export plans before execution | Validate artifacts and gate results |
 | Reuse successful graphs as templates | Trace calls, costs, failures, and revisions |
@@ -166,7 +166,7 @@ Durable Jobs add manifest validation, plan approvals, an attempt journal,
 selective rerolls, and portable exports.
 
 [Architecture](docs/architecture.md) · [Jobs and CLI](docs/jobs.md) ·
-[MCP](docs/mcp.md) · [Verification](docs/verifier.md) ·
+[Cost guardrails](docs/budgets.md) · [MCP](docs/mcp.md) · [Verification](docs/verifier.md) ·
 [All guides and examples](docs/index.md).
 
 ## Quickstart
@@ -228,7 +228,7 @@ team challenges the draft, and a final node writes the decision memo.
 - **Complete workflow cost accounting:** include planning and supervision in
   one spend ledger, then publish repeated cost comparisons from native usage.
 - **Runtime hardening:** synchronize verification with active descendants,
-  enforce serial halt behavior, reject invalid cost inputs, and carry the full
+  enforce serial halt behavior, and carry the full
   task context through planning, execution, and resume.
 - **Operator tools:** inspect runs, detach long jobs, and approve durable pauses.
 - **Native exploration:** bring the web exposure pipeline, camera controls,

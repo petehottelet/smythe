@@ -19,7 +19,9 @@ from smythe.jobs.models import (
 )
 from smythe.jobs.providers import ProviderPool
 from smythe.jobs.runner import JobRunner
-from smythe.jobs.store import OperationStatus, RunLeaseError, RunStatus, SQLiteRunStore
+from smythe.jobs.store import (
+    InvalidTransitionError, OperationStatus, RunLeaseError, RunStatus, SQLiteRunStore,
+)
 from smythe.provider import Artifact, CompletionResult, Provider
 
 Image = pytest.importorskip("PIL.Image")
@@ -421,7 +423,167 @@ def test_invalid_provider_cost_is_immediately_journaled_unknown(tmp_path):
     assert result["status"] == RunStatus.NEEDS_ATTENTION.value
     assert result["cost"]["confirmed_microusd"] == 0
     assert result["cost"]["exposure_microusd"] == 100_000
-    assert "finite and non-negative" in result["operations"][0]["error"]
+    assert "invalid provider accounting: cost_usd" in result["operations"][0]["error"]
+    assert "finite non-negative" in result["operations"][0]["error"]
+
+
+@pytest.mark.parametrize("mutated", [False, True], ids=["constructor", "mutated"])
+@pytest.mark.parametrize(
+    "field,value", [("cost_usd", float("nan")), ("prompt_tokens", True), ("cost_usd", 1e308)],
+    ids=["nan-cost", "boolean-usage", "durable-cost-overflow"],
+)
+def test_invalid_accounting_stops_queued_calls_and_fresh_runner_resume(
+    tmp_path, mutated, field, value,
+):
+    class InvalidAccountingProvider(Provider):
+        def __init__(self):
+            self.calls = 0
+
+        async def complete(self, system, prompt, model):
+            self.calls += 1
+            if mutated:
+                result = CompletionResult(text="invalid", cost_usd=0.08)
+                setattr(result, field, value)
+                return result
+            return CompletionResult(text="invalid", **{field: value})
+
+    data = _priced_manifest(count=3).to_dict()
+    data["execution"].update(max_concurrency=1, max_attempts=2, max_budget_usd="0.60")
+    plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
+    store = SQLiteRunStore(tmp_path / "jobs.db")
+    provider = InvalidAccountingProvider()
+    pool = _FixedPool(provider)
+    result = asyncio.run(
+        JobRunner(store, provider_pool=pool).start(
+            plan, make_approval(plan), manifest_root=tmp_path,
+        )
+    )
+    assert provider.calls == 1
+    assert result["status"] == RunStatus.NEEDS_ATTENTION.value
+    assert result["counts"] == {"unknown_outcome": 1, "pending": 2}
+    assert len(result["attempts"]) == 1
+    assert result["cost"]["confirmed_microusd"] == 0
+    assert result["cost"]["exposure_microusd"] == 100_000
+    assert result["cost"]["reserved_microusd"] == 0
+    assert not result["artifacts"]
+    events = store.snapshot(result["run_id"], include_events=True)["events"]
+    assert sum(event["event_type"] == "call_dispatched" for event in events) == 1
+    assert sum(event["event_type"] == "unknown_outcome" for event in events) == 1
+
+    fresh_runner = JobRunner(store, provider_pool=pool)
+    resumed = asyncio.run(fresh_runner.resume(result["run_id"]))
+    assert provider.calls == 1
+    assert resumed["counts"] == result["counts"]
+    assert resumed["cost"] == result["cost"]
+    assert resumed["execution_metrics"]["operations_started"] == 0
+
+
+def test_invalid_accounting_requires_explicit_reroll_acknowledgement(tmp_path):
+    class CorrectedProvider(Provider):
+        def __init__(self):
+            self.calls = 0
+
+        async def complete(self, system, prompt, model):
+            self.calls += 1
+            return CompletionResult(
+                text="response", cost_usd=float("nan") if self.calls == 1 else 0.08,
+                artifacts=[Artifact(PNG_1X1, "image/png")],
+            )
+
+    data = _priced_manifest().to_dict()
+    data["execution"].update(max_attempts=2, max_budget_usd="0.20")
+    plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
+    store = SQLiteRunStore(tmp_path / "jobs.db")
+    provider = CorrectedProvider()
+    runner = JobRunner(store, provider_pool=_FixedPool(provider))
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path))
+    key = first["operations"][0]["operation_key"]
+    with pytest.raises(InvalidTransitionError):
+        asyncio.run(runner.reroll(first["run_id"], [key], reason="adapter corrected"))
+    assert provider.calls == 1
+    result = asyncio.run(
+        runner.reroll(
+            first["run_id"], [key], reason="adapter corrected; prior charge remains unknown",
+            acknowledge_unknown=True,
+        )
+    )
+    assert provider.calls == 2
+    assert result["counts"] == {"succeeded": 1}
+    assert result["cost"]["confirmed_microusd"] == 80_000
+    assert result["cost"]["exposure_microusd"] == 100_000
+    assert not result["cost"]["cost_is_complete"]
+
+
+def test_invalid_accounting_preserves_already_dispatched_sibling_cost(tmp_path, monkeypatch):
+    classified = asyncio.Event()
+
+    class ConcurrentProvider(Provider):
+        def __init__(self):
+            self.calls = 0
+            self.both_dispatched = asyncio.Event()
+
+        async def complete(self, system, prompt, model):
+            self.calls += 1
+            index = self.calls
+            if index == 1:
+                await self.both_dispatched.wait()
+                return CompletionResult(text="invalid", cost_usd=float("inf"))
+            self.both_dispatched.set()
+            # Wait until the first call has been durably classified.
+            await asyncio.wait_for(classified.wait(), timeout=10)
+            return CompletionResult(
+                text="already dispatched", cost_usd=0.08,
+                artifacts=[Artifact(PNG_1X1, "image/png")],
+            )
+
+    plan = preflight_job(_priced_manifest(count=4), manifest_root=tmp_path)
+    store = SQLiteRunStore(tmp_path / "jobs.db")
+    original_mark_unknown = store.mark_unknown_outcome
+
+    def mark_unknown(call_id, error):
+        original_mark_unknown(call_id, error)
+        classified.set()
+
+    monkeypatch.setattr(store, "mark_unknown_outcome", mark_unknown)
+    provider = ConcurrentProvider()
+    result = asyncio.run(
+        JobRunner(store, provider_pool=_FixedPool(provider)).start(
+            plan, make_approval(plan), manifest_root=tmp_path, run_id="concurrent-invalid",
+        )
+    )
+    assert provider.calls == 2
+    assert result["counts"] == {"unknown_outcome": 1, "succeeded": 1, "pending": 2}
+    assert result["cost"]["confirmed_microusd"] == 80_000
+    assert result["cost"]["exposure_microusd"] == 100_000
+    assert result["cost"]["reserved_microusd"] == 0
+    assert len(result["artifacts"]) == 1
+
+
+def test_arbitrary_provider_message_cannot_impersonate_accounting_classification(tmp_path):
+    class MisleadingFailure(Provider):
+        def __init__(self):
+            self.calls = 0
+
+        async def complete(self, system, prompt, model):
+            self.calls += 1
+            raise ConnectionError("invalid provider accounting: arbitrary remote message")
+
+    data = _priced_manifest(count=2).to_dict()
+    data["execution"]["max_concurrency"] = 1
+    plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
+    store = SQLiteRunStore(tmp_path / "jobs.db")
+    provider = MisleadingFailure()
+    result = asyncio.run(
+        JobRunner(store, provider_pool=_FixedPool(provider)).start(
+            plan, make_approval(plan), manifest_root=tmp_path,
+        )
+    )
+    assert provider.calls == 2
+    assert result["counts"] == {"unknown_outcome": 2}
+    assert all(
+        item["error"].startswith("provider failure after dispatch: ")
+        for item in result["operations"]
+    )
 
 
 def test_estimated_provider_cost_remains_exposure_not_confirmed(tmp_path):

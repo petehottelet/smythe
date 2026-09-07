@@ -79,12 +79,20 @@ Notes:
 `swarm.resume(execution_id)` (or `await swarm.aresume(...)`):
 
 1. Loads the state and rejects unknown ids (`KeyError`) and unreadable versions (`ValueError`).
-2. If `status` is `completed` and `output` is present, returns the stored result without executing anything.
+2. Validates saved budget policy and all charges, and rejects nodes marked `accounting_invalid` until operator reconciliation. If `status` is `completed` and `output` is present, returns the validated stored result without executing anything.
 3. Otherwise restores the graph, re-registers the recorded agents, and resets `running` / `failed` nodes to `pending`. `completed` and `skipped` nodes keep their recorded results and are **not** re-executed.
 4. Restores per-node costs into the budget so the resumed run keeps counting against the original cap.
 5. Executes the remaining nodes (always on the parallel executor), synthesizes over the full graph, and writes the final checkpoint.
 
 The trace on a resumed `SwarmResult` covers only the resumed portion; spans from before the crash are not reconstructed.
+
+An invalid provider usage report stops the run and preserves its live
+reservation. Node failures carry `accounting_invalid` and `accounting_error` in
+their metadata; `budget.accounting_error` also covers synthesis and other
+workflow-level failures. Before clearing these markers, reconcile provider charges,
+repair `budget.node_costs`, and correct the malformed configuration or provider.
+The marker prevents an omitted unresolved reservation from unlocking spend on
+resume. See [Cost guardrails](budgets.md).
 
 ## Version compatibility
 

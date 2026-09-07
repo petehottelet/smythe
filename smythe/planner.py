@@ -7,6 +7,7 @@ import json
 import re
 from abc import ABC, abstractmethod
 
+from smythe.budget import validate_completion_usage
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.loader import build_graph_from_dict
 from smythe.prompts import (
@@ -117,6 +118,7 @@ class LLMArchitect(Architect):
             result = await self._provider.complete(
                 PLANNING_SYSTEM_PROMPT, prompt, model=self._planning_model
             )
+            validate_completion_usage(result)
             try:
                 data = self._extract_json(result.text)
                 graph, registry = build_graph_from_dict(data)

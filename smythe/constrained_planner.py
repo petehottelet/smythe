@@ -9,6 +9,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from smythe.budget import validate_completion_usage
 from smythe.constrained_prompts import (
     CONSTRAINED_RETRY_PROMPT,
     CONSTRAINED_SYSTEM_PROMPT,
@@ -92,6 +93,7 @@ class ConstrainedArchitect(Architect):
             result = await self._provider.complete(
                 CONSTRAINED_SYSTEM_PROMPT, prompt, model=self._model
             )
+            validate_completion_usage(result)
 
             try:
                 selections = self._extract_selections(result.text)

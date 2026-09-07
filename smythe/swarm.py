@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from smythe.budget import Sentinel
+from smythe.budget import BudgetValidationError, Sentinel
 from smythe.checkpoint import (
     CHECKPOINT_VERSION,
     SUPPORTED_CHECKPOINT_VERSIONS,
@@ -115,6 +115,7 @@ class Swarm:
         max_revisions: int = 0,
         verifier: Verifier | None = None,
     ) -> None:
+        Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
         self.model = model
         self.max_budget_usd = max_budget_usd
         self.parallel = parallel
@@ -167,6 +168,7 @@ class Swarm:
         Returns the graph so you can inspect the architect's decisions
         before committing to execution.
         """
+        Sentinel(self.max_budget_usd)
         architect = self._select_architect(task)
         graph, architect_registry = architect.plan(task)
 
@@ -180,6 +182,7 @@ class Swarm:
 
     async def aplan(self, task: Task) -> ExecutionGraph:
         """Async variant of plan() — safe to call from a running event loop."""
+        Sentinel(self.max_budget_usd)
         architect = await self._aselect_architect(task)
         graph, architect_registry = await architect.aplan(task)
 
@@ -298,9 +301,10 @@ class Swarm:
                 budget=budget,
                 tracer=tracer,
             )
-        except BaseException:
+        except BaseException as exc:
             self._save_checkpoint(
                 execution_id, "failed", graph, budget, task, created_at,
+                accounting_error=str(exc) if isinstance(exc, BudgetValidationError) else None,
             )
             raise
 
@@ -367,9 +371,10 @@ class Swarm:
                 budget=budget,
                 tracer=tracer,
             )
-        except BaseException:
+        except BaseException as exc:
             self._save_checkpoint(
                 execution_id, "failed", graph, budget, task, created_at,
+                accounting_error=str(exc) if isinstance(exc, BudgetValidationError) else None,
             )
             raise
 
@@ -402,6 +407,7 @@ class Swarm:
         task: Task | None,
         created_at: float,
         output: str | None = None,
+        accounting_error: str | None = None,
     ) -> None:
         """Persist full execution state, if a checkpoint store is configured."""
         if self._checkpoint_store is None:
@@ -423,6 +429,8 @@ class Swarm:
             output=output,
             created_at=created_at,
         )
+        if accounting_error is not None:
+            state["budget"]["accounting_error"] = accounting_error
         self._checkpoint_store.save(execution_id, state)
 
     def _checkpointer(
@@ -490,18 +498,37 @@ class Swarm:
 
         graph = graph_from_dict(state["graph"])
 
+        budget_state = state.get("budget", {})
+        if not isinstance(budget_state, dict):
+            raise BudgetValidationError("Checkpoint budget must be an object")
+        budget = Sentinel(budget_state.get("max_budget_usd"))
+        budget.restore(
+            budget_state.get("node_costs", {}),
+            unknown_cost_nodes={
+                node.id for node in graph.nodes
+                if node.metadata.get("cost_usd_unknown")
+            },
+            estimated_cost_nodes={
+                node.id for node in graph.nodes
+                if node.metadata.get("cost_usd_is_estimate")
+            },
+        )
+        invalid_nodes = [node.id for node in graph.nodes if node.metadata.get("accounting_invalid")]
+        if invalid_nodes or "accounting_error" in budget_state:
+            raise BudgetValidationError(
+                "Cannot resume unresolved accounting for this workflow "
+                f"(nodes: {invalid_nodes!r}); reconcile provider charges and repair the "
+                "checkpoint before clearing its accounting markers."
+            )
+
         if state.get("status") == "completed" and state.get("output") is not None:
             return SwarmResult(
                 output=state["output"],
                 graph=graph,
                 trace=[],
-                total_cost_usd=sum(state["budget"].get("node_costs", {}).values()),
-                cost_is_complete=not any(
-                    node.metadata.get("cost_usd_unknown") for node in graph.nodes
-                ),
-                cost_contains_estimates=any(
-                    node.metadata.get("cost_usd_is_estimate") for node in graph.nodes
-                ),
+                total_cost_usd=budget.total_cost_usd,
+                cost_is_complete=budget.cost_is_complete,
+                cost_contains_estimates=budget.cost_contains_estimates,
                 execution_id=execution_id,
             )
 
@@ -515,18 +542,6 @@ class Swarm:
 
         task = task_from_dict(state.get("task"))
         tracer = Tracer()
-        budget = Sentinel(state.get("budget", {}).get("max_budget_usd"))
-        budget.restore(
-            state.get("budget", {}).get("node_costs", {}),
-            unknown_cost_nodes={
-                node.id for node in graph.nodes
-                if node.metadata.get("cost_usd_unknown")
-            },
-            estimated_cost_nodes={
-                node.id for node in graph.nodes
-                if node.metadata.get("cost_usd_is_estimate")
-            },
-        )
         created_at = state.get("created_at", time.time())
 
         executor = AsyncExecutor(
@@ -558,9 +573,10 @@ class Swarm:
                 budget=budget,
                 tracer=tracer,
             )
-        except BaseException:
+        except BaseException as exc:
             self._save_checkpoint(
                 execution_id, "failed", graph, budget, task, created_at,
+                accounting_error=str(exc) if isinstance(exc, BudgetValidationError) else None,
             )
             raise
 

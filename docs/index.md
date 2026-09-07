@@ -21,6 +21,7 @@ verification, trace, artifact, and recovery controls.
 ## Operate durable work
 
 - [Checkpoint format](checkpoint-format.md) — saved state and resume semantics
+- [Cost guardrails](budgets.md) — strict usage validation, reservations, and failed-accounting recovery
 - [Jobs](jobs.md) — preflight, approval, attempts, recovery, rerolls, and exports
 - [Optimization](optimize.md) — bounded concurrency experiments and evidence ledgers
 
