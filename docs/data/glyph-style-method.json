@@ -1,0 +1,54 @@
+{
+  "source_spreadsheet_id": "1NRJP88EzQlj_ghBbtjkGi-NbluZzlWpAqVIAq1MDGJc",
+  "source_sheet": "Sheet1",
+  "source_gid": 1663791447,
+  "source_range": "A3:A139",
+  "analysis_date": "2026-09-07",
+  "image_count": 137,
+  "image_handling": "Downloaded observed public IMAGE URLs into ignored local scratch for measurement; no paths traced or imported.",
+  "published_artifact_scope": "Numerical measurements, summary statistics and method metadata only; source images/contact sheets remain research-only.",
+  "classic_rule": "Column E exact Y or Y*",
+  "new_only_rule": "Column E exact N",
+  "category_handling": "No source category labels are published or forward-filled. Seven row-range families are authored visual observations; column E flags define the two source populations.",
+  "thresholds": [
+    96,
+    128,
+    160
+  ],
+  "primary_ink_test": "White-composited grayscale luminance <128",
+  "components": "8-connected foreground; area>=4 px counted, raw counts retained",
+  "holes": "Find enclosed background by 4-neighbor flood fill, then label 4-connected enclosed regions; count areas >=4 pixels and retain raw counts.",
+  "stroke_width": "2x Euclidean distance to background at Zhang-Suen centerline pixels; maximum-distance fallback point per fully collapsed compact component",
+  "angle": "PCA within a 5-pixel radius; at least 4 points, principal eigenvalue >=1 and major/minor >=4. Angles modulo 180 degrees: horizontal <10 or >170; vertical >80 and <100; diagonals >33 and <57, or >123 and <147. Population fractions are weighted by qualifying samples.",
+  "symmetry": "IoU of tight thresholded ink crop with left-right/top-bottom reflection or180degree rotation",
+  "component_spacing": "Minimum Euclidean distance between ink-pixel centers belonging to distinct components; not exact clear-white gap",
+  "counter_width": "Median of twice the Euclidean distance to surrounding ink at thinned enclosed-white medial pixels, with the same collapsed-component fallback; geometric voids are included without semantic classification.",
+  "sensitivity": "All 137 images retain identical raw component and hole counts at thresholds 96, 128, and 160. Area change is (ink160 - ink96) / ink128.",
+  "versions": {
+    "python": "3.11.9",
+    "numpy": "2.2.6",
+    "scipy": "1.15.2",
+    "pillow": "11.1.0"
+  },
+  "artifact_sha256": {
+    "glyph-style-measurements.csv": "4c9b3695f83a947352bbe06855f1ffd898a870b1f9705495e5700eb3e5efa3e2",
+    "glyph-style-summary.json": "ef6729b4b0a965fcebbc7b5b5215da49e0ceeaec9492515c6c11ab7427f9e5c6"
+  },
+  "source_url": "https://docs.google.com/spreadsheets/d/1NRJP88EzQlj_ghBbtjkGi-NbluZzlWpAqVIAq1MDGJc/edit?gid=1663791447#gid=1663791447",
+  "analysis_script_sha256": "2d5dc7683027f6f47c7a21fcc61ac36fa6e78dcf84ea19a82382636b067b10e5",
+  "precision": "Per-row ratios retain Python floating-point precision; distribution summaries round to 5 decimal places. Linear-interpolated NumPy percentiles; per-group distributions weight glyphs equally unless explicitly pooled by orientation samples.",
+  "csv_conventions": {
+    "row": "Source column A row number; rows 3 through 139 inclusive.",
+    "group": "classic for exact column-E Y or Y*; new-only for exact N.",
+    "sha256": "SHA-256 of original PNG file bytes.",
+    "pixel_sha256": "SHA-256 of row-major uint8 RGBA bytes after compositing onto white; dimensions in width and height columns.",
+    "bbox_shape_sha256": "SHA-256 of Python string (height, width) followed by row-major boolean bytes of tight ink crop.",
+    "bbox": "[left, top, right-exclusive, bottom-exclusive] in source pixels.",
+    "arrays": "JSON arrays inside quoted CSV fields; component/hole areas sorted descending, angle histogram uses 12 bins of 15 degrees over [0, 180].",
+    "fraction": "Dimensionless values on [0,1] except explicitly named ratios; normalized stroke width divides by canvas height.",
+    "widths_and_gaps": "Source-pixel units; null/empty means no eligible component pair, enclosed hole, or orientation neighborhood.",
+    "stroke_width_px_*": "Per-glyph distribution of twice the distance transform sampled on its thinned centerline.",
+    "threshold_counts": "Raw component and hole counts, including regions smaller than 4 pixels."
+  },
+  "artifact_hash_serialization": "SHA-256 of UTF-8 bytes after normalizing CRLF to LF, with no byte-order mark. This applies only to the published CSV/JSON artifact hashes; source image hashes use original binary bytes."
+}

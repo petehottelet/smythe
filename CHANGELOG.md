@@ -128,7 +128,15 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Changed
 
-- **README** now leads with the matched framework results: 77% fewer tokens
+- **README flow** now introduces Glyph Rain before the full benchmark section,
+  while the opening retains the matched 77% token and 28% wall-time results.
+  The benchmark narrative moves from artifact scaling and recovery to framework
+  efficiency and generated plans.
+- **Glyph Rain design plan** records reference characteristics and acceptance
+  criteria for independently drawn SVG glyphs and future 3D navigation.
+  This documentation change does not replace the shipped renderers or binaries.
+
+- **README** highlights the matched framework results: 77% fewer tokens
   and 28% less mean wall time than CrewAI. Charts remain strictly black and
   white. The quickstart installs its provider extra, and the CI badge links
   to checks without asserting a static passing status.

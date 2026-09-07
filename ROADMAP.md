@@ -114,6 +114,10 @@ the hardening work ahead of broader production claims:
 
 ### Product and scale
 
+The [Glyph Rain design plan](docs/glyph-rain-plan.md) defines independent SVG
+glyph generation from reference-guided style characteristics and arrow-key navigation
+through a persistent 3D field. Reference code and artwork remain study material.
+
 Native distribution work includes Developer ID signing and notarization for
 macOS downloads, plus native Wayland screensaver integration. The current
 Linux port targets X11; the macOS bundle uses an ad-hoc signature.

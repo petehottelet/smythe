@@ -7,7 +7,22 @@ bloom give each stream a distinct weight against black space.
 Every port uses the [glyph benchmark's](../benchmarks/glyph_screensaver_benchmark.md)
 original stroke programs, speeds, and trail lengths. The renderer draws each
 bounded trail from cached sprites, keeping glyphs sharp as the code falls.
-The display changes preserve the benchmark catalog and its historical results.
+
+The [next-version design plan](../docs/glyph-rain-plan.md) specifies measured
+glyph styling, independently drawn SVGs, and arrow-key exploration through
+3D code rain. Those changes are planned; the downloads below are the verified
+current renderers.
+
+## From goal to screensaver
+
+The workflow generates each tile independently, validates dimensions and
+uniqueness, and assembles the accepted artifacts:
+
+![Glyph generation workflow](../assets/glyph_rain/glyph_pipeline.svg)
+
+Twelve specimens from the current 192-glyph catalog:
+
+![Original glyph specimens](../assets/glyph_rain/glyph_specimens.svg)
 
 ## Ports
 
