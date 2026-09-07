@@ -128,6 +128,10 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Changed
 
+- **Glyph Rain credits** acknowledge `m8e/matrix-rain`, its upstream project
+  `Rezmason/matrix`, and the reference's MIT license in the README, screensaver
+  guide, and design plan. The credit identifies the visual and technical study;
+  no reference code or artwork is included.
 - **README flow** now introduces Glyph Rain before the full benchmark section,
   while the opening retains the matched 77% token and 28% wall-time results.
   The benchmark narrative moves from artifact scaling and recovery to framework
