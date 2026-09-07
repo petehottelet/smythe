@@ -31,9 +31,7 @@ model and pipeline, with blind cross-vendor judging.
 
 ## Glyph Rain
 
-As an example: one goal becomes 192 independent glyph tasks and a working screensaver. The
-original vector glyphs fall in luminous green streams across three depth
-layers, using the same catalog on web, Windows, macOS, and Linux.
+As an example: one goal becomes 192 independent glyph-generation tasks and outputs a working cross-platform screensaver. Supported on Web, Windows, macOS, and Linux.
 
 <p align="center">
   <img src="assets/glyph_rain/glyph-rain-screenshot.png" alt="Glyph Rain with heavy green glyphs, varied glow, and descending streams at three depths" width="900">
