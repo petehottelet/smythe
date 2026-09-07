@@ -19,6 +19,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Iterator
 
+from smythe._sqlite import enable_wal
 from smythe.optimize.contracts import Candidate, ExperimentContract, canonical_json_bytes
 
 
@@ -517,9 +518,7 @@ class ExperimentLedger:
                     self._verify_version()
                 else:
                     self._connection.create_function(_WRITER_FUNCTION, 0, lambda: LEDGER_VERSION)
-                    # Reject unsupported evidence before journal or schema changes.
-                    self._guard_existing_version_before_write()
-                    self._connection.execute("PRAGMA journal_mode = WAL")
+                    enable_wal(self._connection, validate_before_write=self._guard_existing_version_before_write)
                     synchronous = "FULL" if durability == "full" else "NORMAL"
                     self._connection.execute(f"PRAGMA synchronous = {synchronous}")
                     self._create_schema()
