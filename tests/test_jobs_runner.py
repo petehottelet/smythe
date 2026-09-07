@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import os
 import threading
 import time
 
@@ -80,6 +81,36 @@ def test_runner_executes_bounded_offline_job_and_persists_artifacts(tmp_path):
     assert len(result["artifacts"]) == 4
     for artifact in result["artifacts"]:
         assert (tmp_path / "outputs" / result["run_id"] / artifact["relative_path"]).is_file()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows path namespace semantics")
+def test_runner_accepts_equivalent_windows_extended_path_namespace(tmp_path, monkeypatch):
+    """A concurrent mkdir may make resolve() add the extended path prefix."""
+
+    original_resolve = runner_module.Path.resolve
+
+    def resolve_with_namespace(path, *args, **kwargs):
+        resolved = original_resolve(path, *args, **kwargs)
+        value = str(resolved)
+        if path.name == "namespace-run" and not value.startswith("\\\\?\\"):
+            return runner_module.Path("\\\\?\\" + value)
+        return resolved
+
+    monkeypatch.setattr(runner_module.Path, "resolve", resolve_with_namespace)
+    plan = preflight_job(_manifest(count=2), manifest_root=tmp_path)
+    store = SQLiteRunStore(tmp_path / "jobs.db")
+
+    result = asyncio.run(
+        JobRunner(store).start(
+            plan,
+            make_approval(plan),
+            manifest_root=tmp_path,
+            run_id="namespace-run",
+        )
+    )
+
+    assert result["status"] == RunStatus.COMPLETED.value
+    assert result["counts"] == {OperationStatus.SUCCEEDED.value: 2}
 
 
 def test_internal_provider_transport_timeout_covers_approved_contract_max(tmp_path):
