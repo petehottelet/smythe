@@ -14,6 +14,7 @@ import subprocess
 import sys
 import threading
 import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -25,6 +26,7 @@ from smythe.optimize.ledger import (
     CampaignLease, CampaignLeaseConflict, CampaignLeaseError, ExperimentLedger,
     ExperimentLedgerError, PromotionDecision, TrialStatus, UnknownTrialError,
 )
+import smythe._sqlite as sqlite_module
 import smythe.optimize.ledger as ledger_module
 
 
@@ -433,6 +435,170 @@ def test_simultaneous_initialization_preserves_one_version_and_all_payloads(tmp_
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(lambda _: migrate(), range(2)))
     assert results == [(evidence, True, 1), (evidence, True, 1)]
+
+
+@pytest.fixture
+def journal_connections(monkeypatch):
+    original = sqlite3.connect
+    opened = []
+    callback = []
+
+    class Observed(sqlite3.Connection):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.was_closed = False
+            self.timeout_at_close = None
+            opened.append(self)
+
+        def execute(self, sql, *args):
+            if sql == "PRAGMA journal_mode = WAL":
+                return callback[0](self, sql, *args)
+            return super().execute(sql, *args)
+
+        def close(self):
+            self.timeout_at_close = super().execute("PRAGMA busy_timeout").fetchone()[0]
+            self.was_closed = True
+            super().close()
+
+    def install(action):
+        callback.append(action)
+        monkeypatch.setattr(ledger_module.sqlite3, "connect",
+                            lambda *args, **kwargs: original(*args, **kwargs, factory=Observed))
+
+    return original, install, opened
+
+
+@pytest.mark.parametrize("initial_state", ["fresh", "v3", "v3-becomes-unsupported"])
+def test_journal_mode_retries_real_busy_after_reader_releases_lock(tmp_path, journal_connections, initial_state):
+    path = tmp_path / "journal-contention.db"
+    legacy = initial_state != "fresh"
+    evidence = (_legacy_database(path) if legacy else
+                {table: [] for table in ("campaigns", "candidates", "trials", "trial_events", "promotion_decisions")})
+    connect, install, opened = journal_connections
+    busy, released = threading.Event(), threading.Event()
+    attempts, failures = [], []
+
+    def observe(connection, sql, *args):
+        attempts.append(sql)
+        # Exercise the documented immediate-BUSY path using a real SQLite lock.
+        sqlite3.Connection.execute(connection, "PRAGMA busy_timeout = 0").close()
+        try:
+            return sqlite3.Connection.execute(connection, sql, *args)
+        except sqlite3.OperationalError as error:
+            assert error.sqlite_errorcode & 0xff == sqlite3.SQLITE_BUSY
+            failures.append(error)
+            busy.set()
+            assert released.wait(5)
+            raise
+
+    def initialize():
+        with ExperimentLedger(path, durability="normal") as ledger:
+            return (_evidence(ledger), ledger._connection.execute("PRAGMA journal_mode").fetchone()[0],
+                    ledger._connection.execute("PRAGMA busy_timeout").fetchone()[0])
+
+    with closing(connect(path, isolation_level=None)) as reader:
+        assert reader.execute("PRAGMA journal_mode = DELETE").fetchone()[0] == "delete"
+        reader.execute("CREATE TABLE sentinel(value INTEGER)").close()
+        reader.execute("INSERT INTO sentinel VALUES (7)").close()
+        reader.execute("BEGIN").close()
+        assert reader.execute("SELECT value FROM sentinel").fetchall() == [(7,)]
+        install(observe)
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(initialize)
+            try:
+                assert busy.wait(5), "the opening connection did not reach actual SQLITE_BUSY"
+            finally:
+                reader.execute("COMMIT").close()
+                if initial_state == "v3-becomes-unsupported":
+                    reader.execute("UPDATE ledger_meta SET version=99").close()
+                released.set()
+            if initial_state == "v3-becomes-unsupported":
+                with pytest.raises(ExperimentLedgerError, match="unsupported.*99"):
+                    future.result(timeout=10)
+                assert len(attempts) == 1
+                assert reader.execute("PRAGMA journal_mode").fetchone()[0] == "delete"
+                assert _evidence(SimpleNamespace(_connection=reader)) == evidence
+            else:
+                assert future.result(timeout=10) == (evidence, "wal", 5000)
+                assert len(attempts) == 2
+            assert len(failures) == 1
+        assert reader.execute("SELECT value FROM sentinel").fetchall() == [(7,)]
+    assert len(opened) == 1 and opened[0].was_closed
+    assert opened[0].timeout_at_close == 5000
+
+
+@pytest.mark.parametrize("code", [None, sqlite3.SQLITE_LOCKED, sqlite3.SQLITE_READONLY, sqlite3.SQLITE_CORRUPT])
+def test_journal_mode_does_not_retry_nonbusy_errors(tmp_path, journal_connections, code):
+    connect, install, opened = journal_connections
+    error = sqlite3.OperationalError("database is locked")
+    if code is not None:
+        error.sqlite_errorcode = code
+    attempts = []
+
+    def fail(connection, sql, *args):
+        attempts.append(sql)
+        raise error
+
+    install(fail)
+    path = tmp_path / "nonbusy.db"
+    with pytest.raises(sqlite3.OperationalError) as caught:
+        ExperimentLedger(path, durability="normal")
+    assert caught.value is error
+    assert len(attempts) == 1
+    assert opened[0].was_closed and opened[0].timeout_at_close == 5000
+    with closing(connect(path)) as reader:
+        assert not reader.execute("SELECT name FROM sqlite_master WHERE name='ledger_meta'").fetchone()
+
+
+@pytest.mark.parametrize("mode", [None, "delete"])
+def test_journal_mode_refuses_unconfirmed_wal(tmp_path, journal_connections, mode):
+    connect, install, opened = journal_connections
+    closed, attempts = [], []
+
+    class Result:
+        def fetchone(self):
+            return None if mode is None else (mode,)
+
+        def close(self):
+            closed.append(True)
+
+    def respond(connection, sql, *args):
+        attempts.append(sql)
+        return Result()
+
+    install(respond)
+    path = tmp_path / "not-wal.db"
+    with pytest.raises(sqlite3.OperationalError, match="WAL journal mode"):
+        ExperimentLedger(path, durability="normal")
+    assert len(attempts) == 1 and closed == [True]
+    assert opened[0].was_closed and opened[0].timeout_at_close == 5000
+    with closing(connect(path)) as reader:
+        assert not reader.execute("SELECT name FROM sqlite_master WHERE name='ledger_meta'").fetchone()
+
+
+def test_journal_mode_busy_wait_has_one_deadline(tmp_path, journal_connections, monkeypatch):
+    connect, install, opened = journal_connections
+    error = sqlite3.OperationalError("actual busy code with an irrelevant message")
+    error.sqlite_errorcode = sqlite3.SQLITE_BUSY
+    attempts, sleeps = [], []
+    samples = iter([0.0, 0.0, 5.0])
+    monkeypatch.setattr(sqlite_module, "time", SimpleNamespace(monotonic=lambda: next(samples),
+                                                             sleep=sleeps.append))
+
+    def fail(connection, sql, *args):
+        assert sqlite3.Connection.execute(connection, "PRAGMA busy_timeout").fetchone()[0] == 0
+        attempts.append(sql)
+        raise error
+
+    install(fail)
+    path = tmp_path / "deadline.db"
+    with pytest.raises(sqlite3.OperationalError) as caught:
+        ExperimentLedger(path, durability="normal")
+    assert caught.value is error
+    assert len(attempts) == 1 and sleeps == [0.01]
+    assert opened[0].was_closed and opened[0].timeout_at_close == 5000
+    with closing(connect(path)) as reader:
+        assert not reader.execute("SELECT name FROM sqlite_master WHERE name='ledger_meta'").fetchone()
 
 
 def test_migration_failure_rolls_back_schema_and_raw_evidence(tmp_path, monkeypatch):
