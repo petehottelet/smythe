@@ -14,6 +14,7 @@ verification, trace, artifact, and recovery controls.
 ## Plan and execute graphs
 
 - [Architecture](architecture.md) — planning tiers, execution flow, and learning loop
+- [Execution policies](execution.md) — halt, retry, skip, timeouts, and queued work
 - [YAML and jobs](jobs.md) — declarative artifact work and the installed CLI
 - [Adaptive supervision](supervisor.md) — revise pending work from completed results
 - [Verification](verifier.md) — enforce objective acceptance gates

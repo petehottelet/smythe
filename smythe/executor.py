@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 
-from smythe.budget import BudgetEstimateRequired, BudgetValidationError, SentinelAlert
+from smythe.budget import BudgetValidationError, SentinelAlert
 from smythe.executor_base import ExecutorBase, NodeFinalizationError
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
 
@@ -18,9 +18,8 @@ class Executor(ExecutorBase):
     """
 
     def run(self, graph: ExecutionGraph) -> ExecutionGraph:
-        """Execute every node in the graph, respecting dependency order."""
+        """Execute in dependency order; stop immediately on a terminal failure."""
         self.prepare_graph(graph)
-        first_error: Exception | None = None
         visited: set[str] = set()
         # The walk is recomputed each step rather than taken once, so a
         # supervisor revision that adds or drops pending work is picked
@@ -35,25 +34,16 @@ class Executor(ExecutorBase):
             node = remaining[0]
             visited.add(node.id)
             try:
+                # Node execution consumes SKIP and permitted retries. Any
+                # exception that remains stops admission of all queued work.
                 self._execute_node(node, graph)
             except BudgetValidationError as exc:
                 self.mark_accounting_invalid(node, exc)
                 self.notify_update(node)
                 raise
-            except (BudgetEstimateRequired, NodeFinalizationError, SentinelAlert):
-                # Budget admission/reconciliation failures are global safety
-                # stops, as is a post-billing finalization failure. Never let
-                # a later independent node start after one.
-                raise
-            except Exception as exc:
-                if first_error is None:
-                    first_error = exc
-                continue
             self.maybe_regenerate(node, graph)
             if self._supervisor is not None:
                 asyncio.run(self.maybe_revise(node, graph))
-        if first_error is not None:
-            raise first_error
         return graph
 
     def _walk(self, graph: ExecutionGraph) -> list[Node]:
