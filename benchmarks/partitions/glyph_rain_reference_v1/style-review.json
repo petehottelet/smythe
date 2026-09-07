@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "checkedAtUtc": "2026-09-07T10:22:14.8725592+00:00",
+  "method": "Independent agent-browser interaction and visual review of the local preview; actual Chromium screenshots, DOM bounds, computed styles, and numeric sRGB contrast calculations. No performance measurement.",
+  "scope": "CSS restyle of explorer header/footer, catalog/filter controls, and settings. Original interaction-review.json is an unchanged earlier checkpoint. Two final Settings captures were taken after the final CSS freeze; initial interaction tests preceded the catalog-only mobile spacing/scrollbar correction.",
+  "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+  "viewports": [
+    {
+      "height": 1080,
+      "width": 1920,
+      "dpr": 1
+    },
+    {
+      "height": 844,
+      "width": 390,
+      "dpr": 1
+    }
+  ],
+  "checks": {
+    "noDesktopOrMobileHorizontalOverflow": true,
+    "desktopDialog": {
+      "height": 1080,
+      "right": 1920,
+      "width": 480
+    },
+    "mobileDialog": {
+      "height": 844,
+      "width": 390,
+      "left": 0,
+      "top": 0
+    },
+    "formControlsAtLeast44pxHigh": true,
+    "mobileActionButtons": {
+      "width": 169,
+      "height": 44
+    },
+    "headingsUseChartSerif": "Georgia, Times New Roman, serif",
+    "numbersUseTabularNumerals": true,
+    "applyBackground": "#75f098",
+    "surfacesBlack": true,
+    "classic3DControlsDisabled": true,
+    "preset3DApplyAndReopenEnablesTravel": true,
+    "escapeClosesSettings": true,
+    "catalogOriginalCount": 192,
+    "catalogReferenceFilterCount": 56,
+    "finalMobileCatalogColumnsPx": [
+      168,
+      168
+    ],
+    "finalMobileCatalogOverflow": false,
+    "browserErrors": [],
+    "browserConsole": [],
+    "settingsRegressionCommand": "node screensaver/svg-preview/verify-settings.mjs",
+    "settingsRegressionPassed": true,
+    "diffWhitespaceCheckPassed": true
+  },
+  "contrastOnBlack": {
+    "green": 14.67,
+    "bright": 16.33,
+    "secondary": 8.65,
+    "controlRule": 3.71,
+    "method": "WCAG sRGB relative luminance, without relying on glow. Decorative faint rules and unavailable controls are excluded."
+  },
+  "screenshots": [
+    {
+      "path": "settings-desktop.png",
+      "sha256": "f6504c628bca4f6c8f4699f83f7b164a9f2bd47d88d6e66b39b66b2a0ba096af"
+    },
+    {
+      "path": "settings-mobile.png",
+      "sha256": "64e77b8c6c4ad67006c2fff8430db80c0ce1081898e2f59af6a153f2113ab7a1"
+    }
+  ],
+  "screenshotScene": "Fresh default Classic with Matrix green, originalMix=10, 80 columns, render scale=.75. Paused after startup and advanced 120 review ticks; initial elapsed phase was not fixed. Settings opened with S. Desktop then mobile resize. Captures were visually inspected.",
+  "rendererSources": {
+    "base-glyphs.js": "8722d0bf011b22878695699b2e3cbe7b6ae27397cd3dcd88317024d80eff787e",
+    "browser-command.mjs": "8b98aa31695467a0a72d3ebb15853f2ea7740fc0ba849628ace21a102218530e",
+    "catalog.html": "fd5f9d2cc6a75b0f32e7d50f026f6cf46089149e8cf4d2a20a5d2dc25492d4e0",
+    "config.mjs": "f823471fc6cc40a5193f9470bb5012d1edefbfc5ca73ec73a451e2f1203a6613",
+    "engine/bloomPass.js": "79f6009f6d6eaa2844bad93c78f1fdfd20204dd83ac9bc4560f9ff40b7d86c30",
+    "engine/colorToRGB.js": "cc868a9b4047c2c325ade036fb9bad79f4985705b58af338de10349370a0b9a9",
+    "engine/palettePass.js": "9913f36fa9db86e405088bc975bf69f731c7019cca45f98de2d6a5c83e583e94",
+    "engine/rainPass.js": "70c51df478d33a73ebe9e9ca6fef1ed09f7a1a9ffd64b68911a67f0963cce93d",
+    "engine/shaders/bloomPass.blur.frag.glsl": "c1a2b01ad593d1d5bf95cbe2eb3a957c85840c0ede6fe893c61baf81fe610faa",
+    "engine/shaders/bloomPass.combine.frag.glsl": "a2cebf40734ecba772668548816a32235ef7e48439ee1c2ddb9fb20582060b0b",
+    "engine/shaders/bloomPass.highPass.frag.glsl": "727979238690fc06a8fcc14065468e43bd23d6710ab0b8fc4dbf985f6fa00034",
+    "engine/shaders/palettePass.frag.glsl": "d58298cd551be59495289463e93bf306a345eae7693617c147e7b332b7714e82",
+    "engine/shaders/rainPass.effect.frag.glsl": "6c0ee969bd62a7d313a69e19d8a29a0febf2884b5534a706685717496a3289b4",
+    "engine/shaders/rainPass.frag.glsl": "1cd3c2fbdb887965e0906b5a55cf16c0e95385f2deb15008fd8e1433b1000fa5",
+    "engine/shaders/rainPass.intro.frag.glsl": "d409f1f2fe372b6ce2b4a7aaaab00ce85c43853b87011e1c0030a3f45a70bb9e",
+    "engine/shaders/rainPass.raindrop.frag.glsl": "8f8ce9164ff8bf2005f10ad981959e75e4cb153b6f6a12d347586f3813820213",
+    "engine/shaders/rainPass.symbol.frag.glsl": "08f5220fce20c9191170086615061556401db5484994a153335aeda5569ca99c",
+    "engine/shaders/rainPass.vert.glsl": "365b7bb1f7c165103472adaea6198cb2ac5889141f2ef4f20ca62baa863b5adf",
+    "engine/upstream-config.mjs": "10a09629ba28592998e8e00054db13d17be1656fd57f632205e3c24b61ecc132",
+    "engine/utils.js": "5018541245bf7d8556fd43089b09110ff4c145db7352b102b62a7e29e426569e",
+    "glyphs.js": "63967d8b1fe5c7dfb46ec665851b675682d88bd5c18e39a6a7f44ac692cbaabd",
+    "index.html": "e922d399a1fd9d72c6ce8f31adac011e7365d081128c314cb17a0fb15c74ef32",
+    "lib/gl-matrix.js": "07855fa64096dbc30c3cf9088be433f29c8e344665c87b66c7463443d38c15a7",
+    "lib/regl.min.js": "1e85c84ef254125921378d82f4da4e457a0a399bc315880c8c997dd5af8c534d",
+    "measure.mjs": "55ae15311c31d53c6f47d3017d6cfe868b79a08f0e210bf15a1a85c5e71d4ce3",
+    "model.mjs": "90c18929d1449b248114104c1af2163047b2163536cea0ee45f90ee2466a9511",
+    "provenance.mjs": "327debb738aa27a06f5c033a76d710889b7fada5057a6d4a8446ffde4ff1f420",
+    "rain.js": "2b0da82d359c366baea4556efa7905d7de57229fd3894d438c8e547337b06b5a",
+    "review.mjs": "b4070ef64ee274583aa5773c1b1682e097d5e79585bb502ac4859e606b8b80db",
+    "settings.css": "1d53d4e1e35380549e633c67deec45661429b751194e0d0eb517caee138aad5b",
+    "settings.mjs": "d660a83d282f411474458821e175dd89b5777941c0e4410528ab455051aa76ed",
+    "soak.mjs": "035c36e2384aa7fb431f8fcfc2fbfab82c769b308d2e8167d33265ff7b4b77f6",
+    "source-files.mjs": "06f74108d8f02992a63a5fbeed098ca514758162733f19e0f0653663b2b18f92",
+    "style.css": "7928bfd5f2e33576291a49596afa9758f7eae07190c9245297548b1cdbbac9b8",
+    "timing.mjs": "1a7ae6897b0564d71b897f1ee8129c7c9b914b9cf0a390236f2336487860d3f5",
+    "verify-browser-command.mjs": "9d60c40623d2ad04512ba842bce0562e3997847aae2bbee65f858cd8b1fc9fbf",
+    "verify-config.mjs": "dcec2353565e92fa1c9bd9f90d63c24cd7980ffbe608dd5fd2d58b37fa596d9e",
+    "verify-measure-guard.mjs": "8d1cedd1ec25237d8758ce7f99c71236c56d67f17d9d47d01098acc3a853a007",
+    "verify-model.mjs": "037b4fcb160dee7bdeb2d6a25e052642c6e782e0dab6897e10ccd6d259581ab6",
+    "verify-provenance.mjs": "39587265439919bd18905978671ddd73b5ced2eb9694e781857a582fe6fcfb20",
+    "verify-settings.mjs": "dd2aeb89552812b918f51825ef3989fe8b2df1bfce6e4c7f294277511074f8ce",
+    "verify-timing.mjs": "d6d0652ad7d1cd02197a2878619b758221c73d1378483b4e4c81423f66136837"
+  },
+  "sourceInventory": "All current .js, .mjs, .css, .html, and .glsl files beneath screensaver/svg-preview; includes retained measurement helpers.",
+  "exclusions": [
+    "Native operating-system menus",
+    "Native color-picker popup appearance, controlled by the operating system",
+    "Cross-browser visual parity",
+    "New renderer performance or soak claims",
+    "Reduced-motion behavior changes; existing CSS condition remains intact"
+  ]
+}

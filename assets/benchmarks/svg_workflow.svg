@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="902" viewBox="0 0 960 902" role="img" aria-label="192 original SVG glyphs generated, validated, and assembled in 4.03 seconds median, 2.95 times the same backend c1 speed. Zero provider API charges. Generation, validation, assembly, and other timings come from actual repetition 3.">
+<rect width="960" height="902" fill="#ffffff"/>
+<defs>
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse">
+    <rect width="8" height="8" fill="#ffffff"/>
+    <path d="M-2 2L2-2M0 8L8 0M6 10L10 6" fill="none" stroke="#000000" stroke-width="2"/>
+  </pattern>
+</defs>
+<defs><pattern id="workflow-dots" width="7" height="7" patternUnits="userSpaceOnUse"><rect width="7" height="7" fill="#ffffff"/><circle cx="3.5" cy="3.5" r="1" fill="#000000"/></pattern></defs>
+<text x="40" y="44" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="2.2">ORIGINAL SVG GENERATION</text>
+<text x="40" y="82" font-family="Georgia,'Times New Roman',serif" font-size="29" fill="#000000" text-anchor="start" font-weight="700">192 glyphs, from geometry to verified files</text>
+<text x="40" y="109" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="normal">Fresh local generation + full style validation + catalog assembly; no simulated delay</text>
+<line x1="40" y1="132" x2="920" y2="132" stroke="#000000" stroke-width="2"/>
+<text x="40" y="202" font-family="'Trajan Pro 3','Trajan Pro',Trajan,Cinzel,Georgia,serif" font-size="54" fill="#000000" text-anchor="start" font-weight="700">4.03s</text>
+<text x="42" y="232" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="0.7">LOWEST MEDIAN COMPLETE WORKFLOW</text>
+<text x="398" y="202" font-family="'Trajan Pro 3','Trajan Pro',Trajan,Cinzel,Georgia,serif" font-size="54" fill="#000000" text-anchor="start" font-weight="700">2.95×</text>
+<text x="400" y="232" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="0.7">VS SAME BACKEND AT CONCURRENCY 1</text>
+<text x="764" y="202" font-family="'Trajan Pro 3','Trajan Pro',Trajan,Cinzel,Georgia,serif" font-size="54" fill="#000000" text-anchor="start" font-weight="700">$0</text>
+<text x="766" y="232" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="0.7">PROVIDER API CHARGES</text>
+<line x1="40" y1="256" x2="920" y2="256" stroke="#000000"/>
+<text x="40" y="294" font-family="Georgia,'Times New Roman',serif" font-size="19" fill="#000000" text-anchor="start" font-weight="700">Thread workers</text>
+<text x="40" y="317" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="start" font-weight="normal" letter-spacing="0.7">COMPLETE WALL TIME / LOWER IS BETTER</text>
+<text x="40" y="360" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">c1</text>
+<rect x="84" y="348" width="218.9" height="16" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<path d="M299.4 369H309.7M299.4 366V372M309.7 366V372" stroke="#000000" fill="none"/>
+<text x="442" y="360" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="end" font-weight="normal">11.65s</text>
+<text x="40" y="408" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">c4</text>
+<rect x="84" y="396" width="229.1" height="16" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<path d="M294.9 417H331.4M294.9 414V420M331.4 414V420" stroke="#000000" fill="none"/>
+<text x="442" y="408" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="end" font-weight="normal">12.20s</text>
+<text x="40" y="456" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">c8</text>
+<rect x="84" y="444" width="219.8" height="16" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<path d="M295.2 465H312.3M295.2 462V468M312.3 462V468" stroke="#000000" fill="none"/>
+<text x="442" y="456" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="end" font-weight="normal">11.70s</text>
+<text x="40" y="504" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">c16</text>
+<rect x="84" y="492" width="221.9" height="16" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<path d="M280.8 513H348.0M280.8 510V516M348.0 510V516" stroke="#000000" fill="none"/>
+<text x="442" y="504" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="end" font-weight="normal">11.81s</text>
+<text x="40" y="552" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">c32</text>
+<rect x="84" y="540" width="214.5" height="16" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<path d="M253.5 561H312.0M253.5 558V564M312.0 558V564" stroke="#000000" fill="none"/>
+<text x="442" y="552" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="end" font-weight="normal">11.42s</text>
+<text x="500" y="294" font-family="Georgia,'Times New Roman',serif" font-size="19" fill="#000000" text-anchor="start" font-weight="700">Process workers</text>
+<text x="500" y="317" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="start" font-weight="normal" letter-spacing="0.7">COMPLETE WALL TIME / LOWER IS BETTER</text>
+<text x="500" y="360" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">c1</text>
+<rect x="544" y="348" width="223.2" height="16" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<path d="M721.4 369H769.7M721.4 366V372M769.7 366V372" stroke="#000000" fill="none"/>
+<text x="902" y="360" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="end" font-weight="normal">11.88s</text>
+<text x="500" y="408" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">c4</text>
+<rect x="544" y="396" width="87.2" height="16" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<path d="M630.9 417H717.5M630.9 414V420M717.5 414V420" stroke="#000000" fill="none"/>
+<text x="902" y="408" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="end" font-weight="normal">4.64s</text>
+<text x="500" y="456" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">c8</text>
+<rect x="544" y="444" width="75.7" height="16" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<path d="M619.0 465H620.9M619.0 462V468M620.9 462V468" stroke="#000000" fill="none"/>
+<text x="902" y="456" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="end" font-weight="normal">4.03s</text>
+<text x="500" y="504" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">c16</text>
+<rect x="544" y="492" width="75.7" height="16" fill="#000000"/>
+<path d="M617.4 513H644.4M617.4 510V516M644.4 510V516" stroke="#000000" fill="none"/>
+<text x="902" y="504" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="end" font-weight="normal">4.03s</text>
+<text x="500" y="552" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">c32</text>
+<rect x="544" y="540" width="76.7" height="16" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<path d="M619.7 561H648.8M619.7 558V564M648.8 558V564" stroke="#000000" fill="none"/>
+<text x="902" y="552" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="12" fill="#000000" text-anchor="end" font-weight="normal">4.08s</text>
+<line x1="40" y1="600" x2="920" y2="600" stroke="#000000"/>
+<text x="40" y="624" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="normal">3 repetitions per setting; whiskers show min–max; worker cap 8</text>
+<text x="40" y="663" font-family="Georgia,'Times New Roman',serif" font-size="21" fill="#000000" text-anchor="start" font-weight="700">Where the median run spends time</text>
+<text x="40" y="686" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11.5" fill="#000000" text-anchor="start" font-weight="normal">Process c16, repetition 3; one measured 4.03s workflow</text>
+<g id="workflow-phase-breakdown" data-executor="process" data-concurrency="16" data-repeat="3" data-total-seconds="4.0292004">
+<rect data-phase="generation" data-seconds="0.8680488" x="40.000000" y="701" width="189.586734" height="28" fill="#000000" stroke="#000000"/>
+<rect x="40" y="750" width="16" height="12" fill="#000000" stroke="#000000"/>
+<text x="64" y="761" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="700">Generation</text>
+<text x="64" y="784" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="13" fill="#000000" text-anchor="start" font-weight="normal">0.87s</text>
+<rect data-phase="validation" data-seconds="2.4756446" x="229.586734" y="701" width="540.694687" height="28" fill="#ffffff" stroke="#000000"/>
+<rect x="260" y="750" width="16" height="12" fill="#ffffff" stroke="#000000"/>
+<text x="284" y="761" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="700">Validation</text>
+<text x="284" y="784" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="13" fill="#000000" text-anchor="start" font-weight="normal">2.48s</text>
+<rect data-phase="assembly" data-seconds="0.5443895" x="770.281421" y="701" width="118.897725" height="28" fill="url(#hatch)" stroke="#000000"/>
+<rect x="480" y="750" width="16" height="12" fill="url(#hatch)" stroke="#000000"/>
+<text x="504" y="761" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="700">Assembly</text>
+<text x="504" y="784" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="13" fill="#000000" text-anchor="start" font-weight="normal">0.54s</text>
+<rect data-phase="other" data-seconds="0.1411175" x="889.179145" y="701" width="30.820855" height="28" fill="url(#workflow-dots)" stroke="#000000"/>
+<rect x="700" y="750" width="16" height="12" fill="url(#workflow-dots)" stroke="#000000"/>
+<text x="724" y="761" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="700">Other</text>
+<text x="724" y="784" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="13" fill="#000000" text-anchor="start" font-weight="normal">0.14s</text>
+</g>
+<text x="40" y="814" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10.5" fill="#000000" text-anchor="start" font-weight="normal">Other includes setup, worker shutdown, and remaining measured overhead; values rounded to 0.01s</text>
+<line x1="40" y1="835" x2="920" y2="835" stroke="#000000"/>
+<text x="40" y="860" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="normal">Local CPU workload on one measured host; hardware and electricity unpriced</text>
+<text x="920" y="883" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="11" fill="#000000" text-anchor="end" font-weight="normal">glyph_svg_v1.json</text>
+</svg>

@@ -13,6 +13,7 @@ mechanics run in CI with deterministic providers and zero API cost.
 
 | Campaign | Status | Current result |
 |---|---|---|
+| [Original SVG workflow](svg_glyph_benchmark.md) | **Claimable** | 192 original glyphs in 4.03 s median including full validation and assembly; 2.95× process-c1 speed; all 30 workflows accepted |
 | [Task-shape suite v3](shape_suite.md) | **Claimable for wall time and observed quality** | 14% lower end-to-end wall time; historical cost excludes planning |
 | [Hard-kill durability v2](durability_benchmark.md) | **Claimable** | 8 duplicate dispatches after resume versus LangGraph's 32, across 3 reps |
 | [Glyph Rain width-scaling sweep](glyph_screensaver_benchmark.md#width-scaling-from-64-to-256-nodes) | **Claimable** | 64, 128, 192, and 256 valid unique tiles at every concurrency; 40.37×–56.21× at concurrency 64; isolated outputs |
@@ -251,6 +252,23 @@ zero rate-limit events on one paid key. Full table, protocol, and
 measurement scope (including an observed near-duplicate pair):
 [image_benchmarks.md](image_benchmarks.md).
 
+## Original SVG workflow
+
+The [SVG campaign](svg_glyph_benchmark.md) measures 192 fresh filled-contour
+glyphs through Smythe, complete numeric and silhouette validation, and a
+delivered catalog. Thread and process backends use five concurrency settings
+and three repetitions each. Every configuration remains in the record;
+the headline selects the lowest median complete workflow time.
+
+[Full contact sheet](partitions/glyph_svg_v1/catalog/contact-sheet.png) ·
+[Raw campaign](results/glyph_svg_v1.json) ·
+[Navigable web explorer](../screensaver/svg-preview/README.md).
+
+This is local procedural generation. It has no simulated delay and makes no
+provider API calls. Reference research and design calibration happen before
+the campaign and are recorded separately. Browser rendering uses its own
+timing and navigation protocol.
+
 ## Glyph screensaver fan-out
 
 The [glyph screensaver workload](glyph_screensaver_benchmark.md) turns wide
@@ -329,8 +347,9 @@ durably recorded as separate events, so in-flight exposure is not hidden by a
 completion-time log. The 2026-08-05 v2 record re-establishes the framework
 comparison under the conservative accounting: across three reps, Smythe
 re-dispatched exactly one in-flight wave (8 of 64 calls, resume 4.6–6.0 s)
-while LangGraph's superstep checkpointing re-dispatched every completed call
-(32 of 32, resume 16–19 s), with per-node fan-out overhead near parity and
+while LangGraph's superstep checkpointing re-dispatched all 32 previously
+dispatched operations (resume 16–19 s), including the requests still in flight
+when the process was killed, with per-node fan-out overhead near parity and
 published as measured. This is a durability microbenchmark, not provider
 invoice evidence or a universal framework claim.
 
@@ -354,6 +373,9 @@ published anyway: [control_ablation.md](control_ablation.md).
 
 ## Coming soon
 
+- [GPT-6 Astra campaign](astra_benchmark_plan.md): separate model capability
+  from orchestration effects, retain native usage and every attempted run,
+  and compare blind quality against complete-workflow cost and time
 - Full-workflow task-shape cost campaign using the corrected provider-call
   recorder, with planning usage included and input/output pricing separated
 - Repeated, randomized campaign order and a larger external task set for

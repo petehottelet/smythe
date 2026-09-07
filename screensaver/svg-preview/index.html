@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Smythe — SVG Glyph Rain</title>
+  <meta name="description" content="Classic code rain with the reference character set, original Smythe SVG glyphs, and a navigable 3D mode.">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <canvas id="rain" aria-label="Green code rain mixing reference characters and original Smythe glyphs"></canvas>
+  <header class="chrome"><a class="wordmark" href="../../README.md"><img src="wordmark.svg" alt="SMYTHE" width="196" height="31"></a><span id="mode-label">Glyph Rain</span><a class="credit" href="THIRD_PARTY_NOTICES.md">Based on m8e / Rezmason</a></header>
+  <p id="load-status" role="status">Loading the rain…</p>
+  <footer class="chrome" aria-label="Explorer controls">
+    <div class="movement" role="group" aria-label="Move through the rain">
+      <button type="button" data-direction="ArrowLeft" aria-label="Move left" title="Move left"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M4 1h2v2H4v1h5v2H4v1h2v2H4V7H2V3h2Z"/></svg></button>
+      <button type="button" data-direction="ArrowUp" aria-label="Move forward" title="Move forward"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M4 1h2v2h2v2h1v2H7V5H6v4H4V5H3v2H1V5h1V3h2Z"/></svg></button>
+      <button type="button" data-direction="ArrowDown" aria-label="Move backward" title="Move backward"><svg viewBox="0 0 10 10" aria-hidden="true"><path transform="rotate(180 5 5)" d="M4 1h2v2h2v2h1v2H7V5H6v4H4V5H3v2H1V5h1V3h2Z"/></svg></button>
+      <button type="button" data-direction="ArrowRight" aria-label="Move right" title="Move right"><svg viewBox="0 0 10 10" aria-hidden="true"><path transform="rotate(180 5 5)" d="M4 1h2v2H4v1h5v2H4v1h2v2H4V7H2V3h2Z"/></svg></button>
+      <span class="key-hint">Arrow keys to move</span>
+    </div>
+    <nav aria-label="Playback">
+      <button type="button" id="mode" aria-pressed="false">Enter 3D</button>
+      <button type="button" id="pause" aria-pressed="false">Pause</button>
+      <button type="button" id="reset" title="Reset viewpoint (R)">Reset</button>
+      <button type="button" id="fullscreen" title="Fullscreen (F)">Fullscreen</button>
+      <button type="button" id="settings" title="Settings (S)">Settings</button>
+      <a href="catalog.html">View all glyphs</a>
+    </nav>
+  </footer>
+  <div id="settings-root"></div>
+  <noscript>This preview needs JavaScript. <a href="../../benchmarks/partitions/glyph_svg_v1/catalog/">Browse the original SVG files.</a></noscript>
+  <script src="glyphs.js"></script>
+  <script src="base-glyphs.js"></script>
+  <script src="lib/regl.min.js"></script>
+  <script src="lib/gl-matrix.js"></script>
+  <script type="module" src="rain.js"></script>
+</body>
+</html>

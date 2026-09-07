@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<title>BASE-007 — imported classic reference glyph</title>
+<desc>Artwork from m8e/matrix-rain, fork of Rezmason/matrix, commit 5ba90490453ceceb6812d6b1bc658a99a92411d0. See LICENSE and README.md in this directory for attribution and stated origins. Source atlas slot 8; cell translated and uniformly scaled 100/64 without redrawing.</desc>
+<path fill="#000000" fill-rule="nonzero" d="M42.96875 67.65625 L26.71875 67.65625 L32.03125 32.1875 L48.125 32.1875 L42.96875 67.65625 Z M67.96875 67.65625 L51.71875 67.65625 L57.1875 32.1875 L73.28125 32.1875 L67.96875 67.65625 Z"/>
+</svg>

@@ -1,0 +1,606 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "method": "One batched independent agent-browser visual and computed-style review. Actual desktop/mobile screenshots; no renderer performance measurement.",
+  "checkedAtUtc": "2026-09-07T10:28:51.693Z",
+  "rendererSources": {
+    "base-glyphs.js": "8722d0bf011b22878695699b2e3cbe7b6ae27397cd3dcd88317024d80eff787e",
+    "browser-command.mjs": "8b98aa31695467a0a72d3ebb15853f2ea7740fc0ba849628ace21a102218530e",
+    "catalog.html": "fd5f9d2cc6a75b0f32e7d50f026f6cf46089149e8cf4d2a20a5d2dc25492d4e0",
+    "config.mjs": "f823471fc6cc40a5193f9470bb5012d1edefbfc5ca73ec73a451e2f1203a6613",
+    "engine/bloomPass.js": "79f6009f6d6eaa2844bad93c78f1fdfd20204dd83ac9bc4560f9ff40b7d86c30",
+    "engine/colorToRGB.js": "cc868a9b4047c2c325ade036fb9bad79f4985705b58af338de10349370a0b9a9",
+    "engine/palettePass.js": "9913f36fa9db86e405088bc975bf69f731c7019cca45f98de2d6a5c83e583e94",
+    "engine/rainPass.js": "70c51df478d33a73ebe9e9ca6fef1ed09f7a1a9ffd64b68911a67f0963cce93d",
+    "engine/shaders/bloomPass.blur.frag.glsl": "c1a2b01ad593d1d5bf95cbe2eb3a957c85840c0ede6fe893c61baf81fe610faa",
+    "engine/shaders/bloomPass.combine.frag.glsl": "a2cebf40734ecba772668548816a32235ef7e48439ee1c2ddb9fb20582060b0b",
+    "engine/shaders/bloomPass.highPass.frag.glsl": "727979238690fc06a8fcc14065468e43bd23d6710ab0b8fc4dbf985f6fa00034",
+    "engine/shaders/palettePass.frag.glsl": "d58298cd551be59495289463e93bf306a345eae7693617c147e7b332b7714e82",
+    "engine/shaders/rainPass.effect.frag.glsl": "6c0ee969bd62a7d313a69e19d8a29a0febf2884b5534a706685717496a3289b4",
+    "engine/shaders/rainPass.frag.glsl": "1cd3c2fbdb887965e0906b5a55cf16c0e95385f2deb15008fd8e1433b1000fa5",
+    "engine/shaders/rainPass.intro.frag.glsl": "d409f1f2fe372b6ce2b4a7aaaab00ce85c43853b87011e1c0030a3f45a70bb9e",
+    "engine/shaders/rainPass.raindrop.frag.glsl": "8f8ce9164ff8bf2005f10ad981959e75e4cb153b6f6a12d347586f3813820213",
+    "engine/shaders/rainPass.symbol.frag.glsl": "08f5220fce20c9191170086615061556401db5484994a153335aeda5569ca99c",
+    "engine/shaders/rainPass.vert.glsl": "365b7bb1f7c165103472adaea6198cb2ac5889141f2ef4f20ca62baa863b5adf",
+    "engine/upstream-config.mjs": "10a09629ba28592998e8e00054db13d17be1656fd57f632205e3c24b61ecc132",
+    "engine/utils.js": "5018541245bf7d8556fd43089b09110ff4c145db7352b102b62a7e29e426569e",
+    "glyphs.js": "63967d8b1fe5c7dfb46ec665851b675682d88bd5c18e39a6a7f44ac692cbaabd",
+    "index.html": "e922d399a1fd9d72c6ce8f31adac011e7365d081128c314cb17a0fb15c74ef32",
+    "lib/gl-matrix.js": "07855fa64096dbc30c3cf9088be433f29c8e344665c87b66c7463443d38c15a7",
+    "lib/regl.min.js": "1e85c84ef254125921378d82f4da4e457a0a399bc315880c8c997dd5af8c534d",
+    "measure.mjs": "55ae15311c31d53c6f47d3017d6cfe868b79a08f0e210bf15a1a85c5e71d4ce3",
+    "model.mjs": "90c18929d1449b248114104c1af2163047b2163536cea0ee45f90ee2466a9511",
+    "provenance.mjs": "327debb738aa27a06f5c033a76d710889b7fada5057a6d4a8446ffde4ff1f420",
+    "rain.js": "2b0da82d359c366baea4556efa7905d7de57229fd3894d438c8e547337b06b5a",
+    "review.mjs": "b4070ef64ee274583aa5773c1b1682e097d5e79585bb502ac4859e606b8b80db",
+    "settings.css": "b309c9caac6cf59538696022664c0e559f767d14f4c02884ba81cc1cc9527b7f",
+    "settings.mjs": "d660a83d282f411474458821e175dd89b5777941c0e4410528ab455051aa76ed",
+    "soak.mjs": "035c36e2384aa7fb431f8fcfc2fbfab82c769b308d2e8167d33265ff7b4b77f6",
+    "source-files.mjs": "06f74108d8f02992a63a5fbeed098ca514758162733f19e0f0653663b2b18f92",
+    "style.css": "de30fdd6cfa5be227b0df02a527d92cc5e4cdc2520e0bdec5df82ec9513dc70f",
+    "timing.mjs": "1a7ae6897b0564d71b897f1ee8129c7c9b914b9cf0a390236f2336487860d3f5",
+    "verify-browser-command.mjs": "9d60c40623d2ad04512ba842bce0562e3997847aae2bbee65f858cd8b1fc9fbf",
+    "verify-config.mjs": "dcec2353565e92fa1c9bd9f90d63c24cd7980ffbe608dd5fd2d58b37fa596d9e",
+    "verify-measure-guard.mjs": "8d1cedd1ec25237d8758ce7f99c71236c56d67f17d9d47d01098acc3a853a007",
+    "verify-model.mjs": "037b4fcb160dee7bdeb2d6a25e052642c6e782e0dab6897e10ccd6d259581ab6",
+    "verify-provenance.mjs": "39587265439919bd18905978671ddd73b5ced2eb9694e781857a582fe6fcfb20",
+    "verify-settings.mjs": "dd2aeb89552812b918f51825ef3989fe8b2df1bfce6e4c7f294277511074f8ce",
+    "verify-timing.mjs": "d6d0652ad7d1cd02197a2878619b758221c73d1378483b4e4c81423f66136837"
+  },
+  "checks": {
+    "desktopChrome": {
+      "bodyHorizontalOverflow": false,
+      "classicTravelDisabled": [
+        true,
+        true,
+        true
+      ],
+      "dialog": null,
+      "dialogHorizontalOverflow": false,
+      "fontFamilies": [
+        "Georgia, \"Times New Roman\", serif"
+      ],
+      "footer": {
+        "bounds": {
+          "bottom": 1052,
+          "height": 81,
+          "left": 32,
+          "right": 1888,
+          "top": 971,
+          "width": 1856,
+          "x": 32,
+          "y": 971
+        },
+        "direction": "row"
+      },
+      "header": {
+        "background": "rgb(0, 0, 0)",
+        "bounds": {
+          "bottom": 125,
+          "height": 93,
+          "left": 32,
+          "right": 1888,
+          "top": 32,
+          "width": 1856,
+          "x": 32,
+          "y": 32
+        },
+        "padding": [
+          "24px",
+          "32px",
+          "24px",
+          "32px"
+        ],
+        "shadow": "rgb(0, 0, 0) 0px 0px 0px 8px, rgba(117, 240, 152, 0.35) 0px 1px 14px -4px"
+      },
+      "horizontalOverflow": false,
+      "minimumControlHeight": 44,
+      "nonGeorgia": [],
+      "outsideViewport": [],
+      "smallControls": [],
+      "viewport": [
+        1920,
+        1080,
+        1
+      ]
+    },
+    "desktopSettings": {
+      "bodyHorizontalOverflow": false,
+      "classicTravelDisabled": [
+        true,
+        true,
+        true
+      ],
+      "dialog": {
+        "bottom": 1080,
+        "height": 1080,
+        "left": 1440,
+        "right": 1920,
+        "top": 0,
+        "width": 480,
+        "x": 1440,
+        "y": 0
+      },
+      "dialogHorizontalOverflow": false,
+      "fontFamilies": [
+        "Georgia, \"Times New Roman\", serif"
+      ],
+      "footer": {
+        "bounds": {
+          "bottom": 1052,
+          "height": 81,
+          "left": 32,
+          "right": 1888,
+          "top": 971,
+          "width": 1856,
+          "x": 32,
+          "y": 971
+        },
+        "direction": "row"
+      },
+      "header": {
+        "background": "rgb(0, 0, 0)",
+        "bounds": {
+          "bottom": 125,
+          "height": 93,
+          "left": 32,
+          "right": 1888,
+          "top": 32,
+          "width": 1856,
+          "x": 32,
+          "y": 32
+        },
+        "padding": [
+          "24px",
+          "32px",
+          "24px",
+          "32px"
+        ],
+        "shadow": "rgb(0, 0, 0) 0px 0px 0px 8px, rgba(117, 240, 152, 0.35) 0px 1px 14px -4px"
+      },
+      "horizontalOverflow": false,
+      "minimumControlHeight": 44,
+      "nonGeorgia": [],
+      "outsideViewport": [],
+      "smallControls": [],
+      "viewport": [
+        1920,
+        1080,
+        1
+      ]
+    },
+    "mobileSettings": {
+      "bodyHorizontalOverflow": false,
+      "classicTravelDisabled": [
+        true,
+        true,
+        true
+      ],
+      "dialog": {
+        "bottom": 844,
+        "height": 844,
+        "left": 0,
+        "right": 390,
+        "top": 0,
+        "width": 390,
+        "x": 0,
+        "y": 0
+      },
+      "dialogHorizontalOverflow": false,
+      "fontFamilies": [
+        "Georgia, \"Times New Roman\", serif"
+      ],
+      "footer": {
+        "bounds": {
+          "bottom": 826,
+          "height": 179,
+          "left": 18,
+          "right": 372,
+          "top": 647,
+          "width": 354,
+          "x": 18,
+          "y": 647
+        },
+        "direction": "column"
+      },
+      "header": {
+        "background": "rgb(0, 0, 0)",
+        "bounds": {
+          "bottom": 97,
+          "height": 77,
+          "left": 20,
+          "right": 370,
+          "top": 20,
+          "width": 350,
+          "x": 20,
+          "y": 20
+        },
+        "padding": [
+          "16px",
+          "20px",
+          "16px",
+          "20px"
+        ],
+        "shadow": "rgb(0, 0, 0) 0px 0px 0px 4px"
+      },
+      "horizontalOverflow": false,
+      "minimumControlHeight": 44,
+      "nonGeorgia": [],
+      "outsideViewport": [],
+      "smallControls": [],
+      "viewport": [
+        390,
+        844,
+        1
+      ]
+    },
+    "escapeFocusRestore": true,
+    "mobileChrome": {
+      "bodyHorizontalOverflow": false,
+      "classicTravelDisabled": [
+        true,
+        true,
+        true
+      ],
+      "dialog": null,
+      "dialogHorizontalOverflow": false,
+      "fontFamilies": [
+        "Georgia, \"Times New Roman\", serif"
+      ],
+      "footer": {
+        "bounds": {
+          "bottom": 826,
+          "height": 179,
+          "left": 18,
+          "right": 372,
+          "top": 647,
+          "width": 354,
+          "x": 18,
+          "y": 647
+        },
+        "direction": "column"
+      },
+      "header": {
+        "background": "rgb(0, 0, 0)",
+        "bounds": {
+          "bottom": 97,
+          "height": 77,
+          "left": 20,
+          "right": 370,
+          "top": 20,
+          "width": 350,
+          "x": 20,
+          "y": 20
+        },
+        "padding": [
+          "16px",
+          "20px",
+          "16px",
+          "20px"
+        ],
+        "shadow": "rgb(0, 0, 0) 0px 0px 0px 4px"
+      },
+      "horizontalOverflow": false,
+      "minimumControlHeight": 44,
+      "nonGeorgia": [],
+      "outsideViewport": [],
+      "smallControls": [],
+      "viewport": [
+        390,
+        844,
+        1
+      ]
+    },
+    "narrowChrome": {
+      "bodyHorizontalOverflow": false,
+      "classicTravelDisabled": [
+        true,
+        true,
+        true
+      ],
+      "dialog": null,
+      "dialogHorizontalOverflow": false,
+      "fontFamilies": [
+        "Georgia, \"Times New Roman\", serif"
+      ],
+      "footer": {
+        "bounds": {
+          "bottom": 550,
+          "height": 229,
+          "left": 18,
+          "right": 302,
+          "top": 321,
+          "width": 284,
+          "x": 18,
+          "y": 321
+        },
+        "direction": "column"
+      },
+      "header": {
+        "background": "rgb(0, 0, 0)",
+        "bounds": {
+          "bottom": 97,
+          "height": 77,
+          "left": 20,
+          "right": 300,
+          "top": 20,
+          "width": 280,
+          "x": 20,
+          "y": 20
+        },
+        "padding": [
+          "16px",
+          "20px",
+          "16px",
+          "20px"
+        ],
+        "shadow": "rgb(0, 0, 0) 0px 0px 0px 4px"
+      },
+      "horizontalOverflow": false,
+      "minimumControlHeight": 44,
+      "nonGeorgia": [],
+      "outsideViewport": [],
+      "smallControls": [],
+      "viewport": [
+        320,
+        568,
+        1
+      ]
+    },
+    "narrowSettings": {
+      "bodyHorizontalOverflow": false,
+      "classicTravelDisabled": [
+        true,
+        true,
+        true
+      ],
+      "dialog": {
+        "bottom": 568,
+        "height": 568,
+        "left": 0,
+        "right": 320,
+        "top": 0,
+        "width": 320,
+        "x": 0,
+        "y": 0
+      },
+      "dialogHorizontalOverflow": false,
+      "fontFamilies": [
+        "Georgia, \"Times New Roman\", serif"
+      ],
+      "footer": {
+        "bounds": {
+          "bottom": 550,
+          "height": 229,
+          "left": 18,
+          "right": 302,
+          "top": 321,
+          "width": 284,
+          "x": 18,
+          "y": 321
+        },
+        "direction": "column"
+      },
+      "header": {
+        "background": "rgb(0, 0, 0)",
+        "bounds": {
+          "bottom": 97,
+          "height": 77,
+          "left": 20,
+          "right": 300,
+          "top": 20,
+          "width": 280,
+          "x": 20,
+          "y": 20
+        },
+        "padding": [
+          "16px",
+          "20px",
+          "16px",
+          "20px"
+        ],
+        "shadow": "rgb(0, 0, 0) 0px 0px 0px 4px"
+      },
+      "horizontalOverflow": false,
+      "minimumControlHeight": 44,
+      "nonGeorgia": [],
+      "outsideViewport": [],
+      "smallControls": [],
+      "viewport": [
+        320,
+        568,
+        1
+      ]
+    },
+    "draft3DEnablesTravel": true,
+    "applied3DPersistsOnReopen": true,
+    "landscapeSettings": {
+      "bodyHorizontalOverflow": false,
+      "classicTravelDisabled": [
+        false,
+        false,
+        false
+      ],
+      "dialog": {
+        "bottom": 390,
+        "height": 390,
+        "left": 364,
+        "right": 844,
+        "top": 0,
+        "width": 480,
+        "x": 364,
+        "y": 0
+      },
+      "dialogHorizontalOverflow": false,
+      "fontFamilies": [
+        "Georgia, \"Times New Roman\", serif"
+      ],
+      "footer": {
+        "bounds": {
+          "bottom": 362,
+          "height": 137,
+          "left": 32,
+          "right": 812,
+          "top": 225,
+          "width": 780,
+          "x": 32,
+          "y": 225
+        },
+        "direction": "column"
+      },
+      "header": {
+        "background": "rgb(0, 0, 0)",
+        "bounds": {
+          "bottom": 125,
+          "height": 93,
+          "left": 32,
+          "right": 812,
+          "top": 32,
+          "width": 780,
+          "x": 32,
+          "y": 32
+        },
+        "padding": [
+          "24px",
+          "32px",
+          "24px",
+          "32px"
+        ],
+        "shadow": "rgb(0, 0, 0) 0px 0px 0px 8px, rgba(117, 240, 152, 0.35) 0px 1px 14px -4px"
+      },
+      "horizontalOverflow": false,
+      "minimumControlHeight": 44,
+      "nonGeorgia": [],
+      "outsideViewport": [],
+      "smallControls": [],
+      "viewport": [
+        844,
+        390,
+        1
+      ]
+    },
+    "landscapeChrome": {
+      "bodyHorizontalOverflow": false,
+      "classicTravelDisabled": [
+        false,
+        false,
+        false
+      ],
+      "dialog": null,
+      "dialogHorizontalOverflow": false,
+      "fontFamilies": [
+        "Georgia, \"Times New Roman\", serif"
+      ],
+      "footer": {
+        "bounds": {
+          "bottom": 362,
+          "height": 137,
+          "left": 32,
+          "right": 812,
+          "top": 225,
+          "width": 780,
+          "x": 32,
+          "y": 225
+        },
+        "direction": "column"
+      },
+      "header": {
+        "background": "rgb(0, 0, 0)",
+        "bounds": {
+          "bottom": 125,
+          "height": 93,
+          "left": 32,
+          "right": 812,
+          "top": 32,
+          "width": 780,
+          "x": 32,
+          "y": 32
+        },
+        "padding": [
+          "24px",
+          "32px",
+          "24px",
+          "32px"
+        ],
+        "shadow": "rgb(0, 0, 0) 0px 0px 0px 8px, rgba(117, 240, 152, 0.35) 0px 1px 14px -4px"
+      },
+      "horizontalOverflow": false,
+      "minimumControlHeight": 44,
+      "nonGeorgia": [],
+      "outsideViewport": [],
+      "smallControls": [],
+      "viewport": [
+        844,
+        390,
+        1
+      ]
+    },
+    "catalog": {
+      "count": 192,
+      "fontFamilies": [
+        "Georgia, \"Times New Roman\", serif"
+      ],
+      "horizontalOverflow": false,
+      "smallControls": []
+    },
+    "browserErrors": {
+      "errors": []
+    },
+    "browserConsole": {
+      "messages": []
+    }
+  },
+  "screenshots": [
+    {
+      "path": "georgia-chrome-desktop.png",
+      "sha256": "8b6af8adfd00e0f3eb0285d0efd975bedb442b90da80d5788cdc8c9cdd7c972d"
+    },
+    {
+      "path": "georgia-settings-desktop.png",
+      "sha256": "d37888184979c873645bbe28da14a9b9e2e6e1d6f3d83c23192a08e263f0b724"
+    },
+    {
+      "path": "georgia-chrome-mobile.png",
+      "sha256": "eb0a68169b9ad9a204d454eb00bef2f7d64bca59ce4d97064f457c4ec2160add"
+    },
+    {
+      "path": "georgia-settings-mobile.png",
+      "sha256": "8be4312b81c62727b6a973760c33eb40ce4f6b0c7c2dfbc00365bb0cc4b28013"
+    }
+  ],
+  "browser": {
+    "hardwareConcurrency": 32,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36"
+  },
+  "sourcesUnchanged": true,
+  "passed": true,
+  "visualInspection": {
+    "completed": true,
+    "desktopAndMobileScreenshotsReviewed": true,
+    "findings": [],
+    "repairsNeeded": false,
+    "notes": "Larger black logo bar, consistent Georgia typography, green angular frames, square focus outlines, clipped slider corners, and responsive footer wrapping are legible in the four actual captures."
+  },
+  "contrast": {
+    "method": "WCAG sRGB relative luminance of current CSS token colors. Glow is excluded. Faint decorative rules and unavailable controls are excluded from control-outline minimum.",
+    "greenOnBlack": 14.67,
+    "brightOnBlack": 16.33,
+    "secondaryOnBlack": 8.65,
+    "greenOnHoverSurface": 12.87,
+    "blackOnSelectedGreen": 14.67,
+    "ruleOnBlackRoundedRGB": 3.71
+  },
+  "rendererAssets": {
+    "generated-sdf.png": "0e8e3e43cc7f6c1973db06840ea1c69a390b5cb78329fb312bbe39aebf6a7c38",
+    "reference/matrixcode_msdf.png": "1fd4ed52f8e9cc4af6eaad69d28cd289bf6486f15f00c952548ff0533d6a83ab"
+  },
+  "screenshotScene": "Default Classic, Matrix green, originalMix 10%, resolution .75. Preview paused after initial startup, advanced 120 review ticks, then Settings opened with S. Desktop first, then mobile resize. Initial elapsed phase was not fixed. No screenshot synthesis.",
+  "sourceBindingScope": "Current renderer source hashes were identical before and after this one batched review and at receipt creation. Earlier style-review.json and its Settings captures remain preserved as a separate checkpoint.",
+  "exclusions": [
+    "Native operating-system screensaver menus",
+    "Native color-picker popup typography, controlled by the operating system",
+    "Other browser engines",
+    "Renderer performance, power, memory, or new soak claims",
+    "Quantified similarity to the reference effect"
+  ]
+}

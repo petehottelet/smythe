@@ -1,0 +1,465 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "createdAt": "2026-09-07T09:31:59.630Z",
+  "evidenceStatus": "visual-and-interaction-review",
+  "scope": "Fixed-clock visual samples and functional browser checks; not a timing measurement, human preference score, or uniform distribution over all possible views.",
+  "catalogCount": 192,
+  "catalogSha256": "9667056dfcbfd34558b0db4b2e3f044aa6d91d6bb7df52e92bf4d6719dea511a",
+  "sourceSha256": {
+    "model.mjs": "90c18929d1449b248114104c1af2163047b2163536cea0ee45f90ee2466a9511",
+    "rain.js": "f6fc17c38f71f7e0ef02a1bf007b0b0e6d8e9b211cf006683dcf1a6bdd8a58b7",
+    "glyphs.js": "63967d8b1fe5c7dfb46ec665851b675682d88bd5c18e39a6a7f44ac692cbaabd",
+    "index.html": "a0bcc557335832710afd7da9cf0e3ec911a3a46a0f648f6dfa09add4e8769c48",
+    "style.css": "80e91a4f46984b5119e454948aa3211dd3e3f5c0fa84c17587bb35ee962c7cdc"
+  },
+  "servedSourceSha256": {
+    "glyphs.js": "63967d8b1fe5c7dfb46ec665851b675682d88bd5c18e39a6a7f44ac692cbaabd",
+    "index.html": "a0bcc557335832710afd7da9cf0e3ec911a3a46a0f648f6dfa09add4e8769c48",
+    "model.mjs": "90c18929d1449b248114104c1af2163047b2163536cea0ee45f90ee2466a9511",
+    "rain.js": "f6fc17c38f71f7e0ef02a1bf007b0b0e6d8e9b211cf006683dcf1a6bdd8a58b7",
+    "style.css": "80e91a4f46984b5119e454948aa3211dd3e3f5c0fa84c17587bb35ee962c7cdc"
+  },
+  "harnessSha256": {
+    "review.mjs": "9a7eab054dc24641cf24299dd18f2a1bca64ad7614b3b74d5540389b4d870f1d",
+    "browser-command.mjs": "8b98aa31695467a0a72d3ebb15853f2ea7740fc0ba849628ace21a102218530e",
+    "provenance.mjs": "327debb738aa27a06f5c033a76d710889b7fada5057a6d4a8446ffde4ff1f420"
+  },
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+  "sourceStable": true,
+  "harnessStable": true,
+  "screenshot": {
+    "path": "screensaver/svg-preview/preview.png",
+    "sha256": "a25f66f55019338e3647ccb4b3b6290d07697e35cdb7d8436ecc318a7ea4e9d7",
+    "width": 1920,
+    "height": 1080,
+    "dpr": 1,
+    "seed": 7319,
+    "camera": {
+      "x": 0,
+      "z": 0
+    },
+    "rainTimeSeconds": 3.8,
+    "controls": "Hidden through the normal idle class; no image compositing or generated-image substitution.",
+    "captureMethod": "Actual browser screenshot of the frozen renderer. Animation callbacks advanced to exactly 3.8 seconds using a temporary 50ms clock step, then paused. Native timing functions restored before capture.",
+    "darkFraction": 0.7661058063271605,
+    "nearWhiteFraction": 0,
+    "visibleGlyphs": 2384
+  },
+  "interactionChecks": {
+    "fullCatalog": {
+      "passed": true,
+      "svgElements": 192,
+      "pathElements": 262,
+      "emptyPaths": 0
+    },
+    "pausedArrowTravel": {
+      "passed": true,
+      "rainTimeUnchanged": true
+    },
+    "resetRestoresExactPixels": {
+      "passed": true,
+      "checkedSeeds": [
+        7319,
+        1,
+        42,
+        4096
+      ]
+    },
+    "keyboardDirectionButton": {
+      "passed": true,
+      "activation": "Enter on Move forward"
+    },
+    "fullscreen": {
+      "passed": true,
+      "enteredViaButton": true,
+      "exitedViaEscape": true
+    },
+    "reducedMotionStartup": {
+      "passed": true,
+      "paused": true,
+      "rainTime": 0
+    },
+    "mobileResize": {
+      "passed": true,
+      "width": 390,
+      "height": 844,
+      "horizontalOverflow": false
+    },
+    "browserErrors": {
+      "passed": true,
+      "count": 0
+    },
+    "note": "Catalog, real keyboard button/fullscreen actions, and mobile checks were performed manually through agent-browser before timing; fixed-clock samples and reset checks are reproduced by this harness."
+  },
+  "darkCoverage": {
+    "samples": 12,
+    "min": 0.7015080054012346,
+    "median": 0.7505186631944445,
+    "max": 0.7888536844135803,
+    "within65To80Percent": 12,
+    "sampling": "Four declared seeds, each at origin, forward-right (12,18), and back-left (-12,42), all at 3.8 seconds and 1920×1080 DPR 1."
+  },
+  "samples": [
+    {
+      "seed": 7319,
+      "view": "origin",
+      "camera": {
+        "x": 0,
+        "z": 0
+      },
+      "frame": {
+        "camera": {
+          "x": 0,
+          "z": 0
+        },
+        "darkDefinition": "All RGB channels <=16",
+        "darkFraction": 0.7661058063271605,
+        "nearWhiteDefinition": "All RGB channels >=210",
+        "nearWhiteFraction": 0,
+        "pixels": 2073600,
+        "rainTime": 3.7999999999999945,
+        "source": "Rain canvas only; controls excluded"
+      },
+      "heldKeys": [],
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 1080,
+        "physicalWidth": 1920,
+        "width": 1920
+      },
+      "visibleGlyphs": 2384
+    },
+    {
+      "seed": 7319,
+      "view": "forward-right",
+      "camera": {
+        "x": 11.999999999999886,
+        "z": 18.00000000000007
+      },
+      "frame": {
+        "camera": {
+          "x": 11.999999999999886,
+          "z": 18.00000000000007
+        },
+        "darkDefinition": "All RGB channels <=16",
+        "darkFraction": 0.7511781442901234,
+        "nearWhiteDefinition": "All RGB channels >=210",
+        "nearWhiteFraction": 0,
+        "pixels": 2073600,
+        "rainTime": 3.7999999999999945,
+        "source": "Rain canvas only; controls excluded"
+      },
+      "heldKeys": [],
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 1080,
+        "physicalWidth": 1920,
+        "width": 1920
+      },
+      "visibleGlyphs": 2671
+    },
+    {
+      "seed": 7319,
+      "view": "back-left",
+      "camera": {
+        "x": -11.999999999999886,
+        "z": 41.999999999999915
+      },
+      "frame": {
+        "camera": {
+          "x": -11.999999999999886,
+          "z": 41.999999999999915
+        },
+        "darkDefinition": "All RGB channels <=16",
+        "darkFraction": 0.7856370563271605,
+        "nearWhiteDefinition": "All RGB channels >=210",
+        "nearWhiteFraction": 0,
+        "pixels": 2073600,
+        "rainTime": 3.7999999999999945,
+        "source": "Rain canvas only; controls excluded"
+      },
+      "heldKeys": [],
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 1080,
+        "physicalWidth": 1920,
+        "width": 1920
+      },
+      "visibleGlyphs": 2383
+    },
+    {
+      "seed": 1,
+      "view": "origin",
+      "camera": {
+        "x": 0,
+        "z": 0
+      },
+      "frame": {
+        "camera": {
+          "x": 0,
+          "z": 0
+        },
+        "darkDefinition": "All RGB channels <=16",
+        "darkFraction": 0.7821841242283951,
+        "nearWhiteDefinition": "All RGB channels >=210",
+        "nearWhiteFraction": 0,
+        "pixels": 2073600,
+        "rainTime": 3.7999999999999945,
+        "source": "Rain canvas only; controls excluded"
+      },
+      "heldKeys": [],
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 1080,
+        "physicalWidth": 1920,
+        "width": 1920
+      },
+      "visibleGlyphs": 2508
+    },
+    {
+      "seed": 1,
+      "view": "forward-right",
+      "camera": {
+        "x": 11.999999999999886,
+        "z": 18.00000000000007
+      },
+      "frame": {
+        "camera": {
+          "x": 11.999999999999886,
+          "z": 18.00000000000007
+        },
+        "darkDefinition": "All RGB channels <=16",
+        "darkFraction": 0.7015080054012346,
+        "nearWhiteDefinition": "All RGB channels >=210",
+        "nearWhiteFraction": 0,
+        "pixels": 2073600,
+        "rainTime": 3.7999999999999945,
+        "source": "Rain canvas only; controls excluded"
+      },
+      "heldKeys": [],
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 1080,
+        "physicalWidth": 1920,
+        "width": 1920
+      },
+      "visibleGlyphs": 2430
+    },
+    {
+      "seed": 1,
+      "view": "back-left",
+      "camera": {
+        "x": -11.999999999999886,
+        "z": 41.999999999999915
+      },
+      "frame": {
+        "camera": {
+          "x": -11.999999999999886,
+          "z": 41.999999999999915
+        },
+        "darkDefinition": "All RGB channels <=16",
+        "darkFraction": 0.7489549575617284,
+        "nearWhiteDefinition": "All RGB channels >=210",
+        "nearWhiteFraction": 0,
+        "pixels": 2073600,
+        "rainTime": 3.7999999999999945,
+        "source": "Rain canvas only; controls excluded"
+      },
+      "heldKeys": [],
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 1080,
+        "physicalWidth": 1920,
+        "width": 1920
+      },
+      "visibleGlyphs": 2306
+    },
+    {
+      "seed": 42,
+      "view": "origin",
+      "camera": {
+        "x": 0,
+        "z": 0
+      },
+      "frame": {
+        "camera": {
+          "x": 0,
+          "z": 0
+        },
+        "darkDefinition": "All RGB channels <=16",
+        "darkFraction": 0.7720896026234568,
+        "nearWhiteDefinition": "All RGB channels >=210",
+        "nearWhiteFraction": 0,
+        "pixels": 2073600,
+        "rainTime": 3.7999999999999945,
+        "source": "Rain canvas only; controls excluded"
+      },
+      "heldKeys": [],
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 1080,
+        "physicalWidth": 1920,
+        "width": 1920
+      },
+      "visibleGlyphs": 2229
+    },
+    {
+      "seed": 42,
+      "view": "forward-right",
+      "camera": {
+        "x": 11.999999999999886,
+        "z": 18.00000000000007
+      },
+      "frame": {
+        "camera": {
+          "x": 11.999999999999886,
+          "z": 18.00000000000007
+        },
+        "darkDefinition": "All RGB channels <=16",
+        "darkFraction": 0.7498591820987655,
+        "nearWhiteDefinition": "All RGB channels >=210",
+        "nearWhiteFraction": 0,
+        "pixels": 2073600,
+        "rainTime": 3.7999999999999945,
+        "source": "Rain canvas only; controls excluded"
+      },
+      "heldKeys": [],
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 1080,
+        "physicalWidth": 1920,
+        "width": 1920
+      },
+      "visibleGlyphs": 2456
+    },
+    {
+      "seed": 42,
+      "view": "back-left",
+      "camera": {
+        "x": -11.999999999999886,
+        "z": 41.999999999999915
+      },
+      "frame": {
+        "camera": {
+          "x": -11.999999999999886,
+          "z": 41.999999999999915
+        },
+        "darkDefinition": "All RGB channels <=16",
+        "darkFraction": 0.7290919174382716,
+        "nearWhiteDefinition": "All RGB channels >=210",
+        "nearWhiteFraction": 0,
+        "pixels": 2073600,
+        "rainTime": 3.7999999999999945,
+        "source": "Rain canvas only; controls excluded"
+      },
+      "heldKeys": [],
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 1080,
+        "physicalWidth": 1920,
+        "width": 1920
+      },
+      "visibleGlyphs": 2335
+    },
+    {
+      "seed": 4096,
+      "view": "origin",
+      "camera": {
+        "x": 0,
+        "z": 0
+      },
+      "frame": {
+        "camera": {
+          "x": 0,
+          "z": 0
+        },
+        "darkDefinition": "All RGB channels <=16",
+        "darkFraction": 0.7462548225308642,
+        "nearWhiteDefinition": "All RGB channels >=210",
+        "nearWhiteFraction": 0,
+        "pixels": 2073600,
+        "rainTime": 3.7999999999999945,
+        "source": "Rain canvas only; controls excluded"
+      },
+      "heldKeys": [],
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 1080,
+        "physicalWidth": 1920,
+        "width": 1920
+      },
+      "visibleGlyphs": 2510
+    },
+    {
+      "seed": 4096,
+      "view": "forward-right",
+      "camera": {
+        "x": 11.999999999999886,
+        "z": 18.00000000000007
+      },
+      "frame": {
+        "camera": {
+          "x": 11.999999999999886,
+          "z": 18.00000000000007
+        },
+        "darkDefinition": "All RGB channels <=16",
+        "darkFraction": 0.7183931327160494,
+        "nearWhiteDefinition": "All RGB channels >=210",
+        "nearWhiteFraction": 0,
+        "pixels": 2073600,
+        "rainTime": 3.7999999999999945,
+        "source": "Rain canvas only; controls excluded"
+      },
+      "heldKeys": [],
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 1080,
+        "physicalWidth": 1920,
+        "width": 1920
+      },
+      "visibleGlyphs": 2416
+    },
+    {
+      "seed": 4096,
+      "view": "back-left",
+      "camera": {
+        "x": -11.999999999999886,
+        "z": 41.999999999999915
+      },
+      "frame": {
+        "camera": {
+          "x": -11.999999999999886,
+          "z": 41.999999999999915
+        },
+        "darkDefinition": "All RGB channels <=16",
+        "darkFraction": 0.7888536844135803,
+        "nearWhiteDefinition": "All RGB channels >=210",
+        "nearWhiteFraction": 0,
+        "pixels": 2073600,
+        "rainTime": 3.7999999999999945,
+        "source": "Rain canvas only; controls excluded"
+      },
+      "heldKeys": [],
+      "viewport": {
+        "dpr": 1,
+        "height": 1080,
+        "physicalHeight": 1080,
+        "physicalWidth": 1920,
+        "width": 1920
+      },
+      "visibleGlyphs": 2254
+    }
+  ]
+}

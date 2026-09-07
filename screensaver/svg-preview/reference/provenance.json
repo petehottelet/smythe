@@ -1,0 +1,57 @@
+{
+  "version": "m8e-classic-svg-v1",
+  "source": {
+    "repository": "https://github.com/m8e/matrix-rain",
+    "upstream_repository": "https://github.com/Rezmason/matrix",
+    "commit": "5ba90490453ceceb6812d6b1bc658a99a92411d0",
+    "asset": "svg sources/texture_simplified.svg",
+    "sha256": "37bf6ef51382e4a29a236a7067772cca2eeaac26ff9682d34534f8d932fb8a89",
+    "license_sha256": "65333257cebb87e8af86201a65f0e550d65b3cf5a468bfee2a69c9d2b5d21123",
+    "view_box": [
+      0,
+      0,
+      512,
+      512
+    ],
+    "grid": [
+      8,
+      8
+    ],
+    "cell": [
+      64,
+      64
+    ],
+    "sequence_length": 57,
+    "blank_sequence_indices": [
+      4
+    ],
+    "unused_sequence_indices": [
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63
+    ]
+  },
+  "copyright_notice": "Copyright (c) 2018 Rezmason",
+  "repository_license": "MIT; exact pinned notice included in LICENSE",
+  "artwork_origin_as_stated_upstream": "Cleaned vector artwork from an archived SWF on the official The Matrix: Path of Neo promotional website. Upstream describes katakana-derived forms and characters from Susan Kare's Chicago typeface.",
+  "origin_documentation": "https://github.com/m8e/matrix-rain/blob/5ba90490453ceceb6812d6b1bc658a99a92411d0/README.md#goals",
+  "archived_promotional_source": "https://web.archive.org/web/20070914173039/http://www.atari.com:80/thematrixpathofneo/",
+  "rights_scope": "The repository MIT notice is preserved as published. It is not a separate clearance or assertion of ownership of every underlying film or typeface element.",
+  "transformation": {
+    "source_contours": 84,
+    "visible_glyphs": 56,
+    "coordinate_method": "exact Decimal translation of each 64x64 cell, then uniform 100/64 scaling",
+    "curves": "Cubic Bezier geometry retained; relative and shorthand commands expanded exactly",
+    "closure": "Implicit fill closures serialized explicitly; nonzero winding retained",
+    "artwork_redrawn": false,
+    "mirrored": false,
+    "upstream_implementation_code_copied": false,
+    "inspection_png": "4x antialiasing; adaptive cubic sampling at 0.01 normalized-unit tolerance"
+  },
+  "exporter": "screensaver/import_reference_glyphs.py",
+  "original_generated_catalog": "The separate 192 original SVG catalog is unchanged and is not part of this import."
+}

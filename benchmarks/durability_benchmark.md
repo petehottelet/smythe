@@ -51,10 +51,15 @@ sides), 3 reps each:
 | langgraph, rep 3 | 32 | 19.3 s | 64/64 |
 
 Smythe's repeated dispatches were exactly one concurrency wave (8) in every
-rep; LangGraph re-dispatched all 32 completed calls in every rep, because
+rep; LangGraph re-dispatched all 32 previously dispatched operations in every rep, because
 Pregel checkpoints at superstep boundaries and a wide broadcast is one
 superstep. That is **75% fewer repeated dispatches** in this 64-node kill
 profile. Provider billing and wider jobs were not measured by this record.
+
+At the kill point, Smythe had completed 24 operations with 8 attempts still in
+flight in each rep. LangGraph had completed 24, 24, and 25 operations, with 8,
+8, and 7 attempts still in flight. The repeated-dispatch count includes both
+completed and interrupted attempts when they are dispatched again.
 
 Cell A in the same record shows per-node fan-out overhead near parity
 (smythe 0.99–1.19 ms/node vs LangGraph 0.89–1.49 ms/node at N ≤ 1024) with

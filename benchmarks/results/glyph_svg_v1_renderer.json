@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "evidence_status": "diagnostic",
+  "scope": "Three repeated headless browser runs on one host; callback/draw-completion and CPU-submission timing, not physical presentation or comparative performance.",
+  "repeats": 3,
+  "warmup_seconds_per_run": 5,
+  "sample_seconds_per_run": 60,
+  "catalog_sha256": "9667056dfcbfd34558b0db4b2e3f044aa6d91d6bb7df52e92bf4d6719dea511a",
+  "source_sha256": {
+    "model.mjs": "90c18929d1449b248114104c1af2163047b2163536cea0ee45f90ee2466a9511",
+    "rain.js": "f6fc17c38f71f7e0ef02a1bf007b0b0e6d8e9b211cf006683dcf1a6bdd8a58b7",
+    "glyphs.js": "63967d8b1fe5c7dfb46ec665851b675682d88bd5c18e39a6a7f44ac692cbaabd",
+    "index.html": "a0bcc557335832710afd7da9cf0e3ec911a3a46a0f648f6dfa09add4e8769c48",
+    "style.css": "80e91a4f46984b5119e454948aa3211dd3e3f5c0fa84c17587bb35ee962c7cdc"
+  },
+  "harness_sha256": {
+    "measure.mjs": "921e6cbb08d5824bf1db2399e8df5d391591477fe9fffe71837dfbd594911c48",
+    "provenance.mjs": "327debb738aa27a06f5c033a76d710889b7fada5057a6d4a8446ffde4ff1f420",
+    "browser-command.mjs": "8b98aa31695467a0a72d3ebb15853f2ea7740fc0ba849628ace21a102218530e"
+  },
+  "source_records": [
+    {
+      "path": "benchmarks/results/glyph_svg_v1_renderer_r1.json",
+      "sha256": "2f7a538930556c859898314b8f790256b273f115e7e0d906fa820fbd21883305"
+    },
+    {
+      "path": "benchmarks/results/glyph_svg_v1_renderer_r2.json",
+      "sha256": "d3ea5f704e8c808bdbfd7c8684549a9f7e69683b9b4e5bb33bec52e00e0c6ec3"
+    },
+    {
+      "path": "benchmarks/results/glyph_svg_v1_renderer_r3.json",
+      "sha256": "af91e1fb059c4a904a80ff28cff0e6779130d6689a848666fb8c79bb7c925bd3"
+    }
+  ],
+  "runs": [
+    {
+      "repeat": 1,
+      "average_callbacks_per_s": 53.81496252631497,
+      "p95_draw_completion_interval_ms": 22.899999856948853,
+      "p95_cpu_submission_ms": 3.8000001907348633,
+      "cache_peak_bytes": 54395904,
+      "passed_16_7ms_p95_target": false
+    },
+    {
+      "repeat": 2,
+      "average_callbacks_per_s": 36.04038922953879,
+      "p95_draw_completion_interval_ms": 34.30000016689301,
+      "p95_cpu_submission_ms": 6.700000047683716,
+      "cache_peak_bytes": 54395904,
+      "passed_16_7ms_p95_target": false
+    },
+    {
+      "repeat": 3,
+      "average_callbacks_per_s": 36.12785394220952,
+      "p95_draw_completion_interval_ms": 33.100000059604646,
+      "p95_cpu_submission_ms": 6.6999999523162845,
+      "cache_peak_bytes": 54395904,
+      "passed_16_7ms_p95_target": false
+    }
+  ],
+  "median_of_run_averages_callbacks_per_s": 36.12785394220952,
+  "p95_interval_target_passed_runs": 0,
+  "findings": [
+    "All three source/harness bindings match the frozen renderer and full catalog.",
+    "None of the three runs meets the 16.7ms P95 draw-completion interval target.",
+    "All measured image-cache peaks are below64MiB; cache allocation is not total process/GPU memory.",
+    "Large run-to-run variation prevents a stable frame-rate claim.",
+    "The separate startup failure is retained in glyph_svg_v1_renderer_launch_diagnostic.json and contains no timing sample."
+  ]
+}

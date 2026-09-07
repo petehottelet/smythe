@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="572" viewBox="0 0 960 572" role="img" aria-label="Smythe repeated 8 dispatches versus LangGraph 32 after a hard process kill: 75% fewer mean duplicate dispatches across three repetitions. All runs resumed 64 of 64 operations. Offline simulation; provider billing unmeasured.">
+<rect width="960" height="572" fill="#ffffff"/>
+<text x="40" y="42" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="2.2">DURABLE EXECUTION</text>
+<text x="40" y="82" font-family="Georgia,'Times New Roman',serif" font-size="31" fill="#000000" text-anchor="start" font-weight="700">Work repeated after a hard kill</text>
+<text x="40" y="109" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="normal">64-node fan-out; concurrency 8; hard process kill at 32 durable dispatches</text>
+<line x1="40" y1="132" x2="920" y2="132" stroke="#000000" stroke-width="2"/>
+<text x="40" y="206" font-family="'Trajan Pro 3','Trajan Pro',Trajan,Cinzel,Georgia,serif" font-size="64" fill="#000000" text-anchor="start" font-weight="700">75%</text>
+<text x="285" y="175" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="14" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="0.7">FEWER DUPLICATE DISPATCHES</text>
+<text x="285" y="201" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="14" fill="#000000" text-anchor="start" font-weight="normal">8 vs 32 mean repeated dispatches after resume</text>
+<text x="285" y="225" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">All 64 operations completed after resume in every run</text>
+<line x1="40" y1="251" x2="920" y2="251" stroke="#000000"/>
+<text x="40" y="286" font-family="Georgia,'Times New Roman',serif" font-size="18" fill="#000000" text-anchor="start" font-weight="700">Repetition 1</text>
+<text x="40" y="308" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="8.5" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="0.4">DUPLICATE DISPATCHES / LOWER IS BETTER</text>
+<text x="40" y="340" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="600">Smythe</text>
+<text x="300" y="340" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="14" fill="#000000" text-anchor="end" font-weight="normal">8</text>
+<g data-framework="smythe" data-repetition="1" data-dispatches="8">
+<rect x="40" y="351" width="65.0" height="16" fill="#000000"/>
+</g>
+<text x="40" y="399" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="600">LangGraph</text>
+<text x="300" y="399" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="14" fill="#000000" text-anchor="end" font-weight="normal">32</text>
+<g data-framework="langgraph" data-repetition="1" data-dispatches="32">
+<rect x="40" y="410" width="260.0" height="16" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+</g>
+<line x1="322" y1="273" x2="322" y2="429" stroke="#000000"/>
+<text x="345" y="286" font-family="Georgia,'Times New Roman',serif" font-size="18" fill="#000000" text-anchor="start" font-weight="700">Repetition 2</text>
+<text x="345" y="308" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="8.5" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="0.4">DUPLICATE DISPATCHES / LOWER IS BETTER</text>
+<text x="345" y="340" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="600">Smythe</text>
+<text x="605" y="340" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="14" fill="#000000" text-anchor="end" font-weight="normal">8</text>
+<g data-framework="smythe" data-repetition="2" data-dispatches="8">
+<rect x="345" y="351" width="65.0" height="16" fill="#000000"/>
+</g>
+<text x="345" y="399" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="600">LangGraph</text>
+<text x="605" y="399" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="14" fill="#000000" text-anchor="end" font-weight="normal">32</text>
+<g data-framework="langgraph" data-repetition="2" data-dispatches="32">
+<rect x="345" y="410" width="260.0" height="16" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+</g>
+<line x1="627" y1="273" x2="627" y2="429" stroke="#000000"/>
+<text x="650" y="286" font-family="Georgia,'Times New Roman',serif" font-size="18" fill="#000000" text-anchor="start" font-weight="700">Repetition 3</text>
+<text x="650" y="308" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="8.5" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="0.4">DUPLICATE DISPATCHES / LOWER IS BETTER</text>
+<text x="650" y="340" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="600">Smythe</text>
+<text x="910" y="340" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="14" fill="#000000" text-anchor="end" font-weight="normal">8</text>
+<g data-framework="smythe" data-repetition="3" data-dispatches="8">
+<rect x="650" y="351" width="65.0" height="16" fill="#000000"/>
+</g>
+<text x="650" y="399" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="600">LangGraph</text>
+<text x="910" y="399" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="14" fill="#000000" text-anchor="end" font-weight="normal">32</text>
+<g data-framework="langgraph" data-repetition="3" data-dispatches="32">
+<rect x="650" y="410" width="260.0" height="16" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+</g>
+<line x1="40" y1="453" x2="920" y2="453" stroke="#000000"/>
+<text x="40" y="480" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11.5" fill="#000000" text-anchor="start" font-weight="normal">3 repetitions per framework; 100 ms simulated calls; durable dispatch logging</text>
+<text x="40" y="502" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11.5" fill="#000000" text-anchor="start" font-weight="normal">Legacy Swarm file checkpoints vs LangGraph synchronous SQLite checkpoints</text>
+<text x="40" y="524" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11.5" fill="#000000" text-anchor="start" font-weight="normal">Offline process-kill profile; provider billing unmeasured</text>
+<text x="920" y="550" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="11" fill="#000000" text-anchor="end" font-weight="normal">durability_kill_resume_v2.json</text>
+<text x="40" y="550" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="1">SOURCE RECORD</text>
+<!-- source-sha256: ce8e93ec281e0e6260348c20ba1adccff33bcf95160d008162f0fb17bb057c6d -->
+</svg>

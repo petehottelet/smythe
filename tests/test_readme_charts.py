@@ -15,7 +15,9 @@ from benchmarks.render_readme_charts import (
     render_glyph_pipeline,
     render_glyph_scaling,
     render_glyph_specimens,
+    render_recovery,
     render_shape_efficiency,
+    render_svg_workflow,
 )
 
 ROOT = Path(__file__).parents[1]
@@ -47,6 +49,8 @@ def test_generated_public_charts_are_strictly_black_and_white():
         render_framework_comparison,
         render_framework_callouts,
         render_shape_efficiency,
+        render_svg_workflow,
+        render_recovery,
         render_glyph_scaling,
         render_glyph_pipeline,
         render_glyph_specimens,
@@ -70,6 +74,8 @@ def test_committed_benchmark_charts_match_the_current_evidence_renderer():
         "framework_callouts.svg": render_framework_callouts,
         "shape_efficiency.svg": render_shape_efficiency,
         "glyph_scaling.svg": render_glyph_scaling,
+        "svg_workflow.svg": render_svg_workflow,
+        "recovery.svg": render_recovery,
     }
     for name, renderer in charts.items():
         path = ROOT / "assets" / "benchmarks" / name
@@ -118,12 +124,15 @@ def test_readme_connects_glyph_rain_to_benchmark_evidence():
     readme = ROOT.joinpath("README.md").read_text(encoding="utf-8")
     ordered_markers = (
         "## Glyph Rain",
-        "assets/glyph_rain/glyph-rain-screenshot.png",
-        "**Download:** [Windows `.scr`]",
+        "screensaver/svg-preview/preview.png",
+        "**Native downloads:** [Windows `.scr`]",
         "## Benchmarks",
+        "### Original SVG generation",
+        "assets/benchmarks/svg_workflow.svg",
         "### Glyph generation and scaling",
         "assets/benchmarks/glyph_scaling.svg",
         "### Recovery after interruption",
+        "assets/benchmarks/recovery.svg",
         "### Framework efficiency",
         "assets/benchmarks/framework_callouts.svg",
         "assets/benchmarks/framework_comparison.svg",

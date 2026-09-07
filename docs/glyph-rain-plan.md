@@ -1,12 +1,22 @@
 # Glyph Rain: style measurements and implementation plan
 
-Status: research and planned work. The current screensaver code, glyph catalog,
-and compiled downloads remain unchanged by this plan.
+Status: the original 192-glyph SVG workflow is complete. The web explorer now
+adapts the MIT-licensed m8e/Rezmason renderer and base artwork. Its
+[renderer interaction checkpoint](../benchmarks/partitions/glyph_rain_reference_v1/pixel-preview-review.json)
+passed before the final borderless styling.
+Performance and quantified reference parity remain unmeasured. The
+[explorer guide](../screensaver/svg-preview/README.md) documents this adaptation;
+the [generation benchmark](../benchmarks/svg_glyph_benchmark.md) still measures
+only Smythe's original catalog. Native downloads retain the earlier stroke
+catalog and renderer.
 
 Build new, independently drawn SVG glyphs with the proportions, weight,
 terminals, negative space, and visual rhythm distilled from the reference
-sheet. Place them in a persistent three-dimensional rain field that the user
-can explore with the arrow keys. Match the visual grammar; create new symbols.
+sheet. Introduce them occasionally within the licensed classic base catalog.
+The default effect is a fixed 2D grid; a selectable 3D preset supports arrow-key
+travel. **Matrix green** is the default color grade; the pinned **Reference**
+palette remains selectable. The original drawing brief and measured generation workflow remain
+independent of the imported runtime artwork.
 
 ## Sources and measurement boundaries
 
@@ -36,14 +46,14 @@ Every number below is labeled as one of:
 - **Derived:** calculated from source settings, with the assumptions stated.
 - **Proposed target:** a starting specification for Smythe, to verify during implementation.
 
-No reference source code, SVG outlines, image atlas, or font file will ship in
-Smythe. The MIT notice applies when copies or substantial portions of licensed
-work are included. Studying methods and creating independent implementations
-does not itself require adding that notice. Source artwork is expressive work;
-tracing or translating its exact contours into a different format still copies
-the drawing. Research links are retained as provenance.
-[MIT terms](https://opensource.org/license/mit) ·
-[Copyright Office: ideas, methods, and expression](https://www.copyright.gov/help/faq/faq-protect.html).
+The current preview includes adapted REGL rain, bloom, and palette code and
+the reference's classic base artwork. The pinned MIT notice accompanies the
+[engine](../screensaver/svg-preview/engine/LICENSE) and
+[artwork](../screensaver/svg-preview/reference/LICENSE); the
+[artwork provenance](../screensaver/svg-preview/reference/provenance.json)
+records the original atlas and extracted curves. These licensed imports are
+separate from the 192 original glyphs and excluded from their generation
+benchmark. The earlier research-only/no-import plan is superseded.
 
 ## Glyph measurements
 
@@ -55,8 +65,9 @@ A34 is 129 × 128.** Measurements use the actual dimensions of each image.
 The [per-row measurements](data/glyph-style-measurements.csv),
 [distribution summary](data/glyph-style-summary.json), and
 [method record](data/glyph-style-method.json) contain numeric evidence and
-source hashes. Reference PNGs and contact sheets are research material and are
-not included in the repository or runtime.
+source hashes. The 137 spreadsheet PNGs and their research contact sheets are
+not included in the runtime. The separately licensed classic atlas imported
+from the pinned repository is a different source population.
 
 ### Proportion, weight, and empty space
 
@@ -202,7 +213,7 @@ can prove an exact style match.
 
 ## Turning the measurements into original SVGs
 
-The next catalog will retain **192 original Smythe glyph IDs**. Historical
+The new catalog retains **192 original Smythe glyph IDs**. Historical
 benchmark artifacts remain immutable; the new display catalog receives its own
 version, hashes, and visual acceptance record. The 137 reference images are a
 measurement set, not a list of drawings to reproduce.
@@ -256,11 +267,12 @@ Proposed authoring rules:
    within 10 percentage points. Evaluate these gates across the completed
    profile, not each small batch. The seven visual families guide composition
    and optical review; the two stacked-mark examples do not support percentile
-   gates. These are proposed acceptance criteria, not achieved measurements.
+   gates. These are the acceptance criteria implemented in
+   [the catalog evaluator](../benchmarks/svg_glyph_measurements.py).
 5. **Check distinctness.** Reject identical normalized masks. Flag near matches
    for review using intersection-over-union after translation and uniform-scale
    alignment, including a mirrored comparison. Start with an IoU flag at 0.85;
-   simple marks require human review because overlap alone cannot establish
+   simple marks require optical review because overlap alone cannot establish
    originality or duplication.
 6. **Review the ensemble.** At normal playback size, the set should read as one
    writing system. Revise outliers that look like logos, emoji, a generic font,
@@ -269,6 +281,30 @@ Proposed authoring rules:
 7. **Freeze and export.** Commit only accepted original SVGs, the catalog
    manifest, generator version, measurements, and receipts. Generate native
    path data from these SVGs; test all exports against the same source geometry.
+
+### Current catalog and acceptance
+
+The implemented catalog and its acceptance receipts are available as the
+[complete contact sheet](../benchmarks/partitions/glyph_svg_v1/catalog/contact-sheet.png),
+[numeric evaluation](../benchmarks/partitions/glyph_svg_v1/catalog/style-acceptance.json),
+[optical review](../benchmarks/partitions/glyph_svg_v1/optical-review.json), and
+[size audit](../benchmarks/partitions/glyph_svg_v1/size-review.json).
+The [calibration history](../benchmarks/partitions/glyph_svg_v1/calibration-history.json)
+retains the measured failures from earlier candidates. Design calibration was
+completed before the timed campaign; its total elapsed time was not recorded.
+
+The final catalog uses 78 classic-like and 114 expanded-like glyphs. Its
+19 normalized shape metrics pass each profile's median and distribution gates;
+component and hole frequencies pass their separate gates. All 18,336 aligned
+and reflected pair comparisons fall below the 0.85 near-match threshold.
+Thresholds 96/128/160 preserve topology. At 16/32/64/128 pixels, no glyph is
+blank or loses a component or counter. Nine glyphs at 16 pixels and two at
+64 pixels retain extra 1–3-pixel enclosed specks; the size audit lists them.
+
+Raster edge sensitivity is reported separately: both profiles fall outside
+the reference's antialiasing-area band. It depends on the rasterizer and is
+not a geometry acceptance gate. Numeric matching and AI optical review do not
+establish exact stylistic equivalence or independently prove originality.
 
 ## Reference effect: measured structure and defaults
 
@@ -318,6 +354,9 @@ not refresh-rate independent. Smythe must use elapsed time.
 [Symbol simulation](https://github.com/m8e/matrix-rain/blob/5ba90490453ceceb6812d6b1bc658a99a92411d0/shaders/glsl/rainPass.symbol.frag.glsl#L31).
 
 ### Light and color
+
+This section records the pinned upstream defaults. Smythe's deliberate Matrix
+green color-grade adaptation is specified under [Current renderer adaptation](#current-renderer-adaptation).
 
 | Reference parameter | Classic | `3d` |
 |---|---:|---:|
@@ -375,159 +414,174 @@ target; this study did not measure upstream FPS, power draw, or total GPU memory
 [Geometry](https://github.com/m8e/matrix-rain/blob/5ba90490453ceceb6812d6b1bc658a99a92411d0/js/regl/rainPass.js#L26) ·
 [Frame sizing and scheduling](https://github.com/m8e/matrix-rain/blob/5ba90490453ceceb6812d6b1bc658a99a92411d0/js/regl/main.js#L40).
 
-## Smythe rendering specification
+## Current renderer adaptation
 
-Separate four systems: world geometry, glyph identity, illumination, and camera.
-Moving the camera changes projection. It must not regenerate the glyph field
-or reset the rain. The glyphs stay in their cells while a light front travels
-down each column; sparse character substitutions run on an independent clock.
+The current web preview adopts the pinned MIT-licensed REGL rain, bloom,
+and palette passes. It replaces the earlier independently implemented Canvas
+interpretation. The [behavior plan](glyph-rain-parity-plan.md) contains the
+parameter-level comparison and acceptance criteria; the
+[explorer guide](../screensaver/svg-preview/README.md) is the current control map.
+Browser interaction checks pass. They cover presets, mix endpoints, settings,
+paused navigation/reset, fullscreen, input release, mobile layout, reduced
+motion, and hidden-tab suspension. New performance measurements and quantified
+reference-parity checks remain pending.
 
-### World and camera
-
-These are **proposed targets**, not values copied from the reference renderer.
-
-| Parameter | Initial target | Reason / acceptance |
-|---|---:|---|
-| Persistent columns | 300 | Enough overlapping depth at 1920 × 1080; cull before drawing. Tune density from measured frame times and dark-space coverage. |
-| World width × height × depth | 140 × 80 × 60 units | A bounded repeating volume supports continuous travel. |
-| Vertical cells per column | 70 | 21,000 logical cells; only illuminated, visible cells become draws. |
-| Cell pitch | 80/70 ≈ 1.143 units | Fixed world spacing, independent of viewport and refresh rate. |
-| Near / far depth | 4 / 64 units | Clip and fade before a glyph crosses the camera. |
-| Focal length | 0.9 × viewport height | Approximately 58.1° vertical field of view. |
-| Glyph height | 0.85 world units | Leaves space between consecutive glyph cells. |
-| Sideways speed | 12 world units/second | Key-hold duration controls distance. |
-| Forward/backward speed | 18 world units/second | Continuous approach and recession, with no automatic forward drift. |
-| Near fade interval | Depth 4–7 | Smoothly hide wrapping columns before crossing the near plane. |
-| Far fade interval | Depth 46–64 | Blend recycled columns into the distance. |
-| Position reset | X=0, Z=0 | Preserve glyph identities and rain phase. |
-
-Use standard perspective: projected size is proportional to focal length divided
-by camera-relative depth. At a 1080-pixel viewport, focal length is 972 pixels.
-A glyph of height 0.85 projects to **82.62 pixels at depth 10**, **41.31 at 20**,
-and **20.66 at 40**. A one-unit lateral camera move shifts a point **121.5 pixels
-at depth 8** and **30.375 at depth 32**: the acceptance ratio is **4:1**.
-These are analytical examples, not measured frame-rate results.
-
-Track held keys independently of operating-system key repeat. Normalize diagonal
-input so holding two keys does not multiply movement magnitude. Clear held keys
-on focus loss, hidden tabs, pointer cancellation, and window deactivation.
-Wrap positions without changing the stable column seed. Keep the same world and
-camera through resize; only projection and render buffers change.
-
-### Rain and light
-
-| Property | Proposed starting target |
+| Setting | Current preview configuration |
 |---|---|
-| Illumination speed | 16–30 cells/second per column (18.3–34.3 world units/second at the proposed pitch); independent phase. |
-| Lit trail length | Usually 12–24 cells (13.7–27.4 world units), with occasional longer runs and real gaps between waves. |
-| Character substitution | Independently sampled intervals of 0.35–0.9 seconds; time-based, never once per display frame. |
-| Leading glyph | At most one hot cell per wave front; vary whether a column uses a pale head. Avoid a uniform row of white cursors. |
-| Core and bloom | Render crisp cores separately from halos. Apply a brightness threshold before broad bloom; preserve counters and separation. |
-| Palette | Black background; green bodies; yellow-green to pale-green highlights. Calibrate to the reference palette values, then judge in the complete scene. |
-| Dark-space gate | Proposed 65–80% dark pixels in a paused 1080p frame, excluding UI; define dark as all RGB channels ≤16. Record several seeds and camera positions. |
-| Highlight gate | Proposed <3% near-white pixels; define near-white as all RGB channels ≥210. Bright heads must remain localized. |
-| Frame independence | Equivalent rain/camera state after 10 seconds at simulated 30, 60, and 144 FPS, within declared floating-point tolerance. |
+| Default scene | Classic fixed 2D grid; 80 cells across the longer viewport dimension |
+| Other presets | 3D with deliberate arrow-key travel; Operator visual preset |
+| Base artwork | 56 licensed visible glyphs and the source sequence's blank slot |
+| Original artwork | 192 independently generated SVGs, with their original IDs and hashes |
+| Mix | Original catalog selected with 10% probability by default; otherwise select from the 57 base slots |
+| Motion and light | Reference state simulation, separate glyph changes, scalar bloom, then palette mapping |
+| Default color grade | Matrix green: 137° hue, 80% saturation, existing preset lightness stops, cursor `#A2FFD8` |
+| Reference colors | Selectable; retain the chosen preset's original palette and cursor color |
+| Render scale | Default 0.75 × viewport size × device-pixel ratio |
+| Settings | Supported options only; draft changes apply together and are reflected in the URL |
 
-The sheet contains flat glyph artwork. It cannot supply bloom radii, luminance
-decay, frame rate, or motion speed. Derive those from the effect source and
-playback measurements; never report them as measurements of column A.
+The catalogs have different roles. Imported base artwork establishes the
+reference appearance. The original shapes remain an independent measured
+artifact workflow and appear occasionally in the default effect. A display
+mix is not a new generation result, a claim of original authorship for the
+base shapes, or evidence of rendering efficiency.
 
-### Vector rendering and performance
+The default 57-slot base sequence includes an intentional blank. Preserve that
+slot when weighting the base catalog; do not select uniformly across a joined
+56+192 array. The original percentage controls catalog selection independently
+of catalog size.
 
-SVG supplies resolution-independent shape geometry; perspective itself does
-not require SVG. Parse original paths once. Use a bounded sprite cache at several
-physical pixel sizes for distant and middle-distance glyphs, with direct vector
-rendering or a higher-resolution representation for close-ups. Re-rasterize at
-the required size rather than enlarging a tiny bitmap.
+### Matrix green color grade
 
-Start with four physical-pixel cache sizes: **16, 32, 64, and 128**, with two
-light roles. Fully populating 192 glyphs at all four sizes takes **31.875 MiB**
-of raw RGBA pixels before padding, halos, or graphics-library overhead.
-Set a proposed **64 MiB image-cache cap**, evict unused entries, and account
-for render buffers and runtime overhead separately.
-Do not allocate one SVG DOM element for every logical cell or rebuild paths
-every frame. A future MSDF/GPU implementation is an alternative only if profiling
-shows the simpler renderer misses the target. Implement its shaders independently.
+The default grade moves the body green to **137° hue and 80% saturation** while
+preserving each preset's lightness values and stop positions. Classic retains
+stops 0, 0.2, 0.7, and 0.8: approximately `#000000`, `#0A5C21`, `#75F098`, and
+`#A3F5BA`. The cursor is mint **`#A2FFD8`**. This is a deliberate adaptation,
+not an assertion that these are the reference repository's unmodified defaults.
+The **Reference** palette restores the original preset colors, including its
+cursor; the source audit above remains unchanged.
 
-Proposed performance gates:
+The [color comparison receipt](../benchmarks/partitions/glyph_rain_reference_v1/color-comparison.json)
+measures the user's screenshot separately from the earlier preview. Excluding
+the UI (`y < 685`), median body hue is **136.92° versus 108.75°**. A matched
+mid-green mask gives 136.80° versus 108.51°. The bright-tip medians also support
+mint-white highlights rather than the previous yellow-white. The receipt records
+source paths and hashes, pixel masks, sample counts, and distributions; the
+user's image is not copied into the repository.
 
-- Web: target 60 FPS at 1920 × 1080, with P95 frame time ≤16.7 ms after warmup.
-- Native: target at least 40 FPS at 1280 × 720, with P95 frame time ≤25 ms.
-- Frame-time gates use intervals between completed frames, including scheduling
-  delays. Report update/draw work duration separately. Browser callback timing
-  alone does not prove physical presentation timing; identify the available
-  measurement and report missed-frame estimates without claiming GPU timings.
-- Input response: visible movement within 100 ms; key release/focus loss stops
-  travel within the next rendered frame.
-- Measure for 60 seconds after a 5-second warmup; report device, OS, renderer,
-  resolution, device-pixel ratio, visible glyph count, median/P95 frame time,
-  peak cache bytes, and allocation growth.
-- Run a 10-minute travel-and-resize soak. Memory should plateau at the declared
-  cache bound; hidden/minimized renderers should stop animation work.
+Hue is measured; saturation is an art-direction choice. The existing HSL
+lightness curve stays in place, while RGB luminance changes with the new
+chroma. A new rendered comparison must verify appearance after bloom and
+clipping. Use Reference when testing upstream color parity and Matrix green
+when reviewing the requested grade.
 
-These are targets. Publish efficiency numbers only after measuring the final
-original-glyph build. Keep renderer FPS separate from the historical glyph
-generation benchmark and its simulated provider latency.
+### Archived renderer v1
+
+The earlier Canvas implementation used 420 columns in a 140 × 80 × 60 world,
+70 cells per column, direct vector close-ups, and a bounded sprite cache.
+Its [source and screenshot archive](../benchmarks/partitions/glyph_svg_v1/renderer-v1/)
+resolves the hashes in its original receipts.
+
+Its three headless timing runs are superseded diagnostics: they recorded
+36.04–53.81 average callbacks/s and missed the 16.7 ms P95 interval target.
+The 601.12-second movement/resize soak and twelve-view darkness sample describe
+that implementation only. The current REGL renderer requires new checks and
+receipts; none of the old frame rates, cache bounds, or visual samples transfer.
+The original SVG generation benchmark remains valid because its measured
+input, output, and algorithm are unchanged.
 
 ## Controls and platform behavior
 
-| Input | Behavior |
-|---|---|
-| ↑ / ↓ | Move forward / backward through the field. |
-| ← / → | Move sideways with distance-dependent parallax. |
-| Space | Pause/resume the rain; deliberate camera movement still works. |
-| R | Reset the viewpoint without reshuffling glyphs or advancing paused time. |
-| F | Toggle fullscreen in the web explorer. |
-| Escape | Leave fullscreen or exit the native explorer according to platform convention. |
-| Touch | Hold four labeled directional controls; cancel movement on release or lost pointer capture. |
+### Menu visual brief
 
-Web reduced-motion mode starts with still rain and no automatic travel. A user
-may deliberately move the viewpoint. Pause, reset, fullscreen, and control help
-remain keyboard-accessible, with visible focus. Hide passive UI during idle
-viewing; restore it on interaction or focus.
+Use simple VT323 pixel lettering for headings, labels, numerals, buttons,
+inputs, and help text. The SMYTHE logo uses outlined Trajan Pro Bold and generous
+black padding. Align labels and values without control frames. Interface text
+and panels have no glow, corner ornaments, or stepped edges.
+Follow the [explorer style](style.md#explorer-controls) and
+[hottelet.com](https://www.hottelet.com/): primary green `#37FF6E`, bright
+`#9CFFBC`, and black. The rain keeps its separate 137° grade, `#A2FFD8` leading
+glyphs, and bloom. Chart typography and the black-and-white palette remain
+unchanged.
+
+Verify readable pixel lettering, borderless controls, a distinct focus indicator,
+and touch targets of at least 44px. Focus, selection, and disabled states use
+clear shapes and contrast. Verify the sheet at 390px and 1920px widths,
+including scrolling, draft edits, Apply, Cancel/Escape, and restored focus.
+These are visual acceptance targets, not measurements of the earlier menu.
+
+### Input and native hosts
+
+| Input | Current web control contract |
+|---|---|
+| S | Open settings; release held movement before focus enters the sheet |
+| Space | Pause/resume playback |
+| R | Reset the viewpoint |
+| F | Toggle fullscreen |
+| ↑ / ↓ in 3D | Move forward / backward |
+| ← / → in 3D | Move sideways with perspective parallax |
+| Escape in settings | Cancel the draft, close, and restore focus |
+| Apply | Apply the entire settings draft, then update the URL |
+
+Verify reduced-motion startup with no automatic travel, deliberate navigation,
+keyboard focus, and settings cancellation. Held movement must clear on key
+release, focus loss, hidden tabs, and pointer cancellation. Resizing must not
+leave stale render buffers or an invalid camera. Presets and settings must
+expose only capabilities the active engine implements.
 
 Windows `/s` remains a normal screensaver; `/p` remains the settings preview.
 Navigation belongs in an explicit `/w` explorer so normal input dismissal is
 preserved. macOS needs a companion universal Explorer app using the same view;
-the system screensaver host owns input dismissal. Linux supports exploration
+the system screensaver host owns input dismissal. Linux exploration belongs
 in a standalone X11 window; embedded/root modes leave keyboard ownership with
 the screensaver manager. Native Wayland and Mac notarization remain separate work.
+All current compiled downloads retain their earlier stroke catalog and controls.
 
 ## Delivery and acceptance
 
-1. Complete the measured shape brief and 24-glyph calibration set.
-2. Generate and accept all 192 original SVGs; freeze their catalog and hashes.
-3. Implement the persistent world and camera as a renderer-independent model.
-4. Verify web interaction, reduced motion, touch, resize, and hidden-tab behavior.
-5. Port the same geometry and interaction contract to Windows, macOS, and Linux.
-6. Build and test compiled artifacts before replacing any current download.
-7. Update the screenshot, documentation, checksums, and build provenance together.
+The original 192-glyph generation and acceptance campaign is complete. The
+remaining renderer work is:
 
-Required regression evidence:
+1. Verify the adapted Classic, 3D, and Operator configurations against the
+   pinned behavior, with explicit license notices and source provenance.
+2. Verify mix endpoints and the default 10% weighting, including the base blank
+   slot; retain independent provenance for both catalogs.
+3. Test settings as a transaction: draft edits do not reset the effect, Apply
+   commits supported values, Cancel/Escape restore focus, and URLs round-trip.
+4. Test actual browser navigation, pause, reset, fullscreen, reduced motion,
+   mobile layout, resize, hidden tabs, focus loss, and clean shutdown.
+5. Capture the adapted renderer's actual output before replacing its public
+   screenshot. Keep the earlier image with the v1 archive.
+6. Run a new performance campaign and movement/resize soak against frozen
+   source, catalog, and settings hashes.
+7. Port selected behavior and both catalog exports to native Windows, macOS,
+   and Linux. Preserve OS screensaver policy and verify compiled artifacts
+   before replacing downloads.
 
-- A 4:1 parallax ratio at depths 8 and 32; projected size doubles when depth halves.
-- Forward/backward movement changes depth and scale; lateral movement preserves
-  depth and changes screen position. No flat-layer translation substitute.
-- 10,000 movement steps remain in world bounds with stable column identities.
-- With rain paused, camera reset restores the same pixels at the same viewport.
-- Key release, focus loss, visibility change, and touch cancellation clear motion.
-- SVG contours and holes survive all native geometry exports. Original SVGs
-  remain the authoritative assets; bounded runtime rasterization caches are allowed.
-- Windows compiled load/render/resize and actual `/p` subprocess embedding/exit.
-- The same universal Mac artifact executes on Apple Silicon and Intel; verify
-  both the screensaver view and companion Explorer app.
-- The same Linux ELF passes on Ubuntu 22.04 and 24.04. Retain the 16 existing
-  native checks and add the nine checks below, for 25 named receipt checks.
-- Full offline tests, Ruff, local Markdown links, and a scan confirming that no
-  upstream implementation or artwork entered the distributable files.
+Proposed measurement gates remain targets, not current achievements:
 
-The nine added Linux checks are: left/right parallax; forward/backward scale;
-normalized diagonal travel; release stops movement; focus loss clears held
-keys; pause freezes rain while allowing travel; reset restores the paused
-view; resize preserves world and camera state; and 10,000-step wrapping
-preserves column identities. These are planned checks, not current receipts.
+- Web: target 60 FPS at 1920 × 1080, with P95 completed-frame interval ≤16.7 ms
+  after warmup. Declare render scale and DPR; a 0.75-scale buffer is not a
+  full-resolution pixel workload.
+- Native: target at least 40 FPS at 1280 × 720, with P95 interval ≤25 ms.
+- Report CPU command submission separately from callback intervals. GPU
+  completion, physical display presentation, total graphics memory, and power
+  require their own measurements.
+- Measure three 60-second runs after five seconds of warmup each. Keep every
+  run, failure, device/OS/browser identifier, setting, and raw sample.
+- Complete a ten-minute travel/resize soak with finite state, stable resources,
+  stopped hidden/paused work, and released input. Scope any concurrent workload.
 
-The README introduces the current screensaver before its evidence. Its benchmark
-sequence is glyph generation and scaling → recovery → framework efficiency →
-generated execution topology. The planned SVG/navigation work stays labeled as
-planned until its own artifacts and verification are published.
+Native regression acceptance includes proportional depth/parallax, stable
+column identities during repeated travel, correct pause/reset behavior, matching
+SVG contours after export, and normal screensaver dismissal. Windows must load
+and render the compiled `.scr` and exercise actual `/p` subprocess embedding.
+Both Apple Silicon and Intel must execute the same universal artifact. Ubuntu
+22.04 and 24.04 must execute the same Linux ELF with rendering, embedding,
+resize, input, and shutdown checks. These are porting requirements, not receipts
+for the new glyph catalog.
+
+Update screenshots, documentation, checksums, source provenance, and required
+MIT notices together. Run the full offline suite, Ruff, and local Markdown link
+validation before publication. Keep the README centered on generated execution
+topology and its durable envelope; the mixed-artwork display remains separate
+from the original-glyph workflow evidence.

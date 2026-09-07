@@ -1,0 +1,734 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "method": "One batched independent agent-browser visual and computed-style review. Actual browser actions and desktop/mobile screenshots; no renderer performance measurement.",
+  "checkedAtUtc": "2026-09-07T11:32:37.717Z",
+  "rendererSources": {
+    "base-glyphs.js": "8722d0bf011b22878695699b2e3cbe7b6ae27397cd3dcd88317024d80eff787e",
+    "browser-command.mjs": "8b98aa31695467a0a72d3ebb15853f2ea7740fc0ba849628ace21a102218530e",
+    "catalog.html": "fd5f9d2cc6a75b0f32e7d50f026f6cf46089149e8cf4d2a20a5d2dc25492d4e0",
+    "config.mjs": "f823471fc6cc40a5193f9470bb5012d1edefbfc5ca73ec73a451e2f1203a6613",
+    "engine/bloomPass.js": "79f6009f6d6eaa2844bad93c78f1fdfd20204dd83ac9bc4560f9ff40b7d86c30",
+    "engine/colorToRGB.js": "cc868a9b4047c2c325ade036fb9bad79f4985705b58af338de10349370a0b9a9",
+    "engine/palettePass.js": "9913f36fa9db86e405088bc975bf69f731c7019cca45f98de2d6a5c83e583e94",
+    "engine/rainPass.js": "70c51df478d33a73ebe9e9ca6fef1ed09f7a1a9ffd64b68911a67f0963cce93d",
+    "engine/shaders/bloomPass.blur.frag.glsl": "c1a2b01ad593d1d5bf95cbe2eb3a957c85840c0ede6fe893c61baf81fe610faa",
+    "engine/shaders/bloomPass.combine.frag.glsl": "a2cebf40734ecba772668548816a32235ef7e48439ee1c2ddb9fb20582060b0b",
+    "engine/shaders/bloomPass.highPass.frag.glsl": "727979238690fc06a8fcc14065468e43bd23d6710ab0b8fc4dbf985f6fa00034",
+    "engine/shaders/palettePass.frag.glsl": "d58298cd551be59495289463e93bf306a345eae7693617c147e7b332b7714e82",
+    "engine/shaders/rainPass.effect.frag.glsl": "6c0ee969bd62a7d313a69e19d8a29a0febf2884b5534a706685717496a3289b4",
+    "engine/shaders/rainPass.frag.glsl": "1cd3c2fbdb887965e0906b5a55cf16c0e95385f2deb15008fd8e1433b1000fa5",
+    "engine/shaders/rainPass.intro.frag.glsl": "d409f1f2fe372b6ce2b4a7aaaab00ce85c43853b87011e1c0030a3f45a70bb9e",
+    "engine/shaders/rainPass.raindrop.frag.glsl": "8f8ce9164ff8bf2005f10ad981959e75e4cb153b6f6a12d347586f3813820213",
+    "engine/shaders/rainPass.symbol.frag.glsl": "08f5220fce20c9191170086615061556401db5484994a153335aeda5569ca99c",
+    "engine/shaders/rainPass.vert.glsl": "365b7bb1f7c165103472adaea6198cb2ac5889141f2ef4f20ca62baa863b5adf",
+    "engine/upstream-config.mjs": "10a09629ba28592998e8e00054db13d17be1656fd57f632205e3c24b61ecc132",
+    "engine/utils.js": "5018541245bf7d8556fd43089b09110ff4c145db7352b102b62a7e29e426569e",
+    "glyphs.js": "63967d8b1fe5c7dfb46ec665851b675682d88bd5c18e39a6a7f44ac692cbaabd",
+    "index.html": "df3ccdd32d2c6279c7ecd7773dbb544d830ee5211225329fa2425a672c47c573",
+    "lib/gl-matrix.js": "07855fa64096dbc30c3cf9088be433f29c8e344665c87b66c7463443d38c15a7",
+    "lib/regl.min.js": "1e85c84ef254125921378d82f4da4e457a0a399bc315880c8c997dd5af8c534d",
+    "measure.mjs": "55ae15311c31d53c6f47d3017d6cfe868b79a08f0e210bf15a1a85c5e71d4ce3",
+    "model.mjs": "90c18929d1449b248114104c1af2163047b2163536cea0ee45f90ee2466a9511",
+    "provenance.mjs": "327debb738aa27a06f5c033a76d710889b7fada5057a6d4a8446ffde4ff1f420",
+    "rain.js": "2b0da82d359c366baea4556efa7905d7de57229fd3894d438c8e547337b06b5a",
+    "review.mjs": "b4070ef64ee274583aa5773c1b1682e097d5e79585bb502ac4859e606b8b80db",
+    "settings.css": "be96f5e6b9acbde5aef9aa81a34228b9cf96a287c3df06c10c386b1926f417ac",
+    "settings.mjs": "d660a83d282f411474458821e175dd89b5777941c0e4410528ab455051aa76ed",
+    "soak.mjs": "035c36e2384aa7fb431f8fcfc2fbfab82c769b308d2e8167d33265ff7b4b77f6",
+    "source-files.mjs": "466394893888dfc3d4fcad1c0fc28cde12c77a292d646c35cd645f63de56a999",
+    "style.css": "2cd5c23ca1ddb471f7e36b395eb6f063ee059908346d9954ef8fbd236a832d3d",
+    "timing.mjs": "1a7ae6897b0564d71b897f1ee8129c7c9b914b9cf0a390236f2336487860d3f5",
+    "verify-browser-command.mjs": "9d60c40623d2ad04512ba842bce0562e3997847aae2bbee65f858cd8b1fc9fbf",
+    "verify-config.mjs": "dcec2353565e92fa1c9bd9f90d63c24cd7980ffbe608dd5fd2d58b37fa596d9e",
+    "verify-measure-guard.mjs": "8d1cedd1ec25237d8758ce7f99c71236c56d67f17d9d47d01098acc3a853a007",
+    "verify-model.mjs": "037b4fcb160dee7bdeb2d6a25e052642c6e782e0dab6897e10ccd6d259581ab6",
+    "verify-provenance.mjs": "39587265439919bd18905978671ddd73b5ced2eb9694e781857a582fe6fcfb20",
+    "verify-settings.mjs": "dd2aeb89552812b918f51825ef3989fe8b2df1bfce6e4c7f294277511074f8ce",
+    "verify-timing.mjs": "d6d0652ad7d1cd02197a2878619b758221c73d1378483b4e4c81423f66136837"
+  },
+  "checks": {
+    "fontReady": {
+      "available": true,
+      "faces": [
+        {
+          "family": "VT323",
+          "status": "loaded",
+          "weight": "400"
+        }
+      ],
+      "status": "loaded"
+    },
+    "logo": {
+      "alt": "SMYTHE",
+      "loaded": true,
+      "naturalHeight": 47,
+      "naturalWidth": 300,
+      "src": "wordmark.svg"
+    },
+    "arrowLabels": [
+      {
+        "label": "Move left",
+        "svgAriaHidden": "true",
+        "svgPresent": true
+      },
+      {
+        "label": "Move forward",
+        "svgAriaHidden": "true",
+        "svgPresent": true
+      },
+      {
+        "label": "Move backward",
+        "svgAriaHidden": "true",
+        "svgPresent": true
+      },
+      {
+        "label": "Move right",
+        "svgAriaHidden": "true",
+        "svgPresent": true
+      }
+    ],
+    "desktopChrome": {
+      "bodyHorizontalOverflow": false,
+      "classicTravelDisabled": [
+        true,
+        true,
+        true
+      ],
+      "dialog": null,
+      "dialogHorizontalOverflow": false,
+      "fontFamilies": [
+        "VT323, monospace"
+      ],
+      "fontWeights": [
+        "400"
+      ],
+      "footer": {
+        "bounds": {
+          "bottom": 1056,
+          "height": 76,
+          "left": 28,
+          "right": 1892,
+          "top": 980,
+          "width": 1864,
+          "x": 28,
+          "y": 980
+        },
+        "direction": "row"
+      },
+      "header": {
+        "background": "rgb(0, 0, 0)",
+        "bounds": {
+          "bottom": 120,
+          "height": 92,
+          "left": 28,
+          "right": 1892,
+          "top": 28,
+          "width": 1864,
+          "x": 28,
+          "y": 28
+        },
+        "padding": [
+          "24px",
+          "32px",
+          "24px",
+          "32px"
+        ]
+      },
+      "horizontalOverflow": false,
+      "minimumControlHeight": 44,
+      "nonPixel": [],
+      "outsideViewport": [],
+      "smallControls": [],
+      "textShadows": [
+        "none"
+      ],
+      "viewport": [
+        1920,
+        1080,
+        1
+      ]
+    },
+    "desktopSettings": {
+      "bodyHorizontalOverflow": false,
+      "classicTravelDisabled": [
+        true,
+        true,
+        true
+      ],
+      "dialog": {
+        "bottom": 1080,
+        "height": 1080,
+        "left": 1480,
+        "right": 1920,
+        "top": 0,
+        "width": 440,
+        "x": 1480,
+        "y": 0
+      },
+      "dialogHorizontalOverflow": false,
+      "fontFamilies": [
+        "VT323, monospace"
+      ],
+      "fontWeights": [
+        "400"
+      ],
+      "footer": {
+        "bounds": {
+          "bottom": 1056,
+          "height": 76,
+          "left": 28,
+          "right": 1892,
+          "top": 980,
+          "width": 1864,
+          "x": 28,
+          "y": 980
+        },
+        "direction": "row"
+      },
+      "header": {
+        "background": "rgb(0, 0, 0)",
+        "bounds": {
+          "bottom": 120,
+          "height": 92,
+          "left": 28,
+          "right": 1892,
+          "top": 28,
+          "width": 1864,
+          "x": 28,
+          "y": 28
+        },
+        "padding": [
+          "24px",
+          "32px",
+          "24px",
+          "32px"
+        ]
+      },
+      "horizontalOverflow": false,
+      "minimumControlHeight": 44,
+      "nonPixel": [],
+      "outsideViewport": [],
+      "smallControls": [],
+      "textShadows": [
+        "none"
+      ],
+      "viewport": [
+        1920,
+        1080,
+        1
+      ]
+    },
+    "computedColors": {
+      "applyBackground": "rgb(55, 255, 110)",
+      "applyColor": "rgb(0, 0, 0)",
+      "bright": "#9cffbc",
+      "green": "#37ff6e",
+      "help": "rgba(55, 255, 110, 0.62)",
+      "helpBackground": "rgb(0, 0, 0)",
+      "rule": "rgba(55, 255, 110, .62)"
+    },
+    "mobileSettings": {
+      "bodyHorizontalOverflow": false,
+      "classicTravelDisabled": [
+        true,
+        true,
+        true
+      ],
+      "dialog": {
+        "bottom": 844,
+        "height": 844,
+        "left": 0,
+        "right": 390,
+        "top": 0,
+        "width": 390,
+        "x": 0,
+        "y": 0
+      },
+      "dialogHorizontalOverflow": false,
+      "fontFamilies": [
+        "VT323, monospace"
+      ],
+      "fontWeights": [
+        "400"
+      ],
+      "footer": {
+        "bounds": {
+          "bottom": 832,
+          "height": 174,
+          "left": 12,
+          "right": 378,
+          "top": 658,
+          "width": 366,
+          "x": 12,
+          "y": 658
+        },
+        "direction": "column"
+      },
+      "header": {
+        "background": "rgb(0, 0, 0)",
+        "bounds": {
+          "bottom": 92,
+          "height": 76,
+          "left": 16,
+          "right": 374,
+          "top": 16,
+          "width": 358,
+          "x": 16,
+          "y": 16
+        },
+        "padding": [
+          "16px",
+          "20px",
+          "16px",
+          "20px"
+        ]
+      },
+      "horizontalOverflow": false,
+      "minimumControlHeight": 44,
+      "nonPixel": [],
+      "outsideViewport": [],
+      "smallControls": [],
+      "textShadows": [
+        "none"
+      ],
+      "viewport": [
+        390,
+        844,
+        1
+      ]
+    },
+    "escapeFocusRestore": true,
+    "mobileChrome": {
+      "bodyHorizontalOverflow": false,
+      "classicTravelDisabled": [
+        true,
+        true,
+        true
+      ],
+      "dialog": null,
+      "dialogHorizontalOverflow": false,
+      "fontFamilies": [
+        "VT323, monospace"
+      ],
+      "fontWeights": [
+        "400"
+      ],
+      "footer": {
+        "bounds": {
+          "bottom": 832,
+          "height": 174,
+          "left": 12,
+          "right": 378,
+          "top": 658,
+          "width": 366,
+          "x": 12,
+          "y": 658
+        },
+        "direction": "column"
+      },
+      "header": {
+        "background": "rgb(0, 0, 0)",
+        "bounds": {
+          "bottom": 92,
+          "height": 76,
+          "left": 16,
+          "right": 374,
+          "top": 16,
+          "width": 358,
+          "x": 16,
+          "y": 16
+        },
+        "padding": [
+          "16px",
+          "20px",
+          "16px",
+          "20px"
+        ]
+      },
+      "horizontalOverflow": false,
+      "minimumControlHeight": 44,
+      "nonPixel": [],
+      "outsideViewport": [],
+      "smallControls": [],
+      "textShadows": [
+        "none"
+      ],
+      "viewport": [
+        390,
+        844,
+        1
+      ]
+    },
+    "narrowChrome": {
+      "bodyHorizontalOverflow": false,
+      "classicTravelDisabled": [
+        true,
+        true,
+        true
+      ],
+      "dialog": null,
+      "dialogHorizontalOverflow": false,
+      "fontFamilies": [
+        "VT323, monospace"
+      ],
+      "fontWeights": [
+        "400"
+      ],
+      "footer": {
+        "bounds": {
+          "bottom": 556,
+          "height": 224,
+          "left": 12,
+          "right": 308,
+          "top": 332,
+          "width": 296,
+          "x": 12,
+          "y": 332
+        },
+        "direction": "column"
+      },
+      "header": {
+        "background": "rgb(0, 0, 0)",
+        "bounds": {
+          "bottom": 92,
+          "height": 76,
+          "left": 16,
+          "right": 304,
+          "top": 16,
+          "width": 288,
+          "x": 16,
+          "y": 16
+        },
+        "padding": [
+          "16px",
+          "20px",
+          "16px",
+          "20px"
+        ]
+      },
+      "horizontalOverflow": false,
+      "minimumControlHeight": 44,
+      "nonPixel": [],
+      "outsideViewport": [],
+      "smallControls": [],
+      "textShadows": [
+        "none"
+      ],
+      "viewport": [
+        320,
+        568,
+        1
+      ]
+    },
+    "narrowSettings": {
+      "bodyHorizontalOverflow": false,
+      "classicTravelDisabled": [
+        true,
+        true,
+        true
+      ],
+      "dialog": {
+        "bottom": 568,
+        "height": 568,
+        "left": 0,
+        "right": 320,
+        "top": 0,
+        "width": 320,
+        "x": 0,
+        "y": 0
+      },
+      "dialogHorizontalOverflow": false,
+      "fontFamilies": [
+        "VT323, monospace"
+      ],
+      "fontWeights": [
+        "400"
+      ],
+      "footer": {
+        "bounds": {
+          "bottom": 556,
+          "height": 224,
+          "left": 12,
+          "right": 308,
+          "top": 332,
+          "width": 296,
+          "x": 12,
+          "y": 332
+        },
+        "direction": "column"
+      },
+      "header": {
+        "background": "rgb(0, 0, 0)",
+        "bounds": {
+          "bottom": 92,
+          "height": 76,
+          "left": 16,
+          "right": 304,
+          "top": 16,
+          "width": 288,
+          "x": 16,
+          "y": 16
+        },
+        "padding": [
+          "16px",
+          "20px",
+          "16px",
+          "20px"
+        ]
+      },
+      "horizontalOverflow": false,
+      "minimumControlHeight": 44,
+      "nonPixel": [],
+      "outsideViewport": [],
+      "smallControls": [],
+      "textShadows": [
+        "none"
+      ],
+      "viewport": [
+        320,
+        568,
+        1
+      ]
+    },
+    "draftMixUnapplied": true,
+    "cancelKeepsConfigAndRestoresFocus": true,
+    "draft3DEnablesTravel": true,
+    "applyRestoresFocus": true,
+    "applied3DPersistsOnReopen": true,
+    "landscapeSettings": {
+      "bodyHorizontalOverflow": false,
+      "classicTravelDisabled": [
+        false,
+        false,
+        false
+      ],
+      "dialog": {
+        "bottom": 390,
+        "height": 390,
+        "left": 404,
+        "right": 844,
+        "top": 0,
+        "width": 440,
+        "x": 404,
+        "y": 0
+      },
+      "dialogHorizontalOverflow": false,
+      "fontFamilies": [
+        "VT323, monospace"
+      ],
+      "fontWeights": [
+        "400"
+      ],
+      "footer": {
+        "bounds": {
+          "bottom": 366,
+          "height": 132,
+          "left": 28,
+          "right": 816,
+          "top": 234,
+          "width": 788,
+          "x": 28,
+          "y": 234
+        },
+        "direction": "column"
+      },
+      "header": {
+        "background": "rgb(0, 0, 0)",
+        "bounds": {
+          "bottom": 120,
+          "height": 92,
+          "left": 28,
+          "right": 816,
+          "top": 28,
+          "width": 788,
+          "x": 28,
+          "y": 28
+        },
+        "padding": [
+          "24px",
+          "32px",
+          "24px",
+          "32px"
+        ]
+      },
+      "horizontalOverflow": false,
+      "minimumControlHeight": 44,
+      "nonPixel": [],
+      "outsideViewport": [],
+      "smallControls": [],
+      "textShadows": [
+        "none"
+      ],
+      "viewport": [
+        844,
+        390,
+        1
+      ]
+    },
+    "landscapeChrome": {
+      "bodyHorizontalOverflow": false,
+      "classicTravelDisabled": [
+        false,
+        false,
+        false
+      ],
+      "dialog": null,
+      "dialogHorizontalOverflow": false,
+      "fontFamilies": [
+        "VT323, monospace"
+      ],
+      "fontWeights": [
+        "400"
+      ],
+      "footer": {
+        "bounds": {
+          "bottom": 366,
+          "height": 132,
+          "left": 28,
+          "right": 816,
+          "top": 234,
+          "width": 788,
+          "x": 28,
+          "y": 234
+        },
+        "direction": "column"
+      },
+      "header": {
+        "background": "rgb(0, 0, 0)",
+        "bounds": {
+          "bottom": 120,
+          "height": 92,
+          "left": 28,
+          "right": 816,
+          "top": 28,
+          "width": 788,
+          "x": 28,
+          "y": 28
+        },
+        "padding": [
+          "24px",
+          "32px",
+          "24px",
+          "32px"
+        ]
+      },
+      "horizontalOverflow": false,
+      "minimumControlHeight": 44,
+      "nonPixel": [],
+      "outsideViewport": [],
+      "smallControls": [],
+      "textShadows": [
+        "none"
+      ],
+      "viewport": [
+        844,
+        390,
+        1
+      ]
+    },
+    "svgArrowPointer": {
+      "point": {
+        "target": "path",
+        "x": 320.1875,
+        "y": 272
+      },
+      "before": {
+        "x": 0,
+        "z": 0
+      },
+      "held": {
+        "x": 0,
+        "z": 10.501199999999956
+      },
+      "heldPointerCount": 1,
+      "releasedPointerCount": 0,
+      "released": {
+        "x": 0,
+        "z": 13.800600000000031
+      },
+      "stopped": {
+        "x": 0,
+        "z": 13.800600000000031
+      },
+      "moved": true,
+      "stoppedAfterRelease": true
+    },
+    "catalog": {
+      "count": 192,
+      "fontFamilies": [
+        "VT323, monospace"
+      ],
+      "horizontalOverflow": false,
+      "smallControls": []
+    },
+    "browserErrors": {
+      "errors": []
+    },
+    "browserConsole": {
+      "messages": []
+    }
+  },
+  "screenshots": [
+    {
+      "path": "pixel-chrome-desktop.png",
+      "sha256": "cf65d46c95c10dfbbc0c1b508a16831a3b90b7d2bd74506d683e7a8907c6109c"
+    },
+    {
+      "path": "pixel-settings-desktop.png",
+      "sha256": "0f116630af1cd86b24db2309dd83535c9fb87b841a7ea335c8ae5c84fb099e1f"
+    },
+    {
+      "path": "pixel-chrome-mobile.png",
+      "sha256": "c7c646c732068e410ba6c30ce6f2ce8ae5defdbae32e19c074c654f8bac768b6"
+    },
+    {
+      "path": "pixel-settings-mobile.png",
+      "sha256": "a4723bc901c040ac82556605c04f2fe09a2d5dd961075224b70435be121cb979"
+    }
+  ],
+  "browser": {
+    "hardwareConcurrency": 32,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36"
+  },
+  "sourcesUnchanged": true,
+  "passed": true,
+  "visualInspection": {
+    "completed": true,
+    "desktopAndMobileScreenshotsReviewed": true,
+    "findings": [],
+    "repairsNeeded": false,
+    "notes": "Simple rectangular green controls, loaded VT323 text, separate Trajan SVG logo, black logo padding, square sliders, no decorative glow/corners. Four actual captures were inspected."
+  },
+  "contrast": {
+    "method": "WCAG sRGB relative luminance of current computed/token colors. rgba dim/rule alpha .62 is composited over black. Faint decorative/unavailable outlines are excluded.",
+    "greenOnBlack": 15.69,
+    "brightOnBlack": 17.44,
+    "secondaryAndRuleOnBlack": 6.05,
+    "greenOnField": 13.95,
+    "inverseOnSelectedGreen": 14.17,
+    "settingsBlackOnApply": 15.69
+  },
+  "rendererAssets": {
+    "generated-sdf.png": "0e8e3e43cc7f6c1973db06840ea1c69a390b5cb78329fb312bbe39aebf6a7c38",
+    "reference/matrixcode_msdf.png": "1fd4ed52f8e9cc4af6eaad69d28cd289bf6486f15f00c952548ff0533d6a83ab",
+    "wordmark.svg": "f8d8ee2bccc57a8d247bb1de477ccf093be3891985ecb4b6e9a9396ea6f58ddf",
+    "fonts/VT323-Regular.ttf": "cf4de751ada78ceac033dbe16a687742939995b77bc2a052ae17a4957958594d",
+    "fonts/provenance.json": "1a1d8d435e40c8f1dacfaf121a6519ab69e4928153dce0c4a74ac56196f2b1eb"
+  },
+  "screenshotScene": "Default Classic, Matrix green rain, originalMix 10%, resolution .75. Awaited document.fonts.ready and confirmed loaded VT323 FontFace. Paused after startup and advanced 120 review ticks; desktop first, then mobile resize. Initial elapsed phase was not fixed. Settings opened with S. No screenshot synthesis.",
+  "sourceBindingScope": "Source was frozen throughout. The first batched run saved all four screenshots, then agent-browser rejected a fractional mouse coordinate (320.1875). The helper was corrected to round only mouse coordinates, and observations replayed to complete pointer/release checks. Existing screenshot files were preserved. No renderer, CSS, font, or glyph changes occurred between attempts.",
+  "harnessDiagnostic": {
+    "action": "agent-browser mouse move",
+    "rejectedCoordinate": 320.1875,
+    "resolution": "Round the CLI mouse coordinate to integer 320; original SVG center was x=320.1875,y=272. No application defect or CSS repair.",
+    "screenshotsRecaptured": false
+  },
+  "exclusions": [
+    "Native operating-system screensaver menus",
+    "Native color-picker popup font, controlled by the operating system",
+    "Other browser engines",
+    "Renderer performance, power, memory, or new soak claims",
+    "Quantified similarity to the reference effect"
+  ]
+}

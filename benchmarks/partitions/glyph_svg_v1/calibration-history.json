@@ -1,0 +1,338 @@
+{
+  "scope": "Offline design calibration of original geometry; excluded from timed generation, validation, rendering and packing runs.",
+  "reference_artwork_or_code_reused": false,
+  "selection_method": "Fixed authored structures, seeds, weight, spacing and counter parameters; targeted aperture corrections. Each later benchmark call constructs fresh geometry from these frozen parameters.",
+  "parameter_location": "benchmarks/svg_glyphs.py:AUTHORED_PARAMETERS",
+  "calibration_elapsed_seconds": null,
+  "elapsed_time_note": "Complete calibration time was not recorded; no duration or search-total claim is made.",
+  "reference_research_and_optical_review_are_outside_timing": true,
+  "source_exports": "All failed candidateSVGs and sheets remain local ignored diagnostics. Only the accepted original catalog is eligible for publication.",
+  "candidates": [
+    {
+      "candidate": "svg-calibration-v1",
+      "count": 24,
+      "local_diagnostic_directory": "smythe/tmp/svg-calibration-v1",
+      "local_exports_are_not_published": true,
+      "timed_benchmark": false,
+      "status": "superseded calibration",
+      "saved_acceptance_report_available": false
+    },
+    {
+      "candidate": "svg-catalog-candidate-v2",
+      "count": 192,
+      "local_diagnostic_directory": "smythe/tmp/svg-catalog-candidate-v2",
+      "local_exports_are_not_published": true,
+      "timed_benchmark": false,
+      "status": "superseded calibration",
+      "failed_shape_gates": [
+        "catalog.threshold_topology",
+        "classic.bbox_ink_fraction",
+        "classic.horizontal_mirror_iou",
+        "classic.rotation_180_iou",
+        "classic.counter_width_median_canvas_fraction",
+        "classic.component_counts",
+        "classic.hole_counts",
+        "new-only.bbox_ink_fraction",
+        "new-only.horizontal_mirror_iou",
+        "new-only.horizontal_skeleton_fraction",
+        "new-only.component_gap_center_distance_min_canvas_fraction",
+        "new-only.counter_width_median_canvas_fraction",
+        "new-only.stroke_width_p90_p10_ratio",
+        "new-only.hole_counts"
+      ],
+      "threshold_topology_failures": [
+        "GLYPH-028",
+        "GLYPH-058",
+        "GLYPH-073",
+        "GLYPH-078",
+        "GLYPH-079",
+        "GLYPH-092",
+        "GLYPH-095",
+        "GLYPH-102",
+        "GLYPH-120",
+        "GLYPH-124",
+        "GLYPH-132",
+        "GLYPH-150",
+        "GLYPH-151",
+        "GLYPH-166",
+        "GLYPH-175"
+      ],
+      "raster_sensitivity_failed_gates": [],
+      "near_match_count": 36,
+      "all_pairs_compared": 18336
+    },
+    {
+      "candidate": "svg-catalog-candidate-v3",
+      "count": 192,
+      "local_diagnostic_directory": "smythe/tmp/svg-catalog-candidate-v3",
+      "local_exports_are_not_published": true,
+      "timed_benchmark": false,
+      "status": "superseded calibration",
+      "failed_shape_gates": [
+        "catalog.threshold_topology",
+        "classic.bbox_ink_fraction",
+        "classic.horizontal_mirror_iou",
+        "classic.rotation_180_iou",
+        "classic.stroke_width_p90_p10_ratio",
+        "classic.component_counts",
+        "classic.hole_counts",
+        "new-only.bbox_ink_fraction",
+        "new-only.horizontal_mirror_iou",
+        "new-only.horizontal_skeleton_fraction",
+        "new-only.component_gap_center_distance_min_canvas_fraction",
+        "new-only.counter_width_median_canvas_fraction",
+        "new-only.stroke_width_p90_p10_ratio"
+      ],
+      "threshold_topology_failures": [
+        "GLYPH-028",
+        "GLYPH-058",
+        "GLYPH-079",
+        "GLYPH-105"
+      ],
+      "raster_sensitivity_failed_gates": [
+        "classic.threshold_96_160_ink_change_fraction"
+      ],
+      "near_match_count": 26,
+      "all_pairs_compared": 18336
+    },
+    {
+      "candidate": "svg-catalog-candidate-v4",
+      "count": 192,
+      "local_diagnostic_directory": "smythe/tmp/svg-catalog-candidate-v4",
+      "local_exports_are_not_published": true,
+      "timed_benchmark": false,
+      "status": "superseded calibration",
+      "failed_shape_gates": [
+        "catalog.threshold_topology",
+        "classic.bbox_ink_fraction",
+        "classic.horizontal_mirror_iou",
+        "classic.rotation_180_iou",
+        "classic.component_counts",
+        "classic.hole_counts",
+        "new-only.bbox_ink_fraction",
+        "new-only.horizontal_mirror_iou",
+        "new-only.horizontal_skeleton_fraction",
+        "new-only.component_gap_center_distance_min_canvas_fraction",
+        "new-only.counter_width_median_canvas_fraction",
+        "new-only.stroke_width_p90_p10_ratio"
+      ],
+      "threshold_topology_failures": [
+        "GLYPH-028"
+      ],
+      "raster_sensitivity_failed_gates": [],
+      "near_match_count": 27,
+      "all_pairs_compared": 18336,
+      "saved16px_counter_losses": [
+        {
+          "glyph_id": "GLYPH-035",
+          "holes128": 1,
+          "holes16": 0,
+          "blank": false
+        },
+        {
+          "glyph_id": "GLYPH-182",
+          "holes128": 1,
+          "holes16": 0,
+          "blank": false
+        }
+      ]
+    },
+    {
+      "candidate": "svg-catalog-candidate-v5",
+      "count": 192,
+      "local_diagnostic_directory": "smythe/tmp/svg-catalog-candidate-v5",
+      "local_exports_are_not_published": true,
+      "timed_benchmark": false,
+      "status": "superseded calibration",
+      "failed_shape_gates": [],
+      "threshold_topology_failures": [],
+      "raster_sensitivity_failed_gates": [
+        "new-only.threshold_96_160_ink_change_fraction"
+      ],
+      "near_match_count": 24,
+      "all_pairs_compared": 18336,
+      "saved16px_counter_losses": [
+        {
+          "glyph_id": "GLYPH-035",
+          "holes128": 1,
+          "holes16": 0,
+          "blank": false
+        }
+      ]
+    },
+    {
+      "candidate": "svg-catalog-candidate-v6",
+      "count": 192,
+      "local_diagnostic_directory": "smythe/tmp/svg-catalog-candidate-v6",
+      "local_exports_are_not_published": true,
+      "timed_benchmark": false,
+      "status": "superseded calibration",
+      "failed_shape_gates": [
+        "catalog.threshold_topology",
+        "new-only.counter_width_median_canvas_fraction",
+        "new-only.stroke_width_p90_p10_ratio"
+      ],
+      "threshold_topology_failures": [
+        "GLYPH-115"
+      ],
+      "raster_sensitivity_failed_gates": [
+        "new-only.threshold_96_160_ink_change_fraction"
+      ],
+      "near_match_count": 14,
+      "all_pairs_compared": 18336,
+      "saved16px_counter_losses": [
+        {
+          "glyph_id": "GLYPH-035",
+          "holes128": 1,
+          "holes16": 0,
+          "blank": false
+        }
+      ]
+    },
+    {
+      "candidate": "svg-catalog-candidate-v7",
+      "count": 192,
+      "local_diagnostic_directory": "smythe/tmp/svg-catalog-candidate-v7",
+      "local_exports_are_not_published": true,
+      "timed_benchmark": false,
+      "status": "superseded calibration",
+      "failed_shape_gates": [
+        "catalog.threshold_topology",
+        "new-only.counter_width_median_canvas_fraction",
+        "new-only.stroke_width_p90_p10_ratio"
+      ],
+      "threshold_topology_failures": [
+        "GLYPH-115"
+      ],
+      "raster_sensitivity_failed_gates": [
+        "new-only.threshold_96_160_ink_change_fraction"
+      ],
+      "near_match_count": 2,
+      "all_pairs_compared": 18336,
+      "saved16px_counter_losses": []
+    },
+    {
+      "candidate": "svg-catalog-candidate-v8",
+      "count": 192,
+      "local_diagnostic_directory": "smythe/tmp/svg-catalog-candidate-v8",
+      "local_exports_are_not_published": true,
+      "timed_benchmark": false,
+      "status": "superseded calibration",
+      "failed_shape_gates": [],
+      "threshold_topology_failures": [],
+      "raster_sensitivity_failed_gates": [
+        "new-only.threshold_96_160_ink_change_fraction"
+      ],
+      "near_match_count": 2,
+      "all_pairs_compared": 18336,
+      "saved16px_counter_losses": []
+    },
+    {
+      "candidate": "svg-catalog-candidate-v9",
+      "count": 192,
+      "local_diagnostic_directory": "smythe/tmp/svg-catalog-candidate-v9",
+      "local_exports_are_not_published": true,
+      "timed_benchmark": false,
+      "status": "superseded calibration",
+      "failed_shape_gates": [
+        "new-only.bbox_ink_fraction",
+        "new-only.component_gap_center_distance_min_canvas_fraction",
+        "new-only.stroke_width_p90_p10_ratio"
+      ],
+      "threshold_topology_failures": [],
+      "raster_sensitivity_failed_gates": [
+        "classic.threshold_96_160_ink_change_fraction",
+        "new-only.threshold_96_160_ink_change_fraction"
+      ],
+      "near_match_count": 0,
+      "all_pairs_compared": 18336,
+      "saved16px_counter_losses": []
+    },
+    {
+      "candidate": "svg-catalog-candidate-v10",
+      "count": 192,
+      "local_diagnostic_directory": "smythe/tmp/svg-catalog-candidate-v10",
+      "local_exports_are_not_published": true,
+      "timed_benchmark": false,
+      "status": "superseded calibration",
+      "failed_shape_gates": [
+        "new-only.bbox_ink_fraction",
+        "new-only.stroke_width_p90_p10_ratio"
+      ],
+      "threshold_topology_failures": [],
+      "raster_sensitivity_failed_gates": [
+        "classic.threshold_96_160_ink_change_fraction",
+        "new-only.threshold_96_160_ink_change_fraction"
+      ],
+      "near_match_count": 0,
+      "all_pairs_compared": 18336,
+      "saved16px_counter_losses": []
+    },
+    {
+      "candidate": "svg-catalog-candidate-v11",
+      "count": 192,
+      "local_diagnostic_directory": "smythe/tmp/svg-catalog-candidate-v11",
+      "local_exports_are_not_published": true,
+      "timed_benchmark": false,
+      "status": "superseded calibration",
+      "failed_shape_gates": [],
+      "threshold_topology_failures": [],
+      "raster_sensitivity_failed_gates": [
+        "classic.threshold_96_160_ink_change_fraction",
+        "new-only.threshold_96_160_ink_change_fraction"
+      ],
+      "near_match_count": 0,
+      "all_pairs_compared": 18336,
+      "saved16px_counter_losses": []
+    },
+    {
+      "candidate": "svg-catalog-candidate-v12",
+      "count": 192,
+      "local_diagnostic_directory": "smythe/tmp/svg-catalog-candidate-v12",
+      "local_exports_are_not_published": true,
+      "timed_benchmark": false,
+      "status": "superseded calibration",
+      "failed_shape_gates": [],
+      "threshold_topology_failures": [],
+      "raster_sensitivity_failed_gates": [
+        "new-only.threshold_96_160_ink_change_fraction"
+      ],
+      "near_match_count": 0,
+      "all_pairs_compared": 18336,
+      "saved16px_counter_losses": []
+    },
+    {
+      "candidate": "svg-catalog-candidate-v13",
+      "count": 192,
+      "local_diagnostic_directory": "smythe/tmp/svg-catalog-candidate-v13",
+      "local_exports_are_not_published": true,
+      "timed_benchmark": false,
+      "status": "superseded calibration",
+      "failed_shape_gates": [],
+      "threshold_topology_failures": [],
+      "raster_sensitivity_failed_gates": [
+        "new-only.threshold_96_160_ink_change_fraction"
+      ],
+      "near_match_count": 0,
+      "all_pairs_compared": 18336,
+      "saved16px_counter_losses": []
+    },
+    {
+      "candidate": "svg-catalog-candidate-v14",
+      "count": 192,
+      "local_diagnostic_directory": "smythe/tmp/svg-catalog-candidate-v14",
+      "local_exports_are_not_published": true,
+      "timed_benchmark": false,
+      "status": "final candidate, optical sign-off pending",
+      "failed_shape_gates": [],
+      "threshold_topology_failures": [],
+      "raster_sensitivity_failed_gates": [
+        "new-only.threshold_96_160_ink_change_fraction"
+      ],
+      "near_match_count": 0,
+      "all_pairs_compared": 18336,
+      "saved16px_counter_losses": [],
+      "final_size_review": "size-review.json"
+    }
+  ]
+}

@@ -98,8 +98,22 @@ The current unreleased work hardens the guarantees users depend on before a
     pipeline, Smythe records the highest blind quality, fewest mean tokens, and
     lowest mean wall time across Smythe, LangGraph, and CrewAI
     ([report](benchmarks/README.md#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12))
+12. **Original SVG workflow and web explorer** — independently authored filled
+    contours, measured style gates, duplicate detection, and hash-bound contact
+    sheets. The web preview now adapts the MIT-licensed m8e/Rezmason renderer
+    and 56 visible base glyphs plus their blank slot, with a 10% original-glyph
+    mix, Classic/3D/Operator presets, Matrix green rain, simple VT323 pixel
+    controls, and a Trajan Bold outline logo on black. Browser interaction checks
+    pass; performance and quantified reference-parity measurements are pending.
+    The [workflow protocol](benchmarks/svg_glyph_benchmark.md) measures fresh
+    generation, validation, and assembly across repeated thread/process runs;
+    browser frame timing is measured separately.
 
 ## Coming soon
+
+The [GPT-6 Astra campaign plan](benchmarks/astra_benchmark_plan.md) specifies
+matched model and orchestration experiments, complete provider usage pricing,
+and Responses tool support before broader Astra claims.
 
 The [September repository review](docs/project-review-2026-09-06.md) defines
 the hardening work ahead of broader production claims:
@@ -111,12 +125,16 @@ the hardening work ahead of broader production claims:
 | P1 | Serial halt | A fatal node failure prevents all later independent provider calls and retains the original exception and completed results. |
 | P1 | Numeric cost validation | Reject NaN, infinity, negative values, and invalid token counts at admission, reconciliation, and checkpoint restore; invalid usage cannot reduce spend or unlock a budget. |
 | P2 | Full task propagation | Preserve context, constraints, and acceptance criteria for single-node plans and inspected graph handoffs; supervisors, memory, and checkpoints receive the original task. |
+| P2 | Web renderer parity and presentation | With browser interaction checks passing, quantify reference-behavior tolerances and measure the adaptation on controlled display hardware against the 1080p P95 interval target of 16.7 ms. Archived Canvas v1 timings remain superseded diagnostics. |
 
 ### Product and scale
 
-The [Glyph Rain design plan](docs/glyph-rain-plan.md) defines independent SVG
-glyph generation from reference-guided style characteristics and arrow-key navigation
-through a persistent 3D field. Reference code and artwork remain study material.
+The [Glyph Rain design plan](docs/glyph-rain-plan.md) carries the licensed base
+catalog, original SVGs, and selected web behavior into native Windows, macOS,
+and Linux ports. Preserve normal screensaver input dismissal, retain required
+license notices, and verify compiled explorer controls before replacing current
+downloads. The web renderer and base artwork are adapted under the reference's
+MIT license; the measured original-glyph generation workload remains separate.
 
 Native distribution work includes Developer ID signing and notarization for
 macOS downloads, plus native Wayland screensaver integration. The current

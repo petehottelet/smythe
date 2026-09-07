@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import {normalizeSettings,parseSettingsUrl,serializeSettingsUrl,resolveSettingsSchema,settingEnabled} from './settings.mjs';
+
+const schema=['originalMix','numColumns','flip','rotation','backgroundColor',
+  {key:'palette',options:[{value:'green',label:'Green'},{value:'white',label:'White'}]}];
+const base=normalizeSettings(schema,{seed:7319});
+assert.equal(base.originalMix,10);assert.equal(base.numColumns,80);assert.equal(base.seed,7319);
+const parsed=parseSettingsUrl('https://example.test/?originalMix=7.9&numColumns=999&flip=1&rotation=-22&backgroundColor=%23ABCDEF&palette=white&seed=4',schema,base);
+assert.equal(parsed.originalMix,8);assert.equal(parsed.numColumns,160);assert.equal(parsed.flip,true);
+assert.equal(parsed.rotation,-22);assert.equal(parsed.backgroundColor,'#abcdef');assert.equal(parsed.palette,'white');assert.equal(parsed.seed,7319);
+const invalid=parseSettingsUrl('https://example.test/?originalMix=NaN&numColumns=&flip=yes&backgroundColor=javascript:alert(1)&palette=unimplemented',schema,base);
+assert.deepEqual(invalid,base);
+const address=serializeSettingsUrl('https://example.test/view?seed=42&unrelated=keep#rain',parsed,schema,{presetId:'classic'});
+assert.equal(address.searchParams.get('seed'),'42');assert.equal(address.searchParams.get('unrelated'),'keep');assert.equal(address.hash,'#rain');
+assert.equal(address.searchParams.get('preset'),'classic');assert.deepEqual(parseSettingsUrl(address,schema,base),parsed);
+const presets=[{id:'operator',label:'Operator',values:{palette:'white',originalMix:5}}];
+const preset=parseSettingsUrl('https://example.test/?preset=operator&originalMix=12',schema,base,{presets});
+assert.equal(preset.palette,'white');assert.equal(preset.originalMix,12);
+assert.equal(serializeSettingsUrl(address,parsed,schema).searchParams.has('preset'),false);
+assert.throws(()=>resolveSettingsSchema(['palette']),/implemented choices/);
+assert.throws(()=>resolveSettingsSchema(['numColumns','numColumns']),/duplicate/);
+assert.throws(()=>resolveSettingsSchema([{key:'__proto__',type:'checkbox',label:'Unsafe'}]),/Invalid/);
+assert.throws(()=>resolveSettingsSchema([{key:'fakeOption'}]),/Incomplete/);
+assert.throws(()=>resolveSettingsSchema([{key:'broken',type:'range',label:'Broken',min:2,max:1,step:.1}]),/Invalid range/);
+assert.deepEqual(resolveSettingsSchema([]),[]);
+assert.throws(()=>resolveSettingsSchema([{key:'autoTravel',enabledWhen:'3d'}]),/enabledWhen must be a function/);
+const dependent=resolveSettingsSchema([{key:'autoTravel',enabledWhen:config=>config.preset==='3d'}])[0];
+assert.equal(settingEnabled(dependent,{preset:'classic'}),false);
+assert.equal(settingEnabled(dependent,{preset:'operator'}),false);
+assert.equal(settingEnabled(dependent,{preset:'3d'}),true);
+assert.equal(settingEnabled(resolveSettingsSchema(['numColumns'])[0],{}),true);
+console.log('Passed: supported schemas, defaults, numeric bounds, invalid URL input, palette choices, presets, URL round trips, and conditional availability.');

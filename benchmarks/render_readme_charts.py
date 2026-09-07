@@ -11,6 +11,7 @@ from __future__ import annotations
 import html
 import json
 import math
+import statistics
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -613,6 +614,172 @@ def render_glyph_scaling() -> str:
     )
 
 
+def _svg_workflow_phases(run: dict) -> dict[str, float]:
+    """Reconcile one actual run's phase clocks with its complete elapsed time."""
+    fields = ("setup_wall_s", "generation_wall_s", "validation_wall_s", "assembly_wall_s",
+              "worker_shutdown_wall_s", "end_to_end_wall_s")
+    for field in fields:
+        value = run.get(field)
+        if (isinstance(value, bool) or not isinstance(value, (int, float))
+                or not math.isfinite(value) or value < 0
+                or (field in ("generation_wall_s", "validation_wall_s", "assembly_wall_s", "end_to_end_wall_s")
+                    and value == 0)):
+            raise ValueError(f"SVG workflow contains invalid or missing phase timing: {field}")
+    elapsed = run["end_to_end_wall_s"]
+    if math.fsum(run[field] for field in fields[:-1]) > elapsed + 1e-9:
+        raise ValueError("SVG workflow phase timings exceed complete elapsed time")
+    primary = {name: run[f"{name}_wall_s"] for name in ("generation", "validation", "assembly")}
+    other = elapsed - math.fsum(primary.values())
+    if other < 0 or other + 1e-9 < run["setup_wall_s"] + run["worker_shutdown_wall_s"]:
+        raise ValueError("SVG workflow phase timings do not reconcile with setup and shutdown")
+    return {**primary, "other": other}
+
+
+def _svg_workflow_rows() -> tuple[dict, list[dict]]:
+    """Recompute complete-workflow medians; reject unaccepted or partial evidence."""
+    record = _load("glyph_svg_v1.json")
+    protocol = record.get("protocol", {})
+    if (record.get("status") != "passed" or record.get("claimable") is not True
+            or record.get("readme_promotion_eligible") is not True
+            or record.get("catalog_style_accepted") is not True
+            or record.get("known_measurement_defects") != []
+            or protocol.get("glyph_count") != 192
+            or protocol.get("repeats", 0) < 3
+            or protocol.get("simulated_latency_s") != 0
+            or protocol.get("cached_generation_outputs") is not False):
+        raise ValueError("SVG workflow requires complete, accepted, defect-free evidence")
+    groups: dict[tuple[str, int], list[dict]] = {}
+    expected_hashes = None
+    identities = set()
+    for run in record.get("runs", []):
+        key = (run["executor"], run["concurrency"])
+        identity = (*key, run["repeat"])
+        if identity in identities:
+            raise ValueError("SVG workflow contains a duplicate repetition")
+        identities.add(identity)
+        if (run.get("status") != "passed" or run.get("errors") != []
+                or any(run.get(field) != 192 for field in (
+                    "provider_calls", "successful_provider_calls", "completed_nodes", "valid_glyphs"))
+                or run.get("failed_provider_calls") != 0
+                or run.get("style_acceptance", {}).get("accepted") is not True
+                or run.get("api_calls") != 0 or run.get("api_cost_usd") != 0):
+            raise ValueError("SVG workflow contains incomplete or unaccepted work")
+        hashes = sorted((g["index"], g["svg_sha256"], g["pixel_sha256"], g["measurement_sha256"])
+                        for g in run["glyphs"])
+        if (len(hashes) != 192 or [h[0] for h in hashes] != list(range(192))
+                or len({h[1] for h in hashes}) != 192 or len({h[2] for h in hashes}) != 192):
+            raise ValueError("SVG workflow is missing unique glyph outputs")
+        if expected_hashes is not None and hashes != expected_hashes:
+            raise ValueError("SVG workflow outputs differ across configurations")
+        expected_hashes = hashes
+        elapsed = run.get("end_to_end_wall_s")
+        if (isinstance(elapsed, bool) or not isinstance(elapsed, (int, float))
+                or not math.isfinite(elapsed) or elapsed <= 0):
+            raise ValueError("SVG workflow contains invalid elapsed time")
+        _svg_workflow_phases(run)
+        groups.setdefault(key, []).append(run)
+    expected_keys = {(e, c) for e in protocol.get("executors", [])
+                     for c in protocol.get("concurrencies", [])}
+    if (not expected_keys or set(groups) != expected_keys
+            or 1 not in protocol.get("concurrencies", [])):
+        raise ValueError("SVG workflow is missing a configuration or c1 baseline")
+    rows = []
+    for (executor, concurrency), samples in sorted(groups.items()):
+        if {r["repeat"] for r in samples} != set(range(1, protocol["repeats"] + 1)):
+            raise ValueError("SVG workflow is missing a repetition")
+        values = [r["end_to_end_wall_s"] for r in samples]
+        median = statistics.median(values)
+        median_run = min((run for run in samples if run["end_to_end_wall_s"] == median),
+                         key=lambda run: run["repeat"], default=None)
+        rows.append({"executor": executor, "concurrency": concurrency,
+                     "median": median, "min": min(values), "max": max(values), "median_run": median_run})
+    return record, rows
+
+
+def render_svg_workflow() -> str:
+    """Show the complete real SVG workflow, with every tested configuration."""
+    record, rows = _svg_workflow_rows()
+    fastest = min(rows, key=lambda row: row["median"])
+    median_run = fastest["median_run"]
+    if median_run is None:
+        raise ValueError("SVG workflow stage breakdown requires an actual run at the median elapsed time")
+    phases = _svg_workflow_phases(median_run)
+    baseline = next(row for row in rows if row["executor"] == fastest["executor"]
+                    and row["concurrency"] == 1)
+    speedup = baseline["median"] / fastest["median"]
+    body = _patterns()
+    body += (f'<defs><pattern id="workflow-dots" width="7" height="7" patternUnits="userSpaceOnUse">'
+             f'<rect width="7" height="7" fill="{WHITE}"/>'
+             f'<circle cx="3.5" cy="3.5" r="1" fill="{BLACK}"/></pattern></defs>\n')
+    body += _text(40, 44, "ORIGINAL SVG GENERATION", size=11, weight="700", tracking=2.2)
+    body += _text(40, 82, "192 glyphs, from geometry to verified files", size=29,
+                  weight="700", family=SERIF)
+    body += _text(40, 109, "Fresh local generation + full style validation + catalog assembly; no simulated delay", size=13)
+    body += f'<line x1="40" y1="132" x2="920" y2="132" stroke="{BLACK}" stroke-width="2"/>\n'
+    body += _text(40, 202, f'{fastest["median"]:.2f}s', size=54, family=TRAJAN, weight="700")
+    body += _text(42, 232, "LOWEST MEDIAN COMPLETE WORKFLOW", size=10, weight="700", tracking=.7)
+    body += _text(398, 202, f"{speedup:.2f}×", size=54, family=TRAJAN, weight="700")
+    body += _text(400, 232, "VS SAME BACKEND AT CONCURRENCY 1", size=10, weight="700", tracking=.7)
+    body += _text(764, 202, "$0", size=54, family=TRAJAN, weight="700")
+    body += _text(766, 232, "PROVIDER API CHARGES", size=10, weight="700", tracking=.7)
+    body += f'<line x1="40" y1="256" x2="920" y2="256" stroke="{BLACK}"/>\n'
+    maximum = max(row["max"] for row in rows)
+    for panel, executor in enumerate(record["protocol"]["executors"]):
+        x = 40 + panel*460
+        body += _text(x, 294, f"{executor.capitalize()} workers", size=19, family=SERIF, weight="700")
+        body += _text(x, 317, "COMPLETE WALL TIME / LOWER IS BETTER", size=10, tracking=.7)
+        selected = [row for row in rows if row["executor"] == executor]
+        for index, row in enumerate(selected):
+            y = 348 + index*48
+            body += _text(x, y+12, f'c{row["concurrency"]}', size=12, family=MONO)
+            style = "solid" if row == fastest else "outline"
+            body += _bar(x+44, y, 264*row["median"]/maximum, style)
+            low, high = x+44+264*row["min"]/maximum, x+44+264*row["max"]/maximum
+            body += f'<path d="M{low:.1f} {y+21}H{high:.1f}M{low:.1f} {y+18}V{y+24}M{high:.1f} {y+18}V{y+24}" stroke="{BLACK}" fill="none"/>\n'
+            body += _text(x+402, y+12, f'{row["median"]:.2f}s', size=12, family=MONO, anchor="end")
+    footer_y = 348 + len(record["protocol"]["concurrencies"])*48 + 12
+    body += f'<line x1="40" y1="{footer_y}" x2="920" y2="{footer_y}" stroke="{BLACK}"/>\n'
+    body += _text(40, footer_y+24,
+                  f'{record["protocol"]["repeats"]} repetitions per setting; whiskers show min–max; worker cap {record["protocol"]["worker_cap"]}', size=11)
+    body += _text(40, footer_y+63, "Where the median run spends time", size=21, family=SERIF, weight="700")
+    body += _text(40, footer_y+86,
+                  f'{fastest["executor"].capitalize()} c{fastest["concurrency"]}, repetition {median_run["repeat"]}; '
+                  f'one measured {median_run["end_to_end_wall_s"]:.2f}s workflow', size=11.5)
+    phase_styles = (("generation", "Generation", BLACK), ("validation", "Validation", WHITE),
+                    ("assembly", "Assembly", "url(#hatch)"), ("other", "Other", "url(#workflow-dots)"))
+    body += (f'<g id="workflow-phase-breakdown" data-executor="{fastest["executor"]}" '
+             f'data-concurrency="{fastest["concurrency"]}" data-repeat="{median_run["repeat"]}" '
+             f'data-total-seconds="{median_run["end_to_end_wall_s"]!r}">\n')
+    x = 40.0
+    for index, (name, label, fill) in enumerate(phase_styles):
+        width = 880 * phases[name] / median_run["end_to_end_wall_s"]
+        body += (f'<rect data-phase="{name}" data-seconds="{phases[name]!r}" x="{x:.6f}" '
+                 f'y="{footer_y+101}" width="{width:.6f}" height="28" '
+                 f'fill="{fill}" stroke="{BLACK}"/>\n')
+        x += width
+        label_x = 40 + index*220
+        body += (f'<rect x="{label_x}" y="{footer_y+150}" width="16" height="12" '
+                 f'fill="{fill}" stroke="{BLACK}"/>\n')
+        body += _text(label_x+24, footer_y+161, label, size=13, weight="700")
+        body += _text(label_x+24, footer_y+184, f'{phases[name]:.2f}s', size=13, family=MONO)
+    body += '</g>\n'
+    body += _text(40, footer_y+214, "Other includes setup, worker shutdown, and remaining measured overhead; values rounded to 0.01s", size=10.5)
+    body += f'<line x1="40" y1="{footer_y+235}" x2="920" y2="{footer_y+235}" stroke="{BLACK}"/>\n'
+    body += _text(40, footer_y+260, "Local CPU workload on one measured host; hardware and electricity unpriced", size=11)
+    body += _text(920, footer_y+283, "glyph_svg_v1.json", size=11, anchor="end", family=MONO)
+    return _svg(960, footer_y+302, body, label=(
+        f'192 original SVG glyphs generated, validated, and assembled in {fastest["median"]:.2f} '
+        f'seconds median, {speedup:.2f} times the same backend c1 speed. Zero provider API charges. '
+        f'Generation, validation, assembly, and other timings come from actual repetition {median_run["repeat"]}.'))
+
+
+def render_recovery() -> str:
+    """Load the recovery renderer lazily because it shares these SVG helpers."""
+    from benchmarks.recovery_chart import render_recovery as render
+
+    return render()
+
+
 def render_glyph_pipeline() -> str:
     """Render the Glyph Rain example as a generated graph and execution envelope."""
     body = _text(40, 49, "FROM BRIEF TO SCREENSAVER", size=11, weight="700", tracking=2.2)
@@ -752,6 +919,8 @@ def main() -> None:
         OUT / "framework_callouts.svg": render_framework_callouts,
         OUT / "shape_efficiency.svg": render_shape_efficiency,
         OUT / "glyph_scaling.svg": render_glyph_scaling,
+        OUT / "svg_workflow.svg": render_svg_workflow,
+        OUT / "recovery.svg": render_recovery,
         GLYPH_OUT / "glyph_pipeline.svg": render_glyph_pipeline,
         GLYPH_OUT / "glyph_specimens.svg": render_glyph_specimens,
     }

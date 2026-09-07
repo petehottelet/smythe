@@ -1,0 +1,273 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "passed": true,
+  "createdAt": "2026-09-07T10:09:46.8976209Z",
+  "evidenceStatus": "manual-browser-interaction-review",
+  "method": "Independent agent-browser session with actual page navigation, native control selection, keyboard presses, pointer holds/releases, viewport changes, and tab switches. Held arrow movement was exercised with DOM KeyboardEvent down/up dispatch; fixed review stepping and camera APIs were used for visual/reset inspection, not timing.",
+  "sourceBindingScope": "Hashes identify the final source state at the concluding reload and settings check. Broad interaction and screenshot checks preceded the enabledWhen settings-only patch. Conditional availability was then tested across Classic to 3D to Classic, including Apply and reopen, followed by a fresh final reload. This receipt does not claim every check ran under an identical source hash.",
+  "rendererSourceInventory": "All JS, MJS, HTML, CSS, and GLSL files beneath screensaver/svg-preview at final verification, including retained helpers.",
+  "rendererSources": {
+    "base-glyphs.js": "8722d0bf011b22878695699b2e3cbe7b6ae27397cd3dcd88317024d80eff787e",
+    "browser-command.mjs": "8b98aa31695467a0a72d3ebb15853f2ea7740fc0ba849628ace21a102218530e",
+    "catalog.html": "fd5f9d2cc6a75b0f32e7d50f026f6cf46089149e8cf4d2a20a5d2dc25492d4e0",
+    "config.mjs": "e4717520f765e19492ddfcad26f938df848e23de2cfa6d6e02f8afdf0de683a9",
+    "engine/bloomPass.js": "79f6009f6d6eaa2844bad93c78f1fdfd20204dd83ac9bc4560f9ff40b7d86c30",
+    "engine/colorToRGB.js": "cc868a9b4047c2c325ade036fb9bad79f4985705b58af338de10349370a0b9a9",
+    "engine/palettePass.js": "9913f36fa9db86e405088bc975bf69f731c7019cca45f98de2d6a5c83e583e94",
+    "engine/rainPass.js": "70c51df478d33a73ebe9e9ca6fef1ed09f7a1a9ffd64b68911a67f0963cce93d",
+    "engine/shaders/bloomPass.blur.frag.glsl": "c1a2b01ad593d1d5bf95cbe2eb3a957c85840c0ede6fe893c61baf81fe610faa",
+    "engine/shaders/bloomPass.combine.frag.glsl": "a2cebf40734ecba772668548816a32235ef7e48439ee1c2ddb9fb20582060b0b",
+    "engine/shaders/bloomPass.highPass.frag.glsl": "727979238690fc06a8fcc14065468e43bd23d6710ab0b8fc4dbf985f6fa00034",
+    "engine/shaders/palettePass.frag.glsl": "d58298cd551be59495289463e93bf306a345eae7693617c147e7b332b7714e82",
+    "engine/shaders/rainPass.effect.frag.glsl": "6c0ee969bd62a7d313a69e19d8a29a0febf2884b5534a706685717496a3289b4",
+    "engine/shaders/rainPass.frag.glsl": "1cd3c2fbdb887965e0906b5a55cf16c0e95385f2deb15008fd8e1433b1000fa5",
+    "engine/shaders/rainPass.intro.frag.glsl": "d409f1f2fe372b6ce2b4a7aaaab00ce85c43853b87011e1c0030a3f45a70bb9e",
+    "engine/shaders/rainPass.raindrop.frag.glsl": "8f8ce9164ff8bf2005f10ad981959e75e4cb153b6f6a12d347586f3813820213",
+    "engine/shaders/rainPass.symbol.frag.glsl": "08f5220fce20c9191170086615061556401db5484994a153335aeda5569ca99c",
+    "engine/shaders/rainPass.vert.glsl": "365b7bb1f7c165103472adaea6198cb2ac5889141f2ef4f20ca62baa863b5adf",
+    "engine/upstream-config.mjs": "10a09629ba28592998e8e00054db13d17be1656fd57f632205e3c24b61ecc132",
+    "engine/utils.js": "5018541245bf7d8556fd43089b09110ff4c145db7352b102b62a7e29e426569e",
+    "glyphs.js": "63967d8b1fe5c7dfb46ec665851b675682d88bd5c18e39a6a7f44ac692cbaabd",
+    "index.html": "e922d399a1fd9d72c6ce8f31adac011e7365d081128c314cb17a0fb15c74ef32",
+    "lib/gl-matrix.js": "07855fa64096dbc30c3cf9088be433f29c8e344665c87b66c7463443d38c15a7",
+    "lib/regl.min.js": "1e85c84ef254125921378d82f4da4e457a0a399bc315880c8c997dd5af8c534d",
+    "measure.mjs": "55ae15311c31d53c6f47d3017d6cfe868b79a08f0e210bf15a1a85c5e71d4ce3",
+    "model.mjs": "90c18929d1449b248114104c1af2163047b2163536cea0ee45f90ee2466a9511",
+    "provenance.mjs": "327debb738aa27a06f5c033a76d710889b7fada5057a6d4a8446ffde4ff1f420",
+    "rain.js": "2b0da82d359c366baea4556efa7905d7de57229fd3894d438c8e547337b06b5a",
+    "review.mjs": "9a7eab054dc24641cf24299dd18f2a1bca64ad7614b3b74d5540389b4d870f1d",
+    "settings.css": "e7be3ed7672fab81ea6fda094f9ced389a027c0815b2108c4875604d3d0dcf42",
+    "settings.mjs": "d660a83d282f411474458821e175dd89b5777941c0e4410528ab455051aa76ed",
+    "soak.mjs": "035c36e2384aa7fb431f8fcfc2fbfab82c769b308d2e8167d33265ff7b4b77f6",
+    "source-files.mjs": "06f74108d8f02992a63a5fbeed098ca514758162733f19e0f0653663b2b18f92",
+    "style.css": "39dc88bd8615478ea3e1199f017de823c89a17c224c1c8b7000cd6777e8561ee",
+    "timing.mjs": "1a7ae6897b0564d71b897f1ee8129c7c9b914b9cf0a390236f2336487860d3f5",
+    "verify-browser-command.mjs": "9d60c40623d2ad04512ba842bce0562e3997847aae2bbee65f858cd8b1fc9fbf",
+    "verify-config.mjs": "66fad2a1db77d00e295f36791b22750622171fd76dee97191970f51076bca999",
+    "verify-measure-guard.mjs": "8d1cedd1ec25237d8758ce7f99c71236c56d67f17d9d47d01098acc3a853a007",
+    "verify-model.mjs": "037b4fcb160dee7bdeb2d6a25e052642c6e782e0dab6897e10ccd6d259581ab6",
+    "verify-provenance.mjs": "39587265439919bd18905978671ddd73b5ced2eb9694e781857a582fe6fcfb20",
+    "verify-settings.mjs": "dd2aeb89552812b918f51825ef3989fe8b2df1bfce6e4c7f294277511074f8ce",
+    "verify-timing.mjs": "d6d0652ad7d1cd02197a2878619b758221c73d1378483b4e4c81423f66136837"
+  },
+  "rendererAssets": {
+    "generated-sdf.png": "0e8e3e43cc7f6c1973db06840ea1c69a390b5cb78329fb312bbe39aebf6a7c38",
+    "reference/matrixcode_msdf.png": "1fd4ed52f8e9cc4af6eaad69d28cd289bf6486f15f00c952548ff0533d6a83ab",
+    "reference/provenance.json": "b2d911aef1c5b6440a32ae4bee42c9f0566332db86dcdb1b698262c5d3f483b6"
+  },
+  "browser": {
+    "classicTravelDisabled": true,
+    "deviceMemoryGiB": 32,
+    "gpu": {
+      "renderer": "WebKit WebGL",
+      "vendor": "WebKit",
+      "version": "WebGL 1.0 (OpenGL ES 2.0 Chromium)"
+    },
+    "hardwareConcurrency": 32,
+    "originalMix": 10,
+    "preset": "classic",
+    "settingsOpen": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+    "version": "2",
+    "viewport": {
+      "dpr": 1,
+      "height": 1080,
+      "physicalHeight": 810,
+      "physicalWidth": 1440,
+      "renderScale": 0.75,
+      "width": 1920
+    }
+  },
+  "viewports": [
+    {
+      "width": 1920,
+      "physicalWidth": 1440,
+      "dpr": 1,
+      "physicalHeight": 810,
+      "height": 1080,
+      "renderScale": 0.75
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "renderScale": 0.75,
+      "dpr": 1
+    }
+  ],
+  "checks": {
+    "classicStartup": {
+      "directionButtonsDisabled": true,
+      "nonblank": true,
+      "browserErrors": 0,
+      "originalMix": 10,
+      "passed": true,
+      "preset": "classic"
+    },
+    "presetApply": {
+      "applyUpdatesUrl": true,
+      "draftDoesNotChangeRunningPreset": true,
+      "passed": true,
+      "presets": [
+        "classic",
+        "operator",
+        "3d"
+      ],
+      "browserErrors": 0
+    },
+    "originalMix": {
+      "note": "This verifies configuration endpoints and visible rendering, not a statistical distribution of GPU-selected symbols.",
+      "urlReloadRetains100": true,
+      "passed": true,
+      "testedPercentages": [
+        0,
+        10,
+        100
+      ],
+      "endpointsChangedThroughNativeRangeHomeEnd": true,
+      "nonblankAtBothEndpoints": true
+    },
+    "settingsEscape": {
+      "draft100CancelledBackTo10": true,
+      "passed": true,
+      "focusRestoredTo": "settings"
+    },
+    "conditionalTravel": {
+      "applied3DReopenEnabled": true,
+      "appliedClassicReopenDisabled": true,
+      "draft3DEnabled": true,
+      "fields": [
+        "autoTravel",
+        "forwardSpeed",
+        "density"
+      ],
+      "passed": true,
+      "finalReloadClassicDisabled": true,
+      "classicDisabled": true
+    },
+    "paused3DNavigation": {
+      "keyUpClearedHeldKeys": true,
+      "pixelsChanged": true,
+      "rainTimeUnchanged": true,
+      "passed": true,
+      "cameraChanged": true
+    },
+    "reset": {
+      "method": "R key after paused arrow travel",
+      "camera": {
+        "z": 0,
+        "x": 0
+      },
+      "passed": true,
+      "canvasDataUrlExactlyRestored": true
+    },
+    "space": {
+      "playAdvancedTime": true,
+      "secondPressPaused": true,
+      "passed": true
+    },
+    "fullscreen": {
+      "fEntered": true,
+      "passed": true,
+      "escapeExited": true
+    },
+    "pointerRelease": {
+      "actualPointerHoldMoved": true,
+      "pointerCountAfterRelease": 0,
+      "passed": true,
+      "cameraAndFrameCountStopped": true
+    },
+    "focusRelease": {
+      "method": "Window blur event after held navigation",
+      "pointerCountAfter": 0,
+      "cameraAndFrameCountStopped": true,
+      "passed": true,
+      "heldKeysAfter": []
+    },
+    "hiddenTab": {
+      "returnFrames": 17,
+      "hiddenFrames": 17,
+      "hiddenRainTime": 0.2,
+      "passed": true,
+      "returnRainTime": 0.2,
+      "method": "Opened a second browser tab, waited, and returned"
+    },
+    "reducedMotion": {
+      "method": "Browser media preference followed by reload",
+      "rainTimeAtStartup": 0,
+      "passed": true,
+      "pausedAtStartup": true
+    },
+    "mobile": {
+      "closeButtonPixels": [
+        44,
+        44
+      ],
+      "passed": true,
+      "actionButtonPixels": [
+        170,
+        44
+      ],
+      "pageHorizontalOverflow": false,
+      "clippedChromeControls": [],
+      "sheetBodyHorizontalOverflow": false,
+      "height": 844,
+      "width": 390,
+      "dialogHorizontalOverflow": false,
+      "dialogBounds": {
+        "width": 390,
+        "y": 0,
+        "height": 844,
+        "x": 0
+      }
+    },
+    "finalReload": {
+      "travelControlsDisabled": true,
+      "consoleErrors": 0,
+      "preset": "classic",
+      "browserErrors": 0,
+      "version": "2",
+      "settingsOpenedWithS": true,
+      "originalMix": 10,
+      "passed": true
+    }
+  },
+  "screenshots": [
+    {
+      "label": "Classic 2D, default 10% original mix",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "152f7a3cf7a8a3138da7a2400d89ac9cfa85e70f62f59d93e566de89eff73673",
+      "storage": "Local ignored QA capture; not a published artifact link"
+    },
+    {
+      "label": "3D, camera x12 z18, paused, 10% original mix",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "297b9b95e3c54073d0eb135768c96b5a9993cc0f5c2a9416cc4733c524822881",
+      "storage": "Local ignored QA capture; not a published artifact link"
+    },
+    {
+      "label": "Settings sheet at 390x844 before conditional-availability polish",
+      "width": 390,
+      "height": 844,
+      "sha256": "36c537a933db93d33ef961a57759f732e2e028d57922b1d83e7f8ccb219054f6",
+      "storage": "Local ignored QA capture; not a published artifact link"
+    },
+    {
+      "label": "Classic 2D, 100% original mix",
+      "width": 1920,
+      "height": 1080,
+      "sha256": "2e9df3bd1f37709e7dac16ffe0579b168c225e90e518a6699876599e04d9073c",
+      "storage": "Local ignored QA capture; not a published artifact link"
+    }
+  ],
+  "exclusions": [
+    "Renderer FPS or latency benchmark",
+    "GPU completion or physical display timing",
+    "Power or total memory measurement",
+    "Quantified reference parity",
+    "Native binary verification",
+    "New ten-minute soak of the adapted renderer"
+  ]
+}

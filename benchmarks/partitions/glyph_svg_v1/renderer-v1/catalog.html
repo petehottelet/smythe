@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Smythe — Original SVG Catalog</title><link rel="icon" href="data:,"><link rel="stylesheet" href="style.css"></head>
+<body class="catalog"><div class="catalog-heading"><div><h1>Original SVG glyphs</h1><p id="catalog-status">Loading the catalog…</p></div><a href="index.html">Explore the rain</a></div>
+<main id="catalog" aria-label="All original glyphs"></main><script src="glyphs.js"></script><script type="module">
+const catalog = globalThis.SVG_GLYPHS;
+const status = document.getElementById('catalog-status');
+if (!catalog?.glyphs?.length) status.textContent='The generated catalog is not available yet.';
+else {
+  status.textContent=`${catalog.glyphs.length} independently drawn glyphs. Select an ID to open its original SVG.`;
+  for (const glyph of catalog.glyphs) {
+    const figure=document.createElement('figure'); figure.className='specimen';
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'); svg.setAttribute('viewBox','0 0 100 100'); svg.setAttribute('role','img'); svg.setAttribute('aria-label',glyph.glyph_id);
+    for (const d of glyph.paths ?? [glyph.path]) { const path=document.createElementNS(svg.namespaceURI,'path'); path.setAttribute('d',d); path.setAttribute('fill-rule','nonzero'); svg.append(path); }
+    const caption=document.createElement('figcaption'), link=document.createElement('a');
+    link.href=`../../benchmarks/partitions/glyph_svg_v1/catalog/${encodeURIComponent(glyph.glyph_id)}.svg`;link.textContent=glyph.glyph_id;
+    caption.append(link,document.createTextNode(glyph.family ?? 'Original glyph'));figure.append(svg,caption);document.getElementById('catalog').append(figure);
+  }
+}
+</script></body></html>

@@ -1,0 +1,98 @@
+.rain-settings {
+  position: fixed;
+  inset: 0 0 0 auto;
+  margin: 0;
+  width: min(440px, 100%);
+  height: 100dvh;
+  max-width: 100%;
+  max-height: 100dvh;
+  padding: 0;
+  border: 0;
+  background: var(--rain-ink);
+  color: var(--rain-green);
+  font: 400 20px/1.25 var(--rain-pixel, monospace);
+  letter-spacing: normal;
+  text-shadow: none;
+  box-shadow: none;
+}
+.rain-settings::backdrop { background: #000a; }
+.rain-settings__form { display: flex; flex-direction: column; height: 100%; margin: 0; }
+.rain-settings__header, .rain-settings__footer {
+  position: static;
+  inset: auto;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: var(--rain-ink);
+}
+.rain-settings__header { border: 0; }
+.rain-settings__header h2 { font: inherit; font-size: 24px; margin: 0; color: var(--rain-bright); }
+.rain-settings button, .rain-settings input, .rain-settings select {
+  font: inherit;
+  color: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+  text-shadow: none;
+  box-shadow: none;
+  transition: none;
+}
+.rain-settings button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.rain-settings button::after { content: none; }
+.rain-settings button:hover, .rain-settings button:focus-visible { color: var(--rain-bright); background: transparent; box-shadow: none; text-decoration: underline; text-underline-offset: 4px; }
+.rain-settings button:active { color: var(--rain-bright); background: transparent; text-decoration: underline; text-underline-offset: 4px; }
+.rain-settings__header .rain-settings__close { width: 44px; padding: 0; font-size: 24px; line-height: 1; }
+.rain-settings :focus-visible { outline: none; }
+.rain-settings select:focus-visible, .rain-settings input:focus-visible { box-shadow: inset 0 -1px 0 var(--rain-bright); }
+.rain-settings__body { flex: 1; min-height: 0; padding: 20px; overflow: auto; overscroll-behavior: contain; scrollbar-color: var(--rain-rule) var(--rain-ink); scrollbar-width: thin; }
+.rain-settings__preset { display: flex; flex-direction: column; gap: 8px; margin: 0 0 24px; }
+.rain-settings select { width: 100%; min-height: 44px; padding: 10px; border: 0; border-radius: 0; background: transparent; }
+.rain-settings select option { color: var(--rain-green); background: var(--rain-ink); }
+.rain-settings__group { min-width: 0; border: 0; padding: 16px 0 0; margin: 0 0 24px; }
+.rain-settings__group:last-child { margin-bottom: 0; }
+.rain-settings__group legend { padding: 0 10px 0 0; color: var(--rain-bright); font: inherit; }
+.rain-settings__field { min-width: 0; margin: 0 0 16px; }
+.rain-settings__field:last-child { margin-bottom: 0; }
+.rain-settings__line { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 24px; }
+.rain-settings__label { cursor: pointer; }
+.rain-settings__value { min-width: 3.5em; color: var(--rain-bright); text-align: right; font: inherit; font-variant-numeric: tabular-nums; }
+.rain-settings input[type=range] { appearance: none; -webkit-appearance: none; width: 100%; height: 44px; margin: 0; background: transparent; cursor: pointer; }
+.rain-settings input[type=range]::-webkit-slider-runnable-track { height: 2px; background: var(--rain-rule); }
+.rain-settings input[type=range]::-moz-range-track { height: 2px; background: var(--rain-rule); }
+.rain-settings input[type=range]::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 12px; height: 20px; margin-top: -9px; border: 1px solid var(--rain-green); border-radius: 0; background: var(--rain-green); }
+.rain-settings input[type=range]::-moz-range-thumb { width: 10px; height: 18px; border: 1px solid var(--rain-green); border-radius: 0; background: var(--rain-green); }
+.rain-settings__help { margin: 0; color: var(--rain-dim); font: inherit; font-size: 18px; }
+.rain-settings__field--checkbox, .rain-settings__field--color { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px 12px; min-height: 44px; }
+.rain-settings__field--checkbox .rain-settings__help, .rain-settings__field--color .rain-settings__help { grid-column: 1 / -1; }
+.rain-settings input[type=checkbox] { appearance: none; display: grid; place-content: center; width: 44px; height: 44px; margin: 0; border: 0; border-radius: 0; background: transparent; cursor: pointer; }
+.rain-settings input[type=checkbox]::before { content: ''; width: 12px; height: 12px; border: 1px solid var(--rain-dim); }
+.rain-settings input[type=checkbox]:checked::before { background: var(--rain-green); border-color: var(--rain-green); }
+.rain-settings input[type=color] { width: 52px; height: 44px; padding: 8px; border: 0; border-radius: 0; background: transparent; cursor: pointer; }
+.rain-settings input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+.rain-settings input[type=color]::-webkit-color-swatch { border: 0; border-radius: 0; }
+.rain-settings input[type=color]::-moz-color-swatch { border: 0; border-radius: 0; }
+.rain-settings__footer { display: block; border: 0; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+.rain-settings__actions { display: flex; justify-content: flex-end; gap: 8px; }
+.rain-settings__actions .rain-settings__apply { min-width: 96px; background: transparent; color: var(--rain-bright); text-decoration: underline; text-underline-offset: 4px; }
+.rain-settings__actions .rain-settings__apply:hover { background: transparent; color: var(--rain-bright); }
+.rain-settings__error { margin: 0 0 12px; padding: 0; border: 0; color: var(--rain-bright); }
+.rain-settings__error:empty { display: none; }
+.rain-settings [disabled] { color: var(--rain-dim); cursor: not-allowed; }
+.rain-settings__field.is-unavailable .rain-settings__label, .rain-settings__field.is-unavailable .rain-settings__value { color: var(--rain-dim); }
+.rain-settings input[type=range]:disabled::-webkit-slider-thumb { background: var(--rain-ink); border-color: var(--rain-dim); }
+.rain-settings input[type=range]:disabled::-moz-range-thumb { background: var(--rain-ink); border-color: var(--rain-dim); }
+.rain-settings input[type=checkbox]:disabled::before { border-color: var(--rain-faint); }
+.rain-settings__form[aria-busy=true] [disabled] { cursor: wait; }
+@media (max-width: 480px) {
+  .rain-settings { width: 100%; border-left: 0; }
+  .rain-settings__header { padding-top: max(16px, env(safe-area-inset-top)); }
+  .rain-settings__actions button { flex: 1; }
+}

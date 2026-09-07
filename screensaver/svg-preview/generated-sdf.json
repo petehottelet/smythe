@@ -1,0 +1,2766 @@
+{
+  "version": "original-glyph-msdf-v1",
+  "method": "MSDF from original vector paths; not a raster-derived single-channel SDF",
+  "source_kind": "Smythe original generated SVG artwork",
+  "count": 192,
+  "canvas": [
+    100,
+    100
+  ],
+  "grid": [
+    16,
+    12
+  ],
+  "cell_pixels": [
+    128,
+    128
+  ],
+  "texture_pixels": [
+    2048,
+    1536
+  ],
+  "distance_range_pixels": 16,
+  "distance_range_semantics": "full range 16 atlas pixels; -8 outside to +8 inside; boundary 0.5",
+  "channels": "RGB multi-channel; reconstruct signed distance from median(r,g,b)",
+  "color_space": "linear data; no sRGB conversion",
+  "pixel_orientation": "top-left origin; y increases downward; no yflip applied",
+  "order": "row-major GLYPH-000 through GLYPH-191",
+  "source_svg_directory": "benchmarks/partitions/glyph_svg_v1/catalog",
+  "browser_catalog_sha256": "63967d8b1fe5c7dfb46ec665851b675682d88bd5c18e39a6a7f44ac692cbaabd",
+  "source_catalog_sha256": "9667056dfcbfd34558b0db4b2e3f044aa6d91d6bb7df52e92bf4d6719dea511a",
+  "atlas_sha256": "0e8e3e43cc7f6c1973db06840ea1c69a390b5cb78329fb312bbe39aebf6a7c38",
+  "exporter_sha256": "db33c85deaf6d5302ca067746141f3b84b941db61c09980520dcb5c973527c85",
+  "tool": {
+    "version": "MSDFgen v1.13.0 with Skia\n(c) 2014 - 2025 Viktor Chlumsky",
+    "executable_sha256": "603707f3d08017f0e6adff2166ca663de4aa34596cf563f2232059a369f8375a",
+    "official_release": "https://github.com/Chlumsky/msdfgen/releases/tag/v1.13",
+    "verified_archive_url": "https://github.com/Chlumsky/msdfgen/releases/download/v1.13/msdfgen-1.13-win64.zip",
+    "verified_archive_sha256": "08615362a7e4dc822fe1f4ef6a33ae62d7da0e3b91b6334a2ad2930bf4092b0c",
+    "license": "https://github.com/Chlumsky/msdfgen/blob/v1.13/LICENSE.txt",
+    "distributed_with_preview": false,
+    "arguments": [
+      "msdf",
+      "-svg",
+      "INPUT.svg",
+      "-dimensions",
+      "128",
+      "128",
+      "-scale",
+      "1.28",
+      "-translate",
+      "0",
+      "0",
+      "-pxrange",
+      "16",
+      "-coloringstrategy",
+      "distance",
+      "-seed",
+      "0",
+      "-fillrule",
+      "nonzero",
+      "-scanline",
+      "-nopreprocess",
+      "-o",
+      "OUTPUT.png"
+    ]
+  },
+  "validation": {
+    "all_cells_nonblank": true,
+    "all_browser_paths_match_source_svgs": true,
+    "comparison": "128px median-channel threshold versus original SVG rasterizer threshold 128",
+    "minimum_iou_gate": 0.94,
+    "minimum_iou": 0.9758121887597818,
+    "median_iou": 0.9928988677076189,
+    "scope": "Derived-texture fidelity; not a new glyph or workflow benchmark"
+  },
+  "glyphs": [
+    {
+      "glyph_id": "GLYPH-000",
+      "cell": [
+        0,
+        0
+      ],
+      "source_svg_sha256": "f518cf74bf57df859da5dea9832a6a55130ef84dfda159bd54cccfcd6632dc65",
+      "combined_input_svg_sha256": "058a9dd26eb0733f19364fa68cbeb33bdcb0b030d4f342991ffc0d0a02aef997",
+      "tile_png_sha256": "f51de47088a2c53f414f1d0993afa35f57826ef87579bfbebf33b4a8ab3a30bd",
+      "source_raster_iou_at128": 0.9962848297213622,
+      "ink_pixels_at128": 1609,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-001",
+      "cell": [
+        1,
+        0
+      ],
+      "source_svg_sha256": "d16206e90eabcd43d366e71ea36551dcab2c3b5d97f2de5d4ec49878664b726b",
+      "combined_input_svg_sha256": "539fa6e244ad357791c7c509e59abf446660e627ca6e065dc19a101369a4704d",
+      "tile_png_sha256": "197ec3d74a1d190f536fd46c55df4161be1150bdba2556c9c7717292b19f4ba1",
+      "source_raster_iou_at128": 0.99500693481276,
+      "ink_pixels_at128": 3587,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-002",
+      "cell": [
+        2,
+        0
+      ],
+      "source_svg_sha256": "6af8edd34bb846527a8bc2778949ec330d2f0c66cfa660b4589842d99cb8300f",
+      "combined_input_svg_sha256": "d1e543cc4dcb33441b4b38aa70edbfc937d3aada41419f88c6fe7d58b6458dfb",
+      "tile_png_sha256": "4da750c9b7f10dda958fb2182b6b8aef20f079ab29ebac108a57ca4766281fb7",
+      "source_raster_iou_at128": 0.9939894815927873,
+      "ink_pixels_at128": 1323,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-003",
+      "cell": [
+        3,
+        0
+      ],
+      "source_svg_sha256": "97355b9167c66ddf044c5c23870461f20e08ca060c33f53f41a3708444ebad4b",
+      "combined_input_svg_sha256": "6998594a60f598ed65a1a327271d6e1f24eaf4771fba068314b45f55feed6f12",
+      "tile_png_sha256": "f4d3ffe7f9e916c30d9ac61348cca9d86e0b96cbd13e41ce24d911a70fb1b7a6",
+      "source_raster_iou_at128": 0.988767550702028,
+      "ink_pixels_at128": 3169,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-004",
+      "cell": [
+        4,
+        0
+      ],
+      "source_svg_sha256": "5705a724d74fd4095f70474fdf11961985a6b6fae5ca5282554a585a1db0ec93",
+      "combined_input_svg_sha256": "8459d9654ff200764182a0b855726ea5aa354003e3bf0094c7fb682ab1785c94",
+      "tile_png_sha256": "ba4d63975ed07b65c0726fbf965da0f952d991a73b67638e022516b3777deae6",
+      "source_raster_iou_at128": 0.9887663398692811,
+      "ink_pixels_at128": 4876,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-005",
+      "cell": [
+        5,
+        0
+      ],
+      "source_svg_sha256": "83ef0e018feaeb8001ca75a022c62386205dd73d4b818784a98e4edddb33e83b",
+      "combined_input_svg_sha256": "4cae327490b8d84a2b7f64e234b8688752d8fe3ea2a62898e115fc9c3e9e07ce",
+      "tile_png_sha256": "186785b42baf1ca1f871a9412ddc06ba3d2fea735696db3798cee3cb3cc3460a",
+      "source_raster_iou_at128": 0.9908277917908737,
+      "ink_pixels_at128": 4323,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-006",
+      "cell": [
+        6,
+        0
+      ],
+      "source_svg_sha256": "eb501ebfa1ef1292821136d007e7e9c1d9b4e5e0f102e00409b99343250e682b",
+      "combined_input_svg_sha256": "56e7f9a0c78fae683122a2a8a635acd038fe245e3db0bc2ba46e39989ea27624",
+      "tile_png_sha256": "dd326c5488fa6b70b1ae5e60e828296c179026cd5ab1337903a44118b1749a41",
+      "source_raster_iou_at128": 0.9932538790195637,
+      "ink_pixels_at128": 4428,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-007",
+      "cell": [
+        7,
+        0
+      ],
+      "source_svg_sha256": "1935a3fa7d985c8cd047633e54a61b1dcef47b7b5c57bf5b7d2712eb0dcb000b",
+      "combined_input_svg_sha256": "c83cd48d926cf7618d36114da7ac794ba77bc81b682cd870f44c99304ed58241",
+      "tile_png_sha256": "e6c8af69aa8aa8387c8432c1494172dac3b4b8d59492621d83ac3beda3b9da5e",
+      "source_raster_iou_at128": 0.9981456953642384,
+      "ink_pixels_at128": 3768,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-008",
+      "cell": [
+        8,
+        0
+      ],
+      "source_svg_sha256": "861894245a6c1b3c5f20f1354b4382946715c9466e9371b0f8ebe0be684c424b",
+      "combined_input_svg_sha256": "6896bcc0c8bcf243958732718af98942c05a6ce8aba3e2e17511d2f264949d2c",
+      "tile_png_sha256": "c15b1542d684377510d12dea3ca0518a755cdaba0505de2e42765f0fe6fbe7e5",
+      "source_raster_iou_at128": 0.9990825688073395,
+      "ink_pixels_at128": 1089,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-009",
+      "cell": [
+        9,
+        0
+      ],
+      "source_svg_sha256": "320628da88e98e07bfe97e967da8ae07b3089aee662f6356b569c2217d6b4c7d",
+      "combined_input_svg_sha256": "d8e27dbd58531f3c8021decd7bcf755a0fc9ef310fafba8cbe2ddefcaaa231f5",
+      "tile_png_sha256": "7060680ca373aef943fc0b0e27f0bd4a0b3b1aa0485a31f8981f2712ef3563da",
+      "source_raster_iou_at128": 0.9923134608173978,
+      "ink_pixels_at128": 5318,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-010",
+      "cell": [
+        10,
+        0
+      ],
+      "source_svg_sha256": "f9fb92b5fa61063f77a62242c52fea832821a81375c6e6c28016d3d571a98c87",
+      "combined_input_svg_sha256": "71600ca969b525ac52bb992f4150c1bb53954d59018edb5d81bed3d714369266",
+      "tile_png_sha256": "ea492e8262c269a0508340dec68711e272e791e691872c127d9f7a62137753df",
+      "source_raster_iou_at128": 0.9966319657072872,
+      "ink_pixels_at128": 3255,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-011",
+      "cell": [
+        11,
+        0
+      ],
+      "source_svg_sha256": "b133add5b94090ae56335bcfeaf9968495ec394e31536c79d5378e9ec8fc7e1e",
+      "combined_input_svg_sha256": "a453fad9d8b16dfadb73f3e40729e303eaf8ce41819909d813b21dd49786c41b",
+      "tile_png_sha256": "9e05ac6fd8e0e937eb9f6671b29a0ded453b429ee840e18f4d5e46670675c587",
+      "source_raster_iou_at128": 0.9927644179612684,
+      "ink_pixels_at128": 4681,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-012",
+      "cell": [
+        12,
+        0
+      ],
+      "source_svg_sha256": "c16cf170504f6733ba681f292c07a32d46bebee9341c3482f46bf6c744872aab",
+      "combined_input_svg_sha256": "5a27028208e73ef19a7a540372eb4bcdfc268eb993363d58e69244c7af70c4e8",
+      "tile_png_sha256": "abc7bd7845d6071674fb31f1a7bac6be81c4540fdeb5515ca24a236fc561b419",
+      "source_raster_iou_at128": 0.9979360165118679,
+      "ink_pixels_at128": 1934,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-013",
+      "cell": [
+        13,
+        0
+      ],
+      "source_svg_sha256": "9137caea6dc56df24c193eced66340483a94fa145d81d7f0fa4ad2af718aa702",
+      "combined_input_svg_sha256": "ae48db259b9b3dd8602a446a73574cb4b6ec82b2a1730ad575bf350c51f826f4",
+      "tile_png_sha256": "14df320da5c1f6be229a44dd7f8a33ed49606a84293fa78c47e67ea3a5eef17f",
+      "source_raster_iou_at128": 0.9895833333333334,
+      "ink_pixels_at128": 4284,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-014",
+      "cell": [
+        14,
+        0
+      ],
+      "source_svg_sha256": "1591a23cf93645711c48d19fc4bf64fecd0acb9ed147c0a122b59996cc2798c6",
+      "combined_input_svg_sha256": "cb395217d9eb369c0af5337a144727f92d5f044102b5a16dcf51cd16e5d8e775",
+      "tile_png_sha256": "5f1c9072a4e0e98d9622bd06febed57eaaf0418453ac731d07880aae5d5f94de",
+      "source_raster_iou_at128": 0.9878529218647406,
+      "ink_pixels_at128": 3009,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-015",
+      "cell": [
+        15,
+        0
+      ],
+      "source_svg_sha256": "8ccadaafb4f3541554143484cecc3bb42ca522eba3f8477b5635d3fe6c459715",
+      "combined_input_svg_sha256": "2902b9440067bbc504f368b77b9a1c5dc6f56b602a847071dbe953e0dc391f42",
+      "tile_png_sha256": "65c68b74ce4a2257bccda343b157218ee50f723025618f91c1165628e862654b",
+      "source_raster_iou_at128": 0.9924063891070961,
+      "ink_pixels_at128": 3793,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-016",
+      "cell": [
+        0,
+        1
+      ],
+      "source_svg_sha256": "bb7a38f17b4b37f84de0ed7c50ca6d22a83bf3978a52a439f565ee6b2c4e1c2d",
+      "combined_input_svg_sha256": "487c3c1ad0925629d820c3ddb0f82ee618cc75b275a500071bdbe0b2c15d9510",
+      "tile_png_sha256": "b2a31c911c8f8d18663ccaa097d9e070175c144e0f0793a5a0a748ea89b7a76b",
+      "source_raster_iou_at128": 0.9953727506426735,
+      "ink_pixels_at128": 1937,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-017",
+      "cell": [
+        1,
+        1
+      ],
+      "source_svg_sha256": "73b2c276f5e02213fda7eb56ec9d32bee3e758f920924ebd0b768a4f767e4453",
+      "combined_input_svg_sha256": "e3387c7f5fa986ee66aee4b2a797cc9ba5ce475e87c0e1a70deb93a41ab7b8f8",
+      "tile_png_sha256": "f7b941b5ce60ac448f392f40bd3372377b80a46cd73d118e964de7485c9531a7",
+      "source_raster_iou_at128": 0.9922965816080885,
+      "ink_pixels_at128": 4125,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-018",
+      "cell": [
+        2,
+        1
+      ],
+      "source_svg_sha256": "b67b15a8c12dc9a3ad123019bcb014b2376fd8d1a303439aaf2909d1b9b3c647",
+      "combined_input_svg_sha256": "06dfefbe63ecf3ea911b03202a6ca18f7bf9ac9b80d678b4ded410410bb1e36f",
+      "tile_png_sha256": "fd0d0c4087bb0b79d5952434eea771dbc268cde8a5eb7a318409238e6b1e0640",
+      "source_raster_iou_at128": 0.9884594248030775,
+      "ink_pixels_at128": 5445,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-019",
+      "cell": [
+        3,
+        1
+      ],
+      "source_svg_sha256": "c8e4d5a7cc57de3cb52b9b2b889e8ec9e2df4cfb52e0589df41328ad9f128674",
+      "combined_input_svg_sha256": "f3042e51747d79bfe20891df9eb7055d248180045ca1ea4d7643f030bfe8a9f4",
+      "tile_png_sha256": "154f0cb55658ddd2537f0fd048b68eff1d5187dfc9ece98e3cf10b6a20c83224",
+      "source_raster_iou_at128": 0.9907965725166614,
+      "ink_pixels_at128": 3124,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-020",
+      "cell": [
+        4,
+        1
+      ],
+      "source_svg_sha256": "2323e3cae2ffcba2f831ef6740c354a4dcfc07df8022f29d8906d5d73208db12",
+      "combined_input_svg_sha256": "3fc23194f836a974cd3f2976dc2ee505b6ace104130153d0cd7eac459563d064",
+      "tile_png_sha256": "90696a38a33f14ed2c1fb236ade55200d1b5b7f167a1d0d1c867cca06278137c",
+      "source_raster_iou_at128": 0.9919772256728778,
+      "ink_pixels_at128": 3835,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-021",
+      "cell": [
+        5,
+        1
+      ],
+      "source_svg_sha256": "5bc60f859c4f6b6593cceddf4e9636d47fd97964601e3d1ea4711326d8b5fd94",
+      "combined_input_svg_sha256": "d7e0b83325ae4bf9a2e617e172bd13d19c825a4a5bbb9d39fad6a2c954430e5f",
+      "tile_png_sha256": "3ae74e2b76cca49351eba8bc17e0944ab4ac6ea01df48713f64cec5fb5cf5127",
+      "source_raster_iou_at128": 0.9961636828644501,
+      "ink_pixels_at128": 2337,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-022",
+      "cell": [
+        6,
+        1
+      ],
+      "source_svg_sha256": "4a2914020db1fbce3a86bbcf85b3cbaba5129f6b682f01ee680d9e22996730ad",
+      "combined_input_svg_sha256": "06a2cea31ba1789cad73f464c296c5c51f75aa2c656e595faea7217b7d97e5ab",
+      "tile_png_sha256": "34756451c28b2c52491173d45bc216aef7e82dd4faa84706a38d4d3548c63169",
+      "source_raster_iou_at128": 0.9981029167654731,
+      "ink_pixels_at128": 4209,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-023",
+      "cell": [
+        7,
+        1
+      ],
+      "source_svg_sha256": "4097e8cba3112637b27e75104096ccd5f5a8d314d620d4ef904ce89f686b8831",
+      "combined_input_svg_sha256": "76628b7e59167e81c2699601620abaf1fc53500c9376d0a3389e2a8a26b501ce",
+      "tile_png_sha256": "47c447bfa89dca611cc2eb54e78df8497f17265778d52073c28746ab030b4684",
+      "source_raster_iou_at128": 0.9921953675730111,
+      "ink_pixels_at128": 3949,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-024",
+      "cell": [
+        8,
+        1
+      ],
+      "source_svg_sha256": "ba2082c71336ef3fb87f650d2f55e430d7c124d6237d173dc258ff0377c005d5",
+      "combined_input_svg_sha256": "b125c7c3287fff2d0eeb6a077457979b43fdc71e4b7f808fb4d66dd8735e816c",
+      "tile_png_sha256": "913d1acbd20bbc6fdda723dcedc611221b43dc9b82ed00299ec4e51a7cb52080",
+      "source_raster_iou_at128": 0.9957026214009455,
+      "ink_pixels_at128": 2318,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-025",
+      "cell": [
+        9,
+        1
+      ],
+      "source_svg_sha256": "4b7c7a9bf0a982b3e21f95b1881dc1b8fce5cc4723e8a1c2512f74ed25da3d4f",
+      "combined_input_svg_sha256": "37ddc45fe8e27f668794701d8e6f6d1d912979b26181a02401b53c6ee803344f",
+      "tile_png_sha256": "53bd6ae1b1ae69cda790ad087f3e20cf993e726866f41cdf15acc4be49ec50a3",
+      "source_raster_iou_at128": 0.988988698927847,
+      "ink_pixels_at128": 3413,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-026",
+      "cell": [
+        10,
+        1
+      ],
+      "source_svg_sha256": "9fad21ad56d079a7eefbf115897de0eec5588a62f6c224a9162b890aec9fcab9",
+      "combined_input_svg_sha256": "6034fe9a7cb7ca5d4a4b7f58110288e4dd176d14c98ed6870d343a3c9fbed6d5",
+      "tile_png_sha256": "b1cd0f6109118dde2c76a450e7c6c010d94d86211b7ccedcee1143acaacbf388",
+      "source_raster_iou_at128": 0.989704687076673,
+      "ink_pixels_at128": 3660,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-027",
+      "cell": [
+        11,
+        1
+      ],
+      "source_svg_sha256": "e45d407974da7b19e5cc8799d19cf07b6ef86bfd279a13f74a1f86e01fd02cb4",
+      "combined_input_svg_sha256": "7e6930315550674359a4ef36cc335a242cd24f162a5061f82e85dce54e31ca55",
+      "tile_png_sha256": "903c8f48c75ce299d4667cfbe736ea0beaccfcf9c9e1fa6583aaef2aa4500639",
+      "source_raster_iou_at128": 0.9907129199672221,
+      "ink_pixels_at128": 3640,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-028",
+      "cell": [
+        12,
+        1
+      ],
+      "source_svg_sha256": "dc54e1f68c2fb8baa962e2b27fa23cb8ccd95e1c0f0c2e256e55a97f88b960bc",
+      "combined_input_svg_sha256": "9a0a8a93d980fa5e72538efabfa53f3ccdaf18bf6a9f41a1a9acb9f06b47a171",
+      "tile_png_sha256": "814376a33c0a5c5f7e034a88c9b533789020a91aa1f144c44851ddd416660a6f",
+      "source_raster_iou_at128": 0.9915536785952433,
+      "ink_pixels_at128": 4468,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-029",
+      "cell": [
+        13,
+        1
+      ],
+      "source_svg_sha256": "296e4735a12d4db73278b2ee43e7fc364a4e1c816a99033d1d5c9f2797c01f26",
+      "combined_input_svg_sha256": "c21e1042a644c48aec85b60ad322d6ad96e8abbdbf2697160abad3c6d7fcf72a",
+      "tile_png_sha256": "ac763eaab1c7aad460f8ffa42d05c318203afc9d484e5bd760f3c6038eea93b8",
+      "source_raster_iou_at128": 0.993747829107329,
+      "ink_pixels_at128": 2863,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-030",
+      "cell": [
+        14,
+        1
+      ],
+      "source_svg_sha256": "4ac903d1ef7ce9482c9f8f58121d1376a1a01e2e5e9e565016035651c59d30b6",
+      "combined_input_svg_sha256": "f09d5ac3ba672161688ab30879970f3fcd6f043636bf709802deb3ea75cdee71",
+      "tile_png_sha256": "2d2dd10c21feada6bda343ab59c47c35d49250572d1ea5c0f705a716a43c7445",
+      "source_raster_iou_at128": 0.9942212438084755,
+      "ink_pixels_at128": 3613,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-031",
+      "cell": [
+        15,
+        1
+      ],
+      "source_svg_sha256": "9b3cb81275d709ce222168984f42dbc4c587153b3bfb347bf1a2c5479d7f9217",
+      "combined_input_svg_sha256": "a74babca1aca7c59de72f8626febc7a27ae20240eed42065e8359749ccbead1c",
+      "tile_png_sha256": "5506a567b6e9c3827940064e6a35fb717476e8c214312874791d980d570e2e0e",
+      "source_raster_iou_at128": 0.9898321116103098,
+      "ink_pixels_at128": 4187,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-032",
+      "cell": [
+        0,
+        2
+      ],
+      "source_svg_sha256": "c8c53f1e51099e46cecd13711951a159af51d6aefc0968b225856525d3caf324",
+      "combined_input_svg_sha256": "aafe99ffd53741dae3abb74c89131b00cc36e6e70be021fe24d01489c16f1acd",
+      "tile_png_sha256": "c5d1cf2fbac9d5a99682fe9cf437671a295fd6f2d37a15cd83ccce54f789d308",
+      "source_raster_iou_at128": 0.9897936039918349,
+      "ink_pixels_at128": 4379,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-033",
+      "cell": [
+        1,
+        2
+      ],
+      "source_svg_sha256": "4631099d7f516851c2467b3d19c0efad423f4d56dcdf9473069aaf076723a9d7",
+      "combined_input_svg_sha256": "51b6c2a25254fd5a998ab8da1b742e9ec53ca5645bc3e649cae14d85cc5b1b1e",
+      "tile_png_sha256": "26e86db10ef3347594f0e268a1b45aca7021e0e2d1bfd04d56b627d0aad757ee",
+      "source_raster_iou_at128": 0.9934959349593496,
+      "ink_pixels_at128": 3055,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-034",
+      "cell": [
+        2,
+        2
+      ],
+      "source_svg_sha256": "63555f27f6ab82ae69f837c77daa618bf80804aabd97b65bbf23127001519916",
+      "combined_input_svg_sha256": "637d809c1e046ec8e0ff803abab3a3c35dceeefc6420a43d737ea762958b0891",
+      "tile_png_sha256": "9cfb16207d0e609ab7565a281fd1f78b147c4cf9764b58cd63e99b5f8f3be59b",
+      "source_raster_iou_at128": 0.9961734693877551,
+      "ink_pixels_at128": 3906,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-035",
+      "cell": [
+        3,
+        2
+      ],
+      "source_svg_sha256": "31f39e6cff1c21d4b17bdd20ae28a64209e108f14fc0197013587b8ce426387b",
+      "combined_input_svg_sha256": "ba28dd88bb065e809b9b5b9993eeea9976405fb069b7f195934192ee47b3bb5f",
+      "tile_png_sha256": "39d6dd6e7369fe865c1ffb70edec9bae9d06e5d0e07acb6bba9ce02cf0396be5",
+      "source_raster_iou_at128": 0.9927650915668098,
+      "ink_pixels_at128": 4393,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-036",
+      "cell": [
+        4,
+        2
+      ],
+      "source_svg_sha256": "8338c771f77378429507fc868af277a42c80559fa62629b936a02ca98962f80f",
+      "combined_input_svg_sha256": "2c610017139e058c3c80225f83b22947777f1d7bcc59c8b8eef88f45a394bd9a",
+      "tile_png_sha256": "fcdda84753310b7ee67e763559f46e79369151722d905e12dd5805d577533f13",
+      "source_raster_iou_at128": 0.9924242424242424,
+      "ink_pixels_at128": 2754,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-037",
+      "cell": [
+        5,
+        2
+      ],
+      "source_svg_sha256": "7f7418ec137d2996aeba937a7181e14dcc1ed3eb6ddbde8a68fc6e00a618421e",
+      "combined_input_svg_sha256": "bb1edc059f18c04ce59d1b214d731f0042ee1f73cc84169cc6126e17eb675d6b",
+      "tile_png_sha256": "9ceb9d7097effc7e3d756c2a934e8a048cc85b58a49d2974fb97d94340b6cab4",
+      "source_raster_iou_at128": 0.9879720952610055,
+      "ink_pixels_at128": 4147,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-038",
+      "cell": [
+        6,
+        2
+      ],
+      "source_svg_sha256": "9eeba3d8b0e36acae0071466236d523446c1cb3e0e83abd1dcd436584e5dcc9f",
+      "combined_input_svg_sha256": "ea5f70c66cd75341cc445b682cd88d8e6e0ca3d43d449d2c063bed086dc4e0de",
+      "tile_png_sha256": "3b30e564512f19b652da2426b89cb060025d98482b141e833a77dc1b057d3fa5",
+      "source_raster_iou_at128": 0.9900497512437811,
+      "ink_pixels_at128": 4384,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-039",
+      "cell": [
+        7,
+        2
+      ],
+      "source_svg_sha256": "67421bf1876f38dc9145b1c3902617b2b599cb095aaccad4a43e3706bbc0ace8",
+      "combined_input_svg_sha256": "3234b425c55844ac2595ae3d6da75509349222661aad4e9f53495883f0cf9259",
+      "tile_png_sha256": "c660997a73d75c6c8c1ed7065eec0fc31400422d3fe5109d237cdcaf7bab1ba7",
+      "source_raster_iou_at128": 0.9971604353999054,
+      "ink_pixels_at128": 4216,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-040",
+      "cell": [
+        8,
+        2
+      ],
+      "source_svg_sha256": "72b689baadbcb163848dc99af8ac251f77058e2f00529e4213173c1218976561",
+      "combined_input_svg_sha256": "5702b779e8802d792cb26473a0aee1b60ae8308e49c29e2fe4b4384b448cfa64",
+      "tile_png_sha256": "545c64bb82eb108b576e70c6abe313c7a3c33d61416cb82f2ef7165447adcdbd",
+      "source_raster_iou_at128": 0.9943985062683383,
+      "ink_pixels_at128": 3731,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-041",
+      "cell": [
+        9,
+        2
+      ],
+      "source_svg_sha256": "1806a13ecaa055d0a980dbd0b21f175a6b92e92a030ddbf64e781f2ba129a409",
+      "combined_input_svg_sha256": "a21bce5099a094f3151e1a69416f9380dbdd0835e8c4b6c1ed812a2932ac53b7",
+      "tile_png_sha256": "1cdb6d9342363f5800ab38f05b2264da0c7c3cca5fb0059d349bf245878025a9",
+      "source_raster_iou_at128": 0.9960850111856824,
+      "ink_pixels_at128": 3563,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-042",
+      "cell": [
+        10,
+        2
+      ],
+      "source_svg_sha256": "90c2a90f0c61b19843e09a57b66bedec646cd503d85cb1d16dee5d0137e77b5c",
+      "combined_input_svg_sha256": "64f04994448bff3fab35739440635a2a4e8aaa5996508a3eb002751933cfb891",
+      "tile_png_sha256": "f1b7fca4af3e94d193f51aee527c52cfc8aa96c15b22e625ad211f54f980aab2",
+      "source_raster_iou_at128": 0.9912561313712945,
+      "ink_pixels_at128": 4661,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-043",
+      "cell": [
+        11,
+        2
+      ],
+      "source_svg_sha256": "eaac06c64580293988a524fc9c3b81643c7997fc4361ebe79be14ff6f28b0891",
+      "combined_input_svg_sha256": "b0809c60cb602657bacd929830e531b5a393c18f63468fa25d22c3f898e20784",
+      "tile_png_sha256": "32669d37d4eb4aedd403b74cfdcdab3b43a2ed5d7ea4972818a6128c1165971e",
+      "source_raster_iou_at128": 0.9920721705850192,
+      "ink_pixels_at128": 3632,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-044",
+      "cell": [
+        12,
+        2
+      ],
+      "source_svg_sha256": "93d0c497eb18652195c83ac301c83b1a51f14fd8dd5d3aecd01d673d93c2ac03",
+      "combined_input_svg_sha256": "e5d406bbbdc5ea7ee98d8b79c0766b9aaccbf0c4b020da20800d4e15386b7e70",
+      "tile_png_sha256": "bcdf9f5e0c2f9ee2b43365d14ca571c2925b29369a1c657e97c956afd96bd603",
+      "source_raster_iou_at128": 0.992822966507177,
+      "ink_pixels_at128": 3736,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-045",
+      "cell": [
+        13,
+        2
+      ],
+      "source_svg_sha256": "275ff77c0e8ffe3c7891962a74d9fdd4d50955a1683c1494af76261680f9e276",
+      "combined_input_svg_sha256": "e3bf672e8b0cf45405e2f047e5f526eeeefce6491bd14425da488312621e09c0",
+      "tile_png_sha256": "6514a518e8231af71e0b68918596469a1df47428d6692b25e064977da0d22c3e",
+      "source_raster_iou_at128": 0.9972113775794758,
+      "ink_pixels_at128": 3576,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-046",
+      "cell": [
+        14,
+        2
+      ],
+      "source_svg_sha256": "44da992e78e25aa2c82e5332dca914bd3ca9f85e5f0ed91e7efbf77d5b6b8fb8",
+      "combined_input_svg_sha256": "ad1ccf8527734078039f574ac21b138f6cd29a73db7dd714e1966a8177aa4fe4",
+      "tile_png_sha256": "f8faed7b27cf36cc07181b4de1a47e94e39da5c6bd35a867aedd989315111f6e",
+      "source_raster_iou_at128": 0.9928156949433545,
+      "ink_pixels_at128": 3596,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-047",
+      "cell": [
+        15,
+        2
+      ],
+      "source_svg_sha256": "0eacbe925726d927084c8a1a5b6351eb0b990fad2dbcc429c2e8b4f46b2da0bd",
+      "combined_input_svg_sha256": "69588c128d338503ce93fb7d3183aaf1a86ddf6118251c417ccfeccb55a228fe",
+      "tile_png_sha256": "5e087b7e039e3fe72538fde73355fe6a53df1eca79525b33aa24a50bf395afd2",
+      "source_raster_iou_at128": 0.9892418032786885,
+      "ink_pixels_at128": 3872,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-048",
+      "cell": [
+        0,
+        3
+      ],
+      "source_svg_sha256": "0010d43a957f159fb298f109daab12c91e6ab0fcde34cf8d26fbb74ffecf5655",
+      "combined_input_svg_sha256": "29e2cc485d3111dfc92359396b6946de994fdd0970f369fe44b46d9db2994619",
+      "tile_png_sha256": "275edc0a3a2099eabf0dcb2a5e1a6ab6101ffcecd993f7ccf0bb36a85d83442c",
+      "source_raster_iou_at128": 0.9898399014778325,
+      "ink_pixels_at128": 3217,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-049",
+      "cell": [
+        1,
+        3
+      ],
+      "source_svg_sha256": "e7b446336cd6d5ae191e9ef189bd78622c32162e7b69baadbc08b336454171c0",
+      "combined_input_svg_sha256": "5ad5fca3f337694e7161ecd41c519aa2af6e16b83eb768a67a95d99c9c1937fe",
+      "tile_png_sha256": "d48a8e686945b36d3f98223ef7d2f70b0bc78396ca3d863fc06cd014e1a105e4",
+      "source_raster_iou_at128": 0.9974273218420375,
+      "ink_pixels_at128": 3877,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-050",
+      "cell": [
+        2,
+        3
+      ],
+      "source_svg_sha256": "ab51da406c0e5dcb17a0af3f485ad0306d1a9a26ff9c9b6f65df6677992e1248",
+      "combined_input_svg_sha256": "bacfd22a26c548888f0132b96627a9ed047923ddf6e706aec2802542ecaada09",
+      "tile_png_sha256": "ef76ec13f60cfbfa355766a0fa1f858e88b186a6b9942b2609a93dd6633b3508",
+      "source_raster_iou_at128": 0.9964234620886981,
+      "ink_pixels_at128": 4181,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-051",
+      "cell": [
+        3,
+        3
+      ],
+      "source_svg_sha256": "974fee452646c781cb6374ad9f6c8f4b23c592e7ad7212958723a6b84fbc8846",
+      "combined_input_svg_sha256": "c53723c11694cfb3cfc4102c4390c17973dbc35a84da7a927017e12d9c97aac4",
+      "tile_png_sha256": "0e836d56be24163488bee025f18f10c81987c4d66c5e8c4595a3af2e9a06d930",
+      "source_raster_iou_at128": 0.9902304609218436,
+      "ink_pixels_at128": 3975,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-052",
+      "cell": [
+        4,
+        3
+      ],
+      "source_svg_sha256": "b364b8b16a3e17e7662f8e58d7c6742a8b41ae7b2e7f79f0b11cb4a6ca86a4d6",
+      "combined_input_svg_sha256": "3aa4610fc09d5b1e6f840a894bd53953aebc6e8b96ed14fc7cb9bd9835215ea9",
+      "tile_png_sha256": "8e512b92912100ae20f63b042eaf13650e6d4af4e035401266f19d425954372f",
+      "source_raster_iou_at128": 0.9935560859188545,
+      "ink_pixels_at128": 4163,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-053",
+      "cell": [
+        5,
+        3
+      ],
+      "source_svg_sha256": "4958f31f2acdaf44698cfe1725adbeea01628ce7a15097693f91c79b67aeac96",
+      "combined_input_svg_sha256": "eaf26ba32fbac0d48d755fe7e9cc3fb34d67957a8a9de21ea52b7218b8c4c9c0",
+      "tile_png_sha256": "a5cdc50bd9b25c2d2bb8d957df9bb589d71570c6f8a9df2d1604cba69158ea53",
+      "source_raster_iou_at128": 0.9931972789115646,
+      "ink_pixels_at128": 3798,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-054",
+      "cell": [
+        6,
+        3
+      ],
+      "source_svg_sha256": "9f4880a9aa97b0e96e9015167e6abcc32d55430c95cc846d04e8e3e5d21e740b",
+      "combined_input_svg_sha256": "ec9c5c746f4dabe91248a974e3647d5c27f90a38be9d052714d9ec608513168d",
+      "tile_png_sha256": "ed3d0d3aad46709561b604b56623291287b2bba1972e12d17b440e6ea122229f",
+      "source_raster_iou_at128": 0.9938180019782393,
+      "ink_pixels_at128": 4021,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-055",
+      "cell": [
+        7,
+        3
+      ],
+      "source_svg_sha256": "50e27cfa07ef85ea4aeb045326c6074aebf1762302ac8821b95996c61a099f5d",
+      "combined_input_svg_sha256": "83e9a77937296d0da01ad7b49162b35b049625dbfded995dfbf467e3b079882e",
+      "tile_png_sha256": "819f9b24742c470aaa4039a31e89a05cd3e1b6167fe899d33dd55d9749a0a5ae",
+      "source_raster_iou_at128": 0.9968868134311764,
+      "ink_pixels_at128": 4486,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-056",
+      "cell": [
+        8,
+        3
+      ],
+      "source_svg_sha256": "fa327f72247f5c735f94bed09a389d51a9dbcf42a5cc56ee26b01347e1b7ea88",
+      "combined_input_svg_sha256": "90c781ca5f66e0e4cc87bf013b088efcb23c133b7c8d2b7864270b2574a96efa",
+      "tile_png_sha256": "794cea681f631d6bc7ce6b39f54172107a016b2043164414c9c01a4340fb0749",
+      "source_raster_iou_at128": 0.9894756624694606,
+      "ink_pixels_at128": 5293,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-057",
+      "cell": [
+        9,
+        3
+      ],
+      "source_svg_sha256": "7341e8f7093fb96de585619b1d3432ef602fbc01ddc29d213cf8ba55a1a98619",
+      "combined_input_svg_sha256": "2ec54cc439483d315994962a3b37658e6d05f13b9cdcf14b2a01bd2e771620dc",
+      "tile_png_sha256": "f6d7c9b5dd09e16315d161bbf7e8c65e1e677605d80f836deaf5260ad61283ac",
+      "source_raster_iou_at128": 0.9956930305403289,
+      "ink_pixels_at128": 5092,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-058",
+      "cell": [
+        10,
+        3
+      ],
+      "source_svg_sha256": "ae675219a6c2beb6fd4dd96932b151d54efda6fb68322273513f212dbdbdf51d",
+      "combined_input_svg_sha256": "667d10cd8e6ad10479a0b6a0659eed54d4bb5c840c0592058b1959f2134123e7",
+      "tile_png_sha256": "7567bb126c7d5db516a91b24e912d62ca221cd2755f31cf9353b3926db24cb7e",
+      "source_raster_iou_at128": 0.9917413874469089,
+      "ink_pixels_at128": 4205,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-059",
+      "cell": [
+        11,
+        3
+      ],
+      "source_svg_sha256": "7cc8f254c3a86cca8317a6ecf72be27ff6a9b6e215a4911b5eb933e1724bc254",
+      "combined_input_svg_sha256": "70f566dd846e38a3693fd8114c9e907dd8ce4812d52b921611c562aaa4d4a2fd",
+      "tile_png_sha256": "7f33def7e8c9efacf7800b73cc52e1c6657a0ac2b970d7a5ff87b51458d5f679",
+      "source_raster_iou_at128": 0.9935301253538212,
+      "ink_pixels_at128": 4930,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-060",
+      "cell": [
+        12,
+        3
+      ],
+      "source_svg_sha256": "f085b0414eedabf709cf757ab027a2d41b42bf7871310bf76fc5db345672393a",
+      "combined_input_svg_sha256": "4551adaa6e28c57d6ae529f5f25513c404f3dce1d1e9c798515cfa8286e01328",
+      "tile_png_sha256": "d1e216aa01024e435cec36cd73727fa634f335a16923b7c1f72b1e6665164fb4",
+      "source_raster_iou_at128": 0.99089097637347,
+      "ink_pixels_at128": 3485,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-061",
+      "cell": [
+        13,
+        3
+      ],
+      "source_svg_sha256": "a6ec45047505f8c520f724d84d3529695c53c7c747cd29dbdf0ea07c0bf9c607",
+      "combined_input_svg_sha256": "722bc7c83bc7d2b3468a1b213ea75f1f4bd5a7be71d22c2872da825e84a54c0f",
+      "tile_png_sha256": "d63cf61383486c3fce050991796b1d69c30c2ddd124e6f88e009953cb7342477",
+      "source_raster_iou_at128": 0.9991458466794789,
+      "ink_pixels_at128": 4679,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-062",
+      "cell": [
+        14,
+        3
+      ],
+      "source_svg_sha256": "dfd0203022d2ae8c1d74a64bc72cf7a2b9d38cfb36385f2525e42e19ebaa28c9",
+      "combined_input_svg_sha256": "2957f806dee8098e4c21a7139263727baaa98f3dc86c0327df70b64a287719f3",
+      "tile_png_sha256": "bd6ad7074f1352cb683bf7eef584bf1dbf72670f7d2666b87001a6e3ce7617d3",
+      "source_raster_iou_at128": 0.9929816069699903,
+      "ink_pixels_at128": 4103,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-063",
+      "cell": [
+        15,
+        3
+      ],
+      "source_svg_sha256": "85e16d8f169d2e58620027fdbc1946a1a36d9f0dafdde2c72b9be1e75eea4d20",
+      "combined_input_svg_sha256": "bdeeb8f14ab4f7f17758f71e26ee41f9d49b54aaed8333ad655dbe84dd40211a",
+      "tile_png_sha256": "4ac5890061416cfae4184f5e93df10d7abea0bbf0958cc818e56fd2acfdc222d",
+      "source_raster_iou_at128": 0.9920424403183024,
+      "ink_pixels_at128": 2619,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-064",
+      "cell": [
+        0,
+        4
+      ],
+      "source_svg_sha256": "a9944068fd2e9a7dc47a0dab1f3992330033f9d432525a0ae06062ec65daa03b",
+      "combined_input_svg_sha256": "b0dc1d20872bdec9c1a12cab379b61d8db1695508b9efd1b177ae288263f0c48",
+      "tile_png_sha256": "732d2b7cc7f99cd8dbaa2613a849a1f6026563929ee9ddc661cd2d1f4f5058a4",
+      "source_raster_iou_at128": 0.9932651534048391,
+      "ink_pixels_at128": 3985,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-065",
+      "cell": [
+        1,
+        4
+      ],
+      "source_svg_sha256": "393f11fc7ad2a47649895498df7f94f0df2381f6a473771ce71ad528946b7ade",
+      "combined_input_svg_sha256": "f69be06f577ac53c2a49fea6f9b23218383e36e66db30a885709f19e43aaded2",
+      "tile_png_sha256": "b2c6acdb1fb77cad23d2d42f31d54a21b1b261bec93f03cf05f5d6b35c8c3023",
+      "source_raster_iou_at128": 0.9974905897114178,
+      "ink_pixels_at128": 3180,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-066",
+      "cell": [
+        2,
+        4
+      ],
+      "source_svg_sha256": "ea61245f012dbc26b36636e0cc236ddd1dc2990caaa50f441fbc37f02902f35a",
+      "combined_input_svg_sha256": "cb7f3718e85417ca47e11d0096f79b4145e5ac0b20b562971a457e0dbca63418",
+      "tile_png_sha256": "f11613cc4988d09d84273b711d81037254f1e64542a28c3a1996e607de2f2d71",
+      "source_raster_iou_at128": 0.9967511371020142,
+      "ink_pixels_at128": 1534,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-067",
+      "cell": [
+        3,
+        4
+      ],
+      "source_svg_sha256": "dc67550e6563648f2be22362c9af8924642bd466cf248567f9def8ac82b7f9cd",
+      "combined_input_svg_sha256": "829357c907109f5150074c40ef8bfb05a24eb2427ee4edee7a0471a3d80ac2ae",
+      "tile_png_sha256": "78c83d49e5167043771af08b9264dada4733b196bcab0b93b9161755420db329",
+      "source_raster_iou_at128": 0.9929217459693276,
+      "ink_pixels_at128": 5062,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-068",
+      "cell": [
+        4,
+        4
+      ],
+      "source_svg_sha256": "b5ee1a6a6023f5b25a1222ced5221b3cc6b60fee973bc78f39ff9dca62dcf7cc",
+      "combined_input_svg_sha256": "6cd9a01c80134138cb8134e7da63ddd7f3dccf339d7b5d1d850560d51664cfcc",
+      "tile_png_sha256": "9c46c97474b37d3072437bd254dc21488708baa5d0eccf551ae322804fb6e8b1",
+      "source_raster_iou_at128": 0.9953624603368318,
+      "ink_pixels_at128": 4082,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-069",
+      "cell": [
+        5,
+        4
+      ],
+      "source_svg_sha256": "a4ff675e45aee33ffff348d8fbab72233a64249df68db7d109490380228badae",
+      "combined_input_svg_sha256": "2ac6baec4241f2abf5728e686e7867aea9ca96838a9b62d2febad2ecd980222d",
+      "tile_png_sha256": "c5e3e51a67f6fa635eb32497469c9adb69b74cc693d2e64bed934bcdc2d0ce30",
+      "source_raster_iou_at128": 0.9935933147632312,
+      "ink_pixels_at128": 3567,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-070",
+      "cell": [
+        6,
+        4
+      ],
+      "source_svg_sha256": "8a9ed903dafbda9003ec1c3839bb302ac45be1d5bf531f0c2750837c9658dd39",
+      "combined_input_svg_sha256": "a087991ddaa7cf98ab15e0a2b750d7dfd50da4baad096c5c49dcc346f0b75fdc",
+      "tile_png_sha256": "dbb69021aad2b70876262a22b76808592cf555d7dbae9256c6c8abf61313721d",
+      "source_raster_iou_at128": 0.9898785425101214,
+      "ink_pixels_at128": 2445,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-071",
+      "cell": [
+        7,
+        4
+      ],
+      "source_svg_sha256": "ca6daf4c52c7ac5563f605532271607f64898d118fc50192363257d8b0eca8da",
+      "combined_input_svg_sha256": "3e8b2d11cc84fa42e93670f822d722414fad9350ff1fa342a56ca0f0d3cbb6d2",
+      "tile_png_sha256": "79a53dc9584a56b714d37d79bfc135fd64ea25a7b5393a405a4011d61cc16b12",
+      "source_raster_iou_at128": 0.9975505205143906,
+      "ink_pixels_at128": 1629,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-072",
+      "cell": [
+        8,
+        4
+      ],
+      "source_svg_sha256": "89cad41e6065e61e83032cc676b8d4198be1ff80794625a49c4184c67f18fcc6",
+      "combined_input_svg_sha256": "53bd7f3f8ca70c7a50addbd41a5def909338f0cb8785d252ece45f5f57869841",
+      "tile_png_sha256": "992c48cb8837a246f9109ea2a824054e43cc131fc62bc4c5100c2f6b76eb3e0e",
+      "source_raster_iou_at128": 0.9917659804983748,
+      "ink_pixels_at128": 4578,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-073",
+      "cell": [
+        9,
+        4
+      ],
+      "source_svg_sha256": "8b4664a0dd47d5fd88629306e08988e06a6e3624d2d522a1a0e9551b437204ac",
+      "combined_input_svg_sha256": "be5ad1ae682b07896e5b1a50381603e6b625872e69124ceef26ca28d7b4510c3",
+      "tile_png_sha256": "04140ad552ec97b6c0ffaebcc64c0d129b278b7c840b51efbeb55e4fc4ab69ad",
+      "source_raster_iou_at128": 0.9897151898734177,
+      "ink_pixels_at128": 3757,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-074",
+      "cell": [
+        10,
+        4
+      ],
+      "source_svg_sha256": "78810cafb3ab96cb5d4dfad1658f2883776a61f6f2a4e88b703696f3adaa3132",
+      "combined_input_svg_sha256": "e5449b9b68c8280044381c5b046f9c7c4645504c8b41129c65c2f2c3416a801c",
+      "tile_png_sha256": "76ca65a7344a8b66523db24e187903fee8b413ccd2786a79b8cd169e824b58d6",
+      "source_raster_iou_at128": 0.9940959409594096,
+      "ink_pixels_at128": 4046,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-075",
+      "cell": [
+        11,
+        4
+      ],
+      "source_svg_sha256": "0842601c326b8c1929952cd36a6228b6ae9081e44d9ef7abe980dfb070c81982",
+      "combined_input_svg_sha256": "6c06ee6629a82151b8ea11828622cb14456c51a9ae957f311949441e69dbc8c3",
+      "tile_png_sha256": "6d49472778a586898199de6c3969db45b3ce7728a41700c8df020f5373214592",
+      "source_raster_iou_at128": 0.9891835310537335,
+      "ink_pixels_at128": 2836,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-076",
+      "cell": [
+        12,
+        4
+      ],
+      "source_svg_sha256": "9131067813268af5ad0499bd42f0887ec439dd2c35810167012257395c9f6fa9",
+      "combined_input_svg_sha256": "1b172fa0ab160ca298b727aa5627101e244b40b50b7402584eb66bd84dd78f05",
+      "tile_png_sha256": "60a2f9608009f8413279441b318118b3f336b38d2e326e525683006fa3433dc2",
+      "source_raster_iou_at128": 0.9977358490566037,
+      "ink_pixels_at128": 2644,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-077",
+      "cell": [
+        13,
+        4
+      ],
+      "source_svg_sha256": "df5efa0201511ab51cd9b24851942de9528c0b42a2784ead3d1bfbe6db1d22c5",
+      "combined_input_svg_sha256": "0070a1de75baf8d22cf35dcbf2b6851b9aff97059e4278a2f2e0cf1e165964cd",
+      "tile_png_sha256": "9074691c85803a7d0f4c7ac46ac2a233fdf4f4b6326feddb44f499727eedb97b",
+      "source_raster_iou_at128": 0.9942938659058488,
+      "ink_pixels_at128": 4187,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-078",
+      "cell": [
+        14,
+        4
+      ],
+      "source_svg_sha256": "d8e2a0b411b6248ab8ad456072895f38dc1be55a9ee68eb69871a58e7d3aad7c",
+      "combined_input_svg_sha256": "b24a41953ef898d8203f10aa99e4437dd76423dc264624d020767e800d9ef98d",
+      "tile_png_sha256": "e2787e95b634add2ec2360f1c94157fc0c669ff6fdbd01e19bb4036f185e94a2",
+      "source_raster_iou_at128": 0.9940549913301957,
+      "ink_pixels_at128": 4019,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-079",
+      "cell": [
+        15,
+        4
+      ],
+      "source_svg_sha256": "935755ddca7713f3c868ede0ad816e39763e4e6050941f95ee4e0613f3003a5c",
+      "combined_input_svg_sha256": "c36e9b56412d2f729e43d56869c5ed930b9608e85d95588923791355d11c1321",
+      "tile_png_sha256": "81cd8004b99604081527166d9e417c5719619ddf2fc559750345ed4884ed6df8",
+      "source_raster_iou_at128": 0.99689537410742,
+      "ink_pixels_at128": 3211,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-080",
+      "cell": [
+        0,
+        5
+      ],
+      "source_svg_sha256": "7f8f2019ce5ca26d54df22221936b193fb629322874c1cd92f61aaa8d9f21166",
+      "combined_input_svg_sha256": "ff1750723f1d34d4f40d1542a7a02f71b2dafa6a9c689a21500d43f6a467eaf8",
+      "tile_png_sha256": "3e7a591073ce286cb6015b19adc61375a671ef4b0c7bb4b22b2790f5bde0b5ca",
+      "source_raster_iou_at128": 0.992735400949986,
+      "ink_pixels_at128": 3553,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-081",
+      "cell": [
+        1,
+        5
+      ],
+      "source_svg_sha256": "516656dae1f5ff943fb4c2fc7e6f51bb402ad2cec14741ad551b52be2d89ed71",
+      "combined_input_svg_sha256": "2fa970f6c4cb5b7aef29972521e03caf85804eecedda85891653c7c5b69f9cbe",
+      "tile_png_sha256": "ad1d9c7528801abaa025550f9c1d787cc1f1086e6715247fa0f00da784e49093",
+      "source_raster_iou_at128": 0.9905201127337945,
+      "ink_pixels_at128": 3869,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-082",
+      "cell": [
+        2,
+        5
+      ],
+      "source_svg_sha256": "3c5a67cb1ed4fe0388fffc15a21b77d614756a15a7cd570e462f98f179649808",
+      "combined_input_svg_sha256": "385ec3453e121207270c8d3d32b6a894d4ef516e3066cd8d572edbd36edd0371",
+      "tile_png_sha256": "60d29888aaeef3d0023de8e9bccce80dd4caab85dddccf6b1c1cdd62770be9f7",
+      "source_raster_iou_at128": 0.9918367346938776,
+      "ink_pixels_at128": 3407,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-083",
+      "cell": [
+        3,
+        5
+      ],
+      "source_svg_sha256": "516deaf8693a365d9ccf5e0c525cf3ed400751b4e4e4d0e7134d20a3024c77dd",
+      "combined_input_svg_sha256": "3a00ebd0eb13f7dd3deacc67b45e24c2b39a8df7ed812b57c49c099fb90a0ba0",
+      "tile_png_sha256": "cf30c25db8e8e8214fb2804c2e4b6ea8b55e494fe59baca51d5c8f2f0d4bed31",
+      "source_raster_iou_at128": 0.9923805125836989,
+      "ink_pixels_at128": 4310,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-084",
+      "cell": [
+        4,
+        5
+      ],
+      "source_svg_sha256": "80964f855f7e0657ccd003e3e2752fa1cccc9e8b349d13220ed9d38f8ff1da1c",
+      "combined_input_svg_sha256": "e590885b34447ebc0a1f2230074ecb74adc65a053eca2d961f433359c717c4c7",
+      "tile_png_sha256": "8221a82aacaaae1856cb475160d67429e87f91bae80ecafb2c617df6ec1b8f40",
+      "source_raster_iou_at128": 0.9970258522077328,
+      "ink_pixels_at128": 4358,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-085",
+      "cell": [
+        5,
+        5
+      ],
+      "source_svg_sha256": "50dbc9b3d5eb95bd7a935126e065cfc86664c187f02fa7d140b31ee27bc4d34c",
+      "combined_input_svg_sha256": "3113af966e013abe2f080aacd48456e4bc6ac0631a0060e0a04d3e3043a7c0b7",
+      "tile_png_sha256": "d000cc2839ade6ef7ac9944a1b0a719dae62f6e74af96ff953a44301824b5c7e",
+      "source_raster_iou_at128": 0.9963406520292748,
+      "ink_pixels_at128": 2995,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-086",
+      "cell": [
+        6,
+        5
+      ],
+      "source_svg_sha256": "57f38e5733c938c2dfcf8cce34c46706edbb191132c053d2496ca938f89a641d",
+      "combined_input_svg_sha256": "891ef3120ee8a2a08037221d96fc2d3654ab6f1cc98323abb9ae2860b6858a2b",
+      "tile_png_sha256": "debfc174661d343e33df7de99770a7451bc594a356e72278e9b6bfc45b42ad99",
+      "source_raster_iou_at128": 0.9947999095636446,
+      "ink_pixels_at128": 4401,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-087",
+      "cell": [
+        7,
+        5
+      ],
+      "source_svg_sha256": "d12f9bfd245c7bec7061e69ec051077230ce813893202872e861d0abe45465ee",
+      "combined_input_svg_sha256": "b2856723c58419a9a1161f48e31892688363ae59cb8a66d57c75570c7bfde6b3",
+      "tile_png_sha256": "832e79961a8d604a07e845ef0745b77ac8f4f4ffd28dc4136cb097eaffa72f63",
+      "source_raster_iou_at128": 0.9883040935672515,
+      "ink_pixels_at128": 4227,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-088",
+      "cell": [
+        8,
+        5
+      ],
+      "source_svg_sha256": "ac720aff2d2c3d91b9a2946122d6c0ca1032b3652b08b623faf2b1d63b04004d",
+      "combined_input_svg_sha256": "c45b5a5f305105c182be9523e75a53c1d1ce8cc6d6ff44f5fb2a71b9c386a970",
+      "tile_png_sha256": "ccf6deb80d03aa338b37f25c90f8f79d0a42b5127b0fb6606cdf1b77c63a8191",
+      "source_raster_iou_at128": 0.9964240102171137,
+      "ink_pixels_at128": 3902,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-089",
+      "cell": [
+        9,
+        5
+      ],
+      "source_svg_sha256": "ab4a91e7a87c4d5646fb2173558ddcfa8c0416f7648a9f364e771a681146ae28",
+      "combined_input_svg_sha256": "bc9bd2cd7432de866f632f9e68f5d0e1b98bd607a6d5d9f605aa5943b82bc0c5",
+      "tile_png_sha256": "707c7f192642464fd135fdbc1c949b0369ea2ffd2ea2cd5d8a9322bb0b0440d7",
+      "source_raster_iou_at128": 0.9968973006515669,
+      "ink_pixels_at128": 3213,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-090",
+      "cell": [
+        10,
+        5
+      ],
+      "source_svg_sha256": "e4a0eaa5bbc8553024d8ffb8171559fd0527f238cade74638b457a1a37a73371",
+      "combined_input_svg_sha256": "6bdd74f551b2c42d92e5aae85834b50ad4795c39b98548c335e7b35685cc8fed",
+      "tile_png_sha256": "cb44999a148ec60b4128e2faefa03a0cc52a15fb9887a4837d7f77b88350c2cd",
+      "source_raster_iou_at128": 0.9960750109027475,
+      "ink_pixels_at128": 4572,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-091",
+      "cell": [
+        11,
+        5
+      ],
+      "source_svg_sha256": "333fb8b8f4fee4c1a3df7876590adedf396b84c3bd6f15fb156ef345cfe5ecf0",
+      "combined_input_svg_sha256": "494d57eeb99044fd7f2b757aada927c982f17ff5991d22f16da2a641865c111e",
+      "tile_png_sha256": "0251b4e3b5a4ceaf680d94f613933de88654490ae7b181e83606060d1c81d513",
+      "source_raster_iou_at128": 0.9975903614457832,
+      "ink_pixels_at128": 3312,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-092",
+      "cell": [
+        12,
+        5
+      ],
+      "source_svg_sha256": "9d2b5664464dd726dc28397e819e3934ef9fd527e927b2cb09ee056b96e94c21",
+      "combined_input_svg_sha256": "270ed66316eda94cb182b4601f7ce6e93d9c159a648db8df4d8f8d00661f8972",
+      "tile_png_sha256": "bc633b2325cc8ccc905d328418b082650af9ea9c97e94b4ccb31243d2683988c",
+      "source_raster_iou_at128": 0.991782698014152,
+      "ink_pixels_at128": 4355,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-093",
+      "cell": [
+        13,
+        5
+      ],
+      "source_svg_sha256": "636b5c1d6727372f6d2324b439f5f7b2763e1b7735e63896df34f956b6963762",
+      "combined_input_svg_sha256": "22667bcf886deb9c85df728854fda29222b30ca69b88669c1dada977361484a7",
+      "tile_png_sha256": "eeca3d9dfe2bb9e7c423ed91cfd30c6b076ff66157f7c51a53ee7b466ad2b241",
+      "source_raster_iou_at128": 0.9905259719046063,
+      "ink_pixels_at128": 3032,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-094",
+      "cell": [
+        14,
+        5
+      ],
+      "source_svg_sha256": "155159f276b8ff1e5effa4a79d31dd3a5618ea22346ca671f3ed05a30f164bd8",
+      "combined_input_svg_sha256": "f78549f2bb82a2b06a7f1597bf427b9c092d8e742e303cdf99ecf2e457af6b96",
+      "tile_png_sha256": "f6e644c04053d59746dde5b1ba44e1aae3f2a86ec4c931b650d7c90d277ef791",
+      "source_raster_iou_at128": 0.9918641669614432,
+      "ink_pixels_at128": 2805,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-095",
+      "cell": [
+        15,
+        5
+      ],
+      "source_svg_sha256": "7346eb930f514bcb24956836e24de4603ecea3b2b92ca3f614f0a550c94fcef8",
+      "combined_input_svg_sha256": "0e055bc5a5f363dcf06b771872382f95c9c35d4c1ad90b9d540658ba2554a0dc",
+      "tile_png_sha256": "eab9e691fd4aeae1bab15002dc73a2fa02dc3aeb26641b846d35c45155fd3344",
+      "source_raster_iou_at128": 0.9826327712056381,
+      "ink_pixels_at128": 3905,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-096",
+      "cell": [
+        0,
+        6
+      ],
+      "source_svg_sha256": "23d9790367ed0be7c7a4da18d1868ac01ae710214fac98e50acacfa20205164f",
+      "combined_input_svg_sha256": "ba087bada274138a018facc81a82ebd4848754fa0ac40ae27b613df65d33263e",
+      "tile_png_sha256": "800b236510f94b7abfeb0887f675c1709e2113f581a8365faa1902e1a532de56",
+      "source_raster_iou_at128": 0.987049987049987,
+      "ink_pixels_at128": 3814,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-097",
+      "cell": [
+        1,
+        6
+      ],
+      "source_svg_sha256": "eae3d1158fda2e24ede834b516a9d38d0f9b519492bee5128130eefbb85171a3",
+      "combined_input_svg_sha256": "2bfba21990474d304ec4adf9e4ce51cb82ebb18f6a57c9276a6bdaeadd8f0b35",
+      "tile_png_sha256": "b27cc94fe045975e98bf900b401b575b622868ea262a8a4ba3400ea605f69ad6",
+      "source_raster_iou_at128": 0.9896713615023475,
+      "ink_pixels_at128": 3164,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-098",
+      "cell": [
+        2,
+        6
+      ],
+      "source_svg_sha256": "13e272aeae61aff2467eb7fa73c49661191fd120004fdeda1a2158b6902e56ac",
+      "combined_input_svg_sha256": "1b13056d19754da9e81c6cb246e2839fbd8c66278d24f70ed888830be726d83f",
+      "tile_png_sha256": "630f610d71fbba6ec99b0746374d15ebf933eaf8edc9a47b273acdf5ff40e3a3",
+      "source_raster_iou_at128": 0.9976635514018691,
+      "ink_pixels_at128": 4697,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-099",
+      "cell": [
+        3,
+        6
+      ],
+      "source_svg_sha256": "dea82560831aaabc396b711b3f356db4eaa0ccecbfe9f829fe954af65f75c5fe",
+      "combined_input_svg_sha256": "013344a630aaacca42d256fb03afac84c2dd4cf3bed07fe8f2e71d830be5eeab",
+      "tile_png_sha256": "6ce5fcc1f57bd36a5fe87126e52cc24642c801ae49341d0893bd6e753b315b4d",
+      "source_raster_iou_at128": 0.9939908827186076,
+      "ink_pixels_at128": 4797,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-100",
+      "cell": [
+        4,
+        6
+      ],
+      "source_svg_sha256": "02398342d61cc812a96d54b7bcdf2e846a81703f4a2d56474a6d5e72d2f118fc",
+      "combined_input_svg_sha256": "e8380acd806ebf350fe3f4603451ae55f5dd2207ac77948febaba92d23730aa5",
+      "tile_png_sha256": "46da1fe906adca78feae4fa84dc20858b8d7a5c09a35b692f9e1c82ba13cf3c1",
+      "source_raster_iou_at128": 0.9916509561001885,
+      "ink_pixels_at128": 3684,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-101",
+      "cell": [
+        5,
+        6
+      ],
+      "source_svg_sha256": "e94028cb759c435f2d5b71079938818c0907bc1c48b31f98260d452ffb9f0b24",
+      "combined_input_svg_sha256": "43d5ddafbf234a2bc75bea180224194bf022677d62969915afe33cea103c5ddc",
+      "tile_png_sha256": "ec69a0e6a1ab66fc141f382385acf723b523bc1b8c6b129c08630c995ab29202",
+      "source_raster_iou_at128": 0.9949828962371722,
+      "ink_pixels_at128": 4363,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-102",
+      "cell": [
+        6,
+        6
+      ],
+      "source_svg_sha256": "5e7523e3c9647a6d0f22352664f33605f14dcdd50c60ecbe3cc9350c1cc805d6",
+      "combined_input_svg_sha256": "be15e383643e8819f246d030d283d42e8325cb86bac86839ec58f0d59c280c0f",
+      "tile_png_sha256": "bd3df2f77355a4a5dec9cd19fa41636222e2b4581a9324b9002878302a2e02b1",
+      "source_raster_iou_at128": 0.9919600173837462,
+      "ink_pixels_at128": 4566,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-103",
+      "cell": [
+        7,
+        6
+      ],
+      "source_svg_sha256": "a14f916e9390c7b8b8bf103d509c5368c6eb94f527f1e475d08b889c25e9dedf",
+      "combined_input_svg_sha256": "a236b325d18f5fa5db81c405134fe52055b1cb890f52586a333ff24bcf6ea498",
+      "tile_png_sha256": "93425e965041fd999cd0d2cea1c1f726a718d2628673f5e795547e15bc4d88da",
+      "source_raster_iou_at128": 0.9916594765602531,
+      "ink_pixels_at128": 3452,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-104",
+      "cell": [
+        8,
+        6
+      ],
+      "source_svg_sha256": "23cb639ec62d6e57a63a4e1860b748446c255860e21356e4b3a1b0af547e2aa4",
+      "combined_input_svg_sha256": "0d11368e311a27e509104577678a50d9e6e63d075ab470b3809c7dfd1b85ea19",
+      "tile_png_sha256": "438de0ba411b534799a4c8096c229678f1bb7a79bea8c6f57b891c9c6e763d5c",
+      "source_raster_iou_at128": 0.991869918699187,
+      "ink_pixels_at128": 3053,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-105",
+      "cell": [
+        9,
+        6
+      ],
+      "source_svg_sha256": "ed9788d33d8c216a8ba4121f14611ee7c305aa731908562d7666a2a15666e2d5",
+      "combined_input_svg_sha256": "5b168af2dfdd76b267221df244a1e609af4b64b178e422b1d80116c1996f7023",
+      "tile_png_sha256": "1be621a65b7bfa3d50ebe381f5e3b8f30a71b9ec9dbb2db5c64fed0ebdd5edc0",
+      "source_raster_iou_at128": 0.9909358157765801,
+      "ink_pixels_at128": 4048,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-106",
+      "cell": [
+        10,
+        6
+      ],
+      "source_svg_sha256": "770eab9a5a019f485bc66690258e9be3dc56c7493176e232fc36945dbec93aae",
+      "combined_input_svg_sha256": "cdcbf8fc85be208831ea08941704fec9889cd4e71e7b67b0952d8f967e101385",
+      "tile_png_sha256": "98a93e0ad6dc7370c1a06d48d864e760ae5ec9cab10b8a7da46c945fe500550e",
+      "source_raster_iou_at128": 0.9960807368214776,
+      "ink_pixels_at128": 5083,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-107",
+      "cell": [
+        11,
+        6
+      ],
+      "source_svg_sha256": "ca610ab3e9b2c56d205a81c401374bc0910962b932d7f7c235720bbd1690b442",
+      "combined_input_svg_sha256": "afe098e97d241b34cba78cf1f1eda989e85365e48961eaa14c4217f7adbf05af",
+      "tile_png_sha256": "a46c7e9fc817bd740c64a215fa5f246b458184c4c4cdfe426ee947fcb040ec38",
+      "source_raster_iou_at128": 0.9937380887557855,
+      "ink_pixels_at128": 3650,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-108",
+      "cell": [
+        12,
+        6
+      ],
+      "source_svg_sha256": "f08542f54537e2dc62a4a74f1caa2bc764d94ad68e95eb93ae2943e2f0d68f5a",
+      "combined_input_svg_sha256": "54a8b5498f887de4bdb6a6d4115b612a5a94e5bdf290d6c690bbb40f763e04f1",
+      "tile_png_sha256": "b67225ec0db9952ef05aed3761e0d7447fc0dc8b904cb624f059619533c07914",
+      "source_raster_iou_at128": 0.9952696310312205,
+      "ink_pixels_at128": 4214,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-109",
+      "cell": [
+        13,
+        6
+      ],
+      "source_svg_sha256": "4fd40f052af5305b6bdda0d7c64ead0c4e426d44213701e1acc14ece115dae62",
+      "combined_input_svg_sha256": "e35eaa0fa2796cb4e3b3cc53d25905729251ab3bd3d06f000bb5412b288fb6d1",
+      "tile_png_sha256": "cc72bddd884a1c2af18d202dc8d64bdc1fad7e73633b9743cc62a59c617dd309",
+      "source_raster_iou_at128": 0.987401185770751,
+      "ink_pixels_at128": 4026,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-110",
+      "cell": [
+        14,
+        6
+      ],
+      "source_svg_sha256": "bee20ab25956d1bb95161995509fb6bde38a1f96b19a44be2400571f9112b137",
+      "combined_input_svg_sha256": "45315bf961cbdce79f6fe133b774f3e94ccef23027c9a8036313a25c710d9a01",
+      "tile_png_sha256": "597c64df32615d256355025ebdd922825e680b6832bd2be8167294ee468cc27b",
+      "source_raster_iou_at128": 0.9970002142704093,
+      "ink_pixels_at128": 4654,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-111",
+      "cell": [
+        15,
+        6
+      ],
+      "source_svg_sha256": "6d313a8223b723027c9b9f696059bff93b8b1541d28e2afab69dc73ca2b925c0",
+      "combined_input_svg_sha256": "7165662c96a3173c4f9fc2e98988f718e0ce3bb7075abd62d3d12f6585bdda33",
+      "tile_png_sha256": "29ae6fd64e5f3d39e06d3e549598b63c4dc3671311131ca2e81197494af1aa2e",
+      "source_raster_iou_at128": 0.9931612618574895,
+      "ink_pixels_at128": 4503,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-112",
+      "cell": [
+        0,
+        7
+      ],
+      "source_svg_sha256": "d644a000b97570871dd9402c6bdbe2b02a582613259b533d1584b31bbafbc364",
+      "combined_input_svg_sha256": "2abafe81837817ef97332461fa975d764e38c806431b49f29b821e2f665fe2b6",
+      "tile_png_sha256": "eb1e287f13ef59b40dd908f3fea5fb94d4cee0b4ec6201601ae0961e4f8ae1ad",
+      "source_raster_iou_at128": 0.9910913140311804,
+      "ink_pixels_at128": 4006,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-113",
+      "cell": [
+        1,
+        7
+      ],
+      "source_svg_sha256": "fee344bb4871cece337a287eaa61215b4871bfd0bb00c58d156c03f7bc31716e",
+      "combined_input_svg_sha256": "9cb94217bc8d48a78983f5bab6ba64cc4ceb226b174d4301a258c6b0c878d659",
+      "tile_png_sha256": "753551caa6416ba6ea343008922530284e8041e16a47e4d4233111d462037fee",
+      "source_raster_iou_at128": 0.9955104430997462,
+      "ink_pixels_at128": 5102,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-114",
+      "cell": [
+        2,
+        7
+      ],
+      "source_svg_sha256": "12969b68bf6aaed899619b8e6841bba366be8de4ee00bebfd029b7663b283f9e",
+      "combined_input_svg_sha256": "1c9aab3c044dc70b1ead3f7fc453856a59b4eaf932c6d6c5558056f49a805939",
+      "tile_png_sha256": "a338f11733c6e63b47ba4ee07620a7b6d5642044ca1954b718026fbd8190ea3e",
+      "source_raster_iou_at128": 0.9936218678815489,
+      "ink_pixels_at128": 4363,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-115",
+      "cell": [
+        3,
+        7
+      ],
+      "source_svg_sha256": "08406d811927854d51d2abeb5f18881698b48ac1ccfe58f234e4e5056084c06e",
+      "combined_input_svg_sha256": "1c449401606daf6897171ebc97a00d9602e86078056b133a083e45e33aa9be9f",
+      "tile_png_sha256": "01f80b37d36a0c21ca8e005a20c559e814b2e67f20952847caa8d71848c62aba",
+      "source_raster_iou_at128": 0.9843283582089553,
+      "ink_pixels_at128": 3996,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-116",
+      "cell": [
+        4,
+        7
+      ],
+      "source_svg_sha256": "ba163c04c4d7b3a42db451f561200a60ca966b12963d9d427a67038630243c7b",
+      "combined_input_svg_sha256": "f1479c9c861b8e404e0ab411a1ec046291ab659c4bc66393dcd14ecf6662af15",
+      "tile_png_sha256": "e490e4c6355e8c7b60eb0fe847ac509423c3dcf5dcd770f88c825f0493f034bd",
+      "source_raster_iou_at128": 0.9923850137069753,
+      "ink_pixels_at128": 3260,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-117",
+      "cell": [
+        5,
+        7
+      ],
+      "source_svg_sha256": "93300ab4992b784d0d3419371b312c8f3bf46281d57660b10139f2b5ec38804b",
+      "combined_input_svg_sha256": "13504fc0f7b33b6ba14b5eadbb71a3bbd13a9741deaa34f4ea0db120dee5f3a6",
+      "tile_png_sha256": "a4a2870276b768e78d7b7d19a6dc3166c918072362a865dfae70ced6a9da9518",
+      "source_raster_iou_at128": 0.9931178310740355,
+      "ink_pixels_at128": 4770,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-118",
+      "cell": [
+        6,
+        7
+      ],
+      "source_svg_sha256": "6231158412344b96c57acb8a9e0f6d1b530ac6d096f8346dd365847b7b9c7f51",
+      "combined_input_svg_sha256": "883bafd9088322ca124eec63d5602c88d1cdb145b6e4d3f7039836bf21ab9f33",
+      "tile_png_sha256": "fcad0ff855e70b3a50943a31a2894e1d1fa7f75170f4838899c1741c6c128c13",
+      "source_raster_iou_at128": 0.9938461538461538,
+      "ink_pixels_at128": 3554,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-119",
+      "cell": [
+        7,
+        7
+      ],
+      "source_svg_sha256": "51f73d82ff1d311a2f8a321ab033482cd4d73862584ece09e0014a286a461dbc",
+      "combined_input_svg_sha256": "76fa09b7eaa33420e6e60353e84b3763b61401f413e36afd402107b530a5547b",
+      "tile_png_sha256": "142b6df3cde16aa24ec37fae3cc3740cc34c9186c21f25b28d989a7c952f58a3",
+      "source_raster_iou_at128": 0.9933168316831683,
+      "ink_pixels_at128": 4014,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-120",
+      "cell": [
+        8,
+        7
+      ],
+      "source_svg_sha256": "9217ab5b674cec90de83e6aa205c5215b16d3836abefe49f6d1f5c403f492bb8",
+      "combined_input_svg_sha256": "f9684932161af53f66ebc935204bc28fc7eed163279f3f7576772322d7ea0b73",
+      "tile_png_sha256": "9ad5ff42884cd46c48cd8e8c7a9589a765d0e2adcd7e22d01af43756e45ee0ee",
+      "source_raster_iou_at128": 0.9923780487804879,
+      "ink_pixels_at128": 4568,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-121",
+      "cell": [
+        9,
+        7
+      ],
+      "source_svg_sha256": "9508b585425dca675a4b90904bdc4d7cff41959551f87267ff0dc5910212324e",
+      "combined_input_svg_sha256": "3e96012cd24f88bc00c13de92d825f3cc34c3d253252a67137bf5bca1a62046c",
+      "tile_png_sha256": "e31ec7a8c0887bea10a1706b9db223e3acd191dcfdcdf5763860fd6b0e4096c3",
+      "source_raster_iou_at128": 0.9973753280839895,
+      "ink_pixels_at128": 3800,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-122",
+      "cell": [
+        10,
+        7
+      ],
+      "source_svg_sha256": "42c05b5126c97219f42f24bf74a4d06caf6b1de6e91068e2ba65426df64dd730",
+      "combined_input_svg_sha256": "974981c7c969953b9b6f4cfb1fc322bc9430c260690fa75164e813470a7129c7",
+      "tile_png_sha256": "1281c54308694b3facd4bf70fafc0f770199b5b96a2978be1e772e4da565e0c9",
+      "source_raster_iou_at128": 0.9928759894459103,
+      "ink_pixels_at128": 3765,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-123",
+      "cell": [
+        11,
+        7
+      ],
+      "source_svg_sha256": "60a0882ad7d37beda7b80039674c0c86baa56e62fdd077ae2fe9ac83cd082585",
+      "combined_input_svg_sha256": "a8c2e80a863e95020bf29f13dee843ed89d96833cea38aeaa97b57aeedb397a8",
+      "tile_png_sha256": "659e6258eb36507f8a9f5262e06936be1f22bee4a6b30d72651a772c1a8ec0b4",
+      "source_raster_iou_at128": 0.9934867564046895,
+      "ink_pixels_at128": 4579,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-124",
+      "cell": [
+        12,
+        7
+      ],
+      "source_svg_sha256": "578e21fda3ed22e0460ac346db83aa41e8e44e948f5627a003290126db563f41",
+      "combined_input_svg_sha256": "8e26d7bfaf219a72f59d1d4126be92363cf439fa24bc5210e1b57225ea685e72",
+      "tile_png_sha256": "caec040d1c51000bd5c7ee1a22819aebf4edb2ca3e5e035eccae69ca6a024f7d",
+      "source_raster_iou_at128": 0.9969796123835892,
+      "ink_pixels_at128": 3961,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-125",
+      "cell": [
+        13,
+        7
+      ],
+      "source_svg_sha256": "7eeb6514b87edbe0baa15f9e5bb352a07e812e28e43190b01f702c3d0cd74986",
+      "combined_input_svg_sha256": "25c8701c806b6428ed05f1cb23058ce398e24c47207a544af4b9f34ce07239e6",
+      "tile_png_sha256": "3ce53c9b7ff20af8cc2d68946f0f7ed9b32a876203db6c853d29a42abe5c437f",
+      "source_raster_iou_at128": 0.9935911130100405,
+      "ink_pixels_at128": 4655,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-126",
+      "cell": [
+        14,
+        7
+      ],
+      "source_svg_sha256": "5a795264637eddeb8b68d737990995af31432ecaba16edabbcffc1f926500495",
+      "combined_input_svg_sha256": "16efacbe510ddccb05ee2fd5731a3b7711008c448982fc02a8c30be1fcf7582c",
+      "tile_png_sha256": "7c867562e18631294ddcab3200a35c6720f295ceae06ac1012f896f283d2b3b2",
+      "source_raster_iou_at128": 0.992330016583748,
+      "ink_pixels_at128": 4807,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-127",
+      "cell": [
+        15,
+        7
+      ],
+      "source_svg_sha256": "42b8c5e0d618f75c2eb7c8dc4064150b77b81deaaa494cc3ee7ac4c176408a84",
+      "combined_input_svg_sha256": "3d9795ac4bcd71c451a892d63e48e245bfe9ef48aefc12e1777b2a0b5cd6eab6",
+      "tile_png_sha256": "b78f48c162b1e90863400f2a1fa789e69a23cb7d28f7ece553962172ea474629",
+      "source_raster_iou_at128": 0.989368556701031,
+      "ink_pixels_at128": 3071,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-128",
+      "cell": [
+        0,
+        8
+      ],
+      "source_svg_sha256": "363ebae5bdd174d35d995f39e06d7e7a0887ab5ddc5ad756d08808695fa0067a",
+      "combined_input_svg_sha256": "ab50bc648076c57f837bef5082113ca3ec2363c19cc14b9e2039b05ca8ba9e9a",
+      "tile_png_sha256": "4e7769eae430f8682205b43d251e2d6b602c04db7e3da94c7999c519bc60d650",
+      "source_raster_iou_at128": 0.9873778501628665,
+      "ink_pixels_at128": 2425,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-129",
+      "cell": [
+        1,
+        8
+      ],
+      "source_svg_sha256": "deb1aaafe381d15c43939ad992413d02409cece8174150cf468e6bbbc8847086",
+      "combined_input_svg_sha256": "6bb60fb4355cad51cd731bc7300da617505159727685e499eae778bb1d43c3cf",
+      "tile_png_sha256": "5d9d6888ea5855a36f8e49940c05311eec1c1bbfda3291c760d8ccfe8cb599a5",
+      "source_raster_iou_at128": 0.9931100023758612,
+      "ink_pixels_at128": 4180,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-130",
+      "cell": [
+        2,
+        8
+      ],
+      "source_svg_sha256": "c2a323e1299378b3f3fc6004066127323ed439b1f6fadd3513ccb082daeb7209",
+      "combined_input_svg_sha256": "00702737141102f6cd629d95a72d176fa2fac2d412697da5c8fdc05c43345ac2",
+      "tile_png_sha256": "48cd42b1401c9fefd66e87abe0d7df9bd620a0cc7efe05ad863dcd265130301d",
+      "source_raster_iou_at128": 0.9995990376904571,
+      "ink_pixels_at128": 2493,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-131",
+      "cell": [
+        3,
+        8
+      ],
+      "source_svg_sha256": "46e444c3d162211ee53eda083b4b9dc8e334c1cf44b494d5792e185f92b77855",
+      "combined_input_svg_sha256": "19635eb4c37667d2a1e5c85b92daf0d63e7e0780a17f62c704c06615e1414a03",
+      "tile_png_sha256": "79012c57acff1377a1b2285fa20d761dc1cdc2d3f38a341fcfe29ead645a2dd5",
+      "source_raster_iou_at128": 0.9939024390243902,
+      "ink_pixels_at128": 1794,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-132",
+      "cell": [
+        4,
+        8
+      ],
+      "source_svg_sha256": "4e64dc72980fd3523f82e804fcb3245299fc734ec55c7e4bf6fe819e14687656",
+      "combined_input_svg_sha256": "6fd79cea7eb158898606f2c1795754f840c79225644934f38750d311421994c3",
+      "tile_png_sha256": "ca69c42b63b1b66857bfabb1f498cc93ad22cbf6c5347b6379b12db9f8eb15ee",
+      "source_raster_iou_at128": 0.9920690459528808,
+      "ink_pixels_at128": 4256,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-133",
+      "cell": [
+        5,
+        8
+      ],
+      "source_svg_sha256": "a086cafbef3ffc07c8d4c6ffd0a67b91af173985e225ede720a69252cb71d26c",
+      "combined_input_svg_sha256": "6104f4706e7b96fcb352069cd0979559230811c6269ca10db51a1f4f098e5fbd",
+      "tile_png_sha256": "0fe710a8794ec8ef1ea23f1af4f1bc4bf4bfda86bf3fb1351a19ae5ad03c7b5a",
+      "source_raster_iou_at128": 0.9930512977723278,
+      "ink_pixels_at128": 4869,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-134",
+      "cell": [
+        6,
+        8
+      ],
+      "source_svg_sha256": "53ff7347d8651a15a0cc8fc275c76f2951c482ed5dc4d7a7c52c91e408d5f16e",
+      "combined_input_svg_sha256": "d72619d83a5179383e05bc0fba8c2cdcf6d5ad37523a020443818dccaf5fc803",
+      "tile_png_sha256": "ebc4557222f5919c199fdb2bf908526c54ea20760aed22ed0110a9c271b9c01c",
+      "source_raster_iou_at128": 0.9886417415996214,
+      "ink_pixels_at128": 4192,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-135",
+      "cell": [
+        7,
+        8
+      ],
+      "source_svg_sha256": "4c230114e887e54b613e4a8cef3537e865fa51b4313084dff1cdbaac2c10383e",
+      "combined_input_svg_sha256": "39e70ae398869f5c1dab6d29fd81a756fd8d2b063f5839e2732fcb7d7448b2a2",
+      "tile_png_sha256": "6148c39f0bd6864f3f2afec0fffdc3a1c5c3f55af881dc55e0c87dbd72db695e",
+      "source_raster_iou_at128": 0.9976190476190476,
+      "ink_pixels_at128": 1676,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-136",
+      "cell": [
+        8,
+        8
+      ],
+      "source_svg_sha256": "aab873a380afa13c3955cd173d86bd67b5aba47dfdaa744ca867165c95f1818e",
+      "combined_input_svg_sha256": "4d1a6ed8a03f0b1055446d4741dd3163d672c23c53a8ac0ce38c4413cb104aa8",
+      "tile_png_sha256": "a100908bcb859a14781953617cac988040f3d128c3bfc147d778b7037794db50",
+      "source_raster_iou_at128": 0.9908777620109467,
+      "ink_pixels_at128": 4899,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-137",
+      "cell": [
+        9,
+        8
+      ],
+      "source_svg_sha256": "3e6e46de34c3a2e148783e938c0bc27d564fb32c0e701a965babeb52c989d981",
+      "combined_input_svg_sha256": "4e71ba457dff7e2dc43bc2edaa37200dfdf6142c5906cffee7383ab66d17368f",
+      "tile_png_sha256": "37a1c489299336a34923a5090097f0a0311f3dcbfec2000aed3a701e4d9d7f98",
+      "source_raster_iou_at128": 0.998630762209037,
+      "ink_pixels_at128": 4376,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-138",
+      "cell": [
+        10,
+        8
+      ],
+      "source_svg_sha256": "e6924ef6370180503e783b8d49d27f70b5af54fdc7fa67b4f563a5269c851af0",
+      "combined_input_svg_sha256": "234524f79ed973af42e597e63b1c2a6f7dd78e3460f5e230341d2b3958e2d868",
+      "tile_png_sha256": "a13f3335210c583a1cfbb99c2b8f6f38cf0e82c08631e3a40138f82f6d62a21d",
+      "source_raster_iou_at128": 0.9897805831079051,
+      "ink_pixels_at128": 3295,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-139",
+      "cell": [
+        11,
+        8
+      ],
+      "source_svg_sha256": "30ae56379f596bfe41e98c23bf79c4e0b1cbd15e8d27545490397553b31245e6",
+      "combined_input_svg_sha256": "ea6639c8874447531d349be5656b269dffd7fa5fe613b22889192682b5dc523d",
+      "tile_png_sha256": "56571f4cd150196dd482e8de725008f5b73d4b54fbdcb9d2d8f1d21cdfbb01cd",
+      "source_raster_iou_at128": 0.9917104172423321,
+      "ink_pixels_at128": 3589,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-140",
+      "cell": [
+        12,
+        8
+      ],
+      "source_svg_sha256": "c9e020846c32b2bbe6cb43c053ced920f3a835a328c4e6f4d5cda91aeaab8614",
+      "combined_input_svg_sha256": "ce30356f18ebeca9636f7577f495550b60baae5429cbe51d0ff58798b3ff7f18",
+      "tile_png_sha256": "986f644297df0fe4a48c116f0dd190554818c53459baf45700c499c49becc910",
+      "source_raster_iou_at128": 0.9969708443771299,
+      "ink_pixels_at128": 2633,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-141",
+      "cell": [
+        13,
+        8
+      ],
+      "source_svg_sha256": "53a460e2bbdb153a62360af152df43f6e0abf1553b3ffb0e0828ca472d58725c",
+      "combined_input_svg_sha256": "c1b2e62c294f31220a68e0c24c864e27cd1ee778200328ed602a8fd5bf64f357",
+      "tile_png_sha256": "dc1ba1fdd0852be0b66fa7554eb79799ac7fabd737626d7191413fc76f219527",
+      "source_raster_iou_at128": 0.9945164506480558,
+      "ink_pixels_at128": 3990,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-142",
+      "cell": [
+        14,
+        8
+      ],
+      "source_svg_sha256": "aecfb0475ff4cbc605084babd5032c284bff291df87a01834b6fab27df8e7e54",
+      "combined_input_svg_sha256": "29f77b3d24b3f5a230f57e7d6dd9fd31faaa9e388d9ecaeb706897bda22d2355",
+      "tile_png_sha256": "a755c6708c967b0d83537c2f53ca9b2531244648cd6b5c8c7af2e197a28c0739",
+      "source_raster_iou_at128": 0.9880926130099228,
+      "ink_pixels_at128": 4491,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-143",
+      "cell": [
+        15,
+        8
+      ],
+      "source_svg_sha256": "2ca03ee585ec15539dc8a4c2bfe61d66aedf59da36bbad24c468256d5665ec75",
+      "combined_input_svg_sha256": "7c48c1f8d641aaaa51967ba45d717dfdeb12ae0bbfd5039b176bb92efd6a0f03",
+      "tile_png_sha256": "6b02b587d6dc3eb01b51f284df57ff1b56268807c8c10b21fbbde8a7e359e095",
+      "source_raster_iou_at128": 0.9949130987706656,
+      "ink_pixels_at128": 4698,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-144",
+      "cell": [
+        0,
+        9
+      ],
+      "source_svg_sha256": "088e9e727da610fdab8dacda6aabe620b7c4831814e39718904df0a5a5c4415b",
+      "combined_input_svg_sha256": "5bb5b0c665228e358232cfc7a75c9a63b0f90df35b4c5689577bb8e25bea39e5",
+      "tile_png_sha256": "55308c0dad034b89ed4cd4f2771fe92afffdc4c6df9d713e96cb192c74632011",
+      "source_raster_iou_at128": 0.9947340705634544,
+      "ink_pixels_at128": 1889,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-145",
+      "cell": [
+        1,
+        9
+      ],
+      "source_svg_sha256": "a93b5e2ec510d9fd841a03b350bb7118c49524325652d3306f32633c11410652",
+      "combined_input_svg_sha256": "303e209fde739040898c55c4d167161c31b9c0faa064159064ac250971d16b65",
+      "tile_png_sha256": "c7b68edc4564a7ecaa49d7a9537c3a1de2cc24011a195cc34763b23d31af7397",
+      "source_raster_iou_at128": 0.9937304075235109,
+      "ink_pixels_at128": 4133,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-146",
+      "cell": [
+        2,
+        9
+      ],
+      "source_svg_sha256": "55eca32cd76fa0150f88881836d3dc78fb9e1ac170fcebc94edd97790ce47635",
+      "combined_input_svg_sha256": "94ba94e38cca8b9500c0eec2493b983ca73caad22100174e890875140c48eef9",
+      "tile_png_sha256": "5ed94abb959008773a47bea5d737a96fcc4a856f4b00a041aa48cc9e869ce361",
+      "source_raster_iou_at128": 0.9903417533432393,
+      "ink_pixels_at128": 4022,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-147",
+      "cell": [
+        3,
+        9
+      ],
+      "source_svg_sha256": "5e62f6df512881d4cafa003496ed85d4d724b66f3c98d2491ed6fdced02bfd41",
+      "combined_input_svg_sha256": "cdfaa1ead23a93960f1d76df5297c609bd619acc7899a665066006af88d9cf09",
+      "tile_png_sha256": "a1d2211066324f5cffa40a5bc12c68b8cdb4899b135725487b79d74c26486837",
+      "source_raster_iou_at128": 0.9880607814761215,
+      "ink_pixels_at128": 2732,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-148",
+      "cell": [
+        4,
+        9
+      ],
+      "source_svg_sha256": "faa67f57220ebd6a83a6592f89a9b76e959a53d873017bc5e6e32d16e70a52bf",
+      "combined_input_svg_sha256": "914dd960b6a96e8921d9d74640d1b425fe741b61f44be77f879472823a028167",
+      "tile_png_sha256": "523ccc2fb1f4a9a6268cdd88712d5251608ff051c237431119e1bee94ce6adf7",
+      "source_raster_iou_at128": 0.9964856230031949,
+      "ink_pixels_at128": 3119,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-149",
+      "cell": [
+        5,
+        9
+      ],
+      "source_svg_sha256": "3ba59c872e21a20de27fad7da93f587759061fadd01676be644eb790378dccd4",
+      "combined_input_svg_sha256": "d888cac5b7f36ccb2c2f3896f2e06802964f5dd8defa7ec265f0bfb3509e840f",
+      "tile_png_sha256": "38153fab3838981df4a360542f2a18ef157745e94c0f37178462371606358e8c",
+      "source_raster_iou_at128": 0.9957953749124037,
+      "ink_pixels_at128": 4267,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-150",
+      "cell": [
+        6,
+        9
+      ],
+      "source_svg_sha256": "55370475b84c2f3b6c6dccba691217485178f9564b7ef2c1092aaca4aa3a7448",
+      "combined_input_svg_sha256": "8e5c6542117f4b9381265b05a37b44f242c09c88a1baad436ba3df731ce3f673",
+      "tile_png_sha256": "a7a245862827a0fbef38a0224125d31fe77925951676b1ae431ef0cea17e508d",
+      "source_raster_iou_at128": 0.9891609795262947,
+      "ink_pixels_at128": 2464,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-151",
+      "cell": [
+        7,
+        9
+      ],
+      "source_svg_sha256": "565900819ef10b90904d40c485df782f2293cc389b1964d29bb91f58b29f491f",
+      "combined_input_svg_sha256": "1e74585edaf23b8ba5c517c2f653f1089c205227041c660084745b137eeffe1d",
+      "tile_png_sha256": "36be8883ef39afeb65ad9b378cf79cc10055c7b712cd1bfee1ef8ad478bd471c",
+      "source_raster_iou_at128": 0.9934305070827345,
+      "ink_pixels_at128": 4842,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-152",
+      "cell": [
+        8,
+        9
+      ],
+      "source_svg_sha256": "d6caeec31f4e70bbd4890e0f0847eb9ea40181253e0949155144f12f2537e262",
+      "combined_input_svg_sha256": "b2e5c34edfb3e2fef1e37b2bb9e2fbf4a466f214e7b4099c08985f6f8c23b992",
+      "tile_png_sha256": "96426e6ed2da2cfcf8a9c1903e3750025674e0a683fff5e31a1845663fa7882f",
+      "source_raster_iou_at128": 0.9958878504672897,
+      "ink_pixels_at128": 2664,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-153",
+      "cell": [
+        9,
+        9
+      ],
+      "source_svg_sha256": "97c1c9e662d2215bb586efd4f94ef2b0fbc30dfc3dde265a4b5850996bf7e07a",
+      "combined_input_svg_sha256": "f4329e2e65419717d6e02b1ccba07c622b0c1896864d5065c36904327a1a500d",
+      "tile_png_sha256": "89513e54e2516d4a1dfce7c1d221d3663d667aee7d3e7767b898b4ea27d897c2",
+      "source_raster_iou_at128": 0.9917412250516173,
+      "ink_pixels_at128": 4333,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-154",
+      "cell": [
+        10,
+        9
+      ],
+      "source_svg_sha256": "be79f83dedab6175305886f4526dbec4c982e71df005b674137954808610c094",
+      "combined_input_svg_sha256": "6566245159d21faf192deab5058d35a680c359f7477b2e71aee24438e2a84f49",
+      "tile_png_sha256": "b929340c0fbaaedf72e47c41035940eb08635750ef22e3ad3c2fed6b97bca98a",
+      "source_raster_iou_at128": 0.9941717103788388,
+      "ink_pixels_at128": 4441,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-155",
+      "cell": [
+        11,
+        9
+      ],
+      "source_svg_sha256": "4ea6581473869a2452b13b677cba548d2dca4f33c35740de7d61976ec90c6ec3",
+      "combined_input_svg_sha256": "1cca7cef9a1a6dffe047eeb07e9baced17e65631f39bc2a24e2534d1c706e711",
+      "tile_png_sha256": "08f3063ad0313fcbe178127ffbccc7992e4197f9df8d6271814c205cb7441208",
+      "source_raster_iou_at128": 0.9890935530780417,
+      "ink_pixels_at128": 4107,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-156",
+      "cell": [
+        12,
+        9
+      ],
+      "source_svg_sha256": "71055c8254ca5f0ec88269a8db7933e139a5f3ba1cd11cedf037860923499e6b",
+      "combined_input_svg_sha256": "1547defac984372d57ec2a2e442cc23410b7a9a31e275135e51ad94c746afb46",
+      "tile_png_sha256": "9e623b1d842a3539cb778b3be92589b1c5e7252c4619751a4a4861ec89af8f9f",
+      "source_raster_iou_at128": 0.9905470635559132,
+      "ink_pixels_at128": 4947,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-157",
+      "cell": [
+        13,
+        9
+      ],
+      "source_svg_sha256": "2576327d90d0f63a27324de4c2136958bbb7a87c111d8b86c7bbcaa409ffe289",
+      "combined_input_svg_sha256": "5a76f1db2481aa8577ea32d884bb562ad1c4c0ce44443a147572662554f0deef",
+      "tile_png_sha256": "d0dcc710e9dad8b2e302e3eaf5294297aa564c071d09026e75993c56d334d6f7",
+      "source_raster_iou_at128": 0.9928097345132744,
+      "ink_pixels_at128": 3591,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-158",
+      "cell": [
+        14,
+        9
+      ],
+      "source_svg_sha256": "43bd639521cea049fd177c5f8c3cdc4cefafa785032e34b1b0383d63dfdc4dfa",
+      "combined_input_svg_sha256": "e3561dcd263ba640b4291d6ed12aa072933f5a56a27f8b38b007ca4391ffe01f",
+      "tile_png_sha256": "5251528d197834e2c241e84a58059d7b348b086ce1a2f3dc6ae013adca4e0d4d",
+      "source_raster_iou_at128": 0.9912684938151831,
+      "ink_pixels_at128": 4088,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-159",
+      "cell": [
+        15,
+        9
+      ],
+      "source_svg_sha256": "a99d3f6ca95d01f41d35828e165f7b3d4c713442c622b3a50f44cee6271729f9",
+      "combined_input_svg_sha256": "dda29987ee4c3296cfbfdd0633fe9113c04e248e7cce83647292b73c4cfed4e3",
+      "tile_png_sha256": "86f32f0ca317ffa5dccaa3ca9b05101fd191448957a6dea79626bf5e0cc9a5de",
+      "source_raster_iou_at128": 0.9979899497487437,
+      "ink_pixels_at128": 3972,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-160",
+      "cell": [
+        0,
+        10
+      ],
+      "source_svg_sha256": "da190b435986bb8268d54455b608d630c713ad77619f4a18d54a4ca048f1c330",
+      "combined_input_svg_sha256": "905faeac50097b783a710b84016aa45452fdcdd29c3a7ee3728d7f40c079c0b3",
+      "tile_png_sha256": "4e108ac519ba6613c37bcfa7ba4aaef4d52f02e7410cb826cfe219bf93ceef17",
+      "source_raster_iou_at128": 0.9938931297709923,
+      "ink_pixels_at128": 3910,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-161",
+      "cell": [
+        1,
+        10
+      ],
+      "source_svg_sha256": "eb4911c9f6089b0f45aa910b5270e08f3f868e8c608764143790d9971de47e99",
+      "combined_input_svg_sha256": "d35bf2d678d20c1112a31249a689c9ac56b0dd8a7c2b97f511b6a6eba10a2145",
+      "tile_png_sha256": "06c89873cde2980c52681a7dc5c8a6bdf78d259be0b25b0911fe5b59f18f3cab",
+      "source_raster_iou_at128": 0.9926940639269406,
+      "ink_pixels_at128": 3263,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-162",
+      "cell": [
+        2,
+        10
+      ],
+      "source_svg_sha256": "07da05fc09a7a9be2803293aa2561345f06a11b9f4bf2e92bdd9e2fcbc562ae7",
+      "combined_input_svg_sha256": "0f412153f4ab2c1982e0c532de7064d3a7cffd8edde9a60aa0ce1831c2b06825",
+      "tile_png_sha256": "f9d3a19b3db183d7bfb358fd6a9661875c7ca0a4e61aeed1f8bb08da1e133306",
+      "source_raster_iou_at128": 0.9917332598511986,
+      "ink_pixels_at128": 3605,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-163",
+      "cell": [
+        3,
+        10
+      ],
+      "source_svg_sha256": "2fb2c68293fb6fa5364b644d566bbe77c5b09a63dcaf42ac19e5565712359577",
+      "combined_input_svg_sha256": "c375f2df161a45a5c8f7a68de458a07a5e6002837a7541b5d0a6b9965d62eeab",
+      "tile_png_sha256": "ea5786f654532ecbbe061375d0268d2fdaea091cf9f16a4520f1c3d1324d51b8",
+      "source_raster_iou_at128": 0.9947500570645971,
+      "ink_pixels_at128": 4360,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-164",
+      "cell": [
+        4,
+        10
+      ],
+      "source_svg_sha256": "f80ff66f8eaf81dfc9a468e52f46bc8bdb7a7fb274c199d90419f6630e678fd9",
+      "combined_input_svg_sha256": "f0d11e9214ac96d598f41e3816bd137a5ebdb0e782025f5315ed6af9e30eb14d",
+      "tile_png_sha256": "9f998c542dbc41e98318b702797988051a1c7438a930488bf828189b5586da72",
+      "source_raster_iou_at128": 0.9970350404312669,
+      "ink_pixels_at128": 3699,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-165",
+      "cell": [
+        5,
+        10
+      ],
+      "source_svg_sha256": "6379f3dc14981a7c45e9e527894c6633f537986ccaf0839eecd34ba2ff13f3c4",
+      "combined_input_svg_sha256": "927c74d3ef19544591393f7669ce8f5bcd9f3e3019490878a92f3c2a1fa53c87",
+      "tile_png_sha256": "3f58faa593df979cea0190f37e40ec43e0d1b8b229b00ec16245d593f83c94ff",
+      "source_raster_iou_at128": 0.9931051465156365,
+      "ink_pixels_at128": 4053,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-166",
+      "cell": [
+        6,
+        10
+      ],
+      "source_svg_sha256": "c0522b0c8e2de48a43303e9a3ad9057d74e4058eb873feb2a5e846f116733220",
+      "combined_input_svg_sha256": "a05b81f59814795c1c2e82f66fee1d48bcbf98edc5adbbbd42316126601c44f5",
+      "tile_png_sha256": "91e6a6df7a28b1c03f9e5a429cd4db057930887f35ce90988fd31e23607cdce5",
+      "source_raster_iou_at128": 0.9935483870967742,
+      "ink_pixels_at128": 5247,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-167",
+      "cell": [
+        7,
+        10
+      ],
+      "source_svg_sha256": "e54e166d88032e08781d1d0a1107c8768f9688ca2a35a4b156516b1f73c324b7",
+      "combined_input_svg_sha256": "3c1ead88e0f4a655c6b76ffc6522ec14f4b213aa5c0405aca2faac6045f737b2",
+      "tile_png_sha256": "7c5304fd488859dc06975f9e69c05813448389ae9ebfe178e124c4f0888b0ee4",
+      "source_raster_iou_at128": 0.9948464676830577,
+      "ink_pixels_at128": 4635,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-168",
+      "cell": [
+        8,
+        10
+      ],
+      "source_svg_sha256": "06a2214eddebea2a9f57e0bc5347cbcb2fc0f97d43255a42ad5b0acf67c5d134",
+      "combined_input_svg_sha256": "cb8877ef01257daa57257c55d0332bc38825b32d0ba975716023b249413f5ccb",
+      "tile_png_sha256": "261b68a15152660d7977c5966331da61153cafd26ab33738363b5ed728d72e2a",
+      "source_raster_iou_at128": 0.9960684551341351,
+      "ink_pixels_at128": 4308,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-169",
+      "cell": [
+        9,
+        10
+      ],
+      "source_svg_sha256": "0cb0411aa2c189d783ad01dae8aa9fa7bbb3abfc33b3bbdff5408bff69191746",
+      "combined_input_svg_sha256": "d81637773ced99834e3fa52554d77fdf89d987b8d307837cd058c2cdafc2691b",
+      "tile_png_sha256": "17f8c2706edd8f93078fbaee60042be87fb37e8ee4d384e540574b365a6843f2",
+      "source_raster_iou_at128": 0.9898127753303965,
+      "ink_pixels_at128": 3601,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-170",
+      "cell": [
+        10,
+        10
+      ],
+      "source_svg_sha256": "acb9f101e7fe2d9646fd3b96791c67eb4dd4bbf3786b692d93386c85faa970b0",
+      "combined_input_svg_sha256": "3996f6bc706bf8ee47a0a4f5772fda45463edeb75b638846acd300814478fff6",
+      "tile_png_sha256": "6127667727c5032f5968857653b51967cda67ee3033299235ec8ffbd8f0a2760",
+      "source_raster_iou_at128": 0.990503824848325,
+      "ink_pixels_at128": 3761,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-171",
+      "cell": [
+        11,
+        10
+      ],
+      "source_svg_sha256": "ac4369098a64a069f62118bd7a38d3c5f2c79d988b9fd84b02aea16a52c89b85",
+      "combined_input_svg_sha256": "cfece3dec4c0e46acc64d89e6cdf122acc7d9bc70765f5fb8fa49f50fff2ed0b",
+      "tile_png_sha256": "289cfdb9df229f0ae80abb9ad9fe3f8b6597b92b83264559bf9e71db94e2f72b",
+      "source_raster_iou_at128": 0.9852874603893165,
+      "ink_pixels_at128": 4389,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-172",
+      "cell": [
+        12,
+        10
+      ],
+      "source_svg_sha256": "35869f54b51c151b711d7e5745177008a171c8d42ef5ede1fb9bfac8afdd4a52",
+      "combined_input_svg_sha256": "6b6e059c19bf75bda79276272d8625816cdf33765625521753951b06d967c55d",
+      "tile_png_sha256": "a8d0d933776eceba43d595780f92d339dc7e1b67985f984e24611bcd3493ae57",
+      "source_raster_iou_at128": 0.9871080139372822,
+      "ink_pixels_at128": 2834,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-173",
+      "cell": [
+        13,
+        10
+      ],
+      "source_svg_sha256": "6f4ff448cb7fbc50a61d4d055aeb2d830da6713da4ec97ff36b8d8e9193983dd",
+      "combined_input_svg_sha256": "de55ef998f4f4aa96f077dfdfad62f49aabd2253d02e71b876ccf01096c07e6e",
+      "tile_png_sha256": "993383983329eeb40d86c12f27b8f1f117985e7c5469ae2bab8ae65dc06b6099",
+      "source_raster_iou_at128": 0.9904901243599122,
+      "ink_pixels_at128": 2708,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-174",
+      "cell": [
+        14,
+        10
+      ],
+      "source_svg_sha256": "2a63c66b26a4fecaa0acfa5e2797eaa821d364304792175ec284cd2abf68452b",
+      "combined_input_svg_sha256": "3cd5e439f09e9449ef61e2811cd410180bb80e7ae6d3c5405ea3d1c3136fa2ff",
+      "tile_png_sha256": "e29ac65cf920ad9a6c38173f5635c9da414eb8ded20908ddbf78aa79faf560ef",
+      "source_raster_iou_at128": 0.9923096005953858,
+      "ink_pixels_at128": 4002,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-175",
+      "cell": [
+        15,
+        10
+      ],
+      "source_svg_sha256": "1fbce399f08c22b58ec83a7831907c98887127f407d7797ffcf93329431c8e92",
+      "combined_input_svg_sha256": "bec4f16ea959ecf3253c97a18cd165b5100b3e6ba667b4dfdb9a866a0d6abada",
+      "tile_png_sha256": "ce5840a1ca3d02ca79d042318128398be45d3d60332323dca4de76214b6a2a17",
+      "source_raster_iou_at128": 0.9899451553930531,
+      "ink_pixels_at128": 4361,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-176",
+      "cell": [
+        0,
+        11
+      ],
+      "source_svg_sha256": "4faaf22bd19e73311ed115b24477fee0dd7694d296846e734c9534b56195acf0",
+      "combined_input_svg_sha256": "cdb6ade2c2d3d75bc600a03720ce1e46fdae7524c94545fc5d8df7047f62a7a2",
+      "tile_png_sha256": "7a756cf11367b07f71cadd836881b358f6c6f636751601a9b27b3eb19b8a172f",
+      "source_raster_iou_at128": 0.9959464937170652,
+      "ink_pixels_at128": 4914,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-177",
+      "cell": [
+        1,
+        11
+      ],
+      "source_svg_sha256": "0b476f0774437dcf53701ae2a3e45be5669ea2af73237247b06987b37b5aadce",
+      "combined_input_svg_sha256": "1dc4e5d33113e4dc54b0ed815ea12ccb09b933546bcbaadb3f5959621c40b53f",
+      "tile_png_sha256": "fa466cda3c89d767cb3ddbb4ec3c8ca9375b692fcfd6776b8af61c26111b9f62",
+      "source_raster_iou_at128": 0.998220112726194,
+      "ink_pixels_at128": 3365,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-178",
+      "cell": [
+        2,
+        11
+      ],
+      "source_svg_sha256": "925206b2da1fe1e0aad6eebb8d0d83f1529b49f2f93954284f2e15b56cecedfc",
+      "combined_input_svg_sha256": "dae8077b628b158b9ca520d1001f10179eaef51f444e6b8acfa4f9d37b3af229",
+      "tile_png_sha256": "24a0610ffbf69243c8182f664efb95f1d36680fe742be3c668210d6b4241a89a",
+      "source_raster_iou_at128": 0.9925093632958801,
+      "ink_pixels_at128": 3448,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-179",
+      "cell": [
+        3,
+        11
+      ],
+      "source_svg_sha256": "368f88143ea8105672fe1b0e3b94e7f8ba18b94ab2550eb20b2ddb235fcd6112",
+      "combined_input_svg_sha256": "3f269a7a78f7bdfb799bd5e1c0121a38711f336eb635fff5d070aa675eb5837c",
+      "tile_png_sha256": "80b540b2ee0e498cb4b4c338a63482b33354576ff7df7edc36c94ed2b6ab2cb8",
+      "source_raster_iou_at128": 0.989081414668882,
+      "ink_pixels_at128": 4194,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-180",
+      "cell": [
+        4,
+        11
+      ],
+      "source_svg_sha256": "30d6cb36436f91b4cbbe97c50d7085c75ba84aba1d85cf6fffc30d950601ca1c",
+      "combined_input_svg_sha256": "c325c3856fddf055c0383e52063dc99808043f3e795db1ede8622123a37bc44a",
+      "tile_png_sha256": "69960fba41db101b83c6c1143a2fc53fefabbd8dfb7c866165bf8321064572a8",
+      "source_raster_iou_at128": 0.9898150629857947,
+      "ink_pixels_at128": 3697,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-181",
+      "cell": [
+        5,
+        11
+      ],
+      "source_svg_sha256": "f7897f1ead5fc5e2c9d0e8532306c60d182c54377cc3371d8b0b4a88317e8c0a",
+      "combined_input_svg_sha256": "70f91c7dc55ade84627628a9cc2256576cacfbf80915d8dd699fb2a4ca06cac1",
+      "tile_png_sha256": "bc63894a94b311554420d93b37a31818155f33443ec22c2830247e7cda221539",
+      "source_raster_iou_at128": 0.9906798245614035,
+      "ink_pixels_at128": 3615,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-182",
+      "cell": [
+        6,
+        11
+      ],
+      "source_svg_sha256": "08e1f883446fda9e47d5be51fe590eb009bc48a455e2cf6c5b9f6e37a848b62d",
+      "combined_input_svg_sha256": "c423deeb88078a54a4d9b4690c80af28736e14685d856ad897e3f6c2cb033afb",
+      "tile_png_sha256": "569b663cd58835fca4ed466e2e2d86e26a6419772100f90cfd540f03c0b53126",
+      "source_raster_iou_at128": 0.9896820970440602,
+      "ink_pixels_at128": 3556,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-183",
+      "cell": [
+        7,
+        11
+      ],
+      "source_svg_sha256": "9c69ee57bdce85330f07c2904efaef5f4c7189525992cd227fa5ff49bbce03a6",
+      "combined_input_svg_sha256": "a6e708dea0376330f4c16d6a81930e9eebb471f0eee70371488af0960f425ba3",
+      "tile_png_sha256": "dc5bcc1a30a3c013f7244ee61f9eb068e0dfe6af135cb97874a378d964403eaf",
+      "source_raster_iou_at128": 0.9923761118170267,
+      "ink_pixels_at128": 3907,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-184",
+      "cell": [
+        8,
+        11
+      ],
+      "source_svg_sha256": "6a911709a3e2c5ddc43455f9e7f5b900d984a6290780761dc76ca8b74490438e",
+      "combined_input_svg_sha256": "aca95d105f24885eae37facb21e934591bb6f43ce3ff238b4b39a1a1af83cc26",
+      "tile_png_sha256": "98c0942edec1fb33fd1d0fa01dfbe2754066cfba706fa614d296158ec397dce7",
+      "source_raster_iou_at128": 0.9937995177402686,
+      "ink_pixels_at128": 2885,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-185",
+      "cell": [
+        9,
+        11
+      ],
+      "source_svg_sha256": "d5ada6e57ae7f2d8a22987641d3f1d1dfbe00874b23f1adef22934cf571d54a2",
+      "combined_input_svg_sha256": "c2c957176af2dabd21de67f184ef1ec4b4921600376f9fe2a7acd0f3d324a00d",
+      "tile_png_sha256": "438c009f497a144b3c563b3025c2d0ef4d8374bf4aabc632e75b7b08239938c0",
+      "source_raster_iou_at128": 0.9855665143132066,
+      "ink_pixels_at128": 4122,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-186",
+      "cell": [
+        10,
+        11
+      ],
+      "source_svg_sha256": "62a8018a23a9b8fc4ae9492f2503bbfd7e1aa99589b48f9c7868f1977d75abf7",
+      "combined_input_svg_sha256": "2e13df9d6a7fe258c5eac220f279106d47eae321520cf846dd4c2c2b9b43acae",
+      "tile_png_sha256": "3236e44a1f08fc9023fd391884a285e1184cb92e0b7907908ebd2cd90077e9ed",
+      "source_raster_iou_at128": 0.9758121887597818,
+      "ink_pixels_at128": 4193,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-187",
+      "cell": [
+        11,
+        11
+      ],
+      "source_svg_sha256": "b187ed77449913ecc38ca1ae063b189ee7e5483fe5f1f23223b3c44310892a48",
+      "combined_input_svg_sha256": "a932c69aa77a2f73a76410eea2cf178b46d7de2f393100cf33060bde1ece8cfd",
+      "tile_png_sha256": "bbf037f036e854c66ffdfd96cbbb025a22e7c66bc3e8504bf5b2675554737024",
+      "source_raster_iou_at128": 0.9954863461972466,
+      "ink_pixels_at128": 4415,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-188",
+      "cell": [
+        12,
+        11
+      ],
+      "source_svg_sha256": "46e19191f9c588e406eeec8aaaf5ea693db25f0e98d64d6d4ee7ecbe864ed4c4",
+      "combined_input_svg_sha256": "13347d09de3e1911f7d6e86ff99e09773731001fe75a583fd0dbe1abdd07075b",
+      "tile_png_sha256": "b45c577ed9957a37d769023d04477489e6247cff00749fe2957e6bb739817ced",
+      "source_raster_iou_at128": 0.9945811695642357,
+      "ink_pixels_at128": 4405,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-189",
+      "cell": [
+        13,
+        11
+      ],
+      "source_svg_sha256": "db1caa36330f9e83768ef083f91199e33f68abd0c5d70a543b2cf2e816f44e72",
+      "combined_input_svg_sha256": "70243f607f8da3cf3d9612f6009b62de625f1ac39199ae24e06e91bdd5f997e9",
+      "tile_png_sha256": "5873beb8b316a1ee0392d1a48d1d72f503fa5ecb8cd0e6a975d785b2f6924e0d",
+      "source_raster_iou_at128": 0.9883058470764617,
+      "ink_pixels_at128": 3304,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-190",
+      "cell": [
+        14,
+        11
+      ],
+      "source_svg_sha256": "bc6c14e80c44294ab6e5eacf71bee58071f04dacd6ed8a0c16f5fdc3804c7ad0",
+      "combined_input_svg_sha256": "a04cf24af6aec9e552364359bb381d00ef4d38a309ffbeeae894e820a0536281",
+      "tile_png_sha256": "168cea530fe2591a6aa16933cabe51bedcac68f6dc7281f50d938a818b1f78dd",
+      "source_raster_iou_at128": 0.9904761904761905,
+      "ink_pixels_at128": 2704,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    },
+    {
+      "glyph_id": "GLYPH-191",
+      "cell": [
+        15,
+        11
+      ],
+      "source_svg_sha256": "1d668e7b5d18423758a26045ae481efafac4bbd8b62bbe4508ff19bdc64470a4",
+      "combined_input_svg_sha256": "bea9de46706fb2a820f7bf70bcd5bc1b2a848c669672b619958fb9043aea6fcb",
+      "tile_png_sha256": "3bfc072beed8f94943b3fda1635af77fb9f5ebbcd9ceef03005c65d23bf586b1",
+      "source_raster_iou_at128": 0.9929313010823945,
+      "ink_pixels_at128": 4498,
+      "tool_stdout": "",
+      "tool_stderr": ""
+    }
+  ]
+}

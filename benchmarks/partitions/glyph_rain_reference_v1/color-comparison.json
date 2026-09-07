@@ -1,0 +1,407 @@
+{
+  "schema_version": 1,
+  "evidence_status": "screenshot-color-observation",
+  "scope": "Body green and bright-tip color; no renderer performance or whole-frame visual parity claim.",
+  "sources": {
+    "user_screenshot": {
+      "path": "C:\\Users\\PETEHO~1\\AppData\\Local\\TEMPOR~2\\codex-clipboard-769971ca-d639-4166-a69e-05594b09cf16.png",
+      "sha256": "111268eab8a48fe3e731dac522967181f4d88f2966d5a3af6700a03f694886ba",
+      "dimensions": [
+        1050,
+        815
+      ],
+      "rain_area": {
+        "x": [
+          0,
+          1050
+        ],
+        "y": [
+          0,
+          685
+        ],
+        "bounds": "half-open; UI excluded"
+      },
+      "ui_comparison_area": {
+        "x": [
+          0,
+          1050
+        ],
+        "y": [
+          695,
+          815
+        ]
+      },
+      "image_committed": false
+    },
+    "current_preview": {
+      "path": "screensaver/svg-preview/preview.png",
+      "sha256": "010e8c736f7cd47b479c433af6c9426352f1b14a111610e286c0d42a8fe29bb7",
+      "dimensions": [
+        1920,
+        1080
+      ],
+      "rain_area": "whole image; controls absent"
+    },
+    "pinned_palette": {
+      "repository": "https://github.com/m8e/matrix-rain",
+      "commit": "5ba90490453ceceb6812d6b1bc658a99a92411d0",
+      "path": "js/config.js",
+      "body_hsl_hue": 0.3,
+      "body_hsl_saturation": 0.9,
+      "lightness_and_positions": [
+        0,
+        0.2,
+        0.7,
+        0.8
+      ],
+      "cursor": {
+        "hsl": [
+          0.242,
+          1,
+          0.73
+        ],
+        "rgb_8bit": [
+          193,
+          255,
+          117
+        ],
+        "hex": "#C1FF75",
+        "relative_luminance_srgb": 0.84117309
+      }
+    }
+  },
+  "method": {
+    "channels": "RGB byte values treated as sRGB; both PNGs contain no embedded ICC profile.",
+    "hue": "Standard HSV/HSL hue in degrees computed from RGB channel extrema; shared hue for both spaces.",
+    "quantiles": [
+      0.1,
+      0.5,
+      0.9
+    ],
+    "rgb_median": "Independent per-channel medians, not a sampled pixel.",
+    "common_green_mask": "G>=R and G>=B and (max(R,G,B)-min(R,G,B))>=16 and 70<=hue<=170",
+    "masks": {
+      "body": "common_green_mask and 40<=G<=180 and HSV saturation>=0.35",
+      "body_mid": "common_green_mask and 80<=G<=160 and HSV saturation>=0.35",
+      "head": "common_green_mask and G>=220 and 0.55<=HSL lightness<=0.92",
+      "near_white": "G>=245 and R>=200 and B>=200 and max(R,G,B)-min(R,G,B)>=8",
+      "ui_neon": "common_green_mask and G>=220 and HSV saturation>=0.7; UI comparison area only"
+    },
+    "interpretation": "Head and near-white masks are intensity/color proxies, not semantic segmentation of individual leading glyphs. Antialiasing, bloom, noise, screenshot scaling and display capture affect saturation and clipped highlights. Hue is the strongest comparison; source scenes and resolutions differ."
+  },
+  "observations": {
+    "user_rain": {
+      "body": {
+        "count": 196672,
+        "rgb_median": [
+          22.0,
+          77.0,
+          37.0
+        ],
+        "hue_deg_p10_median_p90": [
+          135.6522,
+          136.9231,
+          138.75
+        ],
+        "HSV_saturation_p10_median_p90": [
+          0.5333,
+          0.75,
+          0.7959
+        ],
+        "HSL_saturation_p10_median_p90": [
+          0.3636,
+          0.6,
+          0.661
+        ],
+        "blue_over_green_median": 0.46,
+        "red_over_green_median": 0.25
+      },
+      "body_mid": {
+        "count": 86212,
+        "rgb_median": [
+          27.0,
+          108.0,
+          50.0
+        ],
+        "hue_deg_p10_median_p90": [
+          135.9184,
+          136.8,
+          137.7273
+        ],
+        "HSV_saturation_p10_median_p90": [
+          0.6637,
+          0.7683,
+          0.7941
+        ],
+        "HSL_saturation_p10_median_p90": [
+          0.4967,
+          0.6238,
+          0.6585
+        ],
+        "blue_over_green_median": 0.4458,
+        "red_over_green_median": 0.2317
+      },
+      "head": {
+        "count": 5337,
+        "rgb_median": [
+          83.0,
+          249.0,
+          132.0
+        ],
+        "hue_deg_p10_median_p90": [
+          136.3636,
+          138.3158,
+          143.8235
+        ],
+        "HSV_saturation_p10_median_p90": [
+          0.2627,
+          0.6586,
+          0.7782
+        ],
+        "HSL_saturation_p10_median_p90": [
+          0.6896,
+          0.9314,
+          1.0
+        ],
+        "blue_over_green_median": 0.5422,
+        "red_over_green_median": 0.3414
+      },
+      "near_white": {
+        "count": 739,
+        "rgb_median": [
+          231.0,
+          255.0,
+          246.0
+        ],
+        "hue_deg_p10_median_p90": [
+          148.3137,
+          160.9091,
+          176.25
+        ],
+        "HSV_saturation_p10_median_p90": [
+          0.0585,
+          0.0866,
+          0.1569
+        ],
+        "HSL_saturation_p10_median_p90": [
+          0.5909,
+          1.0,
+          1.0
+        ],
+        "blue_over_green_median": 0.9725,
+        "red_over_green_median": 0.9134
+      }
+    },
+    "current_rain": {
+      "body": {
+        "count": 388760,
+        "rgb_median": [
+          21.0,
+          85.0,
+          7.0
+        ],
+        "hue_deg_p10_median_p90": [
+          107.7876,
+          108.75,
+          111.25
+        ],
+        "HSV_saturation_p10_median_p90": [
+          0.6871,
+          0.92,
+          1.0
+        ],
+        "HSL_saturation_p10_median_p90": [
+          0.5234,
+          0.8519,
+          1.0
+        ],
+        "blue_over_green_median": 0.08,
+        "red_over_green_median": 0.2525
+      },
+      "body_mid": {
+        "count": 185481,
+        "rgb_median": [
+          37.0,
+          111.0,
+          19.0
+        ],
+        "hue_deg_p10_median_p90": [
+          107.7778,
+          108.5106,
+          109.3151
+        ],
+        "HSV_saturation_p10_median_p90": [
+          0.7078,
+          0.8291,
+          0.9655
+        ],
+        "HSL_saturation_p10_median_p90": [
+          0.5477,
+          0.708,
+          0.9333
+        ],
+        "blue_over_green_median": 0.1709,
+        "red_over_green_median": 0.3303
+      },
+      "head": {
+        "count": 51658,
+        "rgb_median": [
+          156.0,
+          239.0,
+          135.0
+        ],
+        "hue_deg_p10_median_p90": [
+          107.6471,
+          108.4091,
+          108.96
+        ],
+        "HSV_saturation_p10_median_p90": [
+          0.3651,
+          0.4348,
+          0.5746
+        ],
+        "HSL_saturation_p10_median_p90": [
+          0.6566,
+          0.7625,
+          0.8491
+        ],
+        "blue_over_green_median": 0.5652,
+        "red_over_green_median": 0.6568
+      },
+      "near_white": {
+        "count": 2477,
+        "rgb_median": [
+          253.0,
+          254.0,
+          217.0
+        ],
+        "hue_deg_p10_median_p90": [
+          60.0,
+          60.0,
+          66.4517
+        ],
+        "HSV_saturation_p10_median_p90": [
+          0.0667,
+          0.1451,
+          0.1995
+        ],
+        "HSL_saturation_p10_median_p90": [
+          0.8421,
+          0.9615,
+          1.0
+        ],
+        "blue_over_green_median": 0.8549,
+        "red_over_green_median": 1.0
+      }
+    },
+    "user_ui_neon": {
+      "count": 3622,
+      "rgb_median": [
+        57.0,
+        255.0,
+        111.0
+      ],
+      "hue_deg_p10_median_p90": [
+        136.3636,
+        136.7742,
+        137.8462
+      ],
+      "HSV_saturation_p10_median_p90": [
+        0.7569,
+        0.7733,
+        0.7817
+      ],
+      "HSL_saturation_p10_median_p90": [
+        0.8455,
+        1.0,
+        1.0
+      ],
+      "blue_over_green_median": 0.4422,
+      "red_over_green_median": 0.2267
+    }
+  },
+  "recommendation": {
+    "status": "bounded art-direction choice grounded in screenshot hue; requires a new rendered visual check",
+    "option_name": "Matrix green",
+    "preserve_option": "Reference retains the pinned palette unchanged",
+    "body_hue_degrees": 137,
+    "body_saturation": 0.8,
+    "body_stops": [
+      {
+        "at": 0,
+        "hsl": [
+          0.38055555555555554,
+          0.8,
+          0
+        ],
+        "rgb_8bit": [
+          0,
+          0,
+          0
+        ],
+        "hex": "#000000",
+        "relative_luminance_srgb": 0.0
+      },
+      {
+        "at": 0.2,
+        "hsl": [
+          0.38055555555555554,
+          0.8,
+          0.2
+        ],
+        "rgb_8bit": [
+          10,
+          92,
+          33
+        ],
+        "hex": "#0A5C21",
+        "relative_luminance_srgb": 0.07797113
+      },
+      {
+        "at": 0.7,
+        "hsl": [
+          0.38055555555555554,
+          0.8,
+          0.7
+        ],
+        "rgb_8bit": [
+          117,
+          240,
+          152
+        ],
+        "hex": "#75F098",
+        "relative_luminance_srgb": 0.6821275
+      },
+      {
+        "at": 0.8,
+        "hsl": [
+          0.38055555555555554,
+          0.8,
+          0.8
+        ],
+        "rgb_8bit": [
+          163,
+          245,
+          186
+        ],
+        "hex": "#A3F5BA",
+        "relative_luminance_srgb": 0.76550322
+      }
+    ],
+    "cursor": {
+      "hsl": [
+        0.4305555555555556,
+        1,
+        0.8167938228000375
+      ],
+      "rgb_8bit": [
+        162,
+        255,
+        216
+      ],
+      "hex": "#A2FFD8",
+      "relative_luminance_srgb": 0.84117309
+    },
+    "brightness_scope": "Retain existing HSL lightness and exposure positions, bloom, cursor intensity and brightness controls. Changing chroma changes RGB luminance at body stops; it is not a claim of exact luminance preservation. The proposed cursor matches the prior cursor relative sRGB luminance before intensity/clipping."
+  }
+}

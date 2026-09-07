@@ -28,37 +28,68 @@ model and pipeline, with blind cross-vendor judging.
 
 ## Glyph Rain
 
-As an example: one goal becomes 192 independent glyph-generation tasks and outputs a working cross-platform screensaver. Supported on Web, Windows, macOS, and Linux.
+One artifact workflow creates 192 original SVG glyphs and validates every
+shape. The explorer mixes them into the reference character set: classic
+code rain, with occasional new characters and a navigable 3D mode.
 
 <p align="center">
-  <img src="assets/glyph_rain/glyph-rain-screenshot.png" alt="Glyph Rain with heavy green glyphs, varied glow, and descending streams at three depths" width="900">
+  <img src="screensaver/svg-preview/preview.png" alt="Classic code rain with the reference character set and occasional original Smythe glyphs" width="900">
 </p>
 
-**Download:** [Windows `.scr`](https://github.com/petehottelet/smythe/raw/refs/heads/main/screensaver/dist/SmytheGlyphRain.scr) ·
+**Explore:** [Run the web explorer](screensaver/svg-preview/README.md) ·
+[Complete 192-glyph contact sheet](benchmarks/partitions/glyph_svg_v1/catalog/contact-sheet.png) ·
+[56 reference glyphs](screensaver/svg-preview/reference/contact-sheet.png) ·
+[24-glyph calibration sheet](benchmarks/partitions/glyph_svg_v1/catalog/calibration-sheet.png) ·
+[Individual SVGs and manifest](benchmarks/partitions/glyph_svg_v1/catalog/).
+Settings includes Classic, Operator, and 3D presets, glyph mix, motion, glow,
+and color controls. VT323 pixel controls and a Trajan Bold outline logo use bright
+green on black. The rain keeps its Matrix green grade and mint highlights.
+The default mix is 10% original glyphs. In 3D mode, arrow
+keys move through the field; Space pauses, R resets the view, and F enters
+fullscreen. Touch controls are included.
+
+**Native downloads:** [Windows `.scr`](https://github.com/petehottelet/smythe/raw/refs/heads/main/screensaver/dist/SmytheGlyphRain.scr) ·
 [macOS universal `.zip`](https://github.com/petehottelet/smythe/raw/refs/heads/main/screensaver/dist/GlyphRain-macos-universal.zip) ·
 [Linux x86-64 `.tar.gz`](https://github.com/petehottelet/smythe/raw/refs/heads/main/screensaver/dist/SmytheGlyphRain-linux-x86_64.tar.gz) ·
-[Web and native source](screensaver/) ·
-[192-glyph atlas](assets/glyph_rain/glyph-atlas.png) ·
-[256-glyph atlas](benchmarks/partitions/glyph_256/assets/glyph-atlas.png)
+[Native source and setup](screensaver/README.md).
 
-Compiled downloads passed native rendering and motion checks on Windows,
+These binaries use the earlier [stroke catalog](assets/glyph_rain/glyph-atlas.png).
+They passed native rendering and motion checks on Windows,
 Apple Silicon, Intel Mac, and Ubuntu 22.04/24.04.
 [Checksums and verification](screensaver/README.md#native-verification).
 macOS uses an ad-hoc signature; Linux requires X11.
 
-Each tile is normalized, checked for dimensions and uniqueness, and hashed
-before assembly. [Run, build, and customize Glyph Rain](screensaver/README.md).
-
-The [next-version plan](docs/glyph-rain-plan.md) specifies original SVG glyphs,
-reference-based styling, and arrow-key exploration through a 3D field.
-Visual research draws on [m8e/matrix-rain](https://github.com/m8e/matrix-rain),
-a fork of Rezmason's Matrix. [Credits and references](screensaver/README.md#credits-and-references).
+The web renderer adapts [m8e](https://github.com/m8e/matrix-rain),
+a fork of Rezmason, under its MIT license. It uses the reference's rain,
+glyph rendering, bloom, and palette pipeline. Smythe's 192 added shapes have
+independently authored contours from a [measured style brief](docs/glyph-rain-plan.md).
+[Credits, licenses, and artwork provenance](screensaver/README.md#credits-and-references).
 
 ## Benchmarks
 
 The glyph workload measures parallel artifact generation. Separate matched
 suites measure recovery, framework overhead, and generated plans. Each result
 links to its protocol and committed records.
+
+### Original SVG generation
+
+**192 original SVG glyphs in 4.03 seconds median**, including generation,
+complete validation, and assembly. The best tested configuration used eight
+process workers and ran **2.95× faster** than process execution at concurrency 1.
+All 30 workflows delivered complete, accepted catalogs with identical hashes.
+
+The new workflow measures fresh contour construction, full style and
+distinctness checks, and delivery of the SVG catalog and raster atlas.
+It runs locally through Smythe from a calibrated procedural grammar, with no
+simulated delay and **$0 provider API charges**. Hardware and design work are
+outside that API-cost figure.
+
+<p align="center">
+  <img src="assets/benchmarks/svg_workflow.svg" alt="Complete SVG workflow times across thread and process configurations, with all repetitions and a measured stage breakdown" width="900">
+</p>
+
+[Workflow results and protocol](benchmarks/svg_glyph_benchmark.md) ·
+[Raw record](benchmarks/results/glyph_svg_v1.json).
 
 ### Glyph generation and scaling
 
@@ -79,6 +110,10 @@ unique tiles. This measures artifact generation, not screensaver frame rate.
 A separate matched durability test measures work repeated after a hard kill.
 Smythe repeated **8 calls versus LangGraph's 32**, a **75% reduction**, across
 three repetitions. [Recovery protocol](benchmarks/durability_benchmark.md).
+
+<p align="center">
+  <img src="assets/benchmarks/recovery.svg" alt="Three matched interruption tests: Smythe repeated 8 dispatches and LangGraph repeated 32 in every repetition; both finished all 64 operations" width="900">
+</p>
 
 ### Framework efficiency
 
@@ -143,22 +178,24 @@ Python 3.11+. Install the provider used below:
 pip install "smythe[openai]"
 ```
 
-Set `OPENAI_API_KEY`, then generate and inspect a plan:
+Set `OPENAI_API_KEY`, then generate and inspect a text-only plan with
+[GPT-6 Astra](https://developers.openai.com/api/docs/models/gpt-6-astra):
 
 ```python
 from smythe import Swarm, Task
 
 swarm = Swarm(
-    model="gpt-5.4-mini",
-    max_budget_usd=0.50,
+    model="gpt-6-astra",
     parallel=True,
     max_concurrency=8,
 )
 
 task = Task(
     goal="Compare SQLite, PostgreSQL, and DuckDB for a local analytics app.",
-    constraints=["Keep the comparison under 400 words"],
-    done_when=["Explain the tradeoffs and recommend one database"],
+    constraints=[
+        "Keep the comparison under 400 words",
+        "Explain the tradeoffs and recommend one database",
+    ],
 )
 
 graph = swarm.plan(task)
@@ -166,10 +203,12 @@ print(graph)
 
 result = swarm.execute(graph)
 print(result.output)
-print(f"execution cost: ${result.total_cost_usd:.4f}")
 ```
 
-The budget covers execution and synthesis; planning calls are separate.
+This example makes paid API calls without a spend cap. Text-provider dollar
+totals currently use a blended token estimate and exclude planning;
+`max_budget_usd` is not an Astra invoice ceiling. Model-specific accounting
+and Astra tool support are specified in the [campaign plan](benchmarks/astra_benchmark_plan.md).
 Anthropic and Gemini use the `smythe[anthropic]` and `smythe[gemini]` extras.
 
 Try the complete acquisition-diligence workflow without an API key:
@@ -193,11 +232,17 @@ team challenges the draft, and a final node writes the decision memo.
   enforce serial halt behavior, reject invalid cost inputs, and carry the full
   task context through planning, execution, and resume.
 - **Operator tools:** inspect runs, detach long jobs, and approve durable pauses.
-- **Glyph Rain exploration:** independently drawn SVG glyphs and a navigable 3D
-  field, specified in the [style and implementation plan](docs/glyph-rain-plan.md).
+- **Native SVG exploration:** port the new catalog and camera controls to
+  Windows, macOS, and Linux, then verify every compiled target against the
+  [implementation plan](docs/glyph-rain-plan.md).
 - **Native distribution:** notarized macOS downloads and native Wayland integration.
+- **Renderer performance:** meet the 1080p frame-interval target with the new
+  glyphs. [Renderer checks and measurement scope](screensaver/svg-preview/README.md#renderer-and-checks).
 - **Broader evidence:** larger stress tests, repeated live glyph sweeps, and
   human-calibrated quality comparisons with saved outputs and judge reasoning.
+- **Astra benchmarks:** matched model and orchestration comparisons with full
+  usage accounting, repeated runs, and blind quality scoring. See the
+  [campaign plan](benchmarks/astra_benchmark_plan.md).
 
 [Specifications and priorities](ROADMAP.md#coming-soon) ·
 [Repository review](docs/project-review-2026-09-06.md).

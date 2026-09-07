@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Smythe — SVG Glyph Rain</title>
+  <meta name="description" content="Explore original Smythe SVG glyphs in a three-dimensional field of code rain.">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="rain" aria-label="Original green SVG glyphs in a three-dimensional rain field"></canvas>
+  <header class="chrome"><a class="wordmark" href="../../README.md">SMYTHE</a><span>Glyph Rain</span></header>
+  <p id="load-status" role="status">Loading the original SVG catalog…</p>
+  <footer class="chrome" aria-label="Explorer controls">
+    <div class="movement" role="group" aria-label="Move through the rain">
+      <button type="button" data-direction="ArrowLeft" aria-label="Move left" title="Move left">←</button>
+      <button type="button" data-direction="ArrowUp" aria-label="Move forward" title="Move forward">↑</button>
+      <button type="button" data-direction="ArrowDown" aria-label="Move backward" title="Move backward">↓</button>
+      <button type="button" data-direction="ArrowRight" aria-label="Move right" title="Move right">→</button>
+      <span class="key-hint">Arrow keys to move</span>
+    </div>
+    <nav aria-label="Playback">
+      <button type="button" id="pause" aria-pressed="false">Pause</button>
+      <button type="button" id="reset" title="Reset viewpoint (R)">Reset</button>
+      <button type="button" id="fullscreen" title="Fullscreen (F)">Fullscreen</button>
+      <a href="catalog.html">View all glyphs</a>
+    </nav>
+  </footer>
+  <noscript>This preview needs JavaScript. <a href="../../benchmarks/partitions/glyph_svg_v1/catalog/">Browse the original SVG files.</a></noscript>
+  <script src="glyphs.js"></script>
+  <script type="module" src="rain.js"></script>
+</body>
+</html>
