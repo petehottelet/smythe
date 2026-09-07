@@ -219,7 +219,7 @@ boundaries; earlier incomplete campaigns remain diagnostic evidence.
 | Observability and memory | Structured lifecycle events, explicit revision/regeneration traces, reviewable history | Record durable phase totals and request identifiers. Distinguish wall time from summed node duration; memory currently sums span durations, which grows with parallel work. |
 | Packaging and CI | Minimal core install, provider extras, wheel smoke tests, offline tests, trusted PyPI publishing | Test README installation commands from clean environments; use dependency constraints for reproducible benchmark campaigns; establish type checks and a measured coverage floor. |
 | Documentation and examples | Concise README plus subsystem guides, architecture diagram, offline acquisition example | Keep exact claims prominent and protocol scope adjacent. Put planned capabilities in Coming soon while retaining limitations beside the behavior they constrain. |
-| Screensaver | Shared glyph catalog across web, Windows, and macOS | Test generated catalogs and parity across renderers; retain original stroke data and tune thickness, glow, depth, and animation independently of benchmark timing. |
+| Screensaver | Shared glyph catalog across web, Windows, macOS, and Linux | Preserve catalog parity across renderers and native artifact checks; add notarized Mac distribution and native Wayland integration. Tune rendering independently of benchmark timing. |
 
 The security policy correctly describes a single-tenant, trusted-operator
 runtime. MCP tools inherit operator permissions; multi-tenant isolation and
@@ -292,7 +292,17 @@ failed assertions or a broken screensaver build.
 The final local offline suite passed **1,022 tests with 4 skips** on Python
 3.11; `ruff check .` passed. The source distribution and wheel built successfully,
 and a clean virtual environment imported the installed wheel and ran the Jobs
-schema CLI. [CI run 34093152554](https://github.com/petehottelet/smythe/actions/runs/34093152554)
+schema CLI. [CI run 34093505237](https://github.com/petehottelet/smythe/actions/runs/34093505237)
 passed lint, all three Python versions, Windows, package installation, and
 offline benchmark smoke checks for the review changes. This review does not
 infer live test status from a static badge.
+
+[Native run 34093505361](https://github.com/petehottelet/smythe/actions/runs/34093505361)
+passed Windows, Apple Silicon, Intel Mac, and Ubuntu 22.04/24.04 execution checks.
+The Mac jobs tested the same universal bundle; the Linux jobs tested the same
+ELF executable. The downloaded Windows binary also passed the local native
+smoke test. Published packages and receipts are identified in
+[build provenance](../screensaver/dist/BUILD_INFO.json). These checks cover
+rendering, motion, resizing, and native lifecycle behavior; Mac notarization,
+Windows multi-monitor dispatch, and native Wayland integration remain outside
+the verified scope.

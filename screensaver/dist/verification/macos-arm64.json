@@ -1,0 +1,53 @@
+{
+  "architecture" : "arm64",
+  "bundle_executable" : "\/Users\/runner\/work\/smythe\/smythe\/screensaver\/dist\/GlyphRain.saver\/Contents\/MacOS\/GlyphRain",
+  "checks" : [
+    {
+      "animation" : {
+        "changed_fraction" : 0.52083333333333337,
+        "dark_fraction" : 0.58472222222222225,
+        "green_fraction" : 0.22916666666666666,
+        "height" : 180,
+        "sample_count" : 3600,
+        "width" : 320
+      },
+      "animation_frames" : 16,
+      "is_preview" : true,
+      "mode" : "preview",
+      "resize" : {
+        "changed_fraction" : 0,
+        "dark_fraction" : 0.59510030864197527,
+        "green_fraction" : 0.23553240740740741,
+        "height" : 216,
+        "sample_count" : 5184,
+        "width" : 384
+      },
+      "status" : "passed"
+    },
+    {
+      "animation" : {
+        "changed_fraction" : 0.32401041666666669,
+        "dark_fraction" : 0.77751736111111114,
+        "green_fraction" : 0.13440972222222222,
+        "height" : 720,
+        "sample_count" : 57600,
+        "width" : 1280
+      },
+      "animation_frames" : 16,
+      "is_preview" : false,
+      "mode" : "fullscreen",
+      "resize" : {
+        "changed_fraction" : 0,
+        "dark_fraction" : 0.74204774502393545,
+        "green_fraction" : 0.16386369362559838,
+        "height" : 756,
+        "sample_count" : 63504,
+        "width" : 1344
+      },
+      "status" : "passed"
+    }
+  ],
+  "principal_class" : "GlyphRainView",
+  "scope" : "Native bundle load, preview\/fullscreen rendering, motion, resize, and stop",
+  "status" : "passed"
+}

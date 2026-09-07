@@ -1,0 +1,2 @@
+# Keep native test receipts byte-for-byte identical to their CI artifacts.
+verification/*.json -text

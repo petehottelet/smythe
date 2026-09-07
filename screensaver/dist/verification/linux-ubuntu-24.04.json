@@ -1,0 +1,71 @@
+{
+  "status": "passed",
+  "binary": "smythe-glyph-rain-linux-x86_64",
+  "binary_sha256": "cb63dfa76af93e2aea0e90bb30bbb9c33089d7c994fbb7c7381757471ab6a79d",
+  "version": "Smythe Glyph Rain X11; glyphs=192",
+  "checks": [
+    "ELF",
+    "shared_192_catalog",
+    "black_green_render",
+    "animation",
+    "deterministic_seed",
+    "window_id_embedding",
+    "XSCREENSAVER_WINDOW",
+    "actual_X11_pixels",
+    "resize",
+    "SIGTERM_clean_exit",
+    "root_render",
+    "fullscreen_focus_escape",
+    "destroyed_preview_clean_exit",
+    "invalid_display",
+    "invalid_window",
+    "invalid_arguments"
+  ],
+  "frames": {
+    "preview-start": {
+      "width": 640,
+      "height": 480,
+      "black_fraction": 0.70007,
+      "green_fraction": 0.26022,
+      "sha256": "a0406f72dbcfdb434061893a8a623f4ccfcfbbfa7bd9814fab3c55173a45887b"
+    },
+    "preview-moving": {
+      "width": 640,
+      "height": 480,
+      "black_fraction": 0.70669,
+      "green_fraction": 0.25365,
+      "sha256": "890a0ded42838a015fe6edfc544d15536378fb9952f9da36347c2850d35bfc52"
+    },
+    "preview-repeat": {
+      "width": 640,
+      "height": 480,
+      "black_fraction": 0.70007,
+      "green_fraction": 0.26022,
+      "sha256": "a0406f72dbcfdb434061893a8a623f4ccfcfbbfa7bd9814fab3c55173a45887b"
+    },
+    "embedded": {
+      "width": 320,
+      "height": 240,
+      "black_fraction": 0.57643,
+      "green_fraction": 0.37178,
+      "sha256": "b94193538988c7190470644da66f9d9373b35b3ab3892296f01ae4b9067edd3e"
+    },
+    "root": {
+      "width": 1280,
+      "height": 720,
+      "black_fraction": 0.72706,
+      "green_fraction": 0.24472,
+      "sha256": "65e18b8f1e2e6831cd6d69ebafd0f999ee930029ecf9852090f8d80d0369dec8"
+    }
+  },
+  "embedded_framebuffer": {
+    "sampled_pixels": 4800,
+    "green_pixels": 1916,
+    "black_pixels": 2257
+  },
+  "resized_framebuffer": {
+    "sampled_pixels": 9600,
+    "green_pixels": 3168,
+    "black_pixels": 5265
+  }
+}
