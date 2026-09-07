@@ -1,0 +1,2 @@
+{"breakaway": true, "exception": "PermissionError", "winerror": 5, "message": "[WinError 5] Access is denied"}
+{"breakaway": false, "returncode": 0}

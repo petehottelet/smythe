@@ -261,7 +261,7 @@ existing `status` and `export` commands retain their job-state exit codes.
 
 ## Detached execution and attachment
 
-Add `--detach` to start an approved job independently of the terminal:
+Add `--detach` to start an approved job in a separate worker:
 
 ```bash
 smythe jobs run job.yaml --approve approve_v1_... --detach
@@ -272,8 +272,20 @@ smythe jobs resume RUN_ID --detach
 The launcher returns after the worker proves current lease ownership and the
 launcher records dispatch authorization. It reports the run ID, actual worker PID, and
 private log and receipt paths. The worker uses the launching Python environment.
-Closing the terminal leaves it running. Failure before authorization prevents
-a later dispatch. An interruption or I/O error after authorization may leave
+On supported hosts, the worker survives its launcher exiting and detaches from
+the console. Windows requires permission to break away from the launcher's
+process container. A bounded, isolated no-op probe checks that permission
+before the actual worker is launched once. A denied probe refuses detached
+startup before worker creation or dispatch authorization and retains the run
+for recovery. Run `jobs resume RUN_ID` in the foreground, or retry detached
+resume from a host that permits breakaway. Smythe does not weaken host policy
+or fall back to a console-only launch that could die with its launcher.
+[Windows process-container rules](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects)
+also apply to containers created by Python launchers.
+[Windows qualification and controlled refusal evidence](../benchmarks/results/windows_operator_20260907/README.md).
+
+Failure before authorization prevents a later dispatch. An interruption or
+I/O error after authorization may leave
 the worker active; error metadata distinguishes that boundary and retains
 recovery information for the saved run. `--startup-timeout-s` accepts 0.1–300
 seconds and defaults to 30.
@@ -504,6 +516,11 @@ executes actual offline artifact operations, hard-kills an owned worker,
 preserves completed outputs during resume, and explicitly rerolls unknown
 calls. It verifies durable call identity and artifact receipts using tiny PNG
 fixtures. Its evidence is separate from glyph generation and provider latency.
+The [completed 5,000-operation campaign](../benchmarks/jobs_scale_5000_20260907_results.md)
+preserved accepted work and recovered 2,500 pending operations. Eight interrupted
+operations required explicit rerolls; their original unknown call records remain
+in the ledger. Its frozen schema-v3 runtime predates
+the schema-v4 namespaces and operator commands documented above.
 
 The related [glyph screensaver benchmark](../benchmarks/glyph_screensaver_benchmark.md)
 is one concrete use of Smythe's general-purpose artifact execution model. It

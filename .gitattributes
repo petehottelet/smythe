@@ -55,3 +55,8 @@
 /benchmarks/results/jobs_scale_5000_20260907_f1/*.json -text
 /benchmarks/results/jobs_scale_5000_20260907_f1/*.zip -text
 /benchmarks/results/astra_pilot_runtime_20260907/* -text
+
+# Windows operator qualification retains source bindings and raw proof/log bytes.
+/benchmarks/results/windows_operator_20260907/** -text
+/benchmarks/results/windows_operator_20260907/logs/** -whitespace
+/benchmarks/results/windows_operator_20260907/diagnostics/** -whitespace

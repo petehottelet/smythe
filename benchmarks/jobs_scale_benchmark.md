@@ -1,14 +1,17 @@
 # Jobs scale and recovery check
 
-**Status: harness verified; no 5,000-operation result published yet.**
+**Status: 5,000-operation campaign completed and independently reconciled.**
 This is an offline correctness and recovery campaign. It does not measure
 model quality, glyph generation, provider latency, or comparative throughput.
+[Measured results and complete evidence archive](jobs_scale_5000_20260907_results.md).
 
 The harness passed independent review and 16 regression checks. Two
 [25-operation development pilots](results/jobs_scale_preflight_20260907/README.md)
 retain the aggressive-lease failure and the default-lease completion. They
-are not the full campaign. The 5,000-operation run follows the Jobs ownership
-fencing fix identified during preparation.
+are not the full campaign. The 5,000-operation run used the ownership-fenced
+schema-v3 runtime at `4bb7c02`. It accepted all 5,000 fixtures after a real
+worker kill, safe resume, and eight explicit rerolls. Later schema-v4 artifact
+namespaces and operator commands were not part of that frozen measurement.
 
 ## Workload
 

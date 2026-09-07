@@ -22,7 +22,7 @@ mechanics run in CI with deterministic providers and zero API cost.
 | [Corrected framework head-to-head](#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12) | **Claimable for the fixed arms** | 77% fewer tokens and 28% less wall time than CrewAI; highest observed blind score |
 | Original self-baselines and pre-correction framework record | Diagnostic | Preserved because they found payload, assembly, and measurement defects; superseded by corrected campaigns |
 | [Control ablation](control_ablation.md) | Mechanism scope | Objective gates remain valuable; routine LLM supervision and judged-prose gating are not default quality paths |
-| [Jobs scale and recovery](jobs_scale_benchmark.md) | Protocol prepared | Actual offline operations, owned-worker hard kill, pending-only resume, and explicit unknown rerolls; full 5,000-operation evidence pending |
+| [Jobs at 5,000 operations](jobs_scale_5000_20260907_results.md) | **Claimable correctness observation** | One offline schema-v3 campaign: 5,000 accepted identical fixtures after a hard kill, safe resume, and eight explicit rerolls; zero accepted work reissued and zero calls on completed resume. No comparative timing or model-quality claim. |
 | [Astra/Sol matched campaign](astra_benchmark_plan.md) | Pilot runtime qualified offline | 13 task/source packs, balanced 12-pilot/200-main schedules, and [79 passed runtime checks](results/astra_pilot_runtime_20260907/README.md); no paid runs or model-quality results |
 
 The authoritative deliverable is `Swarm.execute(...).output`, which is what a

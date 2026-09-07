@@ -35,6 +35,13 @@ Autotune development ledgers below schema v3 require a new ledger.
 
 ### Added
 
+- **Recovery at 5,000 operations**: a completed offline schema-v3 campaign
+  retains every raw file and frozen source. Independent reconciliation verifies
+  5,000 accepted fixtures, eight explicit rerolls, no accepted work reissued,
+  zero new calls on completed resume, and zero provider API charges. A new
+  monochrome README chart presents the observed stages separately from the
+  matched recovery comparison and current schema-v4 operator qualification.
+
 - **Astra pilot runtime**: bind the 12 calibration trials to explicit campaign
   allocations, one directory, frozen sources and policies, and native workflow
   receipts. Completed and failed outcomes remain immutable; interrupted trials
@@ -56,7 +63,7 @@ Autotune development ledgers below schema v3 require a new ledger.
   legacy ownership and unsupported hard-link filesystems fail closed.
 
 - **Detached Jobs and durable pause**: approved runs and resumes can continue
-  independently of the terminal. Workers prove lease ownership before dispatch;
+  after their launcher exits. Workers prove lease ownership before dispatch;
   bounded, read-only attachment reports progress and startup failures retain
   recovery paths. `jobs stop` saves a generation-bound pause and lets admitted
   calls drain. Explicit resume cannot erase a newer stop request. Schema v4
@@ -313,10 +320,16 @@ Autotune development ledgers below schema v3 require a new ledger.
 
 ### Fixed
 
+- **Windows workers under restricted hosts**: an isolated no-op probe checks
+  breakaway permission before the actual worker is launched once. A denied
+  probe refuses startup before worker creation or dispatch authorization and
+  retains the run for foreground recovery. Console-only fallback cannot prove
+  launcher-exit survival and is not used.
 - **PyPI README links**: build metadata resolves repository images and guides
   against the release tag while preserving the GitHub README and code examples.
   The registry badge follows the latest published-version asset. The hook adds
-  no runtime dependency and is retained in the source distribution.
+  no runtime dependency and is retained in the source distribution. The
+  publishing workflow retains its exact wheel, source archive, and checksums.
 - **Independent checkpoint writers**: replace the shared `.json.tmp` filename
   with an exclusive temporary file per save. Flush file bytes before atomic
   replacement and the parent directory where supported. Failed writes preserve

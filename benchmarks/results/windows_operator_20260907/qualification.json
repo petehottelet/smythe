@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "status": "passed",
+  "reviewed_at_utc": "2026-09-07T21:34:29.436242+00:00",
+  "platform": "Windows-10-10.0.26200-SP0",
+  "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+  "python_prefix": "C:\\Users\\PeteHottelet\\Projects\\smythe\\smythe\\tmp\\parallel-test-env",
+  "source_normalization": "UTF-8 decoded text with CRLF/CR normalized to LF before SHA-256",
+  "final_source_lf_sha256": {
+    "smythe/jobs/operator.py": "c4f48cb325fc1eae1f219c084750a794cf73d4eb295b0af39047d90849236172",
+    "tests/test_jobs_operator.py": "32420a24db8e7db760d4967327e497d82e7b5a94592a10d3d78035a735751988",
+    "tests/test_jobs_operator_cli.py": "39af74b911c8764a914c6cf18461bae2a56d4116717508c29076b5594bcfbed5"
+  },
+  "qualification": [
+    {
+      "command": "python -m pytest tests/test_jobs_operator.py tests/test_jobs_operator_cli.py -q -n4 --dist loadfile --tb=short",
+      "passed": 122,
+      "failed": 0,
+      "elapsed_s": 179.66,
+      "source_lf_sha256": {
+        "smythe/jobs/operator.py": "c4f48cb325fc1eae1f219c084750a794cf73d4eb295b0af39047d90849236172",
+        "tests/test_jobs_operator.py": "32420a24db8e7db760d4967327e497d82e7b5a94592a10d3d78035a735751988",
+        "tests/test_jobs_operator_cli.py": "e325aa8fab9236daa505083cadb4d06c92b375f35a71bfcc7b79f4bfd61f9d72"
+      },
+      "source_unchanged_before_after": true,
+      "log": "logs/combined.log"
+    },
+    {
+      "command": "python -m pytest tests/test_jobs_operator_cli.py -q --tb=short",
+      "passed": 21,
+      "failed": 0,
+      "elapsed_s": 25.04,
+      "source_lf_sha256": {
+        "smythe/jobs/operator.py": "c4f48cb325fc1eae1f219c084750a794cf73d4eb295b0af39047d90849236172",
+        "tests/test_jobs_operator.py": "32420a24db8e7db760d4967327e497d82e7b5a94592a10d3d78035a735751988",
+        "tests/test_jobs_operator_cli.py": "39af74b911c8764a914c6cf18461bae2a56d4116717508c29076b5594bcfbed5"
+      },
+      "source_unchanged_before_after": true,
+      "log": "logs/final-cli.log"
+    }
+  ],
+  "refinement": "After the combined run, only the CLI test added an explicit assertion that the successful run has exactly one succeeded call. The entire CLI file then passed again. Runtime and operator unit test bytes stayed unchanged.",
+  "scope": {
+    "paid_provider_calls": 0,
+    "providers": "offline and controlled fakes",
+    "positive_survival": "Local Windows CPython3.11.9 virtual environment; actual worker continued after launcher exit, then completed one call and artifact.",
+    "controlled_refusals": [
+      "restricted direct interpreter",
+      "kill-on-close direct interpreter",
+      "restricted virtual-environment redirector"
+    ],
+    "not_claimed": [
+      "survival when Windows denies breakaway",
+      "survival after a supervisor forcibly terminates an enclosing job",
+      "performance throughput",
+      "final GitHub CI result"
+    ]
+  },
+  "retained_diagnostics": {
+    "initial_ci": {
+      "commit": "c30a6629d4373bf9904abccd037cbdbf1992e65f",
+      "url": "https://github.com/petehottelet/smythe/actions/runs/34160309383/job/101860519222",
+      "status": "superseded failure",
+      "log": "diagnostics/initial-windows-ci-failure.log"
+    },
+    "console_fallback": {
+      "status": "rejected intermediate implementation",
+      "passed": 123,
+      "failed": 2,
+      "elapsed_s": 861.58,
+      "summary": "diagnostics/fallback-qualification-summary.txt",
+      "qualification_source_not_frozen": true,
+      "note": "The original test run was not logged to disk. Its retained summary records the terminal result; cleanup/liveness edits landed during collection/execution. Do not bind this diagnostic to the final source or treat it as current success."
+    },
+    "restricted_probe": {
+      "log": "diagnostics/restricted-job-probe.log",
+      "source": "diagnostics/restricted-job-probe.py.txt",
+      "scope": "No-work child only: requested breakaway produced WinError5; omitting that flag allowed creation. This did not prove worker survival and the fallback was rejected."
+    }
+  },
+  "artifact_sha256": {
+    "diagnostics/fallback-qualification-summary.txt": "5251e0115afc74554aa95b8c6f73d83e1d648998597640dfca0e8a8d477efa22",
+    "diagnostics/initial-windows-ci-failure.log": "645e0ad15ebfc42b86cc1cfd58a605d3f27d442b77d1af69d04302a5873b0c61",
+    "diagnostics/restricted-job-probe.log": "8c660af0e2b6ba71f68799862ac7dd19067f0504c57f37a6a5a568cbe5642726",
+    "logs/combined.log": "62b7ea618bfd9423a327a0959436a1377005842a823f3ef2c3233e392aa87aae",
+    "logs/final-cli.log": "869283be084edb494ea1a388b00210f6d4f72cd68aee50c76f4d3e35b06b8215",
+    "proofs/kill_on_close.json": "7a16ebdf3e26f639d6761e3c7226c44db80a0aec9eaebb783a146d60878bda3e",
+    "proofs/restricted.json": "16b8f46e9da85ebdc86bb4f81ba888905416c9ccafca10264c8ed92980e90365",
+    "proofs/restricted_venv.json": "3489c550298727637ee73f9e34d6800be8c05d7c5edee2dda9c9c4f499414a9e",
+    "proofs/supported-local-host.json": "fb8539f48aa88f1e46113f8d37a44025f0f2db13a42a3bac3729f2647c9a8646",
+    "diagnostics/restricted-job-probe.py.txt": "a08fa13a1ce46df17d22a69cc7423dc6bf559bbfe563857ed5db2ca7c9520a1d"
+  }
+}

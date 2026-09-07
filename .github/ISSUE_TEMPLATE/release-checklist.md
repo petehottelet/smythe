@@ -40,5 +40,6 @@ Follow [RELEASING.md](https://github.com/petehottelet/smythe/blob/main/RELEASING
 
 - [ ] Project `smythe` trusts `petehottelet/smythe`, workflow `publish.yml`, environment `pypi`.
 - [ ] Release workflow publishes successfully.
+- [ ] PyPI wheel and sdist hashes match the publication workflow's retained distributions and `package-hashes.txt`.
 - [ ] `pip install smythe==X.Y.Z` succeeds from PyPI in a fresh venv; its version and installed CLI are checked.
 - [ ] The PyPI badge is updated only after the new published version is available.

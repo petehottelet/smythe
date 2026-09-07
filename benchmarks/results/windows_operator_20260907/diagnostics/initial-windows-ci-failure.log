@@ -1,0 +1,114 @@
+windows-smoke	Exercise the suite on Windows	﻿2026-09-07T20:41:30.4555814Z ##[group]Run python -m pytest tests/ -q
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:30.4556256Z [36;1mpython -m pytest tests/ -q[0m
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:30.4678381Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:30.4678752Z env:
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:30.4679015Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.12.10\x64
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:30.4679486Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.12.10\x64/lib/pkgconfig
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:30.4679933Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:30.4680377Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:30.4680770Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.12.10\x64
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:30.4681081Z ##[endgroup]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:39.1044827Z ....................ss...ss....s........................................ [  2%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:41.0594650Z ........................................................................ [  4%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:42.3517533Z ........................................................................ [  6%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:42.4896706Z ........................................................................ [  9%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:42.5698013Z ........................................................................ [ 11%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:44.3131657Z ........................................................................ [ 13%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:48.8732869Z ........................................................................ [ 16%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:49.0249385Z ........................................................................ [ 18%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:41:49.3342726Z ........................................................................ [ 20%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:42:40.3485165Z ........................................................................ [ 22%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:42:50.6220142Z ........................................................................ [ 25%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:42:55.6154312Z ........................................................................ [ 27%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:43:06.8416772Z ........................................................................ [ 29%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:43:07.9585075Z ........................................................................ [ 32%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:43:14.7242062Z ........................................................................ [ 34%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:43:20.4485354Z ...............................F........................................ [ 36%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:43:26.7077049Z ........................................................................ [ 39%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:44:06.8631268Z ........................................................................ [ 41%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:44:14.4929131Z ........................................................................ [ 43%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:44:20.8812594Z ........................................................................ [ 45%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:44:27.0494698Z ........................................................................ [ 48%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:44:27.1239926Z ........................................................................ [ 50%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:44:27.2013569Z ........................................................................ [ 52%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:44:27.5050908Z ........................................................................ [ 55%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:44:28.5518980Z ........................................................................ [ 57%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:44:28.8385393Z ........................................................................ [ 59%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:44:32.5594416Z ........................................................................ [ 62%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:44:32.7100243Z .........ss......s...................................................... [ 64%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:44:32.8690228Z ........................................................................ [ 66%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:44:33.0839358Z ..........sss........................................................... [ 68%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:44:42.1818496Z ........................................................................ [ 71%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:44:45.6705785Z ........................................................................ [ 73%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:44:54.2759172Z ....................................s................................... [ 75%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:01.1579900Z ........................................................................ [ 78%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:16.4686707Z ........................................................................ [ 80%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:16.7103144Z ........................................................................ [ 82%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:16.9883147Z ........................................................................ [ 85%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:17.4487662Z ........................................................................ [ 87%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:17.7465005Z ........................................................................ [ 89%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:18.0200915Z ........................................................................ [ 91%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:27.2746435Z ........................................................................ [ 94%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:39.2601590Z .............................................................s.......... [ 96%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:52.5530211Z ........................................................................ [ 98%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2932588Z ......................................                                   [100%]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2933733Z ================================== FAILURES ===================================
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2934880Z _ test_real_process_worker_survives_launcher_exit_and_retains_python_environment _
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2935833Z 
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2937341Z tmp_path = WindowsPath('C:/Users/runneradmin/AppData/Local/Temp/pytest-of-runneradmin/pytest-0/test_real_process_worker_survi0')
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2938618Z 
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2939111Z     def test_real_process_worker_survives_launcher_exit_and_retains_python_environment(tmp_path):
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2939982Z         manifest, _, approval = planned(tmp_path)
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2940507Z         database = tmp_path / "jobs.db"
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2940990Z         gate = tmp_path / "release-worker"
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2941471Z         customization = tmp_path / "customization"
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2941944Z         customization.mkdir()
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2942511Z         # Deterministic offline call barrier: the parent CLI must exit before this
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2943351Z         # fixture allows the actual child to complete. No provider key is used.
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2944101Z         (customization / "sitecustomize.py").write_text(
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2944609Z             "import asyncio, os\n"
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2945029Z             "from pathlib import Path\n"
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2945555Z             "from smythe.provider import OfflineProvider\n"
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2946084Z             "original = OfflineProvider.complete\n"
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2946606Z             "async def complete(self, *args, **kwargs):\n"
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2947179Z             "    gate = Path(os.environ['SMYTHE_OPERATOR_TEST_GATE'])\n"
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2947748Z             "    entered = gate.with_suffix('.entered')\n"
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2948408Z             "    pending = entered.with_name(entered.name + '.' + str(os.getpid()) + '.tmp')\n"
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2949092Z             "    pending.write_text(str(os.getpid()))\n"
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2949890Z             "    pending.replace(entered)\n"
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2950339Z             "    while not gate.exists():\n"
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2950823Z             "        await asyncio.sleep(.025)\n"
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2951253Z             "    return await original(self, *args, **kwargs)\n"
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2951660Z             "OfflineProvider.complete = complete\n",
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2952026Z             encoding="utf-8",
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2952311Z         )
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2953426Z         environment = operator._python_environment()
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2953999Z         environment["PYTHONPATH"] = str(customization) + os.pathsep + environment["PYTHONPATH"]
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2954571Z         environment["SMYTHE_OPERATOR_TEST_GATE"] = str(gate)
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2955047Z         for key in ("OPENAI_API_KEY", "GOOGLE_API_KEY", "ANTHROPIC_API_KEY"):
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2955561Z             environment.pop(key, None)
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2955951Z         launched = None
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2956255Z         process = subprocess.Popen(
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2956688Z             [sys.executable, "-P", "-m", "smythe.cli", "jobs", "run", str(manifest),
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2957717Z              "--approve", approval.token, "--detach", "--startup-timeout-s", "20",
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2958208Z              "--store", str(database), "--json"],
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2958712Z             cwd=tmp_path, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2959275Z             stdin=subprocess.DEVNULL, text=True,
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2959765Z             **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}),
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2960225Z         )
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2960460Z         try:
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2960796Z             stdout, stderr = process.communicate(timeout=30)
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2961230Z >           assert process.returncode == 0, (stdout, stderr)
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2962321Z E           AssertionError: ('{"ok":false,"command":"run","error":{"type":"WorkerStartupError","message":"[WinError 5] Access is denied; run 88358...0c8b262edae151cf44cac02c54f09eababc83875528f\\\\4c818862fc4145ac8d6667b701358a37","startup_authorized":false}}}
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2963421Z E             ', '')
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2963711Z E           assert 7 == 0
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2964201Z E            +  where 7 = <Popen: returncode: 7 args: ['C:\\hostedtoolcache\\windows\\Python\\3.12.10\...>.returncode
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2964616Z 
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2964801Z tests\test_jobs_operator_cli.py:222: AssertionError
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2965217Z =========================== short test summary info ===========================
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2966883Z FAILED tests/test_jobs_operator_cli.py::test_real_process_worker_survives_launcher_exit_and_retains_python_environment - AssertionError: ('{"ok":false,"command":"run","error":{"type":"WorkerStartupError","message":"[WinError 5] Access is denied; run 88358...0c8b262edae151cf44cac02c54f09eababc83875528f\\\\4c818862fc4145ac8d6667b701358a37","startup_authorized":false}}}
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2968375Z   ', '')
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2968601Z assert 7 == 0
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2969031Z  +  where 7 = <Popen: returncode: 7 args: ['C:\\hostedtoolcache\\windows\\Python\\3.12.10\...>.returncode
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2969586Z 1 failed, 3120 passed, 13 skipped in 265.33s (0:04:25)
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.6922781Z ##[error]Process completed with exit code 1.

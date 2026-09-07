@@ -1,0 +1,5 @@
+Complete Windows qualification: tests/test_jobs_operator.py tests/test_jobs_operator_cli.py
+123 passed; 2 failed; 861.58 seconds.
+Failures: real_process_worker_survives_launcher_exit_and_retains_python_environment[restricted] and [kill_on_close].
+Both launchers returned success and left matching readiness/start-decision receipts, but no provider barrier or finished receipt appeared. Test source received cleanup/liveness changes after collection; this run is retained as a failed diagnostic, not final qualification.
+Raw pytest directory: C:/Users/PeteHottelet/AppData/Local/Temporary/pytest-of-PeteHottelet/pytest-569

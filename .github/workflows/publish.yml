@@ -40,5 +40,18 @@ jobs:
       - name: Check package
         run: python -m twine check dist/*
 
+      - name: Record exact distribution hashes
+        run: sha256sum dist/*.whl dist/*.tar.gz > package-hashes.txt
+
+      - name: Retain the distributions before publishing
+        uses: actions/upload-artifact@v6
+        with:
+          name: pypi-distributions-${{ github.run_id }}
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+            package-hashes.txt
+          if-no-files-found: error
+
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

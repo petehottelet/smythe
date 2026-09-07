@@ -151,8 +151,8 @@ is credible:
     epoch so expired workers cannot alter recovered journal state. Schema
     upgrades preserve historical attempt provenance and reject live legacy
     leases. [Upgrade and ownership scope](docs/jobs.md#jobs-database-upgrades).
-23. **Detached operator runtime** — keep approved work independent of the
-    terminal, follow it through read-only attachment, and request a durable
+23. **Detached operator runtime** — keep approved work running after its
+    launcher exits on supported hosts, follow it through read-only attachment, and request a durable
     drain/pause. Generation-bound resume preserves later stop requests.
     [Operator commands](docs/jobs.md#detached-execution-and-attachment).
 24. **Artifact directory ownership** — persistent namespaces separate custom
@@ -163,6 +163,11 @@ is credible:
     temporary files, flush complete snapshots, and atomically replace the
     checkpoint. Failure cleanup preserves other writers' files.
     [Persistence and ownership scope](docs/checkpoint-format.md).
+26. **Observed recovery at 5,000 operations** — one offline schema-v3 campaign
+    retained accepted artifacts after a hard kill, completed pending work, and
+    rerolled eight explicitly acknowledged unknown outcomes. All 5,000 files,
+    call identities, and zero-cost balances pass independent reconciliation.
+    [Scope and retained evidence](benchmarks/jobs_scale_5000_20260907_results.md).
 
 ## Coming soon
 
@@ -213,8 +218,9 @@ Linux port targets X11; the macOS bundle uses an ad-hoc signature.
 5. **Integrate asset policy with Jobs v1** — manifest-native production brand
    masters, OCR and perceptual brand validators, select-from-N curation, and
    deterministic export bundles built from accepted attempt pointers
-6. **Scale ladder** — offline 5,000-item stress tests followed by bounded paid
-   50/250/1,000-item trials with kill-and-resume and duplicate detection
+6. **Scale ladder** — extend the reviewed offline 5,000-operation recovery
+   observation to bounded paid 50/250/1,000-item trials with kill-and-resume
+   and duplicate detection; measure the current schema-v4 runtime separately
 7. **Benchmarks, continued** — a discriminating judge, human calibration,
    repeated k=25 cells, repeated glyph live cells, and held-out
    brand-consistency comparisons; save delivered text and judge reasoning so

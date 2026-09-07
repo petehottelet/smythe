@@ -56,9 +56,12 @@ Four guardrails do that:
    `BudgetValidationError`, stops the run, and blocks resume until the charge
    is reconciled. An optional review cannot bypass cost validation.
 4. **Budget still rules.** Revision-added nodes are admitted through the
-   same Sentinel reservation as planned ones. Model-based review calls remain
-   outside the current execution ledger; [complete workflow accounting](budgets.md#current-scope)
-   is tracked separately.
+   same budget admission as planned ones. In ordinary Swarm execution without
+   `run_store`, successful model-based review calls remain outside the execution
+   ledger. Supported [managed text workflows](workflow-accounting.md) bind
+   supervision to the shared ledger, reserve request-bound quotes before review
+   calls, and preserve their charges and unknown exposure across recovery.
+   See [accounting scope](budgets.md#current-scope).
 
 ## Triggering reviews
 

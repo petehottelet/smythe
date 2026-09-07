@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="636" viewBox="0 0 960 636" role="img" aria-label="One offline Jobs campaign: 5,000 accepted identical 1×1 PNG fixtures after a hard kill, safe resume and eight explicit rerolls. No previously accepted work reissued; zero calls on completed resume. No comparative speed or model-quality claim.">
+<rect width="960" height="636" fill="#ffffff"/>
+<text x="40" y="40" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="2.2">DURABLE EXECUTION</text>
+<text x="40" y="80" font-family="Georgia,'Times New Roman',serif" font-size="31" fill="#000000" text-anchor="start" font-weight="700">Jobs after a hard process kill</text>
+<text x="40" y="107" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="normal">One local campaign; concurrency 8; durable calls and accepted artifact pointers</text>
+<line x1="40" y1="128" x2="920" y2="128" stroke="#000000" stroke-width="2"/>
+<text x="40" y="204" font-family="'Trajan Pro 3','Trajan Pro',Trajan,Cinzel,Georgia,serif" font-size="64" fill="#000000" text-anchor="start" font-weight="700">5,000</text>
+<text x="280" y="164" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="14" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="0.8">ACCEPTED ARTIFACTS</text>
+<text x="280" y="189" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="14" fill="#000000" text-anchor="start" font-weight="normal">8 explicit rerolls of interrupted operations</text>
+<text x="280" y="214" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="normal">0 previously accepted operations reissued; 0 calls on completed resume</text>
+<text x="40" y="264" font-family="Georgia,'Times New Roman',serif" font-size="18" fill="#000000" text-anchor="start" font-weight="700">After the kill</text>
+<text x="920" y="264" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="14" fill="#000000" text-anchor="end" font-weight="normal">2,492 accepted / 5,000</text>
+<g data-stage="after_kill" data-accepted="2492" data-maximum="5000">
+<rect x="40" y="276" width="880.0" height="16" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<rect x="40" y="276" width="438.6" height="16" fill="#000000"/>
+</g>
+<text x="40" y="312" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">2,500 pending; 8 interrupted calls still dispatched</text>
+<text x="40" y="354" font-family="Georgia,'Times New Roman',serif" font-size="18" fill="#000000" text-anchor="start" font-weight="700">After safe resume</text>
+<text x="920" y="354" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="14" fill="#000000" text-anchor="end" font-weight="normal">4,992 accepted / 5,000</text>
+<g data-stage="after_resume" data-accepted="4992" data-maximum="5000">
+<rect x="40" y="366" width="880.0" height="16" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<rect x="40" y="366" width="878.6" height="16" fill="#000000"/>
+</g>
+<text x="40" y="402" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">8 unknown outcomes retained</text>
+<text x="40" y="444" font-family="Georgia,'Times New Roman',serif" font-size="18" fill="#000000" text-anchor="start" font-weight="700">After explicit rerolls</text>
+<text x="920" y="444" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="14" fill="#000000" text-anchor="end" font-weight="normal">5,000 accepted / 5,000</text>
+<g data-stage="final" data-accepted="5000" data-maximum="5000">
+<rect x="40" y="456" width="880.0" height="16" fill="#ffffff" stroke="#000000" stroke-width="2"/>
+<rect x="40" y="456" width="880.0" height="16" fill="#000000"/>
+</g>
+<text x="40" y="492" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Every accepted pointer retained; rerolls keep parent-attempt lineage</text>
+<line x1="40" y1="518" x2="920" y2="518" stroke="#000000"/>
+<text x="40" y="544" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">1 campaign; identical 1×1 PNG fixtures; zero API calls and zero API cost</text>
+<text x="40" y="566" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Correctness observation; no comparative speed or model-quality claim</text>
+<text x="40" y="592" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="10" fill="#000000" text-anchor="start" font-weight="normal">result.json</text>
+<text x="40" y="612" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="10" fill="#000000" text-anchor="start" font-weight="normal">RAW SHA-256 96df796d8dfe452e8ef7167f4fd7648b59ea0410a95cd5be228497e9e4626695</text>
+<!-- review-sha256: 619497c458cf3b8ef485fedcec963aca26fc5f5101f8b6fd36f8f5e8221ced18 -->
+</svg>
