@@ -23,14 +23,13 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Added
 
-- **Glyph Rain screensaver ports** (`screensaver/`): a fullscreen web app
-  (three depth layers, persistence-fade trails, ~1,000 columns at 60 fps)
-  deployable as a static site; a native Windows `.scr` (C#/GDI+, built by
-  the compiler bundled with Windows, committed binary in
-  `screensaver/dist/`); and macOS `.saver` Swift source with a
-  one-command build script plus a `screensavers` CI workflow that builds
-  both binaries. All ports render the same exported `GLYPH_SPECS`
-  catalog via `screensaver/export_glyphs.py`.
+- **Glyph Rain screensaver ports** (`screensaver/`): a static fullscreen web
+  app with three depth layers and bounded luminous trails; a native Windows
+  `.scr` in C#/GDI+; a universal macOS `.saver` in Swift; and a Linux x86-64
+  X11 executable in C/Cairo. Compiled downloads, SHA-256 checksums, build
+  provenance, and native verification receipts are committed in
+  `screensaver/dist/`. Every port uses the same 192-glyph catalog exported by
+  `screensaver/export_glyphs.py`.
 - **README benchmark charts** rendered deterministically from committed
   result records by `benchmarks/render_readme_charts.py` into
   `assets/benchmarks/`.
@@ -142,9 +141,11 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 - **Glyph Rain rendering** uses heavier authored strokes, distinct depth
   scales, green cores, and varied bloom across web, Windows, macOS, and Linux.
   The 192-glyph source catalog and historical generation records are preserved.
-- **Native screensaver validation** adds compiled load/render checks for Windows
-  and macOS, plus Linux X11 rendering and embedding checks. Compiled packages
-  are built by the screensavers workflow.
+- **Native screensaver validation** passes compiled load/render checks on
+  Windows, Apple Silicon, and Intel Mac, plus Linux X11 rendering and embedding
+  on Ubuntu 22.04 and 24.04. Both Mac runners test the same universal bundle;
+  both Linux runners test the same ELF executable. The published packages
+  come from that successful workflow run.
 - **Windows preview** attaches the child window before display, avoiding a
   top-level window flash. The native smoke test exercises the real `/p`
   subprocess, motion, resize, and clean shutdown.
@@ -190,6 +191,11 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   callout numerals.
 
 ### Fixed
+
+- Concurrent Windows artifact finalization now treats regular and extended
+  (`\\?\`) path namespaces as the same location during confinement checks.
+  Valid job runs no longer enter `needs_attention` when directory creation
+  changes the spelling returned by `Path.resolve()`.
 
 - **Verification gating could not be switched on.** `verifies` and
   `max_regenerations` were readable only by constructing `Node` objects

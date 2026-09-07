@@ -155,12 +155,17 @@ The web, Windows, macOS, and Linux ports share the same vector catalog.
   <img src="assets/glyph_rain/glyph-rain-screenshot.png" alt="Glyph Rain with heavy green glyphs, varied glow, and descending streams at three depths" width="900">
 </p>
 
-**Download:** [Windows `.scr`](screensaver/dist/SmytheGlyphRain.scr) ·
-[macOS build](https://github.com/petehottelet/smythe/actions/workflows/screensavers.yml) ·
-[Linux build](https://github.com/petehottelet/smythe/actions/workflows/screensavers.yml) ·
+**Download:** [Windows `.scr`](https://github.com/petehottelet/smythe/raw/refs/heads/main/screensaver/dist/SmytheGlyphRain.scr) ·
+[macOS universal `.zip`](https://github.com/petehottelet/smythe/raw/refs/heads/main/screensaver/dist/GlyphRain-macos-universal.zip) ·
+[Linux x86-64 `.tar.gz`](https://github.com/petehottelet/smythe/raw/refs/heads/main/screensaver/dist/SmytheGlyphRain-linux-x86_64.tar.gz) ·
 [Web and native source](screensaver/) ·
 [192-glyph atlas](assets/glyph_rain/glyph-atlas.png) ·
 [256-glyph atlas](benchmarks/partitions/glyph_256/assets/glyph-atlas.png)
+
+Compiled downloads passed native rendering and motion checks on Windows,
+Apple Silicon, Intel Mac, and Ubuntu 22.04/24.04.
+[Checksums and verification](screensaver/README.md#native-verification).
+macOS uses an ad-hoc signature; Linux requires X11.
 
 <p align="center">
   <img src="assets/glyph_rain/glyph_pipeline.svg" alt="A brief becomes a 192-node graph, verified glyphs, and assembled screensaver artifacts" width="900">

@@ -1,0 +1,60 @@
+{
+    "status":  "passed",
+    "binary":  "SmytheGlyphRain.scr",
+    "binary_sha256":  "e3a34cae3eb5063816d0e6694053c6dd1656596a4d87a1c8a43371fa10f895a7",
+    "checks":  [
+                   "compiled_assembly_load",
+                   "native_form_load",
+                   "green_glyphs",
+                   "black_gaps",
+                   "motion",
+                   "native_resize",
+                   "preview_process_entrypoint",
+                   "hidden_parent_embedding",
+                   "preview_clean_exit"
+               ],
+    "animation_frames":  90,
+    "initial":  {
+                    "width":  1028,
+                    "height":  681,
+                    "sampled_pixels":  43947,
+                    "green_pixels":  6254,
+                    "dark_pixels":  34769,
+                    "changed_pixels":  0,
+                    "green_fraction":  0.14230777982569914,
+                    "dark_fraction":  0.79115753066193373,
+                    "changed_fraction":  0
+                },
+    "animated":  {
+                     "width":  1028,
+                     "height":  681,
+                     "sampled_pixels":  43947,
+                     "green_pixels":  4437,
+                     "dark_pixels":  36845,
+                     "changed_pixels":  14076,
+                     "green_fraction":  0.10096252303911529,
+                     "dark_fraction":  0.83839625002844331,
+                     "changed_fraction":  0.32029490067581406
+                 },
+    "resized":  {
+                    "width":  320,
+                    "height":  180,
+                    "sampled_pixels":  3600,
+                    "green_pixels":  775,
+                    "dark_pixels":  2189,
+                    "changed_pixels":  0,
+                    "green_fraction":  0.21527777777777779,
+                    "dark_fraction":  0.60805555555555557,
+                    "changed_fraction":  0
+                },
+    "preview_process":  {
+                            "status":  "passed",
+                            "argument":  "/p",
+                            "width":  320,
+                            "height":  180,
+                            "parent_hidden":  true,
+                            "child_hidden":  true,
+                            "clean_exit":  true
+                        },
+    "scope":  "Compiled .scr form load, native rendering, motion, resize, and /p subprocess embedding/exit; /s multi-monitor dispatch is not exercised"
+}

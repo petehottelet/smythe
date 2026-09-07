@@ -1,0 +1,76 @@
+{
+  "source_commit": "45a68f6162b5208aa180cf1f2755eea572bbd608",
+  "workflow_url": "https://github.com/petehottelet/smythe/actions/runs/34093505361",
+  "built_at_utc": "2026-09-07",
+  "status": "passed",
+  "packages": {
+    "windows": {
+      "file": "SmytheGlyphRain.scr",
+      "sha256": "e3a34cae3eb5063816d0e6694053c6dd1656596a4d87a1c8a43371fa10f895a7",
+      "size_bytes": 97280
+    },
+    "macos": {
+      "file": "GlyphRain-macos-universal.zip",
+      "sha256": "5d14d51f81d0c1ae07cfe1e1340f69f300ab0528d3b2ccdb4b92ac975d7b92e5",
+      "size_bytes": 71060,
+      "binary_sha256": "cec225026018f9ee42b0733d824b3d6cfc1271f088775ac8c54aec75a07c5e95",
+      "architectures": [
+        "arm64",
+        "x86_64"
+      ],
+      "signing": "ad-hoc; not notarized"
+    },
+    "linux": {
+      "file": "SmytheGlyphRain-linux-x86_64.tar.gz",
+      "sha256": "1133f5350b5a42d71363fbfd1c317e89993c180cdd15c6e7d09db552ba9fe930",
+      "size_bytes": 27610,
+      "binary_sha256": "cb63dfa76af93e2aea0e90bb30bbb9c33089d7c994fbb7c7381757471ab6a79d",
+      "architecture": "x86_64",
+      "display": "X11",
+      "build_os": "Ubuntu 22.04"
+    }
+  },
+  "verification": [
+    {
+      "platform": "windows",
+      "runner": "windows-latest",
+      "receipt": "verification/windows.json",
+      "receipt_sha256": "f9199b1f0b9d1caac897d60d38a78611feae933b23a3be0bf966bf24e812f328",
+      "artifact": "screensaver-windows-verification",
+      "status": "passed"
+    },
+    {
+      "platform": "macos",
+      "runner": "macos-latest",
+      "receipt": "verification/macos-arm64.json",
+      "receipt_sha256": "51092b6fd4c706294a7ec2be54e4fe0cc6f9b84b6f4c1fe69ba8ec902b10fba7",
+      "artifact": "screensaver-macos-arm64-verification",
+      "status": "passed"
+    },
+    {
+      "platform": "macos",
+      "runner": "macos-15-intel",
+      "receipt": "verification/macos-x86_64.json",
+      "receipt_sha256": "42e83c12bbbac01c0ce0d2838ed76ad01c773145e04849ad2c9f8203a9a5af56",
+      "artifact": "screensaver-macos-x86_64-verification",
+      "status": "passed"
+    },
+    {
+      "platform": "linux",
+      "runner": "ubuntu-22.04",
+      "receipt": "verification/linux-ubuntu-22.04.json",
+      "receipt_sha256": "c801e93c3e2e677cfb40c4607794610f4fdf8c2c71eb0f037922f5684b9dbdae",
+      "artifact": "screensaver-linux-verification",
+      "status": "passed"
+    },
+    {
+      "platform": "linux",
+      "runner": "ubuntu-24.04",
+      "receipt": "verification/linux-ubuntu-24.04.json",
+      "receipt_sha256": "d7cfbf9acf813439d16334216871e7c12b4788de058d4b051700f14e49a810df",
+      "artifact": "screensaver-linux-compatibility-verification",
+      "status": "passed"
+    }
+  ],
+  "scope": "Native compiled artifact execution; installation policy and session locking are separate."
+}

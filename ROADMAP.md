@@ -76,7 +76,8 @@ The current unreleased work hardens the guarantees users depend on before a
    concurrency sweeps through k=64, live Gemini and GPT Image lanes, and assembled
    preview/GIF/atlas/HTML deliverables plus web, Windows, macOS, and Linux X11
    ports with shared heavy glyph strokes and layered green trails; compiled
-   native ports have build and render smoke checks
+   downloads pass native rendering checks on Windows, Apple Silicon, Intel Mac,
+   and Ubuntu 22.04/24.04, with committed checksums and verification receipts
 8. **Bounded Autotune v1**: immutable hash-bound contracts and allowlisted
    candidates, a zero-API-spend offline concurrency campaign, plan-bound async
    orchestration, atomic dispatch claims, paired confirmation and sealed
