@@ -46,4 +46,5 @@
 
 # Current renderer protocols and receipts retain their measured bytes.
 /benchmarks/renderer_performance_20260907.md text eol=lf
+/benchmarks/renderer_cadence_control_20260907.md text eol=lf
 /benchmarks/results/glyph_rain_regl_20260907*.json -text

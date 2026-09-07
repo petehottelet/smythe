@@ -129,7 +129,17 @@ warmup followed by 60 seconds of samples at a 1080p viewport and 0.75 render
 scale. The helper binds source, catalogs, browser/backend, settings, and raw
 samples; the aggregator recomputes every timing summary. Callback intervals
 and CPU submission remain separate from GPU execution and physical presentation.
-The current adaptation has no completed performance campaign.
+The [completed campaign and cadence control](../../benchmarks/renderer_performance_20260907_results.md)
+retain all six valid sessions: 56.21–56.24 measured draws/second, with an
+18.10 ms P95 callback interval in each run. Every run missed the declared
+59.5 draws/second and 16.7 ms P95 targets. Three blank-page controls showed
+similar source cadence. These headless, active-desktop diagnostics do not
+measure physical presentation or GPU execution time.
+
+The separate [600.95-second stability soak](../../benchmarks/renderer_performance_20260907_results.md#separate-stability-check)
+passed 57 travel/resize cycles while Jobs and correctness workloads ran
+concurrently. Camera bounds, catalog mix, rain-time continuity, pause, and
+source identities held throughout the check.
 
 Benchmark completion now restores exactly one animation loop. A regression
 executes the renderer lifecycle through repeated measurements, pause/resume,
@@ -139,6 +149,7 @@ and timeout, rejecting duplicate scheduled callbacks. Run its offline checks:
 node screensaver/svg-preview/verify-lifecycle.mjs
 node screensaver/svg-preview/verify-measurement.mjs
 node screensaver/svg-preview/verify-browser-metadata.mjs
+node screensaver/svg-preview/verify-raf-control.mjs
 ```
 
 ### Archived Canvas v1 evidence
@@ -178,6 +189,6 @@ sprites. The [catalog record](../native-catalog.json) binds both source catalogs
 The native savers retain their three-layer motion. The REGL exposure pipeline,
 3D exploration, and pixel settings are next for the native ports.
 
-Next: measure reference-behavior tolerances and performance for the final
-preset and catalog configuration. Keep licensing, source hashes, screenshots,
-and test receipts together.
+Next: measure reference-behavior tolerances, visible-browser/display cadence,
+and GPU timing for the same preset and catalog configuration. Keep licensing,
+source hashes, screenshots, and test receipts together.

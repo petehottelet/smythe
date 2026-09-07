@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "scope": "Independent stability receipt review and competing-load declaration; no pacing, GPU/process-memory or hardware-backend qualification",
+  "receipt": {
+    "path": "benchmarks/results/glyph_rain_regl_20260907_f1_soak.json",
+    "sha256": "f83a06fc45fa7ae17d48b4103e8653e57a7511cc69e68ca53be5e54041bdac97"
+  },
+  "actualSeconds": 600.9507542,
+  "iterations": 57,
+  "viewportSizes": [
+    [
+      390,
+      844
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1920,
+      1080
+    ],
+    [
+      2560,
+      1440
+    ]
+  ],
+  "checks": {
+    "sourceMatchesFrozenPrimary": true,
+    "servedSourcesMatch": true,
+    "harnessStable": true,
+    "catalogAndMixStable": true,
+    "cameraFiniteAndWrapped": true,
+    "movementObserved": true,
+    "rainTimeMonotonic": true,
+    "finalPaused": true
+  },
+  "competingWorkloads": [
+    {
+      "name": "Frozen 5,000-operation Jobs scale and recovery campaign",
+      "reportedStartApprox": "2026-09-07T12:24:40-07:00",
+      "details": "Python3.11, concurrency8, identical tiny PNG fixtures, SQLite WAL/FULL; parent confirmed launch and progress during the soak."
+    },
+    {
+      "name": "Jobs namespace qualification and operator correctness checks",
+      "details": "Parent reported focused tests and process smoke work starting during the soak."
+    },
+    {
+      "name": "Renderer review and pure guard checks",
+      "details": "Independent Python arithmetic/source review, documentation preparation and seven short JavaScript regression commands ran during the soak; no additional GPU timing."
+    },
+    {
+      "name": "Existing desktop applications",
+      "details": "Root released the host after all owned tests finished. Existing desktop applications were not closed. One-second preflight observed about 2.6 aggregate CPU-seconds across five Chrome processes, plus active Firefox, Creative Cloud, NordVPN, cam_helper and ChatGPT; host not claimed idle."
+    }
+  ],
+  "unmeasured": [
+    "Physical display presentation",
+    "GPU execution time",
+    "GPU memory",
+    "Total process memory",
+    "Power consumption"
+  ],
+  "heapScope": "Browser performance.memory JS heap samples are retained in the raw receipt; they do not measure GPU or whole-process memory."
+}

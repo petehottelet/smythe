@@ -21,6 +21,26 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
+- **Measured REGL renderer evidence**: all six frozen Classic/3D sessions are
+  retained with raw timings and source identities. Each missed the pacing
+  target. Three exploratory blank-page controls showed similar callback
+  cadence; a separate ten-minute travel/resize check passed 57 cycles.
+  Reproducible arithmetic review keeps browser callbacks separate from GPU
+  timing and physical presentation.
+
+- **Artifact directory ownership**: new Jobs runs use persistent namespaces
+  across case-insensitive filesystems and shared output roots. Owner markers
+  bind directories before dispatch, and exclusive publication preserves
+  existing files. Upgraded runs retain their original receipt paths; conflicting
+  legacy ownership and unsupported hard-link filesystems fail closed.
+
+- **Detached Jobs and durable pause**: approved runs and resumes can continue
+  independently of the terminal. Workers prove lease ownership before dispatch;
+  bounded, read-only attachment reports progress and startup failures retain
+  recovery paths. `jobs stop` saves a generation-bound pause and lets admitted
+  calls drain. Explicit resume cannot erase a newer stop request. Schema v4
+  upgrades reject live earlier-version leases and preserve read-only v2/v3 access.
+
 - **Renderer measurement controls**: freeze a six-session Classic/3D protocol,
   validate raw timings and browser/backend identity, and retain failed attempts.
   Benchmark completion restores one animation loop; lifecycle regressions catch

@@ -10,33 +10,39 @@ Publishing uses PyPI **trusted publishing** (GitHub OIDC, no API token). The fiv
 | Workflow file | `.github/workflows/publish.yml` |
 | Workflow environment | `pypi` |
 
-## One-time setup
+## Publisher configuration
 
-1. **PyPI pending publisher** — configured (project `smythe`, workflow `publish.yml`, environment `pypi`). ✅
-2. **GitHub environment** — Repository → Settings → Environments → New environment → `pypi`. No protection rules needed for the first release.
-3. **Workflow on the default branch** — `publish.yml` triggers on GitHub *release published* and on manual `workflow_dispatch`; both require the workflow to exist on `main`, so merge the branch that carries it before releasing.
+The repository publishes through `.github/workflows/publish.yml` and the
+GitHub environment `pypi`. Keep the corresponding PyPI trusted publisher
+aligned with the values above. The workflow runs when a GitHub release is
+published or when a maintainer dispatches it manually.
 
 ## Per-release flow
 
-1. Bump `version` in `pyproject.toml` **and** `__version__` in `smythe/__init__.py` (PyPI never accepts a re-upload of an existing version). Add the CHANGELOG section.
-2. Local check:
+1. Complete the release's code review, Ruff check, full offline suite, and
+   platform checks. Confirm the tested commit is on `main`.
+2. Bump `version` in `pyproject.toml` **and** `__version__` in `smythe/__init__.py`.
+   Move the completed `Unreleased` entries into a dated section for that version;
+   keep older released sections unchanged. Update installation and feature
+   availability documentation. PyPI never accepts a re-upload of an existing version.
+3. Build into a fresh output directory and validate the exact new artifacts:
    ```bash
-   python -m pip install --upgrade build twine
-   python -m build
-   python -m twine check dist/*
+   python -m pip install build twine
+   python -m build --outdir release-dist
+   python -m twine check release-dist/*
    # then install the wheel in a scratch venv and:
    python -c "import smythe; print(smythe.__version__)"
    ```
-3. Open a release-checklist issue (template: "Release checklist") and work through it.
-4. Create the GitHub release — tag `vX.Y.Z` matching the package version, target `main`. Publishing the release triggers `publish.yml`.
-5. Verify from a clean venv: `pip install smythe`, import it, and `pip index versions smythe`.
-
-## Note on the first publish
-
-The GitHub release **v0.1.0 already exists** (April 2026) and predates the publish workflow, so it will not trigger anything. Two options for the first PyPI upload:
-
-- **Recommended:** merge the v0.2 line, bump to `0.2.0`, and create release `v0.2.0` — the first PyPI version is then the substantially stronger current code.
-- Quick path: run `publish.yml` via *workflow_dispatch* on `main`, which uploads whatever version `main` currently carries.
+4. Open a release-checklist issue (template: "Release checklist") and record
+   the tested commit, check URLs, package hashes, and release notes.
+5. Push the version commit and verify its CI checks. Create tag `vX.Y.Z` at
+   that exact commit and publish its GitHub release. This triggers `publish.yml`.
+6. Attach the verified native screensaver packages with `SHA256SUMS` and
+   `BUILD_INFO.json`. Their independent native version and source commit remain
+   explicit in the build record; attaching them does not imply a new rebuild.
+7. Verify the successful publish workflow. In a fresh environment, install
+   `smythe==X.Y.Z` from PyPI, check its version, and exercise the installed CLI.
+   Update the PyPI badge only after the published version is available.
 
 ## If publishing fails
 

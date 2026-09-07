@@ -28,7 +28,7 @@ model and pipeline, with blind cross-vendor judging.
 
 ## Glyph Rain
 
-Run example: One workflow creates 192 original SVG glyphs and validates the result set. 
+One workflow creates and validates 192 original SVG glyphs.
 
 <p align="center">
   <img src="screensaver/svg-preview/preview.png" alt="Classic code rain with the reference character set and occasional original Smythe glyphs" width="900">
@@ -41,6 +41,10 @@ Run example: One workflow creates 192 original SVG glyphs and validates the resu
 [Individual SVGs and manifest](benchmarks/partitions/glyph_svg_v1/catalog/).
 In 3D mode, arrow keys move through the field; Space pauses, R resets the view, and F enters
 fullscreen. Touch controls are included.
+The [current browser review](benchmarks/partitions/glyph_rain_reference_v1/performance-preview-review-20260907.json)
+binds this screenshot and passes 31 rendering and interaction checks.
+A separate ten-minute travel and resize check passed 57 cycles.
+[Rendering measurements and stability report](benchmarks/renderer_performance_20260907_results.md).
 
 **Native downloads:** [Windows `.scr`](https://github.com/petehottelet/smythe/raw/refs/heads/main/screensaver/dist/SmytheGlyphRain.scr) ·
 [macOS universal `.zip`](https://github.com/petehottelet/smythe/raw/refs/heads/main/screensaver/dist/GlyphRain-macos-universal.zip) ·
@@ -163,9 +167,12 @@ documents each comparison, its scope, and its evidence status.
 
 Agents use MCP tools, generate images, and pass artifacts to downstream nodes.
 Durable Jobs add manifest validation, plan approvals, an attempt journal,
-selective rerolls, read-only run inspection, and portable exports. Inspect
+selective rerolls, detached workers, durable pauses, read-only inspection,
+and portable exports. Inspect
 prompts, responses, costs, and artifact receipts in a local HTML report.
 Lease epochs reject stale-worker journal writes after ownership changes.
+Persistent artifact namespaces and exclusive file publication preserve accepted
+outputs across custom run IDs and shared output directories.
 Iterative graph traversal passes [5,000-node dependency-chain checks](docs/execution.md#deep-graphs),
 including complete offline serial execution and atomic revision validation.
 [Saved graph policies](docs/workflow-accounting.md#freeze-graph-limits) bound node
@@ -237,14 +244,15 @@ team challenges the draft, and a final node writes the decision memo.
 
 ## Coming soon
 
-- **Operator tools:** detach long jobs and approve durable pauses.
 - **Native exploration:** bring the web exposure pipeline, camera controls,
   and settings to Windows, macOS, and Linux, then verify them against the
   [implementation plan](docs/glyph-rain-plan.md).
 - **Native distribution:** notarized macOS downloads and native Wayland integration.
 - **Renderer performance:** meet the 1080p frame-interval target with the new
-  glyphs. The [six-session protocol](benchmarks/renderer_performance_20260907.md)
-  freezes Classic and 3D settings, raw timing checks, and graphics-backend evidence.
+  glyphs, then verify visible presentation and GPU timing. The
+  [six-session headless study](benchmarks/renderer_performance_20260907_results.md)
+  measured 56.21–56.24 draws/second and retained every result; its pacing target
+  was not met.
 - **Broader evidence:** larger stress tests, repeated live glyph sweeps, and
   human-calibrated quality comparisons with saved outputs and judge reasoning.
 - **Astra benchmarks:** matched model and orchestration comparisons with full

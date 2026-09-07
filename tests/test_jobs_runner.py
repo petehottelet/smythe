@@ -81,7 +81,7 @@ def test_runner_executes_bounded_offline_job_and_persists_artifacts(tmp_path):
     assert result["cost"]["confirmed_microusd"] == 0
     assert len(result["artifacts"]) == 4
     for artifact in result["artifacts"]:
-        assert (tmp_path / "outputs" / result["run_id"] / artifact["relative_path"]).is_file()
+        assert (tmp_path / "outputs" / result["artifact_directory"] / artifact["relative_path"]).is_file()
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows path namespace semantics")
@@ -93,7 +93,7 @@ def test_runner_accepts_equivalent_windows_extended_path_namespace(tmp_path, mon
     def resolve_with_namespace(path, *args, **kwargs):
         resolved = original_resolve(path, *args, **kwargs)
         value = str(resolved)
-        if path.name == "namespace-run" and not value.startswith("\\\\?\\"):
+        if path.name.startswith("run-") and not value.startswith("\\\\?\\"):
             return runner_module.Path("\\\\?\\" + value)
         return resolved
 
@@ -385,15 +385,41 @@ def test_never_returning_provider_hits_call_deadline_and_becomes_unknown(tmp_pat
     assert "deadline after dispatch" in result["operations"][0]["error"]
 
 
-def test_whole_run_deadline_cancels_dispatched_call_conservatively(tmp_path):
+def test_whole_run_deadline_cancels_dispatched_call_conservatively(tmp_path, monkeypatch):
+    class EnteredProvider(_NeverReturningProvider):
+        def __init__(self):
+            self.entered = asyncio.Event()
+
+        async def complete(self, system, prompt, model):
+            self.entered.set()
+            return await super().complete(system, prompt, model)
+
     plan = preflight_job(_manifest(count=1), manifest_root=tmp_path)
     store = SQLiteRunStore(tmp_path / "jobs.db")
+    provider = EnteredProvider()
     runner = JobRunner(
         store,
-        provider_pool=_FixedPool(_NeverReturningProvider()),
+        provider_pool=_FixedPool(provider),
         call_timeout_s=10,
         max_wall_seconds=0.05,
     )
+    original_wait_for = asyncio.wait_for
+
+    async def deadline_after_dispatch(awaitable, timeout):
+        if timeout != 0.05:
+            return await original_wait_for(awaitable, timeout)
+        # This regression targets expiry after durable dispatch. Arm its short
+        # timer at provider entry so filesystem preparation cannot win the race.
+        execution = asyncio.ensure_future(awaitable)
+        try:
+            await original_wait_for(provider.entered.wait(), 30)
+            return await original_wait_for(execution, timeout)
+        finally:
+            if not execution.done():
+                execution.cancel()
+            await asyncio.gather(execution, return_exceptions=True)
+
+    monkeypatch.setattr(asyncio, "wait_for", deadline_after_dispatch)
 
     with pytest.raises(TimeoutError, match="wall deadline"):
         asyncio.run(
@@ -405,9 +431,46 @@ def test_whole_run_deadline_cancels_dispatched_call_conservatively(tmp_path):
             )
         )
 
+    assert provider.entered.is_set()
     snapshot = store.snapshot("wall-deadline")
     assert snapshot["status"] == RunStatus.NEEDS_ATTENTION.value
     assert snapshot["counts"] == {OperationStatus.UNKNOWN_OUTCOME.value: 1}
+
+
+def test_whole_run_deadline_before_dispatch_leaves_work_pending(tmp_path, monkeypatch):
+    class CountingProvider(_ImmediateArtifactProvider):
+        calls = 0
+
+        async def complete(self, system, prompt, model):
+            self.calls += 1
+            return await super().complete(system, prompt, model)
+
+    release = threading.Event()
+    plan = preflight_job(_manifest(count=1), manifest_root=tmp_path)
+    store = SQLiteRunStore(tmp_path / "jobs.db")
+    provider = CountingProvider()
+    runner = JobRunner(store, provider_pool=_FixedPool(provider), max_wall_seconds=0.05)
+
+    def delayed_preparation(_snapshot, _root):
+        assert release.wait(30), "preparation barrier was never released"
+
+    monkeypatch.setattr(runner, "_claim_artifact_directory", delayed_preparation)
+
+    async def scenario():
+        try:
+            return await runner.start(plan, make_approval(plan), manifest_root=tmp_path,
+                                      run_id="pre-dispatch-deadline")
+        finally:
+            release.set()
+
+    with pytest.raises(TimeoutError, match="wall deadline"):
+        asyncio.run(scenario())
+    snapshot = store.snapshot("pre-dispatch-deadline")
+    assert provider.calls == 0
+    assert snapshot["counts"] == {OperationStatus.PENDING.value: 1}
+    assert store._call_rows("pre-dispatch-deadline") == []
+    assert snapshot["cost"]["reserved_microusd"] == 0
+    assert store.get_run_lease("pre-dispatch-deadline") is None
 
 
 def test_invalid_provider_cost_is_immediately_journaled_unknown(tmp_path):
@@ -609,7 +672,7 @@ def test_slow_artifact_finalizer_does_not_starve_lease_heartbeat(
     entered = threading.Event()
     release = threading.Event()
     finished = threading.Event()
-    original_write = runner_module.atomic_write_bytes
+    original_write = runner_module.atomic_publish_bytes
 
     def slow_write(path, data):
         entered.set()
@@ -619,7 +682,7 @@ def test_slow_artifact_finalizer_does_not_starve_lease_heartbeat(
         finally:
             finished.set()
 
-    monkeypatch.setattr(runner_module, "atomic_write_bytes", slow_write)
+    monkeypatch.setattr(runner_module, "atomic_publish_bytes", slow_write)
 
     async def scenario() -> None:
         plan = preflight_job(_manifest(count=1), manifest_root=tmp_path)

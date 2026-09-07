@@ -314,7 +314,8 @@ def _accepted_receipts(root: Path, snapshot: dict) -> dict[str, dict]:
         operation_id = artifact["operation_id"]
         _require(operation_id not in receipts, "multiple accepted artifacts for one operation")
         _require(pointers.get(operation_id) == artifact["attempt_id"], "accepted pointer mismatch")
-        data = (root / "outputs" / RUN_ID / artifact["relative_path"]).read_bytes()
+        directory = snapshot.get("artifact_directory", RUN_ID)
+        data = (root / "outputs" / directory / artifact["relative_path"]).read_bytes()
         inspection = inspect_artifact(data, "image/png")
         _require(data == PNG, "artifact bytes differ from the fixture")
         for field in ("sha256", "size_bytes", "mime_type", "width", "height"):

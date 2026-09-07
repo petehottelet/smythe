@@ -85,9 +85,11 @@ The contract has four sections:
 - `execution.max_concurrency` bounds active calls. `max_attempts` bounds the
   complete attempt lineage, including later rerolls.
 - `execution.call_timeout_s` bounds each provider attempt (default 300 seconds,
-  maximum 3,600). `max_wall_seconds` bounds the whole run (default 21,600
-  seconds/six hours, maximum 604,800 seconds/seven days). Both values are part
-  of the approved plan identity.
+  maximum 3,600). `max_wall_seconds` bounds the worker execution window for
+  each start, resume, or reroll (default 21,600 seconds/six hours, maximum
+  604,800 seconds/seven days). It includes artifact-directory preparation;
+  it is not cumulative elapsed time across separate invocations. Both values
+  are part of the approved plan identity.
 - `execution.max_budget_usd` is the outer policy ceiling. The expanded
   worst-case cost is every operation multiplied by its per-call ceiling and
   maximum attempts; preflight fails if that total does not fit.
@@ -178,9 +180,21 @@ The distinction between `prepared` and `dispatched` controls recovery:
 - A process or connection that stops after `dispatched` becomes
   `unknown_outcome`. The provider may have completed and billed the request, so
   Smythe does not issue an automatic duplicate.
-- A completed response is inspected, written atomically beneath
-  `artifacts/<operation-key>/attempt-NNNN/`, and committed with its SHA-256,
+- A completed response is inspected, published without replacing an existing
+  file beneath `<artifact_root>/artifacts/<operation-directory>/attempt-NNNN/`, and committed with its SHA-256,
   MIME type, byte size, and observed dimensions.
+
+Each new run receives a persistent artifact namespace. Its files live beneath
+`<output_directory>/run-<namespace>`; snapshots expose that final component as
+`artifact_directory`. Run IDs remain the public identifiers, so `Run`, `run`,
+and `run.` can stay distinct on Windows. Separate databases also receive
+separate namespaces when they share an output directory.
+
+Before provider dispatch, the worker verifies the directory's persistent owner
+marker and probes exclusive file publication. Jobs requires a local filesystem
+with file hard-link support. An unsupported filesystem, conflicting owner, or
+existing destination fails without replacing earlier bytes. A collision found
+after a provider response remains an unknown outcome for explicit investigation.
 
 The local journal derives an idempotency key for every attempt, but Jobs v1
 does not yet transmit that key to every upstream provider. It is durable local
@@ -235,7 +249,7 @@ unchecked files are labeled. Unsafe paths, symbolic links, and junctions are
 not followed. These checks preserve the recorded acceptance decision and do
 not repeat image decoding or quality evaluation.
 
-`list`, `inspect`, `status`, and `export` open the existing Jobs database in
+`list`, `inspect`, `status`, `attach`, and `export` open the existing Jobs database in
 read-only mode, without provider initialization or schema migration. Missing,
 foreign, and unsupported databases fail closed. A live WAL reader sees one
 consistent committed ledger snapshot while the worker continues. `--out`
@@ -245,6 +259,68 @@ or SHM files as output destinations.
 Successful `list` and `inspect` commands return exit code 0 even when a run
 needs attention. Their JSON output retains the run's recorded status. The
 existing `status` and `export` commands retain their job-state exit codes.
+
+## Detached execution and attachment
+
+Add `--detach` to start an approved job independently of the terminal:
+
+```bash
+smythe jobs run job.yaml --approve approve_v1_... --detach
+smythe jobs attach RUN_ID
+smythe jobs resume RUN_ID --detach
+```
+
+The launcher returns after the worker proves current lease ownership and the
+launcher records dispatch authorization. It reports the run ID, actual worker PID, and
+private log and receipt paths. The worker uses the launching Python environment.
+Closing the terminal leaves it running. Failure before authorization prevents
+a later dispatch. An interruption or I/O error after authorization may leave
+the worker active; error metadata distinguishes that boundary and retains
+recovery information for the saved run. `--startup-timeout-s` accepts 0.1–300
+seconds and defaults to 30.
+
+`attach` observes saved state without initializing providers, recovering work,
+or controlling the worker. It follows for up to 30 seconds by default; set
+`--timeout-s` from 0 to 3,600 and `--poll-interval-s` from 0.05 to 60 seconds
+(default 1). A timeout ends the attachment. Ctrl+C disconnects with exit code
+130. Both leave the job running. `--json` returns one document, including the
+final attachment state. Worker failure and expired ownership return code 7.
+
+Launch receipts live beside the database in `.DATABASE.workers/RUN_ID_SHA256/LAUNCH_ID`.
+Hashing the exact run ID keeps distinct IDs separate on case-insensitive filesystems.
+Directories restrict access to the current user (and SYSTEM on Windows).
+Logs can contain provider errors and local paths. The latest launch receipt
+and current lease are separate observations: a competing failed launch does
+not identify the active worker. Saved PIDs are never used to signal a process.
+
+## Stop and resume safely
+
+Stop requests a durable pause, then observes the drain:
+
+```bash
+smythe jobs stop RUN_ID --reason "Review the accepted outputs"
+smythe jobs status RUN_ID --json
+smythe jobs resume RUN_ID --detach
+```
+
+The request blocks new attempt, reservation, and dispatch admission. Calls
+already marked dispatched finish through the normal accounting and artifact
+path. A pause does not cancel a provider request. Safe prepared calls return
+to pending; accepted outputs and attempt history remain intact. The run becomes
+`paused` after admitted work drains and pending work remains. Completed work,
+unknown outcomes, and budget overruns retain their corresponding statuses.
+
+`stop` uses the same timeout and polling ranges as `attach`. Set `--timeout-s 0`
+to return immediately after saving the request. A timeout or Ctrl+C ends only
+the observation; the pause request persists. An idle approved run can retain
+`pause_requested: true` without starting a worker. JSON includes the captured
+`stop_request` and current `control`, so a later operator action remains visible.
+
+Each stop advances a durable pause generation. Explicit resume captures that
+generation before preflight and clears only the matching request when it
+acquires ownership. A stop issued after that resume intent survives. Initial
+detached launch never clears a pause. Reroll queues selected work under the
+same pause control; explicit resume is needed to reopen admission.
 
 ## Resume and unknown outcomes
 
@@ -290,12 +366,22 @@ risk explicitly during a selective reroll.
 
 ## Jobs database upgrades
 
-The writable store upgrades earlier Jobs databases to schema version 3. Stop
-older workers before upgrading; an unexpired legacy lease blocks migration.
-Historical attempts keep their original unbound provenance. Runs that held a
+The writable store upgrades earlier Jobs databases to schema version 4. Stop
+older workers using their existing controls before upgrading; an unexpired
+earlier-version lease blocks migration. The new `jobs stop` command requires
+the upgraded store and cannot pause a live older worker. Version 3 workers
+enforce ownership but cannot honor durable pause requests.
+Existing attempt provenance is preserved, including unbound pre-v3 attempts. Runs that held a
 legacy lease remain fenced after upgrade, including after lease release.
-Read-only inspection supports version 2 without migration and reports whether
-lease fencing is supported in that snapshot.
+Read-only inspection supports versions 2 and 3 without migration and reports
+whether lease fencing and durable pause control are supported in that snapshot.
+
+Migrated runs retain their original `<output_directory>/<RUN_ID>` directories
+and artifact receipts. Before the first upgraded execution, Smythe verifies
+their accepted bytes and claims the directory with a persistent owner marker.
+Ambiguous legacy directories shared by multiple runs fail closed. Keep the
+original database and outputs together; inspection and export report the saved
+artifact location without moving files.
 
 Code using `JobRunner` receives these checks automatically. Direct store users
 must retain the `RunLease` returned by `acquire_run_lease` and pass it as `lease=`
@@ -338,7 +424,8 @@ smythe jobs export RUN_ID --out run-export.json
 
 The file is written atomically. Exported artifact paths use forward-slash
 relative paths beneath an explicit `artifact_root` such as
-`outputs/RUN_ID`. The export declares `manifest_root: "."` as its relocatable
+`outputs/run-<namespace>` for a new run or `outputs/RUN_ID` for a migrated run.
+The export declares `manifest_root: "."` as its relocatable
 base and `paths_relative_to: "artifact_root"`; join the chosen relocated
 manifest root, `artifact_root`, and each artifact `relative_path` to locate its
 bytes.
@@ -371,7 +458,8 @@ and output charge that one request can incur.
 | 4 | approval mismatch |
 | 5 | budget admission failure |
 | 6 | unknown run or invalid state transition |
-| 7 | local SQLite or filesystem failure |
+| 7 | local SQLite/filesystem failure, detached startup failure, or attachment detects a failed worker or expired lease |
+| 130 | detached startup interrupted, or attachment disconnected with Ctrl+C |
 
 Use `--json` for one compact document on stdout, including structured errors.
 

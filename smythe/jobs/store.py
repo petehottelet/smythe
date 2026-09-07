@@ -21,7 +21,7 @@ from smythe.jobs.artifact_io import MAX_ARTIFACT_BYTES, MAX_IMAGE_PIXELS
 from smythe.jobs.preflight import JobApprovalV1, JobPlanV1, verify_approval
 
 
-STORE_VERSION = 3
+STORE_VERSION = 4
 DEFAULT_RUN_LEASE_TTL_S = 30.0
 MAX_SQLITE_INTEGER = (1 << 63) - 1
 MAX_ARTIFACTS_PER_CALL = 10
@@ -31,16 +31,27 @@ _RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 # Jobs predates an explicit format-kind table. Verify its complete table
 # shape and user_version before opening it for inspection or migration.
 _SCHEMA_COLUMNS = {
-    "runs": "run_id manifest_hash plan_hash manifest_json plan_json approval_json approval_token manifest_root output_directory max_concurrency status approved_microusd confirmed_microusd exposure_microusd reserved_microusd created_at_ns updated_at_ns lease_epoch",
+    "runs": "run_id manifest_hash plan_hash manifest_json plan_json approval_json approval_token manifest_root output_directory max_concurrency status approved_microusd confirmed_microusd exposure_microusd reserved_microusd created_at_ns updated_at_ns lease_epoch artifact_namespace artifact_owner_id",
     "operations": "run_id operation_id operation_key spec_json status attempt_count max_attempts accepted_attempt_id result_text error updated_at_ns",
     "attempts": "attempt_id run_id operation_id attempt_number parent_attempt_id reason status result_text error started_at_ns completed_at_ns lease_owner_id lease_epoch",
     "calls": "call_id attempt_id run_id operation_id status idempotency_key ceiling_microusd confirmed_microusd exposure_microusd cost_is_complete cost_is_estimate provider_request_id error created_at_ns dispatched_at_ns completed_at_ns",
     "artifacts": "artifact_id attempt_id run_id operation_id relative_path mime_type sha256 size_bytes width height accepted created_at_ns",
     "events": "sequence run_id operation_id event_type payload_json created_at_ns",
     "run_leases": "run_id owner_id acquired_at_ns heartbeat_at_ns expires_at_ns epoch",
+    "run_controls": "run_id pause_generation pause_requested pause_reason pause_requested_at_ns drained_at_ns",
 }
 _FENCING_COLUMNS = {"runs": {"lease_epoch"}, "attempts": {"lease_owner_id", "lease_epoch"},
                     "run_leases": {"epoch"}}
+_ARTIFACT_COLUMNS = {"artifact_namespace", "artifact_owner_id"}
+_IDENTITY_RE = re.compile(r"[0-9a-f]{32}\Z")
+_CONTROL_TABLE_SQL = """CREATE TABLE IF NOT EXISTS run_controls (
+    run_id TEXT PRIMARY KEY REFERENCES runs(run_id) ON DELETE CASCADE,
+    pause_generation INTEGER NOT NULL DEFAULT 0,
+    pause_requested INTEGER NOT NULL DEFAULT 0,
+    pause_reason TEXT,
+    pause_requested_at_ns INTEGER,
+    drained_at_ns INTEGER
+)"""
 
 
 class RunStatus(str, Enum):
@@ -51,6 +62,7 @@ class RunStatus(str, Enum):
     PARTIAL = "partial"
     FAILED = "failed"
     BUDGET_OVERRUN = "budget_overrun"
+    PAUSED = "paused"
 
 
 class OperationStatus(str, Enum):
@@ -84,6 +96,10 @@ class _BudgetAdmissionClosed(JobBudgetError):
 
 class RunLeaseError(RunStoreError):
     """Raised when a mutation lacks its current live lease generation."""
+
+
+class RunPauseRequested(RunStoreError):
+    """Raised when a durable pause request refuses new dispatch admission."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,17 +231,19 @@ def _validate_read_row(row, table: str) -> None:
         "cost_is_estimate", "dispatched_at_ns", "size_bytes", "width", "height", "accepted", "sequence",
         "cost_contains_estimates", "count", "acquired_at_ns", "heartbeat_at_ns", "expires_at_ns",
         "lease_epoch", "epoch",
+        "pause_generation", "pause_requested", "pause_requested_at_ns", "drained_at_ns",
     }
     nullable = {
-        "runs": set(),
+        "runs": {"artifact_namespace"},
         "operations": {"accepted_attempt_id", "result_text", "error"},
         "attempts": {"parent_attempt_id", "reason", "result_text", "error", "completed_at_ns", "lease_owner_id"},
         "calls": {"provider_request_id", "error", "dispatched_at_ns", "completed_at_ns"},
         "artifacts": {"width", "height"},
         "events": {"operation_id"},
         "run_leases": set(),
+        "run_controls": {"pause_reason", "pause_requested_at_ns", "drained_at_ns"},
     }
-    flags = {"cost_is_complete", "cost_is_estimate", "accepted", "cost_contains_estimates"}
+    flags = {"cost_is_complete", "cost_is_estimate", "accepted", "cost_contains_estimates", "pause_requested"}
     for field, value in dict(row).items():
         if value is None and field in nullable[table]:
             continue
@@ -234,6 +252,18 @@ def _validate_read_row(row, table: str) -> None:
                 raise RunStoreError("Invalid stored integer in " + table + "." + field)
         elif type(value) is not str:
             raise RunStoreError("Invalid stored text in " + table + "." + field)
+
+
+def _artifact_identity(run: dict[str, Any], schema_version: int) -> dict[str, Any]:
+    namespace = run["artifact_namespace"] if schema_version >= 4 else None
+    owner = run["artifact_owner_id"] if schema_version >= 4 else None
+    if schema_version >= 4 and (
+        type(owner) is not str or not _IDENTITY_RE.fullmatch(owner)
+        or namespace is not None and (type(namespace) is not str or not _IDENTITY_RE.fullmatch(namespace))
+    ):
+        raise RunStoreError("Invalid stored artifact namespace or owner identity")
+    return {"artifact_namespace": namespace, "artifact_owner_id": owner,
+            "artifact_directory": f"run-{namespace}" if namespace else _safe_run_id(run["run_id"])}
 
 
 class SQLiteRunStore:
@@ -293,11 +323,17 @@ class SQLiteRunStore:
             self.schema_version = version
             if not tables and version == 0 and allow_empty:
                 return False
-            supported_versions = (1, 2, STORE_VERSION) if not self.read_only else (2, STORE_VERSION)
+            supported_versions = (1, 2, 3, STORE_VERSION) if not self.read_only else (2, 3, STORE_VERSION)
             if version not in supported_versions:
                 raise RunStoreError("Unsupported Jobs database version")
             expected = dict(_SCHEMA_COLUMNS)
-            if version < STORE_VERSION:
+            if version < 4:
+                expected.pop("run_controls")
+                expected["runs"] = " ".join(field for field in expected["runs"].split()
+                                             if field not in _ARTIFACT_COLUMNS)
+                if "run_controls" in tables:
+                    raise RunStoreError("Mixed Jobs pause schema; stop old writers before upgrading")
+            if version < 3:
                 expected = {table: " ".join(field for field in columns.split()
                             if field not in _FENCING_COLUMNS.get(table, set()))
                             for table, columns in expected.items()}
@@ -307,7 +343,9 @@ class SQLiteRunStore:
                 raise RunStoreError("Database does not contain the required Jobs schema")
             for table, columns in expected.items():
                 found = {row[1] for row in cursor.execute(f"PRAGMA table_info({table})")}
-                if version < STORE_VERSION and found & _FENCING_COLUMNS.get(table, set()):
+                if version < 4 and table == "runs" and found & _ARTIFACT_COLUMNS:
+                    raise RunStoreError("Mixed Jobs artifact schema; stop old writers before upgrading")
+                if version < 3 and found & _FENCING_COLUMNS.get(table, set()):
                     raise RunStoreError("Mixed Jobs lease-fencing schema; stop old writers before upgrading")
                 if not set(columns.split()) <= found:
                     raise RunStoreError("Jobs database has an incomplete " + table + " table")
@@ -318,20 +356,22 @@ class SQLiteRunStore:
 
         Already-running legacy binaries cannot enforce new fences. Operators
         must stop them before upgrading; a live legacy lease blocks migration.
-        Read-only v2 inspection never enters this path.
+        Read-only v2/v3 inspection never enters this path. Version-3 workers
+        enforce ownership but cannot honor durable pause requests.
         """
         with self._transaction(upgrading=True) as cursor:
             version = cursor.execute("PRAGMA user_version").fetchone()[0]
             if version == STORE_VERSION:
                 return  # Another opener completed the same migration.
-            if version not in (1, 2):
+            if version not in (1, 2, 3):
                 raise RunStoreError("Unsupported Jobs database version for migration")
             tables = {row[0] for row in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             if "run_leases" in tables:
                 if cursor.execute("SELECT 1 FROM run_leases WHERE expires_at_ns > ? LIMIT 1",
                                   (self._clock_ns(),)).fetchone():
                     raise RunLeaseError("Stop legacy Jobs workers before upgrading a database with live leases")
-                cursor.execute("ALTER TABLE run_leases ADD COLUMN epoch INTEGER NOT NULL DEFAULT 1")
+                if version < 3:
+                    cursor.execute("ALTER TABLE run_leases ADD COLUMN epoch INTEGER NOT NULL DEFAULT 1")
             else:
                 cursor.execute("""CREATE TABLE run_leases (
                     run_id TEXT PRIMARY KEY REFERENCES runs(run_id) ON DELETE CASCADE,
@@ -339,14 +379,22 @@ class SQLiteRunStore:
                     heartbeat_at_ns INTEGER NOT NULL, expires_at_ns INTEGER NOT NULL,
                     epoch INTEGER NOT NULL DEFAULT 1)""")
                 cursor.execute("CREATE INDEX run_leases_by_expiry ON run_leases(expires_at_ns)")
-            cursor.execute("ALTER TABLE runs ADD COLUMN lease_epoch INTEGER NOT NULL DEFAULT 0")
-            cursor.execute("ALTER TABLE attempts ADD COLUMN lease_owner_id TEXT")
-            cursor.execute("ALTER TABLE attempts ADD COLUMN lease_epoch INTEGER NOT NULL DEFAULT 0")
-            cursor.execute("""UPDATE runs SET lease_epoch=1 WHERE
-                EXISTS(SELECT 1 FROM run_leases WHERE run_leases.run_id=runs.run_id) OR
-                EXISTS(SELECT 1 FROM events WHERE events.run_id=runs.run_id
-                       AND event_type IN ('run_lease_acquired','run_lease_renewed'))""")
-            cursor.execute("PRAGMA user_version = 3")
+            if version < 3:
+                cursor.execute("ALTER TABLE runs ADD COLUMN lease_epoch INTEGER NOT NULL DEFAULT 0")
+                cursor.execute("ALTER TABLE attempts ADD COLUMN lease_owner_id TEXT")
+                cursor.execute("ALTER TABLE attempts ADD COLUMN lease_epoch INTEGER NOT NULL DEFAULT 0")
+                cursor.execute("""UPDATE runs SET lease_epoch=1 WHERE
+                    EXISTS(SELECT 1 FROM run_leases WHERE run_leases.run_id=runs.run_id) OR
+                    EXISTS(SELECT 1 FROM events WHERE events.run_id=runs.run_id
+                           AND event_type IN ('run_lease_acquired','run_lease_renewed'))""")
+            cursor.execute(_CONTROL_TABLE_SQL)
+            cursor.execute("INSERT INTO run_controls(run_id) SELECT run_id FROM runs")
+            cursor.execute("ALTER TABLE runs ADD COLUMN artifact_namespace TEXT")
+            cursor.execute("ALTER TABLE runs ADD COLUMN artifact_owner_id TEXT")
+            for row in cursor.execute("SELECT run_id FROM runs").fetchall():
+                cursor.execute("UPDATE runs SET artifact_owner_id=? WHERE run_id=?",
+                               (uuid4().hex, row["run_id"]))
+            cursor.execute("PRAGMA user_version = 4")
 
     def close(self) -> None:
         with self._lock:
@@ -379,7 +427,9 @@ class SQLiteRunStore:
                 reserved_microusd INTEGER NOT NULL DEFAULT 0,
                 created_at_ns INTEGER NOT NULL,
                 updated_at_ns INTEGER NOT NULL,
-                lease_epoch INTEGER NOT NULL DEFAULT 0
+                lease_epoch INTEGER NOT NULL DEFAULT 0,
+                artifact_namespace TEXT,
+                artifact_owner_id TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS operations (
@@ -479,8 +529,8 @@ class SQLiteRunStore:
                 ON artifacts(run_id, operation_id, accepted);
             CREATE INDEX IF NOT EXISTS run_leases_by_expiry
                 ON run_leases(expires_at_ns);
-            PRAGMA user_version = 3;
             """
+            + _CONTROL_TABLE_SQL + "; PRAGMA user_version = 4;"
         )
 
     @contextmanager
@@ -542,6 +592,7 @@ class SQLiteRunStore:
         approval_json = json.dumps(
             approval.to_dict(), sort_keys=True, separators=(",", ":")
         )
+        artifact_identity = uuid4().hex
         with self._transaction() as cursor:
             now = self._clock_ns()
             cursor.execute(
@@ -550,8 +601,8 @@ class SQLiteRunStore:
                     run_id, manifest_hash, plan_hash, manifest_json, plan_json,
                     approval_json, approval_token, manifest_root, output_directory,
                     max_concurrency, status, approved_microusd,
-                    created_at_ns, updated_at_ns
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    created_at_ns, updated_at_ns, artifact_namespace, artifact_owner_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run_id,
@@ -568,6 +619,8 @@ class SQLiteRunStore:
                     approved_microusd,
                     now,
                     now,
+                    artifact_identity,
+                    artifact_identity,
                 ),
             )
             cursor.executemany(
@@ -592,6 +645,7 @@ class SQLiteRunStore:
                     for operation in plan.operations
                 ],
             )
+            cursor.execute("INSERT INTO run_controls(run_id) VALUES (?)", (run_id,))
             self._event(cursor, run_id, None, "run_created", plan.to_dict(), now)
         return run_id
 
@@ -601,6 +655,7 @@ class SQLiteRunStore:
         owner_id: str,
         *,
         ttl_s: float = DEFAULT_RUN_LEASE_TTL_S,
+        pause_generation: int | None = None,
     ) -> RunLease:
         """Atomically acquire or renew exclusive ownership of a run.
 
@@ -611,6 +666,8 @@ class SQLiteRunStore:
 
         owner = _lease_owner(owner_id)
         duration_ns = _lease_duration_ns(ttl_s)
+        if pause_generation is not None:
+            pause_generation = _microusd(pause_generation, field="pause_generation")
         with self._transaction() as cursor:
             now = self._clock_ns()
             expires = _microusd(now + duration_ns, field="lease expiry")
@@ -659,6 +716,8 @@ class SQLiteRunStore:
                 (run_id, owner, acquired_at, now, expires, epoch),
             )
             cursor.execute("UPDATE runs SET lease_epoch = ? WHERE run_id = ?", (epoch, run_id))
+            if pause_generation is not None:
+                self._clear_observed_pause(cursor, run_id, pause_generation, now)
             row = cursor.execute(
                 "SELECT * FROM run_leases WHERE run_id = ?", (run_id,)
             ).fetchone()
@@ -677,6 +736,66 @@ class SQLiteRunStore:
                 now,
             )
             return _run_lease(row)
+
+    def get_control(self, run_id: str) -> dict[str, Any]:
+        """Read operator intent without acquiring or renewing a lease."""
+        with self._read_transaction() as cursor:
+            version = self._read_schema_version(cursor)
+            if cursor.execute("SELECT 1 FROM runs WHERE run_id=?", (run_id,)).fetchone() is None:
+                raise JobNotFoundError(run_id)
+            return self._control(cursor, run_id, version)
+
+    def request_pause(self, run_id: str, *, reason: str = "operator requested pause") -> dict[str, Any]:
+        """Request a graceful drain; this operator action needs no worker token.
+
+        It neither revokes the worker lease nor cancels an admitted provider
+        call. Admission checks the request in the same transaction as dispatch.
+        Each request advances intent so an older resume cannot erase it.
+        """
+        if not isinstance(reason, str) or not reason.strip() or len(reason) > 2048:
+            raise ValueError("pause reason must be nonempty text of at most 2048 characters")
+        with self._transaction() as cursor:
+            now = self._clock_ns()
+            if cursor.execute("SELECT 1 FROM runs WHERE run_id=?", (run_id,)).fetchone() is None:
+                raise JobNotFoundError(run_id)
+            control = self._control(cursor, run_id)
+            generation = control["pause_generation"]
+            if generation == MAX_SQLITE_INTEGER:
+                raise RunStoreError("Jobs pause generation is exhausted")
+            generation += 1
+            cursor.execute("""UPDATE run_controls SET pause_generation=?, pause_requested=1,
+                pause_reason=?, pause_requested_at_ns=?, drained_at_ns=NULL WHERE run_id=?""",
+                (generation, reason, now, run_id))
+            self._event(cursor, run_id, None, "pause_requested",
+                        {"pause_generation": generation, "reason": reason}, now)
+            return self._control(cursor, run_id)
+
+    @staticmethod
+    def _control(cursor: sqlite3.Cursor, run_id: str, schema_version: int = STORE_VERSION) -> dict[str, Any]:
+        if schema_version < 4:
+            return {"pause_supported": False, "pause_generation": 0, "pause_requested": False,
+                    "pause_reason": None, "pause_requested_at_ns": None, "drained_at_ns": None}
+        row = cursor.execute("SELECT * FROM run_controls WHERE run_id=?", (run_id,)).fetchone()
+        if row is None:
+            raise RunStoreError("Jobs run is missing its durable control row")
+        _validate_read_row(row, "run_controls")
+        return {"pause_supported": True, "pause_generation": row["pause_generation"],
+                "pause_requested": bool(row["pause_requested"]), "pause_reason": row["pause_reason"],
+                "pause_requested_at_ns": row["pause_requested_at_ns"], "drained_at_ns": row["drained_at_ns"]}
+
+    def _clear_observed_pause(self, cursor: sqlite3.Cursor, run_id: str, generation: int, now: int) -> None:
+        control = self._control(cursor, run_id)
+        if control["pause_generation"] != generation or not control["pause_requested"]:
+            return
+        cursor.execute("""UPDATE run_controls SET pause_requested=0, pause_reason=NULL,
+            pause_requested_at_ns=NULL, drained_at_ns=NULL WHERE run_id=?""", (run_id,))
+        cursor.execute("UPDATE runs SET status=?, updated_at_ns=? WHERE run_id=? AND status=?",
+                       (RunStatus.APPROVED.value, now, run_id, RunStatus.PAUSED.value))
+        self._event(cursor, run_id, None, "pause_cleared", {"pause_generation": generation}, now)
+
+    def _assert_pause_open(self, cursor: sqlite3.Cursor, run_id: str) -> None:
+        if self._control(cursor, run_id)["pause_requested"]:
+            raise RunPauseRequested(f"run {run_id!r} has a durable pause request")
 
     def heartbeat_run_lease(
         self,
@@ -762,6 +881,18 @@ class SQLiteRunStore:
         if row is None:
             raise JobNotFoundError(run_id)
         return dict(row)
+
+    def legacy_artifact_roots(self) -> list[dict[str, Any]]:
+        """Read legacy path identities for alias detection before a first claim."""
+        with self._read_transaction() as cursor:
+            version = self._read_schema_version(cursor)
+            if version < 4:
+                raise RunStoreError("Artifact ownership requires a current writable database")
+            rows = cursor.execute("""SELECT run_id,manifest_root,output_directory,artifact_namespace,
+                artifact_owner_id FROM runs WHERE artifact_namespace IS NULL""").fetchall()
+            for row in rows:
+                _validate_read_row(row, "runs")
+            return [dict(row) | _artifact_identity(dict(row), version) for row in rows]
 
     def pending_operations(self, run_id: str) -> list[dict[str, Any]]:
         with self._read_transaction() as cursor:
@@ -855,6 +986,7 @@ class SQLiteRunStore:
         with self._transaction() as cursor:
             now = self._clock_ns()
             self._assert_write_owner(cursor, run_id, lease, now)
+            self._assert_pause_open(cursor, run_id)
             self._assert_budget_open(cursor, run_id, now)
             operation = cursor.execute(
                 """SELECT * FROM operations
@@ -953,6 +1085,7 @@ class SQLiteRunStore:
             if attempt is None:
                 raise JobNotFoundError(attempt_id)
             self._assert_attempt_owner(cursor, attempt, lease, now)
+            self._assert_pause_open(cursor, attempt["run_id"])
             if attempt["status"] != OperationStatus.RUNNING.value:
                 raise InvalidTransitionError("call requires a running attempt")
             run = self._assert_budget_open(cursor, attempt["run_id"], now)
@@ -1014,6 +1147,7 @@ class SQLiteRunStore:
             now = self._clock_ns()
             call = self._call(cursor, call_id)
             self._assert_call_owner(cursor, call, lease, now)
+            self._assert_pause_open(cursor, call["run_id"])
             if call["status"] != "prepared":
                 raise InvalidTransitionError("only a prepared call can be dispatched")
             self._assert_budget_open(cursor, call["run_id"], now)
@@ -1376,6 +1510,9 @@ class SQLiteRunStore:
         with self._transaction() as cursor:
             now = self._clock_ns()
             run = self._assert_write_owner(cursor, run_id, lease, now)
+            control = self._control(cursor, run_id)
+            if control["pause_requested"]:
+                self._finish_pause_drain(cursor, run_id, now)
             if self._latch_budget_overrun(cursor, run, now):
                 return RunStatus.BUDGET_OVERRUN.value
             rows = cursor.execute(
@@ -1386,6 +1523,9 @@ class SQLiteRunStore:
             counts = {row["status"]: row["count"] for row in rows}
             if counts.get(OperationStatus.UNKNOWN_OUTCOME.value, 0):
                 status = RunStatus.NEEDS_ATTENTION
+            elif (control["pause_requested"] and counts.get(OperationStatus.PENDING.value, 0)
+                  and not counts.get(OperationStatus.RUNNING.value, 0)):
+                status = RunStatus.PAUSED
             elif counts.get(OperationStatus.PENDING.value, 0) or counts.get(
                 OperationStatus.RUNNING.value, 0
             ):
@@ -1403,6 +1543,28 @@ class SQLiteRunStore:
             self._event(cursor, run_id, None, "run_finalized", {"status": status.value}, now)
         return status.value
 
+    def _finish_pause_drain(self, cursor: sqlite3.Cursor, run_id: str, now: int) -> None:
+        # A cooperative pause never invents an unknown outcome for an active
+        # provider call. Those calls settle through the ordinary runner path.
+        if cursor.execute("SELECT 1 FROM calls WHERE run_id=? AND status='dispatched' LIMIT 1",
+                          (run_id,)).fetchone():
+            return
+        orphans = cursor.execute("""SELECT attempt.* FROM attempts AS attempt
+            WHERE attempt.run_id=? AND attempt.status='running' AND NOT EXISTS (
+                SELECT 1 FROM calls WHERE calls.attempt_id=attempt.attempt_id)
+            ORDER BY attempt.operation_id,attempt.attempt_number""", (run_id,)).fetchall()
+        for attempt in orphans:
+            self._recover_orphan_attempt(cursor, attempt, now)
+        prepared = cursor.execute("SELECT * FROM calls WHERE run_id=? AND status='prepared'",
+                                  (run_id,)).fetchall()
+        for call in prepared:
+            self._fail_safe_call(cursor, call, "paused before dispatch", now, retryable=True)
+        control = self._control(cursor, run_id)
+        if control["drained_at_ns"] is None:
+            cursor.execute("UPDATE run_controls SET drained_at_ns=? WHERE run_id=?", (now, run_id))
+            self._event(cursor, run_id, None, "pause_drained",
+                        {"pause_generation": control["pause_generation"]}, now)
+
     def snapshot(self, run_id: str, *, include_events: bool = False) -> dict[str, Any]:
         with self._read_transaction() as cursor:
             schema_version = self._read_schema_version(cursor)
@@ -1411,6 +1573,7 @@ class SQLiteRunStore:
             ).fetchone()
             if run_row is None:
                 raise JobNotFoundError(run_id)
+            control = self._control(cursor, run_id, schema_version)
             operations = cursor.execute(
                 "SELECT * FROM operations WHERE run_id = ? ORDER BY operation_key",
                 (run_id,),
@@ -1435,18 +1598,18 @@ class SQLiteRunStore:
                 "SELECT cost_is_estimate FROM calls WHERE run_id = ?", (run_id,)
             ).fetchall()
         return self._snapshot_projection(run_row, operations, attempts, artifacts, events, call_rows,
-                                         schema_version=schema_version)
+                                         schema_version=schema_version, control=control)
 
     @staticmethod
     def _read_schema_version(cursor: sqlite3.Cursor) -> int:
         version = cursor.execute("PRAGMA user_version").fetchone()[0]
-        if version not in (2, STORE_VERSION):
+        if version not in (2, 3, STORE_VERSION):
             raise RunStoreError("Unsupported Jobs database version")
         return version
 
     @staticmethod
     def _snapshot_projection(run_row, operations, attempts, artifacts, events, call_rows,
-                             *, schema_version=STORE_VERSION):
+                             *, schema_version=STORE_VERSION, control):
         run = dict(run_row)
         _validate_read_row(run, "runs")
         for table, rows in (("operations", operations), ("attempts", attempts), ("artifacts", artifacts),
@@ -1463,6 +1626,8 @@ class SQLiteRunStore:
         return {
             "version": schema_version,
             "lease_fencing_supported": schema_version >= 3,
+            **_artifact_identity(run, schema_version),
+            "control": control,
             "run_id": run["run_id"],
             "name": name,
             "status": run["status"],
@@ -1527,14 +1692,24 @@ class SQLiteRunStore:
             raise ValueError("operation must be a nonempty operation key or ID")
         try:
             with self._read_transaction() as cursor:
+                observed_at_ns = self._clock_ns()
                 schema_version = self._read_schema_version(cursor)
+                identity_columns = ",artifact_namespace,artifact_owner_id" if schema_version >= 4 else ""
                 run = cursor.execute("""SELECT run_id,json_extract(plan_json,'$.name') AS name,
                     json_type(plan_json,'$.name') AS name_type,typeof(plan_json) AS plan_storage,
                     status,manifest_hash,plan_hash,manifest_root,output_directory,max_concurrency,
                     approved_microusd,confirmed_microusd,exposure_microusd,reserved_microusd,
-                    created_at_ns,updated_at_ns FROM runs WHERE run_id=?""", (run_id,)).fetchone()
+                    created_at_ns,updated_at_ns""" + identity_columns + " FROM runs WHERE run_id=?",
+                                     (run_id,)).fetchone()
                 if run is None:
                     raise JobNotFoundError(run_id)
+                control = self._control(cursor, run_id, schema_version)
+                lease_row = cursor.execute("SELECT * FROM run_leases WHERE run_id=?", (run_id,)).fetchone()
+                if lease_row is not None:
+                    _validate_read_row(lease_row, "run_leases")
+                    lease = dict(lease_row) | {"epoch": _run_lease(lease_row).epoch}
+                else:
+                    lease = None
                 if (run["name_type"] != "text" or run["plan_storage"] != "text"
                         or type(run["name"]) is not str or run["status"] not in {item.value for item in RunStatus}):
                     raise RunStoreError("Jobs run summary contains invalid name or status")
@@ -1581,10 +1756,11 @@ class SQLiteRunStore:
                                            (run_id,)).fetchone()[0]
                 result = self._snapshot_projection(run, operations, attempts, artifacts, events,
                                                    [{"cost_is_estimate": estimates}],
-                                                   schema_version=schema_version)
+                                                   schema_version=schema_version, control=control)
                 for call in calls:
                     _validate_read_row(call, "calls")
-                result.update(counts=counts, calls=[dict(row) for row in calls], operation_filter=operation,
+                result.update(counts=counts, calls=[dict(row) for row in calls], lease=lease,
+                              observed_at_ns=observed_at_ns, operation_filter=operation,
                               pagination={"limit": limit, "offset": offset, "total": total,
                                           "returned": len(operations), "has_more": offset + len(operations) < total},
                               event_pagination={"limit": events_limit, "total": event_total,

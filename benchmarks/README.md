@@ -14,6 +14,7 @@ mechanics run in CI with deterministic providers and zero API cost.
 | Campaign | Status | Current result |
 |---|---|---|
 | [Original SVG workflow](svg_glyph_benchmark.md) | **Claimable** | 192 original glyphs in 4.03 s median including full validation and assembly; 2.95× process-c1 speed; all 30 workflows accepted |
+| [REGL rendering and cadence control](renderer_performance_20260907_results.md) | Completed diagnostics; target not met | Six valid Classic/3D sessions: 56.21–56.24 draws/s, 18.10 ms P95 callback interval; three blank-page controls showed similar source cadence |
 | [Task-shape suite v3](shape_suite.md) | **Claimable for wall time and observed quality** | 14% lower end-to-end wall time; historical cost excludes planning |
 | [Hard-kill durability v2](durability_benchmark.md) | **Claimable** | 8 duplicate dispatches after resume versus LangGraph's 32, across 3 reps |
 | [Glyph Rain width-scaling sweep](glyph_screensaver_benchmark.md#width-scaling-from-64-to-256-nodes) | **Claimable** | 64, 128, 192, and 256 valid unique tiles at every concurrency; 40.37×–56.21× at concurrency 64; isolated outputs |
@@ -270,6 +271,12 @@ This is local procedural generation. It has no simulated delay and makes no
 provider API calls. Reference research and design calibration happen before
 the campaign and are recorded separately. Browser rendering uses its own
 timing and navigation protocol.
+
+The separate [REGL renderer campaign](renderer_performance_20260907_results.md)
+completed six valid sessions with the default 90/10 catalog mix. Every run
+missed the predeclared pacing target. Raw callback intervals, CPU submission,
+and the blank-page cadence control remain separate from GPU presentation and
+from the original-glyph generation result.
 
 ## Glyph screensaver fan-out
 

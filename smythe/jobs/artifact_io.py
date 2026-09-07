@@ -5,11 +5,13 @@ from __future__ import annotations
 import hashlib
 import io
 import os
+import stat
 import struct
 import tempfile
 import warnings
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
+from typing import Any
 
 
 _SUPPORTED_IMAGE_MIME_BY_FORMAT = {
@@ -181,13 +183,112 @@ def atomic_write_bytes(path: Path, data: bytes) -> None:
             temporary.unlink(missing_ok=True)
 
 
+def atomic_publish_bytes(path: Path, data: bytes) -> None:
+    """Durably publish new bytes, atomically refusing an existing destination.
+
+    The fully flushed temporary file is linked into place without replacement.
+    Filesystems without hard-link support fail closed; Jobs probes this before
+    admitting provider calls. Existing destinations, including identical bytes,
+    always remain untouched.
+    """
+    if not isinstance(data, bytes):
+        raise TypeError("artifact data must be bytes")
+    if len(data) > MAX_ARTIFACT_BYTES:
+        raise ValueError(f"artifact exceeds the {MAX_ARTIFACT_BYTES}-byte persistence limit")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="wb", dir=path.parent, prefix=f".{path.name}.",
+                                         suffix=".tmp", delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.link(temporary, path)
+        _fsync_directory(path.parent)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def _regular_path(root: Path, relative: str) -> Path:
+    windows, posix = PureWindowsPath(relative), PurePosixPath(relative.replace("\\", "/"))
+    if (not relative or windows.drive or windows.root or posix.is_absolute() or ".." in posix.parts
+            or not posix.parts or any(":" in part for part in posix.parts)):
+        raise ValueError("Unsafe recorded artifact path")
+    path = root
+    for part in posix.parts:
+        path = path / part
+        info = path.lstat()
+        if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
+            raise ValueError("Artifact ownership does not follow symbolic links or junctions")
+    if not stat.S_ISREG(info.st_mode):
+        raise ValueError("Artifact ownership requires regular files")
+    return path
+
+
+def claim_artifact_root(root: Path, owner_bytes: bytes, *, legacy: bool,
+                        legacy_artifacts: list[dict[str, Any]]) -> None:
+    """Bind a directory to one persistent run identity before dispatch.
+
+    Legacy receipt paths remain in place. An existing conflicting or incomplete
+    marker is never replaced. No-clobber publication also protects artifacts
+    belonging to an unknown legacy ledger that has not claimed this root yet.
+    """
+    root.mkdir(parents=True, exist_ok=True)
+    marker = root / ".smythe-run-owner.json"
+    try:
+        marker.lstat()
+    except FileNotFoundError:
+        if not legacy and any(root.iterdir()):
+            raise ValueError("New artifact namespace already contains unowned files")
+        for artifact in legacy_artifacts:
+            if not artifact["accepted"]:
+                continue
+            path = _regular_path(root, artifact["relative_path"])
+            size = artifact["size_bytes"]
+            if type(size) is not int or not 0 <= size <= MAX_ARTIFACT_BYTES:
+                raise ValueError("Invalid legacy artifact size")
+            digest = hashlib.sha256()
+            with path.open("rb") as stream:
+                remaining = size
+                while remaining:
+                    chunk = stream.read(min(1024 * 1024, remaining))
+                    if not chunk:
+                        raise ValueError("Legacy accepted artifact is truncated")
+                    digest.update(chunk)
+                    remaining -= len(chunk)
+                if stream.read(1) or digest.hexdigest() != artifact["sha256"]:
+                    raise ValueError("Legacy accepted artifact differs from its receipt")
+        try:
+            atomic_publish_bytes(marker, owner_bytes)
+        except FileExistsError:
+            pass  # Another claimant won; exact ownership is checked below.
+    marker = _regular_path(root, marker.name)
+    with marker.open("rb") as stream:
+        if stream.read(len(owner_bytes) + 1) != owner_bytes:
+            raise ValueError("Artifact directory belongs to another run or has an incomplete owner marker")
+    # Check the actual mounted filesystem even when a marker predates this
+    # process. All probe paths are owned by this fresh temporary directory.
+    with tempfile.TemporaryDirectory(prefix=".smythe-publication-", dir=root) as directory:
+        probe = Path(directory) / "probe"
+        atomic_publish_bytes(probe, b"publication probe")
+        try:
+            atomic_publish_bytes(probe, b"must not replace")
+        except FileExistsError:
+            if probe.read_bytes() != b"publication probe":
+                raise ValueError("Filesystem did not preserve an existing artifact")
+        else:
+            raise ValueError("Filesystem does not support exclusive artifact publication")
+
+
 def _fsync_directory(directory: Path) -> None:
     """Persist the directory entry after replace where the OS supports it."""
 
     if os.name == "nt":
         # Windows does not support opening directories with ``os.open``. The
-        # file itself was fully flushed above; MoveFileEx semantics are the
-        # strongest portable boundary available through the standard library.
+        # file itself is flushed before replacement or exclusive publication;
+        # the standard library cannot separately flush the directory entry.
         return
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
     descriptor = os.open(directory, flags)
