@@ -35,6 +35,7 @@ verification, trace, artifact, and recovery controls.
 - [Image benchmarks](../benchmarks/image_benchmarks.md) — image fan-out and exact-spec finishing
 - [Glyph Rain benchmark](../benchmarks/glyph_screensaver_benchmark.md) — an artifact fan-out example with isolated 64-, 128-, 192-, and 256-node measurements
 - [Glyph Rain screensaver](../screensaver/README.md) — shared glyph catalog, heavy strokes, green cores, and layered glow; verified Windows, universal Mac, and Linux downloads
+- [Glyph Rain design plan](glyph-rain-plan.md) — reference-guided styling, original SVG generation rules, and planned 3D navigation
 
 ## Project guides
 

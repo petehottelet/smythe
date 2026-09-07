@@ -23,7 +23,7 @@ smythe jobs run examples/12_jobs_manifest.yaml --approve approve_v1_...
 
 | Example | What it shows |
 |---|---|
-| [Glyph Rain](../screensaver/README.md) | A 192-node glyph workflow rendered as web, Windows, macOS, and Linux screensavers with heavy strokes and layered green glow. Includes verified native downloads. [Controlled scaling measurements](../benchmarks/glyph_screensaver_benchmark.md) cover 64–256 nodes. |
+| [Glyph Rain](../screensaver/README.md) | A 192-node glyph workflow with verified web, Windows, macOS, and Linux renderers. [Scaling measurements](../benchmarks/glyph_screensaver_benchmark.md) cover 64–256 nodes. The [next-version plan](../docs/glyph-rain-plan.md) specifies original SVGs and 3D exploration. |
 | [01_quickstart_yaml.py](01_quickstart_yaml.py) | Load a declarative YAML DAG ([01_pipeline.yaml](01_pipeline.yaml)) with failure policies and per-node timeouts, execute it in parallel. |
 | [02_dynamic_planning.py](02_dynamic_planning.py) | The `LLMArchitect` designs the execution graph from the task itself. Inspect the plan before executing it. |
 | [03_parallel_budget.py](03_parallel_budget.py) | Eight-node broadcast under a USD budget cap with `max_concurrency=3`, plus the per-node cost breakdown. |
