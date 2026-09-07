@@ -34,6 +34,12 @@ With the default `FileCheckpointStore`, checkpoints live at `~/.smythe/checkpoin
     "revisions_used": 0
   },
   "graph": {
+    "task": {
+      "goal": "…",
+      "constraints": ["…"],
+      "done_when": ["…"],
+      "context": {}
+    },
     "topology": ["fork_join"],
     "estimated_cost_usd": 0.02,
     "nodes": [
@@ -69,7 +75,8 @@ With the default `FileCheckpointStore`, checkpoints live at `~/.smythe/checkpoin
 
 Notes:
 
-- `task` is `null` when a pre-built `ExecutionGraph` was executed instead of a `Task`.
+- `task` and `graph.task` preserve the submitted task through an inspected-graph
+  handoff. Both are `null` for a caller-built graph that carries no task.
 - Node `result` values that aren't JSON-serializable are stored as their `str()` form.
 - `budget.max_budget_usd` is the cap the execution started with; resume honors it, not whatever the resuming Swarm was constructed with.
 - `control.revisions_used` is how much of the supervisor's `max_revisions` allowance the run has already spent. Resume seeds the executor from it, so the cap bounds the **run**, not each attempt: a crash-resume cycle cannot refill the allowance and revise past the limit the caller set.
@@ -100,7 +107,7 @@ checkpoint already handed to a custom store.
 `swarm.resume(execution_id)` (or `await swarm.aresume(...)`):
 
 1. Loads the state and rejects unknown ids (`KeyError`) and unreadable versions (`ValueError`).
-2. Validates saved budget policy, charges, and verification state. Unresolved accounting markers or ambiguous verification decisions stop recovery. A completed snapshot with output and no pending verification work returns its validated stored result.
+2. Restores the complete task, validates saved budget policy, charges, and verification state. Conflicting task copies, unresolved accounting markers, or ambiguous verification decisions stop recovery. A completed snapshot with output and no pending verification work returns its validated stored result and task.
 3. Otherwise restores the graph, re-registers the recorded agents, and resets `running` / `failed` nodes to `pending`. It finishes saved regeneration intents and consumes pending verdicts before dispatch. A rejected generation invalidates affected `completed` and `skipped` results too; other finished nodes keep their recorded results.
 4. Restores per-node costs into the budget so the resumed run keeps counting against the original cap.
 5. Executes the remaining nodes (always on the parallel executor), synthesizes over the full graph, and writes the final checkpoint.
@@ -120,6 +127,11 @@ resume. See [Cost guardrails](budgets.md).
 This build writes version `3` and reads versions `1`, `2`, and `3`.
 Version 2 added `control` and `task.done_when`; version 1 loads their original
 defaults of zero revisions and no acceptance criteria.
+
+The optional `graph.task` field is additive. Legacy graphs inherit the
+checkpoint's top-level task when available. If both populated task copies
+disagree, recovery raises `ValueError` before any provider call. Taskless
+checkpoints remain supported. [Task snapshot values](tasks.md#snapshot-values).
 
 Version 3 makes verification dispositions durable. Older readers reject it
 instead of ignoring a rejection in progress. Completed legacy runs return

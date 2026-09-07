@@ -227,6 +227,13 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Fixed
 
+- **Complete task propagation:** detached task snapshots preserve source context,
+  constraints, and acceptance criteria through routing, planning, graph handoffs,
+  execution, supervision, synthesis, memory, and checkpoint recovery. Same-goal
+  nodes retain all task inputs. Conflicting checkpoint task copies fail before
+  dispatch; existing custom synthesizer signatures remain supported. Task
+  snapshots require string mapping keys and reject cycles; unsupported context
+  objects and nonfinite numbers are normalized to text.
 - **Verification and active work:** persisted verdict receipts and regeneration
   intents prevent rejected generations from surviving cancellation or resume.
   Active descendants settle before reset, completed charges remain recorded,

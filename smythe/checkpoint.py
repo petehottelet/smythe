@@ -14,6 +14,7 @@ schema.
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 import os
 import re
 import threading
@@ -25,7 +26,7 @@ from typing import Any
 from smythe.agent import Agent, AgentProfile
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
 from smythe.registry import Registry
-from smythe.task import Task
+from smythe.task import Task, task_from_dict, task_snapshots_equal, task_to_dict
 
 CHECKPOINT_VERSION = 3
 # v3 adds mandatory verification dispositions. Older graphs without an
@@ -84,9 +85,15 @@ def node_from_dict(data: dict[str, Any]) -> Node:
 
 
 def graph_to_dict(graph: ExecutionGraph) -> dict[str, Any]:
+    return _graph_snapshot(graph, task_to_dict(graph.task))
+
+
+def _graph_snapshot(graph: ExecutionGraph, task_data: dict[str, Any] | None) -> dict[str, Any]:
+    """Serialize graph state using an already captured Task representation."""
     return {
         "topology": [t.value for t in graph.topology],
         "estimated_cost_usd": graph.estimated_cost_usd,
+        "task": task_data,
         "nodes": [node_to_dict(n) for n in graph.nodes],
     }
 
@@ -97,6 +104,7 @@ def graph_from_dict(data: dict[str, Any]) -> ExecutionGraph:
         topology=[Topology(t) for t in data.get("topology", ["serial"])],
         nodes=[node_from_dict(n) for n in data.get("nodes", [])],
         estimated_cost_usd=data.get("estimated_cost_usd"),
+        task=task_from_dict(data.get("task")),
     )
 
 
@@ -135,28 +143,6 @@ def agents_from_list(data: list[dict[str, Any]]) -> list[Agent]:
             ),
         ))
     return agents
-
-
-def task_to_dict(task: Task | None) -> dict[str, Any] | None:
-    if task is None:
-        return None
-    return {
-        "goal": task.goal,
-        "constraints": list(task.constraints),
-        "context": {k: _jsonable(v) for k, v in task.context.items()},
-        "done_when": list(task.done_when),
-    }
-
-
-def task_from_dict(data: dict[str, Any] | None) -> Task | None:
-    if data is None:
-        return None
-    return Task(
-        goal=data["goal"],
-        constraints=list(data.get("constraints", [])),
-        context=dict(data.get("context", {})),
-        done_when=list(data.get("done_when", [])),
-    )
 
 
 def reset_incomplete_nodes(graph: ExecutionGraph) -> list[str]:
@@ -265,6 +251,12 @@ def build_state(
     resume is not a cap, and a crash would silently buy more work
     than the caller authorised.
     """
+    task_data = task_to_dict(task)
+    graph_task_data = task_data if graph.task is task else task_to_dict(graph.task)
+    if (task_data is not None and graph_task_data is not None
+            and not task_snapshots_equal(task_data, graph_task_data)):
+        raise ValueError("Checkpoint graph Task conflicts with the top-level Task")
+    task_data = task_data if task_data is not None else graph_task_data
     now = time.time()
     return {
         "version": CHECKPOINT_VERSION,
@@ -273,8 +265,8 @@ def build_state(
         "created_at": created_at if created_at is not None else now,
         "updated_at": now,
         "model": model,
-        "task": task_to_dict(task),
-        "graph": graph_to_dict(graph),
+        "task": deepcopy(task_data),
+        "graph": _graph_snapshot(graph, deepcopy(task_data)),
         "agents": agents_to_list(registry),
         "budget": {
             "max_budget_usd": max_budget_usd,

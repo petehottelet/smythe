@@ -45,6 +45,10 @@ policies, timeouts, and optional verification relationships.
 Applications can inspect, reject, edit, export, or execute the graph. Planning
 never implies execution.
 
+The graph carries a detached `Task` snapshot, preserving source context and
+acceptance criteria through inspection, execution, supervision, synthesis,
+memory, and resume. [Task handoff semantics](tasks.md).
+
 ### Planning tiers
 
 | Tier | Class | Decision surface |
@@ -149,4 +153,4 @@ prompt mutation.
 
 The [cost guardrails](budgets.md) reject malformed usage and block unresolved
 accounting on resume. The [repository review](project-review-2026-09-06.md)
-records the original defects and remaining task-context work.
+records the original defects and remaining lifecycle-accounting work.

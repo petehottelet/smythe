@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING
 
 from smythe.budget import validate_completion_usage
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Revision
+from smythe.task import render_task
 
 if TYPE_CHECKING:
     from smythe.provider import Provider
@@ -45,14 +46,10 @@ SUPERVISOR_SYSTEM_PROMPT = (
     "conclude that no change is needed."
 )
 
-REVIEW_PROMPT = """Goal:
-{goal}
+REVIEW_PROMPT = """Original task:
+{task_description}
 
-Constraints:
-{constraints}
-
-Acceptance criteria (the work is not done until these hold):
-{done_when}
+The work is not done until its stated acceptance criteria hold.
 
 Completed work so far:
 {completed}
@@ -182,21 +179,13 @@ class LLMSupervisor(Supervisor):
             for n in graph.nodes
             if n.status is NodeStatus.PENDING
         ]
-        goal = task.goal if task is not None else node.metadata.get("task_context", "")
-        constraints = (
-            "\n".join(f"- {c}" for c in task.constraints)
-            if task is not None and task.constraints
-            else "(none stated)"
-        )
-        done_when = (
-            "\n".join(f"- {c}" for c in task.done_when)
-            if task is not None and task.done_when
-            else "(none stated)"
+        resolved_task = task if task is not None else graph.task
+        task_description = (
+            render_task(resolved_task) if resolved_task is not None
+            else node.metadata.get("task_context") or "(not recorded)"
         )
         return REVIEW_PROMPT.format(
-            goal=goal or "(not recorded)",
-            constraints=constraints,
-            done_when=done_when,
+            task_description=task_description,
             completed="\n\n".join(completed) or "(nothing yet)",
             remaining="\n".join(remaining) or "(none — this is the last step)",
             node_id=node.id,

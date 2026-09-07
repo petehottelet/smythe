@@ -7,6 +7,7 @@ Follow-up: [strict numeric cost validation](budgets.md),
 [consistent serial halt](execution.md), and
 [durable verification](verifier.md#recovery-and-concurrent-work) now address
 those findings, including invalid-report recovery and active descendants.
+[Complete task snapshots](tasks.md) also close the planning and handoff gaps.
 The remaining work is tracked in
 the [completion campaign](../plans/coming-soon-2026-09-07.md). This review's
 reproductions and counts describe the original reviewed commit.

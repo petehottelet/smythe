@@ -23,6 +23,7 @@ from smythe.budget import (
 from smythe.graph import ExecutionGraph, Node, NodeStatus, RevisionError
 from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
+from smythe.task import render_task, snapshot_task
 from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
 from smythe.tracer import Tracer
 from smythe.verifier import (
@@ -141,7 +142,8 @@ class ExecutorBase:
             raise ValueError(f"max_revisions must be >= 0, got {max_revisions}")
         self._supervisor = supervisor
         self._max_revisions = max_revisions
-        self._task = task
+        self._default_task = snapshot_task(task) if task is not None else None
+        self._task = snapshot_task(self._default_task) if self._default_task is not None else None
         # Restored from the checkpoint on resume: the revision cap is a
         # per-run guarantee, so a crash must not refill the allowance.
         self._revisions_used = revisions_used
@@ -169,7 +171,8 @@ class ExecutorBase:
 
         try:
             revision = await self._supervisor.review(
-                graph, node, task=self._task, revisions_remaining=remaining,
+                graph, node, task=snapshot_task(self._task) if self._task is not None else None,
+                revisions_remaining=remaining,
             )
         except BudgetValidationError as exc:
             self.mark_accounting_invalid(node, exc)
@@ -394,8 +397,24 @@ class ExecutorBase:
         for node in new_nodes:
             if model is not None:
                 node.metadata.setdefault("model", model)
-            if context is not None:
+            if self._task is None and context is not None:
                 node.metadata.setdefault("task_context", context)
+        if self._task is not None:
+            self.stamp_task_context(new_nodes, self._task)
+
+    @staticmethod
+    def stamp_task_context(nodes: list[Node] | tuple[Node, ...], task: Task) -> None:
+        """Keep constraints/data/criteria even when the label repeats the goal."""
+        # Serialize source data once per variant, not once per fan-out node.
+        full_context = render_task(task)
+        same_goal_context = render_task(task, include_goal=False)
+        for node in nodes:
+            context = same_goal_context if node.label.strip() == task.goal.strip() else full_context
+            if context:
+                node.metadata["task_context"] = context
+            else:
+                # A goal-only SimpleArchitect retains its original bare prompt.
+                node.metadata.pop("task_context", None)
 
     def retry_delay_s(self, attempt: int) -> float:
         """Full-jitter exponential backoff before retry `attempt` (1-based).
@@ -490,11 +509,25 @@ class ExecutorBase:
         keeps wide DAGs from repeatedly scanning every node while assembling
         dependency prompts or deciding whether a node is terminal.
         """
+        if self._prepared_graph is not graph:
+            # Reusing an executor must not carry a previous graph's source
+            # material into a later taskless graph. Only the constructor Task
+            # is a default; the current graph binding is scoped to that graph.
+            task = graph.task if graph.task is not None else self._default_task
+            self._task = snapshot_task(task) if task is not None else None
+            if self._task is not None:
+                graph.task = snapshot_task(self._task)
+                self.stamp_task_context(graph.nodes, self._task)
         self._prepared_graph = graph
         self._node_lookup = {node.id: node for node in graph.nodes}
         self._dependent_ids = {
             dep_id for node in graph.nodes for dep_id in node.depends_on
         }
+
+    def prepare_execution(self, graph: ExecutionGraph) -> None:
+        """Bind a new run even when a caller reuses the same graph object."""
+        self._prepared_graph = None
+        self.prepare_graph(graph)
 
     def _ensure_graph_prepared(self, graph: ExecutionGraph) -> None:
         if self._prepared_graph is not graph:

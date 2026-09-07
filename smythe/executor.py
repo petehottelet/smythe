@@ -20,7 +20,7 @@ class Executor(ExecutorBase):
 
     def run(self, graph: ExecutionGraph) -> ExecutionGraph:
         """Execute in dependency order; stop immediately on a terminal failure."""
-        self.prepare_graph(graph)
+        self.prepare_execution(graph)
         self.recover_verification(graph)
         visited: set[str] = set()
         # The walk is recomputed each step rather than taken once, so a

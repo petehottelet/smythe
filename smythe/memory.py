@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from smythe.task import Task, snapshot_task
+
 
 @dataclass
 class ExecutionOutcome:
@@ -24,6 +26,8 @@ class ExecutionOutcome:
     success: bool
     node_outcomes: list[dict[str, Any]] = field(default_factory=list)
     timestamp: str = ""
+    task_context: dict[str, Any] = field(default_factory=dict)
+    task_done_when: list[str] = field(default_factory=list)
 
 
 class PlannerMemory:
@@ -52,6 +56,10 @@ class PlannerMemory:
         """Append an execution outcome to the history file."""
         from smythe.graph import NodeStatus
 
+        # Capture nested context before inspecting mutable execution results.
+        # Legacy duck-typed callers keep their existing goal/constraint path.
+        saved_task = snapshot_task(task) if isinstance(task, Task) else task
+
         trace = getattr(result, "trace", [])
         total_duration = sum(s.get("duration_ms", 0) for s in trace)
 
@@ -77,8 +85,8 @@ class PlannerMemory:
         )
 
         outcome = ExecutionOutcome(
-            task_goal=task.goal if hasattr(task, "goal") else str(task),
-            task_constraints=list(getattr(task, "constraints", [])),
+            task_goal=saved_task.goal if hasattr(saved_task, "goal") else str(saved_task),
+            task_constraints=list(getattr(saved_task, "constraints", [])),
             topology=[t.value for t in graph.topology],
             node_count=len(graph.nodes),
             total_cost_usd=getattr(result, "total_cost_usd", 0.0),
@@ -86,6 +94,8 @@ class PlannerMemory:
             success=all_completed,
             node_outcomes=node_outcomes,
             timestamp=datetime.now(timezone.utc).isoformat(),
+            task_context=saved_task.context if isinstance(saved_task, Task) else {},
+            task_done_when=list(getattr(saved_task, "done_when", [])),
         )
 
         with self._lock:
@@ -121,10 +131,23 @@ class PlannerMemory:
                     for k_ in ExecutionOutcome.__dataclass_fields__
                     if k_ in data
                 })
+                if not isinstance(outcome.task_goal, str):
+                    continue
+                if not isinstance(outcome.task_context, dict):
+                    continue
+                if any(
+                    not isinstance(values, list)
+                    or any(not isinstance(value, str) for value in values)
+                    for values in (outcome.task_constraints, outcome.task_done_when)
+                ):
+                    continue
             except (json.JSONDecodeError, TypeError, KeyError):
                 continue
             stored_words = self._tokenize(
-                " ".join([outcome.task_goal, *outcome.task_constraints])
+                " ".join([
+                    outcome.task_goal, *outcome.task_constraints, *outcome.task_done_when,
+                    json.dumps(outcome.task_context, ensure_ascii=False),
+                ])
             )
             overlap = len(query_words & stored_words)
             if overlap > 0:
@@ -141,13 +164,18 @@ class PlannerMemory:
 
     @staticmethod
     def _task_text(task: Any) -> str:
-        """Return searchable task text, including hard constraints."""
+        """Return searchable task text, including source context and criteria."""
         if not hasattr(task, "goal"):
             return str(task)
-        goal = str(task.goal)
-        constraints = getattr(task, "constraints", [])
+        saved_task = snapshot_task(task) if isinstance(task, Task) else task
+        goal = str(saved_task.goal)
+        constraints = getattr(saved_task, "constraints", [])
         constraint_text = [str(item) for item in constraints]
-        return " ".join([goal, *constraint_text])
+        criteria = [str(item) for item in getattr(saved_task, "done_when", [])]
+        context = saved_task.context if isinstance(saved_task, Task) else {}
+        return " ".join([
+            goal, *constraint_text, *criteria, json.dumps(context, ensure_ascii=False),
+        ])
 
     @staticmethod
     def _tokenize(text: str) -> set[str]:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from smythe.task import Task
+from smythe.task import Task, render_task
 
 if TYPE_CHECKING:
     from smythe.registry import Registry
@@ -164,24 +164,15 @@ def build_user_prompt(
     """Assemble the user prompt from a Task, optional history, and inventory."""
     parts: list[str] = []
 
-    parts.append(f"## Goal\n\n{task.goal}")
-
-    if task.constraints:
-        constraints_text = "\n".join(f"- {c}" for c in task.constraints)
-        parts.append(f"## Constraints\n\n{constraints_text}")
+    parts.append(f"## Task\n\n{render_task(task)}")
 
     if task.done_when:
-        criteria_text = "\n".join(f"- {c}" for c in task.done_when)
         parts.append(
             "## Acceptance criteria\n\n"
             "The deliverable is not done until it meets all of these. "
-            "Make some node in your plan accountable for each one.\n\n"
-            + criteria_text
+            "Make some node in your plan accountable for each criterion "
+            "listed under Done when above."
         )
-
-    if task.context:
-        ctx_lines = "\n".join(f"- {k}: {v}" for k, v in task.context.items())
-        parts.append(f"## Context\n\n{ctx_lines}")
 
     if history:
         history_lines: list[str] = []

@@ -21,7 +21,7 @@ from smythe.checkpoint import (
     task_from_dict,
 )
 from smythe.executor import Executor
-from smythe.executor_base import DEFAULT_MAX_TOOL_ITERATIONS
+from smythe.executor_base import DEFAULT_MAX_TOOL_ITERATIONS, ExecutorBase
 from smythe.graph import ExecutionGraph
 from smythe.memory import PlannerMemory
 from smythe.tools import ToolRuntime
@@ -37,7 +37,7 @@ from smythe.provider import (
 from smythe.registry import Registry
 from smythe.supervisor import Supervisor
 from smythe.synthesizer import Synthesizer
-from smythe.task import Task
+from smythe.task import Task, snapshot_task, task_snapshots_equal, task_to_dict
 from smythe.tracer import Tracer
 from smythe.verifier import Verifier, validate_verification_checkpoint, verification_pending
 
@@ -169,13 +169,15 @@ class Swarm:
         before committing to execution.
         """
         Sentinel(self.max_budget_usd)
-        architect = self._select_architect(task)
-        graph, architect_registry = architect.plan(task)
+        task = snapshot_task(task)
+        architect = self._select_architect(snapshot_task(task))
+        graph, architect_registry = architect.plan(snapshot_task(task))
 
         for agent in architect_registry.list_agents():
             self._registry.register(agent)
 
         graph = self._registry.assign(graph)
+        graph.task = task
         self._stamp_model(graph)
         self._stamp_task_context(graph, task)
         return graph
@@ -183,48 +185,23 @@ class Swarm:
     async def aplan(self, task: Task) -> ExecutionGraph:
         """Async variant of plan() — safe to call from a running event loop."""
         Sentinel(self.max_budget_usd)
-        architect = await self._aselect_architect(task)
-        graph, architect_registry = await architect.aplan(task)
+        task = snapshot_task(task)
+        architect = await self._aselect_architect(snapshot_task(task))
+        graph, architect_registry = await architect.aplan(snapshot_task(task))
 
         for agent in architect_registry.list_agents():
             self._registry.register(agent)
 
         graph = self._registry.assign(graph)
+        graph.task = task
         self._stamp_model(graph)
         self._stamp_task_context(graph, task)
         return graph
 
     @staticmethod
     def _stamp_task_context(graph: ExecutionGraph, task: Task) -> None:
-        """Give every node the original task, not just its planned label.
-
-        The Architect sees the full task when planning, but generated
-        node labels rarely reproduce its payload (source documents,
-        code, data) - without this, nodes work from a one-line label
-        and the material the task carries never enters the graph.
-        Downstream nodes need it too, not only roots: dependency
-        results carry upstream *analyses* of the artifact, and a
-        reviewer or synthesizer that cannot see the artifact itself
-        hedges every claim it is asked to verify. The cost is the task
-        payload repeated per node. Skipped when the label already is
-        the goal (single-node graphs).
-        """
-        context = task.goal
-        if task.constraints:
-            context += "\n\nConstraints:\n" + "\n".join(
-                f"- {c}" for c in task.constraints
-            )
-        # Nodes are what actually produce the deliverable, so they are what
-        # has to satisfy the acceptance criteria. Showing the criteria only
-        # to the planner and supervisor leaves the work itself unaware of
-        # the bar it is being held to.
-        if task.done_when:
-            context += "\n\nDone when:\n" + "\n".join(
-                f"- {c}" for c in task.done_when
-            )
-        for node in graph.nodes:
-            if node.label.strip() != task.goal.strip():
-                node.metadata.setdefault("task_context", context)
+        """Refresh every node from the authoritative full Task snapshot."""
+        ExecutorBase.stamp_task_context(graph.nodes, task)
 
     def _select_architect(self, task: Task) -> Architect:
         """Pick the architect — use router if set, otherwise the default."""
@@ -264,11 +241,11 @@ class Swarm:
         budget = Sentinel(self.max_budget_usd)
 
         self._active_executor = None
-        task = task_or_graph if isinstance(task_or_graph, Task) else None
-        if task is not None:
-            graph = await self.aplan(task)
+        if isinstance(task_or_graph, Task):
+            graph = await self.aplan(task_or_graph)
         else:
             graph = self._prepare_graph(task_or_graph)
+        task = snapshot_task(graph.task) if graph.task is not None else None
 
         execution_id = uuid4().hex
         created_at = time.time()
@@ -337,11 +314,11 @@ class Swarm:
         budget = Sentinel(self.max_budget_usd)
 
         self._active_executor = None
-        task = task_or_graph if isinstance(task_or_graph, Task) else None
-        if task is not None:
-            graph = self.plan(task)
+        if isinstance(task_or_graph, Task):
+            graph = self.plan(task_or_graph)
         else:
             graph = self._prepare_graph(task_or_graph)
+        task = snapshot_task(graph.task) if graph.task is not None else None
 
         execution_id = uuid4().hex
         created_at = time.time()
@@ -515,6 +492,15 @@ class Swarm:
             )
 
         graph = graph_from_dict(state["graph"])
+        checkpoint_task = task_from_dict(state.get("task"))
+        if (graph.task is not None and checkpoint_task is not None
+                and not task_snapshots_equal(task_to_dict(graph.task), task_to_dict(checkpoint_task))):
+            raise ValueError("Checkpoint graph Task conflicts with the top-level Task")
+        task = graph.task if graph.task is not None else checkpoint_task
+        if task is not None:
+            task = snapshot_task(task)
+            graph.task = snapshot_task(task)
+            self._stamp_task_context(graph, task)
 
         budget_state = state.get("budget", {})
         if not isinstance(budget_state, dict):
@@ -560,7 +546,6 @@ class Swarm:
         graph.validate()
         self._stamp_model(graph)
 
-        task = task_from_dict(state.get("task"))
         tracer = Tracer()
         created_at = state.get("created_at", time.time())
 
@@ -682,6 +667,9 @@ class Swarm:
         """
         graph.validate()
         self._stamp_model(graph)
+        if graph.task is not None:
+            graph.task = snapshot_task(graph.task)
+            self._stamp_task_context(graph, graph.task)
         return graph
 
     def _run_artifact_dir(self, execution_id: str) -> Path | None:
