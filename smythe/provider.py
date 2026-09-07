@@ -13,6 +13,7 @@ Two entry points:
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import math
@@ -21,6 +22,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from uuid import uuid4
 
+from smythe.budget import BudgetValidationError
 from smythe.tools import ChatMessage, ToolCall, ToolSpec, display_name, wire_name
 
 _MIME_SUFFIXES = {
@@ -86,6 +88,12 @@ class CompletionResult:
     ``cost_usd`` may still carry a useful partial/output-only estimate; callers
     should inspect both this flag and ``cost_usd_is_estimate``.
     """
+    provider_continuation: dict | None = field(default=None, repr=False)
+    """Opaque, namespaced continuation for the originating provider only."""
+    native_receipt: dict | None = None
+    """Safe JSON usage/pricing summary for this one native provider call."""
+    response_envelope: object | None = field(default=None, repr=False, compare=False)
+    """Raw immutable response evidence, available only to explicit callers."""
 
     def __post_init__(self) -> None:
         from smythe.budget import validate_completion_usage
@@ -95,6 +103,132 @@ class CompletionResult:
     @property
     def total_tokens(self) -> int:
         return self.prompt_tokens + self.completion_tokens
+
+
+class ProviderResponseError(RuntimeError):
+    """A dispatched response is unusable; its evidence and bill remain available.
+
+    ``billing_result`` carries a validated known charge, even when output cannot
+    be consumed. Raw envelopes never enter ordinary node/checkpoint metadata.
+    """
+
+    def __init__(self, message: str, *, envelope=None, receipt=None, billing_result=None):
+        super().__init__(message)
+        self.envelope = envelope
+        self.receipt = receipt
+        self.billing_result = billing_result
+
+
+class ProviderAccountingError(ProviderResponseError, BudgetValidationError):
+    """A native call's complete billing is missing, malformed, or unpriced."""
+
+
+class ProviderAccountingCancelledError(asyncio.CancelledError, ProviderAccountingError):
+    """Cancellation after native dispatch left the call's accounting unknown."""
+
+    __init__ = ProviderResponseError.__init__
+
+
+def _native_receipt(metadata: dict, receipt: dict | None, *, phase: str) -> None:
+    if receipt is not None:
+        try:
+            if not isinstance(receipt, dict):
+                raise TypeError("receipt must be an object")
+            safe = json.loads(json.dumps(receipt, allow_nan=False))
+        except (TypeError, ValueError) as exc:
+            raise BudgetValidationError("Native receipt must contain finite JSON data") from exc
+        metadata.setdefault("native_receipts", []).append({"phase": phase, "receipt": safe})
+
+
+def _response_error_marker(error: BaseException | None) -> dict | None:
+    """Find a native error through explicit settlement causes, without raw data."""
+    seen = set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        if isinstance(error, ProviderResponseError):
+            return {"type": type(error).__name__, "message": str(error)[:500]}
+        error = error.__cause__
+    return None
+
+
+def _native_response_errors(error: BaseException) -> list[Exception]:
+    """Find terminal native/accounting failures inside groups, by identity."""
+    found = []
+
+    def visit(item):
+        if isinstance(item, (ProviderResponseError, BudgetValidationError)):
+            if not any(item is prior for prior in found):
+                found.append(item)
+        elif isinstance(item, BaseExceptionGroup):
+            for child in item.exceptions:
+                visit(child)
+
+    visit(error)
+    # Unknown exposure must be marked before settling a different known bill;
+    # cancellation remains visible to callers when a group wraps it.
+    return sorted(found, key=lambda item: (
+        not isinstance(item, ProviderAccountingCancelledError),
+        not isinstance(item, BudgetValidationError),
+    ))
+
+
+def _settle_response_group(group: BaseExceptionGroup, settle) -> None:
+    errors = _native_response_errors(group)
+    if not errors:
+        raise group
+    settlement_failure = None
+    for error in errors:
+        try:
+            settle(error)
+        except Exception as exc:
+            # Every distinct receipt must settle, even if another one exceeds
+            # its ceiling. Retain the first reconciliation failure as primary.
+            if settlement_failure is None:
+                settlement_failure = exc
+    raise settlement_failure or errors[0] from group
+
+
+def _settle_response_error(error, *, budget, node_id, metadata, phase):
+    """Settle a known failed call once at its immediate provider boundary."""
+    from smythe.budget import validate_completion_usage
+
+    marker = _response_error_marker(error)
+    if marker is not None:
+        metadata["response_error"] = marker
+    if isinstance(error, BudgetValidationError):
+        metadata["accounting_invalid"] = True
+        metadata["accounting_error"] = str(error)[:500]
+        metadata["cost_usd_unknown"] = True
+        if budget is not None:
+            budget.mark_unknown(node_id)
+    if not isinstance(error, ProviderResponseError):
+        raise error
+    receipt_error = None
+    try:
+        _native_receipt(metadata, error.receipt, phase=phase)
+    except BudgetValidationError as exc:
+        receipt_error = exc
+    try:
+        if error.billing_result is not None:
+            validate_completion_usage(error.billing_result)
+            if budget is not None:
+                budget.add_cost(
+                    node_id, error.billing_result,
+                    preserve_reservation=bool(metadata.get("accounting_invalid")),
+                )
+        if receipt_error is not None:
+            raise receipt_error
+    except Exception as settlement_error:
+        if isinstance(settlement_error, BudgetValidationError):
+            metadata["accounting_invalid"] = True
+            metadata["accounting_error"] = str(settlement_error)[:500]
+            metadata["cost_usd_unknown"] = True
+            if budget is not None:
+                budget.mark_unknown(node_id)
+        raise settlement_error from error
+    finally:
+        if budget is not None and node_id in budget.breakdown():
+            metadata["cost_usd"] = budget.breakdown()[node_id]
 
 
 class Provider(ABC):

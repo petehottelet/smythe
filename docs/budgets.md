@@ -34,11 +34,17 @@ execution. It never clamps an incurred charge to make a budget appear satisfied.
 
 ## Current scope
 
-The Swarm ledger currently covers execution and synthesis. Planning and
-model-based supervision remain outside that ledger. Text calls without an
-explicit provider cost use the configured blended token estimate; they are not
-native Astra billing. Complete lifecycle accounting and model-specific usage
-pricing are separate items in the [Astra campaign plan](../benchmarks/astra_benchmark_plan.md).
+The Swarm ledger currently covers execution and synthesis. Model-based routing,
+planning, and successful supervision remain outside that ledger. The explicit
+[OpenAI Responses provider](openai-responses.md) supplies native Astra/Sol token
+prices and safe per-call receipts. Capped execution requires an inclusive
+per-call ceiling, reserved again before each native tool turn. Known charges
+from unusable responses are retained; unresolved billing keeps its reservation
+and blocks ordinary resume.
+
+Text calls without an explicit provider cost still use the configured blended
+token estimate. Complete lifecycle accounting remains a prerequisite for the
+[Astra cost campaign](../benchmarks/astra_benchmark_plan.md).
 
 [Architecture](architecture.md) · [Checkpoint format](checkpoint-format.md) ·
 [Offline budget example](../examples/03_parallel_budget.py).

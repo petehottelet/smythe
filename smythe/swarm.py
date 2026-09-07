@@ -33,6 +33,8 @@ from smythe.provider import (
     OpenAIImageProvider,
     OpenAIProvider,
     Provider,
+    ProviderResponseError,
+    _response_error_marker,
 )
 from smythe.registry import Registry
 from smythe.supervisor import Supervisor
@@ -285,6 +287,7 @@ class Swarm:
             self._save_checkpoint(
                 execution_id, "failed", graph, budget, task, created_at,
                 accounting_error=str(exc) if isinstance(exc, BudgetValidationError) else None,
+                response_error=_response_error_marker(exc),
             )
             raise
 
@@ -358,6 +361,7 @@ class Swarm:
             self._save_checkpoint(
                 execution_id, "failed", graph, budget, task, created_at,
                 accounting_error=str(exc) if isinstance(exc, BudgetValidationError) else None,
+                response_error=_response_error_marker(exc),
             )
             raise
 
@@ -391,6 +395,7 @@ class Swarm:
         created_at: float,
         output: str | None = None,
         accounting_error: str | None = None,
+        response_error: dict | None = None,
     ) -> None:
         """Persist full execution state, if a checkpoint store is configured."""
         if self._checkpoint_store is None:
@@ -414,6 +419,8 @@ class Swarm:
         )
         if accounting_error is not None:
             state["budget"]["accounting_error"] = accounting_error
+        if response_error is not None:
+            state["control"]["response_error"] = response_error
         self._checkpoint_store.save(execution_id, state)
 
     def _checkpointer(
@@ -524,6 +531,12 @@ class Swarm:
                 f"(nodes: {invalid_nodes!r}); reconcile provider charges and repair the "
                 "checkpoint before clearing its accounting markers."
             )
+        if ("response_error" in state.get("control", {})
+                or any("response_error" in node.metadata for node in graph.nodes)):
+            raise ProviderResponseError(
+                "Cannot resume an unresolved native response failure; reconcile its accounting "
+                "and repair the saved output before clearing the response-error marker."
+            )
 
         completed = state.get("status") == "completed" and state.get("output") is not None
         validate_verification_checkpoint(graph, version=version, completed=completed)
@@ -585,6 +598,7 @@ class Swarm:
             self._save_checkpoint(
                 execution_id, "failed", graph, budget, task, created_at,
                 accounting_error=str(exc) if isinstance(exc, BudgetValidationError) else None,
+                response_error=_response_error_marker(exc),
             )
             raise
 

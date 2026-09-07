@@ -107,6 +107,8 @@ class ChatMessage:
     that only implement complete() reject attachment-bearing messages
     rather than silently dropping the images.
     """
+    provider_continuation: dict[str, Any] | None = field(default=None, repr=False)
+    """Namespaced native assistant items, preserved for the originating provider."""
 
 
 class ToolSession(ABC):

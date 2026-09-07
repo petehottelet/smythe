@@ -14,7 +14,7 @@ from smythe.executor_base import (
     NodeFinalizationError,
 )
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
-from smythe.provider import Provider
+from smythe.provider import Provider, ProviderResponseError
 from smythe.registry import Registry
 from smythe.tools import ToolRuntime
 from smythe.tracer import Tracer
@@ -240,7 +240,15 @@ class AsyncExecutor(ExecutorBase):
             return [], False
         for task in tasks:
             task.cancel()
-        settled = asyncio.gather(*tasks, return_exceptions=True)
+        async def outcome(task):
+            try:
+                return await task
+            except BaseException as exc:
+                # gather() normalizes cancelled tasks to plain CancelledError;
+                # retain native accounting evidence carried by its subclass.
+                return exc
+
+        settled = asyncio.gather(*(outcome(task) for task in tasks))
         interrupted = False
         while not settled.done():
             try:
@@ -270,7 +278,7 @@ class AsyncExecutor(ExecutorBase):
         for error in errors:
             if isinstance(error, (
                 BudgetValidationError, NodeFinalizationError, SentinelAlert,
-                VerificationRecoveryError,
+                VerificationRecoveryError, ProviderResponseError,
             )):
                 # Retain the intent and all accounting: recovery must not hide
                 # an unusable bill or buy a replacement for a failed write.
@@ -321,14 +329,7 @@ class AsyncExecutor(ExecutorBase):
                 return
             except VerificationRecoveryError:
                 raise
-            except asyncio.CancelledError:
-                if self._budget:
-                    self._budget.release(node.id)
-                node.status = NodeStatus.PENDING
-                node.result = None
-                self._tracer.on_node_end(node)
-                raise
-            except (BudgetValidationError, NodeFinalizationError, SentinelAlert) as exc:
+            except (BudgetValidationError, NodeFinalizationError, SentinelAlert, ProviderResponseError) as exc:
                 # A reconciliation alert or post-billing persistence failure
                 # is non-retryable here: another provider call would compound
                 # the spend rather than repair the local failure. Invalid
@@ -340,6 +341,13 @@ class AsyncExecutor(ExecutorBase):
                 self._tracer.on_node_error(node, exc)
                 self._tracer.on_node_end(node)
                 self.notify_update(node)
+                raise
+            except asyncio.CancelledError:
+                if self._budget:
+                    self._budget.release(node.id)
+                node.status = NodeStatus.PENDING
+                node.result = None
+                self._tracer.on_node_end(node)
                 raise
             except Exception as exc:
                 last_exc = exc

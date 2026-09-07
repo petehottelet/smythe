@@ -124,12 +124,17 @@ The current unreleased work hardens the guarantees users depend on before a
     context, and acceptance criteria through routing, planning, graph handoffs,
     execution, supervision, synthesis, memory, and recovery.
     [Tasks and handoffs](docs/tasks.md).
+17. **Native Astra and Sol Responses** — explicit endpoint, reasoning effort,
+    and service tier; preserved function-tool continuation; exact native token
+    pricing; request-bound quotes; and retained billing evidence for unusable
+    responses. [Provider guide](docs/openai-responses.md).
 
 ## Coming soon
 
 The [GPT-6 Astra campaign plan](benchmarks/astra_benchmark_plan.md) specifies
-matched model and orchestration experiments, complete provider usage pricing,
-and Responses tool support before broader Astra claims.
+matched model and orchestration experiments. Native Responses and per-call
+pricing are implemented; complete workflow accounting precedes paid cost
+comparisons and broader Astra claims.
 
 The [September repository review](docs/project-review-2026-09-06.md) defines
 the hardening work ahead of broader production claims:

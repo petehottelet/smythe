@@ -168,6 +168,7 @@ selective rerolls, and portable exports.
 [Architecture](docs/architecture.md) · [Task handoffs](docs/tasks.md) · [Jobs and CLI](docs/jobs.md) ·
 [Failure policies](docs/execution.md) · [Cost guardrails](docs/budgets.md) ·
 [MCP](docs/mcp.md) · [Verification](docs/verifier.md) ·
+[Native Astra and Sol Responses](docs/openai-responses.md) ·
 [All guides and examples](docs/index.md).
 
 ## Quickstart
@@ -205,10 +206,12 @@ result = swarm.execute(graph)
 print(result.output)
 ```
 
-This example makes paid API calls without a spend cap. Text-provider dollar
-totals currently use a blended token estimate and exclude planning;
-`max_budget_usd` is not an Astra invoice ceiling. Model-specific accounting
-and Astra tool support are specified in the [campaign plan](benchmarks/astra_benchmark_plan.md).
+This example uses the published Chat Completions provider and makes paid API
+calls without a spend cap. Its dollar totals use a blended token estimate and
+exclude planning. The current checkout adds an explicit
+[Responses provider](docs/openai-responses.md) with Astra/Sol function tools,
+native usage receipts, and model-specific token prices. Complete workflow
+accounting is the next [campaign prerequisite](benchmarks/astra_benchmark_plan.md).
 Anthropic and Gemini use the `smythe[anthropic]` and `smythe[gemini]` extras.
 
 Try the complete acquisition-diligence workflow without an API key:
