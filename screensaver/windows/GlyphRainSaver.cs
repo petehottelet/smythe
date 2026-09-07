@@ -392,6 +392,9 @@ namespace SmytheGlyphRain
 
     internal static class Sprites
     {
+        // GDI+ uses coarse edge coverage at small sizes. Average a 4x cached
+        // raster so the same SVG area covers the same screen pixels as Cairo/CG.
+        private const int RasterScale = 4;
         internal static GraphicsPath BuildPath(int glyph)
         {
             return BuildPath(GlyphData.Commands[glyph]);
@@ -443,33 +446,35 @@ namespace SmytheGlyphRain
 
         internal static Bitmap RenderMask(int glyph, int cell)
         {
-            var bitmap = new Bitmap(cell, cell, PixelFormat.Format32bppPArgb);
+            var bitmap = new Bitmap(cell * RasterScale, cell * RasterScale, PixelFormat.Format32bppPArgb);
             using (Graphics graphics = Graphics.FromImage(bitmap))
             using (GraphicsPath path = BuildPath(glyph))
-            using (var transform = new Matrix(cell / GlyphData.CanvasW, 0, 0, cell / GlyphData.CanvasH, 0, 0))
+            using (var transform = new Matrix(cell * RasterScale / GlyphData.CanvasW, 0, 0, cell * RasterScale / GlyphData.CanvasH, 0, 0))
             {
                 graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                graphics.PixelOffsetMode = PixelOffsetMode.Half;
                 path.Transform(transform);
                 graphics.FillPath(Brushes.White, path);
             }
-            return bitmap;
+            return Downsample(bitmap);
         }
 
         internal static Bitmap Render(int glyph, int cell, int pad, float level, bool head)
         {
-            var bitmap = new Bitmap(cell + pad * 2, cell + pad * 2, PixelFormat.Format32bppPArgb);
+            var bitmap = new Bitmap((cell + pad * 2) * RasterScale, (cell + pad * 2) * RasterScale, PixelFormat.Format32bppPArgb);
             using (Graphics graphics = Graphics.FromImage(bitmap))
             using (GraphicsPath path = BuildPath(glyph))
-            using (var transform = new Matrix(cell / GlyphData.CanvasW, 0, 0, cell / GlyphData.CanvasH, pad, pad))
+            using (var transform = new Matrix(cell * RasterScale / GlyphData.CanvasW, 0, 0, cell * RasterScale / GlyphData.CanvasH, pad * RasterScale, pad * RasterScale))
             {
                 graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                graphics.PixelOffsetMode = PixelOffsetMode.Half;
                 path.Transform(transform);
                 Color body = BodyColor(level);
                 Color color = head ? Color.FromArgb(255, (int)(162 * level), (int)(255 * level), (int)(216 * level)) : body;
                 // Low-opacity outlines form a halo; the opaque core is the exact
                 // compound SVG fill, never a stroke-width approximation.
-                using (var wide = new Pen(Color.FromArgb((int)(14 * level), 117, 240, 152), Math.Max(1f, cell * 0.20f)))
-                using (var soft = new Pen(Color.FromArgb((int)(head ? 35 * level : 20 * level), 117, 240, 152), Math.Max(1f, cell * 0.08f)))
+                using (var wide = new Pen(Color.FromArgb((int)(14 * level), 117, 240, 152), Math.Max(1f, cell * 0.20f) * RasterScale))
+                using (var soft = new Pen(Color.FromArgb((int)(head ? 35 * level : 20 * level), 117, 240, 152), Math.Max(1f, cell * 0.08f) * RasterScale))
                 using (var brush = new SolidBrush(color))
                 {
                     wide.LineJoin = soft.LineJoin = LineJoin.Round;
@@ -477,7 +482,38 @@ namespace SmytheGlyphRain
                     graphics.FillPath(brush, path);
                 }
             }
-            return bitmap;
+            return Downsample(bitmap);
+        }
+
+        private static Bitmap Downsample(Bitmap source)
+        {
+            var result = new Bitmap(source.Width / RasterScale, source.Height / RasterScale, PixelFormat.Format32bppPArgb);
+            BitmapData input = null, output = null;
+            bool completed = false;
+            try {
+                input = source.LockBits(new Rectangle(0, 0, source.Width, source.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppPArgb);
+                output = result.LockBits(new Rectangle(0, 0, result.Width, result.Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppPArgb);
+                byte[] pixels = new byte[input.Stride * source.Height], averaged = new byte[output.Stride * result.Height];
+                Marshal.Copy(input.Scan0, pixels, 0, pixels.Length);
+                const int samples = RasterScale * RasterScale;
+                for (int y = 0; y < result.Height; y++) for (int x = 0; x < result.Width; x++)
+                    for (int channel = 0; channel < 4; channel++)
+                    {
+                        int sum = 0;
+                        for (int dy = 0; dy < RasterScale; dy++) for (int dx = 0; dx < RasterScale; dx++)
+                            sum += pixels[(y * RasterScale + dy) * input.Stride + (x * RasterScale + dx) * 4 + channel];
+                        averaged[y * output.Stride + x * 4 + channel] = (byte)((sum + samples / 2) / samples);
+                    }
+                Marshal.Copy(averaged, 0, output.Scan0, averaged.Length);
+                completed = true;
+                return result;
+            }
+            finally {
+                if (input != null) source.UnlockBits(input);
+                if (output != null) result.UnlockBits(output);
+                source.Dispose();
+                if (!completed) result.Dispose();
+            }
         }
 
         private static Color BodyColor(float level)
