@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import hmac
 import math
+import os
 import re
 import time
 from dataclasses import dataclass
@@ -644,12 +645,14 @@ def _validated_run_root(
     resolved_manifest_root = manifest_root.resolve()
     output_root = (resolved_manifest_root / output_directory).resolve()
     try:
-        output_root.relative_to(resolved_manifest_root)
+        _confinement_path(output_root).relative_to(
+            _confinement_path(resolved_manifest_root)
+        )
     except ValueError as exc:
         raise ValueError("job output directory escapes the manifest root") from exc
     run_root = (output_root / run_id).resolve()
     try:
-        run_root.relative_to(output_root)
+        _confinement_path(run_root).relative_to(_confinement_path(output_root))
     except ValueError as exc:  # pragma: no cover - run_id validation is defense in depth
         raise ValueError("job run directory escapes the approved output directory") from exc
     return run_root
@@ -662,7 +665,9 @@ def _prepare_confined_parent(destination: Path, run_root: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     resolved_parent = destination.parent.resolve()
     try:
-        resolved_parent.relative_to(resolved_run_root)
+        _confinement_path(resolved_parent).relative_to(
+            _confinement_path(resolved_run_root)
+        )
     except ValueError as exc:
         raise ValueError("artifact destination escapes the approved run directory") from exc
 
@@ -673,7 +678,7 @@ def _read_bound_attachment(fingerprint: Any, root: Path) -> bytes:
     resolved_root = root.resolve()
     path = (resolved_root / fingerprint.relative_path).resolve()
     try:
-        path.relative_to(resolved_root)
+        _confinement_path(path).relative_to(_confinement_path(resolved_root))
     except ValueError as exc:
         raise ValueError(
             f"attachment {fingerprint.relative_path!r} escapes the manifest root"
@@ -693,3 +698,17 @@ def _read_bound_attachment(fingerprint: Any, root: Path) -> bytes:
             "create a new plan and approval"
         )
     return data
+
+
+def _confinement_path(path: Path) -> Path:
+    """Normalize equivalent Windows namespace spellings for containment checks."""
+
+    resolved = path.resolve()
+    if os.name != "nt":
+        return resolved
+    value = str(resolved)
+    if value.startswith("\\\\?\\UNC\\"):
+        value = "\\\\" + value[8:]
+    elif value.startswith("\\\\?\\"):
+        value = value[4:]
+    return Path(value)
