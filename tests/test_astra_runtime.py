@@ -1,5 +1,6 @@
 """Offline native-transport qualification of the separate, gated pilot runtime."""
 
+from contextlib import closing
 import asyncio
 from copy import deepcopy
 import json
@@ -496,20 +497,20 @@ def test_retained_outcome_reconciles_against_current_immutable_evidence(recorded
             evidence = store.load_replay(call_id)["evidence"]
             evidence["body"] += b"\n"
             envelope = SQLiteWorkflowStore._envelope(evidence)
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db, db:
                 db.execute("UPDATE workflow_evidence SET body=?,response_sha=?,metadata_sha=? WHERE evidence_id=?",
                            (envelope[1], envelope[2], envelope[-1], evidence["evidence_id"]))
         elif change == "checkpoint":
             checkpoint = deepcopy(record["checkpoint"]["checkpoint"])
             checkpoint["output"] = "altered saved output"
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db, db:
                 db.execute("UPDATE workflow_checkpoints SET checkpoint_json=?,checkpoint_sha=? WHERE run_id=? AND revision=?",
                            (canonical(checkpoint), runtime._sha(checkpoint), record["run_id"], record["checkpoint"]["revision"]))
         elif change == "decoded-result":
             call_id = record["accounting"]["calls"][0]["call_id"]
             decoded = store.load_replay(call_id)["decoded_result"]
             decoded["text"] = "altered accepted result"
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db, db:
                 db.execute("UPDATE workflow_calls SET result_json=?,result_sha=? WHERE call_id=?",
                            (canonical(decoded), runtime._sha(decoded), call_id))
         else:
@@ -562,11 +563,11 @@ def test_failed_quote_history_is_bound_even_without_an_accepted_quote(tmp_path, 
             values = SQLiteWorkflowStore._envelope(envelope)
             # Keep the body and event byte hash identical; only binding every
             # retained envelope detects this self-consistent metadata change.
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db, db:
                 db.execute("UPDATE workflow_evidence SET request_id=?,metadata_sha=? WHERE evidence_id=?",
                            (envelope["request_id"], values[-1], envelope["evidence_id"]))
         else:
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db, db:
                 db.execute("DELETE FROM workflow_events WHERE run_id=? AND sequence=?", (run_id, event["sequence"]))
         assert store.audit(run_id)["ok"]
         with pytest.raises(runtime.CampaignRuntimeError, match="evidence"):
