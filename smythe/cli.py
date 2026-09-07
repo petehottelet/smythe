@@ -9,6 +9,8 @@ import json
 import os
 import sqlite3
 import sys
+import tempfile
+import unicodedata
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -22,6 +24,7 @@ from smythe.jobs.store import (
     JobBudgetError,
     JobNotFoundError,
     RunLeaseError,
+    RunStatus,
     RunStoreError,
     SQLiteRunStore,
 )
@@ -162,6 +165,21 @@ def build_parser() -> argparse.ArgumentParser:
     status.add_argument("run_id")
     status.add_argument("--events", action="store_true")
     _add_output_options(status, inherited=True)
+
+    listing = commands.add_parser("list", help="list saved jobs without changing the store")
+    listing.add_argument("--limit", type=int, default=50, help="page size (1-500; default: 50)")
+    listing.add_argument("--offset", type=int, default=0, help="number of jobs to skip (default: 0)")
+    listing.add_argument("--status", default=None, help="filter by run status: " + ", ".join(item.value for item in RunStatus))
+    _add_output_options(listing, inherited=True)
+
+    inspection = commands.add_parser("inspect", help="inspect job attempts, phases, costs, and artifacts")
+    inspection.add_argument("run_id")
+    inspection.add_argument("--operation", default=None, metavar="KEY_OR_ID", help="inspect one operation")
+    inspection.add_argument("--limit", type=int, default=50, help="operation page size (default: 50)")
+    inspection.add_argument("--offset", type=int, default=0, help="number of operations to skip (default: 0)")
+    inspection.add_argument("--events-limit", type=int, default=100, help="maximum recent events (default: 100)")
+    inspection.add_argument("--out", default=None, metavar="HTML_PATH", help="write a standalone HTML report")
+    _add_output_options(inspection, inherited=True)
 
     resume = commands.add_parser("resume", help="resume only definitively safe work")
     resume.add_argument("run_id")
@@ -478,6 +496,103 @@ def _write_json(path: str | Path, value: Any) -> Path:
     return destination
 
 
+def _report_destination(path: str | Path, store_path: str | Path) -> Path:
+    """An explicit export must never replace the database being inspected."""
+    destination = Path(path).resolve()
+    source = Path(store_path).resolve()
+    if destination in {source, *(Path(str(source) + suffix) for suffix in ("-wal", "-shm", "-journal"))}:
+        raise ValueError("Output path must not replace the Jobs store or its SQLite sidecars")
+    return destination
+
+
+def _write_html(path: Path, html: str) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", newline="\n", dir=path.parent,
+            prefix=f".{path.name}.", suffix=".tmp", delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+            stream.write(html)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    return path
+
+
+def _terminal_text(value: Any, *, limit: int = 300) -> str:
+    """Keep stored names and errors from executing terminal control sequences."""
+    value = str(value)
+    shortened = value[:limit] + ("…" if len(value) > limit else "")
+    return "".join(
+        f"\\u{ord(char):04x}" if unicodedata.category(char) in {"Cc", "Cf", "Zl", "Zp"} else char
+        for char in shortened
+    )
+
+
+def _usd(microusd: int) -> str:
+    whole, fraction = divmod(microusd, 1_000_000)
+    return f"${whole}.{fraction:06d}"
+
+
+def _emit_job_list(value: dict[str, Any]) -> None:
+    print(f"Jobs: {value['returned']} (offset {value['offset']}, limit {value['limit']})")
+    for run in value["runs"]:
+        print(f"{_terminal_text(run['run_id'])}  {_terminal_text(run['status'])}  {_terminal_text(run['name'])}")
+        cost = run["cost"]
+        print(f"  Operations: {run['operation_count']}; confirmed {_usd(cost['confirmed_microusd'])}; "
+              f"exposure {_usd(cost['exposure_microusd'])}; reserved {_usd(cost['reserved_microusd'])}")
+    if not value["runs"]:
+        print("No jobs matched.")
+    if value["has_more"]:
+        print(f"More jobs: use --offset {value['offset'] + value['returned']}")
+
+
+def _emit_job_inspection(value: dict[str, Any]) -> None:
+    print(f"Run: {_terminal_text(value['run_id'])}")
+    print(f"Name: {_terminal_text(value['name'])}")
+    print(f"Status: {_terminal_text(value['status'])}")
+    print(f"Operations (whole run): {_terminal_text(json.dumps(value['counts'], sort_keys=True))}")
+    cost = value["cost"]
+    print(f"Confirmed: {_usd(cost['confirmed_microusd'])}; Exposure: {_usd(cost['exposure_microusd'])}; "
+          f"Reserved: {_usd(cost['reserved_microusd'])}; Approved: {_usd(cost['approved_microusd'])}")
+    print(f"Cost complete: {'yes' if cost['cost_is_complete'] else 'no'}; "
+          f"includes estimates: {'yes' if cost['cost_contains_estimates'] else 'no'}")
+    page = value["pagination"]
+    print(f"Operation page: {page['returned']} of {page['total']} (offset {page['offset']}, limit {page['limit']})")
+    for operation in value["operations"]:
+        print(f"Operation {_terminal_text(operation['operation_key'])} "
+              f"({_terminal_text(operation['operation_id'])}): {_terminal_text(operation['status'])}; "
+              f"attempts {operation['attempt_count']}/{operation['max_attempts']}")
+        for attempt in value["attempts"]:
+            if attempt["operation_id"] != operation["operation_id"]:
+                continue
+            print(f"  Attempt {attempt['attempt_number']} ({_terminal_text(attempt['attempt_id'])}): "
+                  f"{_terminal_text(attempt['status'])}; parent: {_terminal_text(attempt['parent_attempt_id'] or 'none')}")
+            if attempt.get("reason"):
+                print(f"    Reason: {_terminal_text(attempt['reason'])}")
+            if attempt.get("error"):
+                print(f"    Error: {_terminal_text(attempt['error'])}")
+            for call in value["calls"]:
+                if call["attempt_id"] == attempt["attempt_id"]:
+                    print(f"    Call state: {_terminal_text(call['status'])} ({_terminal_text(call['call_id'])}); "
+                          f"confirmed {_usd(call['confirmed_microusd'])}; exposure {_usd(call['exposure_microusd'])}")
+        for artifact in value["artifacts"]:
+            if artifact["operation_id"] == operation["operation_id"]:
+                print(f"  Artifact {_terminal_text(artifact['relative_path'])}: "
+                      f"{_terminal_text(json.dumps(artifact['integrity'], sort_keys=True))}")
+    if page["has_more"]:
+        print(f"More operations: use --offset {page['offset'] + page['returned']}")
+    events = value["event_pagination"]
+    print(f"Recent events: {events['returned']} of {events['total']}")
+    if "report_path" in value:
+        print(f"HTML report: {_terminal_text(value['report_path'], limit=1000)}")
+
+
 def _emit(args: argparse.Namespace, command: str, value: Any) -> None:
     payload = {"ok": True, "command": command, command: value}
     if args.json:
@@ -501,6 +616,10 @@ def _emit(args: argparse.Namespace, command: str, value: Any) -> None:
         print(f"Operations: {json.dumps(job['counts'], sort_keys=True)}")
     elif command == "export" and isinstance(value, dict) and "path" in value:
         print(f"Exported {value['run_id']} to {value['path']}")
+    elif command == "list":
+        _emit_job_list(value)
+    elif command == "inspect" and args.root_command == "jobs":
+        _emit_job_inspection(value)
     else:
         print(json.dumps(value, indent=2, ensure_ascii=False))
 
@@ -520,7 +639,8 @@ def _emit_error(
         ensure_ascii=False,
         separators=(",", ":") if args.json else None,
     )
-    print(text if args.json else f"error: {error}", file=sys.stdout if args.json else sys.stderr)
+    print(text if args.json else f"error: {_terminal_text(error, limit=1000)}",
+          file=sys.stdout if args.json else sys.stderr)
 
 
 async def _run_optimize_concurrency(args: argparse.Namespace) -> dict[str, Any]:
@@ -697,7 +817,27 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
         _emit(args, command, snapshot)
         return _job_exit(snapshot)
 
-    with SQLiteRunStore(args.store) as store:
+    if command in {"list", "inspect"}:
+        from smythe.jobs.inspection import inspect_job, list_jobs
+
+        destination = _report_destination(args.out, args.store) if command == "inspect" and args.out else None
+        with SQLiteRunStore(args.store, read_only=True) as store:
+            if command == "list":
+                payload = list_jobs(store, limit=args.limit, offset=args.offset, status=args.status)
+            else:
+                payload = inspect_job(store, args.run_id, operation=args.operation,
+                                      limit=args.limit, offset=args.offset, events_limit=args.events_limit)
+        if destination is not None:
+            from smythe.jobs.report import render_job_report
+
+            _write_html(destination, render_job_report(payload))
+            payload = dict(payload, report_path=str(destination))
+        _emit(args, command, payload)
+        return EXIT_OK
+
+    if command == "export" and args.out:
+        _report_destination(args.out, args.store)
+    with SQLiteRunStore(args.store, read_only=command in {"status", "export"}) as store:
         if command == "status":
             snapshot = store.snapshot(args.run_id, include_events=args.events)
         elif command == "resume":

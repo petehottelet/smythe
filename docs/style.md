@@ -94,6 +94,16 @@ Matrix green body grade, `#A2FFD8` leading glyphs, or bloom.
 This explorer treatment does not change the chart typography or the README's
 strictly black-and-white charts.
 
+## Operator reports
+
+Local Jobs reports use the same black-and-white editorial system. Put run
+state, exceptional operation counts, and exact cost balances before detailed
+records. Keep completeness and estimate qualifiers beside the cost table.
+Use native disclosures for prompts, responses, and lineage. On narrow screens,
+stack labeled record fields so inspection controls and expanded text remain
+visible without horizontal scrolling. Reports are self-contained: no scripts,
+remote resources, or automatic artifact loading.
+
 ## Verification
 
 After changing graph assets, regenerate them, scan every active SVG and Mermaid

@@ -133,6 +133,10 @@ The current unreleased work hardens the guarantees users depend on before a
     responses, and atomic graph/control consumption. Separate planning and
     execution retain their charges; recovery replays persisted responses locally.
     [Workflow guide](docs/workflow-accounting.md).
+19. **Jobs operator inspection** — read-only run lists and paged inspection,
+    exact cost balances, prompts, responses, attempt lineage, recent events,
+    and local artifact integrity in a self-contained black-and-white HTML report.
+    [Inspection commands](docs/jobs.md#list-and-inspect-runs).
 
 ## Coming soon
 
@@ -179,19 +183,16 @@ Linux port targets X11; the macOS bundle uses an ad-hoc signature.
 5. **Integrate asset policy with Jobs v1** — manifest-native production brand
    masters, OCR and perceptual brand validators, select-from-N curation, and
    deterministic export bundles built from accepted attempt pointers
-6. **Operator inspection surface** — render the Jobs event/attempt timeline,
-   costs, prompts, responses, validation findings, and artifacts without
-   requiring users to inspect SQLite or raw JSON
-7. **Detachable operator runtime** — keep approved long jobs active when a
+6. **Detachable operator runtime** — keep approved long jobs active when a
    terminal disconnects, then list, inspect, attach, stop, and resume them from
    the installed CLI
-8. **Scale ladder** — offline 5,000-item stress tests followed by bounded paid
+7. **Scale ladder** — offline 5,000-item stress tests followed by bounded paid
    50/250/1,000-item trials with kill-and-resume and duplicate detection
-9. **Benchmarks, continued** — a discriminating judge, human calibration,
+8. **Benchmarks, continued** — a discriminating judge, human calibration,
    repeated k=25 cells, repeated glyph live cells, and held-out
    brand-consistency comparisons; save delivered text and judge reasoning so
    independent reviewers can rescore each quality result
-10. **Autotune generalization**: add campaign-wide leases, calibrated
+9. **Autotune generalization**: add campaign-wide leases, calibrated
    sample-size and repeated-comparison guidance, richer reports, process-
    supervised evaluator isolation, and conservative live-evaluator adapters
    after the offline campaign

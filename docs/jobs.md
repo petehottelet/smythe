@@ -15,15 +15,18 @@ wide artifact production.
 
 ## Install
 
+Jobs commands described here require the current repository checkout. From
+the cloned repository root:
+
 ```bash
-pip install "smythe[jobs]"
+pip install -e ".[jobs]"
 ```
 
 Add the provider extra needed by a live manifest, for example:
 
 ```bash
-pip install "smythe[jobs,openai]"
-pip install "smythe[jobs,gemini]"
+pip install -e ".[jobs,openai]"
+pip install -e ".[jobs,gemini]"
 ```
 
 The installed command is `smythe`. Job state defaults to
@@ -195,6 +198,54 @@ Snapshots distinguish confirmed cost, reserved cost, and unresolved exposure.
 remains exposed; `cost_contains_estimates` reports whether any recorded call
 used a conservative estimate.
 
+## List and inspect runs
+
+Find a run, inspect its attempts, or write a local report:
+
+```bash
+smythe jobs list --limit 50
+smythe jobs list --status needs_attention --json
+smythe jobs inspect RUN_ID
+smythe jobs inspect RUN_ID --operation "tile[3]" --json
+smythe jobs inspect RUN_ID --out job-report.html
+```
+
+The HTML report is a self-contained black-and-white document. It shows
+whole-run state and exact USD balances, then operation prompts, responses,
+attempts, call records, validation errors, artifact receipts, and recent
+events. Expand records to read their text and attempt history. Rejected and unknown
+attempts remain visible alongside accepted outputs. The report includes
+stored prompts, responses, and local paths; it is intended for local review.
+It runs no scripts and loads no remote resources.
+
+Lists are ordered newest first. Both commands accept `--limit` (1–500,
+default 50) and `--offset` (default 0). Inspection includes complete attempt
+lineage for the selected operation page; its cost and status totals still
+cover the entire run. `--operation` accepts an exact key or stable ID.
+`--events-limit` controls the most recent events (1–1,000, default 100), with
+explicit counts when earlier events are omitted. Select another operation
+page or use `export` for the complete journal.
+Each command reads a fresh snapshot; new runs or status changes can shift
+list offsets between requests.
+
+Artifact integrity is a timestamped observation of the files on disk after
+the ledger snapshot. Inspection compares size and SHA-256, reading at most
+64 MiB per invocation and 32 MiB per file. Missing, changed, unreadable, and
+unchecked files are labeled. Unsafe paths, symbolic links, and junctions are
+not followed. These checks preserve the recorded acceptance decision and do
+not repeat image decoding or quality evaluation.
+
+`list`, `inspect`, `status`, and `export` open the existing Jobs database in
+read-only mode, without provider initialization or schema migration. Missing,
+foreign, and unsupported databases fail closed. A live WAL reader sees one
+consistent committed ledger snapshot while the worker continues. `--out`
+writes the requested report atomically and rejects the database and its WAL
+or SHM files as output destinations.
+
+Successful `list` and `inspect` commands return exit code 0 even when a run
+needs attention. Their JSON output retains the run's recorded status. The
+existing `status` and `export` commands retain their job-state exit codes.
+
 ## Resume and unknown outcomes
 
 Resume revalidates the stored manifest, rebuilds the same plan, verifies the
@@ -286,7 +337,7 @@ and output charge that one request can incur.
 
 | Code | Meaning |
 |---:|---|
-| 0 | command succeeded and the resulting job is not in a failed terminal state |
+| 0 | command succeeded; `list` and `inspect` succeed regardless of recorded job status |
 | 1 | job finished `failed`, `partial`, `needs_attention`, or `budget_overrun` |
 | 2 | invalid manifest, preflight input, or command value |
 | 3 | provider configuration or optional dependency failure |

@@ -19,6 +19,8 @@ smythe jobs validate examples/12_jobs_manifest.yaml
 smythe jobs plan examples/12_jobs_manifest.yaml
 # Copy the printed approval token into the next command.
 smythe jobs run examples/12_jobs_manifest.yaml --approve approve_v1_...
+smythe jobs list
+smythe jobs inspect RUN_ID --out job-report.html
 ```
 
 | Example | What it shows |
@@ -37,7 +39,7 @@ smythe jobs run examples/12_jobs_manifest.yaml --approve approve_v1_...
 | [09_image_generation.py](09_image_generation.py) | Parallel image artifacts, per-image cost accounting, and deterministic offline image fixtures; real mode uses Gemini. |
 | [10_gpt_image_generation.py](10_gpt_image_generation.py) | Three GPT Image requests fan out concurrently through the dedicated `OpenAIImageProvider`; offline mode remains free and deterministic. |
 | [11_vision_judge.py](11_vision_judge.py) | Select-from-N curation: parallel ad candidates judged by an art-director node that sees the actual images (`attach_dep_artifacts=True`). In its first real run the judge caught a spelling error in a generated ad. |
-| [12_jobs_manifest.yaml](12_jobs_manifest.yaml) | A zero-cost, four-operation artifact job for the installed `smythe jobs` validate, plan, run, status, resume, reroll, and export workflow. |
+| [12_jobs_manifest.yaml](12_jobs_manifest.yaml) | A zero-cost, four-operation artifact job for the installed `smythe jobs` validate, plan, run, list, inspect, status, resume, reroll, and export workflow. Inspect writes a self-contained HTML report with attempt history, costs, and artifact integrity. |
 | [13_adaptive_supervision.py](13_adaptive_supervision.py) | A plan that corrects itself: research surfaces a conflict, and the supervisor inserts a reconciliation step ahead of the write step instead of letting the contradiction reach the deliverable. |
 | [14_durable_text_workflow.py](14_durable_text_workflow.py) | Plan and execute one journaled text run, inspect exact API-cost balances, then recover its cached output. [Native Astra version and scope](../docs/workflow-accounting.md). |
 | [acquisition_diligence/](acquisition_diligence/) | **Complete acquisition-diligence example.** Task intake → generated `fork-join → adversarial → serial` topology → parallel specialists → red-team review → final memo, with committed expected artifacts (graph, trace, memo). |
