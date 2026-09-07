@@ -37,6 +37,7 @@ rm -f "$DIST/GlyphRain-arm64" "$DIST/GlyphRain-x86_64"
 
 cp "$HERE/Info.plist" "$BUNDLE/Contents/Info.plist"
 cp "$HERE/glyphs.json" "$BUNDLE/Contents/Resources/glyphs.json"
+cp "$HERE/../svg-preview/reference/LICENSE" "$BUNDLE/Contents/Resources/THIRD_PARTY_NOTICES.txt"
 chmod 755 "$BUNDLE/Contents/MacOS/GlyphRain"
 plutil -lint "$BUNDLE/Contents/Info.plist"
 

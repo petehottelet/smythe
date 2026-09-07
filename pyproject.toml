@@ -41,7 +41,9 @@ openclaw = ["openclaw-sdk>=0.1"]
 # tracked separately; an uncapped range ships a broken extra.
 mcp = ["mcp>=1.2,<2"]
 jobs = ["pillow>=10.0"]
-glyphs = ["pillow>=10.1", "numpy>=2.0,<3", "scipy>=1.14,<2", "shapely==2.1.2"]
+# The committed inspection rasters use Pillow 11.1.0 polygon coverage.
+# Newer rasterizers change edge pixels; upgrade with an explicit artwork review.
+glyphs = ["pillow==11.1.0", "numpy>=2.0,<3", "scipy>=1.14,<2", "shapely==2.1.2"]
 benchmarks = [
     "anthropic>=0.40",
     "openai>=1.50",
@@ -67,7 +69,7 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.8",
     "mcp>=1.2,<2",
-    "pillow>=10.1",
+    "pillow==11.1.0",
     "numpy>=2.0,<3",
     "scipy>=1.14,<2",
     "shapely==2.1.2",

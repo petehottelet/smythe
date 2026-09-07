@@ -1,8 +1,7 @@
 // Smythe Glyph Rain — native Windows screensaver (.scr).
 //
-// A GDI+ port of screensaver/index.html: the same 192 framework-generated
-// stroke glyphs (see GlyphData.cs, exported by export_glyphs.py), the same
-// three-depth-layer digital rain with bounded, luminous trails.
+// Exact filled SVG catalogs: 57 reference slots (including one blank) and
+// 192 original glyphs. Cached compound-path sprites use a 90/10 cell mix.
 //
 // Build (no SDK needed beyond Windows' bundled .NET Framework compiler):
 //     screensaver\windows\build_windows.cmd
@@ -18,8 +17,15 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+
+[assembly: AssemblyTitle("Smythe Glyph Rain")]
+[assembly: AssemblyDescription("Native filled SVG code rain: 56 reference shapes and 192 original glyphs")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 
 namespace SmytheGlyphRain
 {
@@ -46,12 +52,18 @@ namespace SmytheGlyphRain
                     break;
                 default:
                     MessageBox.Show(
-                        "Smythe Glyph Rain\n\n192 procedural cyber glyphs generated as one " +
-                        "parallel agent run by the Smythe framework.\n\n" +
-                        "github.com/petehottelet/smythe",
+                        "Smythe Glyph Rain\n\n56 reference SVG shapes + 192 original SVG glyphs.\n" +
+                        "90% reference sequence / 10% originals.\n\n" +
+                        "github.com/petehottelet/smythe\n\n" + ReferenceLicense(),
                         "Smythe Glyph Rain", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     break;
             }
+        }
+
+        private static string ReferenceLicense()
+        {
+            using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("SmytheGlyphRain.ReferenceLicense"))
+            using (var reader = new StreamReader(stream)) { return reader.ReadToEnd(); }
         }
 
         private static void RunFullscreen()
@@ -142,7 +154,7 @@ namespace SmytheGlyphRain
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
-            if (_windowed && ClientSize.Width > 0 && ClientSize.Height > 0 && _buffer != null)
+            if (ClientSize.Width > 0 && ClientSize.Height > 0 && _buffer != null)
             {
                 BuildScene();
             }
@@ -242,7 +254,7 @@ namespace SmytheGlyphRain
         }
     }
 
-    /// <summary>One depth plane: pre-rendered sprites plus its column field.</summary>
+    /// <summary>One depth plane of cached exact SVG fills.</summary>
     internal sealed class Layer : IDisposable
     {
         private readonly Bitmap[] _trail;
@@ -252,15 +264,18 @@ namespace SmytheGlyphRain
         private readonly int _pad;
         private readonly float _speed;
         private readonly ImageAttributes[] _opacity = new ImageAttributes[16];
+        internal long DrawnReference;
+        internal long DrawnOriginal;
+        internal long DrawnBlank;
 
         internal Layer(float cellF, float spacing, float speed, float level,
                        int width, int height, Random random)
         {
             int cell = Math.Max(6, (int)Math.Round(cellF));
             _speed = speed;
-            _pad = Math.Max(2, cell / 2);
-            _trail = new Bitmap[GlyphData.Strokes.Length];
-            _head = new Bitmap[GlyphData.Strokes.Length];
+            _pad = Math.Max(3, cell / 2);
+            _trail = new Bitmap[GlyphData.Count];
+            _head = new Bitmap[GlyphData.Count];
             for (int alpha = 0; alpha < _opacity.Length; alpha++)
             {
                 _opacity[alpha] = new ImageAttributes();
@@ -268,10 +283,10 @@ namespace SmytheGlyphRain
                 matrix.Matrix33 = alpha / 15f;
                 _opacity[alpha].SetColorMatrix(matrix);
             }
-            for (int glyph = 0; glyph < GlyphData.Strokes.Length; glyph++)
+            for (int glyph = 0; glyph < GlyphData.Count; glyph++)
             {
-                _trail[glyph] = Sprites.Render(glyph, cell, _pad, level, head: false);
-                _head[glyph] = Sprites.Render(glyph, cell, _pad, level, head: true);
+                _trail[glyph] = Sprites.Render(glyph, cell, _pad, level, false);
+                _head[glyph] = Sprites.Render(glyph, cell, _pad, level, true);
             }
             _step = Math.Max(3, (int)Math.Round(cell * 1.04));
             int lane = Math.Max(3, (int)Math.Round(cell * spacing));
@@ -279,25 +294,23 @@ namespace SmytheGlyphRain
             for (int index = 0; index < columns; index++)
             {
                 var column = new Column();
-                Reset(column, random, height, initial: true);
-                column.X = (index * lane) % (width + lane) + random.Next(-3, 4);
+                Reset(column, random, height, true);
+                column.X = index * lane + random.Next(-3, 4);
                 _columns.Add(column);
             }
         }
 
         private void Reset(Column column, Random random, int height, bool initial)
         {
-            column.Glyph = random.Next(GlyphData.Strokes.Length);
-            column.Phase = random.Next(GlyphData.Strokes.Length);
-            column.Rate = GlyphData.Speeds[column.Glyph] * 5.6f * _speed;
+            column.Seed = random.Next();
+            column.Glyph = CatalogSelector.Select(column.Seed, 0, 0);
+            column.Phase = random.Next(1000);
+            column.Rate = (float)GlyphData.Speeds[column.Glyph] * 5.6f * _speed;
             column.Accumulator = (float)random.NextDouble();
             column.Y = initial
                 ? (int)(random.NextDouble() * (height + GlyphData.Trails[column.Glyph] * _step))
                 : -_step * random.Next(7);
-            if (!initial && random.NextDouble() < 0.06)
-            {
-                column.Burst = 1.6f;
-            }
+            column.Burst = !initial && random.NextDouble() < 0.06 ? 1.6f : 0;
         }
 
         internal void Step(Graphics graphics, float dt, Random random, int height)
@@ -305,19 +318,16 @@ namespace SmytheGlyphRain
             foreach (Column column in _columns)
             {
                 column.Accumulator += dt * column.Rate * (column.Burst > 0 ? 1.9f : 1f);
-                if (column.Burst > 0)
-                {
-                    column.Burst -= dt;
-                }
+                if (column.Burst > 0) { column.Burst -= dt; }
                 while (column.Accumulator >= 1f)
                 {
                     column.Accumulator -= 1f;
                     column.Y += _step;
-                    column.Phase = (column.Phase + 7) % _trail.Length;
-                    float past = column.Y - GlyphData.Trails[column.Glyph] * _step * 1.15f;
-                    if (past > height && random.NextDouble() < 0.6)
+                    column.Phase++;
+                    if (column.Y - GlyphData.Trails[column.Glyph] * _step * 1.15f > height
+                        && random.NextDouble() < 0.6)
                     {
-                        Reset(column, random, height, initial: false);
+                        Reset(column, random, height, false);
                     }
                 }
                 int length = (int)Math.Round(GlyphData.Trails[column.Glyph] * 1.15f);
@@ -325,8 +335,12 @@ namespace SmytheGlyphRain
                 {
                     int y = column.Y - tail * _step;
                     if (y < -_step || y > height + _step) { continue; }
-                    int glyph = (column.Glyph + column.Phase + _trail.Length * 2 - tail * 7)
-                        % _trail.Length;
+                    // A catalog coin flip per cell keeps 192 originals from
+                    // overwhelming the reference's 57-slot sequence.
+                    int glyph = CatalogSelector.Select(column.Seed, y / _step, column.Phase / 6);
+                    if (glyph == GlyphData.BlankIndex) { DrawnBlank++; continue; }
+                    if (glyph < GlyphData.OriginalOffset) { DrawnReference++; }
+                    else { DrawnOriginal++; }
                     float near = 1f - tail / (float)length;
                     float shimmer = 0.75f + (glyph % 5) * 0.0625f;
                     int alpha = tail == 0 ? 15
@@ -342,110 +356,227 @@ namespace SmytheGlyphRain
         public void Dispose()
         {
             foreach (ImageAttributes opacity in _opacity) { opacity.Dispose(); }
-            foreach (Bitmap bitmap in _trail)
-            {
-                bitmap.Dispose();
-            }
-            foreach (Bitmap bitmap in _head)
-            {
-                bitmap.Dispose();
-            }
+            foreach (Bitmap bitmap in _trail) { bitmap.Dispose(); }
+            foreach (Bitmap bitmap in _head) { bitmap.Dispose(); }
         }
     }
 
     internal sealed class Column
     {
-        internal int X;
-        internal int Y;
-        internal int Glyph;
-        internal int Phase;
-        internal float Rate;
-        internal float Accumulator;
-        internal float Burst;
+        internal int X, Y, Glyph, Phase, Seed;
+        internal float Rate, Accumulator, Burst;
     }
 
-    /// <summary>Pre-renders one glyph's stroke program into a glowing sprite.</summary>
+    internal static class CatalogSelector
+    {
+        private static uint Mix(uint value)
+        {
+            unchecked {
+                value ^= value >> 16; value *= 0x7feb352du;
+                value ^= value >> 15; value *= 0x846ca68bu;
+                return value ^ (value >> 16);
+            }
+        }
+
+        internal static int Select(int seed, int row, int epoch)
+        {
+            unchecked {
+                uint hash = Mix((uint)seed ^ ((uint)row * 0x9e3779b9u) ^ ((uint)epoch * 0x85ebca6bu));
+                uint index = Mix(hash ^ 0xa511e9b3u);
+                return hash % 10000 < (uint)(GlyphData.OriginalShare * 10000)
+                    ? GlyphData.OriginalOffset + (int)(index % (uint)GlyphData.OriginalCount)
+                    : (int)(index % (uint)GlyphData.ReferenceCount);
+            }
+        }
+    }
+
     internal static class Sprites
     {
-        internal static Bitmap Render(int glyph, int cell, int pad, float level, bool head)
+        internal static GraphicsPath BuildPath(int glyph)
         {
-            int size = cell + pad * 2;
-            var bitmap = new Bitmap(size, size, PixelFormat.Format32bppPArgb);
+            return BuildPath(GlyphData.Commands[glyph]);
+        }
+
+        internal static GraphicsPath BuildPath(double[][] commands)
+        {
+            var path = new GraphicsPath(FillMode.Winding);
+            float x = 0, y = 0;
+            bool open = false;
+            try {
+                foreach (double[] command in commands)
+                {
+                    if (command.Length == 0) { throw new InvalidOperationException("Empty SVG command"); }
+                    int kind = (int)command[0];
+                    int expected = kind == 2 ? 7 : kind == 3 ? 1 : 3;
+                    if (kind < 0 || kind > 3 || command[0] != kind || command.Length != expected)
+                    { throw new InvalidOperationException("Invalid SVG command"); }
+                    foreach (double value in command)
+                        if (Double.IsNaN(value) || Double.IsInfinity(value))
+                            throw new InvalidOperationException("Non-finite SVG coordinate");
+                    if (kind == 0)
+                    {
+                        if (open) { throw new InvalidOperationException("Unclosed SVG contour"); }
+                        path.StartFigure(); x = (float)command[1]; y = (float)command[2]; open = true;
+                    }
+                    else
+                    {
+                        if (!open) { throw new InvalidOperationException("SVG command before move"); }
+                        if (kind == 1)
+                        {
+                            path.AddLine(x, y, (float)command[1], (float)command[2]);
+                            x = (float)command[1]; y = (float)command[2];
+                        }
+                        else if (kind == 2)
+                        {
+                            path.AddBezier(x, y, (float)command[1], (float)command[2],
+                                (float)command[3], (float)command[4], (float)command[5], (float)command[6]);
+                            x = (float)command[5]; y = (float)command[6];
+                        }
+                        else { path.CloseFigure(); open = false; }
+                    }
+                }
+                if (open) { throw new InvalidOperationException("Unclosed SVG contour"); }
+                return path;
+            }
+            catch { path.Dispose(); throw; }
+        }
+
+        internal static Bitmap RenderMask(int glyph, int cell)
+        {
+            var bitmap = new Bitmap(cell, cell, PixelFormat.Format32bppPArgb);
             using (Graphics graphics = Graphics.FromImage(bitmap))
+            using (GraphicsPath path = BuildPath(glyph))
+            using (var transform = new Matrix(cell / GlyphData.CanvasW, 0, 0, cell / GlyphData.CanvasH, 0, 0))
             {
                 graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                float glyphH = cell;
-                float glyphW = glyphH * GlyphData.CanvasW / GlyphData.CanvasH;
-                float originX = pad + (cell - glyphW) / 2f;
-                float originY = pad;
-                float unit = glyphW / GlyphData.CanvasW;
-                if (head)
+                path.Transform(transform);
+                graphics.FillPath(Brushes.White, path);
+            }
+            return bitmap;
+        }
+
+        internal static Bitmap Render(int glyph, int cell, int pad, float level, bool head)
+        {
+            var bitmap = new Bitmap(cell + pad * 2, cell + pad * 2, PixelFormat.Format32bppPArgb);
+            using (Graphics graphics = Graphics.FromImage(bitmap))
+            using (GraphicsPath path = BuildPath(glyph))
+            using (var transform = new Matrix(cell / GlyphData.CanvasW, 0, 0, cell / GlyphData.CanvasH, pad, pad))
+            {
+                graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                path.Transform(transform);
+                Color body = BodyColor(level);
+                Color color = head ? Color.FromArgb(255, (int)(162 * level), (int)(255 * level), (int)(216 * level)) : body;
+                // Low-opacity outlines form a halo; the opaque core is the exact
+                // compound SVG fill, never a stroke-width approximation.
+                using (var wide = new Pen(Color.FromArgb((int)(14 * level), 117, 240, 152), Math.Max(1f, cell * 0.20f)))
+                using (var soft = new Pen(Color.FromArgb((int)(head ? 35 * level : 20 * level), 117, 240, 152), Math.Max(1f, cell * 0.08f)))
+                using (var brush = new SolidBrush(color))
                 {
-                    float pulse = 0.65f + (glyph % 7) * 0.05f;
-                    float halo = 1.5f + (glyph % 5) * 0.16f;
-                    DrawPass(graphics, glyph, originX, originY, unit, halo,
-                             Color.FromArgb((int)(28 * level), 111, 255, 61));
-                    DrawPass(graphics, glyph, originX, originY, unit, 1.2f,
-                             Color.FromArgb((int)(42 * level), 111, 255, 61));
-                    DrawPass(graphics, glyph, originX, originY, unit, 1f,
-                             Color.FromArgb(255, (int)((112 + 76 * pulse) * level),
-                                            (int)(255 * level), (int)((74 + 45 * pulse) * level)));
-                }
-                else
-                {
-                    DrawPass(graphics, glyph, originX, originY, unit, 1.15f,
-                             Color.FromArgb((int)(18 * level), 86, 255, 48));
-                    DrawPass(graphics, glyph, originX, originY, unit, 1f,
-                             Color.FromArgb(255, (int)(92 * level),
-                                            (int)(238 * level), (int)(48 * level)));
+                    wide.LineJoin = soft.LineJoin = LineJoin.Round;
+                    graphics.DrawPath(wide, path); graphics.DrawPath(soft, path);
+                    graphics.FillPath(brush, path);
                 }
             }
             return bitmap;
         }
 
-        private static void DrawPass(Graphics graphics, int glyph, float originX,
-                                     float originY, float unit,
-                                     float widthFactor, Color color)
+        private static Color BodyColor(float level)
         {
-            using (var pen = new Pen(color))
-            using (var brush = new SolidBrush(color))
+            double lightness = 0.7 * level;
+            double chroma = (1 - Math.Abs(2 * lightness - 1)) * 0.8;
+            double secondary = chroma * (1 - Math.Abs((137.0 / 60) % 2 - 1));
+            double m = lightness - chroma / 2;
+            return Color.FromArgb(255, (int)Math.Round(m * 255),
+                (int)Math.Round((chroma + m) * 255), (int)Math.Round((secondary + m) * 255));
+        }
+    }
+
+    internal static class CatalogDiagnostics
+    {
+        internal static Dictionary<string, object> Verify()
+        {
+            if (GlyphData.Count != 249 || GlyphData.ReferenceCount != 57 || GlyphData.ReferenceVisibleCount != 56
+                || GlyphData.OriginalCount != 192 || GlyphData.OriginalOffset != 57 || GlyphData.BlankIndex != 4
+                || GlyphData.Commands.Length != 249 || GlyphData.GlyphIds.Length != 249 || GlyphData.FillRule != "nonzero")
+                throw new InvalidOperationException("Incorrect filled SVG catalog");
+            int curves = 0, referenceCounters = 0, originalCounters = 0, visible = 0;
+            var identities = new HashSet<string>();
+            for (int glyph = 0; glyph < GlyphData.Count; glyph++)
             {
-                pen.LineJoin = LineJoin.Bevel;
-                pen.StartCap = LineCap.Square;
-                pen.EndCap = LineCap.Square;
-                foreach (float[] stroke in GlyphData.Strokes[glyph])
+                if (!identities.Add(GlyphData.GlyphIds[glyph])) throw new InvalidOperationException("Duplicate glyph identity");
+                foreach (double[] command in GlyphData.Commands[glyph]) if (command[0] == 2) curves++;
+                using (Bitmap mask = Sprites.RenderMask(glyph, 64))
                 {
-                    int kind = (int)stroke[0];
-                    if (kind == 2)
-                    {
-                        float radius = Math.Max(0.6f, stroke[3] * unit * 1.2f) * widthFactor;
-                        graphics.FillEllipse(brush, originX + stroke[1] * unit - radius,
-                                             originY + stroke[2] * unit - radius,
-                                             radius * 2, radius * 2);
-                        continue;
-                    }
-                    // Keep every authored width instead of flattening the entire
-                    // glyph to a 7.5-unit average in the native port.
-                    pen.Width = Math.Max(0.8f, stroke[stroke.Length - 1] * unit * 1.38f)
-                        * widthFactor;
-                    float x1 = originX + stroke[1] * unit;
-                    float y1 = originY + stroke[2] * unit;
-                    if (kind == 0)
-                    {
-                        graphics.DrawLine(pen, x1, y1, originX + stroke[3] * unit,
-                                          originY + stroke[4] * unit);
-                    }
+                    int ink, holes;
+                    InspectMask(mask, out ink, out holes);
+                    if (glyph == GlyphData.BlankIndex)
+                    { if (ink != 0 || GlyphData.Commands[glyph].Length != 0) throw new InvalidOperationException("Reference blank was lost"); }
                     else
                     {
-                        float cx = originX + stroke[3] * unit;
-                        float cy = originY + stroke[4] * unit;
-                        float x2 = originX + stroke[5] * unit;
-                        float y2 = originY + stroke[6] * unit;
-                        graphics.DrawBezier(pen, x1, y1,
-                            x1 + 2f / 3f * (cx - x1), y1 + 2f / 3f * (cy - y1),
-                            x2 + 2f / 3f * (cx - x2), y2 + 2f / 3f * (cy - y2), x2, y2);
+                        if (ink == 0) throw new InvalidOperationException("Empty filled glyph " + GlyphData.GlyphIds[glyph]);
+                        visible++;
+                        if (holes > 0) { if (glyph < GlyphData.OriginalOffset) referenceCounters++; else originalCounters++; }
                     }
                 }
+            }
+            int originalSamples = 0, blankSamples = 0;
+            for (int i = 0; i < 100000; i++)
+            {
+                int glyph = CatalogSelector.Select(7319, i, 0);
+                if (glyph >= GlyphData.OriginalOffset) originalSamples++;
+                if (glyph == GlyphData.BlankIndex) blankSamples++;
+            }
+            if (visible != 248 || curves == 0 || referenceCounters == 0 || originalCounters == 0
+                || originalSamples < 9500 || originalSamples > 10500 || blankSamples == 0)
+                throw new InvalidOperationException("Filled SVG geometry or weighted selection failed");
+            return new Dictionary<string, object> {
+                {"catalog_sha256", GlyphData.CatalogSha256}, {"reference_sha256", GlyphData.ReferenceSha256},
+                {"original_sha256", GlyphData.OriginalSha256}, {"count", GlyphData.Count}, {"visible_count", visible},
+                {"reference_sequence_count", GlyphData.ReferenceCount}, {"original_count", GlyphData.OriginalCount},
+                {"blank_index", GlyphData.BlankIndex}, {"first_original_id", GlyphData.GlyphIds[GlyphData.OriginalOffset]},
+                {"fill_rule", "nonzero"}, {"cubic_commands", curves},
+                {"reference_glyphs_with_counters_at_64px", referenceCounters}, {"original_glyphs_with_counters_at_64px", originalCounters},
+                {"selection_samples", 100000}, {"original_selections", originalSamples}, {"blank_selections", blankSamples}
+            };
+        }
+
+        internal static Bitmap Atlas()
+        {
+            const int cell = 64, columns = 16;
+            var image = new Bitmap(columns * cell, ((GlyphData.Count + columns - 1) / columns) * cell);
+            using (Graphics graphics = Graphics.FromImage(image))
+            {
+                graphics.Clear(Color.Black);
+                for (int glyph = 0; glyph < GlyphData.Count; glyph++)
+                    using (Bitmap mask = Sprites.RenderMask(glyph, cell))
+                        graphics.DrawImageUnscaled(mask, glyph % columns * cell, glyph / columns * cell);
+            }
+            return image;
+        }
+
+        private static void InspectMask(Bitmap bitmap, out int ink, out int holes)
+        {
+            int width = bitmap.Width, height = bitmap.Height;
+            bool[] filled = new bool[width * height], visited = new bool[width * height];
+            ink = 0; holes = 0;
+            for (int y = 0; y < height; y++) for (int x = 0; x < width; x++)
+                if (bitmap.GetPixel(x, y).A >= 128) { filled[y * width + x] = true; ink++; }
+            var queue = new Queue<int>();
+            for (int start = 0; start < filled.Length; start++)
+            {
+                if (filled[start] || visited[start]) continue;
+                bool edge = false; int area = 0;
+                queue.Enqueue(start); visited[start] = true;
+                while (queue.Count > 0)
+                {
+                    int p = queue.Dequeue(), x = p % width, y = p / width; area++;
+                    if (x == 0 || y == 0 || x == width - 1 || y == height - 1) edge = true;
+                    int[] neighbors = { x > 0 ? p - 1 : -1, x < width - 1 ? p + 1 : -1,
+                        y > 0 ? p - width : -1, y < height - 1 ? p + width : -1 };
+                    foreach (int n in neighbors) if (n >= 0 && !filled[n] && !visited[n])
+                    { visited[n] = true; queue.Enqueue(n); }
+                }
+                if (!edge && area >= 4) holes++;
             }
         }
     }

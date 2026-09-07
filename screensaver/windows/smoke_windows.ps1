@@ -1,6 +1,7 @@
 param(
     [string]$Binary = (Join-Path $PSScriptRoot '..\dist\SmytheGlyphRain.scr'),
-    [string]$Output = (Join-Path ([IO.Path]::GetTempPath()) 'smythe-windows-smoke.png')
+    [string]$Output = (Join-Path ([IO.Path]::GetTempPath()) 'smythe-windows-smoke.png'),
+    [string]$CatalogManifest = (Join-Path $PSScriptRoot '..\native-catalog.json')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -150,6 +151,27 @@ $outputPath = [IO.Path]::GetFullPath($Output)
 $assembly = [Reflection.Assembly]::LoadFile((Resolve-Path -LiteralPath $Binary).Path)
 $formType = $assembly.GetType('SmytheGlyphRain.SaverForm', $true)
 $flags = [Reflection.BindingFlags]'Instance,NonPublic'
+$staticFlags = [Reflection.BindingFlags]'Static,NonPublic'
+$diagnostics = $assembly.GetType('SmytheGlyphRain.CatalogDiagnostics', $true)
+$catalog = $diagnostics.GetMethod('Verify', $staticFlags).Invoke($null, $null)
+$expectedCatalog = Get-Content -LiteralPath $CatalogManifest -Raw | ConvertFrom-Json
+if ($catalog.catalog_sha256 -ne $expectedCatalog.catalog_sha256 -or
+    $catalog.reference_sha256 -ne $expectedCatalog.source_sha256.'screensaver/svg-preview/reference/catalog.json' -or
+    $catalog.original_sha256 -ne $expectedCatalog.source_sha256.'benchmarks/partitions/glyph_svg_v1/catalog/manifest.json') {
+    throw 'Compiled catalog identities do not match the expected native catalog manifest'
+}
+$binaryVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo((Resolve-Path -LiteralPath $Binary).Path).FileVersion
+if ($binaryVersion -ne '1.1.0.0') { throw "Unexpected screensaver version: $binaryVersion" }
+$atlas = $diagnostics.GetMethod('Atlas', $staticFlags).Invoke($null, $null)
+try { $atlas.Save([IO.Path]::ChangeExtension($outputPath, 'catalog.png'), [Drawing.Imaging.ImageFormat]::Png) }
+finally { $atlas.Dispose() }
+$licenseStream = $assembly.GetManifestResourceStream('SmytheGlyphRain.ReferenceLicense')
+if ($null -eq $licenseStream) { throw 'The compiled screensaver is missing its MIT notice' }
+$licenseReader = [IO.StreamReader]::new($licenseStream)
+try { $license = $licenseReader.ReadToEnd() } finally { $licenseReader.Dispose() }
+if (-not $license.Contains('Permission is hereby granted') -or -not $license.Contains('Rezmason')) {
+    throw 'The embedded reference artwork license is incomplete'
+}
 $form = [Activator]::CreateInstance(
     $formType, $flags, $null,
     @([Drawing.Rectangle]::new(0, 0, 1280, 720), $true, $false), $null
@@ -171,6 +193,16 @@ try {
     }
     $bitmap = $field.GetValue($form)
     $animated = Inspect-Frame $bitmap $initialSamples
+    $drawn = [ordered]@{ reference = 0L; original = 0L; blank = 0L }
+    foreach ($layer in $formType.GetField('_layers', $flags).GetValue($form)) {
+        $layerFlags = [Reflection.BindingFlags]'Instance,NonPublic'
+        $drawn.reference += $layer.GetType().GetField('DrawnReference', $layerFlags).GetValue($layer)
+        $drawn.original += $layer.GetType().GetField('DrawnOriginal', $layerFlags).GetValue($layer)
+        $drawn.blank += $layer.GetType().GetField('DrawnBlank', $layerFlags).GetValue($layer)
+    }
+    if ($drawn.reference -le 0 -or $drawn.original -le 0 -or $drawn.blank -le 0) {
+        throw 'Normal animation did not render both catalogs and preserve reference blanks'
+    }
     $bitmap.Save($outputPath, [Drawing.Imaging.ImageFormat]::Png)
     # Setting ClientSize exercises the compiled OnResize path and sprite disposal.
     $form.ClientSize = [Drawing.Size]::new(320, 180)
@@ -185,13 +217,19 @@ try {
         status = 'passed'
         binary = [IO.Path]::GetFileName($Binary)
         binary_sha256 = (Get-FileHash -LiteralPath $Binary -Algorithm SHA256).Hash.ToLowerInvariant()
-        checks = @('compiled_assembly_load', 'native_form_load', 'green_glyphs', 'black_gaps', 'motion', 'native_resize', 'preview_process_entrypoint', 'hidden_parent_embedding', 'preview_clean_exit')
+        binary_version = $binaryVersion
+        catalog_manifest_sha256 = (Get-FileHash -LiteralPath $CatalogManifest -Algorithm SHA256).Hash.ToLowerInvariant()
+        catalog_atlas_sha256 = (Get-FileHash -LiteralPath ([IO.Path]::ChangeExtension($outputPath, 'catalog.png')) -Algorithm SHA256).Hash.ToLowerInvariant()
+        checks = @('compiled_assembly_load', 'filled_svg_catalog_249_slots', 'nonzero_compound_paths', 'cubic_curves', 'visible_248_and_blank_slot', 'both_catalogs_have_counters', 'weighted_original_share', 'both_catalogs_drawn', 'embedded_mit_notice', 'native_form_load', 'green_glyphs', 'black_gaps', 'motion', 'native_resize', 'preview_process_entrypoint', 'hidden_parent_embedding', 'preview_clean_exit')
         animation_frames = 90
+        catalog = $catalog
+        normal_animation_draws = $drawn
+        embedded_mit_notice = $true
         initial = $initial
         animated = $animated
         resized = $resized
         preview_process = $preview
-        scope = 'Compiled .scr form load, native rendering, motion, resize, and /p subprocess embedding/exit; /s multi-monitor dispatch is not exercised'
+        scope = 'Compiled .scr exact compound SVG catalog, native form load, both-family rendering, motion, resize, and /p subprocess embedding/exit; /s multi-monitor dispatch is not exercised'
     }
     $receiptPath = [IO.Path]::ChangeExtension($outputPath, 'json')
     [IO.File]::WriteAllText($receiptPath, ($receipt | ConvertTo-Json -Depth 5) + "`n", [Text.UTF8Encoding]::new($false))
