@@ -23,6 +23,10 @@ smythe jobs list
 smythe jobs inspect RUN_ID --out job-report.html
 ```
 
+For local graphics measurements, the [renderer protocol](../benchmarks/renderer_performance_20260907.md)
+defines six fresh browser sessions and validates their raw timing receipts.
+It uses no provider calls and keeps rendering separate from glyph generation.
+
 | Example | What it shows |
 |---|---|
 | [GPT-6 Astra quickstart](../README.md#quickstart) | Generate, inspect, and execute a text-only task graph with `gpt-6-astra` using the published package. |

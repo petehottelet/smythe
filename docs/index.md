@@ -46,6 +46,7 @@ verification, trace, artifact, and recovery controls.
 - [Web explorer](../screensaver/svg-preview/README.md) — MIT-licensed reference renderer and base glyphs, 10% original-glyph mix, Matrix green rain, presets, VT323 pixel controls, and a Trajan Bold outline logo; browser interaction checks pass, performance remains unmeasured
 - [Glyph Rain design plan](glyph-rain-plan.md) — measured original-glyph distributions, licensed renderer scope, and native porting criteria
 - [Reference behavior plan](glyph-rain-parity-plan.md) — pinned defaults, options, and acceptance checks for the adapted effect
+- [Renderer timing protocol](../benchmarks/renderer_performance_20260907.md) — six independent Classic/3D sessions, raw callback and CPU-submission samples, and explicit backend qualification
 
 ## Project guides
 
