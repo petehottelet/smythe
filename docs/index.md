@@ -34,10 +34,12 @@ verification, trace, artifact, and recovery controls.
 - [Framework comparison](../benchmarks/README.md#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12) — matched Smythe, LangGraph, and CrewAI evidence
 - [Image benchmarks](../benchmarks/image_benchmarks.md) — image fan-out and exact-spec finishing
 - [Glyph Rain benchmark](../benchmarks/glyph_screensaver_benchmark.md) — an artifact fan-out example with isolated 64-, 128-, 192-, and 256-node measurements
-- [Glyph Rain screensaver](../screensaver/README.md) — web, Windows, and macOS ports
+- [Glyph Rain screensaver](../screensaver/README.md) — shared glyph catalog, heavy strokes, green cores, and layered glow across web, Windows, macOS, and Linux
 
 ## Project guides
 
+- [Repository review](project-review-2026-09-06.md) — architecture assessment, reproduced defects, and hardening priorities
+- [Coming soon](../ROADMAP.md#coming-soon) — acceptance criteria for runtime and measurement improvements
 - [Contributing](../CONTRIBUTING.md)
 - [Roadmap](../ROADMAP.md)
 - [Changelog](../CHANGELOG.md)

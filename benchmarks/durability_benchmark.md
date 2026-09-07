@@ -53,9 +53,8 @@ sides), 3 reps each:
 Smythe's repeated dispatches were exactly one concurrency wave (8) in every
 rep; LangGraph re-dispatched all 32 completed calls in every rep, because
 Pregel checkpoints at superstep boundaries and a wide broadcast is one
-superstep. At $0.04/image on a 1,000-image job, that crash profile re-bills
-roughly $20 (superstep granularity) versus at most one in-flight wave
-(≤ $0.32 at c=8) — the gap scales with fan-out width.
+superstep. That is **75% fewer repeated dispatches** in this 64-node kill
+profile. Provider billing and wider jobs were not measured by this record.
 
 Cell A in the same record shows per-node fan-out overhead near parity
 (smythe 0.99–1.19 ms/node vs LangGraph 0.89–1.49 ms/node at N ≤ 1024) with

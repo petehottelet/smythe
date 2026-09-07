@@ -3,8 +3,10 @@ name: screensavers
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - "screensaver/**"
+      - "!screensaver/dist/**"
       - ".github/workflows/screensavers.yml"
 
 permissions:
@@ -18,22 +20,119 @@ jobs:
       - name: Build SmytheGlyphRain.scr
         shell: cmd
         run: screensaver\windows\build_windows.cmd
+      - name: Load and render the compiled Windows screensaver
+        shell: powershell
+        run: screensaver/windows/smoke_windows.ps1 -Output "$env:RUNNER_TEMP/windows-smoke.png"
       - uses: actions/upload-artifact@v4
         with:
           name: SmytheGlyphRain-windows-scr
           path: screensaver/dist/SmytheGlyphRain.scr
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screensaver-windows-verification
+          path: ${{ runner.temp }}/windows-smoke*
+          if-no-files-found: ignore
 
   macos-saver:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - name: Build GlyphRain.saver
-        run: |
-          chmod +x screensaver/macos/build_macos.sh
-          screensaver/macos/build_macos.sh
+        run: bash screensaver/macos/build_macos.sh
+      - name: Load and render the compiled universal bundle on Apple Silicon
+        run: bash screensaver/macos/smoke_macos.sh
       - uses: actions/upload-artifact@v4
         with:
           name: GlyphRain-macos-saver
-          path: screensaver/dist/GlyphRain.saver
+          path: screensaver/dist/GlyphRain-macos-universal.zip
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screensaver-macos-arm64-verification
+          path: screensaver/dist/macos-smoke/
+          if-no-files-found: ignore
+
+  macos-intel-smoke:
+    needs: macos-saver
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: GlyphRain-macos-saver
+          path: ${{ runner.temp }}/macos-package
+      - name: Load and render the same universal bundle on Intel
+        run: |
+          ditto -x -k "$RUNNER_TEMP/macos-package/GlyphRain-macos-universal.zip" "$RUNNER_TEMP/macos-package"
+          test -x "$RUNNER_TEMP/macos-package/GlyphRain.saver/Contents/MacOS/GlyphRain"
+          codesign --verify --strict "$RUNNER_TEMP/macos-package/GlyphRain.saver"
+          bash screensaver/macos/smoke_macos.sh "$RUNNER_TEMP/macos-package/GlyphRain.saver" "$RUNNER_TEMP/macos-intel-smoke"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screensaver-macos-x86_64-verification
+          path: ${{ runner.temp }}/macos-intel-smoke/
+          if-no-files-found: ignore
+
+  linux-x11:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native build and virtual display dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libx11-dev libcairo2-dev xvfb xauth python3-pil
+      - name: Build the Linux executable
+        run: sh screensaver/linux/build_linux.sh
+      - name: Verify compiled X11 rendering, embedding, and shutdown
+        run: >-
+          xvfb-run -a -s '-screen 0 1280x720x24'
+          python3 screensaver/linux/smoke_linux.py
+          screensaver/dist/smythe-glyph-rain-linux-x86_64
+          --out screensaver/dist/linux-verification
+      - name: Package executable and verification receipt
+        run: |
+          package="$RUNNER_TEMP/linux-package"
+          mkdir -p "$package"
+          cp screensaver/dist/smythe-glyph-rain-linux-x86_64 "$package/"
+          cp screensaver/linux/README.md "$package/README.md"
+          cp screensaver/dist/linux-verification/verification.json "$package/verification.json"
+          tar -czf screensaver/dist/SmytheGlyphRain-linux-x86_64.tar.gz -C "$package" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SmytheGlyphRain-linux-x86_64
+          path: screensaver/dist/SmytheGlyphRain-linux-x86_64.tar.gz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screensaver-linux-verification
+          path: screensaver/dist/linux-verification/
+          if-no-files-found: ignore
+
+  linux-compatibility:
+    needs: linux-x11
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: SmytheGlyphRain-linux-x86_64
+          path: ${{ runner.temp }}/linux-package
+      - name: Install runtime and virtual display dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-6 libcairo2 xvfb xauth python3-pil
+      - name: Verify the same compiled executable on Ubuntu 24.04
+        run: |
+          tar -xzf "$RUNNER_TEMP/linux-package/SmytheGlyphRain-linux-x86_64.tar.gz" -C "$RUNNER_TEMP/linux-package"
+          xvfb-run -a -s '-screen 0 1280x720x24' python3 screensaver/linux/smoke_linux.py "$RUNNER_TEMP/linux-package/smythe-glyph-rain-linux-x86_64" --out "$RUNNER_TEMP/linux-compatibility"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screensaver-linux-compatibility-verification
+          path: ${{ runner.temp }}/linux-compatibility/
+          if-no-files-found: ignore

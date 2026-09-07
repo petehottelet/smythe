@@ -43,6 +43,11 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from harness import BenchmarkTask, load_tasks, make_swarm, offline_provider  # noqa: E402
 
+from benchmarks.artifact_records import environment_snapshot  # noqa: E402
+from benchmarks.provider_usage import (  # noqa: E402
+    BLENDED_USD_PER_TOKEN,
+    UsageRecordingProvider,
+)
 from smythe.provider import GeminiProvider, OpenAIProvider  # noqa: E402
 
 EXECUTOR_MODEL = "gpt-5.4-mini"
@@ -74,13 +79,16 @@ def judge(output: str, rubric: list[str]) -> int | None:
     if text.startswith("```"):
         text = text.split("```")[1].removeprefix("json").strip()
     try:
-        return int(json.loads(text)["overall"])
+        score = json.loads(text)["overall"]
+        return score if type(score) is int and 1 <= score <= 10 else None
     except (json.JSONDecodeError, KeyError, TypeError, ValueError):
         return None
 
 
 def run_one(task: BenchmarkTask, baseline: str, *, live: bool) -> dict:
-    provider = OpenAIProvider() if live else offline_provider(baseline)
+    provider = UsageRecordingProvider(
+        OpenAIProvider() if live else offline_provider(baseline)
+    )
     model = EXECUTOR_MODEL if live else "demo-model"
     swarm = make_swarm(baseline, provider, model)
     started = time.perf_counter()
@@ -102,7 +110,12 @@ def run_one(task: BenchmarkTask, baseline: str, *, live: bool) -> dict:
         "nodes": len(graph.nodes),
         "depth": graph.depth,
         "topology": " -> ".join(t.value for t in graph.topology),
-        "cost_usd": round(result.total_cost_usd, 6),
+        "cost_usd": round(provider.total_tokens * BLENDED_USD_PER_TOKEN, 6),
+        "cost_source": "provider_tokens_at_blended_rate",
+        "cost_scope": "planning_execution_synthesis",
+        "cost_is_estimate": True,
+        "execution_cost_usd": round(result.total_cost_usd, 6),
+        "usage": provider.snapshot(),
         "wall_s": None if not live else wall_s,
         "output_terminal": terminal_output,
         "output_delivered": result.output,
@@ -197,6 +210,14 @@ def main() -> None:
 
     payload = {
         "benchmark": "shape-suite",
+        "record_version": 2,
+        "cost_protocol": {
+            "scope": "planning_execution_synthesis",
+            "source": "provider_tokens_at_blended_rate",
+            "usd_per_token": BLENDED_USD_PER_TOKEN,
+            "invoice_cost": False,
+        },
+        "environment": environment_snapshot("smythe", "openai", "google-genai"),
         "mode": "LIVE" if live else "offline",
         "executor_model": EXECUTOR_MODEL if live else "offline",
         "judge_model": JUDGE_MODEL if live else None,

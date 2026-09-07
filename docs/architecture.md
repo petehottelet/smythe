@@ -93,8 +93,10 @@ The graph runs through one set of controls regardless of who designed it.
 6. Apply bounded verification or supervision decisions.
 7. Synthesize the deliverable and write the terminal checkpoint.
 
-Fatal failures cancel and await active siblings. Queued nodes do not start once
-the failure is observed. Completed nodes remain available to a resumed run.
+The parallel executor cancels and awaits active siblings after a fatal failure.
+Queued nodes do not start once the failure is observed. Completed nodes remain
+available to a resumed run. Serial halt behavior and verification of active
+descendants have open hardening work; see [Coming soon](../ROADMAP.md#coming-soon).
 
 ## Artifacts and jobs
 
@@ -135,6 +137,12 @@ prompt mutation.
 - The graph is the planning and inspection boundary.
 - The node is the checkpoint, retry, timeout, trace, and budget-accounting boundary.
 - The run budget governs execution and synthesis.
+- Planning and model-based supervision currently call providers outside that
+  budget. Complete workflow accounting is a [planned extension](../ROADMAP.md#coming-soon).
 - A supervisor may change only pending work.
 - A verifier may reset only its target and downstream dependents.
 - A resumed run keeps completed results, recorded spend, and consumed control allowances.
+
+The [repository review](project-review-2026-09-06.md) documents current gaps in
+task-context propagation, numeric cost validation, and concurrent verification,
+with reproductions and acceptance criteria for each fix.

@@ -3,7 +3,7 @@
 // A CoreGraphics/AppKit port of screensaver/index.html: the same 192
 // framework-generated stroke glyphs (Resources/glyphs.json, exported by
 // export_glyphs.py), the same three-depth-layer digital rain with
-// persistence-fade trails.
+// bounded, luminous trails.
 //
 // Build on a Mac (requires only the Xcode command-line tools):
 //     screensaver/macos/build_macos.sh
@@ -72,13 +72,11 @@ private final class Layer {
     let pad: CGFloat
     let step: CGFloat
     let speed: CGFloat
-    let level: CGFloat
     var columns: [Column] = []
 
     init(catalog: Catalog, cell: CGFloat, spacing: CGFloat, speed: CGFloat,
          level: CGFloat, width: CGFloat, height: CGFloat) {
         self.speed = speed
-        self.level = level
         pad = max(2, cell / 2)
         var trails: [NSImage] = []
         var heads: [NSImage] = []
@@ -92,14 +90,15 @@ private final class Layer {
         headSprites = heads
         step = max(3, cell * 1.04)
         let lane = max(3, cell * spacing)
-        let count = Int(((width / lane).rounded(.up) + 1) * 2)
+        let count = Int((width / lane).rounded(.up) + 1)
         for index in 0..<count {
             let column = Column()
             column.x = (CGFloat(index) * lane)
                 .truncatingRemainder(dividingBy: width + lane)
                 + CGFloat.random(in: -3...3)
-            column.y = CGFloat.random(in: -1.2...1.0) * height
             reset(column, catalog: catalog, initial: true)
+            column.y = CGFloat.random(in: 0...1)
+                * (height + CGFloat(catalog.trails[column.glyph]) * step)
             columns.append(column)
         }
     }
@@ -130,18 +129,22 @@ private final class Layer {
             let originY = pad
             let unit = glyphW / catalog.canvasW
             if head {
-                context.setShadow(offset: .zero, blur: cell * 0.42,
-                                  color: CGColor(red: 0.27, green: 1.0, blue: 0.51,
-                                                 alpha: 0.95))
+                let pulse = 0.65 + CGFloat(glyph % 7) * 0.05
+                context.setShadow(offset: .zero, blur: cell * (0.12 + CGFloat(glyph % 5) * 0.025),
+                                  color: CGColor(red: 0.435, green: 1.0, blue: 0.239,
+                                                 alpha: 0.55 * level))
                 draw(catalog: catalog, glyph: glyph, in: context,
                      originX: originX, originY: originY, unit: unit,
-                     color: CGColor(red: 0.92, green: 1.0, blue: 0.94, alpha: 1))
+                     color: CGColor(red: (112 + 76 * pulse) / 255 * level,
+                                    green: level, blue: (74 + 45 * pulse) / 255 * level, alpha: 1))
             } else {
-                context.setShadow(offset: .zero, blur: 0, color: nil)
+                context.setShadow(offset: .zero, blur: cell * 0.07,
+                                  color: CGColor(red: 0.337, green: 1, blue: 0.188,
+                                                 alpha: 0.24 * level))
                 draw(catalog: catalog, glyph: glyph, in: context,
                      originX: originX, originY: originY, unit: unit,
-                     color: CGColor(red: 0.157 * level, green: 0.886 * level,
-                                    blue: 0.376 * level, alpha: 0.92))
+                     color: CGColor(red: 0.361 * level, green: 0.933 * level,
+                                    blue: 0.188 * level, alpha: 1))
             }
         }
         image.unlockFocus()
@@ -151,14 +154,14 @@ private final class Layer {
     private static func draw(catalog: Catalog, glyph: Int, in context: CGContext,
                              originX: CGFloat, originY: CGFloat, unit: CGFloat,
                              color: CGColor) {
-        context.setLineCap(.round)
-        context.setLineJoin(.round)
+        context.setLineCap(.square)
+        context.setLineJoin(.bevel)
         context.setStrokeColor(color)
         context.setFillColor(color)
         for stroke in catalog.strokes[glyph] {
             let kind = Int(stroke[0])
             if kind == 2 {
-                let radius = max(0.8, CGFloat(stroke[3]) * unit)
+                let radius = max(0.6, CGFloat(stroke[3]) * unit * 1.2)
                 let rect = CGRect(
                     x: originX + CGFloat(stroke[1]) * unit - radius,
                     y: originY + CGFloat(stroke[2]) * unit - radius,
@@ -166,7 +169,7 @@ private final class Layer {
                 context.fillEllipse(in: rect)
                 continue
             }
-            context.setLineWidth(max(1.2, CGFloat(stroke.last ?? 8) * unit))
+            context.setLineWidth(max(0.8, CGFloat(stroke.last ?? 8) * unit * 1.38))
             context.beginPath()
             context.move(to: CGPoint(x: originX + CGFloat(stroke[1]) * unit,
                                      y: originY + CGFloat(stroke[2]) * unit))
@@ -207,18 +210,24 @@ public final class GlyphRainView: ScreenSaverView {
         buildScene()
     }
 
+    public override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        if catalog != nil { buildScene() }
+    }
+
     private func buildScene() {
         guard let catalog = catalog ?? Catalog.load() else { return }
         self.catalog = catalog
         let width = bounds.width
         let height = bounds.height
-        let scale = max(0.3, height / 1080)
+        guard width > 0, height > 0 else { return }
+        let scale = max(0.5, min(1.5, height / 720))
         layers = [
-            Layer(catalog: catalog, cell: 24 * scale, spacing: 0.50, speed: 0.62,
-                  level: 0.78, width: width, height: height),
-            Layer(catalog: catalog, cell: 26 * scale, spacing: 0.52, speed: 0.80,
-                  level: 0.88, width: width, height: height),
-            Layer(catalog: catalog, cell: 28 * scale, spacing: 0.54, speed: 1.00,
+            Layer(catalog: catalog, cell: 11 * scale, spacing: 1.20, speed: 0.62,
+                  level: 0.48, width: width, height: height),
+            Layer(catalog: catalog, cell: 20 * scale, spacing: 1.35, speed: 0.80,
+                  level: 0.75, width: width, height: height),
+            Layer(catalog: catalog, cell: 36 * scale, spacing: 2.50, speed: 1.00,
                   level: 1.00, width: width, height: height),
         ]
         let image = NSImage(size: bounds.size)
@@ -227,6 +236,8 @@ public final class GlyphRainView: ScreenSaverView {
         bounds.fill()
         image.unlockFocus()
         buffer = image
+        drawFrame(catalog: catalog, buffer: image, dt: 0)
+        lastTick = Date()
     }
 
     public override func animateOneFrame() {
@@ -238,44 +249,48 @@ public final class GlyphRainView: ScreenSaverView {
         let now = Date()
         let dt = CGFloat(min(0.05, now.timeIntervalSince(lastTick)))
         lastTick = now
+        drawFrame(catalog: catalog, buffer: buffer, dt: dt)
+        needsDisplay = true
+    }
+
+    private func drawFrame(catalog: Catalog, buffer: NSImage, dt: CGFloat) {
         let height = bounds.height
         buffer.lockFocus()
-        // Persistence fade toward the ground color.
-        NSColor(calibratedRed: 0, green: 0.02, blue: 0.008, alpha: 0.062).setFill()
-        bounds.fill(using: .sourceOver)
+        NSColor.black.setFill()
+        bounds.fill(using: .copy)
         for layer in layers {
             for column in layer.columns {
                 column.accumulator += dt * column.rate * (column.burst > 0 ? 1.9 : 1)
                 if column.burst > 0 { column.burst -= dt }
                 while column.accumulator >= 1 {
                     column.accumulator -= 1
-                    let stamp = layer.trailSprites[
-                        (column.glyph + column.phase) % layer.trailSprites.count]
-                    // The buffer's coordinate space is bottom-up; convert the
-                    // top-down simulation y.
-                    stamp.draw(at: NSPoint(x: column.x - layer.pad,
-                                           y: height - column.y - layer.pad),
-                               from: .zero, operation: .sourceOver, fraction: 1)
                     column.y += layer.step
                     column.phase = (column.phase + 7) % layer.trailSprites.count
                     let past = column.y
-                        - CGFloat(catalog.trails[column.glyph]) * layer.step
+                        - CGFloat(catalog.trails[column.glyph]) * layer.step * 1.15
                     if past > height, Double.random(in: 0...1) < 0.6 {
                         layer.reset(column, catalog: catalog, initial: false)
                     }
                 }
-                if column.y > -layer.step, column.y < height + layer.step {
-                    let head = layer.headSprites[
-                        (column.glyph + column.phase) % layer.headSprites.count]
-                    head.draw(at: NSPoint(x: column.x - layer.pad,
-                                          y: height - column.y - layer.pad),
-                              from: .zero, operation: .sourceOver,
-                              fraction: 0.92 * layer.level)
+                let count = layer.trailSprites.count
+                let length = Int((Double(catalog.trails[column.glyph]) * 1.15).rounded())
+                for tail in stride(from: length, through: 0, by: -1) {
+                    let y = column.y - CGFloat(tail) * layer.step
+                    if y < -layer.step || y > height + layer.step { continue }
+                    let glyph = (column.glyph + column.phase + count * 2 - tail * 7) % count
+                    let near = 1 - CGFloat(tail) / CGFloat(length)
+                    let shimmer = 0.75 + CGFloat(glyph % 5) * 0.0625
+                    let alpha: CGFloat = tail == 0 ? 1 : (0.25 + 0.75 * sqrt(near)) * shimmer
+                    let sprite = tail == 0 ? layer.headSprites[glyph] : layer.trailSprites[glyph]
+                    // NSImage's origin is bottom-up; subtract the whole sprite
+                    // height when placing its top-down simulation cell.
+                    sprite.draw(at: NSPoint(x: column.x - layer.pad,
+                                            y: height - y + layer.pad - sprite.size.height),
+                                from: .zero, operation: .sourceOver, fraction: alpha)
                 }
             }
         }
         buffer.unlockFocus()
-        needsDisplay = true
     }
 
     public override func draw(_ rect: NSRect) {

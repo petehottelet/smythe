@@ -26,22 +26,24 @@
   #badge {
     position: fixed; right: 18px; bottom: 14px; z-index: 5;
     font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    color: #57e07f; text-decoration: none; letter-spacing: .08em;
-    opacity: .45; transition: opacity .4s ease;
-    text-shadow: 0 0 8px rgba(87,224,127,.6);
+    color: #8fe779; text-decoration: none; letter-spacing: .08em;
+    opacity: .75; transition: opacity .4s ease;
   }
   #badge:hover { opacity: 1; }
+  #badge:focus-visible { opacity: 1; outline: 1px solid #bcffa1; outline-offset: 6px; }
   #badge b { color: #baffce; font-weight: 600; }
   body.idle { cursor: none; }
-  body.idle #badge { opacity: 0; }
+  body.idle #badge:not(:focus-visible) { opacity: 0; }
   #hint {
     position: fixed; left: 50%; bottom: 8%; transform: translateX(-50%); z-index: 5;
+    width: max-content; max-width: calc(100% - 32px); text-align: center;
     font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     color: #7dffa0; letter-spacing: .14em; text-transform: uppercase;
-    text-shadow: 0 0 12px rgba(125,255,160,.75); pointer-events: none;
+    pointer-events: none;
     opacity: 0; animation: hint 7s ease 1.2s 1 forwards;
   }
   @keyframes hint { 8% { opacity: .85; } 78% { opacity: .85; } 100% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { #hint { animation: none; } #badge { transition: none; } }
 </style>
 </head>
 <body>
@@ -65,16 +67,12 @@ const [CW, CH] = GLYPHS.canvas;
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const dpr = Math.min(2, window.devicePixelRatio || 1);
 
-// Three depth layers, tightly packed (spacing < 1 overlaps columns) so the
-// field fills the screen: a dense dim far field, a mid field, and a bright
-// near field. Each runs the persistence-fade rain algorithm on its canvas.
+// Narrow distant code and sparse, larger foreground streams leave black
+// channels between columns. Scale, fall speed, and light establish depth.
 const LAYERS = [
-  // Near-uniform glyph size across the three planes (depth reads through
-  // brightness and speed, not scale), with matched fade so every stream
-  // falls a long way before it dims.
-  { canvas: document.getElementById("far"),  cell: 24, spacing: 0.50, speed: 0.62, level: 0.78, fade: 0.034, opaque: true },
-  { canvas: document.getElementById("mid"),  cell: 26, spacing: 0.52, speed: 0.80, level: 0.88, fade: 0.030, opaque: false },
-  { canvas: document.getElementById("near"), cell: 28, spacing: 0.54, speed: 1.00, level: 1.00, fade: 0.026, opaque: false },
+  { canvas: document.getElementById("far"),  cell: 11, spacing: 1.20, speed: 0.62, level: 0.48, opaque: true },
+  { canvas: document.getElementById("mid"),  cell: 20, spacing: 1.35, speed: 0.80, level: 0.75, opaque: false },
+  { canvas: document.getElementById("near"), cell: 36, spacing: 2.50, speed: 1.00, level: 1.00, opaque: false },
 ];
 
 function drawGlyphPath(ctx, index, ox, oy, glyphH, color) {
@@ -82,17 +80,17 @@ function drawGlyphPath(ctx, index, ox, oy, glyphH, color) {
   const sx = gw / CW, sy = glyphH / CH;
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
+  ctx.lineCap = "square";
+  ctx.lineJoin = "bevel";
   for (const s of GLYPHS.strokes[index]) {
     if (s[0] === "d") {
       ctx.beginPath();
-      ctx.arc(ox + s[1] * sx, oy + s[2] * sy, Math.max(0.9, s[3] * sx), 0, 7);
+      ctx.arc(ox + s[1] * sx, oy + s[2] * sy, Math.max(0.6 * dpr, s[3] * sx * 1.2), 0, 7);
       ctx.fill();
       continue;
     }
     ctx.beginPath();
-    ctx.lineWidth = Math.max(1.3, s[s.length - 1] * sx);
+    ctx.lineWidth = Math.max(0.8 * dpr, s[s.length - 1] * sx * 1.38);
     ctx.moveTo(ox + s[1] * sx, oy + s[2] * sy);
     if (s[0] === "l") ctx.lineTo(ox + s[3] * sx, oy + s[4] * sy);
     else ctx.quadraticCurveTo(ox + s[3] * sx, oy + s[4] * sy, ox + s[5] * sx, oy + s[6] * sy);
@@ -101,7 +99,7 @@ function drawGlyphPath(ctx, index, ox, oy, glyphH, color) {
 }
 
 // Pre-render every glyph twice per layer: a trail sprite in layer green and a
-// head sprite with a baked white-green glow, so the frame loop stays at plain
+// head sprite with a baked green glow, so the frame loop stays at plain
 // drawImage calls.
 function makeSprites(cellCss, level) {
   const cell = Math.round(cellCss * dpr);
@@ -110,20 +108,20 @@ function makeSprites(cellCss, level) {
   const gw = cell * CW / CH;
   const ox = pad + (cell - gw) / 2;
   const trail = [], head = [];
-  const trailColor = `rgb(${40 * level | 0},${226 * level | 0},${96 * level | 0})`;
+  const trailColor = `rgb(${92 * level | 0},${238 * level | 0},${48 * level | 0})`;
   for (let g = 0; g < COUNT; g++) {
     let c = new OffscreenCanvas(size, size), ctx = c.getContext("2d");
-    // No baked glow on trail stamps: a fading glyph should dim cleanly
-    // instead of leaving a dark core inside a glowing halo.
+    // A small halo follows the bright body; black gaps keep the shape legible.
+    ctx.shadowColor = `rgba(86,255,48,${0.24 * level})`;
+    ctx.shadowBlur = cell * 0.07;
     drawGlyphPath(ctx, g, ox, pad, cell, trailColor);
     trail.push(c);
     c = new OffscreenCanvas(size, size); ctx = c.getContext("2d");
-    ctx.shadowColor = "rgba(70,255,130,.95)";
-    ctx.shadowBlur = cell * 0.42;
-    drawGlyphPath(ctx, g, ox, pad, cell, "#3bff78");
-    ctx.shadowColor = "rgba(190,255,210,.9)";
-    ctx.shadowBlur = cell * 0.15;
-    drawGlyphPath(ctx, g, ox, pad, cell, "#eaffef");
+    const pulse = 0.65 + (g % 7) * 0.05;
+    ctx.shadowColor = `rgba(111,255,61,${0.55 * level})`;
+    ctx.shadowBlur = cell * (0.12 + (g % 5) * 0.025);
+    const headColor = `rgb(${(112 + 76 * pulse) * level | 0},${255 * level | 0},${(74 + 45 * pulse) * level | 0})`;
+    drawGlyphPath(ctx, g, ox, pad, cell, headColor);
     head.push(c);
   }
   return { trail, head, size, pad, cell };
@@ -144,11 +142,10 @@ function buildLayer(layer) {
   } else {
     ctx.clearRect(0, 0, layer.w, layer.h);
   }
-  layer.sprites = makeSprites(layer.cell, layer.level);
+  const scale = Math.max(0.5, Math.min(1.5, innerHeight / 720));
+  layer.sprites = makeSprites(layer.cell * scale, layer.level);
   const step = Math.max(4, Math.round(layer.sprites.cell * layer.spacing));
-  // 2x columns: extra passes re-cover the width with offset duplicates, so
-  // several streams can share one lane at different phases.
-  const cols = Math.round((Math.ceil(layer.w / step) + 1) * 2.0);
+  const cols = Math.ceil(layer.w / step) + 1;
   layer.step = Math.round(layer.sprites.cell * 1.04);
   layer.columns = [];
   for (let i = 0; i < cols; i++) {
@@ -157,7 +154,7 @@ function buildLayer(layer) {
       x: (i * step) % (layer.w + step) + ((Math.random() * 7 - 3) * dpr | 0),
       glyph: g,
       phase: (Math.random() * COUNT) | 0,
-      y: ((Math.random() * 2.2 - 1.2) * layer.h) | 0,
+      y: (Math.random() * (layer.h + GLYPHS.trails[g] * layer.step)) | 0,
       // Cells per second: the glyph's generated speed scaled by layer depth.
       rate: GLYPHS.speeds[g] * 5.6 * layer.speed,
       acc: Math.random(),
@@ -168,28 +165,20 @@ function buildLayer(layer) {
 
 function stepLayer(layer, dt) {
   const { ctx, w, h, sprites, step, columns } = layer;
-  // Persistence fade: what was bright last frame becomes this frame's trail.
-  // Opaque bottom layer fades toward near-black; transparent layers erase
-  // toward transparency so lower planes stay visible through them.
+  // Repaint a bounded trail on a clean plane. Display refresh rate cannot
+  // accumulate halos, and expired glyphs leave actual black gaps.
   ctx.globalAlpha = 1;
   if (layer.opaque) {
-    ctx.fillStyle = `rgba(0,5,2,${layer.fade})`;
+    ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, w, h);
   } else {
-    ctx.globalCompositeOperation = "destination-out";
-    ctx.fillStyle = `rgba(0,0,0,${layer.fade * 1.35})`;
-    ctx.fillRect(0, 0, w, h);
-    ctx.globalCompositeOperation = "source-over";
+    ctx.clearRect(0, 0, w, h);
   }
   for (const col of columns) {
     col.acc += dt * col.rate * (col.burst > 0 ? 1.9 : 1);
     if (col.burst > 0) col.burst -= dt;
     while (col.acc >= 1) {
       col.acc -= 1;
-      // Stamp the old head as a plain trail glyph before it dims.
-      const old = sprites.trail[(col.glyph + col.phase) % COUNT];
-      ctx.globalAlpha = 1;
-      ctx.drawImage(old, col.x - sprites.pad, col.y - sprites.pad);
       col.y += step;
       col.phase = (col.phase + 7) % COUNT;
       const past = col.y - GLYPHS.trails[col.glyph] * step * 1.15;
@@ -200,31 +189,47 @@ function stepLayer(layer, dt) {
         if (Math.random() < 0.06) col.burst = 1.6;
       }
     }
-    if (col.y > -step && col.y < h + step) {
-      const head = sprites.head[(col.glyph + col.phase) % COUNT];
-      ctx.globalAlpha = (col.burst > 0 ? 1 : 0.92) * layer.level;
-      ctx.drawImage(head, col.x - sprites.pad, col.y - sprites.pad);
+    const length = Math.round(GLYPHS.trails[col.glyph] * 1.15);
+    for (let tail = length; tail >= 0; tail--) {
+      const y = col.y - tail * step;
+      if (y < -step || y > h + step) continue;
+      const index = (col.glyph + col.phase + COUNT * 2 - tail * 7) % COUNT;
+      const near = 1 - tail / length;
+      const shimmer = 0.75 + (index % 5) * 0.0625;
+      ctx.globalAlpha = tail === 0 ? 1 : (0.25 + 0.75 * Math.sqrt(near)) * shimmer;
+      ctx.drawImage(tail === 0 ? sprites.head[index] : sprites.trail[index],
+                    col.x - sprites.pad, y - sprites.pad);
     }
   }
 }
 
-let paused = false, last = performance.now();
+let paused = false, last = performance.now(), frameHandle = null;
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   if (!paused) for (const layer of LAYERS) stepLayer(layer, dt);
-  requestAnimationFrame(frame);
+  frameHandle = requestAnimationFrame(frame);
 }
 
-function rebuild() { for (const layer of LAYERS) buildLayer(layer); }
+function startAnimation() {
+  if (reduced || frameHandle !== null) return;
+  last = performance.now();
+  frameHandle = requestAnimationFrame(frame);
+}
+
+function stopAnimation() {
+  if (frameHandle === null) return;
+  cancelAnimationFrame(frameHandle);
+  frameHandle = null;
+}
+
+function rebuild() {
+  for (const layer of LAYERS) buildLayer(layer);
+  // A settled field on load and resize, including reduced-motion stills.
+  for (const layer of LAYERS) stepLayer(layer, 0);
+}
 rebuild();
-
-if (reduced) {
-  // Reduced motion: settle into a single rich still frame, no animation.
-  for (let i = 0; i < 240; i++) for (const layer of LAYERS) stepLayer(layer, 1 / 30);
-} else {
-  requestAnimationFrame(frame);
-}
+startAnimation();
 
 let resizeTimer;
 addEventListener("resize", () => {
@@ -232,7 +237,8 @@ addEventListener("resize", () => {
   resizeTimer = setTimeout(rebuild, 150);
 });
 document.addEventListener("visibilitychange", () => {
-  last = performance.now();
+  if (document.hidden) stopAnimation();
+  else startAnimation();
 });
 addEventListener("keydown", (event) => {
   if (event.code === "Space") { paused = !paused; event.preventDefault(); }

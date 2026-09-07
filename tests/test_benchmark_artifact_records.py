@@ -1,4 +1,9 @@
 from pathlib import Path
+import subprocess
+from types import SimpleNamespace
+
+import smythe
+from benchmarks import artifact_records
 
 from benchmarks.artifact_records import (
     environment_snapshot,
@@ -49,4 +54,27 @@ def test_environment_snapshot_records_missing_packages_without_failing():
 def test_environment_snapshot_records_checkout_smythe_version():
     snapshot = environment_snapshot("smythe")
 
-    assert snapshot["packages"]["smythe"]
+    assert snapshot["packages"]["smythe"] == smythe.__version__
+    assert snapshot["smythe_source"]["version"] == smythe.__version__
+    assert snapshot["smythe_source"]["module"].endswith("smythe/__init__.py")
+
+
+def test_environment_snapshot_does_not_confuse_stale_install_with_source(monkeypatch):
+    monkeypatch.setattr(artifact_records.metadata, "version", lambda _: "0.0.1-stale")
+    snapshot = environment_snapshot("smythe")
+    assert snapshot["packages"]["smythe"] == smythe.__version__
+    assert snapshot["installed_packages"]["smythe"] == "0.0.1-stale"
+
+
+def test_source_snapshot_records_revision_and_dirty_status(monkeypatch):
+    replies = iter([SimpleNamespace(stdout="abc123\n"), SimpleNamespace(stdout=" M file.py\n")])
+    monkeypatch.setattr(artifact_records.subprocess, "run", lambda *a, **kw: next(replies))
+    assert artifact_records._source_control_snapshot() == {"revision": "abc123", "dirty": True}
+
+
+def test_source_snapshot_remains_usable_without_git(monkeypatch):
+    def missing_git(*args, **kwargs):
+        raise subprocess.CalledProcessError(1, "git")
+
+    monkeypatch.setattr(artifact_records.subprocess, "run", missing_git)
+    assert artifact_records._source_control_snapshot() == {"revision": None, "dirty": None}

@@ -21,7 +21,31 @@ the three found bugs in smythe and the sequence is the finding:
 |---|---|---|
 | 1 (2 reps) | [shape_suite.json](results/shape_suite.json) | The terminal-join measurement bug |
 | 2 (3 reps) | [shape_suite_v2.json](results/shape_suite_v2.json) | Right-sizing worked; `DELIVERABLE` synthesis regressed multi-part goals |
-| 3 (3 reps) | [shape_suite_v3.json](results/shape_suite_v3.json) | Current numbers, both bugs fixed |
+| 3 (3 reps) | [shape_suite_v3.json](results/shape_suite_v3.json) | Claimable wall time and observed quality; execution-stage cost only |
+
+## Current evidence status
+
+**Generated plans took 14% less end-to-end wall time than the fixed pipeline,
+with observed quality in the same measured band.** The 15 runs per arm include
+planning in their wall-clock timing.
+
+The September 2026 audit found that the historical USD column excludes the
+LLM architect's provider calls. It records execution and synthesis tokens at a
+uniform $3 per million tokens. The 19% reduction is therefore an
+**execution-stage cost estimate**, not total workflow savings or provider
+invoice savings. The 20% cost-per-quality reduction has the same restricted
+scope. Those figures no longer support end-to-end cost headlines.
+
+New harness records count usage at the shared provider boundary, including
+planning, execution, and synthesis. They retain per-call input/output tokens
+and label the blended-rate estimate explicitly. The original records remain
+unchanged; a new live campaign is required to establish full-workflow cost.
+
+The corrected [offline accounting run](results/shape_suite_usage_offline.json)
+passes all 15 task/arm combinations with 40 recorded provider responses,
+including five planning calls. Its deterministic provider returns synthetic
+usage; the actual API spend is $0. This record validates accounting mechanics,
+not model quality or paid-provider efficiency.
 
 ## The measurement bug (found first, and it matters)
 
@@ -101,25 +125,21 @@ validated on one task shape silently misreports every other shape.
 
 Raw records: [results/shape_suite_v3.json](results/shape_suite_v3.json).
 
-| Baseline | Quality | Min | Runs < 7 | Nodes | Cost | Wall | USD / quality point |
+| Baseline | Quality | Min | Runs < 7 | Nodes | Execution cost estimate | End-to-end wall | Execution USD / quality point |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | single agent | 8.73 | 5 | 4/15 | 1.00 | $0.032 | 4.5 s | **$0.00024** |
 | fixed pipeline | 9.33 | 5 | 2/15 | 3.00 | $0.201 | 14.9 s | $0.00144 |
 | smythe dynamic | **9.47** | **6** | 2/15 | 2.87 | $0.163 | 12.8 s | $0.00115 |
 
-Measured judge variance on this setup is ±0.49, so **9.47 vs 9.33 is a
-tie, not a win** — do not read it as generated topology beating a
-well-built fixed pipeline on quality. What is outside noise is
-deterministic and not judge-dependent: dynamic reaches that same quality
-for **19% less money and 14% less wall time**, and 20% better cost per
-quality point, because it sizes each plan to the task instead of paying
-for three nodes every time.
+Measured judge variance on this setup is ±0.49. The observed scores, **9.47
+and 9.33**, occupy the same measured quality band. Generated plans took
+**14% less end-to-end wall time** and used **19% less estimated execution
+cost**. Planning is included in wall time and excluded from the historical
+cost column. These are observed campaign means from three repetitions per
+task, not a statistical latency guarantee.
 
-This is the first campaign in which the suite's pre-registered
-hypothesis held. That hypothesis was that means would compress but *cost
-per accepted quality point* would favour generated topology, since a
-fixed pipeline must overspend on the trivial task and under-structure
-the parallel one. Both halves now show up in the node counts.
+The pre-registered cost-per-quality hypothesis remains open at the complete
+workflow boundary until planning usage is included in a new campaign.
 
 ## Where shape actually decides the winner
 
@@ -153,7 +173,8 @@ n=3 per cell on five tasks. `mixed-audit` still swings (10, 6, 10 for a
 single agent; 5, 10, 5 for the fixed pipeline), so single-cell
 differences on that task are noise and it is the one task no arm has
 solved. One judge, one executor model, tasks authored by this project.
-Cost figures come from the blended-rate estimate, not provider invoices.
+Cost figures are execution and synthesis tokens at a blended $3 per million
+tokens, excluding planning. They are not provider invoices.
 
 Three campaigns have now been run against this suite and two of them
 found bugs in smythe rather than facts about it. That is the suite

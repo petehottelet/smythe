@@ -2,7 +2,7 @@
 //
 // A GDI+ port of screensaver/index.html: the same 192 framework-generated
 // stroke glyphs (see GlyphData.cs, exported by export_glyphs.py), the same
-// three-depth-layer digital rain with persistence-fade trails.
+// three-depth-layer digital rain with bounded, luminous trails.
 //
 // Build (no SDK needed beyond Windows' bundled .NET Framework compiler):
 //     screensaver\windows\build_windows.cmd
@@ -78,11 +78,15 @@ namespace SmytheGlyphRain
             var form = new SaverForm(
                 new Rectangle(0, 0, rect.Right - rect.Left, rect.Bottom - rect.Top),
                 windowed: false, preview: true);
-            form.Show();
-            Native.SetParent(form.Handle, parent);
+            form.TopLevel = false;
+            // Creating the handle keeps the form hidden. Attach it before the
+            // message loop shows it, so Settings preview cannot flash a desktop
+            // window and inherits its parent's visibility from its first frame.
+            IntPtr child = form.Handle;
             Native.SetWindowLong(form.Handle, Native.GWL_STYLE,
-                Native.GetWindowLong(form.Handle, Native.GWL_STYLE) | Native.WS_CHILD);
-            Native.MoveWindow(form.Handle, 0, 0,
+                (Native.GetWindowLong(child, Native.GWL_STYLE) & ~Native.WS_POPUP) | Native.WS_CHILD);
+            Native.SetParent(child, parent);
+            Native.MoveWindow(child, 0, 0,
                 rect.Right - rect.Left, rect.Bottom - rect.Top, true);
             Application.Run(form);
         }
@@ -155,11 +159,14 @@ namespace SmytheGlyphRain
             _graphics.Clear(Color.FromArgb(0, 5, 2));
             _graphics.InterpolationMode = InterpolationMode.Bilinear;
 
-            float scale = Math.Max(0.3f, height / 1080f);
+            float scale = Math.Max(0.5f, Math.Min(1.5f, height / 720f));
+            foreach (Layer layer in _layers) { layer.Dispose(); }
             _layers.Clear();
-            _layers.Add(new Layer(24f * scale, 0.50f, 0.62f, 0.78f, width, height, _random));
-            _layers.Add(new Layer(26f * scale, 0.52f, 0.80f, 0.88f, width, height, _random));
-            _layers.Add(new Layer(28f * scale, 0.54f, 1.00f, 1.00f, width, height, _random));
+            _layers.Add(new Layer(11f * scale, 1.20f, 0.62f, 0.48f, width, height, _random));
+            _layers.Add(new Layer(20f * scale, 1.35f, 0.80f, 0.75f, width, height, _random));
+            _layers.Add(new Layer(36f * scale, 2.50f, 1.00f, 1.00f, width, height, _random));
+            DrawFrame(0);
+            _lastTick = DateTime.UtcNow;
         }
 
         private void Step()
@@ -167,22 +174,22 @@ namespace SmytheGlyphRain
             DateTime now = DateTime.UtcNow;
             float dt = Math.Min(0.05f, (float)(now - _lastTick).TotalSeconds);
             _lastTick = now;
-            // Persistence fade: one shared buffer darkens toward the ground
-            // color, so every bright stamp becomes next frame's trail.
-            using (var fade = new SolidBrush(Color.FromArgb(10, 0, 5, 2)))
-            {
-                _graphics.FillRectangle(fade, 0, 0, _buffer.Width, _buffer.Height);
-            }
+            DrawFrame(dt);
+            Invalidate();
+        }
+
+        private void DrawFrame(float dt)
+        {
+            _graphics.Clear(Color.Black);
             foreach (Layer layer in _layers)
             {
                 layer.Step(_graphics, dt, _random, _buffer.Height);
             }
-            Invalidate();
         }
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            e.Graphics.DrawImageUnscaled(_buffer, 0, 0);
+            if (_buffer != null) { e.Graphics.DrawImageUnscaled(_buffer, 0, 0); }
         }
 
         protected override void OnMouseMove(MouseEventArgs e)
@@ -244,17 +251,23 @@ namespace SmytheGlyphRain
         private readonly int _step;
         private readonly int _pad;
         private readonly float _speed;
-        private readonly float _level;
+        private readonly ImageAttributes[] _opacity = new ImageAttributes[16];
 
         internal Layer(float cellF, float spacing, float speed, float level,
                        int width, int height, Random random)
         {
             int cell = Math.Max(6, (int)Math.Round(cellF));
             _speed = speed;
-            _level = level;
             _pad = Math.Max(2, cell / 2);
             _trail = new Bitmap[GlyphData.Strokes.Length];
             _head = new Bitmap[GlyphData.Strokes.Length];
+            for (int alpha = 0; alpha < _opacity.Length; alpha++)
+            {
+                _opacity[alpha] = new ImageAttributes();
+                var matrix = new ColorMatrix();
+                matrix.Matrix33 = alpha / 15f;
+                _opacity[alpha].SetColorMatrix(matrix);
+            }
             for (int glyph = 0; glyph < GlyphData.Strokes.Length; glyph++)
             {
                 _trail[glyph] = Sprites.Render(glyph, cell, _pad, level, head: false);
@@ -262,7 +275,7 @@ namespace SmytheGlyphRain
             }
             _step = Math.Max(3, (int)Math.Round(cell * 1.04));
             int lane = Math.Max(3, (int)Math.Round(cell * spacing));
-            int columns = (int)Math.Round((Math.Ceiling((double)width / lane) + 1) * 2.0);
+            int columns = (int)Math.Ceiling((double)width / lane) + 1;
             for (int index = 0; index < columns; index++)
             {
                 var column = new Column();
@@ -279,7 +292,7 @@ namespace SmytheGlyphRain
             column.Rate = GlyphData.Speeds[column.Glyph] * 5.6f * _speed;
             column.Accumulator = (float)random.NextDouble();
             column.Y = initial
-                ? (int)((random.NextDouble() * 2.2 - 1.2) * height)
+                ? (int)(random.NextDouble() * (height + GlyphData.Trails[column.Glyph] * _step))
                 : -_step * random.Next(7);
             if (!initial && random.NextDouble() < 0.06)
             {
@@ -299,26 +312,36 @@ namespace SmytheGlyphRain
                 while (column.Accumulator >= 1f)
                 {
                     column.Accumulator -= 1f;
-                    Bitmap stamp = _trail[(column.Glyph + column.Phase) % _trail.Length];
-                    graphics.DrawImageUnscaled(stamp, column.X - _pad, column.Y - _pad);
                     column.Y += _step;
                     column.Phase = (column.Phase + 7) % _trail.Length;
-                    int past = column.Y - GlyphData.Trails[column.Glyph] * _step;
+                    float past = column.Y - GlyphData.Trails[column.Glyph] * _step * 1.15f;
                     if (past > height && random.NextDouble() < 0.6)
                     {
                         Reset(column, random, height, initial: false);
                     }
                 }
-                if (column.Y > -_step && column.Y < height + _step)
+                int length = (int)Math.Round(GlyphData.Trails[column.Glyph] * 1.15f);
+                for (int tail = length; tail >= 0; tail--)
                 {
-                    Bitmap head = _head[(column.Glyph + column.Phase) % _head.Length];
-                    graphics.DrawImageUnscaled(head, column.X - _pad, column.Y - _pad);
+                    int y = column.Y - tail * _step;
+                    if (y < -_step || y > height + _step) { continue; }
+                    int glyph = (column.Glyph + column.Phase + _trail.Length * 2 - tail * 7)
+                        % _trail.Length;
+                    float near = 1f - tail / (float)length;
+                    float shimmer = 0.75f + (glyph % 5) * 0.0625f;
+                    int alpha = tail == 0 ? 15
+                        : (int)Math.Round((0.25 + 0.75 * Math.Sqrt(near)) * shimmer * 15);
+                    Bitmap sprite = tail == 0 ? _head[glyph] : _trail[glyph];
+                    graphics.DrawImage(sprite,
+                        new Rectangle(column.X - _pad, y - _pad, sprite.Width, sprite.Height),
+                        0, 0, sprite.Width, sprite.Height, GraphicsUnit.Pixel, _opacity[alpha]);
                 }
             }
         }
 
         public void Dispose()
         {
+            foreach (ImageAttributes opacity in _opacity) { opacity.Dispose(); }
             foreach (Bitmap bitmap in _trail)
             {
                 bitmap.Dispose();
@@ -355,107 +378,75 @@ namespace SmytheGlyphRain
                 float glyphW = glyphH * GlyphData.CanvasW / GlyphData.CanvasH;
                 float originX = pad + (cell - glyphW) / 2f;
                 float originY = pad;
-                List<RectangleF> dots;
-                using (GraphicsPath path = BuildPath(glyph, originX, originY, glyphW, glyphH,
-                                                     out dots))
+                float unit = glyphW / GlyphData.CanvasW;
+                if (head)
                 {
-                    float unit = glyphW / GlyphData.CanvasW;
-                    if (head)
-                    {
-                        DrawPass(graphics, path, dots, unit, 3.2f,
-                                 Color.FromArgb(70, 64, 255, 118));
-                        DrawPass(graphics, path, dots, unit, 1.9f,
-                                 Color.FromArgb(110, 59, 255, 120));
-                        DrawPass(graphics, path, dots, unit, 1.0f,
-                                 Color.FromArgb(255, 234, 255, 239));
-                    }
-                    else
-                    {
-                        int green = (int)(226 * level);
-                        int red = (int)(40 * level);
-                        int blue = (int)(96 * level);
-                        // Trail sprites carry no glow pass: a fading stamp
-                        // dims cleanly rather than leaving a glowing halo
-                        // around a dark core.
-                        DrawPass(graphics, path, dots, unit, 1.0f,
-                                 Color.FromArgb(235, red, green, blue));
-                    }
+                    float pulse = 0.65f + (glyph % 7) * 0.05f;
+                    float halo = 1.5f + (glyph % 5) * 0.16f;
+                    DrawPass(graphics, glyph, originX, originY, unit, halo,
+                             Color.FromArgb((int)(28 * level), 111, 255, 61));
+                    DrawPass(graphics, glyph, originX, originY, unit, 1.2f,
+                             Color.FromArgb((int)(42 * level), 111, 255, 61));
+                    DrawPass(graphics, glyph, originX, originY, unit, 1f,
+                             Color.FromArgb(255, (int)((112 + 76 * pulse) * level),
+                                            (int)(255 * level), (int)((74 + 45 * pulse) * level)));
+                }
+                else
+                {
+                    DrawPass(graphics, glyph, originX, originY, unit, 1.15f,
+                             Color.FromArgb((int)(18 * level), 86, 255, 48));
+                    DrawPass(graphics, glyph, originX, originY, unit, 1f,
+                             Color.FromArgb(255, (int)(92 * level),
+                                            (int)(238 * level), (int)(48 * level)));
                 }
             }
             return bitmap;
         }
 
-        private static void DrawPass(Graphics graphics, GraphicsPath path,
-                                     List<RectangleF> dots, float unit,
+        private static void DrawPass(Graphics graphics, int glyph, float originX,
+                                     float originY, float unit,
                                      float widthFactor, Color color)
         {
             using (var pen = new Pen(color))
-            {
-                pen.LineJoin = LineJoin.Round;
-                pen.StartCap = LineCap.Round;
-                pen.EndCap = LineCap.Round;
-                // GraphicsPath keeps per-subpath widths in metadata we cannot
-                // attach, so strokes are drawn via the shared path with an
-                // averaged width; the visual difference at rain size is nil.
-                pen.Width = Math.Max(0.8f, 7.5f * unit * widthFactor);
-                graphics.DrawPath(pen, path);
-            }
             using (var brush = new SolidBrush(color))
             {
-                foreach (RectangleF dot in dots)
+                pen.LineJoin = LineJoin.Bevel;
+                pen.StartCap = LineCap.Square;
+                pen.EndCap = LineCap.Square;
+                foreach (float[] stroke in GlyphData.Strokes[glyph])
                 {
-                    RectangleF inflated = dot;
-                    inflated.Inflate(dot.Width * (widthFactor - 1f) / 2f,
-                                     dot.Height * (widthFactor - 1f) / 2f);
-                    graphics.FillEllipse(brush, inflated);
+                    int kind = (int)stroke[0];
+                    if (kind == 2)
+                    {
+                        float radius = Math.Max(0.6f, stroke[3] * unit * 1.2f) * widthFactor;
+                        graphics.FillEllipse(brush, originX + stroke[1] * unit - radius,
+                                             originY + stroke[2] * unit - radius,
+                                             radius * 2, radius * 2);
+                        continue;
+                    }
+                    // Keep every authored width instead of flattening the entire
+                    // glyph to a 7.5-unit average in the native port.
+                    pen.Width = Math.Max(0.8f, stroke[stroke.Length - 1] * unit * 1.38f)
+                        * widthFactor;
+                    float x1 = originX + stroke[1] * unit;
+                    float y1 = originY + stroke[2] * unit;
+                    if (kind == 0)
+                    {
+                        graphics.DrawLine(pen, x1, y1, originX + stroke[3] * unit,
+                                          originY + stroke[4] * unit);
+                    }
+                    else
+                    {
+                        float cx = originX + stroke[3] * unit;
+                        float cy = originY + stroke[4] * unit;
+                        float x2 = originX + stroke[5] * unit;
+                        float y2 = originY + stroke[6] * unit;
+                        graphics.DrawBezier(pen, x1, y1,
+                            x1 + 2f / 3f * (cx - x1), y1 + 2f / 3f * (cy - y1),
+                            x2 + 2f / 3f * (cx - x2), y2 + 2f / 3f * (cy - y2), x2, y2);
+                    }
                 }
             }
-        }
-
-        private static GraphicsPath BuildPath(int glyph, float originX, float originY,
-                                              float glyphW, float glyphH,
-                                              out List<RectangleF> dots)
-        {
-            var path = new GraphicsPath();
-            dots = new List<RectangleF>();
-            float scaleX = glyphW / GlyphData.CanvasW;
-            float scaleY = glyphH / GlyphData.CanvasH;
-            foreach (float[] stroke in GlyphData.Strokes[glyph])
-            {
-                int kind = (int)stroke[0];
-                if (kind == 2)
-                {
-                    float radius = Math.Max(0.6f, stroke[3] * scaleX);
-                    dots.Add(new RectangleF(
-                        originX + stroke[1] * scaleX - radius,
-                        originY + stroke[2] * scaleY - radius,
-                        radius * 2, radius * 2));
-                    continue;
-                }
-                path.StartFigure();
-                float x1 = originX + stroke[1] * scaleX;
-                float y1 = originY + stroke[2] * scaleY;
-                if (kind == 0)
-                {
-                    path.AddLine(x1, y1,
-                                 originX + stroke[3] * scaleX,
-                                 originY + stroke[4] * scaleY);
-                }
-                else
-                {
-                    float cx = originX + stroke[3] * scaleX;
-                    float cy = originY + stroke[4] * scaleY;
-                    float x2 = originX + stroke[5] * scaleX;
-                    float y2 = originY + stroke[6] * scaleY;
-                    // Quadratic-to-cubic elevation for GDI+ beziers.
-                    path.AddBezier(
-                        x1, y1,
-                        x1 + 2f / 3f * (cx - x1), y1 + 2f / 3f * (cy - y1),
-                        x2 + 2f / 3f * (cx - x2), y2 + 2f / 3f * (cy - y2),
-                        x2, y2);
-                }
-            }
-            return path;
         }
     }
 
@@ -463,6 +454,7 @@ namespace SmytheGlyphRain
     {
         internal const int GWL_STYLE = -16;
         internal const int WS_CHILD = 0x40000000;
+        internal const int WS_POPUP = unchecked((int)0x80000000);
 
         [StructLayout(LayoutKind.Sequential)]
         internal struct RECT

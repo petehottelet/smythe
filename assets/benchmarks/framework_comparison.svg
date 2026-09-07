@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="530" viewBox="0 0 960 530" role="img" aria-label="Framework benchmark comparing Smythe, LangGraph, and CrewAI. Smythe records the highest blind quality, fewest tokens, and lowest mean wall time.">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="530" viewBox="0 0 960 530" role="img" aria-label="Framework benchmark comparing Smythe, LangGraph, and CrewAI. Smythe has the highest observed blind score, fewest tokens, and lowest mean wall time.">
 <rect width="960" height="530" fill="#ffffff"/>
 <defs>
   <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse">
@@ -51,6 +51,6 @@
 <text x="920" y="402" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="13" fill="#000000" text-anchor="end" font-weight="normal">42.48s</text>
 <rect x="660" y="414" width="210.0" height="16" fill="url(#hatch)" stroke="#000000" stroke-width="2"/>
 <line x1="40" y1="476" x2="920" y2="476" stroke="#000000"/>
-<text x="40" y="505" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11.5" fill="#000000" text-anchor="start" font-weight="normal">15 runs per framework; zero errors; framework-native execution and accounting</text>
+<text x="40" y="505" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11.5" fill="#000000" text-anchor="start" font-weight="normal">15 runs per framework; zero errors; token usage measures the fixed pipeline</text>
 <text x="920" y="505" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="11.5" fill="#000000" text-anchor="end" font-weight="normal">framework_h2h_rightsized.json</text>
 </svg>
