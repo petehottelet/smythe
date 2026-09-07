@@ -20,10 +20,7 @@
 </div>
 
 **Give Smythe a goal. It generates an inspectable task graph and executes it
-with bounded concurrency, execution budgets, verification, traces, and recovery.**
-
-The graph defines the work; the durable execution envelope governs the run.
-Glyph Rain shows both ideas in one visible result.
+with bounded concurrency, execution budgets, verification, traces, and recovery.** The graph defines the work; the durable execution envelope governs the run.
 
 **Measured against CrewAI on the matched framework suite: 77% fewer tokens
 and 28% less wall time.** Five tasks, three repetitions, the same executor
