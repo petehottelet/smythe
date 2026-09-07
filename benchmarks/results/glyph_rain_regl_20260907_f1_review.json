@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "evidenceStatus": "reviewed-diagnostic-target-not-met",
+  "claimable": false,
+  "primaryTargetPassed": false,
+  "method": "Independent Python standard-library raw interval summation and inclusive-linear quantile recomputation, exact file/source/protocol hash comparison, chronological schedule, startup/config/canvas/catalog checks, active GL and browser launch identity checks; control timestamps checked increasing with selected subset. No physical presentation, GPU timing or idle-host claim.",
+  "rendererFreezeCommit": "41e4f9ddf2c659e3c93f0bb0ebd5b9582bbe8b7a",
+  "observedLaterHead": "5c1939bef718849213f5ef27296b6cbf898a2f25",
+  "headChangeScope": "Completion-tracker documentation only; all frozen source bytes match",
+  "host": {
+    "os": "win32",
+    "release": "10.0.26200",
+    "architecture": "x64",
+    "cpu": "AMD Ryzen 9 5950X 16-Core Processor            ",
+    "logicalCpuCount": 32,
+    "totalSystemMemoryBytes": 137354932224,
+    "powerProfile": "Ultimate Performance (powercfg d7f4320b-1457-4825-a0eb-bcef78b3e1b8)",
+    "competingWorkloads": "Root released the host after all owned tests finished. Existing desktop applications were not closed. One-second preflight observed about 2.6 aggregate CPU-seconds across five Chrome processes, plus active Firefox, Creative Cloud, NordVPN, cam_helper and ChatGPT; host not claimed idle."
+  },
+  "primary": [
+    {
+      "path": "benchmarks/results/glyph_rain_regl_20260907_f1_r1_classic.json",
+      "sha256": "e679bb596a0d3d6ea598fee1e9ed6bc032ff65eb409c3d8df71202e731454371",
+      "preset": "classic",
+      "repetition": 1,
+      "durationSeconds": 60.007200000000005,
+      "averageDrawsPerSecond": 56.243250809902804,
+      "frameIntervalP95Ms": 18.10000000000582,
+      "cpuSubmissionP95Ms": 0.20000004768371585,
+      "targetPassed": false
+    },
+    {
+      "path": "benchmarks/results/glyph_rain_regl_20260907_f1_r1_3d.json",
+      "sha256": "d606822f0506920759dbf8f4cdd5bb316ca145f28cb4ada311afa3e2fa012cb2",
+      "preset": "3d",
+      "repetition": 1,
+      "durationSeconds": 60.0011,
+      "averageDrawsPerSecond": 56.21563604667248,
+      "frameIntervalP95Ms": 18.10000000000582,
+      "cpuSubmissionP95Ms": 0.2999999523162842,
+      "targetPassed": false
+    },
+    {
+      "path": "benchmarks/results/glyph_rain_regl_20260907_f1_r2_3d.json",
+      "sha256": "694fb949654f48dc4ea1fc3280d2d3e43b69e9c629c110eda978cb0764e5f616",
+      "preset": "3d",
+      "repetition": 2,
+      "durationSeconds": 60.0057,
+      "averageDrawsPerSecond": 56.24465675760803,
+      "frameIntervalP95Ms": 18.10000000000582,
+      "cpuSubmissionP95Ms": 0.20000004768371585,
+      "targetPassed": false
+    },
+    {
+      "path": "benchmarks/results/glyph_rain_regl_20260907_f1_r2_classic.json",
+      "sha256": "37d8c3082934443ddfb4a133d9956206d14f7fd98dfbc428d60f6c702b7c2f8a",
+      "preset": "classic",
+      "repetition": 2,
+      "durationSeconds": 60.0011,
+      "averageDrawsPerSecond": 56.21563604667248,
+      "frameIntervalP95Ms": 18.10000000000582,
+      "cpuSubmissionP95Ms": 0.2999999523162842,
+      "targetPassed": false
+    },
+    {
+      "path": "benchmarks/results/glyph_rain_regl_20260907_f1_r3_classic.json",
+      "sha256": "c6732bf71f100f2c98dca5dbcb694c70c25780d5d75f83cd847347f8be3a9564",
+      "preset": "classic",
+      "repetition": 3,
+      "durationSeconds": 60.005799999999994,
+      "averageDrawsPerSecond": 56.2445630255742,
+      "frameIntervalP95Ms": 18.10000000000582,
+      "cpuSubmissionP95Ms": 0.20000004768371585,
+      "targetPassed": false
+    },
+    {
+      "path": "benchmarks/results/glyph_rain_regl_20260907_f1_r3_3d.json",
+      "sha256": "6716af5fadd6fef77d970562f4c0a5fc3638effab7cb30e9205b98f3b60bf711",
+      "preset": "3d",
+      "repetition": 3,
+      "durationSeconds": 60.006699999999995,
+      "averageDrawsPerSecond": 56.21038983980122,
+      "frameIntervalP95Ms": 18.10000000000582,
+      "cpuSubmissionP95Ms": 0.20000004768371585,
+      "targetPassed": false
+    }
+  ],
+  "cadenceControl": [
+    {
+      "path": "benchmarks/results/glyph_rain_regl_20260907_cadence_r1.json",
+      "sha256": "7ad8dc70e1fd972ca448e084f02a168ce110ec301d5d42c651d931ce36935618",
+      "repetition": 1,
+      "raw": {
+        "callbackCount": 3381,
+        "intervalCount": 3380,
+        "durationMs": 60005.8,
+        "averageCallbacksPerSecond": 56.327888304130596,
+        "intervalMs": {
+          "mean": 17.75319526627219,
+          "p95": 18.100000000002183,
+          "max": 18.899999999997817
+        }
+      },
+      "selected": {
+        "callbackCount": 3378,
+        "intervalCount": 3377,
+        "durationMs": 60005.8,
+        "averageCallbacksPerSecond": 56.27789313699675,
+        "intervalMs": {
+          "mean": 17.768966538347648,
+          "p95": 18.10000000000582,
+          "max": 20.099999999998545
+        }
+      },
+      "omittedCallbacks": 3
+    },
+    {
+      "path": "benchmarks/results/glyph_rain_regl_20260907_cadence_r2.json",
+      "sha256": "07f6b19a5f41946e3ebe0d657138828eceb17e2bc36a54d1d575d1c13a2c5726",
+      "repetition": 2,
+      "raw": {
+        "callbackCount": 3381,
+        "intervalCount": 3380,
+        "durationMs": 60012.4,
+        "averageCallbacksPerSecond": 56.32169351667322,
+        "intervalMs": {
+          "mean": 17.755147928994084,
+          "p95": 18.100000000002183,
+          "max": 19.19999999999709
+        }
+      },
+      "selected": {
+        "callbackCount": 3376,
+        "intervalCount": 3375,
+        "durationMs": 60012.4,
+        "averageCallbacksPerSecond": 56.238377402003586,
+        "intervalMs": {
+          "mean": 17.781451851851852,
+          "p95": 18.10000000000582,
+          "max": 19.19999999999709
+        }
+      },
+      "omittedCallbacks": 5
+    },
+    {
+      "path": "benchmarks/results/glyph_rain_regl_20260907_cadence_r3.json",
+      "sha256": "aaa12610056a2a09e5810198cd52214d84ac4cf257d95f76b37f55730cca49c4",
+      "repetition": 3,
+      "raw": {
+        "callbackCount": 3383,
+        "intervalCount": 3382,
+        "durationMs": 60012.99999999999,
+        "averageCallbacksPerSecond": 56.35445653441755,
+        "intervalMs": {
+          "mean": 17.744825547013598,
+          "p95": 18.100000000002183,
+          "max": 19
+        }
+      },
+      "selected": {
+        "callbackCount": 3378,
+        "intervalCount": 3377,
+        "durationMs": 60012.99999999999,
+        "averageCallbacksPerSecond": 56.27114125272858,
+        "intervalMs": {
+          "mean": 17.77109860823216,
+          "p95": 18.10000000000582,
+          "max": 20
+        }
+      },
+      "omittedCallbacks": 5
+    }
+  ],
+  "primaryAggregate": {
+    "path": "benchmarks/results/glyph_rain_regl_20260907_f1.json",
+    "sha256": "ab42c5451eb8c5a95e96762797dd775fbbba3edfc5dd22b89a55445319a174de"
+  },
+  "interpretation": "Blank-page source cadence closely matches rain. This supports an environment-cadence explanation, without proving its cause or changing failed primary gates."
+}

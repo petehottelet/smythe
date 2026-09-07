@@ -6,12 +6,15 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
+
 from smythe.cli import (
     EXIT_APPROVAL,
     EXIT_INVALID_INPUT,
     EXIT_JOB_FAILED,
     EXIT_OK,
     EXIT_PREFLIGHT,
+    _portable_export,
     main,
 )
 
@@ -145,7 +148,7 @@ def test_plan_token_runs_job_then_status_resume_and_export(tmp_path, capsys):
     exported = json.loads(destination.read_text(encoding="utf-8"))
     assert exported["manifest_root"] == "."
     assert exported["paths_relative_to"] == "artifact_root"
-    assert exported["artifact_root"] == f"outputs/{run_id}"
+    assert exported["artifact_root"] == f"outputs/{exported['artifact_directory']}"
     assert exported["events"]
     assert all(not artifact["relative_path"].startswith("/") for artifact in exported["artifacts"])
     for artifact in exported["artifacts"]:
@@ -243,3 +246,18 @@ def test_rejected_job_and_reroll_return_terminal_error_exit(tmp_path, capsys):
     rerolled = _json_output(capsys)["reroll"]
     assert rerolled["counts"] == {"rejected": 1}
     assert rerolled["operations"][0]["attempt_count"] == 2
+
+
+def test_export_uses_recorded_directory_and_retains_legacy_missing_field_compatibility():
+    old = {"manifest_root": "/source", "output_directory": "outputs\\nested", "run_id": "legacy"}
+    assert _portable_export(old)["artifact_root"] == "outputs/nested/legacy"
+    current = dict(old, artifact_directory="run-" + "a" * 32)
+    assert _portable_export(current)["artifact_root"] == "outputs/nested/run-" + "a" * 32
+    assert old["manifest_root"] == "/source" and current["manifest_root"] == "/source"
+
+
+@pytest.mark.parametrize("directory", [None, True, "", "../run", "C:\\outside", "run/file", "run:stream"])
+def test_export_rejects_invalid_recorded_directory_without_legacy_fallback(directory):
+    with pytest.raises(ValueError, match="artifact directory"):
+        _portable_export({"manifest_root": "/source", "output_directory": "outputs",
+                          "run_id": "legacy", "artifact_directory": directory})

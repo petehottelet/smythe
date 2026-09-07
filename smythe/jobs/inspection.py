@@ -68,6 +68,17 @@ def _check_path(anchor: Path, parts: tuple[str, ...]) -> Path:
     return candidate
 
 
+def _artifact_directory(snapshot: dict[str, Any]) -> str:
+    """Use the recorded directory; only older snapshots omit that field."""
+    run_id = snapshot["run_id"]
+    if not isinstance(run_id, str) or _RUN_RE.fullmatch(run_id) is None:
+        raise ValueError("Ledger run ID is not a safe path component")
+    directory = snapshot["artifact_directory"] if "artifact_directory" in snapshot else run_id
+    if not isinstance(directory, str) or _RUN_RE.fullmatch(directory) is None:
+        raise ValueError("Ledger artifact directory is not a safe path component")
+    return directory
+
+
 def _artifact_root(snapshot: dict[str, Any]) -> tuple[Path, tuple[str, ...]]:
     root_value = snapshot["manifest_root"]
     if not isinstance(root_value, str):
@@ -76,10 +87,7 @@ def _artifact_root(snapshot: dict[str, Any]) -> tuple[Path, tuple[str, ...]]:
     if not root.is_absolute():
         raise ValueError("Ledger manifest root must be an absolute path")
     root = root.resolve()
-    run_id = snapshot["run_id"]
-    if not isinstance(run_id, str) or _RUN_RE.fullmatch(run_id) is None:
-        raise ValueError("Ledger run ID is not a safe path component")
-    parts = (*_relative_parts(snapshot["output_directory"], allow_dot=True), run_id)
+    parts = (*_relative_parts(snapshot["output_directory"], allow_dot=True), _artifact_directory(snapshot))
     _check_path(root, parts)
     return root, parts
 

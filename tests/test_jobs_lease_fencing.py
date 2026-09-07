@@ -252,6 +252,9 @@ def make_legacy(path, root, clock, *, leased=False, prepared=False):
             store.acquire_run_lease("run", "legacy-owner")
     # Reconstruct the historical v2 shape, including its lack of fencing columns.
     with sqlite3.connect(path) as db:
+        db.execute("DROP TABLE run_controls")
+        db.execute("ALTER TABLE runs DROP COLUMN artifact_namespace")
+        db.execute("ALTER TABLE runs DROP COLUMN artifact_owner_id")
         db.execute("ALTER TABLE runs DROP COLUMN lease_epoch")
         db.execute("ALTER TABLE attempts DROP COLUMN lease_owner_id")
         db.execute("ALTER TABLE attempts DROP COLUMN lease_epoch")
@@ -281,7 +284,7 @@ def test_open_v2_reader_reports_migration_in_its_next_snapshot(tmp_path):
             pass
         for method in (reader.snapshot, reader.inspection_snapshot):
             current = method("run")
-            assert current["version"] == 3
+            assert current["version"] == 4
             assert current["lease_fencing_supported"] is True
 
 

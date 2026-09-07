@@ -11,7 +11,7 @@ import sqlite3
 import sys
 import tempfile
 import unicodedata
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Sequence
 
 from smythe.jobs.loading import load_manifest
@@ -63,6 +63,7 @@ EXIT_JOB_STATE = 6
 EXIT_LOCAL_ERROR = 7
 EXIT_OPTIMIZE_STATE = 8
 EXIT_OPTIMIZE_LIMIT = 9
+EXIT_INTERRUPTED = 130
 
 _FAILED_STATUSES = {"needs_attention", "partial", "failed", "budget_overrun"}
 
@@ -159,6 +160,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="must match the ceiling used by jobs plan",
     )
+    run.add_argument("--detach", action="store_true", help="start a worker independent of this terminal")
+    run.add_argument("--startup-timeout-s", type=float, default=30.0,
+                     help="detached worker readiness timeout (0.1-300 seconds; default: 30)")
     _add_output_options(run, inherited=True)
 
     status = commands.add_parser("status", help="show durable run state")
@@ -183,7 +187,27 @@ def build_parser() -> argparse.ArgumentParser:
 
     resume = commands.add_parser("resume", help="resume only definitively safe work")
     resume.add_argument("run_id")
+    resume.add_argument("--detach", action="store_true", help="resume in a detached worker")
+    resume.add_argument("--startup-timeout-s", type=float, default=30.0,
+                        help="detached worker readiness timeout (0.1-300 seconds; default: 30)")
     _add_output_options(resume, inherited=True)
+
+    stop = commands.add_parser("stop", help="request a durable pause and let admitted calls drain")
+    stop.add_argument("run_id")
+    stop.add_argument("--reason", default="operator requested pause", help="saved reason for this stop request")
+    stop.add_argument("--timeout-s", type=float, default=30.0,
+                      help="drain observation duration (0-3600 seconds; default: 30)")
+    stop.add_argument("--poll-interval-s", type=float, default=1.0,
+                      help="observation interval (0.05-60 seconds; default: 1)")
+    _add_output_options(stop, inherited=True)
+
+    attach = commands.add_parser("attach", help="watch saved job state without controlling its worker")
+    attach.add_argument("run_id")
+    attach.add_argument("--timeout-s", type=float, default=30.0,
+                        help="maximum attachment time (0-3600 seconds; default: 30)")
+    attach.add_argument("--poll-interval-s", type=float, default=1.0,
+                        help="read interval (0.05-60 seconds; default: 1)")
+    _add_output_options(attach, inherited=True)
 
     reroll = commands.add_parser("reroll", help="rerun selected rejected operations")
     reroll.add_argument("run_id")
@@ -472,10 +496,12 @@ def _job_exit(snapshot: dict[str, Any]) -> int:
 
 
 def _portable_export(snapshot: dict[str, Any]) -> dict[str, Any]:
+    from smythe.jobs.inspection import _artifact_directory, _relative_parts
+
     exported = dict(snapshot)
     exported["manifest_root"] = "."
-    exported["artifact_root"] = (
-        Path(str(exported["output_directory"])) / str(exported["run_id"])
+    exported["artifact_root"] = PurePosixPath(
+        *_relative_parts(snapshot["output_directory"], allow_dot=True), _artifact_directory(snapshot),
     ).as_posix()
     exported["paths_relative_to"] = "artifact_root"
     return exported
@@ -611,9 +637,24 @@ def _emit(args: argparse.Namespace, command: str, value: Any) -> None:
         print(f"Approval token: {value['approval']['token']}")
     elif command in {"run", "status", "resume", "reroll"}:
         job = value
-        print(f"Run: {job['run_id']}")
-        print(f"Status: {job['status']}")
-        print(f"Operations: {json.dumps(job['counts'], sort_keys=True)}")
+        print(f"Run: {_terminal_text(job['run_id'])}")
+        print(f"Status: {_terminal_text(job['status'])}")
+        if job.get("detached"):
+            print(f"Worker PID: {job['worker_pid']}")
+            print(f"Worker log: {_terminal_text(job['log_path'], limit=1000)}")
+            print("Use jobs attach to observe this run.")
+        else:
+            print(f"Operations: {json.dumps(job['counts'], sort_keys=True)}")
+    elif command in {"attach", "stop"}:
+        print(f"Run: {_terminal_text(value['run_id'])}")
+        if "stop_request" in value:
+            print(f"Stop request generation: {value['stop_request']['pause_generation']}")
+        print(f"Attachment: {_terminal_text(value['attachment']['state'])}")
+        if "status" in value:
+            print(f"Status: {_terminal_text(value['status'])}")
+            print(f"Operations: {json.dumps(value['counts'], sort_keys=True)}")
+        if value.get("worker"):
+            print(f"Worker log: {_terminal_text(value['worker']['log_path'], limit=1000)}")
     elif command == "export" and isinstance(value, dict) and "path" in value:
         print(f"Exported {value['run_id']} to {value['path']}")
     elif command == "list":
@@ -634,6 +675,10 @@ def _emit_error(
         "command": command,
         "error": {"type": type(error).__name__, "message": str(error)},
     }
+    from smythe.jobs.operator import WorkerStartupError, WorkerStartupInterrupted
+
+    if isinstance(error, (WorkerStartupError, WorkerStartupInterrupted)):
+        payload["error"]["launch"] = error.launch
     text = json.dumps(
         payload,
         ensure_ascii=False,
@@ -774,6 +819,10 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
         return EXIT_OK
 
     if command in {"validate", "plan", "run"}:
+        if command == "run" and args.detach:
+            from smythe.jobs.operator import validate_startup_timeout
+
+            validate_startup_timeout(args.startup_timeout_s)
         plan, manifest_root = _plan(args.manifest)
         if command == "validate":
             _emit(
@@ -806,6 +855,17 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
             raise ApprovalError(
                 "approval token does not match this manifest and spend ceiling"
             )
+        if args.detach:
+            from smythe.jobs.operator import launch_worker
+
+            with SQLiteRunStore(args.store) as store:
+                # Preserve start()'s local attachment/provider checks before
+                # creating the approved run. The worker revalidates on resume.
+                JobRunner(store)._validate_dispatch_inputs(plan, manifest_root)
+                run_id = store.create_run(plan, approval, manifest_root=manifest_root)
+            launched = launch_worker(args.store, run_id, startup_timeout_s=args.startup_timeout_s)
+            _emit(args, command, launched)
+            return EXIT_OK
         with SQLiteRunStore(args.store) as store:
             snapshot = asyncio.run(
                 JobRunner(store).start(
@@ -815,6 +875,37 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
                 )
             )
         _emit(args, command, snapshot)
+        return _job_exit(snapshot)
+
+    if command == "resume" and args.detach:
+        from smythe.jobs.operator import launch_worker
+
+        launched = launch_worker(args.store, args.run_id, startup_timeout_s=args.startup_timeout_s,
+                                 clear_pause=True)
+        _emit(args, command, launched)
+        return EXIT_OK
+
+    if command in {"attach", "stop"}:
+        from smythe.jobs.operator import attach_job, stop_job
+
+        def update(value):
+            if not args.json:
+                print(f"{_terminal_text(value['status'])}: "
+                      f"{json.dumps(value['counts'], sort_keys=True)}", file=sys.stderr)
+
+        try:
+            observe = stop_job if command == "stop" else attach_job
+            snapshot = observe(args.store, args.run_id, timeout_s=args.timeout_s,
+                               poll_interval_s=args.poll_interval_s, on_update=update,
+                               **({"reason": args.reason} if command == "stop" else {}))
+        except KeyboardInterrupt:
+            _emit(args, command, {"run_id": args.run_id, "attachment": {"state": "disconnected"}})
+            return EXIT_INTERRUPTED
+        _emit(args, command, snapshot)
+        if snapshot["attachment"]["state"] == "disconnected":
+            return EXIT_INTERRUPTED
+        if command == "attach" and snapshot["attachment"]["state"] in {"worker_failed", "lease_expired"}:
+            return EXIT_LOCAL_ERROR
         return _job_exit(snapshot)
 
     if command in {"list", "inspect"}:
@@ -886,6 +977,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     command = getattr(args, f"{args.root_command}_command", args.root_command)
     try:
         return _dispatch(args)
+    except KeyboardInterrupt as exc:
+        from smythe.jobs.operator import WorkerStartupInterrupted
+
+        if not isinstance(exc, WorkerStartupInterrupted):
+            raise
+        _emit_error(args, command, exc)
+        return EXIT_INTERRUPTED
     except ApprovalError as exc:
         _emit_error(args, command, exc)
         return EXIT_APPROVAL

@@ -32,13 +32,14 @@ def recorded(tmp_path):
     paths = []
     with SQLiteRunStore(database) as store:
         run_id = store.create_run(plan, make_approval(plan), manifest_root=tmp_path)
+        directory = store.snapshot(run_id)["artifact_directory"]
         for index, op in enumerate(store.pending_operations(run_id)):
             attempt = store.begin_attempt(run_id, op["operation_id"])
             permit = store.prepare_call(attempt["attempt_id"], 0)
             store.mark_call_dispatched(permit.call_id)
             content = f"artifact-{index}".encode()
             relative = f"artifacts/{index}.bin"
-            path = tmp_path / "outputs" / run_id / relative
+            path = tmp_path / "outputs" / directory / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(content)
             paths.append(path)
@@ -146,6 +147,23 @@ def test_manifest_output_dot_is_supported(tmp_path):
     target.parent.mkdir()
     target.write_bytes(path.read_bytes())
     assert inspect_job(store, "run")["artifact_integrity"]["counts"] == {"verified": 1}
+
+
+def test_inspection_reads_recorded_artifact_directory_instead_of_raw_run_id(tmp_path):
+    directory = "run-" + "a" * 32
+    store, old_path, _ = _fake_store(tmp_path, artifact_directory=directory)
+    target = tmp_path / "outputs" / directory / "artifact.bin"
+    target.parent.mkdir()
+    target.write_bytes(old_path.read_bytes())
+    old_path.write_bytes(b"wrong raw-ID directory")
+    assert inspect_job(store, "run")["artifact_integrity"]["counts"] == {"verified": 1}
+
+
+@pytest.mark.parametrize("directory", [None, True, "", "../run", "C:\\outside", "run/file", "run:stream"])
+def test_invalid_recorded_directory_never_falls_back_to_raw_run_id(tmp_path, directory, monkeypatch):
+    store, _, _ = _fake_store(tmp_path, artifact_directory=directory)
+    monkeypatch.setattr(os, "open", lambda *a, **kw: pytest.fail("invalid directory opened"))
+    assert inspect_job(store, "run")["artifact_integrity"]["counts"] == {"unsafe": 1}
 
 
 def test_symbolic_link_is_never_hashed(tmp_path, monkeypatch):

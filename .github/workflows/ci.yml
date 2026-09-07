@@ -103,6 +103,7 @@ jobs:
         run: |
           node screensaver/svg-preview/verify-measurement.mjs
           node screensaver/svg-preview/verify-browser-metadata.mjs
+          node screensaver/svg-preview/verify-raf-control.mjs
 
   openai-responses-contract:
     runs-on: ubuntu-latest
@@ -155,3 +156,20 @@ jobs:
         run: python -m pip install -e ".[dev]"
       - name: Exercise the suite on Windows
         run: python -m pytest tests/ -q
+
+  macos-operator-smoke:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install operator test dependencies
+        run: python -m pip install -e ".[dev,jobs]"
+      - name: Verify detached execution, observation, and durable pause
+        run: >-
+          python -m pytest -q
+          tests/test_jobs_operator.py
+          tests/test_jobs_operator_cli.py
+          tests/test_jobs_pause.py
+          tests/test_jobs_artifact_namespace.py

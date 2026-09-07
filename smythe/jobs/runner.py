@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import hmac
+import json
 import math
 import os
 import re
@@ -18,7 +19,8 @@ from uuid import uuid4
 from smythe.budget import BudgetValidationError, validate_completion_usage
 from smythe.jobs.artifact_io import (
     MAX_ARTIFACT_BYTES,
-    atomic_write_bytes,
+    atomic_publish_bytes,
+    claim_artifact_root,
     inspect_artifact,
 )
 from smythe.jobs.models import (
@@ -45,6 +47,7 @@ from smythe.jobs.store import (
     OperationStatus,
     RunLease,
     RunLeaseError,
+    RunPauseRequested,
     SQLiteRunStore,
 )
 from smythe.provider import Artifact, CompletionResult
@@ -151,8 +154,24 @@ class JobRunner:
         _validate_run_id(created_id)
         return await self._execute_with_lease(created_id, plan, root)
 
-    async def resume(self, run_id: str) -> dict[str, Any]:
+    async def resume(
+        self, run_id: str, *, clear_pause: bool = True, pause_generation: int | None = None,
+    ) -> dict[str, Any]:
         _validate_run_id(run_id)
+        if type(clear_pause) is not bool:
+            raise TypeError("clear_pause must be a boolean")
+        if pause_generation is not None and (
+            type(pause_generation) is not int or not 0 <= pause_generation <= MAX_SQLITE_INTEGER
+        ):
+            raise ValueError("pause_generation must be a nonnegative SQLite integer")
+        if not clear_pause and pause_generation is not None:
+            raise ValueError("pause_generation requires clear_pause=True")
+        # Capture explicit resume intent before preflight or worker launch. A
+        # later pause generation must survive the lease-acquisition transaction.
+        observed_pause = None
+        if clear_pause:
+            observed_pause = (self.store.get_control(run_id)["pause_generation"]
+                              if pause_generation is None else pause_generation)
         record = self.store.manifest_record(run_id)
         root = Path(record["manifest_root"])
         manifest = JobManifestV1.from_json(record["manifest_json"])
@@ -160,7 +179,9 @@ class JobRunner:
         approval = JobApprovalV1.from_dict(record["approval"])
         verify_approval(plan, approval)
         self._validate_dispatch_inputs(plan, root)
-        return await self._execute_with_lease(run_id, plan, root, recover=True)
+        return await self._execute_with_lease(
+            run_id, plan, root, recover=True, pause_generation=observed_pause,
+        )
 
     async def reroll(
         self,
@@ -202,11 +223,14 @@ class JobRunner:
         *,
         recover: bool = False,
         reroll: tuple[list[str], str, bool] | None = None,
+        pause_generation: int | None = None,
     ) -> dict[str, Any]:
         """Own the run for recovery, state transitions, and provider execution."""
 
         owner_id = f"runner-{uuid4().hex}"
-        lease = self.store.acquire_run_lease(run_id, owner_id, ttl_s=self.lease_ttl_s)
+        lease = self.store.acquire_run_lease(
+            run_id, owner_id, ttl_s=self.lease_ttl_s, pause_generation=pause_generation,
+        )
         execution_task: asyncio.Task[dict[str, Any]] | None = None
         heartbeat_task: asyncio.Task[None] | None = None
         primary_error: BaseException | None = None
@@ -295,6 +319,7 @@ class JobRunner:
         # through the existing reroll flow. Persisted classification prevents a
         # fresh runner from resuming other paid work with an invalid ledger.
         snapshot = self.store.snapshot(run_id)
+        await asyncio.to_thread(self._claim_artifact_directory, snapshot, root)
         if any(
             item["status"] == OperationStatus.UNKNOWN_OUTCOME.value
             and (item["error"] or "").startswith(_INVALID_ACCOUNTING_PREFIX)
@@ -315,6 +340,7 @@ class JobRunner:
         started = 0
         counter_lock = asyncio.Lock()
         stop_dispatch = asyncio.Event()
+        pause_dispatch = asyncio.Event()
         start = time.perf_counter()
 
         async def producer() -> None:
@@ -340,7 +366,8 @@ class JobRunner:
                     try:
                         await self._execute_operation(
                             run_id, operation, root, plan, stop_dispatch=stop_dispatch,
-                            lease=lease,
+                            pause_dispatch=pause_dispatch, lease=lease,
+                            artifact_directory=snapshot["artifact_directory"],
                         )
                     finally:
                         async with counter_lock:
@@ -375,12 +402,18 @@ class JobRunner:
         plan: JobPlanV1,
         *,
         stop_dispatch: asyncio.Event,
+        pause_dispatch: asyncio.Event,
         lease: RunLease,
+        artifact_directory: str,
     ) -> None:
         try:
             attempt = self.store.begin_attempt(run_id, operation.operation_id, lease=lease)
             ceiling = usd_to_micros(operation.max_cost_per_call_usd)
             permit = self.store.prepare_call(attempt["attempt_id"], ceiling, lease=lease)
+        except RunPauseRequested:
+            pause_dispatch.set()
+            stop_dispatch.set()
+            return
         except JobBudgetError:
             # A sibling call can discover and latch an overrun while queued
             # operations are waiting. No new attempt is admitted after that.
@@ -412,7 +445,8 @@ class JobRunner:
             # Attachment loading can yield while a sibling reports bad usage.
             # This call is still safe to release and has consumed no retry.
             self.store.fail_pre_dispatch(
-                permit.call_id, "dispatch stopped after invalid provider accounting",
+                permit.call_id, ("dispatch stopped for durable pause" if pause_dispatch.is_set()
+                                 else "dispatch stopped after invalid provider accounting"),
                 retryable=True,
                 lease=lease,
             )
@@ -420,6 +454,10 @@ class JobRunner:
 
         try:
             self.store.mark_call_dispatched(permit.call_id, lease=lease)
+        except RunPauseRequested:
+            pause_dispatch.set()
+            stop_dispatch.set()
+            return
         except JobBudgetError as exc:
             self.store.fail_pre_dispatch(permit.call_id, str(exc), lease=lease)
             return
@@ -491,6 +529,7 @@ class JobRunner:
                     root,
                     output_directory=plan.output_directory,
                     run_id=run_id,
+                    artifact_directory=artifact_directory,
                 ),
             )
             accepted = bool(artifact_records) and not errors
@@ -553,6 +592,27 @@ class JobRunner:
                 )
             )
         return loaded
+
+    def _claim_artifact_directory(self, snapshot: dict[str, Any], root: Path) -> None:
+        run_root = _validated_run_root(root, output_directory=snapshot["output_directory"],
+                                       run_id=snapshot["run_id"],
+                                       artifact_directory=snapshot["artifact_directory"])
+        legacy = snapshot["artifact_namespace"] is None
+        if legacy:
+            run_root.mkdir(parents=True, exist_ok=True)
+            for candidate in self.store.legacy_artifact_roots():
+                if candidate["artifact_owner_id"] == snapshot["artifact_owner_id"]:
+                    continue
+                other = (Path(candidate["manifest_root"]) / candidate["output_directory"]
+                         / candidate["artifact_directory"]).resolve()
+                if (_confinement_path(other) == _confinement_path(run_root)
+                        or other.exists() and other.samefile(run_root)):
+                    raise ValueError("Legacy artifact directory aliases another run; ownership is ambiguous")
+        owner_bytes = (json.dumps({"version": 1, "run_id": snapshot["run_id"],
+                                   "artifact_owner_id": snapshot["artifact_owner_id"]},
+                                  sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+        claim_artifact_root(run_root, owner_bytes, legacy=legacy,
+                            legacy_artifacts=snapshot["artifacts"] if legacy else [])
 
     @staticmethod
     def _cost(
@@ -649,7 +709,7 @@ class JobRunner:
             )
             pending_writes.append((destination, artifact.data))
         for destination, data in pending_writes:
-            atomic_write_bytes(destination, data)
+            atomic_publish_bytes(destination, data)
         return records, errors
 
 
@@ -699,7 +759,7 @@ def _artifact_filename(
 
 
 def _validate_run_id(run_id: str) -> str:
-    """Reject identifiers that could escape or alias an artifact directory."""
+    """Validate the identifier syntax; persistent ownership handles aliases."""
 
     if not isinstance(run_id, str) or not _SAFE_RUN_ID.fullmatch(run_id):
         raise ValueError(
@@ -714,6 +774,7 @@ def _validated_run_root(
     *,
     output_directory: str,
     run_id: str,
+    artifact_directory: str | None = None,
 ) -> Path:
     """Resolve the run directory and re-check preflight's confinement at dispatch."""
 
@@ -726,7 +787,8 @@ def _validated_run_root(
         )
     except ValueError as exc:
         raise ValueError("job output directory escapes the manifest root") from exc
-    run_root = (output_root / run_id).resolve()
+    directory = run_id if artifact_directory is None else _validate_run_id(artifact_directory)
+    run_root = (output_root / directory).resolve()
     try:
         _confinement_path(run_root).relative_to(_confinement_path(output_root))
     except ValueError as exc:  # pragma: no cover - run_id validation is defense in depth

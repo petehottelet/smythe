@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "campaignId": "glyph-rain-regl-20260907-cadence-control1",
+  "status": "frozen-before-control-sampling",
+  "createdAt": "2026-09-07T19:19:39.402281+00:00",
+  "gitRevisionAtPreparation": "5c1939bef718849213f5ef27296b6cbf898a2f25",
+  "scope": "Exploratory blank-page RAF cadence and unchanged gate only; no performance pass or GPU-presentation claim",
+  "primaryRecord": {
+    "path": "benchmarks/results/glyph_rain_regl_20260907_f1.json",
+    "sha256": "ab42c5451eb8c5a95e96762797dd775fbbba3edfc5dd22b89a55445319a174de"
+  },
+  "sourceSha256": {
+    "screensaver/svg-preview/raf-control.mjs": "d34b53c3c0fd244517c76fb5a7a00c3a91409670c0baee98e58e5f3d170cc1fa",
+    "screensaver/svg-preview/verify-raf-control.mjs": "3d73974b1e2a21fb35f393a792c2ac0409d2ba7520baf4b11d1affa65171e571",
+    "screensaver/svg-preview/timing.mjs": "1a7ae6897b0564d71b897f1ee8129c7c9b914b9cf0a390236f2336487860d3f5",
+    "screensaver/svg-preview/browser-command.mjs": "8b98aa31695467a0a72d3ebb15853f2ea7740fc0ba849628ace21a102218530e",
+    "screensaver/svg-preview/browser-launch.mjs": "4ccd3978851ad43293b558980a1b985fc095e3ff38a83fced56ff23f5f6e292d",
+    "screensaver/svg-preview/browser-metadata.mjs": "05f5d528ceb3f4c639a89079cd7d06fccd0d381f335c72dcba7a468a2df7fdb2",
+    "screensaver/svg-preview/measurement.mjs": "6b8f31e7e4963d544c31258a95bf361268db3919652fe538a3b857f3159c8079",
+    "screensaver/svg-preview/provenance.mjs": "327debb738aa27a06f5c033a76d710889b7fada5057a6d4a8446ffde4ff1f420",
+    "benchmarks/renderer_cadence_control_20260907.md": "d158421c1db6f3c5ab25fe06e133486e90a49a03142e717e73c2590b52a42464"
+  },
+  "warmupSeconds": 5,
+  "minimumActualSampleSeconds": 60,
+  "repetitions": [
+    1,
+    2,
+    3
+  ],
+  "outputs": [
+    "benchmarks/results/glyph_rain_regl_20260907_cadence_r1.json",
+    "benchmarks/results/glyph_rain_regl_20260907_cadence_r2.json",
+    "benchmarks/results/glyph_rain_regl_20260907_cadence_r3.json"
+  ],
+  "viewport": [
+    1920,
+    1080
+  ],
+  "dpr": 1,
+  "page": "about:blank",
+  "glContextOnly": [
+    2,
+    2
+  ],
+  "gateFps": 60,
+  "preservesPrimaryGates": true,
+  "claimable": false,
+  "apiCalls": 0
+}
