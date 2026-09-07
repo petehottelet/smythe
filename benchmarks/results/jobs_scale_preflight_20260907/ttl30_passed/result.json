@@ -1,0 +1,434 @@
+{
+  "campaign_status": "completed",
+  "comparative_claimable": false,
+  "configuration": {
+    "completed_before_kill": 4,
+    "concurrency": 8,
+    "count": 25,
+    "kill_after_entries": 12,
+    "lease_heartbeat_s": 1.0,
+    "lease_ttl_s": 30.0,
+    "max_attempts": 2
+  },
+  "durability": {
+    "finished_resume": {
+      "journal_mode": "wal",
+      "synchronous": 2
+    },
+    "reroll": {
+      "journal_mode": "wal",
+      "synchronous": 2
+    },
+    "resume": {
+      "journal_mode": "wal",
+      "synchronous": 2
+    },
+    "start": {
+      "journal_mode": "wal",
+      "synchronous": 2
+    }
+  },
+  "environment": {
+    "logical_cpu_count": 32,
+    "machine": "AMD64",
+    "pillow": "12.3.0",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+    "sqlite": "3.49.1"
+  },
+  "evidence_status": "offline_correctness_observation",
+  "lease_expiry": {
+    "expires_at_ns": 1788801917496630000,
+    "expiry_method": "elapsed real wall-clock time; no database edits",
+    "resume_allowed_at_ns": 1788801917497145900,
+    "wall_s": 29.27425709995441
+  },
+  "ledger": {
+    "after_kill": {
+      "approved_microusd": 0,
+      "confirmed_microusd": 0,
+      "cost_contains_estimates": false,
+      "cost_is_complete": true,
+      "exposure_microusd": 0,
+      "reserved_microusd": 0
+    },
+    "after_resume": {
+      "approved_microusd": 0,
+      "confirmed_microusd": 0,
+      "cost_contains_estimates": true,
+      "cost_is_complete": true,
+      "exposure_microusd": 0,
+      "reserved_microusd": 0
+    },
+    "final": {
+      "approved_microusd": 0,
+      "confirmed_microusd": 0,
+      "cost_contains_estimates": true,
+      "cost_is_complete": true,
+      "exposure_microusd": 0,
+      "reserved_microusd": 0
+    }
+  },
+  "metric_scopes": {
+    "peak_active_provider_calls": "Entered fixture coroutine until its durable returned event.",
+    "phase_parent_wall_s": "Subprocess launch through exit, including imports and JSON evidence.",
+    "runner_peak_active_calls": "Active operation scope, including dispatch and artifact I/O.",
+    "start_peak": "Runner metrics unavailable: hard kill prevents final metrics publication.",
+    "timing_overhead": "Includes per-entry/return JSONL fsync and benchmark observation."
+  },
+  "phases": {
+    "finished_resume": {
+      "counts": {
+        "succeeded": 25
+      },
+      "execution_metrics": {
+        "operations_started": 0,
+        "peak_active_calls": 0,
+        "wall_s": 0.0
+      },
+      "parent_wall_s": 1.9780530999414623,
+      "provider": {
+        "entries": 0,
+        "interrupted_call_ids": [],
+        "peak_active_provider_calls": 0,
+        "returns": 0
+      },
+      "status": "completed",
+      "worker_wall_s": 0.7218137998133898
+    },
+    "reroll": {
+      "counts": {
+        "succeeded": 25
+      },
+      "execution_metrics": {
+        "operations_started": 8,
+        "peak_active_calls": 8,
+        "wall_s": 3.156492
+      },
+      "parent_wall_s": 5.077094099950045,
+      "provider": {
+        "entries": 8,
+        "interrupted_call_ids": [],
+        "peak_active_provider_calls": 8,
+        "returns": 8
+      },
+      "status": "completed",
+      "worker_wall_s": 3.9387753000482917
+    },
+    "resume": {
+      "counts": {
+        "succeeded": 17,
+        "unknown_outcome": 8
+      },
+      "execution_metrics": {
+        "operations_started": 13,
+        "peak_active_calls": 8,
+        "wall_s": 8.491354
+      },
+      "parent_wall_s": 9.866134400013834,
+      "provider": {
+        "entries": 13,
+        "interrupted_call_ids": [],
+        "peak_active_provider_calls": 8,
+        "returns": 13
+      },
+      "status": "needs_attention",
+      "worker_wall_s": 8.864888499956578
+    },
+    "start": {
+      "barrier": {
+        "completed_operations": 4,
+        "pid": 127468,
+        "provider_entries": 12,
+        "ready_time_ns": 1788801888130424700
+      },
+      "execution_metrics": null,
+      "exit_code": 1,
+      "kill_mechanism": "TerminateProcess",
+      "kill_time_ns": 1788801888159497000,
+      "parent_wall_s": 9.267777299974114,
+      "provider": {
+        "entries": 12,
+        "interrupted_call_ids": [
+          "2e08f6970cf241e3a9af7ddefa336fb8",
+          "68065658347f4638905a479e5a224fe5",
+          "70e68125196848048674be27c7d3e957",
+          "9119a56560fb45119629e04fae8ddf2a",
+          "967f8a7d35614eb5bc85c2ac21c5ac34",
+          "e84ebad25eef4758969a415250cfb9fa",
+          "f8c254e64f68401a998b4273cd8dd073",
+          "fe0daea8137b455c95329ddd038b6f41"
+        ],
+        "peak_active_provider_calls": 8,
+        "returns": 4
+      }
+    }
+  },
+  "provenance": {
+    "git_revision": "aec976aab1b9bab005b51b6ff2f4fbba0864d776",
+    "git_status_at_start": [
+      " M CHANGELOG.md",
+      " M README.md",
+      " M ROADMAP.md",
+      " M docs/execution.md",
+      " M docs/index.md",
+      " M examples/README.md",
+      " M plans/coming-soon-2026-09-07.md",
+      " M smythe/executor.py",
+      " M smythe/graph.py",
+      " M tests/test_executor.py",
+      " M tests/test_graph.py",
+      " M tests/test_supervisor.py",
+      "?? benchmarks/jobs_scale_benchmark.md",
+      "?? benchmarks/jobs_scale_benchmark.py",
+      "?? tests/test_jobs_scale_benchmark.py"
+    ],
+    "source_sha256": {
+      "benchmarks/jobs_scale_benchmark.py": "61c749d13d4697aafab842865f2aed96e60a4516a1fd945dc0f9bac10c2811e7",
+      "smythe/__init__.py": "553e6781357aa18d605e41c01c53eddcf2188135c9cda92bd73ee4fcc5cdab00",
+      "smythe/agent.py": "63d945b48bd4bcea08b841d59565a3e3716a7487621c173906073e1adfa1482f",
+      "smythe/assets/__init__.py": "f3bbd2eef274563a337d3b44300eb91be4f8844e846907cd63dfa4484c741680",
+      "smythe/assets/finishing.py": "24ebd2cab7f0fd60003eb4bf74c13833f83b03e72f1b168585889c57005c0d37",
+      "smythe/assets/models.py": "a60959f01cfa0212f13731ac2b094af77f715fbb62943a04c6d2241e4ffc88e3",
+      "smythe/assets/validation.py": "ee258ea199e42652ab4cd945ae8eadfc131503ce69b05255177d625c2ab5f3f9",
+      "smythe/async_executor.py": "0efce309fca6cfba4008bb30fc47722b387d4dec1c3b0ecde27683de97c686f0",
+      "smythe/budget.py": "c69a487d901df6d519ef9662859956e2a3a6c2ae09b3ca89a3ae9b8a0a19814b",
+      "smythe/checkpoint.py": "9a7548a6d537b552ced6c9c3562a94259fd5f783225edad06530facc67577291",
+      "smythe/cli.py": "4d7b26fd29539f74ef21c7a7d9021141b513728d208f63bb7742bed1563bdc82",
+      "smythe/constrained_planner.py": "ee68781caa462cbb05605918db300f875e72b8ae750e2d5588c732d6b5ced5c7",
+      "smythe/constrained_prompts.py": "9e82f1f59e0cad58adc2a9911e4f49618d832410a488505c7ed658618459e9d3",
+      "smythe/design.py": "8e5bd2bf48f39433183189b527c342f8b7d080a9e3cfced4cff494b558e89853",
+      "smythe/distill.py": "6e1c7bc74992a057ca87bbb0c44f625d3d99b7969a7dbf5f769b98dca783fa05",
+      "smythe/executor.py": "b993d527d8e63f2957da4ab56da28adcf5bd28b9acdd04a2ddd4347fef315d5e",
+      "smythe/executor_base.py": "061fb643772a60b54a1cb9ad1483e76dfa3cd0157192cc3955143bdcd2544a17",
+      "smythe/graph.py": "006605a67651eb1d3db955c860148dbff6b8f269b370a5f0d76b80ed2a63ee78",
+      "smythe/jobs/__init__.py": "badcb2cb25527c07968cea9ec69305ad1d1dec17c7e8049c1d6252327c971259",
+      "smythe/jobs/artifact_io.py": "eb74774165ca2fc0c046a13acf5511ef1b369638280fd5637f550070e2f38ccc",
+      "smythe/jobs/inspection.py": "5e74cff4ad3bc08eda0f252f1b2812cba514aa08331de466a26f843482dbd5e7",
+      "smythe/jobs/loading.py": "9085c95d6b21bc5b727e89f449608e5e858a6ebf5bb70efb520aeba37d95f961",
+      "smythe/jobs/models.py": "da0bf205b390c2301522b862ece609e59ac6cee84758ad56a534133828d3c1aa",
+      "smythe/jobs/preflight.py": "59b66ce76f49197380bb9466a00d7915d207d383832eb029b6ff6fb43d6af2e1",
+      "smythe/jobs/providers.py": "93e0885dd6d85c6bf335e78a3eadc8821e4af4116452a8d26e668d4a1d279fa4",
+      "smythe/jobs/report.py": "5dde920a7e2ef238b6d317e875a3c43f56cf6ada4f57d770ef17e7a9204d788c",
+      "smythe/jobs/runner.py": "a70706a2c0ff89a33514f53b08dd744efb18bfc7b9308362c7750cae6357309f",
+      "smythe/jobs/store.py": "ec02970749a377d9aad252539ebb50e2f6f86f94ef771ed07753512a66e980e0",
+      "smythe/loader.py": "035c6812f6ddfa278be39f8c1a8ce6a7edccd4940eaccdbeb4f730197809450a",
+      "smythe/mcp.py": "364bfd09feeaac83fc02aecf9e2ca03b264a743152122a20b4a76013b31178a4",
+      "smythe/memory.py": "ec65d7899b099ec0e3fc0efb105a0dccb38272daf1ba9181347032c367abec62",
+      "smythe/openclaw_adapter.py": "b9b5e6ee96bdc72f71fb8baa0d0835f6c8e27131e6a49a315bb6450388916026",
+      "smythe/optimize/__init__.py": "bca3f3813a31c9c57d4fbffceda232736a900923ca5f119a4f8599430ac22d19",
+      "smythe/optimize/concurrency.py": "6922fe0ed8ca6b739f719bbedace9775ff98ed5efb21057a21e5cc3aa75cca00",
+      "smythe/optimize/contracts.py": "1b95dc91b9838feff23ef19624f3073dc324d18e9425c53560148cd3538f27b4",
+      "smythe/optimize/engine.py": "add044b94677cf07db9999ae9c4e61e542aeeba7b957218b28d5c03d27801554",
+      "smythe/optimize/ledger.py": "68b8ecc240a31a1dcc8bb8073ec8792aa88e72aab3f977d9e2be8e27bc3bb793",
+      "smythe/optimize/statistics.py": "340b3badfb043ee5bad76841a1b999a6c6ef8f3882f927501311df86a39068e5",
+      "smythe/planner.py": "7a021c6b4eab87e1ede57ef65fcbb99ff22199bb64dcdcf8044556fd8a089e80",
+      "smythe/pricing.py": "61962f7262794e1b7596dbfe756e45b2ab54e34a42c166e31e6bf7c593c540ed",
+      "smythe/prompts.py": "0adf24b71c3d126bea7eb4ded06611cb5249eb0fb59c0ba40dda3cb10921dc5b",
+      "smythe/provider.py": "a5d9d3d359ef0565060d2f0fc35db3171a1708649bb8e81e757ecdc25e4e6513",
+      "smythe/provider_responses.py": "c4b4a894a6a9fa58986abea9cdb6d14d5f9238c958604fd6ec6d0de304b51492",
+      "smythe/registry.py": "9662974945e25230b0a1c5cc7612fad93c937b40a06f9319e3034c232d856a96",
+      "smythe/router.py": "3726161f7fc013540045585c5c47f53a064faf730b46884776b6187ffbf0ede5",
+      "smythe/skills.py": "573eab534f52376519457ceff6315d90d85c684659efe15fd7d10c2c38ff1392",
+      "smythe/supervisor.py": "ea892aa86ed1d61e255fda7afb2e677854dc1115872ac19f1e934e7e9d0828a8",
+      "smythe/swarm.py": "dcad36a138d2e0ec4a24adde9ffe69ecee17de6d2d590f5afe4b60ef731f03e2",
+      "smythe/synthesizer.py": "7feff7f5283ea75efa89249e5d7210878a70e8bc79f3f2d2f92d1c774d1cefc0",
+      "smythe/task.py": "ac099413d102996c8483a57d30eee8f55f4d4d66f6b2ed44207c6d08d4a45606",
+      "smythe/tools.py": "930deeaa768f891f12a309ba59f6f37a4377d419203cc8bfb237c24199aedd82",
+      "smythe/tracer.py": "a37da030cb4204a95283038a2c1aa143541b473da9ad830b9e148b1160d29ed5",
+      "smythe/verifier.py": "fd63f5a963ae990f2ff080847f1d7c3fb3cde5e8c44d3c35a8f9985739c72bde",
+      "smythe/workflow.py": "2d3597172bc0c33af21c678b25eb0342a1bcc5a23271ed3799cfd711230da325",
+      "smythe/workflow_binding.py": "ea976f83032086e986c4419a709ca64f4cc729a6b75a6e2d0412e5521bd6c36b",
+      "smythe/workflow_provider.py": "970c7d1b387fe5d54810697538b076dd2f28fa146b7ac82a9ab7ac4d3dbbb3f8",
+      "smythe/workflow_store.py": "eae86dab3d1986fcfbee37ac0d12a37c1511d41133ffa0fa62a7644dddb4d3ee",
+      "tests/test_jobs_scale_benchmark.py": "9ca94fceb2f60b4bc4027a4a9823d6576b7548bafbfb0863add85a044d0abe7a"
+    },
+    "sources_unchanged_during_campaign": true
+  },
+  "recorded_at": "2026-09-07T17:25:34.953342+00:00",
+  "retained_evidence": {
+    "barrier.json": {
+      "sha256": "8652342a0d44453645ec4ebd45fc51cd9d7209bb34aa64a9de69ad77a22e0ae3",
+      "size_bytes": 115
+    },
+    "config.json": {
+      "sha256": "846a8b2723c61482043c984923efb7f1a4b721dfd40651459374d1cc19873020",
+      "size_bytes": 168
+    },
+    "finished_resume-durability.json": {
+      "sha256": "693d85e686608b2376729b243bf70e84ec65dfe2010dea0ec4e13989d2e2fc9d",
+      "size_bytes": 48
+    },
+    "finished_resume-result.json": {
+      "sha256": "e16bc4496e3eb390cc706fb4c549adeb23c0a215cf3f23b40dd75af925a989cf",
+      "size_bytes": 211
+    },
+    "finished_resume-worker.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    "jobs.db": {
+      "sha256": "78fef461eda7c6d8ade5b3720575be2fe3323f4a7944794bb9bffc48cc242242",
+      "size_bytes": 200704
+    },
+    "jobs.db-shm": {
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+      "size_bytes": 32768
+    },
+    "jobs.db-wal": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    "provenance.json": {
+      "sha256": "aff611209431164699ee713a3707f0a5fedce5394075d36de4588a8d78a3b9db",
+      "size_bytes": 6249
+    },
+    "reroll-durability.json": {
+      "sha256": "693d85e686608b2376729b243bf70e84ec65dfe2010dea0ec4e13989d2e2fc9d",
+      "size_bytes": 48
+    },
+    "reroll-ids.json": {
+      "sha256": "e455545643583445d035d3cba3c0621b9fffa9d3d048478924e6c809a5f61e79",
+      "size_bytes": 331
+    },
+    "reroll-provider.jsonl": {
+      "sha256": "79a76004a73b2cbbfacecd59c1f67212ba692415e2017a9b8b32b9b1276dd71a",
+      "size_bytes": 3624
+    },
+    "reroll-result.json": {
+      "sha256": "794e35f2c8328dcea560378f39fd8dec2d04446331151999866d19a7cb793d94",
+      "size_bytes": 216
+    },
+    "reroll-worker.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    "resume-durability.json": {
+      "sha256": "693d85e686608b2376729b243bf70e84ec65dfe2010dea0ec4e13989d2e2fc9d",
+      "size_bytes": 48
+    },
+    "resume-provider.jsonl": {
+      "sha256": "e87317c9bdd975598f91f77cfd801da431a8fc7681e76ae790e099edd75a8fa6",
+      "size_bytes": 5889
+    },
+    "resume-result.json": {
+      "sha256": "6c118544687d6e55470999bc887a63c93c7d3ccb3f1e58420dfecf6f0f2ad759",
+      "size_bytes": 248
+    },
+    "resume-worker.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    "start-durability.json": {
+      "sha256": "693d85e686608b2376729b243bf70e84ec65dfe2010dea0ec4e13989d2e2fc9d",
+      "size_bytes": 48
+    },
+    "start-provider.jsonl": {
+      "sha256": "bcef2eeb3ab4fd0dc14c0c2e3afe187d0d00c24e7b5d15a2a844bbc0f5d2fc3d",
+      "size_bytes": 3604
+    },
+    "start-worker.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    }
+  },
+  "schema": "smythe.jobs-scale-recovery.v1",
+  "scope": "One local campaign; deterministic 1x1 PNGs; no API calls or speedup claim.",
+  "sqlite_disk_bytes": {
+    "jobs.db": 200704,
+    "jobs.db-shm": 32768,
+    "jobs.db-wal": 0
+  },
+  "state_counts": {
+    "after_kill": {
+      "pending": 13,
+      "running": 8,
+      "succeeded": 4
+    },
+    "after_resume": {
+      "succeeded": 17,
+      "unknown_outcome": 8
+    },
+    "final": {
+      "succeeded": 25
+    }
+  },
+  "verification": {
+    "accepted_artifacts": 25,
+    "accepted_before_kill": 4,
+    "accepted_receipts_sha256": "56de78ef45a052132ace697122b9d38515521ddb7e3a045f08fb5bc63ccda9f9",
+    "artifact_bytes": 1750,
+    "artifact_dimensions": [
+      1,
+      1
+    ],
+    "artifact_mime_type": "image/png",
+    "completed_resume_provider_entries": 0,
+    "durable_call_status_counts": {
+      "succeeded": 25,
+      "unknown_outcome": 8
+    },
+    "explicit_rerolls": 8,
+    "fixture_bytes": 70,
+    "fixture_sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+    "operations": 25,
+    "passed": true,
+    "pending_completed_on_resume": 13,
+    "preserved_precrash_receipts_sha256": "155eb07f19b53472635aad556c321088291dcb98f1e04fc54101eed4bc5bb6e7",
+    "previously_succeeded_redispatches": 0,
+    "provider_entries": 33,
+    "remote_api_calls": 0,
+    "reroll_lineage": [
+      {
+        "accepted_attempt_id": "0762568de28d4f3c9ca0ff3b24a92dcc",
+        "operation_id": "op_31c0d42c1bbb0e40b4784ec2818384b2",
+        "parent_attempt_id": "c71cb002815747999aff815856ce6292"
+      },
+      {
+        "accepted_attempt_id": "4dbb2fa58afd4976a6f8dd8493c80dc9",
+        "operation_id": "op_356631a4beccc5267e5371bb1700e166",
+        "parent_attempt_id": "d084a512a6b444938d39142260f0d04a"
+      },
+      {
+        "accepted_attempt_id": "a5df888364ca4621a23af3c43dc7c3f5",
+        "operation_id": "op_5611e8dcb3c6a644d516303b3d715141",
+        "parent_attempt_id": "6bafbaadd7da46db9b9463e628556d39"
+      },
+      {
+        "accepted_attempt_id": "acb9af92cd194114b325b413422bc871",
+        "operation_id": "op_b4192a53128674f04eab85ecfdc8ab42",
+        "parent_attempt_id": "214c2b7d2e2f405b94e675b2763622c2"
+      },
+      {
+        "accepted_attempt_id": "bb41c119e3074cecb042a706f6af1774",
+        "operation_id": "op_bf70ed03d3779913b5a9a7483fd3dc29",
+        "parent_attempt_id": "65c69fc8a8eb4e2e8f0c28e147218045"
+      },
+      {
+        "accepted_attempt_id": "b44a8e1b99f74d7482d46515d5a90f5b",
+        "operation_id": "op_db017fdcf8d132f3f946610e82e12c8f",
+        "parent_attempt_id": "d083fc5feeb14d2e8dde922899dc789c"
+      },
+      {
+        "accepted_attempt_id": "e0371beb57fe42208cb8acc9b332c28c",
+        "operation_id": "op_e3d2e4ac85c23a21f481f9cb38e18090",
+        "parent_attempt_id": "cc51b7a50a7a4ea393355fad27f62421"
+      },
+      {
+        "accepted_attempt_id": "e765d22ee32043529592a9302ee5c285",
+        "operation_id": "op_ed16d65645eff21c1ebfdeb076c65357",
+        "parent_attempt_id": "1adfd33a8a694d838afcf71058df653a"
+      }
+    ],
+    "sqlite_integrity": "ok",
+    "unique_artifact_content_hashes": 1,
+    "unknown_auto_redispatches": 0,
+    "unknown_preserved_on_resume": 8
+  },
+  "wall_s": {
+    "crash_validation": 0.043290199944749475,
+    "final_validation": 0.07149650016799569,
+    "resume_validation": 0.2764020001050085,
+    "total": 57.15830450016074
+  }
+}

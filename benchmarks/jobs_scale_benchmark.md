@@ -1,8 +1,14 @@
 # Jobs scale and recovery check
 
-**Status: protocol in preparation; no 5,000-operation result published yet.**
+**Status: harness verified; no 5,000-operation result published yet.**
 This is an offline correctness and recovery campaign. It does not measure
 model quality, glyph generation, provider latency, or comparative throughput.
+
+The harness passed independent review and 16 regression checks. Two
+[25-operation development pilots](results/jobs_scale_preflight_20260907/README.md)
+retain the aggressive-lease failure and the default-lease completion. They
+are not the full campaign. The 5,000-operation run follows the Jobs ownership
+fencing fix identified during preparation.
 
 ## Workload
 

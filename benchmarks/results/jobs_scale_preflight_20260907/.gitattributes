@@ -1,0 +1,4 @@
+# These pilot records include original CRLF bytes and raw-byte SHA-256 hashes.
+ttl5_failed/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+ttl30_passed/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+archive.json -text

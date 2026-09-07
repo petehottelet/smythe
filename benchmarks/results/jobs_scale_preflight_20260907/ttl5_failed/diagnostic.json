@@ -1,0 +1,60 @@
+{
+  "schema": "smythe.jobs-scale-recovery.v1",
+  "campaign_status": "failed",
+  "evidence_status": "unbound_harness_diagnostic",
+  "comparative_claimable": false,
+  "summary": "Pre-freeze 25-operation offline C8 pilot: exact start barrier reached and owned process hard-killed; resume failed with RunLeaseError under an aggressive 5-second TTL and 0.25-second heartbeat. This is not evidence of a failure at the production default 30-second TTL.",
+  "configuration": {
+    "completed_before_kill": 4,
+    "concurrency": 8,
+    "count": 25,
+    "kill_after_entries": 12,
+    "lease_heartbeat_s": 0.25,
+    "lease_ttl_s": 5.0,
+    "max_attempts": 2
+  },
+  "provenance": {
+    "git_revision": null,
+    "source_sha256": null,
+    "note": "The then-uncommitted harness did not serialize its in-memory provenance before failing. No exact revision or source hashes are reconstructed."
+  },
+  "failure": {
+    "exception_type": "RunLeaseError",
+    "phase": "resume",
+    "log": "resume-worker.log"
+  },
+  "retained_evidence": {
+    "config.json": {
+      "size_bytes": 168,
+      "sha256": "220f9656bde4e3f49d38354f6e1555b5f7f3f265546a057c5053e8910fb72413"
+    },
+    "barrier.json": {
+      "size_bytes": 115,
+      "sha256": "0ea6cef01c097309b8f1a7294ddeda2cbe99ec9f39936ba59a000cac497d769c"
+    },
+    "start-durability.json": {
+      "size_bytes": 48,
+      "sha256": "693d85e686608b2376729b243bf70e84ec65dfe2010dea0ec4e13989d2e2fc9d"
+    },
+    "resume-durability.json": {
+      "size_bytes": 48,
+      "sha256": "693d85e686608b2376729b243bf70e84ec65dfe2010dea0ec4e13989d2e2fc9d"
+    },
+    "start-provider.jsonl": {
+      "size_bytes": 3604,
+      "sha256": "feb664f09b302ca2d863eb4156c5acbc87eac2fbcfdc0310fa0d46fdc368a0c6"
+    },
+    "resume-provider.jsonl": {
+      "size_bytes": 452,
+      "sha256": "56e395df23472acad2528eb65b6b8b0c9f285c5eccba17d6d089d2cdc01bf3c4"
+    },
+    "start-worker.log": {
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "resume-worker.log": {
+      "size_bytes": 2036,
+      "sha256": "cabceded93244f75b5131941ccc016f8e31880909d7b35e082034029dd4b5f9f"
+    }
+  }
+}
