@@ -11,8 +11,8 @@
   </p>
 
   <p>
-    <a href="#glyph-rain">Glyph Rain</a> ·
-    <a href="#benchmarks">Benchmarks</a> ·
+    <a href="#benchmark">Benchmark</a> ·
+    <a href="#process">Process</a> ·
     <a href="#quickstart">Quickstart</a> ·
     <a href="#why-smythe">Why Smythe</a> ·
     <a href="docs/index.md">Documentation</a>
