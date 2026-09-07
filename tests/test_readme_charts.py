@@ -114,20 +114,28 @@ def test_glyph_scaling_chart_uses_all_four_isolated_records():
     assert "Scaling across 64, 128, 192 and 256 nodes" in svg
 
 
-def test_readme_places_evidence_before_the_glyph_rain_example():
+def test_readme_connects_glyph_rain_to_benchmark_evidence():
     readme = ROOT.joinpath("README.md").read_text(encoding="utf-8")
     ordered_markers = (
-        "assets/benchmarks/framework_callouts.svg",
-        "assets/benchmarks/framework_comparison.svg",
-        "assets/benchmarks/shape_efficiency.svg",
-        "assets/benchmarks/glyph_scaling.svg",
+        "## Glyph Rain",
         "assets/glyph_rain/glyph-rain-screenshot.png",
         "**Download:** [Windows `.scr`]",
-        "assets/glyph_rain/glyph_pipeline.svg",
-        "assets/glyph_rain/glyph_specimens.svg",
+        "## Benchmarks",
+        "### Glyph generation and scaling",
+        "assets/benchmarks/glyph_scaling.svg",
+        "### Recovery after interruption",
+        "### Framework efficiency",
+        "assets/benchmarks/framework_callouts.svg",
+        "assets/benchmarks/framework_comparison.svg",
+        "### Generated execution topology",
+        "assets/benchmarks/shape_efficiency.svg",
     )
     positions = [readme.index(marker) for marker in ordered_markers]
     assert positions == sorted(positions)
+
+    guide = ROOT.joinpath("screensaver/README.md").read_text(encoding="utf-8")
+    for name in ("glyph_pipeline.svg", "glyph_specimens.svg"):
+        assert f"../assets/glyph_rain/{name}" in guide
 
 
 def test_shape_chart_promotes_complete_wall_time_and_not_partial_cost():
