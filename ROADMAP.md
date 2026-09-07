@@ -165,7 +165,7 @@ the hardening work ahead of broader production claims:
 | Priority | Change | Acceptance criteria |
 |---|---|---|
 | P1 | Complete-workflow cost evidence | Publish fresh cost comparisons from the durable text ledger, with native usage, declared prices, failed attempts, and all optimization trials retained. |
-| P2 | Web renderer parity and presentation | With browser interaction checks passing, quantify reference-behavior tolerances and measure the adaptation on controlled display hardware against the 1080p P95 interval target of 16.7 ms. Archived Canvas v1 timings remain superseded diagnostics. |
+| P2 | Web renderer parity and presentation | Run the [frozen six-session protocol](benchmarks/renderer_performance_20260907.md) for Classic and 3D, then quantify reference tolerances and display-hardware performance. The headless callback study does not establish physical presentation timing. Archived Canvas v1 timings remain superseded diagnostics. |
 
 ### Product and scale
 

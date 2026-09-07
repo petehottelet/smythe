@@ -122,10 +122,23 @@ Settings schema and URL checks run without a browser:
 node screensaver/svg-preview/verify-settings.mjs
 ```
 
-A new browser campaign must bind the adapted source, both catalogs, render
-scale, viewport, DPR, preset, mix, and all repetitions. Report callback
-intervals and CPU submission separately from GPU execution or physical
-presentation. The current adaptation has no completed performance campaign.
+The [frozen performance protocol](../../benchmarks/renderer_performance_20260907.md)
+defines three independent sessions each for Classic and 3D: five seconds of
+warmup followed by 60 seconds of samples at a 1080p viewport and 0.75 render
+scale. The helper binds source, catalogs, browser/backend, settings, and raw
+samples; the aggregator recomputes every timing summary. Callback intervals
+and CPU submission remain separate from GPU execution and physical presentation.
+The current adaptation has no completed performance campaign.
+
+Benchmark completion now restores exactly one animation loop. A regression
+executes the renderer lifecycle through repeated measurements, pause/resume,
+and timeout, rejecting duplicate scheduled callbacks. Run its offline checks:
+
+```bash
+node screensaver/svg-preview/verify-lifecycle.mjs
+node screensaver/svg-preview/verify-measurement.mjs
+node screensaver/svg-preview/verify-browser-metadata.mjs
+```
 
 ### Archived Canvas v1 evidence
 

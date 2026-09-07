@@ -71,7 +71,8 @@ function frame(now){
   if(shouldRender)scene.draw(false);
   submissionSinceDraw+=performance.now()-start;
   if(shouldRender){lastCpu=submissionSinceDraw;submissionSinceDraw=0;collect(now,lastCpu);}
-  if(active())handle=requestAnimationFrame(frame);
+  // Measurement completion may already have restored playback via schedule().
+  if(handle===null&&active())handle=requestAnimationFrame(frame);
 }
 function pause(value=!paused){
   if(benchmark)finishMeasurement('Playback changed during measurement');
@@ -160,7 +161,8 @@ function inspectFrame(){
 const summary=items=>{const a=[...items].sort((a,b)=>a-b);const q=f=>{if(!a.length)return null;const i=(a.length-1)*f,l=Math.floor(i);return a[l]+(a[Math.ceil(i)]-a[l])*(i-l);};return {samples:a.length,mean:a.length?a.reduce((a,b)=>a+b,0)/a.length:null,median:q(.5),p95:q(.95),max:a.at(-1)??null};};
 function collect(now,cpu){
   if(!benchmark||now<benchmark.sampleStart)return;const b=benchmark;
-  if(b.first===null)b.first=now;if(b.last!==null)b.intervals.push(now-b.last);b.last=now;b.cpu.push(cpu);
+  if(b.first===null){b.first=now;b.firstState={time:simulation.time,tick:simulation.tick};}
+  if(b.last!==null)b.intervals.push(now-b.last);b.last=now;b.lastState={time:simulation.time,tick:simulation.tick};b.cpu.push(cpu);
   if(now-b.first>=b.durationSeconds*1000)finishMeasurement();
 }
 function finishMeasurement(reason=null){
@@ -171,7 +173,8 @@ function finishMeasurement(reason=null){
     createdAt:new Date().toISOString(),warmupSeconds:b.warmupSeconds,requestedDurationSeconds:b.durationSeconds,measuredDurationSeconds:seconds,
     catalogCount:192,catalogSha256:globalThis.SVG_GLYPHS.catalog_sha256,referenceGlyphCount:56,
     frameIntervalMs:summary(b.intervals),cpuSubmissionMs:summary(b.cpu),averageFramesPerSecond:seconds?b.intervals.length/seconds:null,
-    samples:{frameIntervalMs:b.intervals,cpuSubmissionMs:b.cpu},initialStats:b.initial,finalStats:stats(),userAgent:navigator.userAgent,
+    samples:{frameIntervalMs:b.intervals,cpuSubmissionMs:b.cpu},sampleBoundary:{first:b.firstState??null,last:b.lastState??null},
+    initialStats:b.initial,finalStats:stats(),userAgent:navigator.userAgent,
     exclusions:['GPU execution time','physical display timing','power','total process/GPU memory','generation time']};
   pause(b.priorPaused);b.resolve(result);
 }

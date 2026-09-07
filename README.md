@@ -243,7 +243,8 @@ team challenges the draft, and a final node writes the decision memo.
   [implementation plan](docs/glyph-rain-plan.md).
 - **Native distribution:** notarized macOS downloads and native Wayland integration.
 - **Renderer performance:** meet the 1080p frame-interval target with the new
-  glyphs. [Renderer checks and measurement scope](screensaver/svg-preview/README.md#renderer-and-checks).
+  glyphs. The [six-session protocol](benchmarks/renderer_performance_20260907.md)
+  freezes Classic and 3D settings, raw timing checks, and graphics-backend evidence.
 - **Broader evidence:** larger stress tests, repeated live glyph sweeps, and
   human-calibrated quality comparisons with saved outputs and judge reasoning.
 - **Astra benchmarks:** matched model and orchestration comparisons with full

@@ -92,12 +92,17 @@ jobs:
           node screensaver/svg-preview/verify-settings.mjs
           node screensaver/svg-preview/verify-config.mjs
           node screensaver/svg-preview/verify-timing.mjs
+          node screensaver/svg-preview/verify-lifecycle.mjs
       - name: Verify browser receipt provenance checks
         run: node screensaver/svg-preview/verify-provenance.mjs
       - name: Verify browser helper process handling
         run: node screensaver/svg-preview/verify-browser-command.mjs
       - name: Verify benchmark receipt overwrite protection
         run: node screensaver/svg-preview/verify-measure-guard.mjs
+      - name: Verify renderer measurements and browser identity
+        run: |
+          node screensaver/svg-preview/verify-measurement.mjs
+          node screensaver/svg-preview/verify-browser-metadata.mjs
 
   openai-responses-contract:
     runs-on: ubuntu-latest

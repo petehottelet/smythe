@@ -21,6 +21,11 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
+- **Renderer measurement controls**: freeze a six-session Classic/3D protocol,
+  validate raw timings and browser/backend identity, and retain failed attempts.
+  Benchmark completion restores one animation loop; lifecycle regressions catch
+  duplicate callbacks across repeated measurements, pause/resume, and timeout.
+
 ### Added
 
 - **Jobs lease fencing**: schema version 3 binds worker writes to live owner
