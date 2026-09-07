@@ -5,7 +5,8 @@ workflows through native Responses and the durable text ledger. It binds
 source files, dependencies, prices, prompts, graph limits, spending allocations,
 and one campaign directory before execution.
 
-**No paid campaign has run.** The runner has offline transport tests; live
+**No paid campaign has run.** The runner passed
+[79 offline contract checks](results/astra_pilot_runtime_20260907/README.md); live
 execution awaits an authorized spending ceiling. The 200-workflow main study
 and judge commands remain closed pending their calibration and accounting
 requirements. The [experiment protocol](astra_benchmark_plan.md) defines those

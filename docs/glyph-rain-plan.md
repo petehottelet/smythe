@@ -2,9 +2,11 @@
 
 Status: the original 192-glyph SVG workflow is complete. The web explorer now
 adapts the MIT-licensed m8e/Rezmason renderer and base artwork. Its
-[renderer interaction checkpoint](../benchmarks/partitions/glyph_rain_reference_v1/pixel-preview-review.json)
-passed before the final borderless styling.
-Performance and quantified reference parity remain unmeasured. The
+[current browser review](../benchmarks/partitions/glyph_rain_reference_v1/performance-preview-review-20260907.json)
+passed 31 checks. The [six-session headless campaign](../benchmarks/renderer_performance_20260907_results.md)
+completed; all six sessions missed the pacing target. A separate ten-minute
+soak passed 57 travel/resize cycles. Visible presentation, GPU timing, and
+quantified reference parity remain unmeasured. The
 [explorer guide](../screensaver/svg-preview/README.md) documents this adaptation;
 the [generation benchmark](../benchmarks/svg_glyph_benchmark.md) still measures
 only Smythe's original catalog. Native downloads now render both current SVG
@@ -422,10 +424,13 @@ and palette passes. It replaces the earlier independently implemented Canvas
 interpretation. The [behavior plan](glyph-rain-parity-plan.md) contains the
 parameter-level comparison and acceptance criteria; the
 [explorer guide](../screensaver/svg-preview/README.md) is the current control map.
-Browser interaction checks pass. They cover presets, mix endpoints, settings,
+The 31 current browser checks pass. They cover presets, mix endpoints, settings,
 paused navigation/reset, fullscreen, input release, mobile layout, reduced
-motion, and hidden-tab suspension. New performance measurements and quantified
-reference-parity checks remain pending.
+motion, and hidden-tab suspension. The
+[current performance report](../benchmarks/renderer_performance_20260907_results.md)
+retains all six target-missing headless sessions and the separate 57-cycle
+stability soak. Visible presentation, GPU timing, and quantified reference
+parity require separate measurements.
 
 | Setting | Current preview configuration |
 |---|---|
@@ -485,8 +490,9 @@ resolves the hashes in its original receipts.
 Its three headless timing runs are superseded diagnostics: they recorded
 36.04–53.81 average callbacks/s and missed the 16.7 ms P95 interval target.
 The 601.12-second movement/resize soak and twelve-view darkness sample describe
-that implementation only. The current REGL renderer requires new checks and
-receipts; none of the old frame rates, cache bounds, or visual samples transfer.
+that implementation only. The current REGL renderer has
+[separately bound checks and receipts](../benchmarks/renderer_performance_20260907_results.md);
+none of the old frame rates, cache bounds, or visual samples transfer.
 The original SVG generation benchmark remains valid because its measured
 input, output, and algorithm are unchanged.
 
@@ -544,23 +550,26 @@ record compiled glyph and host verification.
 ## Delivery and acceptance
 
 The original 192-glyph generation and acceptance campaign is complete. The
-remaining renderer work is:
+[current browser receipt](../benchmarks/partitions/glyph_rain_reference_v1/performance-preview-review-20260907.json)
+records 31 passed checks and five visual samples, covering catalog mixing,
+presets, settings, navigation, and lifecycle behavior. The public screenshot
+is bound to that review; the earlier image remains in the v1 archive.
 
-1. Verify the adapted Classic, 3D, and Operator configurations against the
-   pinned behavior, with explicit license notices and source provenance.
-2. Verify mix endpoints and the default 10% weighting, including the base blank
-   slot; retain independent provenance for both catalogs.
-3. Test settings as a transaction: draft edits do not reset the effect, Apply
-   commits supported values, Cancel/Escape restore focus, and URLs round-trip.
-4. Test actual browser navigation, pause, reset, fullscreen, reduced motion,
-   mobile layout, resize, hidden tabs, focus loss, and clean shutdown.
-5. Capture the adapted renderer's actual output before replacing its public
-   screenshot. Keep the earlier image with the v1 archive.
-6. Run a new performance campaign and movement/resize soak against frozen
-   source, catalog, and settings hashes.
-7. Both catalog exports now ship on Windows, macOS, and Linux with compiled
-   rendering checks. Next, port the web exposure pipeline and explorer controls,
-   preserve OS screensaver policy, and verify the new compiled behavior.
+The [headless timing campaign](../benchmarks/renderer_performance_20260907_results.md)
+completed three sessions each for Classic and 3D; none met the pacing target.
+The separate [600.95-second soak](../benchmarks/results/glyph_rain_regl_20260907_f1_soak.json)
+passed 57 travel/resize cycles under the
+[recorded concurrent workload](../benchmarks/results/glyph_rain_regl_20260907_f1_soak_context.json).
+These receipts bind the source, catalogs, settings, and measurement methods.
+
+Remaining work:
+
+1. Quantify the adapted presets' parity with the pinned reference behavior.
+2. Measure visible display presentation and GPU execution separately, then
+   diagnose pacing without changing artwork or exposure to improve a score.
+3. Port the web exposure pipeline and explorer controls to the native hosts,
+   preserve OS screensaver policy, and verify the new compiled behavior. Both
+   catalogs already ship on Windows, macOS, and Linux with compiled checks.
 
 Proposed measurement gates remain targets, not current achievements:
 
@@ -571,10 +580,12 @@ Proposed measurement gates remain targets, not current achievements:
 - Report CPU command submission separately from callback intervals. GPU
   completion, physical display presentation, total graphics memory, and power
   require their own measurements.
-- Measure three 60-second runs after five seconds of warmup each. Keep every
-  run, failure, device/OS/browser identifier, setting, and raw sample.
-- Complete a ten-minute travel/resize soak with finite state, stable resources,
-  stopped hidden/paused work, and released input. Scope any concurrent workload.
+- Future timing campaigns retain at least three 60-second runs after five
+  seconds of warmup each, including every failure and raw sample. The current
+  headless campaign completed this protocol for both measured presets.
+- Repeat the completed ten-minute travel/resize soak after material renderer
+  changes; check finite state, resource behavior, stopped hidden/paused work,
+  and released input, with any concurrent workload declared.
 
 Native regression acceptance includes proportional depth/parallax, stable
 column identities during repeated travel, correct pause/reset behavior, matching

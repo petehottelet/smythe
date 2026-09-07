@@ -1,0 +1,117 @@
+{
+  "artifact_hash_policy": "sha256 of exact file bytes, with no newline normalization",
+  "artifacts": {
+    "README.md": {
+      "provenance": "Human-readable scope and reproduction instructions for this qualification.",
+      "sha256": "454417c9e38fcd04df1c325043e1dcc9db2ea3b3bcc83fe395418605f279cc04",
+      "size_bytes": 4038
+    },
+    "pytest.log": {
+      "provenance": "Original final qualification stdout/stderr log, copied byte-for-byte.",
+      "sha256": "1c61cdfa6baa744e863dbaa5579c3e42267a4d47f42c8857f2d8eaee62a2874e",
+      "size_bytes": 194
+    },
+    "revalidation.json": {
+      "provenance": "Postqualification import, source, preparation and scoped Ruff receipt; historical checks are explicitly distinguished.",
+      "sha256": "80f13a048813f90712fdac27ff2c97f9aa5d74a3444dc7ab16e3c1dccfe1b106",
+      "size_bytes": 6444
+    },
+    "sources-after.json": {
+      "provenance": "Manifest recaptured during the timestamped postqualification read-only revalidation.",
+      "sha256": "8f95b1519ed05fde543cfa9217d89265324056e9101c389d8974e55f7d9d6bcc",
+      "size_bytes": 5810
+    },
+    "sources-before.json": {
+      "provenance": "Original 61-file manifest saved immediately before the final test run, copied byte-for-byte.",
+      "sha256": "9650047e830736e972da22071662352aaf5b1e9e0e0d6e222b2a6290281b1bef",
+      "size_bytes": 5685
+    }
+  },
+  "claim_scope": "No live cost, quality, availability, or comparative performance result.",
+  "claimable": false,
+  "coverage": [
+    "Strict integer allowances, stage sums, exact per-trial cap projection and caller-detached freeze state.",
+    "Source/dependency/policy/directory binding before provider or workflow database admission.",
+    "Twelve scheduled pilot arms, fixed three-stage topology, bounded generated graphs and dynamic parallel overlap.",
+    "All planning and execution requests accounted in durable native-response evidence.",
+    "Failed/completed outcome retention, unknown billing admission refusal and same-run crash recovery without rebuy.",
+    "Independent campaign writer lock, reparse/linked ancestry and SQLite/receipt path rejection.",
+    "Retained accounting, output, checkpoints, native raw bodies, decoded data, all non-lease events and unaccepted quote evidence reconciliation.",
+    "Historical preparation immutability, ignored scratch exclusion, and permanently closed main/judge commands."
+  ],
+  "date": "2026-09-07",
+  "evidence_status": "focused_offline_runtime_contract_qualification",
+  "live_campaign": {
+    "accepted": null,
+    "allowance_authorized": false,
+    "allowances_nanousd": null,
+    "judge_enabled": false,
+    "main_enabled": false,
+    "pilot_executed": false,
+    "quality_evaluated": false
+  },
+  "offline_fixture": {
+    "actual_api_cost_usd": "0",
+    "client_boundary": "OpenAIResponsesProvider._get_client replaced by SimpleNamespace clients and AsyncMock methods.",
+    "dependency_binding": "Test fixture labels; offline-contract-sdk, offline-contract-python, offline-contract-yaml.",
+    "installed_sdk_serialization_qualified": false,
+    "live_api_calls": 0,
+    "live_model_access_qualified": false,
+    "native_adapter_and_ledger_contracts_qualified": true,
+    "synthetic_allowances_are_authorization": false,
+    "synthetic_usage_is_measured_spend": false
+  },
+  "postqualification_revalidation": {
+    "observed_at_utc": "2026-09-07T20:46:17.672604+00:00",
+    "original_historical_stdout_reconstructed": false,
+    "receipt": "revalidation.json",
+    "scope": "Fresh read-only import proof, scoped Ruff, 61-file manifest equality, preparation equality and main explicit-file equality."
+  },
+  "preparation": {
+    "file_manifest": "revalidation.json#/preparation/files_sha256_lf",
+    "historical_receipt": "../astra_preparation_20260907.json",
+    "preparation_sha256": "b903d7fd603714c9b6a0b98a4f78af0bdaf6084b4ec836f98629f92432ad1101",
+    "tracked_files_verified": 34,
+    "unchanged_and_reproduced": true
+  },
+  "record_id": "astra_pilot_runtime_20260907",
+  "schema": "smythe.astra-pilot-offline-qualification.v1",
+  "status": "passed",
+  "test_run": {
+    "command": "python -m pytest tests/test_astra_runtime.py -q",
+    "deselected": 0,
+    "duration_scope": "Offline test-suite wall time; not pilot workflow latency or a performance benchmark.",
+    "duration_seconds": 684.2,
+    "exit_code_provenance": "Final qualification process result observed by the agent; raw log contains the pytest summary.",
+    "failed": 0,
+    "full_offline_repository_suite": false,
+    "import_root": "same frozen repository root, set explicitly through PYTHONPATH",
+    "network": "No live provider calls; in-process fake Responses client.",
+    "passed": 79,
+    "process_exit_code": 0,
+    "raw_log": "pytest.log",
+    "skipped": 0,
+    "working_directory": "frozen repository root"
+  },
+  "tested_source": {
+    "base_commit": "f1bffa53d5a060acc400dd85f4ceb9c408faa334",
+    "base_repository": "https://github.com/petehottelet/smythe",
+    "exclusions": [
+      "Subsequent checkpoint changes",
+      "Subsequent distribution metadata/build-hook and version changes",
+      "Subsequent documentation changes",
+      "Untracked or ignored scratch files"
+    ],
+    "explicit_additions_sha256_lf": {
+      "benchmarks/astra_runtime.py": "c1f5f6e7fe9fd953f546245be3852a197beb7176ac55fbb9a221ed81b6b419fa",
+      "tests/test_astra_runtime.py": "abb781f66f6741451b1ecd56d178a9a13fc5a4040143cddc1714454354fbebff"
+    },
+    "full_source_manifest": "sources-before.json",
+    "original_end_of_run_equality_observed": true,
+    "postqualification_manifest": "sources-after.json",
+    "postqualification_manifest_equal": true,
+    "source_files": 61,
+    "source_hash_policy": "sha256-utf8-text-crlf-to-lf-v1",
+    "source_inventory": "git ls-files -z -- smythe/*.py plus benchmarks/astra_runtime.py, tests/test_astra_runtime.py, and pyproject.toml"
+  }
+}
