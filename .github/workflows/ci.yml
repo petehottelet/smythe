@@ -16,7 +16,7 @@ jobs:
           python-version: "3.11"
       # Pinned: an unpinned linter makes CI non-reproducible.
       - run: pip install ruff==0.16.0
-      - run: ruff check smythe/ tests/ benchmarks/ examples/
+      - run: ruff check smythe/ tests/ benchmarks/ examples/ hatch_build.py
 
   test:
     runs-on: ubuntu-latest
@@ -122,6 +122,7 @@ jobs:
           tests/test_native_response_accounting.py
           tests/test_workflow_provider.py
           tests/test_workflow_native_runtime.py
+          tests/test_astra_runtime.py
 
   package-smoke:
     runs-on: ubuntu-latest
@@ -132,7 +133,8 @@ jobs:
           python-version: "3.12"
       - name: Build distribution artifacts
         run: |
-          python -m pip install --upgrade pip build
+          python -m pip install --upgrade pip build hatchling pytest
+          python -m pytest -q tests/test_pypi_readme.py
           python -m build
       - name: Install the wheel in a clean environment
         run: |
@@ -173,3 +175,5 @@ jobs:
           tests/test_jobs_operator_cli.py
           tests/test_jobs_pause.py
           tests/test_jobs_artifact_namespace.py
+          tests/test_checkpoint_atomic.py
+          tests/test_checkpoint.py

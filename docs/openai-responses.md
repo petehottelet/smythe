@@ -2,14 +2,10 @@
 
 `OpenAIResponsesProvider` runs text and function-tool requests with
 `gpt-6-astra` and `gpt-5.6-sol`. Each response carries native usage and a
-dated, model-specific token price. This adapter is available from the current
-repository checkout; the published `smythe==0.6.0` package uses the older
-Chat Completions provider.
+dated, model-specific token price. Smythe 0.7.0 includes this explicit adapter:
 
 ```bash
-git clone https://github.com/petehottelet/smythe.git
-cd smythe
-pip install -e ".[openai]"
+pip install "smythe[openai]==0.7.0"
 ```
 
 Set `OPENAI_API_KEY`. Select the provider explicitly; automatic provider

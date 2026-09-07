@@ -4,9 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "smythe"
-version = "0.6.0"
+version = "0.7.0"
 description = "Generated agent execution graphs with durable, budgeted orchestration"
-readme = "README.md"
+dynamic = ["readme"]
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
@@ -81,6 +81,8 @@ Repository = "https://github.com/petehottelet/smythe"
 Issues = "https://github.com/petehottelet/smythe/issues"
 Changelog = "https://github.com/petehottelet/smythe/blob/main/CHANGELOG.md"
 "Security Policy" = "https://github.com/petehottelet/smythe/security/policy"
+
+[tool.hatch.metadata.hooks.custom]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

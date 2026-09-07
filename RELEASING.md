@@ -33,6 +33,12 @@ published or when a maintainer dispatches it manually.
    # then install the wheel in a scratch venv and:
    python -c "import smythe; print(smythe.__version__)"
    ```
+   The build-only README hook resolves local documentation and image links
+   against `vX.Y.Z` for PyPI. The source README stays unchanged. The PyPI badge
+   alone follows `main` with a generic label, so the badge update after
+   publication also reaches the package description. Verify a wheel rebuilt
+   from the sdist has identical package members and metadata; run
+   `python -m pytest tests/test_pypi_readme.py` with Hatchling installed.
 4. Open a release-checklist issue (template: "Release checklist") and record
    the tested commit, check URLs, package hashes, and release notes.
 5. Push the version commit and verify its CI checks. Create tag `vX.Y.Z` at

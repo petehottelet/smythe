@@ -15,18 +15,17 @@ wide artifact production.
 
 ## Install
 
-Jobs commands described here require the current repository checkout. From
-the cloned repository root:
+Install Smythe 0.7.0 with the Jobs dependencies:
 
 ```bash
-pip install -e ".[jobs]"
+pip install "smythe[jobs]==0.7.0"
 ```
 
 Add the provider extra needed by a live manifest, for example:
 
 ```bash
-pip install -e ".[jobs,openai]"
-pip install -e ".[jobs,gemini]"
+pip install "smythe[jobs,openai]==0.7.0"
+pip install "smythe[jobs,gemini]==0.7.0"
 ```
 
 The installed command is `smythe`. Job state defaults to

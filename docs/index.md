@@ -23,16 +23,17 @@ verification, trace, artifact, and recovery controls.
 ## Operate durable work
 
 - [Durable text workflows](workflow-accounting.md) — phase-wide native costs, saved graph limits, exact request quotes, fenced ownership, and local response replay
-- [Checkpoint format](checkpoint-format.md) — saved state and resume semantics
+- [Checkpoint format](checkpoint-format.md) — flushed atomic publication, saved state, and resume semantics
 - [Cost guardrails](budgets.md) — strict usage validation, reservations, and failed-accounting recovery
 - [Jobs](jobs.md) — preflight, approval, detached workers, durable pause/resume, fenced ownership, artifact namespaces, database upgrades, inspection, rerolls, and exports
 - [Optimization](optimize.md) — bounded concurrency experiments and evidence ledgers
 
 ## Connect models and tools
 
-- [GPT-6 Astra quickstart](../README.md#quickstart) — text-only planning and execution
+- [GPT-6 Astra quickstart](../README.md#quickstart) — native text planning and execution within one saved $5 allowance
 - [Native OpenAI Responses](openai-responses.md) — Astra/Sol function tools, exact token prices, request quotes, and retained failure receipts
 - [Astra benchmark plan](../benchmarks/astra_benchmark_plan.md) — prepared task packs and balanced schedules, complete usage accounting, and matched comparisons
+- [Astra pilot runner](../benchmarks/astra_runtime.md) — source-bound spending allocations, native workflow receipts, and recovery of the 12 calibration trials
 - [MCP](mcp.md) — tool discovery, allowlists, secrets, budgets, and timeouts
 - [Style](style.md) — visual language for diagrams and public assets
 
@@ -56,5 +57,5 @@ verification, trace, artifact, and recovery controls.
 - [Contributing](../CONTRIBUTING.md)
 - [Roadmap](../ROADMAP.md)
 - [Changelog](../CHANGELOG.md)
-- [Releasing](../RELEASING.md)
+- [Releasing](../RELEASING.md) — package builds, release assets, and PyPI publication
 - [Security](../SECURITY.md)

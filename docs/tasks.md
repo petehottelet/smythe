@@ -4,7 +4,8 @@ A `Task` carries four inputs through the workflow: its goal, constraints,
 source context, and acceptance criteria. Smythe snapshots them before routing
 or planning and attaches the snapshot to `ExecutionGraph.task`.
 
-Install the current checkout with `pip install -e .` to run this example.
+Smythe 0.7.0 carries the complete task through planning, execution, and recovery.
+Install `pip install "smythe==0.7.0"` to run this example.
 
 ```python
 from smythe import OfflineProvider, SimpleArchitect, Swarm, Task
