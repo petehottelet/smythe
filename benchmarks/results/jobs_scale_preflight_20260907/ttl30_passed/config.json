@@ -1,0 +1,9 @@
+{
+  "completed_before_kill": 4,
+  "concurrency": 8,
+  "count": 25,
+  "kill_after_entries": 12,
+  "lease_heartbeat_s": 1.0,
+  "lease_ttl_s": 30.0,
+  "max_attempts": 2
+}

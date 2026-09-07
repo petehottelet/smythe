@@ -1,0 +1,263 @@
+{
+  "archive_verification": {
+    "accepted_artifacts_verified_against_database_and_png_bytes": 25,
+    "accepted_receipts_sha256_matches_original_record": true,
+    "original_inventory_files_verified": 29,
+    "successful_pilot_database_integrity": "ok",
+    "unknown_call_ids_and_cost_flags_preserved": 8,
+    "verification_scope": "Read-only packaging checks performed after both pilots; original pilot results are unchanged."
+  },
+  "comparative_claimable": false,
+  "contains_5000_operation_result": false,
+  "evidence_status": "pre_freeze_harness_diagnostics",
+  "file_count": 56,
+  "files": {
+    "ttl30_passed/barrier.json": {
+      "sha256": "8652342a0d44453645ec4ebd45fc51cd9d7209bb34aa64a9de69ad77a22e0ae3",
+      "size_bytes": 115
+    },
+    "ttl30_passed/config.json": {
+      "sha256": "846a8b2723c61482043c984923efb7f1a4b721dfd40651459374d1cc19873020",
+      "size_bytes": 168
+    },
+    "ttl30_passed/finished_resume-durability.json": {
+      "sha256": "693d85e686608b2376729b243bf70e84ec65dfe2010dea0ec4e13989d2e2fc9d",
+      "size_bytes": 48
+    },
+    "ttl30_passed/finished_resume-result.json": {
+      "sha256": "e16bc4496e3eb390cc706fb4c549adeb23c0a215cf3f23b40dd75af925a989cf",
+      "size_bytes": 211
+    },
+    "ttl30_passed/finished_resume-worker.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    "ttl30_passed/jobs.db": {
+      "sha256": "78fef461eda7c6d8ade5b3720575be2fe3323f4a7944794bb9bffc48cc242242",
+      "size_bytes": 200704
+    },
+    "ttl30_passed/jobs.db-shm": {
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
+      "size_bytes": 32768
+    },
+    "ttl30_passed/jobs.db-wal": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_0/attempt-0001/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_1/attempt-0002/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_10/attempt-0001/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_11/attempt-0001/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_12/attempt-0001/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_13/attempt-0002/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_14/attempt-0002/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_15/attempt-0002/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_16/attempt-0002/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_17/attempt-0002/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_18/attempt-0002/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_19/attempt-0002/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_2/attempt-0001/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_20/attempt-0001/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_21/attempt-0001/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_22/attempt-0001/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_23/attempt-0001/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_24/attempt-0001/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_3/attempt-0001/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_4/attempt-0001/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_5/attempt-0001/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_6/attempt-0001/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_7/attempt-0001/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_8/attempt-0001/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_9/attempt-0001/artifact-01.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
+    "ttl30_passed/provenance.json": {
+      "sha256": "aff611209431164699ee713a3707f0a5fedce5394075d36de4588a8d78a3b9db",
+      "size_bytes": 6249
+    },
+    "ttl30_passed/reroll-durability.json": {
+      "sha256": "693d85e686608b2376729b243bf70e84ec65dfe2010dea0ec4e13989d2e2fc9d",
+      "size_bytes": 48
+    },
+    "ttl30_passed/reroll-ids.json": {
+      "sha256": "e455545643583445d035d3cba3c0621b9fffa9d3d048478924e6c809a5f61e79",
+      "size_bytes": 331
+    },
+    "ttl30_passed/reroll-provider.jsonl": {
+      "sha256": "79a76004a73b2cbbfacecd59c1f67212ba692415e2017a9b8b32b9b1276dd71a",
+      "size_bytes": 3624
+    },
+    "ttl30_passed/reroll-result.json": {
+      "sha256": "794e35f2c8328dcea560378f39fd8dec2d04446331151999866d19a7cb793d94",
+      "size_bytes": 216
+    },
+    "ttl30_passed/reroll-worker.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    "ttl30_passed/result.json": {
+      "sha256": "3cf6fdab6828bdfa2b29925ee64bfd7f51c37b18fcfa11b7e75a45a8d9851002",
+      "size_bytes": 17621
+    },
+    "ttl30_passed/resume-durability.json": {
+      "sha256": "693d85e686608b2376729b243bf70e84ec65dfe2010dea0ec4e13989d2e2fc9d",
+      "size_bytes": 48
+    },
+    "ttl30_passed/resume-provider.jsonl": {
+      "sha256": "e87317c9bdd975598f91f77cfd801da431a8fc7681e76ae790e099edd75a8fa6",
+      "size_bytes": 5889
+    },
+    "ttl30_passed/resume-result.json": {
+      "sha256": "6c118544687d6e55470999bc887a63c93c7d3ccb3f1e58420dfecf6f0f2ad759",
+      "size_bytes": 248
+    },
+    "ttl30_passed/resume-worker.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    "ttl30_passed/start-durability.json": {
+      "sha256": "693d85e686608b2376729b243bf70e84ec65dfe2010dea0ec4e13989d2e2fc9d",
+      "size_bytes": 48
+    },
+    "ttl30_passed/start-provider.jsonl": {
+      "sha256": "bcef2eeb3ab4fd0dc14c0c2e3afe187d0d00c24e7b5d15a2a844bbc0f5d2fc3d",
+      "size_bytes": 3604
+    },
+    "ttl30_passed/start-worker.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    "ttl5_failed/barrier.json": {
+      "sha256": "0ea6cef01c097309b8f1a7294ddeda2cbe99ec9f39936ba59a000cac497d769c",
+      "size_bytes": 115
+    },
+    "ttl5_failed/config.json": {
+      "sha256": "220f9656bde4e3f49d38354f6e1555b5f7f3f265546a057c5053e8910fb72413",
+      "size_bytes": 168
+    },
+    "ttl5_failed/diagnostic.json": {
+      "sha256": "47516d0de6853eb72e7d7a01343f6efec038d3241de5c2c5377d65d761653500",
+      "size_bytes": 2225
+    },
+    "ttl5_failed/resume-durability.json": {
+      "sha256": "693d85e686608b2376729b243bf70e84ec65dfe2010dea0ec4e13989d2e2fc9d",
+      "size_bytes": 48
+    },
+    "ttl5_failed/resume-provider.jsonl": {
+      "sha256": "56e395df23472acad2528eb65b6b8b0c9f285c5eccba17d6d089d2cdc01bf3c4",
+      "size_bytes": 452
+    },
+    "ttl5_failed/resume-worker.log": {
+      "sha256": "cabceded93244f75b5131941ccc016f8e31880909d7b35e082034029dd4b5f9f",
+      "size_bytes": 2036
+    },
+    "ttl5_failed/start-durability.json": {
+      "sha256": "693d85e686608b2376729b243bf70e84ec65dfe2010dea0ec4e13989d2e2fc9d",
+      "size_bytes": 48
+    },
+    "ttl5_failed/start-provider.jsonl": {
+      "sha256": "feb664f09b302ca2d863eb4156c5acbc87eac2fbcfdc0310fa0d46fdc368a0c6",
+      "size_bytes": 3604
+    },
+    "ttl5_failed/start-worker.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    }
+  },
+  "hash_policy": "SHA-256 over original raw bytes; files copied without reserialization.",
+  "pilots": [
+    {
+      "concurrency": 8,
+      "lease_heartbeat_s": 0.25,
+      "lease_ttl_s": 5.0,
+      "operations_requested": 25,
+      "record": "ttl5_failed/diagnostic.json",
+      "source_binding": "unbound; exact revision and source hashes unavailable",
+      "status": "failed"
+    },
+    {
+      "concurrency": 8,
+      "lease_heartbeat_s": 1.0,
+      "lease_ttl_s": 30.0,
+      "operations_requested": 25,
+      "record": "ttl30_passed/result.json",
+      "source_binding": "pre-freeze dirty working tree; original raw-byte source hashes retained",
+      "status": "completed"
+    }
+  ],
+  "schema": "smythe.jobs-scale-pilot-archive.v1",
+  "total_evidence_bytes": 282386
+}

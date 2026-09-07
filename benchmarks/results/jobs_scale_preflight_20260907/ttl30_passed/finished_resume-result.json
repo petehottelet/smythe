@@ -1,0 +1,12 @@
+{
+  "counts": {
+    "succeeded": 25
+  },
+  "execution_metrics": {
+    "operations_started": 0,
+    "peak_active_calls": 0,
+    "wall_s": 0.0
+  },
+  "status": "completed",
+  "worker_wall_s": 0.7218137998133898
+}

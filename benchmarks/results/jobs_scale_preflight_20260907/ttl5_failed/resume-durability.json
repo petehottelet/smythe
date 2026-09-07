@@ -1,0 +1,4 @@
+{
+  "journal_mode": "wal",
+  "synchronous": 2
+}

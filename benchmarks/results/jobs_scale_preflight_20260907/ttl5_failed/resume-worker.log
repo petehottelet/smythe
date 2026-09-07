@@ -1,0 +1,29 @@
+Traceback (most recent call last):
+  File "C:\Users\PeteHottelet\Projects\smythe\benchmarks\jobs_scale_benchmark.py", line 518, in <module>
+    main()
+  File "C:\Users\PeteHottelet\Projects\smythe\benchmarks\jobs_scale_benchmark.py", line 504, in main
+    asyncio.run(_worker(args.workdir.resolve(), args.worker))
+  File "C:\Users\PeteHottelet\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\PeteHottelet\AppData\Local\Programs\Python\Python312\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PeteHottelet\AppData\Local\Programs\Python\Python312\Lib\asyncio\base_events.py", line 691, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\PeteHottelet\Projects\smythe\benchmarks\jobs_scale_benchmark.py", line 219, in _worker
+    result = await runner.resume(RUN_ID)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PeteHottelet\Projects\smythe\smythe\jobs\runner.py", line 162, in resume
+    return await self._execute_with_lease(run_id, plan, root, recover=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PeteHottelet\Projects\smythe\smythe\jobs\runner.py", line 245, in _execute_with_lease
+    await heartbeat_task
+  File "C:\Users\PeteHottelet\Projects\smythe\smythe\jobs\runner.py", line 277, in _heartbeat_lease
+    self.store.heartbeat_run_lease(
+  File "C:\Users\PeteHottelet\Projects\smythe\smythe\jobs\store.py", line 616, in heartbeat_run_lease
+    self._assert_run_lease(cursor, run_id, owner, now)
+  File "C:\Users\PeteHottelet\Projects\smythe\smythe\jobs\store.py", line 1627, in _assert_run_lease
+    raise RunLeaseError(f"run {run_id!r} lease for {owner_id!r} expired")
+smythe.jobs.store.RunLeaseError: run 'jobs-scale' lease for 'runner-d41cb49b3dce4083bd4b1dd543d278d1' expired
