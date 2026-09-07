@@ -319,6 +319,28 @@ class OfflineProvider(Provider):
         self._cursor = 0
         self.calls: list[str] = []  # first line of every prompt, for assertions
 
+    def workflow_descriptor(self) -> dict:
+        """Describe only stateless offline modes supported by durable workflows."""
+        if self._responses or self._artifacts_per_call:
+            raise ValueError("Durable OfflineProvider supports static plan/echo only, not scripts or artifacts")
+        if ((self._plan is not None and type(self._plan) is not dict)
+                or type(self._echo_prefix) is not str):
+            raise ValueError("Durable offline plan must be an object and echo_prefix must be text")
+        # Reuse strict finite JSON validation; import lazily to avoid a module
+        # initialization cycle. No SDK is imported by the Responses module.
+        from smythe.provider_responses import _json_dump
+
+        return json.loads(_json_dump({
+            "kind": "offline", "adapter_version": "offline-static-v1",
+            "decoder_version": "offline-static-v1", "endpoint_scope": "offline",
+            "price_version": "offline-zero-v1", "supported_models": None,
+            "config": {"plan": self._plan, "echo_prefix": self._echo_prefix},
+        }))
+
+    def snapshot_for_workflow(self) -> OfflineProvider:
+        """Detach a static offline configuration without resetting a script."""
+        return OfflineProvider(**self.workflow_descriptor()["config"])
+
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         from smythe.prompts import PLANNING_SYSTEM_PROMPT
 

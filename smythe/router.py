@@ -11,6 +11,9 @@ from smythe.budget import validate_completion_usage
 from smythe.planner import Architect, ArchitectError, DeterministicArchitect
 from smythe.provider import Provider
 from smythe.task import Task, render_task_json
+from smythe.workflow_binding import (
+    ComponentBinding, bind_component, describe_component, provider_description, require_exact,
+)
 
 
 CLASSIFIER_SYSTEM_PROMPT = """\
@@ -42,12 +45,45 @@ class WhiteRabbit:
         autonomous: Architect | None = None,
         classifier_provider: Provider | None = None,
         classifier_model: str = "claude-opus-4-8",
+        run_binding: ComponentBinding | None = None,
     ) -> None:
         self._deterministic = deterministic or {}
         self._constrained = constrained
         self._autonomous = autonomous
         self._classifier_provider = classifier_provider
         self._classifier_model = classifier_model
+        self._run_binding = run_binding
+
+    def workflow_description(self, **defaults) -> dict:
+        require_exact(self, WhiteRabbit)
+        return {"type": "white_rabbit", "version": 1,
+                "classifier": provider_description(self._classifier_provider, self._classifier_model)
+                if self._classifier_provider else None,
+                "deterministic": {name: describe_component(tier, role="architect", **defaults)
+                                  for name, tier in self._deterministic.items()},
+                "constrained": describe_component(self._constrained, role="architect", **defaults),
+                "autonomous": describe_component(self._autonomous, role="architect", **defaults)}
+
+    def workflow_providers(self) -> tuple[Provider, ...]:
+        providers = [self._classifier_provider] if self._classifier_provider else []
+        for tier in (*self._deterministic.values(), self._constrained, self._autonomous):
+            if tier is not None:
+                providers.extend(tier.workflow_providers())
+        return tuple(providers)
+
+    def bind_run(self, binding: ComponentBinding) -> WhiteRabbit:
+        self.workflow_description(default_provider=binding.default_provider,
+                                  default_model=binding.default_model)
+        return WhiteRabbit(
+            deterministic={name: bind_component(tier, binding.child(
+                f"deterministic:{name}", phase="planning",
+            )) for name, tier in self._deterministic.items()},
+            constrained=bind_component(self._constrained, binding.child("constrained", phase="planning")),
+            autonomous=bind_component(self._autonomous, binding.child("autonomous", phase="planning")),
+            classifier_provider=binding.snapshot_provider(self._classifier_provider)
+            if self._classifier_provider else None,
+            classifier_model=self._classifier_model, run_binding=binding,
+        )
 
     def route(self, task: Task) -> Architect:
         """Classify task and return the appropriate architect (sync)."""
@@ -69,7 +105,9 @@ class WhiteRabbit:
                 + render_task_json(task)
             )
 
-        result = await self._classifier_provider.complete(
+        provider = (self._run_binding.for_call(self._classifier_provider, trigger="task")
+                    if self._run_binding else self._classifier_provider)
+        result = await provider.complete(
             system, prompt, model=self._classifier_model
         )
         validate_completion_usage(result)

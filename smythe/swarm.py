@@ -42,6 +42,7 @@ from smythe.synthesizer import Synthesizer
 from smythe.task import Task, snapshot_task, task_snapshots_equal, task_to_dict
 from smythe.tracer import Tracer
 from smythe.verifier import Verifier, validate_verification_checkpoint, verification_pending
+from smythe.workflow_store import SQLiteWorkflowStore
 
 
 @dataclass
@@ -58,6 +59,10 @@ class SwarmResult:
             provider estimates or conservative request ceilings.
         execution_id: Identifier for this execution; pass to
             ``swarm.resume()`` when a checkpoint store is configured.
+        cost_scope: Accounting boundary: ordinary execution/synthesis or the
+            opt-in complete text workflow.
+        workflow_accounting: Exact confirmed, reserved, and unknown nanoUSD
+            balances and call counts for a managed text workflow.
     """
 
     output: str
@@ -67,6 +72,8 @@ class SwarmResult:
     execution_id: str | None = None
     cost_is_complete: bool = True
     cost_contains_estimates: bool = False
+    cost_scope: str = "execution_and_synthesis"
+    workflow_accounting: dict[str, Any] | None = None
 
 
 def _auto_detect_provider(model: str) -> Provider:
@@ -116,6 +123,7 @@ class Swarm:
         supervisor: Supervisor | None = None,
         max_revisions: int = 0,
         verifier: Verifier | None = None,
+        run_store: SQLiteWorkflowStore | None = None,
     ) -> None:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
         self.model = model
@@ -128,6 +136,7 @@ class Swarm:
         self.supervisor = supervisor
         self.max_revisions = max_revisions
         self.verifier = verifier
+        self._run_store = run_store
         # The running executor, so checkpoints can record the revision
         # allowance actually consumed rather than assuming zero.
         self._active_executor: Any = None
@@ -170,6 +179,8 @@ class Swarm:
         Returns the graph so you can inspect the architect's decisions
         before committing to execution.
         """
+        if self._run_store is not None:
+            return asyncio.run(self._workflow_runtime().plan(task))
         Sentinel(self.max_budget_usd)
         task = snapshot_task(task)
         architect = self._select_architect(snapshot_task(task))
@@ -186,6 +197,8 @@ class Swarm:
 
     async def aplan(self, task: Task) -> ExecutionGraph:
         """Async variant of plan() — safe to call from a running event loop."""
+        if self._run_store is not None:
+            return await self._workflow_runtime().plan(task)
         Sentinel(self.max_budget_usd)
         task = snapshot_task(task)
         architect = await self._aselect_architect(snapshot_task(task))
@@ -228,6 +241,10 @@ class Swarm:
         If parallel=True, uses the async executor for concurrent nodes.
         """
         task_or_graph = self._resolve_input(task_or_graph)
+        if self._run_store is not None:
+            return asyncio.run(self._workflow_runtime().execute(
+                task_or_graph, max_concurrency=self.max_concurrency if self.parallel else 1,
+            ))
         if self.parallel:
             return asyncio.run(self.execute_async(task_or_graph))
         return self._execute_sync(task_or_graph)
@@ -237,6 +254,10 @@ class Swarm:
     ) -> SwarmResult:
         """Async execution using the parallel AsyncExecutor."""
         task_or_graph = self._resolve_input(task_or_graph)
+        if self._run_store is not None:
+            return await self._workflow_runtime().execute(
+                task_or_graph, max_concurrency=self.max_concurrency,
+            )
         from smythe.async_executor import AsyncExecutor
 
         tracer = Tracer()
@@ -481,6 +502,10 @@ class Swarm:
         already finished, its stored result is returned without
         re-executing anything.
         """
+        if self._run_store is not None:
+            return await self._workflow_runtime().resume(
+                execution_id, max_concurrency=self.max_concurrency,
+            )
         if self._checkpoint_store is None:
             raise ValueError(
                 "Cannot resume: this Swarm has no checkpoint_store configured."
@@ -499,6 +524,8 @@ class Swarm:
             )
 
         graph = graph_from_dict(state["graph"])
+        if graph.run_ref is not None:
+            raise ValueError("This graph requires its matching durable run_store")
         checkpoint_task = task_from_dict(state.get("task"))
         if (graph.task is not None and checkpoint_task is not None
                 and not task_snapshots_equal(task_to_dict(graph.task), task_to_dict(checkpoint_task))):
@@ -644,6 +671,7 @@ class Swarm:
         max_budget_usd: float | None = None,
         provider: Provider | None = None,
         parallel: bool = False,
+        run_store: SQLiteWorkflowStore | None = None,
     ) -> Swarm:
         """Create a Swarm pre-loaded with a YAML-defined execution graph.
 
@@ -661,6 +689,7 @@ class Swarm:
             registry=registry,
             architect=SimpleArchitect(),
             parallel=parallel,
+            run_store=run_store,
         )
         instance._yaml_graph = graph
         instance._stamp_model(graph)
@@ -679,6 +708,8 @@ class Swarm:
         model stamped yet; providers reject an empty model name.  One
         shared helper so no execute path can forget it again.
         """
+        if graph.run_ref is not None:
+            raise ValueError("This graph requires its matching durable run_store")
         graph.validate()
         self._stamp_model(graph)
         if graph.task is not None:
@@ -698,3 +729,19 @@ class Swarm:
         if self.artifact_dir is None:
             return None
         return Path(self.artifact_dir) / execution_id[:12]
+
+    def _workflow_runtime(self):
+        """Pass explicit component dependencies into an isolated durable run."""
+        from smythe.workflow import WorkflowRuntime
+
+        return WorkflowRuntime(
+            store=self._run_store, model=self.model, max_budget_usd=self.max_budget_usd,
+            provider=self._provider, architect=self._architect, registry=self._registry,
+            router=self._router, synthesizer=self._synthesizer, supervisor=self.supervisor,
+            max_revisions=self.max_revisions, verifier=self.verifier,
+            memory=self._memory, tool_runtime=self._tool_runtime,
+            checkpoint_store=self._checkpoint_store,
+            checkpoint_every_n_nodes=self.checkpoint_every_n_nodes,
+            retry_backoff_s=self.retry_backoff_s,
+            max_concurrency=self.max_concurrency,
+        )

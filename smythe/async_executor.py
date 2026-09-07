@@ -19,6 +19,7 @@ from smythe.registry import Registry
 from smythe.tools import ToolRuntime
 from smythe.tracer import Tracer
 from smythe.verifier import VerificationRecoveryError
+from smythe.workflow_store import WorkflowError
 
 if TYPE_CHECKING:
     from smythe.supervisor import Supervisor
@@ -66,6 +67,8 @@ class AsyncExecutor(ExecutorBase):
         verifier: Verifier | None = None,
         revisions_used: int = 0,
         on_control_update: Callable[[], None] | None = None,
+        provider_call_factory: Callable[[Node, str, int, int], Provider] | None = None,
+        on_supervision_update: Callable[[Node, bool], None] | None = None,
     ) -> None:
         super().__init__(
             provider=provider, registry=registry, tracer=tracer, budget=budget,
@@ -75,6 +78,8 @@ class AsyncExecutor(ExecutorBase):
             max_revisions=max_revisions, task=task, verifier=verifier,
             revisions_used=revisions_used,
             on_control_update=on_control_update,
+            provider_call_factory=provider_call_factory,
+            on_supervision_update=on_supervision_update,
         )
         self._estimated_tokens_per_node = validate_token_count(
             estimated_tokens_per_node, "estimated_tokens_per_node",
@@ -260,8 +265,7 @@ class AsyncExecutor(ExecutorBase):
         for task in tasks:
             node = active.pop(task)
             if node.status in (NodeStatus.PENDING, NodeStatus.RUNNING):
-                if self._budget:
-                    self._budget.release(node.id)
+                self.release_node_budget(node)
                 node.status = NodeStatus.PENDING
                 node.result = None
         return errors, interrupted
@@ -278,7 +282,7 @@ class AsyncExecutor(ExecutorBase):
         for error in errors:
             if isinstance(error, (
                 BudgetValidationError, NodeFinalizationError, SentinelAlert,
-                VerificationRecoveryError, ProviderResponseError,
+                VerificationRecoveryError, ProviderResponseError, WorkflowError,
             )):
                 # Retain the intent and all accounting: recovery must not hide
                 # an unusable bill or buy a replacement for a failed write.
@@ -294,6 +298,7 @@ class AsyncExecutor(ExecutorBase):
         attempts = 1 + max(node.max_retries, 0) if node.failure_policy == FailurePolicy.RETRY else 1
 
         for attempt in range(attempts):
+            self._call_attempts[node.id] = attempt
             delay = self.retry_delay_s(attempt)
             if delay:
                 await asyncio.sleep(delay)
@@ -329,7 +334,8 @@ class AsyncExecutor(ExecutorBase):
                 return
             except VerificationRecoveryError:
                 raise
-            except (BudgetValidationError, NodeFinalizationError, SentinelAlert, ProviderResponseError) as exc:
+            except (BudgetValidationError, NodeFinalizationError, SentinelAlert,
+                    ProviderResponseError, WorkflowError) as exc:
                 # A reconciliation alert or post-billing persistence failure
                 # is non-retryable here: another provider call would compound
                 # the spend rather than repair the local failure. Invalid
@@ -343,8 +349,7 @@ class AsyncExecutor(ExecutorBase):
                 self.notify_update(node)
                 raise
             except asyncio.CancelledError:
-                if self._budget:
-                    self._budget.release(node.id)
+                self.release_node_budget(node)
                 node.status = NodeStatus.PENDING
                 node.result = None
                 self._tracer.on_node_end(node)
@@ -354,8 +359,7 @@ class AsyncExecutor(ExecutorBase):
                 self._tracer.on_node_error(node, exc)
                 self._tracer.on_node_end(node)
 
-        if self._budget:
-            self._budget.release(node.id)
+        self.release_node_budget(node)
 
         node.result = str(last_exc)
 

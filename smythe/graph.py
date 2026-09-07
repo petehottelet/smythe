@@ -5,10 +5,29 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
+import re
 from typing import Any
 from uuid import uuid4
 
 from smythe.task import Task, task_to_dict
+
+
+def snapshot_run_ref(value: dict | None) -> dict | None:
+    """Detach a strict durable-run reference without copying the call ledger."""
+    if value is None:
+        return None
+    keys = {"version", "store_id", "run_id", "recipe_sha256"}
+    if type(value) is not dict or value.keys() != keys:
+        raise ValueError("Durable run reference has an invalid schema")
+    if type(value["version"]) is not int or value["version"] != 1:
+        raise ValueError("Unsupported durable run reference version")
+    for key in ("store_id", "run_id"):
+        if type(value[key]) is not str or re.fullmatch(r"[A-Za-z0-9_-]{1,64}", value[key]) is None:
+            raise ValueError(f"Invalid durable run reference {key}")
+    if (type(value["recipe_sha256"]) is not str
+            or re.fullmatch(r"[0-9a-f]{64}", value["recipe_sha256"]) is None):
+        raise ValueError("Invalid durable run recipe hash")
+    return dict(value)
 
 
 def _escape_mermaid(text: str) -> str:
@@ -169,12 +188,14 @@ class ExecutionGraph:
         nodes: Ordered list of execution nodes.
         estimated_cost_usd: Pre-execution cost estimate set by the planner.
         task: Detached Task snapshot carried through execution and recovery.
+        run_ref: Identity of the durable workflow store, run, and frozen recipe.
     """
 
     topology: list[Topology]
     nodes: list[Node] = field(default_factory=list)
     estimated_cost_usd: float | None = None
     task: Task | None = None
+    run_ref: dict | None = None
 
     def roots(self) -> list[Node]:
         """Nodes with no dependencies — entry points for execution."""
@@ -310,6 +331,7 @@ class ExecutionGraph:
             "topology": [t.value for t in self.topology],
             "estimated_cost_usd": self.estimated_cost_usd,
             "task": task_to_dict(self.task),
+            "run_ref": snapshot_run_ref(self.run_ref),
             "nodes": [
                 {
                     "id": n.id,

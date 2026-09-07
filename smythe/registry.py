@@ -13,8 +13,30 @@ from smythe.skills import (
     DefaultCapabilityMapper,
     SkillProvider,
 )
+from smythe.workflow_binding import ComponentBinding, WorkflowBindingError, json_snapshot, require_exact
 
 logger = logging.getLogger("smythe.registry")
+
+
+def _workflow_agents(description):
+    data = json_snapshot(description)
+    if (type(data) is not dict or data.keys() != {"type", "version", "agents"}
+            or data["type"] != "registry" or type(data["version"]) is not int
+            or data["version"] != 1 or type(data["agents"]) is not list):
+        raise WorkflowBindingError("Invalid workflow registry description")
+    seen = set()
+    for entry in data["agents"]:
+        if (type(entry) is not dict
+                or entry.keys() != {"id", "name", "persona", "capabilities", "history"}
+                or any(type(entry.get(key)) is not str for key in ("id", "name", "persona"))
+                or not entry["id"] or entry["id"] in seen
+                or type(entry["capabilities"]) is not list
+                or any(type(value) is not str for value in entry["capabilities"])
+                or type(entry["history"]) is not list
+                or any(type(value) is not dict for value in entry["history"])):
+            raise WorkflowBindingError("Invalid or duplicate workflow agent description")
+        seen.add(entry["id"])
+    return data["agents"]
 
 
 class Registry:
@@ -45,6 +67,45 @@ class Registry:
         self._hydration_mode = hydration_mode
         self._cache_ttl = capability_cache_ttl_seconds
         self._capability_cache: dict[str, tuple[set[str], float]] = {}
+
+    def workflow_description(self, **defaults) -> dict:
+        require_exact(self, Registry)
+        if (self._skill_provider is not None
+                and self._hydration_mode is not CapabilityHydrationMode.STATIC_ONLY):
+            raise WorkflowBindingError("Journaled workflows require static registry capabilities")
+        agents = []
+        for agent in self._agents.values():
+            if type(agent) is not Agent or type(agent.profile) is not AgentProfile:
+                raise WorkflowBindingError("Journaled registries require plain Agent/Profile snapshots")
+            if agent.profile.mcp_servers:
+                raise WorkflowBindingError("Journaled text workflows do not support MCP tools")
+            if type(agent.profile.capabilities) is not list:
+                raise WorkflowBindingError("Agent capabilities must be a list of strings")
+            agents.append({"id": agent.id, "name": agent.name, "persona": agent.profile.persona,
+                           "capabilities": list(agent.profile.capabilities), "history": agent.history})
+        description = {"type": "registry", "version": 1, "agents": agents}
+        return {**description, "agents": _workflow_agents(description)}
+
+    def workflow_providers(self) -> tuple:
+        return ()
+
+    def bind_run(self, binding: ComponentBinding) -> Registry:
+        return Registry.from_workflow_description(self.workflow_description())
+
+    @classmethod
+    def from_workflow_description(cls, description: dict) -> Registry:
+        """Restore a validated static registry, including detached agent history."""
+        if cls is not Registry:
+            raise WorkflowBindingError("Workflow registry restore requires the built-in Registry")
+        entries = _workflow_agents(description)
+        bound = cls(hydration_mode=CapabilityHydrationMode.STATIC_ONLY)
+        for entry in entries:
+            bound.register(Agent(
+                id=entry["id"], profile=AgentProfile(
+                    name=entry["name"], persona=entry["persona"], capabilities=entry["capabilities"],
+                ), history=entry["history"],
+            ))
+        return bound
 
     def register(self, agent: Agent) -> None:
         self._agents[agent.id] = agent

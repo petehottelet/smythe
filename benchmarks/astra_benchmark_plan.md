@@ -40,10 +40,10 @@ deprecated. [Chat Completions API reference](https://developers.openai.com/api/r
 Smythe's [execution ledger](../smythe/budget.py) and the existing
 [benchmark usage wrapper](provider_usage.py) use a blended $3 per million
 tokens when the provider supplies no explicit cost. The native Responses
-provider supplies a dated token price instead. Model-based routing, planning,
-and successful supervision remain separate from the execution ledger. Do not present
-`max_budget_usd` as a ceiling on the full API bill until every phase and
-attempt shares durable admission and accounting.
+provider supplies a dated token price instead. The campaign must use
+[`run_store=SQLiteWorkflowStore(...)`](../docs/workflow-accounting.md), which
+binds all supported text phases and attempts to one durable ledger. The ordinary
+execution-only ledger remains unsuitable for full-workflow cost comparisons.
 
 Before a cost campaign, preserve endpoint-native usage for every request:
 ordinary input, cache reads, cache writes, output, reasoning-token detail when
@@ -55,8 +55,9 @@ configure reasoning effort and service tier in every adapter. The native
 provider now preserves these categories, prices integer nanoUSD, and retains
 raw bytes before validation or decoding. Its offline contracts cover cache
 categories, context thresholds, tool continuation, and unusable or unpriced
-responses. Complete-workflow persistence and reconciliation remain campaign
-prerequisites; missing usage remains unknown, never zero.
+responses. The managed workflow path persists and reconciles those receipts
+across every phase; missing usage remains unknown, never zero. The paid pilot
+and confirmatory campaign still require an explicit total API-spend ceiling.
 
 ## Published prices and cost formula
 

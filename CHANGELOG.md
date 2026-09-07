@@ -23,6 +23,13 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Added
 
+- **Durable text-workflow accounting**: opt-in SQLite run storage binds routing,
+  planning, execution, verification, supervision, and synthesis to one exact
+  nanoUSD ledger. Request-bound quotes, fenced dispatch, raw-response persistence,
+  local replay, frozen control decisions, and atomic checkpoint consumption
+  preserve costs across separate planning, execution, and recovery calls.
+  Built-in Astra/Sol text providers and stateless offline fixtures are supported;
+  custom local components declare their identity and scope through `LocalOnly`.
 - **Native Astra/Sol Responses provider**: explicit Standard/global requests,
   native function-tool continuation, request-bound input-count quotes, and a
   dated token price table with exact cache-read, cache-write, long-context,

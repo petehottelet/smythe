@@ -9,7 +9,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from smythe.budget import validate_completion_usage
+from smythe.budget import validate_completion_usage, validate_token_count
 from smythe.constrained_prompts import (
     CONSTRAINED_RETRY_PROMPT,
     CONSTRAINED_SYSTEM_PROMPT,
@@ -20,6 +20,10 @@ from smythe.planner import Architect, ArchitectError
 from smythe.provider import Provider
 from smythe.registry import Registry
 from smythe.task import Task
+from smythe.workflow_binding import (
+    ComponentBinding, WorkflowBindingError, bind_component,
+    describe_component, provider_description, require_exact,
+)
 
 
 @dataclass
@@ -61,12 +65,47 @@ class ConstrainedArchitect(Architect):
         templates: list[SubGraphTemplate],
         model: str = "claude-opus-4-8",
         max_retries: int = 2,
+        *,
+        run_binding: ComponentBinding | None = None,
     ) -> None:
         self._provider = provider
         self._templates = {t.name: t for t in templates}
         self._template_list = templates
         self._model = model
         self._max_retries = max_retries
+        self._run_binding = run_binding
+
+    def workflow_description(self, **defaults) -> dict:
+        require_exact(self, ConstrainedArchitect)
+        validate_token_count(self._max_retries, "max_retries")
+        templates = []
+        seen = set()
+        for template in self._template_list:
+            if (type(template) is not SubGraphTemplate or type(template.name) is not str
+                    or not template.name or type(template.description) is not str
+                    or template.name in seen):
+                raise WorkflowBindingError("Templates require unique plain SubGraphTemplate descriptors")
+            seen.add(template.name)
+            description = describe_component(template.builder, role="template_builder")
+            if description.get("type") != "local_only" or description.get("role") != "template_builder":
+                raise WorkflowBindingError("Template builders require LocalOnly(role='template_builder')")
+            templates.append({"name": template.name, "description": template.description,
+                              "builder": description})
+        return {"type": "constrained_architect", "version": 1,
+                **provider_description(self._provider, self._model),
+                "max_retries": self._max_retries, "templates": templates}
+
+    def workflow_providers(self) -> tuple[Provider, ...]:
+        return (self._provider,)
+
+    def bind_run(self, binding: ComponentBinding) -> ConstrainedArchitect:
+        self.workflow_description()
+        return ConstrainedArchitect(
+            binding.snapshot_provider(self._provider),
+            [SubGraphTemplate(t.name, t.description, bind_component(
+                t.builder, binding.child(f"template:{t.name}"),
+            )) for t in self._template_list], self._model, self._max_retries, run_binding=binding,
+        )
 
     def plan(self, task: Task) -> tuple[ExecutionGraph, Registry]:
         return asyncio.run(self.aplan(task))
@@ -90,7 +129,9 @@ class ConstrainedArchitect(Architect):
                     + CONSTRAINED_RETRY_PROMPT
                 )
 
-            result = await self._provider.complete(
+            provider = (self._run_binding.for_call(self._provider, trigger="task", attempt=attempt)
+                        if self._run_binding else self._provider)
+            result = await provider.complete(
                 CONSTRAINED_SYSTEM_PROMPT, prompt, model=self._model
             )
             validate_completion_usage(result)
@@ -98,6 +139,8 @@ class ConstrainedArchitect(Architect):
             try:
                 selections = self._extract_selections(result.text)
                 return self._compose(selections, task)
+            except WorkflowBindingError:
+                raise
             except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
                 last_error = exc
                 continue
@@ -152,6 +195,8 @@ class ConstrainedArchitect(Architect):
             params = sel.get("params", {})
 
             nodes, registry = template.builder(task, **params)
+            if self._run_binding is not None:
+                registry = bind_component(registry, self._run_binding.child(f"result:{idx}"))
             # Defensively clone template nodes so composition never mutates
             # reusable template internals across planner calls.
             nodes = [deepcopy(node) for node in nodes]

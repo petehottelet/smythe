@@ -33,6 +33,10 @@ from typing import TYPE_CHECKING
 from smythe.budget import validate_completion_usage
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Revision
 from smythe.task import render_task
+from smythe.verifier import node_generation
+from smythe.workflow_binding import (
+    ComponentBinding, WorkflowBindingError, provider_description, require_exact,
+)
 
 if TYPE_CHECKING:
     from smythe.provider import Provider
@@ -122,11 +126,39 @@ class LLMSupervisor(Supervisor):
         model: str | None = None,
         review_after: set[str] | None = None,
         only_terminal: bool = True,
+        run_binding: ComponentBinding | None = None,
     ) -> None:
         self._provider = provider
         self._model = model
         self._review_after = review_after
         self._only_terminal = only_terminal
+        self._run_binding = run_binding
+
+    def workflow_description(self, **defaults) -> dict:
+        require_exact(self, LLMSupervisor)
+        if type(self._only_terminal) is not bool or (
+            self._review_after is not None and (
+                type(self._review_after) is not set
+                or any(type(value) is not str for value in self._review_after)
+            )
+        ):
+            raise WorkflowBindingError("Supervisor review policy requires a bool and set of node IDs")
+        model = self._model or defaults.get("default_model") or None
+        return {"type": "llm_supervisor", "version": 1,
+                **provider_description(self._provider, model),
+                "review_after": sorted(self._review_after) if self._review_after is not None else None,
+                "only_terminal": self._only_terminal}
+
+    def workflow_providers(self) -> tuple[Provider, ...]:
+        return (self._provider,)
+
+    def bind_run(self, binding: ComponentBinding) -> LLMSupervisor:
+        self.workflow_description(default_model=binding.default_model)
+        return LLMSupervisor(
+            binding.snapshot_provider(self._provider), model=self._model,
+            review_after=set(self._review_after) if self._review_after is not None else None,
+            only_terminal=self._only_terminal, run_binding=binding,
+        )
 
     def _should_review(self, graph: ExecutionGraph, node: Node) -> bool:
         if self._review_after is not None:
@@ -154,7 +186,11 @@ class LLMSupervisor(Supervisor):
             return None
 
         model = self._model or node.metadata.get("model", "")
-        result = await self._provider.complete(
+        provider = (self._run_binding.for_call(
+            self._provider, trigger={"node_id": node.id, "generation": node_generation(node)},
+            generation=node_generation(node),
+        ) if self._run_binding else self._provider)
+        result = await provider.complete(
             SUPERVISOR_SYSTEM_PROMPT,
             self._build_prompt(graph, node, task, revisions_remaining),
             model,

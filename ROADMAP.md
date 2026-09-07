@@ -128,20 +128,25 @@ The current unreleased work hardens the guarantees users depend on before a
     and service tier; preserved function-tool continuation; exact native token
     pricing; request-bound quotes; and retained billing evidence for unusable
     responses. [Provider guide](docs/openai-responses.md).
+18. **Durable text-workflow accounting** — one exact ledger across every
+    supported phase, request-bound reservations, fenced dispatch, saved native
+    responses, and atomic graph/control consumption. Separate planning and
+    execution retain their charges; recovery replays persisted responses locally.
+    [Workflow guide](docs/workflow-accounting.md).
 
 ## Coming soon
 
 The [GPT-6 Astra campaign plan](benchmarks/astra_benchmark_plan.md) specifies
-matched model and orchestration experiments. Native Responses and per-call
-pricing are implemented; complete workflow accounting precedes paid cost
-comparisons and broader Astra claims.
+matched model and orchestration experiments. Native Responses and complete
+text-workflow accounting are implemented; paid comparisons require a bounded
+pilot, a frozen campaign, and reviewed result records.
 
 The [September repository review](docs/project-review-2026-09-06.md) defines
 the hardening work ahead of broader production claims:
 
 | Priority | Change | Acceptance criteria |
 |---|---|---|
-| P1 | Complete workflow accounting | Planning, routing, supervision, execution, and synthesis reserve and reconcile spend in one ledger; result completeness covers every provider call. Publish fresh cost comparisons with native usage, declared prices, and all optimization trials retained. |
+| P1 | Complete-workflow cost evidence | Publish fresh cost comparisons from the durable text ledger, with native usage, declared prices, failed attempts, and all optimization trials retained. |
 | P2 | Web renderer parity and presentation | With browser interaction checks passing, quantify reference-behavior tolerances and measure the adaptation on controlled display hardware against the 1080p P95 interval target of 16.7 ms. Archived Canvas v1 timings remain superseded diagnostics. |
 
 ### Product and scale
