@@ -25,6 +25,9 @@ from smythe.optimize.engine import (
     TrialOutcome,
 )
 from smythe.optimize.ledger import (
+    CampaignLease,
+    CampaignLeaseError,
+    CampaignLeaseConflict,
     ExperimentLedger,
     PromotionDecision,
     TrialRecord,
@@ -33,6 +36,9 @@ from smythe.optimize.ledger import (
 from smythe.optimize.statistics import PromotionAssessment, assess_promotion
 
 __all__ = [
+    "CampaignLease",
+    "CampaignLeaseError",
+    "CampaignLeaseConflict",
     "CONTRACT_VERSION",
     "Candidate",
     "ConcurrencyScenario",

@@ -9,6 +9,8 @@ import json
 import math
 import re
 import time
+import threading
+import uuid
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, TypeAlias
@@ -23,6 +25,9 @@ from smythe.optimize.contracts import (
 )
 from smythe.optimize.ledger import (
     _ENGINE_HOLDOUT_CAPABILITY,
+    _lease_duration_ns,
+    CampaignLease,
+    CampaignLeaseError,
     ExperimentLedger,
     ExperimentLedgerError,
     LedgerBudgetError,
@@ -112,6 +117,45 @@ class _DurationBudget:
     lock: asyncio.Lock
 
 
+class _LeaseHeartbeat:
+    """Renew independently of synchronous statistics on the event-loop thread."""
+
+    def __init__(self, ledger, lease, ttl, interval, loop, task):
+        self.failure: BaseException | None = None
+        self._stop = threading.Event()
+
+        def renew():
+            while not self._stop.wait(interval):
+                try:
+                    ledger.heartbeat_campaign_lease(lease, ttl_s=ttl)
+                except BaseException as error:
+                    self.failure = error
+                    loop.call_soon_threadsafe(task.cancel)
+                    return
+
+        self._thread = threading.Thread(target=renew, name="smythe-autotune-heartbeat", daemon=True)
+
+    def start(self):
+        self._thread.start()
+
+    def close(self):
+        self._stop.set()
+        self._thread.join()
+
+
+async def _cancel_and_drain(tasks):
+    for task in tasks:
+        if not task.done():
+            task.cancel()
+    draining = asyncio.gather(*tasks, return_exceptions=True)
+    while not draining.done():
+        try:
+            await asyncio.shield(draining)
+        except asyncio.CancelledError:
+            continue
+    draining.result()
+
+
 @dataclass(frozen=True, slots=True)
 class OptimizationResult:
     """Terminal campaign result and its durable evidence references."""
@@ -168,6 +212,8 @@ class OptimizationRunner:
         evaluator_hash: str,
         bootstrap_resamples: int = DEFAULT_BOOTSTRAP_RESAMPLES,
         campaign_id: str | None = None,
+        lease_ttl_s: float = 30.0,
+        lease_heartbeat_s: float | None = None,
     ) -> None:
         if not isinstance(contract, ExperimentContract):
             raise TypeError("contract must be an ExperimentContract")
@@ -201,6 +247,13 @@ class OptimizationRunner:
         self.evaluator_hash = normalized_hash
         self.bootstrap_resamples = bootstrap_resamples
         self.campaign_id = campaign_id.strip() if campaign_id is not None else None
+        _lease_duration_ns(lease_ttl_s)
+        interval = lease_ttl_s / 3 if lease_heartbeat_s is None else lease_heartbeat_s
+        _lease_duration_ns(interval)
+        if interval >= lease_ttl_s:
+            raise ValueError("lease heartbeat must be shorter than its TTL")
+        self.lease_ttl_s = float(lease_ttl_s)
+        self.lease_heartbeat_s = float(interval)
 
     async def run(
         self,
@@ -209,9 +262,72 @@ class OptimizationRunner:
     ) -> OptimizationResult:
         """Execute one deterministic campaign, safely resuming completed trials."""
 
+        caller = asyncio.current_task()
+        initial_cancellations = caller.cancelling()
         self._validate_executable_contract()
         started = time.monotonic()
         plan = self._build_plan(incumbent, candidates)
+        try:
+            self.ledger.create_campaign(self.contract, incumbent.candidate_id,
+                                        plan["all_candidates"], plan_hash=plan["plan_hash"],
+                                        campaign_id=plan["campaign_id"])
+        except (ExperimentLedgerError, ValueError) as exc:
+            raise OptimizationError(f"campaign binding drift: {exc}") from exc
+        lease = self.ledger.acquire_campaign_lease(plan["campaign_id"], uuid.uuid4().hex,
+                                                   ttl_s=self.lease_ttl_s)
+        task = None
+        heartbeat = None
+        error = None
+        result = None
+        started_heartbeat = False
+        try:
+            owned = self._run_owned(incumbent, plan, started, lease=lease)
+            try:
+                task = asyncio.create_task(owned)
+            except BaseException:
+                owned.close()
+                raise
+            heartbeat = _LeaseHeartbeat(self.ledger, lease, self.lease_ttl_s,
+                                        self.lease_heartbeat_s, asyncio.get_running_loop(), task)
+            heartbeat.start()
+            started_heartbeat = True
+            result = await asyncio.shield(task)
+        except BaseException as caught:
+            error = caught
+            if task is not None:
+                task.cancel()
+                # Repeated caller cancellation must not abandon owned evaluators.
+                while not task.done():
+                    try:
+                        await asyncio.shield(task)
+                    except BaseException:
+                        pass
+                if not task.cancelled():
+                    task.exception()
+        finally:
+            if started_heartbeat:
+                heartbeat.close()
+            if heartbeat is not None and heartbeat.failure is not None:
+                loss = CampaignLeaseError(f"Campaign lease heartbeat failed: {heartbeat.failure}")
+                loss.__cause__ = heartbeat.failure
+                if error is None or (isinstance(error, asyncio.CancelledError)
+                                     and caller.cancelling() <= initial_cancellations):
+                    error = loss
+                else:
+                    error.add_note(str(loss))
+            try:
+                self.ledger.release_campaign_lease(lease)
+            except BaseException as release_error:
+                if error is None:
+                    error = release_error
+                else:
+                    error.add_note(f"Campaign lease release failed: {release_error}")
+        if error is not None:
+            raise error
+        assert result is not None
+        return result
+
+    async def _run_owned(self, incumbent, plan, started, *, lease: CampaignLease):
         campaign_id = self._open_and_register(plan)
         holdout_seed_material, holdout_seed_commitment = (
             self._holdout_seed_binding(campaign_id, plan)
@@ -243,6 +359,7 @@ class OptimizationRunner:
             development_seeds,
             deadline,
             duration_budget,
+            lease=lease,
         )
         challenger_development = await self._evaluate_development_candidates(
             campaign_id,
@@ -251,6 +368,7 @@ class OptimizationRunner:
             development_seeds,
             deadline,
             duration_budget,
+            lease=lease,
         )
         self._require_time(deadline)
         scores = tuple(
@@ -288,7 +406,7 @@ class OptimizationRunner:
                     "development_scores": list(scores),
                 },
             )
-            decision_id = self.ledger.append_decision(decision)
+            decision_id = self.ledger.append_decision(decision, lease=lease)
             return OptimizationResult(
                 campaign_id=campaign_id,
                 optimization_plan_hash=plan["plan_hash"],
@@ -319,6 +437,7 @@ class OptimizationRunner:
             confirmation_seeds,
             deadline,
             duration_budget,
+            lease=lease,
         )
         self._require_time(deadline)
         confirmation = self._assess(
@@ -344,6 +463,7 @@ class OptimizationRunner:
                 holdout_seeds,
                 deadline,
                 duration_budget,
+                lease=lease,
             )
             self._require_time(deadline)
             holdout = self._assess(
@@ -384,7 +504,7 @@ class OptimizationRunner:
                 "holdout": _assessment_dict(holdout),
             },
         )
-        decision_id = self.ledger.append_decision(decision)
+        decision_id = self.ledger.append_decision(decision, lease=lease)
         return OptimizationResult(
             campaign_id=campaign_id,
             optimization_plan_hash=plan["plan_hash"],
@@ -682,6 +802,8 @@ class OptimizationRunner:
         seeds: Sequence[int],
         deadline: float,
         duration_budget: _DurationBudget,
+        *,
+        lease: CampaignLease,
     ) -> dict[str, tuple[TrialRecord, ...]]:
         semaphore = asyncio.Semaphore(self.contract.max_parallel_candidates)
         stop_event = asyncio.Event()
@@ -699,6 +821,7 @@ class OptimizationRunner:
                         deadline,
                         duration_budget,
                         stop_event,
+                        lease=lease,
                     )
             except BaseException:
                 stop_event.set()
@@ -708,10 +831,7 @@ class OptimizationRunner:
         try:
             results = await asyncio.gather(*tasks)
         except BaseException:
-            for task in tasks:
-                if not task.done():
-                    task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
+            await _cancel_and_drain(tasks)
             raise
         return {
             candidate.candidate_id: result
@@ -728,6 +848,8 @@ class OptimizationRunner:
         seeds: Sequence[int],
         deadline: float,
         duration_budget: _DurationBudget,
+        *,
+        lease: CampaignLease,
     ) -> tuple[tuple[TrialRecord, ...], tuple[TrialRecord, ...]]:
         semaphore = asyncio.Semaphore(self.contract.max_parallel_candidates)
         stop_event = asyncio.Event()
@@ -747,6 +869,7 @@ class OptimizationRunner:
                         deadline,
                         duration_budget,
                         stop_event,
+                        lease=lease,
                     )
             except BaseException:
                 stop_event.set()
@@ -759,10 +882,7 @@ class OptimizationRunner:
         try:
             baseline, candidate = await asyncio.gather(*tasks)
         except BaseException:
-            for task in tasks:
-                if not task.done():
-                    task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
+            await _cancel_and_drain(tasks)
             raise
         return baseline, candidate
 
@@ -777,6 +897,8 @@ class OptimizationRunner:
         deadline: float,
         duration_budget: _DurationBudget,
         stop_event: asyncio.Event | None = None,
+        *,
+        lease: CampaignLease,
     ) -> tuple[TrialRecord, ...]:
         records: list[TrialRecord] = []
         for seed in seeds:
@@ -795,6 +917,7 @@ class OptimizationRunner:
                     deadline,
                     duration_budget,
                     stop_event,
+                    lease=lease,
                 )
             )
         return tuple(records)
@@ -810,6 +933,8 @@ class OptimizationRunner:
         deadline: float,
         duration_budget: _DurationBudget,
         stop_event: asyncio.Event | None,
+        *,
+        lease: CampaignLease,
     ) -> TrialRecord:
         self._require_time(deadline)
         try:
@@ -821,6 +946,7 @@ class OptimizationRunner:
                 seed,
                 evaluator_hash=self.evaluator_hash,
                 ceiling_microusd=self.contract.per_trial_reservation_microusd,
+                lease=lease,
             )
         except UnknownTrialError as exc:
             raise OptimizationNeedsAttention(str(exc)) from exc
@@ -832,7 +958,7 @@ class OptimizationRunner:
         record = self.ledger.get_trial(trial_key)
         if record.status is TrialStatus.COMPLETED:
             self._validate_completed_record(record)
-            await self._enforce_limits(record, duration_budget)
+            await self._enforce_limits(record, duration_budget, lease=lease)
             return record
         if record.status is TrialStatus.UNKNOWN:
             raise OptimizationNeedsAttention(
@@ -853,7 +979,7 @@ class OptimizationRunner:
                 "parallel evaluation stopped before atomic dispatch claim"
             )
         try:
-            self.ledger.claim_trial_dispatch(trial_key)
+            self.ledger.claim_trial_dispatch(trial_key, lease=lease)
         except (TrialStateError, UnknownTrialError) as exc:
             raise OptimizationNeedsAttention(
                 f"lost atomic dispatch claim for trial {trial_key!r}; evaluator not invoked"
@@ -861,7 +987,7 @@ class OptimizationRunner:
 
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            self._mark_unknown(trial_key, "wall-time expired after dispatch claim")
+            self._mark_unknown(trial_key, "wall-time expired after dispatch claim", lease=lease)
             raise OptimizationNeedsAttention(
                 f"wall-time expired after dispatching trial {trial_key!r}"
             )
@@ -880,11 +1006,15 @@ class OptimizationRunner:
         trial_started = time.monotonic()
         try:
             outcome = await asyncio.wait_for(self.evaluator(context), timeout=remaining)
-        except asyncio.CancelledError:
-            self._mark_unknown(trial_key, "evaluator cancelled after dispatch")
+        except asyncio.CancelledError as exc:
+            try:
+                self._mark_unknown(trial_key, "evaluator cancelled after dispatch", lease=lease)
+            except CampaignLeaseError as loss:
+                exc.add_note(str(loss))
+                raise exc from loss
             raise
         except TimeoutError as exc:
-            self._mark_unknown(trial_key, "evaluator exceeded remaining wall-time")
+            self._mark_unknown(trial_key, "evaluator exceeded remaining wall-time", lease=lease)
             raise OptimizationNeedsAttention(
                 f"trial {trial_key!r} timed out after dispatch; outcome is unknown"
             ) from exc
@@ -892,6 +1022,7 @@ class OptimizationRunner:
             self._mark_unknown(
                 trial_key,
                 f"evaluator raised {type(exc).__name__} after dispatch: {exc}",
+                lease=lease,
             )
             raise OptimizationNeedsAttention(
                 f"trial {trial_key!r} evaluator failed after dispatch"
@@ -901,7 +1032,8 @@ class OptimizationRunner:
             normalized = self._validate_outcome(outcome)
         except (TypeError, ValueError, OverflowError) as exc:
             self._mark_unknown(
-                trial_key, f"evaluator returned an invalid outcome: {type(exc).__name__}: {exc}"
+                trial_key, f"evaluator returned an invalid outcome: {type(exc).__name__}: {exc}",
+                lease=lease,
             )
             raise OptimizationNeedsAttention(
                 f"trial {trial_key!r} returned an invalid outcome"
@@ -915,16 +1047,18 @@ class OptimizationRunner:
                 duration_ms=duration_ms,
                 artifact_hashes=normalized.artifact_hashes,
                 evaluator_hash=self.evaluator_hash,
+                lease=lease,
             )
         except Exception as exc:
             self._mark_unknown(
                 trial_key,
                 f"durable completion failed after evaluator returned: {type(exc).__name__}: {exc}",
+                lease=lease,
             )
             raise OptimizationNeedsAttention(
                 f"trial {trial_key!r} could not be durably completed"
             ) from exc
-        await self._enforce_limits(completed, duration_budget)
+        await self._enforce_limits(completed, duration_budget, lease=lease)
         return completed
 
     def _validate_outcome(self, outcome: object) -> TrialOutcome:
@@ -1015,7 +1149,10 @@ class OptimizationRunner:
         self,
         record: TrialRecord,
         duration_budget: _DurationBudget,
+        *,
+        lease: CampaignLease,
     ) -> None:
+        self.ledger.assert_campaign_lease(lease)
         if (
             record.actual_cost_microusd is not None
             and record.actual_cost_microusd > record.ceiling_microusd
@@ -1034,14 +1171,16 @@ class OptimizationRunner:
                     f"max_wall_seconds {self.contract.max_wall_seconds}"
                 )
 
-    def _mark_unknown(self, trial_key: str, error: str) -> None:
+    def _mark_unknown(self, trial_key: str, error: str, *, lease: CampaignLease) -> None:
         normalized = "".join(
             character if ord(character) >= 32 else " " for character in str(error)
         ).strip()
         if not normalized:
             normalized = "unknown evaluator failure after dispatch"
         try:
-            self.ledger.mark_trial_unknown(trial_key, normalized[:4096])
+            self.ledger.mark_trial_unknown(trial_key, normalized[:4096], lease=lease)
+        except CampaignLeaseError:
+            raise
         except Exception:
             pass
 

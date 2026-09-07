@@ -27,7 +27,7 @@ from smythe.optimize.engine import (
     _bound_phase,
     _split_seeds,
 )
-from smythe.optimize.ledger import ExperimentLedger, TrialStatus
+from smythe.optimize.ledger import CampaignLeaseConflict, ExperimentLedger, TrialStatus
 
 
 EVALUATOR_HASH = "sha256:" + "e" * 64
@@ -416,7 +416,7 @@ async def test_custom_campaign_plan_drift_and_active_dispatch_fail_closed(tmp_pa
         owner_task = asyncio.create_task(owner.run(incumbent, (challenger,)))
         await started.wait()
         competing = _runner(contract, ledger, blocking, campaign_id=campaign_id)
-        with pytest.raises(OptimizationNeedsAttention):
+        with pytest.raises(CampaignLeaseConflict):
             await competing.run(incumbent, (challenger,))
         dispatched = ledger.list_trials(campaign_id)
         assert len(dispatched) == 1
@@ -445,6 +445,7 @@ async def test_custom_campaign_plan_drift_and_active_dispatch_fail_closed(tmp_pa
             "development",
             _bound_phase("incumbent", plan["plan_hash"]),
             development_seed,
+            lease=ledger.acquire_campaign_lease("drift", "fixture", ttl_s=3600),
             evaluator_hash=EVALUATOR_HASH,
             ceiling_microusd=contract.per_trial_reservation_microusd,
         )
