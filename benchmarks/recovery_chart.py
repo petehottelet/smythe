@@ -90,7 +90,9 @@ def validate_recovery(record: dict) -> dict[str, list[dict]]:
 
 def render_recovery() -> str:
     """Render each actual repetition and its derived mean dispatch reduction."""
-    source = RECORD_PATH.read_bytes()
+    # Git checkouts can translate CRLF without changing any evidence. Bind the
+    # chart to the LF source representation used by the committed JSON blob.
+    source = RECORD_PATH.read_bytes().replace(b"\r\n", b"\n")
     record = json.loads(source)
     groups = validate_recovery(record)
     means = {framework: statistics.mean(row["duplicate_dispatches"] for row in rows)

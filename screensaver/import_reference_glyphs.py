@@ -414,6 +414,29 @@ def read_inputs(out: Path, source_repo: Path | None = None) -> tuple[bytes, byte
                  for path in (ASSET, "LICENSE"))
 
 
+def _png_fingerprint(content: bytes) -> tuple[str, tuple[int, int], str]:
+    """Bind inspection pixels, not platform-specific PNG compression bytes."""
+    from PIL import Image
+
+    with Image.open(io.BytesIO(content)) as image:
+        if image.format != "PNG" or image.n_frames != 1:
+            raise ValueError("expected a single-frame inspection PNG")
+        # Preserve mode and size, but decode palettes/transparency before hashing
+        # so a changed palette cannot hide behind unchanged pixel indices.
+        pixels = image.convert("RGBA").tobytes()
+        return image.mode, image.size, hashlib.sha256(pixels).hexdigest()
+
+
+def export_matches(relative: str, actual: bytes, expected: bytes) -> bool:
+    """Require exact non-PNG bytes and exact decoded inspection PNG pixels."""
+    if Path(relative).suffix.lower() != ".png":
+        return actual == expected
+    try:
+        return _png_fingerprint(actual) == _png_fingerprint(expected)
+    except (OSError, ValueError):
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-repo", type=Path, help="local pinned reference clone; no network access")
@@ -425,7 +448,7 @@ def main():
     for relative, content in files.items():
         target = args.out / relative
         if args.check:
-            if not target.is_file() or target.read_bytes() != content:
+            if not target.is_file() or not export_matches(relative, target.read_bytes(), content):
                 mismatches.append(relative)
         else:
             target.parent.mkdir(parents=True, exist_ok=True)

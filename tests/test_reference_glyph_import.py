@@ -1,6 +1,7 @@
 """Reference artwork import preserves pinned geometry, spacing, and provenance."""
 
 import hashlib
+import io
 import json
 from pathlib import Path
 import subprocess
@@ -11,7 +12,7 @@ import pytest
 
 from screensaver.import_reference_glyphs import (
     COMMIT, DEFAULT_OUT, LICENSE_SHA256, SCALE, SVG_SHA256,
-    _normalized_path, build_catalog, export_files, parse_contours, read_inputs, render_glyph,
+    _normalized_path, build_catalog, export_files, export_matches, parse_contours, read_inputs, render_glyph,
 )
 
 
@@ -118,7 +119,9 @@ def test_exports_match_checked_in_files_and_keep_original_catalog_separate():
     assert "glyphs.js" not in files
     assert not any("GLYPH-" in name for name in files)
     for name, expected in files.items():
-        assert (DEFAULT_OUT / name).read_bytes() == expected, name
+        # Keep failures concise: pytest's raw PNG byte diff can take minutes.
+        matches = export_matches(name, (DEFAULT_OUT / name).read_bytes(), expected)
+        assert matches, name
     js = files["base-glyphs.js"].decode().split("globalThis.BASE_GLYPHS = ", 1)[1]
     assert json.loads(js.removesuffix(";\n")) == json.loads(files["reference/catalog.json"])
     provenance = json.loads(files["reference/provenance.json"])
@@ -126,6 +129,86 @@ def test_exports_match_checked_in_files_and_keep_original_catalog_separate():
     assert "Susan Kare" in provenance["artwork_origin_as_stated_upstream"]
     assert "not a separate" in provenance["rights_scope"]
     assert provenance["transformation"]["upstream_implementation_code_copied"] is False
+
+
+def png_bytes(image, *, compress_level=6):
+    output = io.BytesIO()
+    image.save(output, format="PNG", compress_level=compress_level)
+    return output.getvalue()
+
+
+def test_inspection_png_accepts_identical_pixels_with_different_compression():
+    from PIL import Image
+
+    image = Image.new("RGB", (16, 16), "white")
+    image.putpixel((3, 7), (12, 34, 56))
+    uncompressed, compressed = (png_bytes(image, compress_level=level) for level in (0, 9))
+    assert hashlib.sha256(uncompressed).hexdigest() != hashlib.sha256(compressed).hexdigest()
+    assert export_matches("reference/contact-sheet.png", uncompressed, compressed)
+
+
+@pytest.mark.parametrize("change", ["pixel", "dimensions", "mode", "corrupt", "format"])
+def test_inspection_png_rejects_changed_or_invalid_images(change):
+    from PIL import Image
+
+    image = Image.new("RGB", (16, 16), "white")
+    expected = png_bytes(image)
+    if change == "pixel":
+        image.putpixel((3, 7), (254, 255, 255))
+    elif change == "dimensions":
+        image = image.resize((8, 32))
+    elif change == "mode":
+        image = image.convert("RGBA")
+    actual = png_bytes(image)
+    if change == "corrupt":
+        actual = b"not a PNG"
+    elif change == "format":
+        output = io.BytesIO()
+        image.save(output, format="BMP")
+        actual = output.getvalue()
+    assert not export_matches("reference/contact-sheet.png", actual, expected)
+
+
+def test_inspection_png_detects_palette_changes_with_identical_indices():
+    from PIL import Image
+
+    image = Image.new("P", (16, 16), 0)
+    image.putpalette([255, 255, 255] + [0] * 765)
+    expected = png_bytes(image)
+    image.putpalette([254, 255, 255] + [0] * 765)
+    assert not export_matches("reference/contact-sheet.png", png_bytes(image), expected)
+
+
+@pytest.mark.parametrize("name", ["base-glyphs.js", "reference/catalog.json", "reference/BASE-000.svg",
+                                  "reference/LICENSE", "reference/README.md"])
+def test_non_png_exports_require_exact_bytes(name):
+    assert export_matches(name, b"exact\n", b"exact\n")
+    assert not export_matches(name, b"exact\r\n", b"exact\n")
+
+
+@pytest.mark.parametrize("changed_pixel", [False, True])
+def test_cli_inspection_png_check_uses_pixels_and_does_not_rewrite(tmp_path, changed_pixel):
+    from PIL import Image
+
+    files = export_files(*read_inputs(DEFAULT_OUT))
+    for name, content in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+    path = tmp_path / "reference/contact-sheet.png"
+    with Image.open(path) as original:
+        image = original.copy()
+    if changed_pixel:
+        image.putpixel((0, 0), (0, 0, 0))
+    actual = png_bytes(image, compress_level=0)
+    path.write_bytes(actual)
+    command = [sys.executable, str(Path(__file__).resolve().parents[1] /
+                                 "screensaver/import_reference_glyphs.py"),
+               "--out", str(tmp_path), "--check"]
+    result = subprocess.run(command, capture_output=True, text=True)
+    assert result.returncode == (1 if changed_pixel else 0), result.stderr
+    assert ("reference/contact-sheet.png" in result.stderr) is changed_pixel
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == hashlib.sha256(actual).hexdigest()
 
 
 def test_cli_check_is_read_only_and_detects_changed_exports(tmp_path):

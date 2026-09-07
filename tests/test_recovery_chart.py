@@ -28,7 +28,7 @@ def render_fixture(monkeypatch, tmp_path, record):
 
 
 def test_current_recovery_chart_uses_all_six_committed_samples_and_zero_based_bars():
-    source = chart.RECORD_PATH.read_bytes()
+    source = chart.RECORD_PATH.read_bytes().replace(b"\r\n", b"\n")
     document = chart.render_recovery()
     assert document == chart.render_recovery()
     root = ET.fromstring(document)
@@ -56,6 +56,19 @@ def test_current_recovery_chart_uses_all_six_committed_samples_and_zero_based_ba
         assert smythe.attrib["fill"] == "#000000"
         assert langgraph.attrib["fill"] == "#ffffff"
         assert langgraph.attrib["stroke"] == "#000000"
+
+
+def test_recovery_chart_is_identical_for_lf_and_crlf_source(monkeypatch, tmp_path):
+    source = chart.RECORD_PATH.read_bytes().replace(b"\r\n", b"\n")
+    path = tmp_path / chart.RECORD_PATH.name
+    monkeypatch.setattr(chart, "RECORD_PATH", path)
+    path.write_bytes(source)
+    lf_document = chart.render_recovery()
+    path.write_bytes(source.replace(b"\n", b"\r\n"))
+    crlf_document = chart.render_recovery()
+    assert crlf_document == lf_document
+    assert hashlib.sha256(source).hexdigest() in crlf_document
+    assert json.loads(path.read_bytes()) == json.loads(source)
 
 
 def test_chart_derives_reduction_and_mark_widths_from_raw_rows(evidence, monkeypatch, tmp_path):
