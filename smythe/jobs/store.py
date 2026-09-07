@@ -25,7 +25,20 @@ STORE_VERSION = 2
 DEFAULT_RUN_LEASE_TTL_S = 30.0
 MAX_SQLITE_INTEGER = (1 << 63) - 1
 MAX_ARTIFACTS_PER_CALL = 10
+MAX_LIST_RUNS = 500
 _RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+# Jobs predates an explicit format-kind table. Verify its complete table
+# shape and user_version before opening it for inspection or migration.
+_SCHEMA_COLUMNS = {
+    "runs": "run_id manifest_hash plan_hash manifest_json plan_json approval_json approval_token manifest_root output_directory max_concurrency status approved_microusd confirmed_microusd exposure_microusd reserved_microusd created_at_ns updated_at_ns",
+    "operations": "run_id operation_id operation_key spec_json status attempt_count max_attempts accepted_attempt_id result_text error updated_at_ns",
+    "attempts": "attempt_id run_id operation_id attempt_number parent_attempt_id reason status result_text error started_at_ns completed_at_ns",
+    "calls": "call_id attempt_id run_id operation_id status idempotency_key ceiling_microusd confirmed_microusd exposure_microusd cost_is_complete cost_is_estimate provider_request_id error created_at_ns dispatched_at_ns completed_at_ns",
+    "artifacts": "artifact_id attempt_id run_id operation_id relative_path mime_type sha256 size_bytes width height accepted created_at_ns",
+    "events": "sequence run_id operation_id event_type payload_json created_at_ns",
+    "run_leases": "run_id owner_id acquired_at_ns heartbeat_at_ns expires_at_ns",
+}
 
 
 class RunStatus(str, Enum):
@@ -149,25 +162,128 @@ def _run_lease(row: sqlite3.Row) -> RunLease:
     )
 
 
+def _read_json_object(value: object, field: str) -> dict[str, Any]:
+    """Decode stored JSON without allowing ambiguous or nonfinite output."""
+    def pairs(items):
+        result = {}
+        for key, item in items:
+            if key in result:
+                raise ValueError("duplicate object key")
+            result[key] = item
+        return result
+
+    def constant(_value):
+        raise ValueError("nonfinite JSON constant")
+
+    def finite(item):
+        if isinstance(item, float) and not math.isfinite(item):
+            raise ValueError("nonfinite JSON number")
+        if isinstance(item, dict):
+            for child in item.values():
+                finite(child)
+        elif isinstance(item, list):
+            for child in item:
+                finite(child)
+
+    try:
+        if type(value) is not str:
+            raise ValueError("stored JSON is not text")
+        result = json.loads(value, object_pairs_hook=pairs, parse_constant=constant)
+        if type(result) is not dict:
+            raise ValueError("stored JSON root is not an object")
+        finite(result)
+        return result
+    except (ValueError, TypeError, RecursionError) as exc:
+        raise RunStoreError("Invalid stored JSON in " + field) from exc
+
+
+def _validate_read_row(row, table: str) -> None:
+    """SQLite affinity is not a type guarantee; never emit BLOBs as JSON."""
+    integers = {
+        "max_concurrency", "approved_microusd", "confirmed_microusd", "exposure_microusd",
+        "reserved_microusd", "created_at_ns", "updated_at_ns", "attempt_count", "max_attempts",
+        "attempt_number", "started_at_ns", "completed_at_ns", "ceiling_microusd", "cost_is_complete",
+        "cost_is_estimate", "dispatched_at_ns", "size_bytes", "width", "height", "accepted", "sequence",
+        "cost_contains_estimates", "count", "acquired_at_ns", "heartbeat_at_ns", "expires_at_ns",
+    }
+    nullable = {
+        "runs": set(),
+        "operations": {"accepted_attempt_id", "result_text", "error"},
+        "attempts": {"parent_attempt_id", "reason", "result_text", "error", "completed_at_ns"},
+        "calls": {"provider_request_id", "error", "dispatched_at_ns", "completed_at_ns"},
+        "artifacts": {"width", "height"},
+        "events": {"operation_id"},
+        "run_leases": set(),
+    }
+    flags = {"cost_is_complete", "cost_is_estimate", "accepted", "cost_contains_estimates"}
+    for field, value in dict(row).items():
+        if value is None and field in nullable[table]:
+            continue
+        if field in integers:
+            if type(value) is not int or not 0 <= value <= MAX_SQLITE_INTEGER or field in flags and value not in (0, 1):
+                raise RunStoreError("Invalid stored integer in " + table + "." + field)
+        elif type(value) is not str:
+            raise RunStoreError("Invalid stored text in " + table + "." + field)
+
+
 class SQLiteRunStore:
     """Incremental local run state with a durable pre-dispatch boundary."""
 
-    def __init__(self, path: str | Path) -> None:
+    def __init__(self, path: str | Path, *, read_only: bool = False) -> None:
+        if type(read_only) is not bool:
+            raise TypeError("read_only must be a boolean")
         self.path = Path(path).resolve()
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._connection = sqlite3.connect(
-            self.path,
-            isolation_level=None,
-            check_same_thread=False,
-        )
-        self._connection.row_factory = sqlite3.Row
+        self.read_only = read_only
         self._lock = threading.RLock()
-        with self._lock:
-            self._connection.execute("PRAGMA foreign_keys = ON")
-            self._connection.execute("PRAGMA journal_mode = WAL")
-            self._connection.execute("PRAGMA synchronous = FULL")
+        if not read_only:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self._connection = sqlite3.connect(
+                self.path.as_uri() + "?mode=ro" if read_only else self.path,
+                uri=read_only, isolation_level=None, check_same_thread=False,
+            )
+        except sqlite3.Error as exc:
+            raise RunStoreError("Cannot open Jobs database") from exc
+        self._connection.row_factory = sqlite3.Row
+        try:
+            # Connection-local settings do not alter database bytes. In
+            # particular, never use immutable=1: inspectors must see live WAL.
+            if read_only:
+                self._connection.execute("PRAGMA query_only = ON")
             self._connection.execute("PRAGMA busy_timeout = 5000")
-            self._create_schema()
+            existing = self._validate_schema(allow_empty=not read_only)
+            self._connection.execute("PRAGMA foreign_keys = ON")
+            if not read_only:
+                self._connection.execute("PRAGMA journal_mode = WAL")
+                self._connection.execute("PRAGMA synchronous = FULL")
+                if not existing or self._connection.execute("PRAGMA user_version").fetchone()[0] < STORE_VERSION:
+                    self._create_schema()
+        except sqlite3.Error as exc:
+            self._connection.close()
+            raise RunStoreError("Invalid or unreadable Jobs database schema") from exc
+        except BaseException:
+            self._connection.close()
+            raise
+
+    def _validate_schema(self, *, allow_empty: bool) -> bool:
+        with self._read_transaction() as cursor:
+            tables = {row[0] for row in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            version = cursor.execute("PRAGMA user_version").fetchone()[0]
+            if not tables and version == 0 and allow_empty:
+                return False
+            supported_versions = (1, STORE_VERSION) if not self.read_only else (STORE_VERSION,)
+            if version not in supported_versions:
+                raise RunStoreError("Unsupported Jobs database version")
+            expected = dict(_SCHEMA_COLUMNS)
+            if version == 1 and not self.read_only:
+                expected.pop("run_leases")  # Preserve the existing writable v1 upgrade.
+            if not expected.keys() <= tables:
+                raise RunStoreError("Database does not contain the required Jobs schema")
+            for table, columns in expected.items():
+                found = {row[1] for row in cursor.execute(f"PRAGMA table_info({table})")}
+                if not set(columns.split()) <= found:
+                    raise RunStoreError("Jobs database has an incomplete " + table + " table")
+        return True
 
     def close(self) -> None:
         with self._lock:
@@ -302,6 +418,8 @@ class SQLiteRunStore:
 
     @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Cursor]:
+        if self.read_only:
+            raise RunStoreError("Jobs database is read-only")
         with self._lock:
             cursor = self._connection.cursor()
             cursor.execute("BEGIN IMMEDIATE")
@@ -328,6 +446,9 @@ class SQLiteRunStore:
             cursor.execute("BEGIN")
             try:
                 yield cursor
+            except sqlite3.Error as exc:
+                cursor.execute("ROLLBACK")
+                raise RunStoreError("Cannot read Jobs database") from exc
             except BaseException:
                 cursor.execute("ROLLBACK")
                 raise
@@ -533,9 +654,10 @@ class SQLiteRunStore:
     def get_run_lease(self, run_id: str) -> RunLease | None:
         """Return the persisted lease, including an expired lease if present."""
 
-        self.get_run(run_id)
-        with self._lock:
-            row = self._connection.execute(
+        with self._read_transaction() as cursor:
+            if cursor.execute("SELECT 1 FROM runs WHERE run_id = ?", (run_id,)).fetchone() is None:
+                raise JobNotFoundError(run_id)
+            row = cursor.execute(
                 "SELECT * FROM run_leases WHERE run_id = ?", (run_id,)
             ).fetchone()
         return _run_lease(row) if row is not None else None
@@ -550,9 +672,10 @@ class SQLiteRunStore:
         return dict(row)
 
     def pending_operations(self, run_id: str) -> list[dict[str, Any]]:
-        self.get_run(run_id)
-        with self._lock:
-            rows = self._connection.execute(
+        with self._read_transaction() as cursor:
+            if cursor.execute("SELECT 1 FROM runs WHERE run_id = ?", (run_id,)).fetchone() is None:
+                raise JobNotFoundError(run_id)
+            rows = cursor.execute(
                 """
                 SELECT * FROM operations
                 WHERE run_id = ? AND status = ?
@@ -561,6 +684,73 @@ class SQLiteRunStore:
                 (run_id, OperationStatus.PENDING.value),
             ).fetchall()
         return [dict(row) | {"spec": json.loads(row["spec_json"])} for row in rows]
+
+    def list_runs(
+        self, *, limit: int = 50, offset: int = 0, status: RunStatus | str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return one bounded page, newest creation first, then run ID.
+
+        Pagination is offset based and each call observes a single WAL
+        snapshot. New runs inserted between pages can shift their offsets.
+        Prompts, operation specifications, results and artifact rows are not
+        loaded. ``limit`` is 1..500; ``offset`` is a nonnegative SQLite integer.
+        """
+        return self.list_run_page(limit=limit, offset=offset, status=status)["runs"]
+
+    def list_run_page(
+        self, *, limit: int = 50, offset: int = 0, status: RunStatus | str | None = None,
+    ) -> dict[str, Any]:
+        """Return bounded summaries and has_more from the same read snapshot."""
+        if type(limit) is not int or not 1 <= limit <= MAX_LIST_RUNS:
+            raise ValueError(f"limit must be an integer between 1 and {MAX_LIST_RUNS}")
+        if type(offset) is not int or not 0 <= offset <= MAX_SQLITE_INTEGER:
+            raise ValueError("offset must be a nonnegative SQLite integer")
+        if isinstance(status, RunStatus):
+            status = status.value
+        if status is not None and (type(status) is not str or status not in {item.value for item in RunStatus}):
+            raise ValueError("status must be a Jobs run status")
+        where = "WHERE status = ?" if status is not None else ""
+        parameters = (status, limit + 1, offset) if status is not None else (limit + 1, offset)
+        try:
+            with self._read_transaction() as cursor:
+                runs = cursor.execute(f"""
+                    SELECT run_id,status,created_at_ns,updated_at_ns,
+                        approved_microusd,confirmed_microusd,exposure_microusd,reserved_microusd
+                    FROM runs {where} ORDER BY created_at_ns DESC,run_id ASC LIMIT ? OFFSET ?
+                """, parameters).fetchall()
+                summaries = []
+                for run in runs[:limit]:
+                    _validate_read_row(run, "runs")
+                    detail = cursor.execute("""SELECT json_extract(plan_json,'$.name') AS name,
+                        json_type(plan_json,'$.name') AS name_type,typeof(plan_json) AS plan_storage,
+                        EXISTS(SELECT 1 FROM calls WHERE calls.run_id=runs.run_id AND cost_is_estimate=1)
+                            AS cost_contains_estimates FROM runs WHERE run_id=?""", (run["run_id"],)).fetchone()
+                    if detail["name_type"] != "text" or detail["plan_storage"] != "text" or run["status"] not in {item.value for item in RunStatus}:
+                        raise RunStoreError("Jobs run summary contains invalid name or status")
+                    for field in ("created_at_ns", "updated_at_ns", "approved_microusd", "confirmed_microusd",
+                                  "exposure_microusd", "reserved_microusd"):
+                        try:
+                            _microusd(run[field], field=field)
+                        except (TypeError, ValueError) as exc:
+                            raise RunStoreError("Jobs run summary contains invalid numeric data") from exc
+                    counts = {row["status"]: row["count"] for row in cursor.execute(
+                        "SELECT status,COUNT(*) AS count FROM operations WHERE run_id=? GROUP BY status", (run["run_id"],))}
+                    if not counts.keys() <= {item.value for item in OperationStatus}:
+                        raise RunStoreError("Jobs run has invalid operation status")
+                    summaries.append({
+                        "run_id": run["run_id"], "name": detail["name"], "status": run["status"],
+                        "created_at_ns": run["created_at_ns"], "updated_at_ns": run["updated_at_ns"],
+                        "operation_count": sum(counts.values()), "counts": counts,
+                        "cost": {key: run[key] for key in ("approved_microusd", "confirmed_microusd",
+                                 "exposure_microusd", "reserved_microusd")} | {
+                            "cost_is_complete": run["exposure_microusd"] == 0,
+                            "cost_contains_estimates": bool(detail["cost_contains_estimates"]),
+                        },
+                    })
+                return {"runs": summaries, "limit": limit, "offset": offset,
+                        "returned": len(summaries), "has_more": len(runs) > limit}
+        except sqlite3.Error as exc:
+            raise RunStoreError("Cannot read Jobs run summaries") from exc
 
     def begin_attempt(
         self,
@@ -1167,15 +1357,27 @@ class SQLiteRunStore:
             call_rows = cursor.execute(
                 "SELECT cost_is_estimate FROM calls WHERE run_id = ?", (run_id,)
             ).fetchall()
+        return self._snapshot_projection(run_row, operations, attempts, artifacts, events, call_rows)
+
+    @staticmethod
+    def _snapshot_projection(run_row, operations, attempts, artifacts, events, call_rows):
         run = dict(run_row)
+        _validate_read_row(run, "runs")
+        for table, rows in (("operations", operations), ("attempts", attempts), ("artifacts", artifacts),
+                            ("events", events), ("calls", call_rows)):
+            for row in rows:
+                _validate_read_row(row, table)
+        name = run["name"] if "name" in run else _read_json_object(run["plan_json"], "runs.plan_json").get("name")
+        if type(name) is not str:
+            raise RunStoreError("Invalid stored job name")
         counts: dict[str, int] = {}
         for operation in operations:
             counts[operation["status"]] = counts.get(operation["status"], 0) + 1
         exposure = run["exposure_microusd"]
         return {
             "version": STORE_VERSION,
-            "run_id": run_id,
-            "name": json.loads(run["plan_json"])["name"],
+            "run_id": run["run_id"],
+            "name": name,
             "status": run["status"],
             "manifest_hash": run["manifest_hash"],
             "plan_hash": run["plan_hash"],
@@ -1203,26 +1405,112 @@ class SQLiteRunStore:
                     "accepted_attempt_id": row["accepted_attempt_id"],
                     "result_text": row["result_text"],
                     "error": row["error"],
-                    "spec": json.loads(row["spec_json"]),
+                    "spec": _read_json_object(row["spec_json"], "operations.spec_json"),
                 }
                 for row in operations
             ],
             "attempts": [dict(row) for row in attempts],
             "artifacts": [dict(row) for row in artifacts],
             "events": [
-                dict(row) | {"payload": json.loads(row["payload_json"])}
+                dict(row) | {"payload": _read_json_object(row["payload_json"], "events.payload_json")}
                 for row in events
             ],
             "created_at_ns": run["created_at_ns"],
             "updated_at_ns": run["updated_at_ns"],
         }
 
+    def inspection_snapshot(
+        self, run_id: str, *, operation: str | None = None, limit: int = 50,
+        offset: int = 0, events_limit: int = 100,
+    ) -> dict[str, Any]:
+        """Page operations and their lineage within one live WAL snapshot.
+
+        Summary counts/costs always describe the full run. Attempts, calls and
+        artifacts contain the selected operations' complete local history;
+        events contain the latest N for the run or exact operation filter,
+        returned in chronological order. This does not read artifact files.
+        """
+        if type(limit) is not int or not 1 <= limit <= MAX_LIST_RUNS:
+            raise ValueError(f"limit must be an integer between 1 and {MAX_LIST_RUNS}")
+        if type(offset) is not int or not 0 <= offset <= MAX_SQLITE_INTEGER:
+            raise ValueError("offset must be a nonnegative SQLite integer")
+        if type(events_limit) is not int or not 1 <= events_limit <= 1000:
+            raise ValueError("events_limit must be an integer between 1 and 1000")
+        if operation is not None and (type(operation) is not str or not operation or len(operation) > 512):
+            raise ValueError("operation must be a nonempty operation key or ID")
+        try:
+            with self._read_transaction() as cursor:
+                run = cursor.execute("""SELECT run_id,json_extract(plan_json,'$.name') AS name,
+                    json_type(plan_json,'$.name') AS name_type,typeof(plan_json) AS plan_storage,
+                    status,manifest_hash,plan_hash,manifest_root,output_directory,max_concurrency,
+                    approved_microusd,confirmed_microusd,exposure_microusd,reserved_microusd,
+                    created_at_ns,updated_at_ns FROM runs WHERE run_id=?""", (run_id,)).fetchone()
+                if run is None:
+                    raise JobNotFoundError(run_id)
+                if (run["name_type"] != "text" or run["plan_storage"] != "text"
+                        or type(run["name"]) is not str or run["status"] not in {item.value for item in RunStatus}):
+                    raise RunStoreError("Jobs run summary contains invalid name or status")
+                for field in ("created_at_ns", "updated_at_ns", "approved_microusd", "confirmed_microusd",
+                              "exposure_microusd", "reserved_microusd"):
+                    try:
+                        _microusd(run[field], field=field)
+                    except (TypeError, ValueError) as exc:
+                        raise RunStoreError("Jobs run summary contains invalid numeric data") from exc
+                counts = {row["status"]: row["count"] for row in cursor.execute(
+                    "SELECT status,COUNT(*) AS count FROM operations WHERE run_id=? GROUP BY status", (run_id,))}
+                if not counts.keys() <= {item.value for item in OperationStatus}:
+                    raise RunStoreError("Jobs run has invalid operation status")
+                where, parameters = "run_id=?", (run_id,)
+                selected_id = None
+                if operation is not None:
+                    matches = cursor.execute("""SELECT operation_id FROM operations
+                        WHERE run_id=? AND (operation_key=? OR operation_id=?) LIMIT 2""",
+                        (run_id, operation, operation)).fetchall()
+                    if not matches:
+                        raise ValueError("No operation matches this key or ID")
+                    if len(matches) != 1:
+                        raise ValueError("Operation selector matches more than one operation")
+                    selected_id = matches[0]["operation_id"]
+                    where, parameters = "run_id=? AND operation_id=?", (run_id, selected_id)
+                total = 1 if selected_id is not None else sum(counts.values())
+                operations = cursor.execute(f"""SELECT * FROM operations WHERE {where}
+                    ORDER BY operation_key,operation_id LIMIT ? OFFSET ?""", (*parameters, limit, offset)).fetchall()
+                ids = tuple(row["operation_id"] for row in operations)
+                attempts, calls, artifacts = [], [], []
+                if ids:
+                    selected = ",".join("?" for _ in ids)
+                    lineage = (run_id, *ids)
+                    attempts = cursor.execute(f"""SELECT * FROM attempts WHERE run_id=?
+                        AND operation_id IN ({selected}) ORDER BY operation_id,attempt_number""", lineage).fetchall()
+                    calls = cursor.execute(f"""SELECT * FROM calls WHERE run_id=?
+                        AND operation_id IN ({selected}) ORDER BY created_at_ns,call_id""", lineage).fetchall()
+                    artifacts = cursor.execute(f"""SELECT * FROM artifacts WHERE run_id=?
+                        AND operation_id IN ({selected}) ORDER BY relative_path,artifact_id""", lineage).fetchall()
+                event_total = cursor.execute(f"SELECT COUNT(*) FROM events WHERE {where}", parameters).fetchone()[0]
+                events = cursor.execute(f"""SELECT * FROM events WHERE {where}
+                    ORDER BY sequence DESC LIMIT ?""", (*parameters, events_limit)).fetchall()[::-1]
+                estimates = cursor.execute("SELECT EXISTS(SELECT 1 FROM calls WHERE run_id=? AND cost_is_estimate=1)",
+                                           (run_id,)).fetchone()[0]
+                result = self._snapshot_projection(run, operations, attempts, artifacts, events,
+                                                   [{"cost_is_estimate": estimates}])
+                for call in calls:
+                    _validate_read_row(call, "calls")
+                result.update(counts=counts, calls=[dict(row) for row in calls], operation_filter=operation,
+                              pagination={"limit": limit, "offset": offset, "total": total,
+                                          "returned": len(operations), "has_more": offset + len(operations) < total},
+                              event_pagination={"limit": events_limit, "total": event_total,
+                                                "returned": len(events), "has_more": len(events) < event_total})
+                return result
+        except sqlite3.Error as exc:
+            raise RunStoreError("Cannot read Jobs inspection snapshot") from exc
+
     def manifest_record(self, run_id: str) -> dict[str, Any]:
         run = self.get_run(run_id)
+        _validate_read_row(run, "runs")
         return {
             "manifest_json": run["manifest_json"],
             "manifest_root": run["manifest_root"],
-            "approval": json.loads(run["approval_json"]),
+            "approval": _read_json_object(run["approval_json"], "runs.approval_json"),
         }
 
     def _call_rows(self, run_id: str) -> list[sqlite3.Row]:

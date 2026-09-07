@@ -23,6 +23,13 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Added
 
+- **Jobs operator inspection**: `jobs list` and `jobs inspect` read existing
+  ledgers without constructing providers. Bounded operation and event pages
+  retain whole-run cost totals and selected attempt lineage. Self-contained
+  HTML reports show prompts, responses, calls, validation errors, and current
+  artifact size/SHA-256 findings, with escaped text and no remote resources.
+  Status and export also open the ledger read-only; missing or foreign
+  databases fail without creating or migrating a schema.
 - **Durable text-workflow accounting**: opt-in SQLite run storage binds routing,
   planning, execution, verification, supervision, and synthesis to one exact
   nanoUSD ledger. Request-bound quotes, fenced dispatch, raw-response persistence,
@@ -125,7 +132,7 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   worst-case cost preflight, and approvals bound to the exact manifest, plan,
   and spend ceiling.
 - The installed `smythe jobs` CLI provides `schema`, `validate`, `plan`, `run`,
-  `status`, `resume`, `reroll`, and `export`. A SQLite WAL dispatch journal
+  `list`, `inspect`, `status`, `resume`, `reroll`, and `export`. A SQLite WAL dispatch journal
   persists calls before provider dispatch, distinguishes safe recovery from
   `unknown_outcome`, retains attempt lineage and artifact hashes, and requires
   explicit acknowledgment before rerunning an ambiguous call.

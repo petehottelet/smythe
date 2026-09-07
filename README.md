@@ -163,7 +163,8 @@ documents each comparison, its scope, and its evidence status.
 
 Agents use MCP tools, generate images, and pass artifacts to downstream nodes.
 Durable Jobs add manifest validation, plan approvals, an attempt journal,
-selective rerolls, and portable exports.
+selective rerolls, read-only run inspection, and portable exports. Inspect
+prompts, responses, costs, and artifact receipts in a local HTML report.
 
 [Architecture](docs/architecture.md) · [Task handoffs](docs/tasks.md) · [Jobs and CLI](docs/jobs.md) ·
 [Failure policies](docs/execution.md) · [Cost guardrails](docs/budgets.md) ·
@@ -231,7 +232,7 @@ team challenges the draft, and a final node writes the decision memo.
 
 ## Coming soon
 
-- **Operator tools:** inspect runs, detach long jobs, and approve durable pauses.
+- **Operator tools:** detach long jobs and approve durable pauses.
 - **Native exploration:** bring the web exposure pipeline, camera controls,
   and settings to Windows, macOS, and Linux, then verify them against the
   [implementation plan](docs/glyph-rain-plan.md).
