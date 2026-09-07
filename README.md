@@ -28,9 +28,7 @@ model and pipeline, with blind cross-vendor judging.
 
 ## Glyph Rain
 
-One artifact workflow creates 192 original SVG glyphs and validates every
-shape. The explorer mixes them into the reference character set: classic
-code rain, with occasional new characters and a navigable 3D mode.
+Run example: One workflow creates 192 original SVG glyphs and validates the result set. 
 
 <p align="center">
   <img src="screensaver/svg-preview/preview.png" alt="Classic code rain with the reference character set and occasional original Smythe glyphs" width="900">
@@ -41,11 +39,7 @@ code rain, with occasional new characters and a navigable 3D mode.
 [56 reference glyphs](screensaver/svg-preview/reference/contact-sheet.png) ·
 [24-glyph calibration sheet](benchmarks/partitions/glyph_svg_v1/catalog/calibration-sheet.png) ·
 [Individual SVGs and manifest](benchmarks/partitions/glyph_svg_v1/catalog/).
-Settings includes Classic, Operator, and 3D presets, glyph mix, motion, glow,
-and color controls. VT323 pixel controls and a Trajan Bold outline logo use bright
-green on black. The rain keeps its Matrix green grade and mint highlights.
-The default mix is 10% original glyphs. In 3D mode, arrow
-keys move through the field; Space pauses, R resets the view, and F enters
+In 3D mode, arrow keys move through the field; Space pauses, R resets the view, and F enters
 fullscreen. Touch controls are included.
 
 **Native downloads:** [Windows `.scr`](https://github.com/petehottelet/smythe/raw/refs/heads/main/screensaver/dist/SmytheGlyphRain.scr) ·
