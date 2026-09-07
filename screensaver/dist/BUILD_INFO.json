@@ -1,30 +1,45 @@
 {
-  "source_commit": "45a68f6162b5208aa180cf1f2755eea572bbd608",
-  "workflow_url": "https://github.com/petehottelet/smythe/actions/runs/34093505361",
-  "built_at_utc": "2026-09-07",
+  "source_commit": "a0327aa58f80e6c7206f5c3eeeae1b48985953e6",
+  "workflow_url": "https://github.com/petehottelet/smythe/actions/runs/34123023804",
+  "built_at_utc": "2026-09-07T12:40:57Z",
   "status": "passed",
+  "catalog": {
+    "version": "native-mixed-svg-v1",
+    "catalog_sha256": "168fa9e14488e37d98af007abbd33792587ba52d9a97eeeffbf9839f60bed9a3",
+    "count": 249,
+    "reference_count": 57,
+    "reference_visible_count": 56,
+    "original_count": 192,
+    "blank_index": 4,
+    "original_share": 0.1,
+    "fill_rule": "nonzero"
+  },
+  "catalog_manifest_sha256": "df5f2562a6df5ae006df3375be75495e41f6286ce099fff2cc12147d9cbed690",
   "packages": {
     "windows": {
       "file": "SmytheGlyphRain.scr",
-      "sha256": "e3a34cae3eb5063816d0e6694053c6dd1656596a4d87a1c8a43371fa10f895a7",
-      "size_bytes": 97280
+      "sha256": "c7660ee87d6d0e7774b1ee0c044d66dabf8cd92ebd8b8d193a55e6621ac177ea",
+      "size_bytes": 3070976,
+      "version": "1.1.0.0"
     },
     "macos": {
       "file": "GlyphRain-macos-universal.zip",
-      "sha256": "5d14d51f81d0c1ae07cfe1e1340f69f300ab0528d3b2ccdb4b92ac975d7b92e5",
-      "size_bytes": 71060,
-      "binary_sha256": "cec225026018f9ee42b0733d824b3d6cfc1271f088775ac8c54aec75a07c5e95",
+      "sha256": "d6b3d8367efa23526b0458c4dc81b59e39044e82e5c5133ac2e26af042c820a8",
+      "size_bytes": 631118,
+      "binary_sha256": "95b43f36ee02c7208e5c26e24125a26c36206096afb9307bf7a131369f0da01d",
       "architectures": [
         "arm64",
         "x86_64"
       ],
+      "version": "1.1",
+      "build": "2",
       "signing": "ad-hoc; not notarized"
     },
     "linux": {
       "file": "SmytheGlyphRain-linux-x86_64.tar.gz",
-      "sha256": "1133f5350b5a42d71363fbfd1c317e89993c180cdd15c6e7d09db552ba9fe930",
-      "size_bytes": 27610,
-      "binary_sha256": "cb63dfa76af93e2aea0e90bb30bbb9c33089d7c994fbb7c7381757471ab6a79d",
+      "sha256": "a42a258e5fa85ed0939bc5ba1f4cd1a74237786bc9566b7a420819ac4af178a5",
+      "size_bytes": 806395,
+      "binary_sha256": "1d4a025504ac8812dc1ffd77c951e9eaa3f26bb4735d1d52d652c61004566585",
       "architecture": "x86_64",
       "display": "X11",
       "build_os": "Ubuntu 22.04"
@@ -35,7 +50,8 @@
       "platform": "windows",
       "runner": "windows-latest",
       "receipt": "verification/windows.json",
-      "receipt_sha256": "f9199b1f0b9d1caac897d60d38a78611feae933b23a3be0bf966bf24e812f328",
+      "receipt_sha256": "d93f255f82481f558f098d45408c32c95141e64df0eaf58bc89aae8767f6edf6",
+      "ci_receipt_sha256": "09cad43cb246529213d1f07068ab11d8c200b87ee75fab97923f5a22e47c8836",
       "artifact": "screensaver-windows-verification",
       "status": "passed"
     },
@@ -43,7 +59,8 @@
       "platform": "macos",
       "runner": "macos-latest",
       "receipt": "verification/macos-arm64.json",
-      "receipt_sha256": "51092b6fd4c706294a7ec2be54e4fe0cc6f9b84b6f4c1fe69ba8ec902b10fba7",
+      "receipt_sha256": "79824238ad294f585fb2a3ceebfca33a71c7da63407e1b6f394d413acff5c66b",
+      "ci_receipt_sha256": "a3ee6fdcb1f6cd2b16600704cb318df155ad1fe86a5c89055dfb6c0760272fa3",
       "artifact": "screensaver-macos-arm64-verification",
       "status": "passed"
     },
@@ -51,7 +68,8 @@
       "platform": "macos",
       "runner": "macos-15-intel",
       "receipt": "verification/macos-x86_64.json",
-      "receipt_sha256": "42e83c12bbbac01c0ce0d2838ed76ad01c773145e04849ad2c9f8203a9a5af56",
+      "receipt_sha256": "c1bef2b7aea7ba18545469f7d68c5524b7830f33168aeecf353034e512ee47b6",
+      "ci_receipt_sha256": "b3a7de7650b7a7238d98393b031311d7e0af8914eaa1c12b63ee192b15658bae",
       "artifact": "screensaver-macos-x86_64-verification",
       "status": "passed"
     },
@@ -59,7 +77,8 @@
       "platform": "linux",
       "runner": "ubuntu-22.04",
       "receipt": "verification/linux-ubuntu-22.04.json",
-      "receipt_sha256": "c801e93c3e2e677cfb40c4607794610f4fdf8c2c71eb0f037922f5684b9dbdae",
+      "receipt_sha256": "9cf36b75b32e18d35525f4c93364b8446338bbe7bc25e3950b56ddfd5441d9ec",
+      "ci_receipt_sha256": "9cf36b75b32e18d35525f4c93364b8446338bbe7bc25e3950b56ddfd5441d9ec",
       "artifact": "screensaver-linux-verification",
       "status": "passed"
     },
@@ -67,10 +86,73 @@
       "platform": "linux",
       "runner": "ubuntu-24.04",
       "receipt": "verification/linux-ubuntu-24.04.json",
-      "receipt_sha256": "d7cfbf9acf813439d16334216871e7c12b4788de058d4b051700f14e49a810df",
+      "receipt_sha256": "da33da57ecfbed5d78ea8e361c1524cea1e21845e63078ef09c19ccf76a38ea4",
+      "ci_receipt_sha256": "da33da57ecfbed5d78ea8e361c1524cea1e21845e63078ef09c19ccf76a38ea4",
       "artifact": "screensaver-linux-compatibility-verification",
       "status": "passed"
     }
   ],
-  "scope": "Native compiled artifact execution; installation policy and session locking are separate."
+  "scope": "Compiled SVG catalog, rendering, and native host verification. Native savers retain layered trails; REGL exposure and explorer controls remain web features. Installation policy and session locking are separate.",
+  "renderings": [
+    {
+      "file": "verification/windows-atlas.png",
+      "sha256": "9ba5494be85e336da4e8339fadbc148cb1276da1c39432908c6381dacbdf8b81",
+      "artifact": "screensaver-windows-verification",
+      "artifact_file": "windows-smoke.catalog.png"
+    },
+    {
+      "file": "verification/windows-render.png",
+      "sha256": "31837fe95caa37110efd44ac1dcd65aa5e90ae5ac40ba2da64b651cf322c90ad",
+      "artifact": "screensaver-windows-verification",
+      "artifact_file": "windows-smoke.png"
+    },
+    {
+      "file": "verification/macos-arm64-atlas.png",
+      "sha256": "69f0ed76937ba4107b9f62465de7338bea9bb8aeca4fbd2ed9196aab55fd2ac4",
+      "artifact": "screensaver-macos-arm64-verification",
+      "artifact_file": "catalog-atlas.png"
+    },
+    {
+      "file": "verification/macos-x86_64-atlas.png",
+      "sha256": "69f0ed76937ba4107b9f62465de7338bea9bb8aeca4fbd2ed9196aab55fd2ac4",
+      "artifact": "screensaver-macos-x86_64-verification",
+      "artifact_file": "catalog-atlas.png"
+    },
+    {
+      "file": "verification/linux-atlas.png",
+      "sha256": "57127f207b8f5a39b26435486cb57c75deb300043554b59e96c83951c2146040",
+      "artifact": "screensaver-linux-verification",
+      "artifact_file": "glyph-sheet.png"
+    }
+  ],
+  "contour_review": {
+    "status": "diagnostic; not an acceptance receipt",
+    "scope": "Independent 64px source-SVG comparisons for Windows and both Mac architectures. Raw IoU and small raster counter differences are preserved; Linux retains its separate 128px acceptance gate.",
+    "files": [
+      {
+        "file": "screensaver/verification/analyze_native_masks.py",
+        "sha256": "e49acd7c9a827c110a3a4bcdd4138e1f9bc3370f58a764daddb066de5923a72a"
+      },
+      {
+        "file": "screensaver/dist/verification/contour-review.md",
+        "sha256": "3cf3b24f2b5fe005669428fb6c4330a46ca18c3ee970f341c8a55cc0ca113a69"
+      },
+      {
+        "file": "screensaver/dist/verification/catalog-source-64.png",
+        "sha256": "03f9769ca85003b43efeb2bdc486fa5d3134cdb812a79994eb5c274fc6610a14"
+      },
+      {
+        "file": "screensaver/dist/verification/windows-contour-diagnostic.json",
+        "sha256": "ceb4e75b4d71bc7a8fa62fe7e36c12723bc9a7dc2f0b3e944de3798478e01b6b"
+      },
+      {
+        "file": "screensaver/dist/verification/macos-arm64-contour-diagnostic.json",
+        "sha256": "fdd9476d74d345cae80b9b8729df341f29e47b23554b1474bfab20fe3eaf5732"
+      },
+      {
+        "file": "screensaver/dist/verification/macos-x86_64-contour-diagnostic.json",
+        "sha256": "d4c2b6221daef91a22c1521f5e7f533b4c362849e704e8b5a117efad8862f361"
+      }
+    ]
+  }
 }

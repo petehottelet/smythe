@@ -1,11 +1,11 @@
 {
   "status": "passed",
   "binary": "smythe-glyph-rain-linux-x86_64",
-  "binary_sha256": "cb63dfa76af93e2aea0e90bb30bbb9c33089d7c994fbb7c7381757471ab6a79d",
-  "version": "Smythe Glyph Rain X11; glyphs=192",
+  "binary_sha256": "1d4a025504ac8812dc1ffd77c951e9eaa3f26bb4735d1d52d652c61004566585",
+  "version": "Smythe Glyph Rain X11; glyphs=249 reference=57 original=192 catalog=168fa9e14488e37d98af007abbd33792587ba52d9a97eeeffbf9839f60bed9a3",
   "checks": [
     "ELF",
-    "shared_192_catalog",
+    "mixed_249_catalog_hashes",
     "black_green_render",
     "animation",
     "deterministic_seed",
@@ -19,53 +19,3393 @@
     "destroyed_preview_clean_exit",
     "invalid_display",
     "invalid_window",
-    "invalid_arguments"
+    "invalid_arguments",
+    "all_249_source_svg_silhouettes",
+    "nonzero_fill_and_blank_slot",
+    "both_catalog_families_render",
+    "weighted_90_10_selection",
+    "emerald_body_mint_heads",
+    "embedded_MIT_notice"
   ],
+  "catalog": {
+    "version": "native-mixed-svg-v1",
+    "glyph_count": 249,
+    "reference_count": 57,
+    "reference_visible_count": 56,
+    "original_count": 192,
+    "original_offset": 57,
+    "blank_index": 4,
+    "canvas": [
+      100,
+      100
+    ],
+    "fill_rule": "nonzero",
+    "default_original_mix": 0.1,
+    "catalog_sha256": "168fa9e14488e37d98af007abbd33792587ba52d9a97eeeffbf9839f60bed9a3",
+    "reference_sha256": "6befd44f62a114b8627728b13c8300026e0d1f3c51c4b2b033f3ff1ea985e090",
+    "original_sha256": "9667056dfcbfd34558b0db4b2e3f044aa6d91d6bb7df52e92bf4d6719dea511a",
+    "native_catalog_receipt_sha256": "df5f2562a6df5ae006df3375be75495e41f6286ce099fff2cc12147d9cbed690"
+  },
+  "contours": {
+    "status": "passed",
+    "glyph_count": 249,
+    "reference_visible_count": 56,
+    "original_count": 192,
+    "blank_index": 4,
+    "method": "Compiled native contours versus librsvg source SVGs; no alignment, scaling, or flip correction",
+    "tile_size": 128,
+    "inner_margin": 4,
+    "white_ink": false,
+    "ink_threshold": 128,
+    "minimum_required_iou": 0.99,
+    "minimum_measured_iou": 0.9996505939902166,
+    "actual_sha256": "57127f207b8f5a39b26435486cb57c75deb300043554b59e96c83951c2146040",
+    "source_sha256": "6c092d67e5c9950ec79a1ce2c6ac86400092b758a0662cad9e78c0473d81209f",
+    "glyphs": [
+      {
+        "slot": 0,
+        "family": "reference",
+        "ink_pixels": 5535,
+        "bounds": [
+          19,
+          14,
+          109,
+          114
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "98b7b01c07b999c1cf3749dd6f53a003a0ecaeca49f7bcf976791f39bdd39654"
+      },
+      {
+        "slot": 1,
+        "family": "reference",
+        "ink_pixels": 3705,
+        "bounds": [
+          22,
+          22,
+          106,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "0790c64a851d76dc7cb761bce383645089f84b6f9e74e4e4fdde399890667649"
+      },
+      {
+        "slot": 2,
+        "family": "reference",
+        "ink_pixels": 4212,
+        "bounds": [
+          21,
+          18,
+          107,
+          110
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "fe58130d41681be66117a32c87501f9132fb19a5df6bfa0fbd5d776ad0163c12"
+      },
+      {
+        "slot": 3,
+        "family": "reference",
+        "ink_pixels": 4603,
+        "bounds": [
+          21,
+          12,
+          107,
+          116
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "fc5b2648134cfce549525afd26f6a96719e91543f76df9902905a2f88ed4bf64"
+      },
+      {
+        "slot": 4,
+        "family": "reference",
+        "ink_pixels": 0,
+        "bounds": null,
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "0fbba07a833d4dcfc7024eaf313661a0ba8f80a05c6d29b8801c612e10e60dee"
+      },
+      {
+        "slot": 5,
+        "family": "reference",
+        "ink_pixels": 5467,
+        "bounds": [
+          21,
+          12,
+          106,
+          116
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "348a89d865813f4264956ce3c13a7f4a43bfd8249919d03adaad7129322734bf"
+      },
+      {
+        "slot": 6,
+        "family": "reference",
+        "ink_pixels": 1125,
+        "bounds": [
+          56,
+          19,
+          71,
+          109
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "725379d246b8ae89df2ae9d571355de0160e52cb7d5228c40fd25cd78748a875"
+      },
+      {
+        "slot": 7,
+        "family": "reference",
+        "ink_pixels": 1218,
+        "bounds": [
+          49,
+          28,
+          78,
+          100
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "4b7c02736b2dd07a9ac8a5936141b8df8b75f66be30c86e57c69b62acd728a7c"
+      },
+      {
+        "slot": 8,
+        "family": "reference",
+        "ink_pixels": 1633,
+        "bounds": [
+          36,
+          43,
+          92,
+          85
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "a780b1cc28479cc88775109340b8f1a7bc91764750a77bf5cdbdfd9682bf047d"
+      },
+      {
+        "slot": 9,
+        "family": "reference",
+        "ink_pixels": 1678,
+        "bounds": [
+          44,
+          38,
+          84,
+          90
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "fcb82cc937892ac6f572098f7eaf1d596915922cbe7a37f7559d8163347a11b8"
+      },
+      {
+        "slot": 10,
+        "family": "reference",
+        "ink_pixels": 4180,
+        "bounds": [
+          22,
+          20,
+          106,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "f035b90c6487b58dd6d07c7cb08d5b4c27b874f1c961d874e4abe05bd6cb39cb"
+      },
+      {
+        "slot": 11,
+        "family": "reference",
+        "ink_pixels": 3544,
+        "bounds": [
+          22,
+          23,
+          106,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "26054558cb78bfb8484b48272bb7f2914da29c8d8915d9d643644fab0830a930"
+      },
+      {
+        "slot": 12,
+        "family": "reference",
+        "ink_pixels": 3553,
+        "bounds": [
+          23,
+          19,
+          105,
+          109
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "ba1864c12b2c7662960bd0889f0746d154d1915b0af2203d12a1c9173c976ffa"
+      },
+      {
+        "slot": 13,
+        "family": "reference",
+        "ink_pixels": 1092,
+        "bounds": [
+          16,
+          57,
+          112,
+          71
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "094b7f9fff6713bc7808a2f56f2444ee5199ac34e07bcda6253ecb02bb2727cb"
+      },
+      {
+        "slot": 14,
+        "family": "reference",
+        "ink_pixels": 3704,
+        "bounds": [
+          22,
+          20,
+          106,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "3f19b8cee2fff74a0631c1ac281b2d9489405a175d7391c0f585cc205ee3ee5b"
+      },
+      {
+        "slot": 15,
+        "family": "reference",
+        "ink_pixels": 3721,
+        "bounds": [
+          22,
+          21,
+          106,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "d6efa8ddb0e56e06e455c3351592c583b3c0dcc730a4fdfcc2080ecfc096dd28"
+      },
+      {
+        "slot": 16,
+        "family": "reference",
+        "ink_pixels": 2880,
+        "bounds": [
+          22,
+          23,
+          106,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "74fc8caddb32b831bee2dbf4198f108fd4a809e7917a4bf6e36412f66fd02979"
+      },
+      {
+        "slot": 17,
+        "family": "reference",
+        "ink_pixels": 3389,
+        "bounds": [
+          24,
+          20,
+          103,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "91b6cf921a07ca6e28b1e3bc8d72055b2be1e4be109d4317bff268a7b90ea16d"
+      },
+      {
+        "slot": 18,
+        "family": "reference",
+        "ink_pixels": 3562,
+        "bounds": [
+          20,
+          19,
+          107,
+          109
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "d14592107bd2d7fd86b531cf5dbba42fe5092ba5a8a9d13aafb124f24890dfb2"
+      },
+      {
+        "slot": 19,
+        "family": "reference",
+        "ink_pixels": 558,
+        "bounds": [
+          50,
+          54,
+          78,
+          74
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "3e2661c1602706e1a83f4b10eae54cd5e50b8b5106f302a0a73fc2ebfcc6e0a1"
+      },
+      {
+        "slot": 20,
+        "family": "reference",
+        "ink_pixels": 1120,
+        "bounds": [
+          24,
+          57,
+          104,
+          71
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "2d2c801fb5cd0dae48a8b042f14cab2ef8324a60c557a4c95252a4b2559dc22d"
+      },
+      {
+        "slot": 21,
+        "family": "reference",
+        "ink_pixels": 1457,
+        "bounds": [
+          31,
+          35,
+          97,
+          93
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "d42ec54a41175cacdcd2d569fbf8fe4609fb0bd0d06efa85bfb838ff9091b2ce"
+      },
+      {
+        "slot": 22,
+        "family": "reference",
+        "ink_pixels": 1454,
+        "bounds": [
+          31,
+          35,
+          97,
+          93
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "f5e1dfdf548ad0e8345e51008faa7fced11e45ecf9128277f3c0ff0a058743a7"
+      },
+      {
+        "slot": 23,
+        "family": "reference",
+        "ink_pixels": 6135,
+        "bounds": [
+          21,
+          18,
+          107,
+          110
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "0f74638b04271eb6c61dc20c724ac69f50a54bb46565fea8f08daf7de441c4b7"
+      },
+      {
+        "slot": 24,
+        "family": "reference",
+        "ink_pixels": 1500,
+        "bounds": [
+          56,
+          17,
+          72,
+          111
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "3f567704d43ac7872a553f3c84a5c79e9af11c5f1e730c7937b286f49bc30014"
+      },
+      {
+        "slot": 25,
+        "family": "reference",
+        "ink_pixels": 1596,
+        "bounds": [
+          32,
+          32,
+          96,
+          96
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "d405afc13cbe0cca1f8f464826b710c6ae165b992f4ead2a1d65a734ff1b631d"
+      },
+      {
+        "slot": 26,
+        "family": "reference",
+        "ink_pixels": 2036,
+        "bounds": [
+          30,
+          35,
+          98,
+          93
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "50a1dd5a5332fe49ebfd03b6a27d93d7ea371d2fa9d38a513efee861925915e5"
+      },
+      {
+        "slot": 27,
+        "family": "reference",
+        "ink_pixels": 3466,
+        "bounds": [
+          21,
+          22,
+          107,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "bacebd6a983f7271be0d596944b3130dffb9347560b1e41e16642548b9bea887"
+      },
+      {
+        "slot": 28,
+        "family": "reference",
+        "ink_pixels": 3415,
+        "bounds": [
+          18,
+          16,
+          110,
+          112
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "3e3f0f5d4755dc1cb65d22ebe9766fed1e479277227a1e307679686008de04a5"
+      },
+      {
+        "slot": 29,
+        "family": "reference",
+        "ink_pixels": 3316,
+        "bounds": [
+          23,
+          24,
+          105,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "ca1a96dfa1dfcfa67eb768536fdc75e49e96e2271314c393633e7d12089992b3"
+      },
+      {
+        "slot": 30,
+        "family": "reference",
+        "ink_pixels": 3934,
+        "bounds": [
+          17,
+          23,
+          111,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "6666b1a13d12f0c0219e44aa3dc59ad25cb0a4e521a84b96b883db5a77feafaa"
+      },
+      {
+        "slot": 31,
+        "family": "reference",
+        "ink_pixels": 3021,
+        "bounds": [
+          22,
+          22,
+          107,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "82725980647133cd966ef86feb693086b689db6531b017b3ea6b9077b4031d6b"
+      },
+      {
+        "slot": 32,
+        "family": "reference",
+        "ink_pixels": 4273,
+        "bounds": [
+          22,
+          21,
+          106,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "b4ecff7352b997f446e502538babb1071e6d35b44abe18239df6d77ca9b6ff6c"
+      },
+      {
+        "slot": 33,
+        "family": "reference",
+        "ink_pixels": 3610,
+        "bounds": [
+          21,
+          25,
+          107,
+          103
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "a0a03b178900458ee64804000e4d694344f8efa2ccadbb7d978ef466f1a6f2a8"
+      },
+      {
+        "slot": 34,
+        "family": "reference",
+        "ink_pixels": 4675,
+        "bounds": [
+          18,
+          18,
+          110,
+          110
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "608ffa275b9ea231aa255b1af7b2f937743f145b9faf928744940223ed99e71a"
+      },
+      {
+        "slot": 35,
+        "family": "reference",
+        "ink_pixels": 3994,
+        "bounds": [
+          21,
+          18,
+          106,
+          110
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "3265b362fc62c48ada403b0abd429e8393ccbd3088f52343f22feefd24955799"
+      },
+      {
+        "slot": 36,
+        "family": "reference",
+        "ink_pixels": 4947,
+        "bounds": [
+          21,
+          12,
+          107,
+          115
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "8aa64d05ae780d31d36087636892aaf331ae1df9ce4a2199511010adf5946b79"
+      },
+      {
+        "slot": 37,
+        "family": "reference",
+        "ink_pixels": 4318,
+        "bounds": [
+          22,
+          18,
+          106,
+          110
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "682624390a85e36d6eaa64cdfd06065b4a1fba588f0953d7f4e57959f7d5361c"
+      },
+      {
+        "slot": 38,
+        "family": "reference",
+        "ink_pixels": 3293,
+        "bounds": [
+          22,
+          18,
+          106,
+          110
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "0442b42458c0bf2d51248f78633387a6a30846ce8fd9597e1499f838398d554e"
+      },
+      {
+        "slot": 39,
+        "family": "reference",
+        "ink_pixels": 4274,
+        "bounds": [
+          22,
+          12,
+          106,
+          115
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "74f1295bcea79757a3d4ed8fec5fc1a67951a2986d52d9560f73c53c5dc24767"
+      },
+      {
+        "slot": 40,
+        "family": "reference",
+        "ink_pixels": 4070,
+        "bounds": [
+          22,
+          18,
+          106,
+          110
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "a55197e2ded3868f09d4c0b916c284b6a962aac791351ed0f21985765473bef1"
+      },
+      {
+        "slot": 41,
+        "family": "reference",
+        "ink_pixels": 3615,
+        "bounds": [
+          22,
+          22,
+          106,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "58ce9e758d72d455c4d85297b5a88b9c0e9488b10145ce9a09c56e2494237025"
+      },
+      {
+        "slot": 42,
+        "family": "reference",
+        "ink_pixels": 3871,
+        "bounds": [
+          21,
+          18,
+          107,
+          110
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "651083905a4b3dbf1fe340101fdba343e8d086d6d9b7c421fb0294732972678e"
+      },
+      {
+        "slot": 43,
+        "family": "reference",
+        "ink_pixels": 3141,
+        "bounds": [
+          42,
+          14,
+          86,
+          114
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "ea837df726172614d7632d4ac1cfb8a6cfd39fb6e840692270b8f04567f2e5b5"
+      },
+      {
+        "slot": 44,
+        "family": "reference",
+        "ink_pixels": 4130,
+        "bounds": [
+          22,
+          18,
+          106,
+          110
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "5b41a27c6a0fb07242ef8b62cb10176050eddfc50aaf99272a6147836682015c"
+      },
+      {
+        "slot": 45,
+        "family": "reference",
+        "ink_pixels": 3617,
+        "bounds": [
+          22,
+          18,
+          106,
+          110
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "82204b0af673be2f17b3ded8652737fa3141dc08dd103c60f9aa56c2b165abef"
+      },
+      {
+        "slot": 46,
+        "family": "reference",
+        "ink_pixels": 4992,
+        "bounds": [
+          21,
+          18,
+          107,
+          110
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "f45a4e444119bdbf242fae4de9e9ca4ae4f2122dda759eb4f15099c9c38561ec"
+      },
+      {
+        "slot": 47,
+        "family": "reference",
+        "ink_pixels": 4094,
+        "bounds": [
+          22,
+          20,
+          106,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "e599a1088c3d0c628a14b8b3e6ec0b433c88addfead05feb90495d3b57cd0499"
+      },
+      {
+        "slot": 48,
+        "family": "reference",
+        "ink_pixels": 3280,
+        "bounds": [
+          21,
+          20,
+          106,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "3b9cd20ba9dc866326c5131479855e39f933a58a96b974e34f659db91557ce9f"
+      },
+      {
+        "slot": 49,
+        "family": "reference",
+        "ink_pixels": 4616,
+        "bounds": [
+          22,
+          14,
+          106,
+          114
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "df90de33ab1db978bccf10506bc0027b14e84b3af0174d7a70b5b5086736ac09"
+      },
+      {
+        "slot": 50,
+        "family": "reference",
+        "ink_pixels": 4767,
+        "bounds": [
+          22,
+          13,
+          106,
+          115
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "6601c46e9da31a112ec500ee177a633c3ee4806f9cb69b193ae2f7d3ed800d29"
+      },
+      {
+        "slot": 51,
+        "family": "reference",
+        "ink_pixels": 4044,
+        "bounds": [
+          22,
+          21,
+          106,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "a7cc719447dfccc98505ab4fe4c18548c61a94b4c4d996a3c930df17c7ae79dc"
+      },
+      {
+        "slot": 52,
+        "family": "reference",
+        "ink_pixels": 3209,
+        "bounds": [
+          22,
+          19,
+          106,
+          109
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "c254be9b58228391a090b8ff8e8a9df520bc72499376ff06f217a38a751ee2cb"
+      },
+      {
+        "slot": 53,
+        "family": "reference",
+        "ink_pixels": 4892,
+        "bounds": [
+          21,
+          18,
+          107,
+          109
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "69321f606ffcedccde52dc4e4c25ac0d0c94fc25f147fe802a64202115b223c2"
+      },
+      {
+        "slot": 54,
+        "family": "reference",
+        "ink_pixels": 5427,
+        "bounds": [
+          21,
+          18,
+          107,
+          110
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "177557e2afbe74d2781299d95c1da5f29176a76f55ce2b48a76d55cf2fd3b77e"
+      },
+      {
+        "slot": 55,
+        "family": "reference",
+        "ink_pixels": 3899,
+        "bounds": [
+          23,
+          21,
+          105,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "94a7f9bb8fac28ec55f73ac8a465bf58365d84ff6a95ffe7e1bd237edf0d7961"
+      },
+      {
+        "slot": 56,
+        "family": "reference",
+        "ink_pixels": 6135,
+        "bounds": [
+          21,
+          18,
+          107,
+          110
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "0f74638b04271eb6c61dc20c724ac69f50a54bb46565fea8f08daf7de441c4b7"
+      },
+      {
+        "slot": 57,
+        "family": "original",
+        "ink_pixels": 1371,
+        "bounds": [
+          37,
+          41,
+          91,
+          87
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "3469d9ac92c98f4b2367ccb9155901f4f1a0655172e500801a2302e9687eced7"
+      },
+      {
+        "slot": 58,
+        "family": "original",
+        "ink_pixels": 3162,
+        "bounds": [
+          28,
+          20,
+          103,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "810dc6500520f18032f9c12975377501da18eb6abb2d05ad134ac5fd4724188d"
+      },
+      {
+        "slot": 59,
+        "family": "original",
+        "ink_pixels": 1179,
+        "bounds": [
+          41,
+          30,
+          88,
+          98
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "e16c5e58a74169102039851189891ac4e72f00ddf416bd25c63cc5a108a6f55d"
+      },
+      {
+        "slot": 60,
+        "family": "original",
+        "ink_pixels": 2788,
+        "bounds": [
+          22,
+          21,
+          103,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "81ff42500bd99dddaf251c0959bd8135de48c5d3162a5b911c25a4f0b73a4c0d"
+      },
+      {
+        "slot": 61,
+        "family": "original",
+        "ink_pixels": 4310,
+        "bounds": [
+          23,
+          22,
+          103,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "ef660b45f639bc07aa6155ea222f52df66b43924e3da85264f6f5ed4bbd2987f"
+      },
+      {
+        "slot": 62,
+        "family": "original",
+        "ink_pixels": 3798,
+        "bounds": [
+          23,
+          21,
+          103,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "8b4ff5a449c4601d0c3c54b9939b003d196e87b8757d1527f18d7049bcd66f24"
+      },
+      {
+        "slot": 63,
+        "family": "original",
+        "ink_pixels": 3885,
+        "bounds": [
+          28,
+          20,
+          101,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "03047b0686bb0c2f1612c340acd08546cfe3ee7fca6c10758c77088a2b49a81a"
+      },
+      {
+        "slot": 64,
+        "family": "original",
+        "ink_pixels": 3228,
+        "bounds": [
+          26,
+          20,
+          102,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "acf1c9284f275e547056d433db0c110e28eaaf8bde84c7cd4eb23de6eb9d2193"
+      },
+      {
+        "slot": 65,
+        "family": "original",
+        "ink_pixels": 958,
+        "bounds": [
+          39,
+          53,
+          87,
+          73
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "eb329a2620b46a12f0900c47ea95d3c53e2329f22d739b5a1c20766625a3a137"
+      },
+      {
+        "slot": 66,
+        "family": "original",
+        "ink_pixels": 4715,
+        "bounds": [
+          24,
+          21,
+          104,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "2a9df3efe9442ef60803dfdf4f0869a185182455b2addbfa63399a5b75bec495"
+      },
+      {
+        "slot": 67,
+        "family": "original",
+        "ink_pixels": 2888,
+        "bounds": [
+          24,
+          20,
+          107,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "952e8a85a26fdd0edf2218e2c7dee015c31cc4221d3f343169ad0113f884f2ae"
+      },
+      {
+        "slot": 68,
+        "family": "original",
+        "ink_pixels": 4088,
+        "bounds": [
+          25,
+          20,
+          102,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "2d6afdb0d8fa951cbb35cfa03e0d0601c622a7e1b288e0c6a9e6fdc601bb6906"
+      },
+      {
+        "slot": 69,
+        "family": "original",
+        "ink_pixels": 1721,
+        "bounds": [
+          36,
+          39,
+          95,
+          89
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "7a333af6d8b10929eb8511284add637e8043b20e04223edf91c862f69912e8f3"
+      },
+      {
+        "slot": 70,
+        "family": "original",
+        "ink_pixels": 3804,
+        "bounds": [
+          24,
+          21,
+          102,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "1ed7e2632feb4b6580e3ec55f5c1cd96ccc80a0e0caed353cd708b490ffff8a1"
+      },
+      {
+        "slot": 71,
+        "family": "original",
+        "ink_pixels": 2644,
+        "bounds": [
+          24,
+          24,
+          106,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "12e3a10effcfa83f97d71fbb282a116e16185e3b462fe40e386f7b7fd5f0663a"
+      },
+      {
+        "slot": 72,
+        "family": "original",
+        "ink_pixels": 3279,
+        "bounds": [
+          24,
+          24,
+          103,
+          103
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "b5c89c6c3ce05563969fb4a0164a47e474cb8d72c4873347a23dbeefcf0a1476"
+      },
+      {
+        "slot": 73,
+        "family": "original",
+        "ink_pixels": 1711,
+        "bounds": [
+          46,
+          21,
+          81,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "b44b76cd41ec711546cf38537ba70a853499bdf6c3227e94ded9f7703fdb1b4e"
+      },
+      {
+        "slot": 74,
+        "family": "original",
+        "ink_pixels": 3626,
+        "bounds": [
+          26,
+          21,
+          104,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "fabfa1fdd5658dfe4e0354e3dd69b8afb5cb657fa831bbc3e4bbab92eb5d8468"
+      },
+      {
+        "slot": 75,
+        "family": "original",
+        "ink_pixels": 4737,
+        "bounds": [
+          24,
+          20,
+          103,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "fce10bd2780757d6342e13d8993f25f69acc7d20f1c110847716ec5c2a2755c4"
+      },
+      {
+        "slot": 76,
+        "family": "original",
+        "ink_pixels": 2751,
+        "bounds": [
+          28,
+          21,
+          103,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "a1b67d04f95a63ed86137e5867d9dc81a3ea1010903ccb88eece1f51426f2129"
+      },
+      {
+        "slot": 77,
+        "family": "original",
+        "ink_pixels": 3384,
+        "bounds": [
+          23,
+          20,
+          102,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "58d9103f7b7647e8e9f6e7316ab280bbe971d5ffee3eb0cb7e8478a7eefb518a"
+      },
+      {
+        "slot": 78,
+        "family": "original",
+        "ink_pixels": 2091,
+        "bounds": [
+          45,
+          22,
+          83,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "cc2d5efb98008abee294c21914373d5fed0635d0e12fc495a09cffe34acc81ff"
+      },
+      {
+        "slot": 79,
+        "family": "original",
+        "ink_pixels": 3687,
+        "bounds": [
+          26,
+          22,
+          101,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "30072bfa7ba711249de26fb4954c8bb558a57768cbc96dea9016f9dac2809cd1"
+      },
+      {
+        "slot": 80,
+        "family": "original",
+        "ink_pixels": 3509,
+        "bounds": [
+          28,
+          22,
+          102,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "1a7797ae7e5bc853c4853692b86a85fc1ee50e7d20923413c887a917dab0f157"
+      },
+      {
+        "slot": 81,
+        "family": "original",
+        "ink_pixels": 2056,
+        "bounds": [
+          38,
+          21,
+          87,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "63f302577acfbea3ee7aadc1bd08b8f450acb32f2fd78b799d2bb22e630987a0"
+      },
+      {
+        "slot": 82,
+        "family": "original",
+        "ink_pixels": 3006,
+        "bounds": [
+          22,
+          23,
+          104,
+          105
+        ],
+        "source_silhouette_iou": 0.9996674426338543,
+        "pixel_sha256": "b6d33bccb630787a629b734b44754e96f59b161bd51aedcaf352b66ba41672b1"
+      },
+      {
+        "slot": 83,
+        "family": "original",
+        "ink_pixels": 3242,
+        "bounds": [
+          30,
+          21,
+          98,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "28041221a1c3a087f723bc8355ad3d1fd7d132193a71e2cc19254b3b2f200a59"
+      },
+      {
+        "slot": 84,
+        "family": "original",
+        "ink_pixels": 3304,
+        "bounds": [
+          22,
+          22,
+          103,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "09a5ffbd342db49d41aed033eed2204ea4c4e341d25aeac6621cb7f5e26ff7be"
+      },
+      {
+        "slot": 85,
+        "family": "original",
+        "ink_pixels": 3949,
+        "bounds": [
+          26,
+          20,
+          102,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "5fd5e076bea36e94b4270e6ecb1e370b8c45baf13ad7acd585f86b539bd38fee"
+      },
+      {
+        "slot": 86,
+        "family": "original",
+        "ink_pixels": 2516,
+        "bounds": [
+          23,
+          22,
+          104,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "871df89a8c7abedfbc8c231aee32d7bf43f5f0a2be5ff53ad0001b1a97526b96"
+      },
+      {
+        "slot": 87,
+        "family": "original",
+        "ink_pixels": 3178,
+        "bounds": [
+          26,
+          21,
+          100,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "b9f5644a0fc1892ba4b51572c4c6e8c8ae4bf7c8bdb3b05b29629bbff6a0d29b"
+      },
+      {
+        "slot": 88,
+        "family": "original",
+        "ink_pixels": 3685,
+        "bounds": [
+          24,
+          20,
+          103,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "6a74d1ee0e4a74efa44a9362aa442725985b87d7d2a15aaa9ce359b98856100d"
+      },
+      {
+        "slot": 89,
+        "family": "original",
+        "ink_pixels": 3855,
+        "bounds": [
+          26,
+          20,
+          102,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "1ff3bac58059cc2876b32f4ef5655a2792aaa833a441254d2463fa8d929609bf"
+      },
+      {
+        "slot": 90,
+        "family": "original",
+        "ink_pixels": 2684,
+        "bounds": [
+          22,
+          22,
+          103,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "ee6d34c89f1e84658134e402cb37c17805ac5a996c60957b787b99b68db1b2ed"
+      },
+      {
+        "slot": 91,
+        "family": "original",
+        "ink_pixels": 3389,
+        "bounds": [
+          23,
+          21,
+          103,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "5ebfa683f983330f897a95e2e486e5ee72ad06839255c61a85fe25873c284841"
+      },
+      {
+        "slot": 92,
+        "family": "original",
+        "ink_pixels": 3855,
+        "bounds": [
+          30,
+          21,
+          101,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "81039f1cd3710dcf43a8f68420e71f70259fc30ef48ca11d90807963b5e2f70b"
+      },
+      {
+        "slot": 93,
+        "family": "original",
+        "ink_pixels": 2422,
+        "bounds": [
+          25,
+          23,
+          106,
+          104
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "2503e931a2d99d0ea8a07924d05255dc289d3c913f5064967b5ccf589bb82f3e"
+      },
+      {
+        "slot": 94,
+        "family": "original",
+        "ink_pixels": 3659,
+        "bounds": [
+          31,
+          20,
+          100,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "6a2b2da0875d05ca83e8c8c1048233eea9f1d87258be0bb515ab4f82553ea043"
+      },
+      {
+        "slot": 95,
+        "family": "original",
+        "ink_pixels": 3874,
+        "bounds": [
+          27,
+          21,
+          104,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "f2dce9cea2dfa257ea19155a1c74335a0c702e854238ff19701fc81553133cb7"
+      },
+      {
+        "slot": 96,
+        "family": "original",
+        "ink_pixels": 3656,
+        "bounds": [
+          25,
+          22,
+          100,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "68d2bd14dc8353431137ef0143d497ef966f57eec1bd0b2647963154ba4b807c"
+      },
+      {
+        "slot": 97,
+        "family": "original",
+        "ink_pixels": 3271,
+        "bounds": [
+          28,
+          22,
+          101,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "8a32343d1269c7afde62251d86a0b11d0c638787cfe76708e8850db3022b6958"
+      },
+      {
+        "slot": 98,
+        "family": "original",
+        "ink_pixels": 3130,
+        "bounds": [
+          28,
+          21,
+          103,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "652e7472586a4aa6dd3e268723ab8203086ff24821411d6c1e7584bd4195d558"
+      },
+      {
+        "slot": 99,
+        "family": "original",
+        "ink_pixels": 4117,
+        "bounds": [
+          26,
+          20,
+          104,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "9d1ffbca53389c0ec1490e1e75114576aecbeaa7e49a55a89b13e82c300a7ad6"
+      },
+      {
+        "slot": 100,
+        "family": "original",
+        "ink_pixels": 3217,
+        "bounds": [
+          28,
+          21,
+          103,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "1d537bbd80b185022ea38a2345bc172af38226b9e200a8f6c9ef9d0d2f7101c2"
+      },
+      {
+        "slot": 101,
+        "family": "original",
+        "ink_pixels": 3320,
+        "bounds": [
+          23,
+          23,
+          104,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "aea26b9cacf4e6e29f93d5f19503c71fcb71984f9bf12b62b4fb4fa7ebd48e37"
+      },
+      {
+        "slot": 102,
+        "family": "original",
+        "ink_pixels": 3224,
+        "bounds": [
+          25,
+          22,
+          101,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "0c752c88a2ee45acefb7ddf66d8906f21f1b2691297ac3fa08a73b2ddb8aa48a"
+      },
+      {
+        "slot": 103,
+        "family": "original",
+        "ink_pixels": 3148,
+        "bounds": [
+          29,
+          20,
+          101,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "dcd5e6b507e9009899ff59c1156ea830aba31586f7698330a4cc0ff48e639964"
+      },
+      {
+        "slot": 104,
+        "family": "original",
+        "ink_pixels": 3409,
+        "bounds": [
+          26,
+          19,
+          104,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "5897f695ec05f7e00248403e3fee71b1daea4e01d09e8ad934230d249cb8284c"
+      },
+      {
+        "slot": 105,
+        "family": "original",
+        "ink_pixels": 2843,
+        "bounds": [
+          28,
+          21,
+          102,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "d07fd048025b7e88590c3eea615379792b64d50a6569f45f4110e8b7c229fc2a"
+      },
+      {
+        "slot": 106,
+        "family": "original",
+        "ink_pixels": 3400,
+        "bounds": [
+          25,
+          23,
+          106,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "2b60ab3b2cbb9c1ada241a8d83f132d95c322dadf0095a88d1c01359488f41a0"
+      },
+      {
+        "slot": 107,
+        "family": "original",
+        "ink_pixels": 3647,
+        "bounds": [
+          26,
+          23,
+          104,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "78d70e3102872022c0e8f04b7e42fb145544564d6d932fb0cd968d0b5f3d6823"
+      },
+      {
+        "slot": 108,
+        "family": "original",
+        "ink_pixels": 3532,
+        "bounds": [
+          27,
+          21,
+          102,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "264d5d406f2a2d656cb4fc4420ea5939c7f4b7bf24b9f1d1cf7568dd3fef80e8"
+      },
+      {
+        "slot": 109,
+        "family": "original",
+        "ink_pixels": 3659,
+        "bounds": [
+          24,
+          22,
+          104,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "c3951fa0ae9e6a53f6391cf457884c6f129547bc10b72ece1eeae6710a998ff7"
+      },
+      {
+        "slot": 110,
+        "family": "original",
+        "ink_pixels": 3372,
+        "bounds": [
+          23,
+          24,
+          102,
+          103
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "a7d384b112e7ccf71e8064efd8350a760d8a7afffaa324f5076672235be8cb5d"
+      },
+      {
+        "slot": 111,
+        "family": "original",
+        "ink_pixels": 3551,
+        "bounds": [
+          27,
+          22,
+          104,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "df8bff94cc21b38300312f910affc2fcce09077a98014c18ad737090bf338ef0"
+      },
+      {
+        "slot": 112,
+        "family": "original",
+        "ink_pixels": 3978,
+        "bounds": [
+          23,
+          22,
+          103,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "b0a2891346b6a1e4d7d5c5d082ed3ae25d482c307b746ade1b183775dbc6b8a8"
+      },
+      {
+        "slot": 113,
+        "family": "original",
+        "ink_pixels": 4627,
+        "bounds": [
+          25,
+          21,
+          106,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "52f477429105fbdaa4f254e047d8045e035f9efb756bd926c74df979ada1b379"
+      },
+      {
+        "slot": 114,
+        "family": "original",
+        "ink_pixels": 4490,
+        "bounds": [
+          23,
+          19,
+          104,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "79cf0f4d98383fbd9caa09b6bdd15ec84558b519fafe9db2390159a82256e556"
+      },
+      {
+        "slot": 115,
+        "family": "original",
+        "ink_pixels": 3678,
+        "bounds": [
+          25,
+          21,
+          103,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "a50eedbe42d65bd1eb4ddbf1aae7e83b2b2a02d5be735e3c2faff2168c77e0c2"
+      },
+      {
+        "slot": 116,
+        "family": "original",
+        "ink_pixels": 4363,
+        "bounds": [
+          22,
+          23,
+          103,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "d82fab3eaa44e43ae7945f9cf9e866ca1e547d7916989363a91a82e44b4d033d"
+      },
+      {
+        "slot": 117,
+        "family": "original",
+        "ink_pixels": 3061,
+        "bounds": [
+          25,
+          21,
+          104,
+          109
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "3287b0551e0e3d3b6722852c07508deeaf012a0d949a8dc94f5623cbfe1ed60d"
+      },
+      {
+        "slot": 118,
+        "family": "original",
+        "ink_pixels": 3982,
+        "bounds": [
+          23,
+          20,
+          103,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "85eb7e441e389cb4ecd262286351ebc8246d30e8d06b05e8f782db0b9fb9ed1d"
+      },
+      {
+        "slot": 119,
+        "family": "original",
+        "ink_pixels": 3596,
+        "bounds": [
+          23,
+          22,
+          103,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "954d56c549ec774dd9757dde1e040288d98e869c15acc1a8bd15e3dbc2444399"
+      },
+      {
+        "slot": 120,
+        "family": "original",
+        "ink_pixels": 2339,
+        "bounds": [
+          24,
+          28,
+          103,
+          99
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "e60d3accb274f34b6c7cb92fa54a263cf4955f97a87c22d2a8e0de1f22da8757"
+      },
+      {
+        "slot": 121,
+        "family": "original",
+        "ink_pixels": 3488,
+        "bounds": [
+          28,
+          19,
+          101,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "a213cd85b428cf234eb8482707c59c498babda36ff27790d8632bb3cbb59ede7"
+      },
+      {
+        "slot": 122,
+        "family": "original",
+        "ink_pixels": 2831,
+        "bounds": [
+          26,
+          21,
+          104,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "a1a46a61f2c141b899a42d78338f96c4d455ee31b75384674b623c306cbfcda4"
+      },
+      {
+        "slot": 123,
+        "family": "original",
+        "ink_pixels": 1403,
+        "bounds": [
+          40,
+          31,
+          87,
+          98
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "e465196f2a1bf6445966b0e8a7b0b20d59bf9fb525ba0f956eb53ecc8b3ff41a"
+      },
+      {
+        "slot": 124,
+        "family": "original",
+        "ink_pixels": 4397,
+        "bounds": [
+          23,
+          22,
+          102,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "0bbe7735cb7c2b9e705d2f9fffab2c89e9da3d3cc636f79aebfc7dadef2cc76f"
+      },
+      {
+        "slot": 125,
+        "family": "original",
+        "ink_pixels": 3587,
+        "bounds": [
+          22,
+          22,
+          104,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "6909e79e7a03ce631477bda048a035a7de34df338f83b4f1667814f64bac96ab"
+      },
+      {
+        "slot": 126,
+        "family": "original",
+        "ink_pixels": 3100,
+        "bounds": [
+          26,
+          22,
+          102,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "1d36d3a92d32e6263b5bc68e9282c5790776cc4a8f796411cea8780acc777aad"
+      },
+      {
+        "slot": 127,
+        "family": "original",
+        "ink_pixels": 2174,
+        "bounds": [
+          32,
+          22,
+          95,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "81e0fafb416d94b8b861e0ea43a0f1055a06e76fab64358a757849a9082115c0"
+      },
+      {
+        "slot": 128,
+        "family": "original",
+        "ink_pixels": 1397,
+        "bounds": [
+          24,
+          36,
+          104,
+          93
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "e0acce5f0c577c1cf379ff91354003716d269065c060c7cb3d99109b25c6009c"
+      },
+      {
+        "slot": 129,
+        "family": "original",
+        "ink_pixels": 4039,
+        "bounds": [
+          24,
+          22,
+          101,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "71761da53cc0c771f9b9357fdbb4fc92a2f3ea4d3904601487630b2c0f5b5af2"
+      },
+      {
+        "slot": 130,
+        "family": "original",
+        "ink_pixels": 3320,
+        "bounds": [
+          26,
+          21,
+          103,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "add55649a5e06303aa5821d7487526729fcde2f34279a687006d7dbc7b92e0b1"
+      },
+      {
+        "slot": 131,
+        "family": "original",
+        "ink_pixels": 3528,
+        "bounds": [
+          24,
+          21,
+          104,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "0ff64c894c46071ab14ca14082d45499adb5a655a97272aa32b8f06c6a877576"
+      },
+      {
+        "slot": 132,
+        "family": "original",
+        "ink_pixels": 2500,
+        "bounds": [
+          30,
+          21,
+          99,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "4d5f562ca4235250b8465d776389936097532a8e800229e230dcbff37d6054f1"
+      },
+      {
+        "slot": 133,
+        "family": "original",
+        "ink_pixels": 2278,
+        "bounds": [
+          24,
+          35,
+          103,
+          93
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "04d30d15b9cdb7e9e58fc5a8fe032ac0fc35023c876958f4043c91c6cdcf8670"
+      },
+      {
+        "slot": 134,
+        "family": "original",
+        "ink_pixels": 3653,
+        "bounds": [
+          26,
+          20,
+          104,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "6768e439860ca69bb5cee58bb6b7e8b742811c4c19f72b218d501e5055d1b456"
+      },
+      {
+        "slot": 135,
+        "family": "original",
+        "ink_pixels": 3553,
+        "bounds": [
+          24,
+          20,
+          103,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "b48ca83a96ff8180f0afa651371949a0eb905b29412d030ca0c8a0cd290f31e9"
+      },
+      {
+        "slot": 136,
+        "family": "original",
+        "ink_pixels": 2906,
+        "bounds": [
+          32,
+          19,
+          97,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "72af619301b821db86263d72a000ba9066e8748f1dd883e21e2b520ef16fe5b2"
+      },
+      {
+        "slot": 137,
+        "family": "original",
+        "ink_pixels": 3112,
+        "bounds": [
+          27,
+          20,
+          100,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "3aaa489d45c0ffb22a05897edb88423fde24d1a2b64d746a6e3b5dcdc5302140"
+      },
+      {
+        "slot": 138,
+        "family": "original",
+        "ink_pixels": 3381,
+        "bounds": [
+          26,
+          20,
+          105,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "fbdbd04e92747553c753a084b2cf072db0a61f2550a21434c669d200bdd40cd5"
+      },
+      {
+        "slot": 139,
+        "family": "original",
+        "ink_pixels": 2999,
+        "bounds": [
+          25,
+          24,
+          105,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "829cc396121e5f2533eeab3c1326251541bc428ecee5ba5e572745bb002d0de3"
+      },
+      {
+        "slot": 140,
+        "family": "original",
+        "ink_pixels": 3786,
+        "bounds": [
+          25,
+          22,
+          104,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "1e7fde52f72aa12db427735a7ce5eb1e1c823dad4a7ec38dd52cbe0ebac3f863"
+      },
+      {
+        "slot": 141,
+        "family": "original",
+        "ink_pixels": 3910,
+        "bounds": [
+          25,
+          22,
+          100,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "485fca0847e528d2d4e5a195e665aa4c5002a1823d1a2f59a4f27fdd4ea8aeb1"
+      },
+      {
+        "slot": 142,
+        "family": "original",
+        "ink_pixels": 2666,
+        "bounds": [
+          34,
+          21,
+          95,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "2c3e9f8202783f2f47731d7ef8811a399d82d4f3eca4d5ae92d55ee62fef41a7"
+      },
+      {
+        "slot": 143,
+        "family": "original",
+        "ink_pixels": 3803,
+        "bounds": [
+          25,
+          22,
+          104,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "9b9868118b1d6ef5205670a5906ab53d9b8758a2f33113a6fdc8bfbf8566103b"
+      },
+      {
+        "slot": 144,
+        "family": "original",
+        "ink_pixels": 3702,
+        "bounds": [
+          24,
+          21,
+          102,
+          109
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "0fef50b2d63d8bb861fa702679872885df4e298f102c7f14a331406dd332a164"
+      },
+      {
+        "slot": 145,
+        "family": "original",
+        "ink_pixels": 3452,
+        "bounds": [
+          23,
+          21,
+          104,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "844f75eacc8cf844597a8cf18454a06579bd79bb651d7ed8b798ef8d381c1baa"
+      },
+      {
+        "slot": 146,
+        "family": "original",
+        "ink_pixels": 2784,
+        "bounds": [
+          30,
+          23,
+          97,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "8109487195e5840e801887f4a61f9fc600b4c2eafea25caeaf2fe2a6c4c173f8"
+      },
+      {
+        "slot": 147,
+        "family": "original",
+        "ink_pixels": 4019,
+        "bounds": [
+          26,
+          21,
+          101,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "0a40f6080cddd586e97ccdaaef609117023c7cf0b396e7c9336b784839e10e72"
+      },
+      {
+        "slot": 148,
+        "family": "original",
+        "ink_pixels": 2945,
+        "bounds": [
+          25,
+          26,
+          103,
+          103
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "1b7163301524972273549bad6fe7d28bb46c14bbf8435db6bb8ba725064ac570"
+      },
+      {
+        "slot": 149,
+        "family": "original",
+        "ink_pixels": 3889,
+        "bounds": [
+          26,
+          21,
+          102,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "ae523987c94d7a3dfaa32cc696f60aaaa124271626c1a8430a58565e0c6564f4"
+      },
+      {
+        "slot": 150,
+        "family": "original",
+        "ink_pixels": 2705,
+        "bounds": [
+          25,
+          23,
+          104,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "7ec4dfd4dd4aea89433e9d47f86e76c234a60ca0de719686ad1d0add584616f2"
+      },
+      {
+        "slot": 151,
+        "family": "original",
+        "ink_pixels": 2469,
+        "bounds": [
+          23,
+          25,
+          105,
+          101
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "b2eea4f3215e6459323c9b0d8309ed4ce1cee99f241ccf05fd07bd85cecd2bc8"
+      },
+      {
+        "slot": 152,
+        "family": "original",
+        "ink_pixels": 3463,
+        "bounds": [
+          24,
+          28,
+          105,
+          101
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "052327d6cb714a23adf243597a156996cd812d272fa95e2dd5180ddcb9bbe3c0"
+      },
+      {
+        "slot": 153,
+        "family": "original",
+        "ink_pixels": 3356,
+        "bounds": [
+          24,
+          21,
+          102,
+          109
+        ],
+        "source_silhouette_iou": 0.9997021149836163,
+        "pixel_sha256": "9383ce6c67b57f99c755bcb9347a2d951f33527633f7a8b9ffd13d3a2b8655ef"
+      },
+      {
+        "slot": 154,
+        "family": "original",
+        "ink_pixels": 2771,
+        "bounds": [
+          23,
+          23,
+          104,
+          104
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "5f81d2a7d4919a1a6bc61818983ce499530851fc6c0f277a4aa65c6f642fb3ae"
+      },
+      {
+        "slot": 155,
+        "family": "original",
+        "ink_pixels": 4095,
+        "bounds": [
+          24,
+          20,
+          101,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "341092a8ba8a9b34e044143f3d1024045231e10118a9211114bf5f4334a63475"
+      },
+      {
+        "slot": 156,
+        "family": "original",
+        "ink_pixels": 4170,
+        "bounds": [
+          24,
+          20,
+          103,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "bcb7567ce6852ac9d0e8d144412972bde9251385b4fc10aea5ee34c7a4ef12d9"
+      },
+      {
+        "slot": 157,
+        "family": "original",
+        "ink_pixels": 3256,
+        "bounds": [
+          25,
+          22,
+          101,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "84da2a1c2dad3dd11a8ba1d297e3bb433c80adbc54d8ad16a19fbffff4509b7d"
+      },
+      {
+        "slot": 158,
+        "family": "original",
+        "ink_pixels": 3866,
+        "bounds": [
+          27,
+          22,
+          99,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "8efabddc491bff26f721fcd67ab9ef03a5f624fa1a99d353f62ceebdd2347136"
+      },
+      {
+        "slot": 159,
+        "family": "original",
+        "ink_pixels": 4050,
+        "bounds": [
+          24,
+          22,
+          104,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "7b572dcbe80aa992b12db24155b6120b9da4599b7461e9fb9f642de6931dea4e"
+      },
+      {
+        "slot": 160,
+        "family": "original",
+        "ink_pixels": 3040,
+        "bounds": [
+          28,
+          20,
+          101,
+          109
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "37b01a3b11bf9ec05b8089c84a185e74e07ac7e725d9609ae55bbae3a52886d0"
+      },
+      {
+        "slot": 161,
+        "family": "original",
+        "ink_pixels": 2670,
+        "bounds": [
+          28,
+          19,
+          99,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "a2f3b046bf27ec5a2e4bba9d803c0bf9a62767bca1a4495dd8cb8aff2e2011dd"
+      },
+      {
+        "slot": 162,
+        "family": "original",
+        "ink_pixels": 3549,
+        "bounds": [
+          27,
+          21,
+          100,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "849c6262eada44adcb14a77b72f7793555245262c5b375cc914cf8ae8e9fb4e2"
+      },
+      {
+        "slot": 163,
+        "family": "original",
+        "ink_pixels": 4410,
+        "bounds": [
+          25,
+          22,
+          103,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "d33bfbde4fab4a7b0ff409835d2d1fa6119f4b890c97d5a37fc91a0d484871ab"
+      },
+      {
+        "slot": 164,
+        "family": "original",
+        "ink_pixels": 3262,
+        "bounds": [
+          27,
+          22,
+          101,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "b1abb56ec93c0c15fdb5ec5ba59bc5915637d80829ddb35ce2315c4c7b8ea74e"
+      },
+      {
+        "slot": 165,
+        "family": "original",
+        "ink_pixels": 3648,
+        "bounds": [
+          31,
+          22,
+          99,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "c62990ab633c751d4d60d33042ddbb7f4cf806c2e72dfcea7c686602943634d2"
+      },
+      {
+        "slot": 166,
+        "family": "original",
+        "ink_pixels": 3585,
+        "bounds": [
+          29,
+          20,
+          100,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "e8bf16a7e0530b06220da01eea6edb8a4a17223df1263f28c1538a7b7838fca8"
+      },
+      {
+        "slot": 167,
+        "family": "original",
+        "ink_pixels": 4078,
+        "bounds": [
+          24,
+          21,
+          105,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "b787d1c7d7f474a9f07d5939d32a66b0ab229c57f902f372705da08df188f087"
+      },
+      {
+        "slot": 168,
+        "family": "original",
+        "ink_pixels": 3986,
+        "bounds": [
+          25,
+          20,
+          104,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "5c93659b1ae0e5ca9b52dff316dacf1c28c64c160c939e91dcf3cb66810cecdf"
+      },
+      {
+        "slot": 169,
+        "family": "original",
+        "ink_pixels": 3527,
+        "bounds": [
+          24,
+          22,
+          102,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "2bd0a24ad89b457ac69f8ff8d19c836cafef059830f432c3eb4caab937a16ef9"
+      },
+      {
+        "slot": 170,
+        "family": "original",
+        "ink_pixels": 4578,
+        "bounds": [
+          23,
+          22,
+          102,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "bd79a4c2ab38d9d41262b0c0c6db06733386d8de8fa3bb46090ec057454e4779"
+      },
+      {
+        "slot": 171,
+        "family": "original",
+        "ink_pixels": 3905,
+        "bounds": [
+          25,
+          21,
+          101,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "46c7b3e3a2dffb795d21a2c771d25d2fdf0d454a1dfe21327673f2f3f7e11869"
+      },
+      {
+        "slot": 172,
+        "family": "original",
+        "ink_pixels": 3528,
+        "bounds": [
+          24,
+          21,
+          103,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "93cc7805c0429545e01e003f1edb5274d9dcc3a5873226f691076c079c03807a"
+      },
+      {
+        "slot": 173,
+        "family": "original",
+        "ink_pixels": 2861,
+        "bounds": [
+          24,
+          25,
+          106,
+          102
+        ],
+        "source_silhouette_iou": 0.9996505939902166,
+        "pixel_sha256": "e6239cdd0096de463e821c99153a32cd4c5f92b9dfcee4485d3e6ee22281d938"
+      },
+      {
+        "slot": 174,
+        "family": "original",
+        "ink_pixels": 4173,
+        "bounds": [
+          25,
+          20,
+          105,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "eacdc8ad21694cf2c4107f424b6c5ef97d8b5d273a383c7d23945780997e8a0e"
+      },
+      {
+        "slot": 175,
+        "family": "original",
+        "ink_pixels": 3102,
+        "bounds": [
+          30,
+          21,
+          100,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "45bc1bb1db76d581e66552eb6f636bb7a0b4ae38f2ba97ab5e6c206fe3fa9e83"
+      },
+      {
+        "slot": 176,
+        "family": "original",
+        "ink_pixels": 3521,
+        "bounds": [
+          26,
+          20,
+          102,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "98b7068748b48ab660439895aa4d2801ebdfe363e85a6d8464b91cb93987dede"
+      },
+      {
+        "slot": 177,
+        "family": "original",
+        "ink_pixels": 4004,
+        "bounds": [
+          28,
+          20,
+          103,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "6506696500fa780dc10bbc637147a57edc81b43c07d54b58e1622e5a99fb0da1"
+      },
+      {
+        "slot": 178,
+        "family": "original",
+        "ink_pixels": 3329,
+        "bounds": [
+          29,
+          21,
+          102,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "430c4a87ecb014b7c56e8358fe09977ab9d476430a14e49d7cc1c3c150c64e61"
+      },
+      {
+        "slot": 179,
+        "family": "original",
+        "ink_pixels": 3303,
+        "bounds": [
+          27,
+          22,
+          98,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "715793686ad8f28a55c02ff101b508cafac8c00eaf6241007537c10bc0c4d885"
+      },
+      {
+        "slot": 180,
+        "family": "original",
+        "ink_pixels": 4020,
+        "bounds": [
+          29,
+          21,
+          99,
+          109
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "0bc3f68a0530d9e1b9e1eee6c3b3c1bbae1123ae702813b50d7473e332ff91d3"
+      },
+      {
+        "slot": 181,
+        "family": "original",
+        "ink_pixels": 3417,
+        "bounds": [
+          25,
+          24,
+          105,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "31e434b20137e3511375c3f265ed698d8fe55d53828f6916cb1954e0bb881e0a"
+      },
+      {
+        "slot": 182,
+        "family": "original",
+        "ink_pixels": 4040,
+        "bounds": [
+          27,
+          20,
+          101,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "3b5b224a5b9203cffc25ba60e039f9b8b6cff22d2c802b1cb2e746563e5d0509"
+      },
+      {
+        "slot": 183,
+        "family": "original",
+        "ink_pixels": 4215,
+        "bounds": [
+          24,
+          20,
+          101,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "18bc288e14d97ded985b59d2e4790f0c2619fc181540bf68b096a315434dc87c"
+      },
+      {
+        "slot": 184,
+        "family": "original",
+        "ink_pixels": 2669,
+        "bounds": [
+          23,
+          27,
+          103,
+          100
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "20723bca35af198dc9e843f13ab0f532c6bd13d4b72609851f7a1fcd47d22f07"
+      },
+      {
+        "slot": 185,
+        "family": "original",
+        "ink_pixels": 2171,
+        "bounds": [
+          23,
+          30,
+          104,
+          99
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "86e4d037ec56c0a105485e9cb5529e7e34b734d07c0e20595b0379750d1b253a"
+      },
+      {
+        "slot": 186,
+        "family": "original",
+        "ink_pixels": 3747,
+        "bounds": [
+          24,
+          24,
+          102,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "3b7b33f8b7769dea032f2941a638ccc152a189fed3b2491755713dd1e0b90276"
+      },
+      {
+        "slot": 187,
+        "family": "original",
+        "ink_pixels": 2188,
+        "bounds": [
+          27,
+          31,
+          102,
+          98
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "60fc7d071f0a2d06fe1546dbce77418928803f75ed2d5a912be65a3e11644e7f"
+      },
+      {
+        "slot": 188,
+        "family": "original",
+        "ink_pixels": 1540,
+        "bounds": [
+          42,
+          24,
+          84,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "e518d9bc5a9c76292607bfa7fe080b2b17a8c2bc1b8e373f5fa1328701cb999d"
+      },
+      {
+        "slot": 189,
+        "family": "original",
+        "ink_pixels": 3752,
+        "bounds": [
+          28,
+          20,
+          103,
+          108
+        ],
+        "source_silhouette_iou": 0.9997334754797441,
+        "pixel_sha256": "7b17de913b15638756dc2c242d476f6df874be0cfcec862da208e13053e79686"
+      },
+      {
+        "slot": 190,
+        "family": "original",
+        "ink_pixels": 4279,
+        "bounds": [
+          27,
+          20,
+          103,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "6e09c311a66b06555724a410838f136efd5b6fdfc03d171d56e28a0df4191ab1"
+      },
+      {
+        "slot": 191,
+        "family": "original",
+        "ink_pixels": 3739,
+        "bounds": [
+          24,
+          25,
+          102,
+          104
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "311fac195e3ffa42360bd4d293426d139f916fb818b987bb65200c69dcf13c89"
+      },
+      {
+        "slot": 192,
+        "family": "original",
+        "ink_pixels": 1468,
+        "bounds": [
+          30,
+          41,
+          100,
+          88
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "18454f7181c9948b813da6a0500d4e0d44c56fddbc991e398b2615f201705c1a"
+      },
+      {
+        "slot": 193,
+        "family": "original",
+        "ink_pixels": 4306,
+        "bounds": [
+          25,
+          20,
+          102,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "015c3723b086a8b041e93ad08480c8033cdbb5f097b50b6dc3e8291ce70e2364"
+      },
+      {
+        "slot": 194,
+        "family": "original",
+        "ink_pixels": 3795,
+        "bounds": [
+          25,
+          22,
+          101,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "249adce79f2a86048455f87e4bd3f7eeb19be3163b8b7293e87b1214555a49b2"
+      },
+      {
+        "slot": 195,
+        "family": "original",
+        "ink_pixels": 2864,
+        "bounds": [
+          23,
+          27,
+          102,
+          102
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "24e1d8f47c503b6eea686ef637541e874d28e557040ca2b7b2e54f6d672951a4"
+      },
+      {
+        "slot": 196,
+        "family": "original",
+        "ink_pixels": 3198,
+        "bounds": [
+          22,
+          23,
+          105,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "80e89657e9f7e21ac1e2f569032af51a3c896bacbba3fb2c5f40d991c1fe8a2e"
+      },
+      {
+        "slot": 197,
+        "family": "original",
+        "ink_pixels": 2326,
+        "bounds": [
+          26,
+          22,
+          100,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "e04151e0c9d27606f44c55234e353712d45dda9dfc92659d6790b13b622afa2d"
+      },
+      {
+        "slot": 198,
+        "family": "original",
+        "ink_pixels": 3584,
+        "bounds": [
+          24,
+          21,
+          103,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "cd10f369278774aa1100e2acc2b841a702f8e6af594157b36bd10dc4b97853f5"
+      },
+      {
+        "slot": 199,
+        "family": "original",
+        "ink_pixels": 3959,
+        "bounds": [
+          26,
+          21,
+          103,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "a65663c86d9c84001270019980b9297889ed4723985d73ce68af4c72e5c111f5"
+      },
+      {
+        "slot": 200,
+        "family": "original",
+        "ink_pixels": 4122,
+        "bounds": [
+          29,
+          20,
+          100,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "a2f531b31efcb8eba2f78ff84268352ea9dacc29f690ae0fb29ff0589961a415"
+      },
+      {
+        "slot": 201,
+        "family": "original",
+        "ink_pixels": 1678,
+        "bounds": [
+          40,
+          21,
+          91,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "cdd465b5427334bd3e7ade76ec5d1f27cb8b8f48cbfe72f3d722bf370d7be92e"
+      },
+      {
+        "slot": 202,
+        "family": "original",
+        "ink_pixels": 3645,
+        "bounds": [
+          27,
+          20,
+          103,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "090890fa35e5bf92739b339e8f5493e8526517febb866a6053f33d4012ce6d4b"
+      },
+      {
+        "slot": 203,
+        "family": "original",
+        "ink_pixels": 3548,
+        "bounds": [
+          22,
+          25,
+          104,
+          103
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "e8bc02680f9d9d1bca3b16717c18e7a8ccd122197e295f65bae8e4fee5e97229"
+      },
+      {
+        "slot": 204,
+        "family": "original",
+        "ink_pixels": 2397,
+        "bounds": [
+          33,
+          21,
+          98,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "dd8b7f9c041bb6b1320bb426dd389caa8b23a56ecfe00c555175df8061b0ae39"
+      },
+      {
+        "slot": 205,
+        "family": "original",
+        "ink_pixels": 2763,
+        "bounds": [
+          34,
+          22,
+          97,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "887112d8ab674f7b209aa4ef5d84e664f647cb70b1d316b446489383c08368f1"
+      },
+      {
+        "slot": 206,
+        "family": "original",
+        "ink_pixels": 3759,
+        "bounds": [
+          23,
+          20,
+          105,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "0727a0c3ba8395f571b42c765021faad1abbb46e9376983a59115f59846cf8eb"
+      },
+      {
+        "slot": 207,
+        "family": "original",
+        "ink_pixels": 2162,
+        "bounds": [
+          24,
+          31,
+          103,
+          96
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "9bbb3423d7de013b35f88a5fa5d908b4bdb561ad6acfed5c536b5f467dbb59b4"
+      },
+      {
+        "slot": 208,
+        "family": "original",
+        "ink_pixels": 4176,
+        "bounds": [
+          24,
+          21,
+          105,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "7c704adab3f661a6d7608d6283c8c142e306539332fac9d80d304970d7d1016f"
+      },
+      {
+        "slot": 209,
+        "family": "original",
+        "ink_pixels": 2455,
+        "bounds": [
+          35,
+          20,
+          93,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "1471e6b473d1f44c1cdb4e04cb1ef3af111ae6605a6f1b814aa78448f1d49f25"
+      },
+      {
+        "slot": 210,
+        "family": "original",
+        "ink_pixels": 3883,
+        "bounds": [
+          25,
+          21,
+          102,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "ec2f1bcd8ddb81cf30dec161e2bb38c415c8353f39469d306d5c435438fbfe57"
+      },
+      {
+        "slot": 211,
+        "family": "original",
+        "ink_pixels": 3861,
+        "bounds": [
+          26,
+          22,
+          105,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "6eaad14efc8f893cc6172f56c0ebbf5f2b769a4f54d90f09137de94d97aef93b"
+      },
+      {
+        "slot": 212,
+        "family": "original",
+        "ink_pixels": 3608,
+        "bounds": [
+          24,
+          23,
+          104,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "21965fc49ccc55e565f80fcf6f445e1c8c82b4b347223eff57c344473fe170d1"
+      },
+      {
+        "slot": 213,
+        "family": "original",
+        "ink_pixels": 4337,
+        "bounds": [
+          25,
+          21,
+          105,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "d26e38b14a243c7c4cdf7a181b7cf4d18d8c1c750455a5038e8d3573db37c9d5"
+      },
+      {
+        "slot": 214,
+        "family": "original",
+        "ink_pixels": 3193,
+        "bounds": [
+          25,
+          21,
+          106,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "aa6a77b2ae5e413544dc13e99563a56b30e95323a86e5dba05b79e9b548bd6e4"
+      },
+      {
+        "slot": 215,
+        "family": "original",
+        "ink_pixels": 3713,
+        "bounds": [
+          24,
+          21,
+          102,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "251d1246576646c99bdec894bba63020746e0e0cb99d0a08f10b428e4adb91f8"
+      },
+      {
+        "slot": 216,
+        "family": "original",
+        "ink_pixels": 3391,
+        "bounds": [
+          24,
+          22,
+          103,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "6993ee7ccdd7d220c63a3549baa1c9c684914baaf715e10bbf37d94ff057ad8b"
+      },
+      {
+        "slot": 217,
+        "family": "original",
+        "ink_pixels": 3446,
+        "bounds": [
+          26,
+          20,
+          100,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "5131631fe43b63c861d7a0828e82af910600566deb8087620f83da734691d046"
+      },
+      {
+        "slot": 218,
+        "family": "original",
+        "ink_pixels": 2850,
+        "bounds": [
+          22,
+          25,
+          105,
+          104
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "430164a72842d4efb4eae75592835484444816d1f9a10db0c503a7955c8717c5"
+      },
+      {
+        "slot": 219,
+        "family": "original",
+        "ink_pixels": 3163,
+        "bounds": [
+          24,
+          22,
+          104,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "5cefa2f0d4b6ac5a2beb807f769bb8b36b2afbbd96109b443f22919de3d08ccc"
+      },
+      {
+        "slot": 220,
+        "family": "original",
+        "ink_pixels": 3801,
+        "bounds": [
+          23,
+          19,
+          105,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "e60ae72bd244e0f3b52d732b9a3b872d0c93cba7e75a5217e840f0956f6480cf"
+      },
+      {
+        "slot": 221,
+        "family": "original",
+        "ink_pixels": 3238,
+        "bounds": [
+          25,
+          23,
+          105,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "c5897f213591d2114e17d443593afeb8d41196c2514e00df41ccd35159c4fa6f"
+      },
+      {
+        "slot": 222,
+        "family": "original",
+        "ink_pixels": 3573,
+        "bounds": [
+          28,
+          22,
+          102,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "2d38d125405cbf4084a6fac2701f200a86986aeebd64bf162c9bc7e3cf2952ef"
+      },
+      {
+        "slot": 223,
+        "family": "original",
+        "ink_pixels": 4573,
+        "bounds": [
+          23,
+          21,
+          103,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "0066f8046c9a4409fdb31ebdd29c0caf003ca69e6844874ee7d7520f90b4d305"
+      },
+      {
+        "slot": 224,
+        "family": "original",
+        "ink_pixels": 4025,
+        "bounds": [
+          24,
+          22,
+          104,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "8245dd393f03b10e7dc3891ef44f3ae4e3acd880e4ba4a80b4ce722fb59c240f"
+      },
+      {
+        "slot": 225,
+        "family": "original",
+        "ink_pixels": 3777,
+        "bounds": [
+          24,
+          22,
+          106,
+          104
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "c045761572af43f0fefa92b9e6609c358f2df2a390865b81a6df0fb092214160"
+      },
+      {
+        "slot": 226,
+        "family": "original",
+        "ink_pixels": 3163,
+        "bounds": [
+          28,
+          21,
+          98,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "0f5891b2b7120f8359cdaa7bce7571fd58015007fa3fccd973212b7ad8cd00d2"
+      },
+      {
+        "slot": 227,
+        "family": "original",
+        "ink_pixels": 3300,
+        "bounds": [
+          26,
+          20,
+          100,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "890df0e31f550c709dfa5e395c6ba9a6d04448e4fd01305fc9c21f9c9634f70b"
+      },
+      {
+        "slot": 228,
+        "family": "original",
+        "ink_pixels": 3859,
+        "bounds": [
+          25,
+          21,
+          102,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "80ec132ba9db4596d52073d72be9c9f8b48dca63902ddc85ce304177b3e01f06"
+      },
+      {
+        "slot": 229,
+        "family": "original",
+        "ink_pixels": 2510,
+        "bounds": [
+          26,
+          21,
+          100,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "78402ff01adf2b6cb00dcf20869ab2a0cd6959b19dc0d8fd458ef9db75819e8f"
+      },
+      {
+        "slot": 230,
+        "family": "original",
+        "ink_pixels": 2384,
+        "bounds": [
+          23,
+          21,
+          104,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "86137005f7ea14ec581bcd634528bc03665885f16dbde21af69a332f002e4137"
+      },
+      {
+        "slot": 231,
+        "family": "original",
+        "ink_pixels": 3469,
+        "bounds": [
+          25,
+          19,
+          104,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "e7cfb6aa25525f1570ed0255156c911e5812eee42a2edbce4a4b8c7e4ae0bd81"
+      },
+      {
+        "slot": 232,
+        "family": "original",
+        "ink_pixels": 3847,
+        "bounds": [
+          26,
+          19,
+          101,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "385a3f56eb672cdfcba12308f1a656bb45ae22d9246b31434c4bc15a6950d763"
+      },
+      {
+        "slot": 233,
+        "family": "original",
+        "ink_pixels": 4393,
+        "bounds": [
+          25,
+          20,
+          106,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "28ad72e13c2a4f4a4b9fa4c3e179d305bb9c738423e93005be9be989068e2407"
+      },
+      {
+        "slot": 234,
+        "family": "original",
+        "ink_pixels": 2948,
+        "bounds": [
+          24,
+          22,
+          102,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "6f55fcd09942250244c17897b10680bbd40b3745c00020371531ff08831eee94"
+      },
+      {
+        "slot": 235,
+        "family": "original",
+        "ink_pixels": 3072,
+        "bounds": [
+          24,
+          22,
+          101,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "3a775e5c8a222e6193976d46f4304b776b2ae770692cff462eb9e18693b92c3f"
+      },
+      {
+        "slot": 236,
+        "family": "original",
+        "ink_pixels": 3757,
+        "bounds": [
+          22,
+          27,
+          103,
+          102
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "ef00dfc70e17289991dedceb2b3789e09ed7dfc7b20bc95a230479c290081070"
+      },
+      {
+        "slot": 237,
+        "family": "original",
+        "ink_pixels": 3274,
+        "bounds": [
+          25,
+          21,
+          102,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "da358505ede2515ccafa1730974570ac672825d4e093ea437db8aa4e7936b52c"
+      },
+      {
+        "slot": 238,
+        "family": "original",
+        "ink_pixels": 3161,
+        "bounds": [
+          25,
+          24,
+          106,
+          104
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "f74052730f8b2ce176504fff3478ad95445b2c95b017aeebaef0d547382237bd"
+      },
+      {
+        "slot": 239,
+        "family": "original",
+        "ink_pixels": 3118,
+        "bounds": [
+          22,
+          23,
+          104,
+          104
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "f0c309993dc8a986c207ebdb6b2dd346d3f6e9df4a3bc2fccd551ee06e5054d9"
+      },
+      {
+        "slot": 240,
+        "family": "original",
+        "ink_pixels": 3420,
+        "bounds": [
+          25,
+          22,
+          101,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "43193dae51aaac4d10c462f03e87277151df6c2fccb4a749d7915b3e4e401c36"
+      },
+      {
+        "slot": 241,
+        "family": "original",
+        "ink_pixels": 2550,
+        "bounds": [
+          29,
+          21,
+          99,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "ab3bc6f2ea14cc036eb22fbc66e19388901ce2fc4e4e722acc3b500c50e1e47e"
+      },
+      {
+        "slot": 242,
+        "family": "original",
+        "ink_pixels": 3615,
+        "bounds": [
+          25,
+          23,
+          100,
+          107
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "1b4cde00de27be0dd61aebfe90589b8c96dd013eea5a6e9c946e8a0259615ecb"
+      },
+      {
+        "slot": 243,
+        "family": "original",
+        "ink_pixels": 3669,
+        "bounds": [
+          27,
+          22,
+          100,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "fd865f5fd52e106d1f73d8f948f621b327341af5f820c44d0d20227e02966a8b"
+      },
+      {
+        "slot": 244,
+        "family": "original",
+        "ink_pixels": 3902,
+        "bounds": [
+          25,
+          23,
+          105,
+          105
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "16896606163cf794bddf780b7132c3abbac475adc518dc47c232ee68fa2f436a"
+      },
+      {
+        "slot": 245,
+        "family": "original",
+        "ink_pixels": 3935,
+        "bounds": [
+          24,
+          23,
+          105,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "8a0ad21ddf661f20756fa22d466e70e089a2ee2e5550508cfa1d557efc4ed5a5"
+      },
+      {
+        "slot": 246,
+        "family": "original",
+        "ink_pixels": 2893,
+        "bounds": [
+          28,
+          22,
+          99,
+          106
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "2b2af9b9d1de83c0efb402dc66320b4df73a6a83b2e0b628c96f89fbdde5cb9f"
+      },
+      {
+        "slot": 247,
+        "family": "original",
+        "ink_pixels": 2425,
+        "bounds": [
+          23,
+          29,
+          105,
+          99
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "3c034d95bfec424209f5bbbc9d0381e7eb70a95058f3986e3e2d4111bd5b7cdf"
+      },
+      {
+        "slot": 248,
+        "family": "original",
+        "ink_pixels": 3990,
+        "bounds": [
+          23,
+          21,
+          102,
+          108
+        ],
+        "source_silhouette_iou": 1.0,
+        "pixel_sha256": "0893a1046a824c00d3b7fe862abd86955547a7019945809fdcbc7b77c479cc73"
+      }
+    ]
+  },
+  "selections": {
+    "preview-start": {
+      "reference": 1773,
+      "original": 211,
+      "blank": 32,
+      "configured_original_mix": 0.1,
+      "observed_original_share": 0.1063508064516129
+    },
+    "preview-moving": {
+      "reference": 70221,
+      "original": 8158,
+      "blank": 1254,
+      "configured_original_mix": 0.1,
+      "observed_original_share": 0.1040840020923972
+    },
+    "preview-repeat": {
+      "reference": 1773,
+      "original": 211,
+      "blank": 32,
+      "configured_original_mix": 0.1,
+      "observed_original_share": 0.1063508064516129
+    },
+    "reference-only": {
+      "reference": 1971,
+      "original": 0,
+      "blank": 36,
+      "configured_original_mix": 0.0,
+      "observed_original_share": 0.0
+    },
+    "original-only": {
+      "reference": 0,
+      "original": 1801,
+      "blank": 0,
+      "configured_original_mix": 1.0,
+      "observed_original_share": 1.0
+    }
+  },
   "frames": {
     "preview-start": {
       "width": 640,
       "height": 480,
-      "black_fraction": 0.70007,
-      "green_fraction": 0.26022,
-      "sha256": "a0406f72dbcfdb434061893a8a623f4ccfcfbbfa7bd9814fab3c55173a45887b"
+      "black_fraction": 0.72826,
+      "green_fraction": 0.23739,
+      "body_hue_median": 136.8,
+      "mint_pixels": 2030,
+      "sha256": "e459392f8d71f16a63e8c052f3f620631a9429d11642df30274f32c1aa725df1"
     },
     "preview-moving": {
       "width": 640,
       "height": 480,
-      "black_fraction": 0.70669,
-      "green_fraction": 0.25365,
-      "sha256": "890a0ded42838a015fe6edfc544d15536378fb9952f9da36347c2850d35bfc52"
+      "black_fraction": 0.74841,
+      "green_fraction": 0.21706,
+      "body_hue_median": 136.74418604651163,
+      "mint_pixels": 1589,
+      "sha256": "5c44c3a50a3ccbb0f9501570e434a833acae17ff8e57953d8a2a1a5de5cb795d"
     },
     "preview-repeat": {
       "width": 640,
       "height": 480,
-      "black_fraction": 0.70007,
-      "green_fraction": 0.26022,
-      "sha256": "a0406f72dbcfdb434061893a8a623f4ccfcfbbfa7bd9814fab3c55173a45887b"
+      "black_fraction": 0.72826,
+      "green_fraction": 0.23739,
+      "body_hue_median": 136.8,
+      "mint_pixels": 2030,
+      "sha256": "e459392f8d71f16a63e8c052f3f620631a9429d11642df30274f32c1aa725df1"
+    },
+    "reference-only": {
+      "width": 640,
+      "height": 480,
+      "black_fraction": 0.72603,
+      "green_fraction": 0.23939,
+      "body_hue_median": 136.8,
+      "mint_pixels": 2080,
+      "sha256": "74bfff13ec117803d00b6eed573cd5d1d17828630e846f570daf0528189f45df"
+    },
+    "original-only": {
+      "width": 640,
+      "height": 480,
+      "black_fraction": 0.75261,
+      "green_fraction": 0.21722,
+      "body_hue_median": 136.8,
+      "mint_pixels": 2285,
+      "sha256": "3f1f163786da2aa3a8312b20cbc34eadc18e0c01bf5bf7d9b4ffb725e88d3921"
     },
     "embedded": {
       "width": 320,
       "height": 240,
-      "black_fraction": 0.57643,
-      "green_fraction": 0.37178,
-      "sha256": "b94193538988c7190470644da66f9d9373b35b3ab3892296f01ae4b9067edd3e"
+      "black_fraction": 0.62138,
+      "green_fraction": 0.32408,
+      "body_hue_median": 136.71428571428572,
+      "mint_pixels": 665,
+      "sha256": "d0affcd66386604ccaf61bf99e5b686f60b73cb36ed9c93746b80198cc6f902a"
     },
     "root": {
       "width": 1280,
       "height": 720,
-      "black_fraction": 0.72706,
-      "green_fraction": 0.24472,
-      "sha256": "65e18b8f1e2e6831cd6d69ebafd0f999ee930029ecf9852090f8d80d0369dec8"
+      "black_fraction": 0.7463,
+      "green_fraction": 0.22761,
+      "body_hue_median": 136.88888888888889,
+      "mint_pixels": 6348,
+      "sha256": "ed44e454e1eec0618749561e12d0df337452f5bb2bc04b723c3f073770d6ce2e"
     }
   },
   "embedded_framebuffer": {
     "sampled_pixels": 4800,
-    "green_pixels": 1916,
-    "black_pixels": 2257
+    "green_pixels": 1687,
+    "black_pixels": 2321
   },
   "resized_framebuffer": {
     "sampled_pixels": 9600,
-    "green_pixels": 2805,
-    "black_pixels": 5566
+    "green_pixels": 1763,
+    "black_pixels": 7044
   }
 }

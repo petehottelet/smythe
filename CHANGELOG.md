@@ -41,16 +41,16 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   greens `#37FF6E` and `#9CFFBC`, borderless text controls, and no interface glow
   or corner ornaments. Browser interaction checks pass; performance and
   quantified reference parity remain unmeasured.
-  Native downloads retain the earlier
-  stroke catalog. The previous Canvas renderer, screenshot, and hash-bound
+  Native downloads share both current SVG catalogs. The previous Canvas renderer, screenshot, and hash-bound
   timing/soak receipts are preserved as superseded evidence.
 - **Glyph Rain screensaver ports** (`screensaver/`): a static fullscreen web
   app with three depth layers and bounded luminous trails; a native Windows
   `.scr` in C#/GDI+; a universal macOS `.saver` in Swift; and a Linux x86-64
   X11 executable in C/Cairo. Compiled downloads, SHA-256 checksums, build
   provenance, and native verification receipts are committed in
-  `screensaver/dist/`. Every native port and the legacy web view use the same 192-glyph catalog exported by
-  `screensaver/export_glyphs.py`.
+  `screensaver/dist/`. Every native port uses the current 56 reference glyphs,
+  blank slot, and 192 original SVGs through `screensaver/export_native_glyphs.py`.
+  The legacy web view alone retains the earlier stroke data.
 - **README benchmark charts** rendered deterministically from committed
   result records by `benchmarks/render_readme_charts.py` into
   `assets/benchmarks/`.
@@ -149,6 +149,14 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Changed
 
+- **Native glyph downloads** now render the current filled SVG contours on
+  Windows, macOS, and Linux, with a 10% original mix, Matrix green bodies,
+  and mint highlights. Exact curves, winding, and blank-slot selection are
+  preserved. Native atlas and host checks bind the compiled packages to both
+  source catalogs; embedded and packaged notices credit the reference artwork.
+- **Reproducible glyph rasters** pin the `glyphs` and `dev` extras to Pillow
+  11.1.0. Pillow 12.3 changed polygon edge coverage and caused the committed
+  reference contact-sheet regression check to fail. The artwork is unchanged.
 - **Glyph Rain credits** identify the adapted code and imported base artwork
   from `m8e/matrix-rain` and upstream `Rezmason/matrix`. MIT notices accompany
   both the engine and artwork, with pinned source provenance. The original
