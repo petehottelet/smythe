@@ -47,6 +47,12 @@ The [completed study](../benchmarks/renderer_performance_20260907_results.md)
 retains all six primary sessions, their missed pacing target, a separate browser
 cadence control, and the ten-minute travel/resize check.
 
+The repository's [Autotune concurrency command](../docs/optimize.md#run-the-offline-campaign)
+remains offline. Its unreleased [campaign ownership](../docs/optimize.md#campaign-ownership-unreleased)
+update acquires and renews a lease automatically; the CLI needs no new flags.
+Low-level ledger callers must pass explicit lease tokens. These changes are
+available from the checkout after 0.7.0 and are not in the pinned package above.
+
 | Example | What it shows |
 |---|---|
 | [GPT-6 Astra quickstart](../README.md#quickstart) | Generate, inspect, and execute a text-only task graph through native Responses, with a $5 run allowance, concurrency eight, and planning included in the SQLite ledger. |

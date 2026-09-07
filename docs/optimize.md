@@ -35,6 +35,10 @@ is reduced to the same small, immutable policy patch before evaluation.
 The package is pre-1.0 and its API may change. The programmatic runner is
 `OptimizationRunner` in `smythe.optimize.engine`.
 
+The [0.7.0 release](https://github.com/petehottelet/smythe/blob/v0.7.0/docs/optimize.md)
+uses ledger schema v3. Campaign ownership and schema v4 below are **unreleased**
+changes available from the repository checkout.
+
 ## Experiment contracts and budgets
 
 `ExperimentContract` freezes the measurement policy before a campaign starts.
@@ -257,6 +261,48 @@ micro-USD cost, and optional SHA-256 artifact hashes.
 confirmation and holdout assessments, decision and trial keys, and ledger
 snapshot.
 
+### Campaign ownership (Unreleased)
+
+One live lease owns each campaign. `OptimizationRunner.run()` acquires a
+unique owner identity and increasing epoch, renews it in a background thread,
+and releases it after evaluator cleanup. Another runner for the same campaign
+receives `CampaignLeaseConflict` before invoking its evaluator. Independent
+campaigns can run concurrently.
+
+The default lease lasts 30 seconds and renews every 10 seconds. Programmatic
+callers can set `lease_ttl_s` and `lease_heartbeat_s`; both must be finite,
+positive durations, and renewal must occur more often than expiry. The CLI
+uses the defaults and needs no additional flags. Renewal runs separately from
+the event loop so synchronous statistical work can continue without blocking
+the heartbeat.
+
+Every trial transition and promotion decision checks the current owner,
+epoch, and expiry inside its write transaction. Dispatch records retain their
+owner permanently. A stale or foreign token cannot complete a dispatched
+trial, mark it unknown, publish a decision, or release a successor's lease.
+Expiry is checked after acquiring the SQLite write lock and again after
+validation, before committing trial or decision changes.
+
+Heartbeat failure cancels owned evaluator work. Cancellation drains that work
+before stopping renewal and releasing ownership; repeated caller cancellation
+does not abandon cleanup. Evaluators must still cooperate with cancellation.
+Ownership cannot forcibly stop arbitrary synchronous code or undo a provider
+request already sent.
+
+The low-level ledger API now requires an explicit `lease=` token for
+`prepare_trial`, both dispatch methods, `complete_trial`, `mark_trial_unknown`,
+`append_trial`, and `append_decision`. Acquire it through
+`acquire_campaign_lease(campaign_id, owner_id)`, renew through
+`heartbeat_campaign_lease`, and release through `release_campaign_lease`.
+`CampaignLease`, `CampaignLeaseError`, and `CampaignLeaseConflict` are public
+exports. Use `OptimizationRunner` to manage this lifecycle automatically.
+This required-token API change belongs to the next minor release; it is not
+part of the published 0.7.0 API.
+
+Leases fence Smythe's public mutation API on a local SQLite ledger. They do not
+isolate untrusted code inside the runner process, protect against direct
+database editing, or provide a distributed lock across copied database files.
+
 ### Holdout trust boundary
 
 Candidate proposers receive contracts and public campaign evidence, not the
@@ -325,10 +371,19 @@ Append-only describes transitions made through the public Python API; it is
 not protection against an operator directly modifying the SQLite database.
 Protect and back up the database as experiment evidence.
 
-The current ledger schema is version 3. It adds atomic full-plan sealing and a
-single terminal-decision constraint. It deliberately rejects the unreleased
-version-1 and version-2 Autotune schemas before mutating them; create a fresh
-ledger rather than treating old development evidence as a v3 campaign.
+The unreleased ledger schema is version 4. It adds campaign leases, monotonic
+owner epochs, and immutable dispatch ownership to v3's atomic plan sealing and
+single terminal-decision constraint. Writable opening upgrades a v3 database
+transactionally, preserving campaign and candidate payloads, trial events,
+costs, decisions, holdout secrets, and plan identities. Read-only inspection
+continues to support a closed v3 database without migration.
+
+Stop v3 runners before upgrading. Migration installs a connection-version
+barrier that rejects writes from already-open v3 connections, including cached
+statements. A current writer also validates the barrier on reopening; failed
+migration rolls back. Existing evidence is preserved rather than assigning
+historical dispatches to a new owner. Versions 1 and 2 remain unsupported;
+create a fresh ledger for those early development schemas.
 
 ## Unknown outcomes stop the campaign
 
@@ -337,32 +392,42 @@ the external side-effect boundary. After dispatch, a timeout or process loss
 is different. The provider may have finished and billed the work even when no
 response was committed locally.
 
-When the active runner observes that failure, it marks the trial `unknown`.
-The ledger then:
+An active owner can record that failure as `unknown`. Once recorded, the
+ledger:
 
 - keeps the full reservation in unknown cost exposure;
 - refuses to dispatch, complete, or reuse the same trial; and
 - refuses to use a non-completed trial as promotion evidence.
 
-`OptimizationRunner` enforces the stop rule. An evaluator timeout, exception,
-invalid outcome, cancellation, or failure to commit a returned outcome after
-dispatch marks that trial unknown and raises `OptimizationNeedsAttention`.
-During parallel development the runner cancels and awaits its sibling tasks;
-any sibling already past dispatch is also recorded conservatively rather than
-silently retried.
+A runner that has lost ownership cannot write that disposition. Its unresolved
+`dispatched` trial keeps the full ceiling in `reserved_microusd`; a recorded
+`unknown` trial keeps it in `unknown_exposure_microusd`. Both block new admission.
 
-On restart, completed trials are validated and reused, while prepared trials
-remain safe to claim. A previously dispatched trial with no durable terminal
-event stops the campaign as `OptimizationNeedsAttention`; it is not
-automatically reclassified or dispatched again because another process may
-still own it.
+`OptimizationRunner` enforces the stop rule. An evaluator timeout, exception,
+invalid outcome, or failed completion stops the campaign with
+`OptimizationNeedsAttention`. It records the ambiguous trial as unknown when
+ownership remains live and the ledger write succeeds. A failed disposition
+write leaves the dispatch unresolved and reserved. Caller cancellation retains `CancelledError`;
+heartbeat or ownership failure can raise `CampaignLeaseError` and leave the
+dispatch unresolved. During parallel development the runner cancels and
+awaits its sibling tasks, recording their dispositions only while it owns
+the lease. It never silently retries a dispatched sibling.
+
+On restart, a new runner must acquire ownership before using the campaign.
+Completed trials are validated and reused. Prepared trials remain safe to
+claim only when the campaign contains no unknown outcome or dispatch owned
+by an earlier epoch. A previously dispatched trial with no durable terminal
+event stops the runner as `OptimizationNeedsAttention`; it is not automatically
+reclassified or dispatched again. Its full reservation remains in the ledger.
+The low-level admission API enforces the same stop rule, including already
+prepared sibling trials.
 
 Investigate provider records and local artifacts before deciding how to
 proceed; do not hide the ambiguity by using a new seed or phase name.
 
-The runner does not yet hold a campaign-wide process lease. Run only one active
-runner for a campaign; a competing process can observe the first process's
-dispatched trial as ambiguous and stop without duplicating it.
+Lease expiry permits a new owner to acquire the campaign; it does not prove
+that a previous external request was unexecuted or unbilled. There is no
+automatic retry or reconciliation command for these ambiguous trials.
 
 ## Current boundaries
 
@@ -372,7 +437,6 @@ The following pieces remain future work:
   current deterministic concurrency grid;
 - CLI adapters for general or provider-backed evaluators with conservative
   per-trial price ceilings;
-- campaign-wide leases for safe multi-process operation;
 - calibrated sample-size guidance and repeated-comparison controls; and
 - richer export, comparison, and human-approval surfaces.
 

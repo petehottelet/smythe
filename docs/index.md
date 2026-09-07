@@ -27,7 +27,7 @@ verification, trace, artifact, and recovery controls.
 - [Checkpoint format](checkpoint-format.md) — flushed atomic publication, saved state, and resume semantics
 - [Cost guardrails](budgets.md) — strict usage validation, reservations, and failed-accounting recovery
 - [Jobs](jobs.md) — preflight, approval, detached workers and host limits, durable pause/resume, fenced ownership, artifact namespaces, database upgrades, inspection, rerolls, and exports
-- [Optimization](optimize.md) — bounded concurrency experiments and evidence ledgers
+- [Optimization](optimize.md) — bounded concurrency experiments, evidence ledgers, and unreleased campaign ownership with schema-v3 migration
 
 ## Connect models and tools
 

@@ -19,8 +19,10 @@ and [unique, flushed file checkpoints](checkpoint-format.md) are implemented.
 The [completion campaign](../plans/coming-soon-2026-09-07.md#work-queue) records
 their source-bound tests and CI evidence. The [Astra pilot runtime qualification](../benchmarks/results/astra_pilot_runtime_20260907/README.md)
 is offline evidence; new paid comparisons and calibrated quality results remain
-pending. Deliverable contracts, Autotune campaign ownership, strict capability
-assignment, and the other remaining work are tracked in that campaign and the
+pending. The unreleased [Autotune ownership update](optimize.md#campaign-ownership-unreleased)
+adds live campaign leases, fenced trial writes, and preserved v3 evidence.
+Deliverable contracts, strict capability assignment, and the other remaining
+work are tracked in that campaign and the
 [roadmap](../ROADMAP.md#coming-soon).
 
 The rating, assessment, reproductions, counts, and original delivery sequence
@@ -243,11 +245,11 @@ boundaries; earlier incomplete campaigns remain diagnostic evidence.
 | Execution | Bounded active-task admission, explicit retries, timeouts, cancellation, per-call recording | The four correctness findings and explicit verification generations are addressed. Continue consolidating shared executor behavior while retaining the regression matrix. |
 | Durability | Atomic artifact replacement, versioned checkpoints, terminal checkpoints | The reviewed fixed `.json.tmp` collision is addressed by unique temporary files and durable flushing. Ordinary file checkpoints still provide no concurrent-resume ownership; managed workflows and Jobs have fenced leases. |
 | Jobs | Approval bound to exact plans, SQLite WAL/FULL durability, dispatch journal, leases, explicit unknown outcomes | Managed Swarm accounting and Jobs operator inspection are implemented. Production asset-policy integration remains open. |
-| Autotune | Immutable contracts, allowlisted mutation, paired comparisons, confirmation and held-out evaluation | Add campaign ownership and evaluator process isolation before live generalization. Keep the offline simulator distinct from measured provider performance. |
+| Autotune | Immutable contracts, allowlisted mutation, paired comparisons, confirmation and held-out evaluation | Campaign ownership is implemented as an unreleased update. Add evaluator process isolation and calibration before live generalization; keep the offline simulator distinct from measured provider performance. |
 | Providers and MCP | Lazy optional SDK imports, vendor-neutral messages/tools, allowlists, environment-variable names in persisted configuration | Unify adapter configuration and costing; test supported minimum/current SDKs. Offer strict capability assignment: [Registry.assign](../smythe/registry.py#L112) currently creates a generalist when no agent satisfies required capabilities. |
 | Assets | Separate production/concept policies, deterministic finishing, validation and hash receipts | Keep exact production constraints separate from model judgment. Promote Jobs artifact validation without implying the simpler Swarm artifact records have all the same guarantees. |
 | Observability and memory | Structured lifecycle events, explicit revision/regeneration traces, reviewable history | Managed workflows now record durable phase totals and request identifiers. Distinguish wall time from summed node duration; memory still sums span durations, which grows with parallel work. |
-| Packaging and CI | Minimal core install, provider extras, wheel smoke tests, offline tests, trusted PyPI publishing | Clean-environment README candidate checks are qualified in the completion campaign; final distributions still need release qualification. Broaden reproducible dependency constraints, type checks, and a measured coverage floor. |
+| Packaging and CI | Minimal core install, provider extras, wheel smoke tests, offline tests, trusted PyPI publishing | [0.7.0 publication](release-0.7.0.md) is qualified with matching downloads and fresh PyPI installation checks. Broaden reproducible dependency constraints, type checks, and a measured coverage floor. |
 | Documentation and examples | Concise README plus subsystem guides, architecture diagram, offline acquisition example | Keep exact claims prominent and protocol scope adjacent. Put planned capabilities in Coming soon while retaining limitations beside the behavior they constrain. |
 | Screensaver | Shared glyph catalog across web, Windows, macOS, and Linux | Preserve catalog parity across renderers and native artifact checks; add notarized Mac distribution and native Wayland integration. Tune rendering independently of benchmark timing. |
 

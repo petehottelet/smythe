@@ -21,10 +21,32 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
+### Added
+
+- **Autotune campaign ownership**: renewable campaign leases and owner epochs
+  fence trial transitions and promotion decisions. Competing runners fail
+  before evaluation; stale owners cannot settle work or release a successor.
+  Heartbeat failure drains owned evaluators, and unresolved earlier dispatches
+  retain their reservations and block new admission.
+
+### Changed
+
+- Autotune schema v4 transactionally upgrades v3 evidence and blocks writes
+  from already-open v3 connections. Closed read-only v3 inspection remains
+  supported. Low-level trial and decision methods now require an explicit
+  `lease=` token; this breaking API change is for the next minor release.
+
 ### Documentation
 
 - Link the README's native downloads to the published v0.7.0 release, update
   the verified PyPI badge, and align the release and renderer status guides.
+
+### Tests
+
+- Explicitly close SQLite connections in 36 test-fixture contexts while
+  preserving their transaction behavior. All 298 affected tests pass; the
+  allocation probe closes all 103 observed connections, including the 16
+  fixture connections previously left open.
 
 ## [0.7.0] - 2026-09-07
 
