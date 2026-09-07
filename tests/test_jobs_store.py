@@ -107,18 +107,23 @@ def test_snapshot_uses_one_wal_read_view_during_concurrent_commit(tmp_path):
     run_id = reader.create_run(plan, approval, manifest_root=tmp_path)
     operation_id = reader.pending_operations(run_id)[0]["operation_id"]
     writer = SQLiteRunStore(database)
-    operation_query_started = Event()
     writer_committed = Event()
     writer_errors: list[BaseException] = []
+    thread: Thread | None = None
 
     def trace(statement: str) -> None:
+        nonlocal thread
         if statement.startswith("SELECT * FROM operations WHERE run_id"):
-            operation_query_started.set()
-            assert writer_committed.wait(5)
+            # Start the writer only once the reader reaches the boundary.
+            # A readiness deadline before this point counts unrelated reader
+            # setup/scheduling time and can expire under parallel test load.
+            thread = Thread(target=write_between_snapshot_queries)
+            thread.start()
+            if not writer_committed.wait(10):
+                writer_errors.append(AssertionError("writer did not commit at the read barrier"))
 
     def write_between_snapshot_queries() -> None:
         try:
-            assert operation_query_started.wait(5)
             writer.begin_attempt(run_id, operation_id)
         except BaseException as exc:  # pragma: no cover - surfaced below
             writer_errors.append(exc)
@@ -126,15 +131,14 @@ def test_snapshot_uses_one_wal_read_view_during_concurrent_commit(tmp_path):
             writer_committed.set()
 
     reader._connection.set_trace_callback(trace)
-    thread = Thread(target=write_between_snapshot_queries)
-    thread.start()
     try:
         snapshot = reader.snapshot(run_id)
     finally:
         reader._connection.set_trace_callback(None)
-        thread.join(timeout=5)
+        if thread is not None:
+            thread.join(timeout=10)
 
-    assert not thread.is_alive()
+    assert thread is not None and not thread.is_alive()
     assert writer_errors == []
     assert snapshot["status"] == RunStatus.APPROVED.value
     assert snapshot["counts"] == {OperationStatus.PENDING.value: 1}
@@ -211,17 +215,17 @@ def test_run_lease_excludes_other_store_and_gates_recovery(tmp_path):
     assert lease.owner_id == "worker-a"
     with pytest.raises(RunLeaseError, match="worker-a"):
         second_store.acquire_run_lease(run_id, "worker-b", ttl_s=30)
-    with pytest.raises(RunLeaseError, match="requires that lease owner"):
+    with pytest.raises(RunLeaseError, match="requires a current lease token"):
         second_store.recover_inflight(run_id)
-    with pytest.raises(RunLeaseError, match="worker-a"):
+    with pytest.raises(RunLeaseError, match="matching current lease token"):
         second_store.recover_inflight(run_id, lease_owner_id="worker-b")
 
     assert first_store.recover_inflight(
-        run_id, lease_owner_id="worker-a"
+        run_id, lease_owner_id="worker-a", lease=lease,
     ) == {"safe_to_retry": [], "unknown_outcome": []}
-    renewed = first_store.heartbeat_run_lease(run_id, "worker-a", ttl_s=30)
+    renewed = first_store.heartbeat_run_lease(run_id, "worker-a", ttl_s=30, lease=lease)
     assert renewed.expires_at_ns >= lease.expires_at_ns
-    assert first_store.release_run_lease(run_id, "worker-a") is True
+    assert first_store.release_run_lease(run_id, "worker-a", lease=lease) is True
     assert first_store.get_run_lease(run_id) is None
     assert second_store.acquire_run_lease(run_id, "worker-b").owner_id == "worker-b"
 
@@ -247,8 +251,8 @@ def test_unknown_requires_explicit_acknowledgement_before_reroll(tmp_path):
             reason="operator review",
         )
 
-    store.acquire_run_lease(run_id, "worker-a")
-    with pytest.raises(RunLeaseError, match="requires that lease owner"):
+    lease = store.acquire_run_lease(run_id, "worker-a")
+    with pytest.raises(RunLeaseError, match="requires a current lease token"):
         store.queue_reroll(
             run_id,
             [operation["operation_key"]],
@@ -261,8 +265,9 @@ def test_unknown_requires_explicit_acknowledgement_before_reroll(tmp_path):
         acknowledge_unknown=True,
         reason="operator accepts possible duplicate spend",
         lease_owner_id="worker-a",
+        lease=lease,
     )
-    store.release_run_lease(run_id, "worker-a")
+    store.release_run_lease(run_id, "worker-a", lease=lease)
     assert queued == [operation["operation_key"]]
 
 

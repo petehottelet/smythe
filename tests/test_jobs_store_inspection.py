@@ -120,13 +120,16 @@ def test_version_one_is_never_upgraded_by_reader_but_writable_upgrade_remains(tm
         create_run(store, tmp_path)
     with sqlite3.connect(path) as db:
         db.execute("DROP TABLE run_leases")
+        db.execute("ALTER TABLE runs DROP COLUMN lease_epoch")
+        db.execute("ALTER TABLE attempts DROP COLUMN lease_owner_id")
+        db.execute("ALTER TABLE attempts DROP COLUMN lease_epoch")
         db.execute("PRAGMA user_version=1")
     before = logical_dump(path)
     with pytest.raises(RunStoreError, match="version"):
         SQLiteRunStore(path, read_only=True)
     assert logical_dump(path) == before
     with SQLiteRunStore(path) as writer:
-        assert writer._connection.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert writer._connection.execute("PRAGMA user_version").fetchone()[0] == 3
         assert writer.get_run_lease("run") is None
         assert writer.get_run("run")["run_id"] == "run"
 

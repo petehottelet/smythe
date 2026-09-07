@@ -260,6 +260,18 @@ state transition and execution window. A second process cannot recover or
 reroll the same live run; it receives a job-state error until the owner
 releases the lease or its heartbeat expires after a crash.
 
+Each new ownership period receives a higher lease epoch. Renewals retain it. Every worker
+write checks the live owner and epoch inside the same SQLite transaction as the
+mutation. Attempts retain their originating owner and epoch. An expired worker
+cannot dispatch, settle a call, replace an accepted result, or finalize the run
+after another worker takes over. Lease time is sampled after the transaction
+acquires its write lock, so lock contention cannot revive an expired lease.
+
+This fences durable dispatch admission and journal writes. A request already
+marked dispatched can still reach or finish at the provider after ownership
+expires. Its uncommitted outcome remains unknown until investigated; the lease
+does not cancel an external request or make it safe to repeat automatically.
+
 A completed run starts zero new operations. Safe pre-dispatch interruptions
 return to pending. Dispatched-but-uncommitted calls remain `unknown_outcome`,
 and the run becomes `needs_attention`.
@@ -275,6 +287,21 @@ Do not resolve an unknown outcome by ordinary `resume`; that is intentionally a
 no-op for the ambiguous operation. First investigate the provider account and
 artifact destination. If a duplicate call is acceptable, acknowledge that
 risk explicitly during a selective reroll.
+
+## Jobs database upgrades
+
+The writable store upgrades earlier Jobs databases to schema version 3. Stop
+older workers before upgrading; an unexpired legacy lease blocks migration.
+Historical attempts keep their original unbound provenance. Runs that held a
+legacy lease remain fenced after upgrade, including after lease release.
+Read-only inspection supports version 2 without migration and reports whether
+lease fencing is supported in that snapshot.
+
+Code using `JobRunner` receives these checks automatically. Direct store users
+must retain the `RunLease` returned by `acquire_run_lease` and pass it as `lease=`
+to worker mutations, heartbeat, and release. Omitting the token is supported
+only for a run that has never acquired a lease. A new owner's token cannot
+settle an earlier owner's attempt; use recovery to classify the old work.
 
 ## Selective rerolls
 

@@ -23,6 +23,12 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Added
 
+- **Jobs lease fencing**: schema version 3 binds worker writes to live owner
+  epochs and immutable attempt provenance. Expired owners cannot admit dispatch,
+  settle, recover, reroll, or finalize after takeover. Lease time is sampled
+  inside the write transaction. Read-only version-2 inspection remains supported;
+  writable migration rejects a live legacy lease.
+
 - **Astra experiment preparation**: 13 original task/source packs, separate
   factual checks and anchored rubrics, and seeded four-arm schedules for
   12 pilot and 200 main workflows. Portable hashes bind every input and
