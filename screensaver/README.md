@@ -120,3 +120,20 @@ vercel deploy --prod
 
 `glyph-rain-preview.png` is a 1920×1080 capture of the web renderer. Benchmark
 artifacts retain their original renderings and hash-bound receipts.
+
+## Credits and references
+
+Visual and technical research for Glyph Rain's next version draws on
+[m8e/matrix-rain](https://github.com/m8e/matrix-rain), a fork of
+[Rezmason/matrix](https://github.com/Rezmason/matrix). Credit to Rezmason and
+the project's contributors for the reference implementation of glyph
+presentation, traveling illumination, green palettes, bloom, and depth.
+
+We studied [revision 5ba9049](https://github.com/m8e/matrix-rain/tree/5ba90490453ceceb6812d6b1bc658a99a92411d0).
+Its [MIT license](https://github.com/m8e/matrix-rain/blob/5ba90490453ceceb6812d6b1bc658a99a92411d0/LICENSE)
+credits **Copyright (c) 2018 Rezmason**. Smythe uses independently authored
+code and glyphs; no source code, glyph outlines, textures, or fonts from the
+reference project are included.
+
+The [style and implementation plan](../docs/glyph-rain-plan.md) records the
+reference measurements and the specification for new original SVG glyphs.

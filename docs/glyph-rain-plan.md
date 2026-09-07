@@ -21,9 +21,13 @@ to invent an origin or character name.
 
 The effect reference is [m8e/matrix-rain at commit
 5ba9049](https://github.com/m8e/matrix-rain/tree/5ba90490453ceceb6812d6b1bc658a99a92411d0),
-a fork of Rezmason/matrix. Study its defaults, simulation structure, vector
+a fork of [Rezmason/matrix](https://github.com/Rezmason/matrix). Credit to
+Rezmason and the project's contributors for the reference implementation.
+Its [MIT license](https://github.com/m8e/matrix-rain/blob/5ba90490453ceceb6812d6b1bc658a99a92411d0/LICENSE)
+credits Copyright (c) 2018 Rezmason. Study its defaults, simulation structure, vector
 sampling, bloom, palette, and depth projection. The sheet determines shape
 characteristics; the repository explains the moving-light effect.
+[Screensaver credits](../screensaver/README.md#credits-and-references).
 
 Every number below is labeled as one of:
 
