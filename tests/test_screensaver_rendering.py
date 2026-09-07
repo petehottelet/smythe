@@ -161,6 +161,20 @@ internal class RenderCheck
         using (Bitmap blank = Sprites.RenderMask(GlyphData.BlankIndex, 64))
             if (Ink(blank) != 0) throw new Exception("Intentional reference blank was filled");
 
+        // SVG integer edges enclose pixel centers at n+0.5. GDI+'s default
+        // offset shifts the silhouette by half a pixel and corrupts small shapes.
+        double[][] original = GlyphData.Commands[0];
+        try {
+            GlyphData.Commands[0] = new double[][] {
+                new double[] { 0, 10, 10 }, new double[] { 1, 90, 10 },
+                new double[] { 1, 90, 90 }, new double[] { 1, 10, 90 }, new double[] { 3 }
+            };
+            using (Bitmap mask = Sprites.RenderMask(0, 100))
+                if (mask.GetPixel(9, 50).A != 0 || mask.GetPixel(10, 50).A != 255
+                    || mask.GetPixel(89, 50).A != 255 || mask.GetPixel(90, 50).A != 0)
+                    throw new Exception("Native fill does not use SVG pixel-center placement");
+        } finally { GlyphData.Commands[0] = original; }
+
         // Opposite inner contour winding must preserve an actual filled-path counter.
         var ring = new double[][] {
             new double[] { 0, 10, 10 }, new double[] { 1, 90, 10 },
