@@ -26,9 +26,9 @@ with bounded concurrency, execution budgets, verification, traces, and recovery.
 and 28% less wall time.** Five tasks, three repetitions, the same executor
 model and pipeline, with blind cross-vendor judging.
 
-## Glyph Rain
+## Benchmark
 
-One workflow creates and validates 192 original SVG glyphs.
+Example task: One workflow creates and validates 192 original SVG glyphs.
 
 <p align="center">
   <img src="screensaver/svg-preview/preview.png" alt="Classic code rain with the reference character set and occasional original Smythe glyphs" width="900">
@@ -51,9 +51,6 @@ A separate ten-minute travel and resize check passed 57 cycles.
 [Linux x86-64 `.tar.gz`](https://github.com/petehottelet/smythe/raw/refs/heads/main/screensaver/dist/SmytheGlyphRain-linux-x86_64.tar.gz) ·
 [Native source and setup](screensaver/README.md).
 
-All three downloads now use the current SVG shapes: **56 reference glyphs plus
-192 original Smythe glyphs**, with the reference blank slot and a 10% original
-mix. Filled contours preserve curves, counters, and detached marks.
 The compiled packages passed rendering and motion checks on Windows,
 Apple Silicon, Intel Mac, and Ubuntu 22.04/24.04.
 [Checksums and verification](screensaver/README.md#native-verification).
@@ -62,13 +59,11 @@ The native savers use layered trails; the web explorer provides the REGL effect,
 3D navigation, and pixel settings.
 
 The web renderer adapts [m8e](https://github.com/m8e/matrix-rain),
-a fork of Rezmason, under its MIT license. It uses the reference's rain,
-glyph rendering, bloom, and palette pipeline. Native packages also include the
-licensed reference artwork and its MIT notice. Smythe's 192 added shapes have
+a fork of Rezmason. Native packages also include the reference artwork. Smythe's 192 added screensaver shapes have
 independently authored contours from a [measured style brief](docs/glyph-rain-plan.md).
 [Credits, licenses, and artwork provenance](screensaver/README.md#credits-and-references).
 
-## Benchmarks
+## Process
 
 The glyph workload measures parallel artifact generation. Separate matched
 suites measure recovery, framework overhead, and generated plans. Each result
