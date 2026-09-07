@@ -20,10 +20,7 @@
 </div>
 
 **Give Smythe a goal. It generates an inspectable task graph and executes it
-with bounded concurrency, execution budgets, verification, traces, and recovery.**
-
-The graph defines the work; the durable execution envelope governs the run.
-Glyph Rain shows both ideas in one visible result.
+with bounded concurrency, execution budgets, verification, traces, and recovery.** The graph defines the work; the durable execution envelope governs the run.
 
 **Measured against CrewAI on the matched framework suite: 77% fewer tokens
 and 28% less wall time.** Five tasks, three repetitions, the same executor
@@ -31,9 +28,7 @@ model and pipeline, with blind cross-vendor judging.
 
 ## Glyph Rain
 
-One goal becomes 192 independent glyph tasks and a working screensaver. The
-original vector glyphs fall in luminous green streams across three depth
-layers, using the same catalog on web, Windows, macOS, and Linux.
+As an example: one goal becomes 192 independent glyph-generation tasks and outputs a working cross-platform screensaver. Supported on Web, Windows, macOS, and Linux.
 
 <p align="center">
   <img src="assets/glyph_rain/glyph-rain-screenshot.png" alt="Glyph Rain with heavy green glyphs, varied glow, and descending streams at three depths" width="900">
