@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 from threading import Event, Thread
 
 import pytest
@@ -15,6 +16,16 @@ from smythe.jobs.store import (
     RunStatus,
     SQLiteRunStore,
 )
+
+
+@pytest.fixture
+def store_factory():
+    """Close test-owned stores after all assertions and workers finish."""
+    with ExitStack() as stack:
+        def create(path):
+            return stack.enter_context(SQLiteRunStore(path))
+
+        yield create
 
 
 def _plan(tmp_path, *, provider="openai_image", attempts=2, count=1):
@@ -56,17 +67,17 @@ def _plan(tmp_path, *, provider="openai_image", attempts=2, count=1):
     "run_id",
     ["", ".", "..", "../outside", "..\\outside", "name/child", "name\\child"],
 )
-def test_store_rejects_unsafe_custom_run_id(tmp_path, run_id):
+def test_store_rejects_unsafe_custom_run_id(tmp_path, store_factory, run_id):
     plan, approval = _plan(tmp_path, provider="offline")
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
 
     with pytest.raises(ValueError, match="run_id"):
         store.create_run(plan, approval, manifest_root=tmp_path, run_id=run_id)
 
 
-def test_complete_call_persists_artifact_and_cost(tmp_path):
+def test_complete_call_persists_artifact_and_cost(tmp_path, store_factory):
     plan, approval = _plan(tmp_path)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     run_id = store.create_run(plan, approval, manifest_root=tmp_path)
     operation = store.pending_operations(run_id)[0]
     attempt = store.begin_attempt(run_id, operation["operation_id"])
@@ -100,13 +111,13 @@ def test_complete_call_persists_artifact_and_cost(tmp_path):
     assert any(event["event_type"] == "call_dispatched" for event in snapshot["events"])
 
 
-def test_snapshot_uses_one_wal_read_view_during_concurrent_commit(tmp_path):
+def test_snapshot_uses_one_wal_read_view_during_concurrent_commit(tmp_path, store_factory):
     plan, approval = _plan(tmp_path, provider="offline", attempts=1)
     database = tmp_path / "jobs.db"
-    reader = SQLiteRunStore(database)
+    reader = store_factory(database)
     run_id = reader.create_run(plan, approval, manifest_root=tmp_path)
     operation_id = reader.pending_operations(run_id)[0]["operation_id"]
-    writer = SQLiteRunStore(database)
+    writer = store_factory(database)
     writer_committed = Event()
     writer_errors: list[BaseException] = []
     thread: Thread | None = None
@@ -145,9 +156,9 @@ def test_snapshot_uses_one_wal_read_view_during_concurrent_commit(tmp_path):
     assert writer.snapshot(run_id)["counts"] == {OperationStatus.RUNNING.value: 1}
 
 
-def test_recovery_marks_dispatched_call_unknown_and_never_pending(tmp_path):
+def test_recovery_marks_dispatched_call_unknown_and_never_pending(tmp_path, store_factory):
     plan, approval = _plan(tmp_path)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     run_id = store.create_run(plan, approval, manifest_root=tmp_path)
     operation = store.pending_operations(run_id)[0]
     attempt = store.begin_attempt(run_id, operation["operation_id"])
@@ -164,9 +175,9 @@ def test_recovery_marks_dispatched_call_unknown_and_never_pending(tmp_path):
     assert snapshot["cost"]["exposure_microusd"] == 100_000
 
 
-def test_prepared_call_recovery_is_safe_and_restores_attempt_allowance(tmp_path):
+def test_prepared_call_recovery_is_safe_and_restores_attempt_allowance(tmp_path, store_factory):
     plan, approval = _plan(tmp_path, provider="offline", attempts=1)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     run_id = store.create_run(plan, approval, manifest_root=tmp_path)
     operation = store.pending_operations(run_id)[0]
     attempt = store.begin_attempt(run_id, operation["operation_id"])
@@ -184,9 +195,9 @@ def test_prepared_call_recovery_is_safe_and_restores_attempt_allowance(tmp_path)
     store.prepare_call(retried["attempt_id"], 0)
 
 
-def test_recovery_restores_running_attempt_that_never_prepared_a_call(tmp_path):
+def test_recovery_restores_running_attempt_that_never_prepared_a_call(tmp_path, store_factory):
     plan, approval = _plan(tmp_path, provider="offline", attempts=1)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     run_id = store.create_run(plan, approval, manifest_root=tmp_path)
     operation = store.pending_operations(run_id)[0]
     first = store.begin_attempt(run_id, operation["operation_id"])
@@ -233,9 +244,9 @@ def test_run_lease_excludes_other_store_and_gates_recovery(tmp_path):
     second_store.close()
 
 
-def test_unknown_requires_explicit_acknowledgement_before_reroll(tmp_path):
+def test_unknown_requires_explicit_acknowledgement_before_reroll(tmp_path, store_factory):
     plan, approval = _plan(tmp_path)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     run_id = store.create_run(plan, approval, manifest_root=tmp_path)
     operation = store.pending_operations(run_id)[0]
     attempt = store.begin_attempt(run_id, operation["operation_id"])
@@ -271,9 +282,9 @@ def test_unknown_requires_explicit_acknowledgement_before_reroll(tmp_path):
     assert queued == [operation["operation_key"]]
 
 
-def test_reroll_changes_only_selected_failed_operation(tmp_path):
+def test_reroll_changes_only_selected_failed_operation(tmp_path, store_factory):
     plan, approval = _plan(tmp_path, provider="offline", attempts=2, count=2)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     run_id = store.create_run(plan, approval, manifest_root=tmp_path)
     operations = store.pending_operations(run_id)
     failed = operations[0]
@@ -304,9 +315,9 @@ def test_reroll_changes_only_selected_failed_operation(tmp_path):
     }
 
 
-def test_budget_overrun_is_derived_latched_and_blocks_every_admission(tmp_path):
+def test_budget_overrun_is_derived_latched_and_blocks_every_admission(tmp_path, store_factory):
     plan, approval = _plan(tmp_path, attempts=1, count=4)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     run_id = store.create_run(plan, approval, manifest_root=tmp_path)
     operations = store.pending_operations(run_id)
 

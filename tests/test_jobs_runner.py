@@ -6,6 +6,7 @@ import asyncio
 import io
 import os
 import threading
+from contextlib import ExitStack
 
 import pytest
 import smythe.jobs.runner as runner_module
@@ -29,6 +30,16 @@ Image = pytest.importorskip("PIL.Image")
 _png_buffer = io.BytesIO()
 Image.new("RGBA", (1, 1), (255, 0, 0, 255)).save(_png_buffer, format="PNG")
 PNG_1X1 = _png_buffer.getvalue()
+
+
+@pytest.fixture
+def store_factory():
+    """Close test-owned stores after all assertions and workers finish."""
+    with ExitStack() as stack:
+        def create(path):
+            return stack.enter_context(SQLiteRunStore(path))
+
+        yield create
 
 
 def _manifest(*, count=4, attempts=1):
@@ -68,9 +79,9 @@ def _manifest(*, count=4, attempts=1):
     )
 
 
-def test_runner_executes_bounded_offline_job_and_persists_artifacts(tmp_path):
+def test_runner_executes_bounded_offline_job_and_persists_artifacts(tmp_path, store_factory):
     plan = preflight_job(_manifest(), manifest_root=tmp_path)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     runner = JobRunner(store)
 
     result = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path))
@@ -85,7 +96,7 @@ def test_runner_executes_bounded_offline_job_and_persists_artifacts(tmp_path):
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows path namespace semantics")
-def test_runner_accepts_equivalent_windows_extended_path_namespace(tmp_path, monkeypatch):
+def test_runner_accepts_equivalent_windows_extended_path_namespace(tmp_path, store_factory, monkeypatch):
     """A concurrent mkdir may make resolve() add the extended path prefix."""
 
     original_resolve = runner_module.Path.resolve
@@ -99,7 +110,7 @@ def test_runner_accepts_equivalent_windows_extended_path_namespace(tmp_path, mon
 
     monkeypatch.setattr(runner_module.Path, "resolve", resolve_with_namespace)
     plan = preflight_job(_manifest(count=2), manifest_root=tmp_path)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
 
     result = asyncio.run(
         JobRunner(store).start(
@@ -114,28 +125,28 @@ def test_runner_accepts_equivalent_windows_extended_path_namespace(tmp_path, mon
     assert result["counts"] == {OperationStatus.SUCCEEDED.value: 2}
 
 
-def test_internal_provider_transport_timeout_covers_approved_contract_max(tmp_path):
-    runner = JobRunner(SQLiteRunStore(tmp_path / "jobs.db"))
+def test_internal_provider_transport_timeout_covers_approved_contract_max(tmp_path, store_factory):
+    runner = JobRunner(store_factory(tmp_path / "jobs.db"))
 
     assert runner.providers._request_timeout_s == MAX_CALL_TIMEOUT_S
     assert runner.call_timeout_s is None
     assert runner.max_wall_seconds is None
 
 
-def test_operator_deadlines_can_only_tighten_the_approved_plan(tmp_path):
+def test_operator_deadlines_can_only_tighten_the_approved_plan(tmp_path, store_factory):
     data = _manifest(count=1).to_dict()
     data["execution"]["call_timeout_s"] = 900
     data["execution"]["max_wall_seconds"] = 7200
     plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
 
-    default_runner = JobRunner(SQLiteRunStore(tmp_path / "default.db"))
+    default_runner = JobRunner(store_factory(tmp_path / "default.db"))
     strict_runner = JobRunner(
-        SQLiteRunStore(tmp_path / "strict.db"),
+        store_factory(tmp_path / "strict.db"),
         call_timeout_s=120,
         max_wall_seconds=600,
     )
     loose_runner = JobRunner(
-        SQLiteRunStore(tmp_path / "loose.db"),
+        store_factory(tmp_path / "loose.db"),
         call_timeout_s=1200,
         max_wall_seconds=9000,
     )
@@ -187,10 +198,10 @@ class _FixedPool(ProviderPool):
         return None
 
 
-def test_selective_reroll_replaces_only_rejected_operation(tmp_path):
+def test_selective_reroll_replaces_only_rejected_operation(tmp_path, store_factory):
     manifest = _manifest(count=1, attempts=2)
     plan = preflight_job(manifest, manifest_root=tmp_path)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     runner = JobRunner(store, provider_pool=_FixedPool(_SequenceProvider()))
 
     first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path))
@@ -211,9 +222,9 @@ class _AmbiguousProvider(Provider):
         raise ConnectionError("response lost")
 
 
-def test_provider_exception_after_dispatch_becomes_unknown_outcome(tmp_path):
+def test_provider_exception_after_dispatch_becomes_unknown_outcome(tmp_path, store_factory):
     plan = preflight_job(_manifest(count=1, attempts=2), manifest_root=tmp_path)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     runner = JobRunner(store, provider_pool=_FixedPool(_AmbiguousProvider()))
 
     result = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path))
@@ -223,7 +234,7 @@ def test_provider_exception_after_dispatch_becomes_unknown_outcome(tmp_path):
     assert store.pending_operations(result["run_id"]) == []
 
 
-def test_runner_rejects_attachment_changed_after_approval(tmp_path):
+def test_runner_rejects_attachment_changed_after_approval(tmp_path, store_factory):
     attachment = tmp_path / "input.png"
     attachment.write_bytes(b"approved-input")
     data = _manifest(count=1).to_dict()
@@ -232,7 +243,7 @@ def test_runner_rejects_attachment_changed_after_approval(tmp_path):
     plan = preflight_job(manifest, manifest_root=tmp_path)
     approval = make_approval(plan)
     attachment.write_bytes(b"different-input")
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
 
     with pytest.raises(ValueError, match="changed after preflight"):
         asyncio.run(JobRunner(store).start(plan, approval, manifest_root=tmp_path))
@@ -242,9 +253,9 @@ def test_runner_rejects_attachment_changed_after_approval(tmp_path):
     "run_id",
     ["../outside", "..\\outside", ".", "", "name/child", "name\\child"],
 )
-def test_runner_rejects_unsafe_custom_run_id(tmp_path, run_id):
+def test_runner_rejects_unsafe_custom_run_id(tmp_path, store_factory, run_id):
     plan = preflight_job(_manifest(count=1), manifest_root=tmp_path)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
 
     with pytest.raises(ValueError, match="run_id"):
         asyncio.run(
@@ -367,9 +378,9 @@ class _ImmediateArtifactProvider(Provider):
         )
 
 
-def test_never_returning_provider_hits_call_deadline_and_becomes_unknown(tmp_path):
+def test_never_returning_provider_hits_call_deadline_and_becomes_unknown(tmp_path, store_factory):
     plan = preflight_job(_manifest(count=1), manifest_root=tmp_path)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     runner = JobRunner(
         store,
         provider_pool=_FixedPool(_NeverReturningProvider()),
@@ -385,7 +396,7 @@ def test_never_returning_provider_hits_call_deadline_and_becomes_unknown(tmp_pat
     assert "deadline after dispatch" in result["operations"][0]["error"]
 
 
-def test_whole_run_deadline_cancels_dispatched_call_conservatively(tmp_path, monkeypatch):
+def test_whole_run_deadline_cancels_dispatched_call_conservatively(tmp_path, store_factory, monkeypatch):
     class EnteredProvider(_NeverReturningProvider):
         def __init__(self):
             self.entered = asyncio.Event()
@@ -395,7 +406,7 @@ def test_whole_run_deadline_cancels_dispatched_call_conservatively(tmp_path, mon
             return await super().complete(system, prompt, model)
 
     plan = preflight_job(_manifest(count=1), manifest_root=tmp_path)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     provider = EnteredProvider()
     runner = JobRunner(
         store,
@@ -437,7 +448,7 @@ def test_whole_run_deadline_cancels_dispatched_call_conservatively(tmp_path, mon
     assert snapshot["counts"] == {OperationStatus.UNKNOWN_OUTCOME.value: 1}
 
 
-def test_whole_run_deadline_before_dispatch_leaves_work_pending(tmp_path, monkeypatch):
+def test_whole_run_deadline_before_dispatch_leaves_work_pending(tmp_path, store_factory, monkeypatch):
     class CountingProvider(_ImmediateArtifactProvider):
         calls = 0
 
@@ -447,7 +458,7 @@ def test_whole_run_deadline_before_dispatch_leaves_work_pending(tmp_path, monkey
 
     release = threading.Event()
     plan = preflight_job(_manifest(count=1), manifest_root=tmp_path)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     provider = CountingProvider()
     runner = JobRunner(store, provider_pool=_FixedPool(provider), max_wall_seconds=0.05)
 
@@ -473,9 +484,9 @@ def test_whole_run_deadline_before_dispatch_leaves_work_pending(tmp_path, monkey
     assert store.get_run_lease("pre-dispatch-deadline") is None
 
 
-def test_invalid_provider_cost_is_immediately_journaled_unknown(tmp_path):
+def test_invalid_provider_cost_is_immediately_journaled_unknown(tmp_path, store_factory):
     plan = preflight_job(_priced_manifest(), manifest_root=tmp_path)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     runner = JobRunner(store, provider_pool=_FixedPool(_InvalidCostProvider()))
 
     result = asyncio.run(
@@ -495,7 +506,7 @@ def test_invalid_provider_cost_is_immediately_journaled_unknown(tmp_path):
     ids=["nan-cost", "boolean-usage", "durable-cost-overflow"],
 )
 def test_invalid_accounting_stops_queued_calls_and_fresh_runner_resume(
-    tmp_path, mutated, field, value,
+    tmp_path, store_factory, mutated, field, value,
 ):
     class InvalidAccountingProvider(Provider):
         def __init__(self):
@@ -512,7 +523,7 @@ def test_invalid_accounting_stops_queued_calls_and_fresh_runner_resume(
     data = _priced_manifest(count=3).to_dict()
     data["execution"].update(max_concurrency=1, max_attempts=2, max_budget_usd="0.60")
     plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     provider = InvalidAccountingProvider()
     pool = _FixedPool(provider)
     result = asyncio.run(
@@ -540,7 +551,7 @@ def test_invalid_accounting_stops_queued_calls_and_fresh_runner_resume(
     assert resumed["execution_metrics"]["operations_started"] == 0
 
 
-def test_invalid_accounting_requires_explicit_reroll_acknowledgement(tmp_path):
+def test_invalid_accounting_requires_explicit_reroll_acknowledgement(tmp_path, store_factory):
     class CorrectedProvider(Provider):
         def __init__(self):
             self.calls = 0
@@ -555,7 +566,7 @@ def test_invalid_accounting_requires_explicit_reroll_acknowledgement(tmp_path):
     data = _priced_manifest().to_dict()
     data["execution"].update(max_attempts=2, max_budget_usd="0.20")
     plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     provider = CorrectedProvider()
     runner = JobRunner(store, provider_pool=_FixedPool(provider))
     first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path))
@@ -576,7 +587,7 @@ def test_invalid_accounting_requires_explicit_reroll_acknowledgement(tmp_path):
     assert not result["cost"]["cost_is_complete"]
 
 
-def test_invalid_accounting_preserves_already_dispatched_sibling_cost(tmp_path, monkeypatch):
+def test_invalid_accounting_preserves_already_dispatched_sibling_cost(tmp_path, store_factory, monkeypatch):
     classified = asyncio.Event()
 
     class ConcurrentProvider(Provider):
@@ -599,7 +610,7 @@ def test_invalid_accounting_preserves_already_dispatched_sibling_cost(tmp_path, 
             )
 
     plan = preflight_job(_priced_manifest(count=4), manifest_root=tmp_path)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     original_mark_unknown = store.mark_unknown_outcome
 
     def mark_unknown(call_id, error, **kwargs):
@@ -621,7 +632,7 @@ def test_invalid_accounting_preserves_already_dispatched_sibling_cost(tmp_path, 
     assert len(result["artifacts"]) == 1
 
 
-def test_arbitrary_provider_message_cannot_impersonate_accounting_classification(tmp_path):
+def test_arbitrary_provider_message_cannot_impersonate_accounting_classification(tmp_path, store_factory):
     class MisleadingFailure(Provider):
         def __init__(self):
             self.calls = 0
@@ -633,7 +644,7 @@ def test_arbitrary_provider_message_cannot_impersonate_accounting_classification
     data = _priced_manifest(count=2).to_dict()
     data["execution"]["max_concurrency"] = 1
     plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     provider = MisleadingFailure()
     result = asyncio.run(
         JobRunner(store, provider_pool=_FixedPool(provider)).start(
@@ -648,9 +659,9 @@ def test_arbitrary_provider_message_cannot_impersonate_accounting_classification
     )
 
 
-def test_estimated_provider_cost_remains_exposure_not_confirmed(tmp_path):
+def test_estimated_provider_cost_remains_exposure_not_confirmed(tmp_path, store_factory):
     plan = preflight_job(_priced_manifest(), manifest_root=tmp_path)
-    store = SQLiteRunStore(tmp_path / "jobs.db")
+    store = store_factory(tmp_path / "jobs.db")
     runner = JobRunner(store, provider_pool=_FixedPool(_EstimatedCostProvider()))
 
     result = asyncio.run(
