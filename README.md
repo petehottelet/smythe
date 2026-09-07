@@ -156,7 +156,7 @@ documents each comparison, its scope, and its evidence status.
 | Generated execution topology | Durable execution envelope |
 |---|---|
 | Generate a DAG from the goal with `LLMArchitect` | Bound active calls with `max_concurrency` |
-| Select approved templates with `ConstrainedArchitect` | Reserve execution spend and reject invalid usage |
+| Select approved templates with `ConstrainedArchitect` | Reserve supported text-workflow phases in one `run_store` ledger |
 | Build exact workflows with `DeterministicArchitect` | Save node results and resume from checkpoints |
 | Inspect and export plans with their complete task | Validate artifacts and recover verification decisions |
 | Reuse successful graphs as templates | Trace calls, costs, failures, and revisions |
@@ -169,6 +169,7 @@ selective rerolls, and portable exports.
 [Failure policies](docs/execution.md) · [Cost guardrails](docs/budgets.md) ·
 [MCP](docs/mcp.md) · [Verification](docs/verifier.md) ·
 [Native Astra and Sol Responses](docs/openai-responses.md) ·
+[Durable text accounting](docs/workflow-accounting.md) ·
 [All guides and examples](docs/index.md).
 
 ## Quickstart
@@ -210,8 +211,9 @@ This example uses the published Chat Completions provider and makes paid API
 calls without a spend cap. Its dollar totals use a blended token estimate and
 exclude planning. The current checkout adds an explicit
 [Responses provider](docs/openai-responses.md) with Astra/Sol function tools,
-native usage receipts, and model-specific token prices. Complete workflow
-accounting is the next [campaign prerequisite](benchmarks/astra_benchmark_plan.md).
+native usage receipts, and model-specific token prices. Opt into
+[durable text workflows](docs/workflow-accounting.md) for request-bound quotes,
+one ledger across every phase, and local replay of saved responses.
 Anthropic and Gemini use the `smythe[anthropic]` and `smythe[gemini]` extras.
 
 Try the complete acquisition-diligence workflow without an API key:
@@ -229,8 +231,6 @@ team challenges the draft, and a final node writes the decision memo.
 
 ## Coming soon
 
-- **Complete workflow cost accounting:** include planning and supervision in
-  one spend ledger, then publish repeated cost comparisons from native usage.
 - **Operator tools:** inspect runs, detach long jobs, and approve durable pauses.
 - **Native exploration:** bring the web exposure pipeline, camera controls,
   and settings to Windows, macOS, and Linux, then verify them against the

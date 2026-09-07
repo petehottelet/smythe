@@ -18,6 +18,7 @@ from smythe.provider import (
 )
 from smythe.task import Task, render_task
 from smythe.tracer import Tracer
+from smythe.workflow_binding import ComponentBinding, WorkflowBindingError, provider_description, require_exact
 
 logger = logging.getLogger("smythe.synthesizer")
 
@@ -55,12 +56,49 @@ class Synthesizer:
         model: str | None = None,
         budget: Sentinel | None = None,
         tracer: Tracer | None = None,
+        *,
+        run_binding: ComponentBinding | None = None,
     ) -> None:
         self._strategy = strategy
         self._provider = provider
         self._model = model or ""
         self._budget = budget
         self._tracer = tracer
+        self._run_binding = run_binding
+
+    def workflow_description(self, **defaults) -> dict:
+        require_exact(self, Synthesizer)
+        if type(self._strategy) is not SynthesisStrategy:
+            raise WorkflowBindingError("Unsupported synthesis strategy")
+        if self._budget is not None or self._tracer is not None:
+            raise WorkflowBindingError("Bound synthesis uses the workflow ledger and run trace")
+        provider = defaults.get("default_provider") or self._provider
+        model = defaults.get("default_model") or self._model
+        paid = self._strategy is SynthesisStrategy.LLM_MERGE
+        if paid and provider is None:
+            raise WorkflowBindingError("Journaled LLM synthesis requires an explicit provider")
+        return {"type": "synthesizer", "version": 1, "strategy": self._strategy.value,
+                "completion": provider_description(provider, model) if paid else None}
+
+    def workflow_providers(self) -> tuple[Provider, ...]:
+        return (self._provider,) if self._strategy is SynthesisStrategy.LLM_MERGE and self._provider else ()
+
+    def bind_run(self, binding: ComponentBinding) -> Synthesizer:
+        self.workflow_description(default_provider=binding.default_provider,
+                                  default_model=binding.default_model)
+        source = binding.default_provider or self._provider
+        return Synthesizer(
+            self._strategy,
+            provider=binding.snapshot_provider(source)
+            if source is not None and self._strategy is SynthesisStrategy.LLM_MERGE else None,
+            model=binding.default_model or self._model, run_binding=binding,
+        )
+
+    def _check_bound_overrides(self, provider, model, budget, tracer):
+        if self._run_binding is not None and any(
+            value is not None for value in (provider, model, budget, tracer)
+        ):
+            raise WorkflowBindingError("Bound synthesis does not accept call-time runtime overrides")
 
     def synthesize(
         self,
@@ -72,6 +110,7 @@ class Synthesizer:
         tracer: Tracer | None = None,
     ) -> str:
         """Produce a single output from the completed graph."""
+        self._check_bound_overrides(provider, model, budget, tracer)
         completed = [
             n for n in graph.nodes
             if n.status == NodeStatus.COMPLETED and n.result is not None
@@ -108,6 +147,7 @@ class Synthesizer:
         tracer: Tracer | None = None,
     ) -> str:
         """Async variant for use inside an existing event loop."""
+        self._check_bound_overrides(provider, model, budget, tracer)
         completed = [
             n for n in graph.nodes
             if n.status == NodeStatus.COMPLETED and n.result is not None
@@ -197,6 +237,9 @@ class Synthesizer:
         resolved_model = model if model is not None else self._model
         resolved_budget = budget or self._budget
         resolved_tracer = tracer or self._tracer
+
+        if self._run_binding is not None:
+            resolved_provider = self._run_binding.for_call(self._provider, trigger="graph_completed")
 
         if resolved_provider is None:
             logger.warning("LLM_MERGE requested but no provider set; falling back to concatenation")

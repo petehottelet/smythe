@@ -10,6 +10,7 @@ from smythe.executor_base import ExecutorBase, NodeFinalizationError
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
 from smythe.provider import ProviderResponseError
 from smythe.verifier import VerificationRecoveryError
+from smythe.workflow_store import WorkflowError
 
 
 class Executor(ExecutorBase):
@@ -91,6 +92,7 @@ class Executor(ExecutorBase):
         attempts = 1 + max(node.max_retries, 0) if node.failure_policy == FailurePolicy.RETRY else 1
 
         for attempt in range(attempts):
+            self._call_attempts[node.id] = attempt
             delay = self.retry_delay_s(attempt)
             if delay:
                 time.sleep(delay)
@@ -114,7 +116,8 @@ class Executor(ExecutorBase):
                 # Keep the paid verdict and pending receipt intact. A local
                 # control-write failure must never cause another provider call.
                 raise
-            except (BudgetValidationError, NodeFinalizationError, SentinelAlert, ProviderResponseError) as exc:
+            except (BudgetValidationError, NodeFinalizationError, SentinelAlert,
+                    ProviderResponseError, WorkflowError) as exc:
                 # Invalid post-call accounting is terminal. Retain any held
                 # reservation: an unusable bill is not evidence of a free call.
                 if isinstance(exc, BudgetValidationError):
@@ -130,8 +133,7 @@ class Executor(ExecutorBase):
                 self._tracer.on_node_error(node, exc)
                 self._tracer.on_node_end(node)
 
-        if self._budget:
-            self._budget.release(node.id)
+        self.release_node_budget(node)
 
         node.status = NodeStatus.FAILED
         node.result = str(last_exc)

@@ -214,6 +214,24 @@ class OpenAIResponsesProvider(Provider):
         self._session_loop = None
         self._session_closed = False
 
+    def workflow_descriptor(self) -> dict:
+        """Describe supported durable configuration without credentials or I/O."""
+        return {
+            "kind": "openai_responses", "adapter_version": "openai-responses-v1",
+            "decoder_version": "openai-responses-v1", "endpoint_scope": "global",
+            "price_version": PRICE_VERSION, "supported_models": sorted(MODELS),
+            "config": {
+                "reasoning_effort": self._reasoning_effort,
+                "max_output_tokens": self._max_output_tokens,
+                "max_cost_per_call_usd": self._max_cost_per_call_usd,
+                "request_timeout_s": self._request_timeout_s,
+            },
+        }
+
+    def snapshot_for_workflow(self) -> OpenAIResponsesProvider:
+        """Detach configuration; a workflow owns its own client lifecycle."""
+        return OpenAIResponsesProvider(api_key=self._api_key, **self.workflow_descriptor()["config"])
+
     @asynccontextmanager
     async def session(self):
         """Yield an independent provider pooling HTTP connections in this loop.

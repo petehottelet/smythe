@@ -114,6 +114,8 @@ jobs:
           tests/test_provider_responses.py
           tests/test_native_pricing.py
           tests/test_native_response_accounting.py
+          tests/test_workflow_provider.py
+          tests/test_workflow_native_runtime.py
 
   package-smoke:
     runs-on: ubuntu-latest

@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from smythe.agent import Agent, AgentProfile
-from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
+from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology, snapshot_run_ref
 from smythe.registry import Registry
 from smythe.task import Task, task_from_dict, task_snapshots_equal, task_to_dict
 
@@ -94,6 +94,7 @@ def _graph_snapshot(graph: ExecutionGraph, task_data: dict[str, Any] | None) -> 
         "topology": [t.value for t in graph.topology],
         "estimated_cost_usd": graph.estimated_cost_usd,
         "task": task_data,
+        "run_ref": snapshot_run_ref(graph.run_ref),
         "nodes": [node_to_dict(n) for n in graph.nodes],
     }
 
@@ -105,6 +106,7 @@ def graph_from_dict(data: dict[str, Any]) -> ExecutionGraph:
         nodes=[node_from_dict(n) for n in data.get("nodes", [])],
         estimated_cost_usd=data.get("estimated_cost_usd"),
         task=task_from_dict(data.get("task")),
+        run_ref=snapshot_run_ref(data.get("run_ref")),
     )
 
 

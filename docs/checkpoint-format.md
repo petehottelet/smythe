@@ -1,5 +1,11 @@
 # Checkpoint format (version 3)
 
+This guide describes the ordinary `checkpoint_store` path. Opt-in
+[`run_store` workflows](workflow-accounting.md) use a separate SQLite journal
+with call evidence and exact accounting. Their graph exports carry a strict
+`run_ref` containing store/run IDs and the recipe hash; ordinary execution and
+checkpoint resume reject that reference instead of dropping its ledger.
+
 When a `Swarm` is constructed with a `checkpoint_store`, it persists the full
 execution state after planning and once more when the run finishes or fails.
 By default (`checkpoint_every_n_nodes=1`) it also saves after every node reaches

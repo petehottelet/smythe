@@ -33,12 +33,25 @@ from smythe.verifier import (
     TokenVerifier, Verifier, VerificationRecoveryError, node_generation, verification_integer,
     validate_verification_receipt,
 )
+from smythe.workflow_store import WorkflowError
 
 if TYPE_CHECKING:
     from smythe.supervisor import Supervisor
     from smythe.task import Task
 
 DEFAULT_MAX_TOOL_ITERATIONS = 10
+
+
+def _raise_workflow_error(error: BaseException) -> None:
+    """Keep journal failures terminal when a context wraps them in a group."""
+    if isinstance(error, WorkflowError):
+        raise error
+    if isinstance(error, BaseExceptionGroup):
+        for child in error.exceptions:
+            try:
+                _raise_workflow_error(child)
+            except WorkflowError as found:
+                raise found from error
 
 
 class NodeFinalizationError(RuntimeError):
@@ -125,8 +138,15 @@ class ExecutorBase:
         verifier: Verifier | None = None,
         revisions_used: int = 0,
         on_control_update: Callable[[], None] | None = None,
+        provider_call_factory: Callable[[Node, str, int, int], Provider] | None = None,
+        on_supervision_update: Callable[[Node, bool], None] | None = None,
     ) -> None:
         self._provider = provider
+        self._provider_call_factory = provider_call_factory
+        self._workflow_managed = (
+            provider_call_factory is not None or getattr(provider, "workflow_managed", False) is True
+        )
+        self._call_attempts: dict[str, int] = {}
         self._reserved_node_ids: set[str] = set()
         self._settled_response_errors: list[tuple[str, Exception]] = []
         self._response_settlement_failures: dict[str, Exception] = {}
@@ -135,6 +155,7 @@ class ExecutorBase:
         self._budget = budget
         self._on_node_update = on_node_update
         self._on_control_update = on_control_update
+        self._on_supervision_update = on_supervision_update
         self._tool_runtime = tool_runtime
         self._max_tool_iterations = max_tool_iterations
         self._artifact_dir = Path(artifact_dir) if artifact_dir is not None else None
@@ -185,8 +206,12 @@ class ExecutorBase:
                 _settle_response_group(
                     exc, lambda error: self._record_response_error(node, error, phase="supervision"),
                 )
+            _raise_workflow_error(exc)
             self._tracer.on_revision(node, None, applied=False, detail=str(exc))
+            self.notify_supervision_update(node, False)
             return False
+        except WorkflowError:
+            raise
         except ProviderResponseError as exc:
             self._record_response_error(node, exc, phase="supervision")
             self.notify_update(node)
@@ -202,21 +227,35 @@ class ExecutorBase:
             self._tracer.on_revision(
                 node, None, applied=False, detail=f"supervisor raised: {exc}",
             )
+            self.notify_supervision_update(node, False)
             return False
         if revision is None or revision.is_empty:
+            self.notify_supervision_update(node, False)
             return False
 
         try:
             graph.apply_revision(revision)
         except RevisionError as exc:
             self._tracer.on_revision(node, revision, applied=False, detail=str(exc))
+            self.notify_supervision_update(node, False)
             return False
 
         self._revisions_used += 1
         self._inherit_execution_context(revision.add_nodes, graph)
         self.prepare_graph(graph)
         self._tracer.on_revision(node, revision, applied=True)
+        self.notify_supervision_update(node, True)
         return True
+
+    def notify_supervision_update(self, node: Node, revision_applied: bool) -> None:
+        """Persist a consumed supervisor decision after its graph disposition."""
+        if self._on_supervision_update is not None:
+            try:
+                self._on_supervision_update(node, revision_applied)
+            except WorkflowError:
+                raise
+            except Exception as exc:
+                raise WorkflowError("Could not persist supervisor disposition") from exc
 
     def maybe_regenerate(self, node: Node, graph: ExecutionGraph) -> bool:
         """Apply a durable rejection when the caller has no active descendants."""
@@ -236,6 +275,8 @@ class ExecutorBase:
                 self._on_control_update()
             else:
                 self.notify_update(node)
+        except WorkflowError:
+            raise
         except Exception as exc:
             raise VerificationRecoveryError("Could not persist verification control") from exc
 
@@ -462,7 +503,7 @@ class ExecutorBase:
         pre-call behavior for ordinary text providers while still reserving
         image calls.
         """
-        if self._budget is None:
+        if self._budget is None or self._workflow_managed:
             return
 
         estimate = node.metadata.get("estimated_cost_usd")
@@ -511,16 +552,21 @@ class ExecutorBase:
         if self._on_node_update is not None:
             try:
                 self._on_node_update(node)
+            except WorkflowError:
+                raise
             except Exception as exc:
+                if self._workflow_managed:
+                    raise WorkflowError("Could not persist managed node completion") from exc
                 if node.status is NodeStatus.COMPLETED and "verification_receipt" in node.metadata:
                     raise VerificationRecoveryError("Could not persist completed verifier") from exc
                 raise
 
-    @staticmethod
-    def mark_accounting_invalid(node: Node, error: BudgetValidationError) -> None:
+    def mark_accounting_invalid(self, node: Node, error: BudgetValidationError) -> None:
         """Persist the need for reconciliation before this run can resume."""
         node.metadata["accounting_invalid"] = True
         node.metadata["accounting_error"] = str(error)
+        if self._workflow_managed and not isinstance(error, ProviderResponseError):
+            node.metadata["workflow_accounting_invalid"] = True
 
     def prepare_graph(self, graph: ExecutionGraph) -> None:
         """Cache immutable graph structure used throughout an execution.
@@ -547,11 +593,17 @@ class ExecutorBase:
 
     def prepare_execution(self, graph: ExecutionGraph) -> None:
         """Bind a new run even when a caller reuses the same graph object."""
-        if any("response_error" in node.metadata for node in graph.nodes):
+        if not self._workflow_managed and any("response_error" in node.metadata for node in graph.nodes):
             raise ProviderResponseError(
                 "Native response failure requires explicit accounting reconciliation and local repair"
             )
+        if self._workflow_managed:
+            for node in graph.nodes:
+                if ("workflow_accounting_invalid" in node.metadata
+                        or node.metadata.get("accounting_invalid") and "response_error" not in node.metadata):
+                    raise BudgetValidationError("Unjournaled accounting requires reconciliation")
         self._reserved_node_ids.clear()
+        self._call_attempts.clear()
         self._settled_response_errors.clear()
         self._response_settlement_failures.clear()
         self._prepared_graph = None
@@ -619,6 +671,7 @@ class ExecutorBase:
             return await asyncio.wait_for(coro, timeout=node.timeout_s)
         except BaseExceptionGroup as exc:
             if not _native_response_errors(exc):
+                _raise_workflow_error(exc)
                 self._raise_unresolved_response(node)
             _settle_response_group(
                 exc, lambda error: self._record_response_error(node, error, phase="tool"),
@@ -627,6 +680,8 @@ class ExecutorBase:
             # Provider and tool-call boundaries already settled their errors.
             # A tool context can also fail during connection or teardown.
             self._record_response_error(node, exc, phase="tool")
+            raise
+        except WorkflowError:
             raise
         except TimeoutError as exc:
             # wait_for can wrap a native CancelledError subclass on timeout.
@@ -666,13 +721,13 @@ class ExecutorBase:
         async with self._tool_runtime.open(agent) as session:
             tools = list(session.tools) or None
             limit = node.max_tool_iterations or self._max_tool_iterations
-            for _ in range(limit):
-                if self._budget and node.id not in self._reserved_node_ids:
+            for turn in range(limit):
+                if self._budget and not self._workflow_managed and node.id not in self._reserved_node_ids:
                     if self._provider.requires_explicit_budget_estimate(model):
                         self.reserve_node_budget(node)
                     else:
                         self._budget.check(node.id)
-                result = await self._provider_chat(node, system, messages, model, tools=tools)
+                result = await self._provider_chat(node, system, messages, model, tools=tools, turn=turn)
                 self._record_cost(node, result)
                 # Artifacts on intermediate turns are already billed —
                 # carry them to the final result so they get persisted.
@@ -705,6 +760,7 @@ class ExecutorBase:
                     except BaseExceptionGroup as exc:
                         if _native_response_errors(exc):
                             raise  # acall_node settles grouped accounting.
+                        _raise_workflow_error(exc)
                         outcome = ToolResult(tool_call_id=tc.id, content=str(exc), is_error=True)
                     except ProviderResponseError as exc:
                         self._record_response_error(node, exc, phase="tool")
@@ -713,6 +769,8 @@ class ExecutorBase:
                         # A tool may itself call a paid provider. Numeric
                         # accounting failures must not become retryable model
                         # feedback that dispatches another provider turn.
+                        raise
+                    except WorkflowError:
                         raise
                     except Exception as exc:
                         # Tool failures go back to the model, not up the stack —
@@ -730,14 +788,21 @@ class ExecutorBase:
             f"Node {node.id!r} hit max_tool_iterations={limit} without completing"
         )
 
-    async def _provider_chat(self, node, system, messages, model, tools=None):
+    async def _provider_chat(self, node, system, messages, model, tools=None, *, turn=0):
         self._raise_unresolved_response(node)
         phase = "verification" if node.verifies else "execution"
+        provider = self._provider
+        if self._provider_call_factory is not None:
+            provider = self._provider_call_factory(node, phase, self._call_attempts.get(node.id, 0), turn)
+            if getattr(provider, "workflow_managed", False) is not True:
+                raise WorkflowError("The provider call factory must return a journal-managed provider")
         try:
             if tools is None:
-                return await self._provider.chat(system, messages, model)
-            return await self._provider.chat(system, messages, model, tools=tools)
+                return await provider.chat(system, messages, model)
+            return await provider.chat(system, messages, model, tools=tools)
         except BaseExceptionGroup as exc:
+            if not _native_response_errors(exc):
+                _raise_workflow_error(exc)
             _settle_response_group(
                 exc, lambda error: self._record_response_error(node, error, phase=phase),
             )
@@ -746,6 +811,8 @@ class ExecutorBase:
             raise
 
     def _raise_unresolved_response(self, node):
+        if self._workflow_managed and "workflow_accounting_invalid" in node.metadata:
+            raise BudgetValidationError("Unjournaled accounting requires reconciliation")
         if "response_error" not in node.metadata and not node.metadata.get("accounting_invalid"):
             return
         if node.id in self._response_settlement_failures:
@@ -753,9 +820,47 @@ class ExecutorBase:
         for node_id, error in reversed(self._settled_response_errors):
             if node_id == node.id:
                 raise error
+        if self._workflow_managed and "response_error" in node.metadata:
+            # A new managed run re-enters the same immutable journal call.
+            # Only that facade can decide whether saved evidence is usable.
+            return
         if node.metadata.get("accounting_invalid"):
             raise BudgetValidationError("Unresolved provider accounting requires reconciliation")
         raise ProviderResponseError("Unresolved native response requires reconciliation and repair")
+
+    @property
+    def _accounting_budget(self):
+        """A managed projection can observe receipts without mutating the ledger."""
+        if not self._workflow_managed or getattr(self._budget, "workflow_managed", False) is True:
+            return self._budget
+        return None
+
+    def release_node_budget(self, node: Node) -> None:
+        if self._budget is not None and not self._workflow_managed:
+            self._budget.release(node.id)
+
+    def _sync_managed_cost(self, node: Node) -> None:
+        if not self._workflow_managed:
+            return
+        # Count a logical call once, including a replay after checkpoint lag.
+        costs = {}
+        for entry in node.metadata.get("native_receipts", []):
+            if not isinstance(entry, dict) or not isinstance(entry.get("receipt"), dict):
+                raise WorkflowError("Invalid saved managed receipt")
+            receipt = entry["receipt"]
+            run_id, call_id = receipt.get("workflow_run_id"), receipt.get("workflow_call_id")
+            amount = receipt.get("cost_nanousd")
+            if isinstance(amount, str) and re.fullmatch(r"0|[1-9][0-9]*", amount):
+                amount = int(amount)
+            if (receipt.get("workflow_charge_recorded") is True
+                    and isinstance(run_id, str) and isinstance(call_id, str)
+                    and type(amount) is int and amount >= 0):
+                costs[run_id, call_id] = amount
+        if costs:
+            try:
+                node.metadata["cost_usd"] = sum(costs.values()) / 1_000_000_000
+            except OverflowError as exc:
+                raise WorkflowError("Managed receipt exceeds the display projection range") from exc
 
     def _record_response_error(self, node, error, *, phase):
         if any(node_id == node.id and settled is error
@@ -766,11 +871,13 @@ class ExecutorBase:
         self._settled_response_errors.append((node.id, error))
         try:
             _settle_response_error(
-                error, budget=self._budget, node_id=node.id, metadata=node.metadata, phase=phase,
+                error, budget=self._accounting_budget, node_id=node.id, metadata=node.metadata, phase=phase,
             )
         except Exception as exc:
             self._response_settlement_failures[node.id] = exc
             raise
+        finally:
+            self._sync_managed_cost(node)
         if error.billing_result is not None:
             self._reserved_node_ids.discard(node.id)
 
@@ -782,14 +889,16 @@ class ExecutorBase:
             node.metadata, result.native_receipt,
             phase="verification" if node.verifies else "execution",
         )
-        if self._budget:
-            cost = self._budget.add_cost(node.id, result)
+        budget = self._accounting_budget
+        if budget is not None:
+            cost = budget.add_cost(node.id, result)
             self._reserved_node_ids.discard(node.id)
             if result.cost_usd_unknown:
                 node.metadata["cost_usd_unknown"] = True
             if result.cost_usd_is_estimate:
                 node.metadata["cost_usd_is_estimate"] = True
             node.metadata["cost_usd"] = cost
+        self._sync_managed_cost(node)
 
     def finalize_node_result(self, node: Node, result: CompletionResult) -> None:
         """Store the node's text result, persisting any artifacts to disk.

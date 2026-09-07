@@ -120,12 +120,14 @@ the application permits, including growing tool history. The runtime reserves
 that ceiling before each native tool turn and reconciles the returned charge.
 Supplying a ceiling does not change the API's token cap.
 
-The current Swarm ledger covers execution and synthesis. Model-based routing,
-planning, and successful supervision still require complete-workflow accounting.
-The native adapter supplies per-call evidence; the next accounting milestone
-binds every phase and attempt to one durable ledger. Existing Chat Completions
-calls continue to use the blended estimate when their provider supplies no
-explicit cost.
+The ordinary Swarm ledger covers execution and synthesis. Add
+[`run_store=SQLiteWorkflowStore(...)`](workflow-accounting.md) to bind every
+text-workflow phase and attempt to one durable ledger, including routing,
+planning, and supervision. That path counts and reserves each exact native
+request, persists raw evidence, and recovers saved responses locally.
+Its request quote replaces the legacy per-call estimate for admission.
+Existing Chat Completions calls continue to use the blended estimate when
+their provider supplies no explicit cost.
 
 [Cost guardrails](budgets.md) · [Task handoffs](tasks.md) ·
 [Astra campaign plan](../benchmarks/astra_benchmark_plan.md).

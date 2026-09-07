@@ -34,7 +34,7 @@ execution. It never clamps an incurred charge to make a budget appear satisfied.
 
 ## Current scope
 
-The Swarm ledger currently covers execution and synthesis. Model-based routing,
+The ordinary Swarm ledger covers execution and synthesis. Model-based routing,
 planning, and successful supervision remain outside that ledger. The explicit
 [OpenAI Responses provider](openai-responses.md) supplies native Astra/Sol token
 prices and safe per-call receipts. Capped execution requires an inclusive
@@ -42,9 +42,16 @@ per-call ceiling, reserved again before each native tool turn. Known charges
 from unusable responses are retained; unresolved billing keeps its reservation
 and blocks ordinary resume.
 
-Text calls without an explicit provider cost still use the configured blended
-token estimate. Complete lifecycle accounting remains a prerequisite for the
-[Astra cost campaign](../benchmarks/astra_benchmark_plan.md).
+Opt into [durable text workflows](workflow-accounting.md) with
+`run_store=SQLiteWorkflowStore(...)` for one exact ledger across routing,
+planning, execution, verification, supervision, and synthesis. That path uses
+native request quotes, preserves unknown exposure across restarts, and replays
+saved responses locally. Its returned accounting separates confirmed charges
+from reserved and unknown exposure. Native prices are dated list prices.
+
+Ordinary text calls without an explicit provider cost still use the configured
+blended token estimate. The [Astra cost campaign](../benchmarks/astra_benchmark_plan.md)
+requires new records from the complete-workflow path.
 
 [Architecture](architecture.md) · [Checkpoint format](checkpoint-format.md) ·
 [Offline budget example](../examples/03_parallel_budget.py).

@@ -22,6 +22,7 @@ verification, trace, artifact, and recovery controls.
 
 ## Operate durable work
 
+- [Durable text workflows](workflow-accounting.md) — phase-wide native cost accounting, exact request quotes, fenced ownership, and local response replay
 - [Checkpoint format](checkpoint-format.md) — saved state and resume semantics
 - [Cost guardrails](budgets.md) — strict usage validation, reservations, and failed-accounting recovery
 - [Jobs](jobs.md) — preflight, approval, attempts, recovery, rerolls, and exports

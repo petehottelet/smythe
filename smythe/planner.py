@@ -7,7 +7,7 @@ import json
 import re
 from abc import ABC, abstractmethod
 
-from smythe.budget import validate_completion_usage
+from smythe.budget import Sentinel, validate_completion_usage, validate_token_count
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.loader import build_graph_from_dict
 from smythe.prompts import (
@@ -19,6 +19,9 @@ from smythe.prompts import (
 from smythe.provider import Provider
 from smythe.registry import Registry
 from smythe.task import Task
+from smythe.workflow_binding import (
+    ComponentBinding, WorkflowBindingError, describe_component, provider_description, require_exact,
+)
 
 
 class ArchitectError(Exception):
@@ -59,6 +62,17 @@ class SimpleArchitect(DeterministicArchitect):
     or for tasks that don't need LLM-driven decomposition.
     """
 
+    def workflow_description(self, **defaults) -> dict:
+        require_exact(self, SimpleArchitect)
+        return {"type": "simple_architect", "version": 1}
+
+    def workflow_providers(self) -> tuple[Provider, ...]:
+        return ()
+
+    def bind_run(self, binding: ComponentBinding) -> SimpleArchitect:
+        self.workflow_description()
+        return SimpleArchitect()
+
     def plan(self, task: Task) -> tuple[ExecutionGraph, Registry]:
         node = Node(label=task.goal)
         graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
@@ -83,6 +97,8 @@ class LLMArchitect(Architect):
         cost_per_token: float = 0.000003,
         avg_tokens_per_node: int = 2000,
         registry: Registry | None = None,
+        *,
+        run_binding: ComponentBinding | None = None,
     ) -> None:
         self._provider = provider
         self._planning_model = planning_model
@@ -93,6 +109,33 @@ class LLMArchitect(Architect):
         # When set, the planning prompt includes an inventory of these
         # agents (and their tools) so plans can be designed around them.
         self._registry = registry
+        self._run_binding = run_binding
+
+    def workflow_description(self, **defaults) -> dict:
+        require_exact(self, LLMArchitect)
+        if self._memory is not None:
+            raise WorkflowBindingError("Journaled workflows do not support live planner memory")
+        validate_token_count(self._max_retries, "max_retries")
+        validate_token_count(self._avg_tokens_per_node, "avg_tokens_per_node")
+        Sentinel(cost_per_token=self._cost_per_token)
+        return {"type": "llm_architect", "version": 1,
+                **provider_description(self._provider, self._planning_model),
+                "max_retries": self._max_retries, "cost_per_token": self._cost_per_token,
+                "avg_tokens_per_node": self._avg_tokens_per_node,
+                "registry": describe_component(self._registry, role="registry")}
+
+    def workflow_providers(self) -> tuple[Provider, ...]:
+        return (self._provider,)
+
+    def bind_run(self, binding: ComponentBinding) -> LLMArchitect:
+        self.workflow_description()
+        return LLMArchitect(
+            binding.snapshot_provider(self._provider), self._planning_model,
+            max_retries=self._max_retries, cost_per_token=self._cost_per_token,
+            avg_tokens_per_node=self._avg_tokens_per_node,
+            registry=self._registry.bind_run(binding.child("registry")) if self._registry else None,
+            run_binding=binding,
+        )
 
     def plan(self, task: Task) -> tuple[ExecutionGraph, Registry]:
         """Sync wrapper — safe to call outside an event loop."""
@@ -115,7 +158,9 @@ class LLMArchitect(Architect):
                     + f"Your previous response could not be parsed: {last_error}\n\n"
                     + RETRY_PROMPT
                 )
-            result = await self._provider.complete(
+            provider = (self._run_binding.for_call(self._provider, trigger="task", attempt=attempt)
+                        if self._run_binding else self._provider)
+            result = await provider.complete(
                 PLANNING_SYSTEM_PROMPT, prompt, model=self._planning_model
             )
             validate_completion_usage(result)
