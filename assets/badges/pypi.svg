@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="78" height="20" viewBox="0 0 78 20" role="img" aria-label="PyPI v0.6.0">
+<svg xmlns="http://www.w3.org/2000/svg" width="78" height="20" viewBox="0 0 78 20" role="img" aria-label="PyPI v0.7.0">
   <rect x="0.5" y="0.5" width="77" height="19" fill="#ffffff" stroke="#000000"/>
   <rect x="1" y="1" width="34" height="18" fill="#000000"/>
   <g font-family="Verdana, 'DejaVu Sans', sans-serif" font-size="11" text-anchor="middle">
     <text x="17.5" y="14" fill="#ffffff">pypi</text>
-    <text x="56.5" y="14" fill="#000000">v0.6.0</text>
+    <text x="56.5" y="14" fill="#000000">v0.7.0</text>
   </g>
 </svg>

@@ -49,10 +49,11 @@ Status: pre-1.0. Minor versions may break APIs (see [CHANGELOG.md](CHANGELOG.md)
 - ✅ **Judge variance measurement + bounded optimizer smoke test** — noisy
   candidates are reverted and every experiment is journaled
 
-## v0.7.0: trust at production fan-out
+## Shipped (v0.7.0): trust at production fan-out
 
-Version 0.7.0 hardens the guarantees users depend on before a 5,000-item job
-is credible:
+Version 0.7.0 is available on [PyPI](https://pypi.org/project/smythe/0.7.0/)
+and [GitHub](https://github.com/petehottelet/smythe/releases/tag/v0.7.0).
+It adds the following runtime guarantees and measured evidence:
 
 1. **Fail-closed budget reservations** for image and other non-token outputs,
    using explicit inclusive per-call price ceilings

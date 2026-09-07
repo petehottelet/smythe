@@ -4,7 +4,8 @@ Examples 01–05, 08–14, and the acquisition-diligence example run offline
 out of the box. A built-in `DemoProvider` returns deterministic responses so
 you can inspect planning, fan-out, budgets, recovery, and synthesis without an
 API key. Examples 06 and 07 are live MCP integration tours. These examples
-target Smythe 0.7.0 and use files from the repository. Run them from its root:
+target [Smythe 0.7.0](https://github.com/petehottelet/smythe/releases/tag/v0.7.0)
+and use files from the repository. Run them from its root:
 
 ```bash
 pip install -e .            # from the repo root

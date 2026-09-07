@@ -7,6 +7,11 @@ time; the remaining selections use the reference's 57 slots, including its
 intentional blank. Matrix green bodies and mint highlights descend through
 three native depth layers.
 
+Download the packages, checksums, and build record from the
+[Smythe v0.7.0 release](https://github.com/petehottelet/smythe/releases/tag/v0.7.0).
+Their independent native version is 1.1; the build record identifies the
+exact source and platform checks.
+
 The ports fill the actual vector contours, preserving cubic curves, spacing,
 closed counters, and detached marks. GDI+, Core Graphics, and Cairo cache the
 resulting sprites. The [shared export record](native-catalog.json) binds both
@@ -44,7 +49,10 @@ hashes and acceptance records.
 The [new benchmark](../benchmarks/svg_glyph_benchmark.md) measures fresh original
 SVG geometry, style validation, duplicate detection, and catalog assembly
 through Smythe. Its 4.03-second median workflow result excludes imported base
-artwork and browser rendering. The adapted renderer has not been timed; the
+artwork and browser rendering. The adapted renderer's
+[six-session headless study](../benchmarks/renderer_performance_20260907_results.md)
+measured 56.21–56.24 draws/second and missed its frozen pacing target.
+A separate ten-minute travel/resize check passed 57 cycles. The
 [previous renderer's records](../benchmarks/partitions/glyph_svg_v1/renderer-v1/)
 remain superseded diagnostics.
 

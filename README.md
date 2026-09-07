@@ -4,7 +4,7 @@
   <p><em>task-based agent swarms with dynamic parallelization, routing, and execution topology.</em></p>
 
   <p>
-    <a href="https://pypi.org/project/smythe/"><img src="assets/badges/pypi.svg" alt="PyPI v0.6.0"></a>
+    <a href="https://pypi.org/project/smythe/"><img src="assets/badges/pypi.svg" alt="PyPI v0.7.0"></a>
     <a href="https://github.com/petehottelet/smythe/actions/workflows/ci.yml"><img src="assets/badges/ci.svg" alt="CI checks"></a>
     <img src="assets/badges/python.svg" alt="Python 3.11, 3.12, and 3.13">
     <a href="LICENSE"><img src="assets/badges/license.svg" alt="License: MIT"></a>
@@ -46,9 +46,10 @@ binds this screenshot and passes 31 rendering and interaction checks.
 A separate ten-minute travel and resize check passed 57 cycles.
 [Rendering measurements and stability report](benchmarks/renderer_performance_20260907_results.md).
 
-**Native downloads:** [Windows `.scr`](https://github.com/petehottelet/smythe/raw/refs/heads/main/screensaver/dist/SmytheGlyphRain.scr) ·
-[macOS universal `.zip`](https://github.com/petehottelet/smythe/raw/refs/heads/main/screensaver/dist/GlyphRain-macos-universal.zip) ·
-[Linux x86-64 `.tar.gz`](https://github.com/petehottelet/smythe/raw/refs/heads/main/screensaver/dist/SmytheGlyphRain-linux-x86_64.tar.gz) ·
+**Native downloads:** [Windows `.scr`](https://github.com/petehottelet/smythe/releases/download/v0.7.0/SmytheGlyphRain.scr) ·
+[macOS universal `.zip`](https://github.com/petehottelet/smythe/releases/download/v0.7.0/GlyphRain-macos-universal.zip) ·
+[Linux x86-64 `.tar.gz`](https://github.com/petehottelet/smythe/releases/download/v0.7.0/SmytheGlyphRain-linux-x86_64.tar.gz) ·
+[v0.7.0 release and checksums](https://github.com/petehottelet/smythe/releases/tag/v0.7.0) ·
 [Native source and setup](screensaver/README.md).
 
 All three downloads now use the current SVG shapes: **56 reference glyphs plus
@@ -291,5 +292,6 @@ team challenges the draft, and a final node writes the decision memo.
 [Repository review](docs/project-review-2026-09-06.md).
 
 Smythe is pre-1.0; minor releases may change APIs.
+[Release verification](docs/release-0.7.0.md) ·
 [Release history](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) ·
 [Security](SECURITY.md) · [MIT license](LICENSE).

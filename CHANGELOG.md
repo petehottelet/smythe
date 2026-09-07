@@ -21,6 +21,11 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
+### Documentation
+
+- Link the README's native downloads to the published v0.7.0 release, update
+  the verified PyPI badge, and align the release and renderer status guides.
+
 ## [0.7.0] - 2026-09-07
 
 Generated task graphs now run inside a durable, exact-cost execution journal.
