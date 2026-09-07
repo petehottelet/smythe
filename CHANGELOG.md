@@ -232,6 +232,10 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Fixed
 
+- **Portable evidence checks:** recovery-chart source hashing uses LF
+  newlines, and reference PNG reproduction compares decoded pixels. Different
+  PNG compression no longer fails an unchanged glyph catalog or produces a
+  large binary test diff.
 - **Cost and usage integrity:** finite nonnegative USD and integer nonnegative
   tokens are validated at provider construction, admission, reconciliation,
   and checkpoint restore. Invalid accounting stops serial and parallel work,

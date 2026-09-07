@@ -40,6 +40,8 @@ double rule, or a dashed outline on white.
   outline, and a third comparison with black hatching on white.
 - Keep scales honest and state whether higher or lower is better.
 - Put the result record and sample size on the asset itself.
+- Normalize JSON source-record newlines to LF before embedding a chart's
+  source hash. Windows and Linux checkouts must identify the same record.
 - Use square rules and open space. Avoid rounded panels, pills, gradients,
   shadows, and glow effects.
 - A callout pairs one Trajan numeral with one exact comparison. It never
@@ -98,3 +100,8 @@ After changing graph assets, regenerate them, scan every active SVG and Mermaid
 file for colors outside `#000000` and `#ffffff`, then render the SVGs to pixels
 for visual review. Pattern fills and `none` are allowed; translucent marks are
 not.
+
+For raster reproduction, compare decoded mode, dimensions, and pixel hashes.
+PNG compression can differ across platforms without changing the image.
+Keep exact file hashes in download receipts and byte-level checks for source
+artwork, licenses, SVG geometry, and structured catalog exports.

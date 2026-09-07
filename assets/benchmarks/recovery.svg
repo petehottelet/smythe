@@ -53,5 +53,5 @@
 <text x="40" y="524" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11.5" fill="#000000" text-anchor="start" font-weight="normal">Offline process-kill profile; provider billing unmeasured</text>
 <text x="920" y="550" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="11" fill="#000000" text-anchor="end" font-weight="normal">durability_kill_resume_v2.json</text>
 <text x="40" y="550" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="1">SOURCE RECORD</text>
-<!-- source-sha256: ce8e93ec281e0e6260348c20ba1adccff33bcf95160d008162f0fb17bb057c6d -->
+<!-- source-sha256: 3567715f09ab6a4882cd43e2a39c27199b6c95841ee95eaf989607205fcc685a -->
 </svg>

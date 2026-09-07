@@ -112,3 +112,7 @@ python benchmarks/run_durability_benchmark.py --cell b
 
 Use `--quick` for one repetition and `--out PATH` to preserve a machine-readable
 record.
+
+The README recovery chart embeds the source JSON's SHA-256 with newlines
+normalized to LF, so the digest is stable across checkout platforms. This
+normalization does not change the recorded measurements.

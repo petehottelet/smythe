@@ -1,4 +1,5 @@
 # Preserve byte hashes for the original SVG campaign across Windows and Unix.
+/benchmarks/results/durability_kill_resume_v2.json text eol=lf
 /benchmarks/*svg*.py text eol=lf
 /benchmarks/results/glyph_svg_v1*.json text eol=lf
 /benchmarks/partitions/glyph_svg_v1/**/*.json text eol=lf
