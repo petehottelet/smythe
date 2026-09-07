@@ -93,10 +93,10 @@ The graph runs through one set of controls regardless of who designed it.
 6. Apply bounded verification or supervision decisions.
 7. Synthesize the deliverable and write the terminal checkpoint.
 
-The parallel executor cancels and awaits active siblings after a fatal failure.
-Queued nodes do not start once the failure is observed. Completed nodes remain
-available to a resumed run. Serial halt behavior and verification of active
-descendants have open hardening work; see [Coming soon](../ROADMAP.md#coming-soon).
+Both executors stop new work on a terminal failure. The parallel executor also
+cancels and awaits active siblings. Completed results and charges remain
+available to an explicit resume. See [Execution policies](execution.md).
+Verification of active descendants remains in [Coming soon](../ROADMAP.md#coming-soon).
 
 ## Artifacts and jobs
 

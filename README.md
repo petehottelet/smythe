@@ -166,7 +166,8 @@ Durable Jobs add manifest validation, plan approvals, an attempt journal,
 selective rerolls, and portable exports.
 
 [Architecture](docs/architecture.md) · [Jobs and CLI](docs/jobs.md) ·
-[Cost guardrails](docs/budgets.md) · [MCP](docs/mcp.md) · [Verification](docs/verifier.md) ·
+[Failure policies](docs/execution.md) · [Cost guardrails](docs/budgets.md) ·
+[MCP](docs/mcp.md) · [Verification](docs/verifier.md) ·
 [All guides and examples](docs/index.md).
 
 ## Quickstart
@@ -227,9 +228,8 @@ team challenges the draft, and a final node writes the decision memo.
 
 - **Complete workflow cost accounting:** include planning and supervision in
   one spend ledger, then publish repeated cost comparisons from native usage.
-- **Runtime hardening:** synchronize verification with active descendants,
-  enforce serial halt behavior, and carry the full
-  task context through planning, execution, and resume.
+- **Runtime hardening:** synchronize verification with active descendants
+  and carry the full task context through planning, execution, and resume.
 - **Operator tools:** inspect runs, detach long jobs, and approve durable pauses.
 - **Native exploration:** bring the web exposure pipeline, camera controls,
   and settings to Windows, macOS, and Linux, then verify them against the

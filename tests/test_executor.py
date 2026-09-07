@@ -125,12 +125,12 @@ def test_serial_halts_downstream_of_failed():
         executor.run(graph)
 
     assert a.status == NodeStatus.FAILED
-    assert b.status in (NodeStatus.PENDING, NodeStatus.FAILED)
-    assert b.result is None or "Upstream" in str(b.result)
+    assert b.status == NodeStatus.PENDING
+    assert b.result is None
 
 
-def test_serial_skips_downstream_of_failed():
-    """Downstream node with SKIP policy should be SKIPPED when upstream fails."""
+def test_serial_halt_leaves_undispatched_skip_descendants_pending():
+    """SKIP applies to the node's own attempt, not an earlier global HALT."""
     executor, _ = _make_executor(FailingProvider(failures=999, fail_labels={"Upstream"}))
     a = Node(label="Upstream", id="a", failure_policy=FailurePolicy.HALT)
     b = Node(label="Downstream", id="b", depends_on=["a"], failure_policy=FailurePolicy.SKIP)
@@ -141,7 +141,10 @@ def test_serial_skips_downstream_of_failed():
         executor.run(graph)
 
     assert a.status == NodeStatus.FAILED
-    assert b.status == NodeStatus.SKIPPED
+    assert b.status == NodeStatus.PENDING
+    assert b.result is None
+    assert c.status == NodeStatus.PENDING
+    assert c.result is None
 
 
 def test_default_policy_is_halt():

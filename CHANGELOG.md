@@ -232,6 +232,9 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Fixed
 
+- **Serial halt:** terminal node errors now stop later independent calls
+  immediately. Completed results and costs remain intact; queued nodes stay
+  pending for an explicit resume. Exhausted retries also halt; `SKIP` continues.
 - **Portable evidence checks:** recovery-chart source hashing uses LF
   newlines, and reference PNG reproduction compares decoded pixels. Different
   PNG compression no longer fails an unchanged glyph catalog or produces a
