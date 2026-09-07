@@ -51,8 +51,8 @@ before assembly. [Run, build, and customize Glyph Rain](screensaver/README.md).
 
 The [next-version plan](docs/glyph-rain-plan.md) specifies original SVG glyphs,
 reference-based styling, and arrow-key exploration through a 3D field.
-Visual research draws on [m8e/matrix-rain](https://github.com/m8e/matrix-rain),
-a fork of Rezmason's Matrix. [Credits and references](screensaver/README.md#credits-and-references).
+Visual research draws on [m8e](https://github.com/m8e/matrix-rain),
+a fork of Rezmason. [Credits and references](screensaver/README.md#credits-and-references).
 
 ## Benchmarks
 
