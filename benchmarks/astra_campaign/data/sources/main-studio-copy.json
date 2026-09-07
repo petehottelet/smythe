@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "id": "main-studio-copy",
+  "provenance": "Original synthetic benchmark material; no real-world claims.",
+  "documents": [
+    {
+      "id": "draft",
+      "title": "Copy under review",
+      "content": "Studio seats cost 40 credits per month or 384 annually. Save 25%! Every seat includes unlimited storage (100 GB cap) and gauranteed one-minute support around the clock."
+    },
+    {
+      "id": "policy",
+      "title": "Authoritative product policy",
+      "content": "{\"annual_credits\": 384, \"monthly_credits\": 40, \"storage_gb\": 100, \"support\": \"weekdays 08:00-18:00; first response target four business hours, not guaranteed\"}"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "id": "main-capacity-chain",
+  "provenance": "Original synthetic benchmark material; no real-world claims.",
+  "documents": [
+    {
+      "id": "capacity",
+      "title": "Capacity and dispatch rules",
+      "content": "{\"decision_rule\": \"Use overtime if deliverable units fall below the order; otherwise use regular.\", \"downtime\": \"15% of total gross minutes\", \"machines\": 3, \"minutes_per_machine\": 720, \"minutes_per_unit\": 6, \"order_units\": 290, \"partial_boxes_allowed\": false, \"quality_yield\": \"92% of started units; floor to whole units\", \"units_per_box\": 20}"
+    }
+  ]
+}

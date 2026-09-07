@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "id": "main-production-chain",
+  "stage": "main",
+  "shape": "deep-serial",
+  "task": {
+    "goal": "Compute the production chain in order and decide whether to expedite.",
+    "constraints": [
+      "Use only the supplied fictional source pack; do not search or add outside facts.",
+      "Return one bare JSON value with no Markdown fences.",
+      "Return steps {after_test, after_coating, allocated, explanation}, shipments, backlog and decision.",
+      "shipments is the integer number of full cartons. backlog is unshipped order units. Show each dependency in explanation."
+    ],
+    "done_when": []
+  },
+  "source_file": "sources/main-production-chain.json",
+  "rubric": [
+    {
+      "id": "criterion-1",
+      "criterion": "Calculate each yield from the preceding stage, then subtract reserves.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-2",
+      "criterion": "Count only full cartons and account for residual loose units.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-3",
+      "criterion": "Compute backlog from shipped units, not allocated units.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-4",
+      "criterion": "Apply the expedite threshold and explain the arithmetic chain.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "id": "check-1",
+      "kind": "keys",
+      "path": [],
+      "expected": [
+        "steps",
+        "shipments",
+        "backlog",
+        "decision"
+      ]
+    },
+    {
+      "id": "check-2",
+      "kind": "number",
+      "path": [
+        "steps",
+        "after_test"
+      ],
+      "expected": 1080,
+      "tolerance": 0
+    },
+    {
+      "id": "check-3",
+      "kind": "number",
+      "path": [
+        "steps",
+        "after_coating"
+      ],
+      "expected": 1026,
+      "tolerance": 0
+    },
+    {
+      "id": "check-4",
+      "kind": "number",
+      "path": [
+        "steps",
+        "allocated"
+      ],
+      "expected": 996,
+      "tolerance": 0
+    },
+    {
+      "id": "check-5",
+      "kind": "number",
+      "path": [
+        "shipments"
+      ],
+      "expected": 41,
+      "tolerance": 0
+    },
+    {
+      "id": "check-6",
+      "kind": "number",
+      "path": [
+        "backlog"
+      ],
+      "expected": 36,
+      "tolerance": 0
+    },
+    {
+      "id": "check-7",
+      "kind": "equals",
+      "path": [
+        "decision"
+      ],
+      "expected": "expedite"
+    },
+    {
+      "id": "check-8",
+      "kind": "nonempty",
+      "path": [
+        "steps",
+        "explanation"
+      ],
+      "min_chars": 1
+    }
+  ]
+}

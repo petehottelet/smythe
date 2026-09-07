@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "id": "main-calendar",
+  "stage": "main",
+  "shape": "single-step",
+  "task": {
+    "goal": "Normalize all six dates in the source record to YYYY-MM-DD, preserving order.",
+    "constraints": [
+      "Use only the supplied fictional source pack; do not search or add outside facts.",
+      "Return one bare JSON value with no Markdown fences.",
+      "Output only an array of six strings."
+    ],
+    "done_when": []
+  },
+  "source_file": "sources/main-calendar.json",
+  "rubric": [
+    {
+      "id": "criterion-1",
+      "criterion": "Resolve slash dates using the stated day-first rule.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-2",
+      "criterion": "Convert all six dates, including leap day, in original order.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-3",
+      "criterion": "Return the requested JSON array without additions.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "id": "check-1",
+      "kind": "equals",
+      "path": [],
+      "expected": [
+        "2036-02-29",
+        "2035-12-03",
+        "2033-04-07",
+        "2037-10-21",
+        "2034-01-01",
+        "2032-09-08"
+      ]
+    }
+  ]
+}

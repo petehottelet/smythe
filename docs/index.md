@@ -22,7 +22,7 @@ verification, trace, artifact, and recovery controls.
 
 ## Operate durable work
 
-- [Durable text workflows](workflow-accounting.md) — phase-wide native cost accounting, exact request quotes, fenced ownership, and local response replay
+- [Durable text workflows](workflow-accounting.md) — phase-wide native costs, saved graph limits, exact request quotes, fenced ownership, and local response replay
 - [Checkpoint format](checkpoint-format.md) — saved state and resume semantics
 - [Cost guardrails](budgets.md) — strict usage validation, reservations, and failed-accounting recovery
 - [Jobs](jobs.md) — preflight, approval, read-only run lists and HTML inspection, recovery, rerolls, and exports
@@ -32,7 +32,7 @@ verification, trace, artifact, and recovery controls.
 
 - [GPT-6 Astra quickstart](../README.md#quickstart) — text-only planning and execution
 - [Native OpenAI Responses](openai-responses.md) — Astra/Sol function tools, exact token prices, request quotes, and retained failure receipts
-- [Astra benchmark plan](../benchmarks/astra_benchmark_plan.md) — compatibility, complete usage accounting, and matched comparisons
+- [Astra benchmark plan](../benchmarks/astra_benchmark_plan.md) — prepared task packs and balanced schedules, complete usage accounting, and matched comparisons
 - [MCP](mcp.md) — tool discovery, allowlists, secrets, budgets, and timeouts
 - [Style](style.md) — visual language for diagrams and public assets
 

@@ -1,0 +1,151 @@
+{
+  "version": 1,
+  "id": "main-capacity-chain",
+  "stage": "main",
+  "shape": "deep-serial",
+  "task": {
+    "goal": "Compute available machine capacity, quality yield and full-box deliveries in order. Decide whether overtime is required.",
+    "constraints": [
+      "Use only the supplied fictional source pack; do not search or add outside facts.",
+      "Return one bare JSON value with no Markdown fences.",
+      "Return steps {gross_minutes, net_minutes, started_units, passing_units, explanation}, deliverable_units, shortfall and decision.",
+      "Floor completed units after each explicitly stated floor step; never round them to nearest. Show the dependency chain."
+    ],
+    "done_when": []
+  },
+  "source_file": "sources/main-capacity-chain.json",
+  "rubric": [
+    {
+      "id": "criterion-1",
+      "criterion": "Derive net minutes from all three machines and downtime.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-2",
+      "criterion": "Convert capacity to units and floor the quality result correctly.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-3",
+      "criterion": "Deliver only full boxes and compute the remaining order shortfall.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-4",
+      "criterion": "Explain the resulting decision using the full dependency chain.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "id": "check-1",
+      "kind": "keys",
+      "path": [],
+      "expected": [
+        "steps",
+        "deliverable_units",
+        "shortfall",
+        "decision"
+      ]
+    },
+    {
+      "id": "check-2",
+      "kind": "number",
+      "path": [
+        "steps",
+        "gross_minutes"
+      ],
+      "expected": 2160,
+      "tolerance": 0
+    },
+    {
+      "id": "check-3",
+      "kind": "number",
+      "path": [
+        "steps",
+        "net_minutes"
+      ],
+      "expected": 1836,
+      "tolerance": 0
+    },
+    {
+      "id": "check-4",
+      "kind": "number",
+      "path": [
+        "steps",
+        "started_units"
+      ],
+      "expected": 306,
+      "tolerance": 0
+    },
+    {
+      "id": "check-5",
+      "kind": "number",
+      "path": [
+        "steps",
+        "passing_units"
+      ],
+      "expected": 281,
+      "tolerance": 0
+    },
+    {
+      "id": "check-6",
+      "kind": "number",
+      "path": [
+        "deliverable_units"
+      ],
+      "expected": 280,
+      "tolerance": 0
+    },
+    {
+      "id": "check-7",
+      "kind": "number",
+      "path": [
+        "shortfall"
+      ],
+      "expected": 10,
+      "tolerance": 0
+    },
+    {
+      "id": "check-8",
+      "kind": "equals",
+      "path": [
+        "decision"
+      ],
+      "expected": "overtime"
+    },
+    {
+      "id": "check-9",
+      "kind": "nonempty",
+      "path": [
+        "steps",
+        "explanation"
+      ],
+      "min_chars": 1
+    }
+  ]
+}

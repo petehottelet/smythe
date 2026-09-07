@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "id": "main-identifiers",
+  "provenance": "Original synthetic benchmark material; no real-world claims.",
+  "documents": [
+    {
+      "id": "identifiers",
+      "title": "Asset ID rules and input",
+      "content": "{\"input\": [\" qf_42 \", \"lm 7\", \"RC-0310\", \"zx_0000\", \"Bk58\"], \"rules\": [\"Trim outer whitespace.\", \"Uppercase the two-letter prefix.\", \"Remove spaces, underscores and hyphens between the prefix and number.\", \"Output PREFIX-NNNN, padding the decimal suffix to four digits.\", \"Preserve zero as 0000.\"]}"
+    }
+  ]
+}

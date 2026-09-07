@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "id": "main-warehouse-routing",
+  "provenance": "Original synthetic benchmark material; no real-world claims.",
+  "documents": [
+    {
+      "id": "trial",
+      "title": "Trial results",
+      "content": "In 400 small-parcel orders on the day shift, average pick time fell 18%. Oversize orders, night shifts and peak weeks were excluded."
+    },
+    {
+      "id": "incidents",
+      "title": "Exception log",
+      "content": "The router required manual recovery for 12 of the 400 orders. No shipments were lost during the trial; a supervisor was present for every recovery."
+    },
+    {
+      "id": "capacity",
+      "title": "Rollout constraints",
+      "content": "A full rollout needs six trained supervisors. Two are trained. Training four more takes six weeks; the month has three weeks remaining."
+    },
+    {
+      "id": "options",
+      "title": "Available decisions",
+      "content": "Management may continue a staffed small-parcel trial, test oversize and night-shift cases, or approve a full rollout after staffing and exception-handling checks."
+    },
+    {
+      "id": "claims",
+      "title": "Claims to evaluate",
+      "content": "{\"ready-this-month\": \"Staff training can finish before this month ends.\", \"staffing-gap\": \"Four additional supervisors need training before full rollout.\", \"trial-observation\": \"The included small-parcel day-shift orders had lower average pick time.\", \"universal-speedup\": \"An 18% speedup is established for every order size and shift.\"}"
+    }
+  ]
+}

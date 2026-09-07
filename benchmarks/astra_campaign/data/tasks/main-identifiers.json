@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "id": "main-identifiers",
+  "stage": "main",
+  "shape": "single-step",
+  "task": {
+    "goal": "Normalize the five asset identifiers using the source rules.",
+    "constraints": [
+      "Use only the supplied fictional source pack; do not search or add outside facts.",
+      "Return one bare JSON value with no Markdown fences.",
+      "Output only an array of five strings, preserving input order."
+    ],
+    "done_when": []
+  },
+  "source_file": "sources/main-identifiers.json",
+  "rubric": [
+    {
+      "id": "criterion-1",
+      "criterion": "Apply every normalization rule without changing numeric identity.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-2",
+      "criterion": "Handle already padded identifiers and zero correctly.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-3",
+      "criterion": "Preserve order and output only the required array.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "id": "check-1",
+      "kind": "equals",
+      "path": [],
+      "expected": [
+        "QF-0042",
+        "LM-0007",
+        "RC-0310",
+        "ZX-0000",
+        "BK-0058"
+      ]
+    }
+  ]
+}

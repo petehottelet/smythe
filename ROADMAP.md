@@ -141,13 +141,19 @@ The current unreleased work hardens the guarantees users depend on before a
     ordering, and depth calculation preserve existing traversal order. Offline
     regressions execute a reverse-ordered 5,000-node chain and verify deep
     revisions before mutation. [Execution guide](docs/execution.md#deep-graphs).
+21. **Saved graph limits** — bind node count, effective execution models,
+    retries, and regeneration to the durable workflow recipe. Plan replay,
+    handoffs, recovery, and revisions enforce the same limits.
+    [Graph policy guide](docs/workflow-accounting.md#freeze-graph-limits).
 
 ## Coming soon
 
 The [GPT-6 Astra campaign plan](benchmarks/astra_benchmark_plan.md) specifies
 matched model and orchestration experiments. Native Responses and complete
-text-workflow accounting are implemented; paid comparisons require a bounded
-pilot, a frozen campaign, and reviewed result records.
+text-workflow accounting are implemented. The offline preparation package
+provides 13 task/source packs and balanced schedules for 12 pilot and 200 main
+workflows. Paid comparisons require the campaign spending envelope, accounted
+judge, bounded pilot, frozen acceptance gates, and reviewed result records.
 
 The [September repository review](docs/project-review-2026-09-06.md) defines
 the hardening work ahead of broader production claims:

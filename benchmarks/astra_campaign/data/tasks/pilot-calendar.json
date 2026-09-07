@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "id": "pilot-calendar",
+  "stage": "pilot",
+  "shape": "single-step",
+  "task": {
+    "goal": "Normalize the four dates in the source record to YYYY-MM-DD, preserving order.",
+    "constraints": [
+      "Use only the supplied fictional source pack; do not search or add outside facts.",
+      "Return one bare JSON value with no Markdown fences.",
+      "Output only an array of four strings."
+    ],
+    "done_when": []
+  },
+  "source_file": "sources/pilot-calendar.json",
+  "rubric": [
+    {
+      "id": "criterion-1",
+      "criterion": "Convert every supplied date correctly.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-2",
+      "criterion": "Preserve the original order and exact date meaning.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-3",
+      "criterion": "Return only the required JSON array.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "id": "check-1",
+      "kind": "equals",
+      "path": [],
+      "expected": [
+        "2032-02-29",
+        "2031-11-06",
+        "2030-01-09",
+        "2034-08-12"
+      ]
+    }
+  ]
+}

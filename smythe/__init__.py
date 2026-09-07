@@ -32,6 +32,7 @@ from smythe.provider import (
 from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.pricing import NativeReceipt
 from smythe.workflow_binding import LocalOnly, WorkflowBindingError
+from smythe.workflow_policy import WorkflowGraphPolicy
 from smythe.workflow_store import SQLiteWorkflowStore, WorkflowError
 from smythe.router import WhiteRabbit
 from smythe.skills import (
@@ -98,6 +99,7 @@ __all__ = [
     "LocalOnly",
     "SQLiteWorkflowStore",
     "WorkflowBindingError",
+    "WorkflowGraphPolicy",
     "WorkflowError",
     "PlannerMemory",
     "Provider",

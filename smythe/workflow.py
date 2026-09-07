@@ -31,6 +31,7 @@ from smythe.workflow_binding import (
 from smythe.workflow_provider import (
     WorkflowProviderContext, describe_provider, validate_workflow_model,
 )
+from smythe.workflow_policy import snapshot_graph_policy
 from smythe.workflow_store import (
     CallKey, SQLiteWorkflowStore, WorkflowConflictError, WorkflowError, WorkflowLeaseError,
     WorkflowStateError,
@@ -123,7 +124,7 @@ class WorkflowRuntime:
     def __init__(self, *, store, model, max_budget_usd, provider, architect, registry,
                  router, synthesizer, supervisor, max_revisions, verifier, memory,
                  tool_runtime, checkpoint_store, checkpoint_every_n_nodes, retry_backoff_s,
-                 max_concurrency):
+                 max_concurrency, graph_policy=None):
         if type(store) is not SQLiteWorkflowStore:
             raise WorkflowBindingError("run_store must be SQLiteWorkflowStore")
         Sentinel(max_budget_usd)
@@ -149,6 +150,7 @@ class WorkflowRuntime:
         self.execution_concurrency = None
         self.retry_backoff_s = retry_backoff_s
         self.checkpoint_every_n_nodes = checkpoint_every_n_nodes
+        self.graph_policy = snapshot_graph_policy(graph_policy)
         self.recipe = self._describe()
         self.graph = None
         self.executor = None
@@ -162,7 +164,7 @@ class WorkflowRuntime:
 
     def _describe(self):
         validate_workflow_model(self.provider, self.model)
-        return json_snapshot({
+        recipe = {
             "type": "text_workflow", "version": 1, "model": self.model,
             "provider": describe_provider(self.provider),
             "components": {name: describe_component(
@@ -171,7 +173,12 @@ class WorkflowRuntime:
             "max_revisions": self.max_revisions, "retry_backoff_s": self.retry_backoff_s,
             "max_concurrency": self.max_concurrency,
             "verifier": "token-v1", "checkpoint_every_n_nodes": self.checkpoint_every_n_nodes,
-        })
+        }
+        # Omit the field for existing unbounded recipes: adding a null would
+        # change their identity and prevent otherwise compatible recovery.
+        if self.graph_policy is not None:
+            recipe["graph_policy"] = self.graph_policy.to_dict()
+        return json_snapshot(recipe)
 
     def _reference(self):
         return {"version": 1, "store_id": self.store.store_id, "run_id": self.run_id,
@@ -275,9 +282,14 @@ class WorkflowRuntime:
     def _new_run(self, task):
         return self.store.create_run(task_to_dict(task), self.recipe, _nanousd(self.max_budget_usd))
 
-    def _prepare_graph(self, graph, *, fresh=False):
+    def _validate_graph_policy(self, graph):
+        if self.graph_policy is not None:
+            self.graph_policy.validate(graph, default_model=self.model)
+
+    def _validate_graph(self, graph, *, fresh=False):
         graph.validate()
         json_snapshot(graph_to_dict(graph))
+        self._validate_graph_policy(graph)
         for node in graph.nodes:
             if fresh and (node.status is not NodeStatus.PENDING or node.result is not None):
                 raise WorkflowBindingError("A new workflow requires pending nodes without prior results")
@@ -299,10 +311,14 @@ class WorkflowRuntime:
                 raise WorkflowBindingError("Node timeout must be finite and positive")
             if node.attach_dep_artifacts or node.metadata.get("attachments") or node.metadata.get("artifacts"):
                 raise WorkflowBindingError("Durable workflows currently support plain text nodes")
-            node.metadata.setdefault("model", self.model)
-            validate_workflow_model(self.execution_provider, node.metadata["model"])
+            validate_workflow_model(self.execution_provider, node.metadata.get("model", self.model))
             if node.agent_id is not None and self.registry.get(node.agent_id) is None:
                 raise WorkflowBindingError(f"Node {node.id!r} names an unknown agent")
+
+    def _prepare_graph(self, graph, *, fresh=False):
+        self._validate_graph(graph, fresh=fresh)
+        for node in graph.nodes:
+            node.metadata.setdefault("model", self.model)
         self.registry.assign(graph)
         self.registry.workflow_description()
         graph.run_ref = self._reference()
@@ -315,6 +331,7 @@ class WorkflowRuntime:
     def _save(self, status="running", *, output=None):
         if self.graph is None:
             return
+        self._validate_graph_policy(self.graph)
         self.registry.workflow_description()
         calls = []
         nodes = {node.id: node for node in self.graph.nodes}
@@ -392,6 +409,7 @@ class WorkflowRuntime:
             architect = (await self.bound["router"].aroute(snapshot_task(frozen))
                          if self.bound["router"] else self.bound["architect"])
             graph, registry = await architect.aplan(snapshot_task(frozen))
+            self._validate_graph_policy(graph)
             registry.workflow_description()
             for agent in registry.list_agents():
                 self.registry.register(agent)
@@ -400,8 +418,13 @@ class WorkflowRuntime:
             return {"graph": graph_to_dict(graph), "registry": self.registry.workflow_description()}
 
         result = await self._operation_result("planning", "planning", {"task": task_to_dict(task)}, build)
-        self.registry = Registry.from_workflow_description(result["registry"])
-        self.graph = graph_from_dict(result["graph"])
+        registry = Registry.from_workflow_description(result["registry"])
+        graph = graph_from_dict(result["graph"])
+        # Completed planning operations replay without invoking build(). Apply
+        # the same graph policy before adopting or checkpointing that result.
+        self._validate_graph_policy(graph)
+        self.registry = registry
+        self._prepare_graph(graph, fresh=True)
         self._save("planned")
         return self.graph
 
@@ -451,12 +474,14 @@ class WorkflowRuntime:
         state = saved["checkpoint"]
         if type(state.get("version")) is not int or state["version"] != 1:
             raise WorkflowStateError("Unsupported workflow checkpoint version")
-        self.registry = Registry.from_workflow_description(state["registry"])
-        self.graph = graph_from_dict(state["graph"])
-        if (self.graph.run_ref != self._reference()
-                or _canonical(task_to_dict(self.graph.task)) != _canonical(self.run["task"])):
+        registry = Registry.from_workflow_description(state["registry"])
+        graph = graph_from_dict(state["graph"])
+        if (graph.run_ref != self._reference()
+                or _canonical(task_to_dict(graph.task)) != _canonical(self.run["task"])):
             raise WorkflowConflictError("Checkpoint graph does not match its durable run")
-        self._prepare_graph(self.graph)
+        self._validate_graph_policy(graph)
+        self.registry = registry
+        self._prepare_graph(graph)
         return state
 
     async def resume(self, run_id, *, max_concurrency):
@@ -636,5 +661,21 @@ class _WorkflowSupervisor:
                     node, proposal, applied=False,
                     detail="Revision targets work already admitted in the durable journal",
                 )
+                return None
+        if runtime.graph_policy is not None:
+            try:
+                candidate = graph_from_dict(json_snapshot(graph_to_dict(graph)))
+                additions = tuple(node_from_dict(json_snapshot(node_to_dict(item)))
+                                  for item in proposal.add_nodes)
+                candidate.apply_revision(Revision(
+                    add_nodes=additions, drop_node_ids=proposal.drop_node_ids,
+                    rewire=proposal.rewire, reason=proposal.reason,
+                ))
+                # Validate the exact context the executor will give new nodes,
+                # without changing the live graph or the returned proposal.
+                runtime.executor._inherit_execution_context(additions, candidate)
+                runtime._validate_graph(candidate)
+            except (ValueError, TypeError, KeyError) as error:
+                runtime.trace.on_revision(node, proposal, applied=False, detail=str(error))
                 return None
         return proposal

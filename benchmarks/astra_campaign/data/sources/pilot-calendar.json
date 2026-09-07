@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "id": "pilot-calendar",
+  "provenance": "Original synthetic benchmark material; no real-world claims.",
+  "documents": [
+    {
+      "id": "calendar",
+      "title": "Date input record",
+      "content": "{\"dates\": [\"29 February 2032\", \"11/06/2031\", \"9 Jan 2030\", \"2034-08-12\"], \"slash_format\": \"MM/DD/YYYY\"}"
+    }
+  ]
+}

@@ -1,0 +1,176 @@
+{
+  "version": 1,
+  "id": "main-studio-copy",
+  "stage": "main",
+  "shape": "fan-in-verify",
+  "task": {
+    "goal": "Audit the draft copy independently for spelling, arithmetic and contradictions with the authoritative policy; then produce corrected copy.",
+    "constraints": [
+      "Use only the supplied fictional source pack; do not search or add outside facts.",
+      "Return one bare JSON value with no Markdown fences.",
+      "Return defects {spelling, arithmetic, policy}, corrected_copy and facts. Each defect group must map the defective phrases to explanations.",
+      "facts must use these keys: monthly, annual, savings_percent, storage_gb. Report savings_percent to two decimal places when needed. The policy document is authoritative; do not add promises.",
+      "Each defect group must be a nonempty object mapping quoted draft phrases to explanations; identify the phrases yourself."
+    ],
+    "done_when": []
+  },
+  "source_file": "sources/main-studio-copy.json",
+  "rubric": [
+    {
+      "id": "criterion-1",
+      "criterion": "Explain each spelling defect and correct it in the final copy.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-2",
+      "criterion": "Recompute all prices and discounts from the authoritative inputs.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-3",
+      "criterion": "Remove promises that contradict the stated limits and service policy.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    },
+    {
+      "id": "criterion-4",
+      "criterion": "Produce coherent corrected copy retaining the supported offer and constraints.",
+      "anchors": {
+        "0": "Absent or contradicts the supplied evidence.",
+        "1": "Addresses a small part; major errors remain.",
+        "2": "Mostly relevant but incomplete or materially unsupported.",
+        "3": "Correct and substantially complete; only minor omissions.",
+        "4": "Complete, accurate and explicitly supported by the supplied evidence."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "id": "check-1",
+      "kind": "keys",
+      "path": [],
+      "expected": [
+        "defects",
+        "corrected_copy",
+        "facts"
+      ]
+    },
+    {
+      "id": "check-2",
+      "kind": "keys",
+      "path": [
+        "defects"
+      ],
+      "expected": [
+        "spelling",
+        "arithmetic",
+        "policy"
+      ]
+    },
+    {
+      "id": "check-11",
+      "kind": "nonempty",
+      "path": [
+        "corrected_copy"
+      ],
+      "min_chars": 1
+    },
+    {
+      "id": "check-12",
+      "kind": "keys",
+      "path": [
+        "facts"
+      ],
+      "expected": [
+        "monthly",
+        "annual",
+        "savings_percent",
+        "storage_gb"
+      ]
+    },
+    {
+      "id": "check-13",
+      "kind": "number",
+      "path": [
+        "facts",
+        "monthly"
+      ],
+      "expected": 40,
+      "tolerance": 0
+    },
+    {
+      "id": "check-14",
+      "kind": "number",
+      "path": [
+        "facts",
+        "annual"
+      ],
+      "expected": 384,
+      "tolerance": 0
+    },
+    {
+      "id": "check-15",
+      "kind": "number",
+      "path": [
+        "facts",
+        "savings_percent"
+      ],
+      "expected": 20,
+      "tolerance": 0
+    },
+    {
+      "id": "check-16",
+      "kind": "number",
+      "path": [
+        "facts",
+        "storage_gb"
+      ],
+      "expected": 100,
+      "tolerance": 0
+    },
+    {
+      "id": "group-spelling",
+      "kind": "object",
+      "path": [
+        "defects",
+        "spelling"
+      ],
+      "minimum": 1
+    },
+    {
+      "id": "group-arithmetic",
+      "kind": "object",
+      "path": [
+        "defects",
+        "arithmetic"
+      ],
+      "minimum": 1
+    },
+    {
+      "id": "group-policy",
+      "kind": "object",
+      "path": [
+        "defects",
+        "policy"
+      ],
+      "minimum": 1
+    }
+  ]
+}
