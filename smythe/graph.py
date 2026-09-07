@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 import re
@@ -36,24 +36,32 @@ def _escape_mermaid(text: str) -> str:
 
 
 def _has_cycle_in(adjacency: Mapping[str, list[str]]) -> bool:
-    """Cycle check over a node-id -> dependency-ids mapping."""
+    """Check dependency edges without consuming Python's recursion stack."""
     visiting: set[str] = set()
     done: set[str] = set()
 
-    def dfs(node_id: str) -> bool:
+    for node_id in adjacency:
         if node_id in done:
-            return False
-        if node_id in visiting:
-            return True
+            continue
         visiting.add(node_id)
-        for dep in adjacency.get(node_id, ()):
-            if dfs(dep):
+        stack: list[tuple[str, Iterator[str]]] = [
+            (node_id, iter(adjacency.get(node_id, ())))
+        ]
+        while stack:
+            current, dependencies = stack[-1]
+            try:
+                dep = next(dependencies)
+            except StopIteration:
+                stack.pop()
+                visiting.remove(current)
+                done.add(current)
+                continue
+            if dep in visiting:
                 return True
-        visiting.discard(node_id)
-        done.add(node_id)
-        return False
-
-    return any(dfs(node_id) for node_id in adjacency)
+            if dep not in done:
+                visiting.add(dep)
+                stack.append((dep, iter(adjacency.get(dep, ()))))
+    return False
 
 
 # House diagram style (docs/style.md): serif type, pure black-and-white nodes,
@@ -179,6 +187,42 @@ class Node:
     max_regenerations: int = 0
 
 
+def _dependency_order(nodes: list[Node], *, strict_missing: bool = False) -> list[Node]:
+    """Return DFS postorder, preserving node and dependency iteration order.
+
+    Mark nodes on entry so shared dependencies and back edges are visited
+    once. Cycle validation remains separate; this walk can also render an
+    unvalidated graph.
+    """
+    visited: set[str] = set()
+    order: list[Node] = []
+    lookup = {node.id: node for node in nodes}
+    for node in nodes:
+        if node.id in visited:
+            continue
+        visited.add(node.id)
+        stack: list[tuple[Node, Iterator[str]]] = [(node, iter(node.depends_on))]
+        while stack:
+            current, dependencies = stack[-1]
+            try:
+                dep_id = next(dependencies)
+            except StopIteration:
+                stack.pop()
+                order.append(current)
+                continue
+            if dep_id not in lookup:
+                if strict_missing:
+                    raise ValueError(
+                        f"Node {current.id!r} depends on unknown node {dep_id!r}"
+                    )
+                continue
+            if dep_id not in visited:
+                visited.add(dep_id)
+                dependency = lookup[dep_id]
+                stack.append((dependency, iter(dependency.depends_on)))
+    return order
+
+
 @dataclass
 class ExecutionGraph:
     """A DAG of nodes representing the planned execution for a task.
@@ -215,24 +259,19 @@ class ExecutionGraph:
 
     @property
     def depth(self) -> int:
-        """Longest path in the DAG (number of edges on the critical path)."""
-        if not self.nodes:
-            return 0
+        """Longest path in edges; raise ValueError when the graph contains a cycle."""
         lookup = {n.id: n for n in self.nodes}
+        if _has_cycle_in({node_id: node.depends_on for node_id, node in lookup.items()}):
+            raise ValueError("Execution graph contains a cycle")
         cache: dict[str, int] = {}
-
-        def _depth(node_id: str) -> int:
-            if node_id in cache:
-                return cache[node_id]
-            node = lookup.get(node_id)
-            if node is None or not node.depends_on:
-                cache[node_id] = 0
-                return 0
-            d = 1 + max(_depth(dep) for dep in node.depends_on)
-            cache[node_id] = d
-            return d
-
-        return max(_depth(n.id) for n in self.nodes)
+        for node in _dependency_order(list(lookup.values())):
+            # Unvalidated missing dependencies retain their historical depth
+            # of zero; validate() remains responsible for rejecting them.
+            cache[node.id] = (
+                1 + max(cache.get(dep, 0) for dep in node.depends_on)
+                if node.depends_on else 0
+            )
+        return max(cache.values(), default=0)
 
     @property
     def agent_count(self) -> int:
@@ -491,37 +530,7 @@ class ExecutionGraph:
         return " (depends on " + ", ".join(dep_names) + ")"
 
     def _topo_sort(self) -> list[Node]:
-        visited: set[str] = set()
-        order: list[Node] = []
-        lookup = {n.id: n for n in self.nodes}
-
-        def visit(node: Node) -> None:
-            if node.id in visited:
-                return
-            visited.add(node.id)
-            for dep_id in node.depends_on:
-                if dep_id in lookup:
-                    visit(lookup[dep_id])
-            order.append(node)
-
-        for node in self.nodes:
-            visit(node)
-        return order
+        return _dependency_order(self.nodes)
 
     def _has_cycle(self) -> bool:
-        visited: set[str] = set()
-        in_stack: set[str] = set()
-        adj: dict[str, list[str]] = {n.id: n.depends_on for n in self.nodes}
-
-        def dfs(nid: str) -> bool:
-            visited.add(nid)
-            in_stack.add(nid)
-            for dep in adj.get(nid, []):
-                if dep in in_stack:
-                    return True
-                if dep not in visited and dfs(dep):
-                    return True
-            in_stack.discard(nid)
-            return False
-
-        return any(nid not in visited and dfs(nid) for nid in adj)
+        return _has_cycle_in({node.id: node.depends_on for node in self.nodes})

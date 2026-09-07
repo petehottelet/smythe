@@ -165,6 +165,8 @@ Agents use MCP tools, generate images, and pass artifacts to downstream nodes.
 Durable Jobs add manifest validation, plan approvals, an attempt journal,
 selective rerolls, read-only run inspection, and portable exports. Inspect
 prompts, responses, costs, and artifact receipts in a local HTML report.
+Iterative graph traversal passes [5,000-node dependency-chain checks](docs/execution.md#deep-graphs),
+including complete offline serial execution and atomic revision validation.
 
 [Architecture](docs/architecture.md) · [Task handoffs](docs/tasks.md) · [Jobs and CLI](docs/jobs.md) ·
 [Failure policies](docs/execution.md) · [Cost guardrails](docs/budgets.md) ·

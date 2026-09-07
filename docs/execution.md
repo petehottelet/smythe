@@ -29,6 +29,24 @@ pending graph. Invalid-accounting markers require reconciliation first.
 Unfinished [verification transitions](verifier.md#recovery-and-concurrent-work)
 are recovered before new work or cached-output return.
 
+## Deep graphs
+
+Validation, cycle detection, dependency ordering, and depth calculation use
+iterative traversal. A chain does not depend on Python's recursion limit or
+the order in which its nodes appear. Serial execution preserves depth-first
+dependency order, including the declared order of sibling dependencies.
+
+Regression tests validate 5,000-node chains in forward, reverse, and shuffled
+order, check a 5,000-node fork/join graph, and execute all 5,000 steps of a
+reverse-ordered chain with an offline provider. Revision tests cover deep
+rewiring and reject cycles or missing dependencies before changing the graph.
+Reading `depth` on a cyclic graph raises `ValueError`.
+
+These are correctness checks, not throughput measurements. Serial execution
+still rechecks pending work after each step so supervision and verification
+can change the remaining graph. Flat artifact fan-out has a separate
+[Jobs scale and recovery protocol](../benchmarks/jobs_scale_benchmark.md).
+
 [YAML example](../examples/01_pipeline.yaml) ·
 [Crash and resume example](../examples/04_resume_after_crash.py) ·
 [Architecture](architecture.md).

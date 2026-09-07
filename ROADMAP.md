@@ -137,6 +137,10 @@ The current unreleased work hardens the guarantees users depend on before a
     exact cost balances, prompts, responses, attempt lineage, recent events,
     and local artifact integrity in a self-contained black-and-white HTML report.
     [Inspection commands](docs/jobs.md#list-and-inspect-runs).
+20. **Deep graph execution** — iterative validation, cycle checks, dependency
+    ordering, and depth calculation preserve existing traversal order. Offline
+    regressions execute a reverse-ordered 5,000-node chain and verify deep
+    revisions before mutation. [Execution guide](docs/execution.md#deep-graphs).
 
 ## Coming soon
 

@@ -23,6 +23,10 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Added
 
+- **Offline Jobs scale harness**: an owned subprocess, deterministic crash
+  barrier, real lease expiry, pending-only resume, and explicit unknown rerolls.
+  Identity, attempt lineage, call states, accounting, and every accepted PNG
+  receipt gate completion. Failed campaigns retain diagnostic records.
 - **Jobs operator inspection**: `jobs list` and `jobs inspect` read existing
   ledgers without constructing providers. Bounded operation and event pages
   retain whole-run cost totals and selected attempt lineage. Self-contained
@@ -248,6 +252,11 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Fixed
 
+- **Deep graph traversal**: replace recursive cycle detection, depth calculation,
+  dependency ordering, and serial walks with iterative traversal. Preserve
+  depth-first ordering and missing-dependency errors; validate deep revisions
+  before mutation. Regressions include actual offline execution of a reversed
+  5,000-node chain. Cyclic `depth` access raises `ValueError`.
 - **Complete task propagation:** detached task snapshots preserve source context,
   constraints, and acceptance criteria through routing, planning, graph handoffs,
   execution, supervision, synthesis, memory, and checkpoint recovery. Same-goal

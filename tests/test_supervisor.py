@@ -157,6 +157,60 @@ def test_empty_revision_is_a_noop():
     assert len(graph.nodes) == 1
 
 
+def test_deep_revision_applies_add_drop_and_rewire_after_validation():
+    graph = _graph(*["step"] * 5_000)
+    nodes = list(graph.nodes)
+    graph.nodes.reverse()
+    nodes[0].status = NodeStatus.COMPLETED
+    nodes[0].result = "saved result"
+    inserted = Node(id="inserted", label="Inserted", depends_on=["n2499"])
+    tail = Node(id="tail", label="New tail", depends_on=["n4998"])
+
+    graph.apply_revision(Revision(
+        add_nodes=(inserted, tail), drop_node_ids=("n4999",),
+        rewire={"n2500": (inserted.id,)},
+    ))
+
+    assert [id(node) for node in graph.nodes] == [
+        *(id(node) for node in reversed(nodes[:-1])), id(inserted), id(tail),
+    ]
+    assert nodes[2500].depends_on == [inserted.id]
+    assert nodes[0].status is NodeStatus.COMPLETED
+    assert nodes[0].result == "saved result"
+    assert graph.depth == 5_000
+    graph.validate()
+
+
+@pytest.mark.parametrize("invalid_dependency", ["n4998", "missing"])
+def test_rejected_deep_revision_preserves_graph_and_proposed_nodes(invalid_dependency):
+    graph = _graph(*["step"] * 5_000)
+    graph.nodes.reverse()
+    original_list = graph.nodes
+    graph.nodes[-1].result = {"retained": ["evidence"]}
+    before = [
+        (id(node), id(node.depends_on), tuple(node.depends_on), node.status, id(node.result))
+        for node in graph.nodes
+    ]
+    extra = Node(id="extra", label="Proposed", depends_on=["n4998"])
+    extra_dependencies = extra.depends_on
+
+    with pytest.raises(RevisionError, match="cycle|missing node"):
+        graph.apply_revision(Revision(
+            add_nodes=(extra,), drop_node_ids=("n4999",),
+            rewire={"n0": (invalid_dependency,)},
+        ))
+
+    assert graph.nodes is original_list
+    assert [
+        (id(node), id(node.depends_on), tuple(node.depends_on), node.status, id(node.result))
+        for node in graph.nodes
+    ] == before
+    assert graph.nodes[-1].result == {"retained": ["evidence"]}
+    assert extra.depends_on is extra_dependencies
+    assert extra.depends_on == ["n4998"]
+    assert extra.status is NodeStatus.PENDING
+
+
 # ---------------------------------------------------------------------------
 # Executor integration
 # ---------------------------------------------------------------------------

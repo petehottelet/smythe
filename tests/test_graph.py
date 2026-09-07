@@ -1,5 +1,7 @@
 """Tests for ExecutionGraph construction and validation."""
 
+import random
+
 import pytest
 
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
@@ -225,3 +227,96 @@ def test_node_execution_controls_have_safe_independent_defaults():
 
     first.required_capabilities.append("vision")
     assert second.required_capabilities == []
+
+
+def _serial_nodes(count):
+    return [
+        Node(id=f"n{i}", label=f"Step {i}", depends_on=[f"n{i - 1}"] if i else [])
+        for i in range(count)
+    ]
+
+
+@pytest.mark.parametrize("order", ["forward", "reverse", "shuffled"])
+def test_5000_node_chain_validates_and_orders_without_recursion(order):
+    nodes = _serial_nodes(5_000)
+    if order == "reverse":
+        nodes.reverse()
+    elif order == "shuffled":
+        random.Random(20260907).shuffle(nodes)
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=nodes)
+
+    graph.validate()
+
+    assert graph.depth == 4_999
+    assert [node.id for node in graph._topo_sort()] == [f"n{i}" for i in range(5_000)]
+
+
+@pytest.mark.parametrize("order", ["forward", "reverse", "shuffled"])
+def test_5000_node_fork_join_handles_shared_dependencies_in_any_order(order):
+    root = Node(id="root", label="Root")
+    leaves = [Node(id=f"leaf{i}", label="Leaf", depends_on=[root.id]) for i in range(4_998)]
+    join = Node(id="join", label="Join", depends_on=[node.id for node in reversed(leaves)])
+    nodes = [root, *leaves, join]
+    if order == "reverse":
+        nodes.reverse()
+    elif order == "shuffled":
+        random.Random(20260907).shuffle(nodes)
+    graph = ExecutionGraph(topology=[Topology.FORK_JOIN], nodes=nodes)
+
+    graph.validate()
+    positions = {node.id: index for index, node in enumerate(graph._topo_sort())}
+
+    assert graph.depth == 2
+    assert len(positions) == 5_000
+    assert all(positions[root.id] < positions[leaf.id] < positions[join.id] for leaf in leaves)
+
+
+def test_topological_order_preserves_dependency_order_and_shared_subtrees():
+    root = Node(id="root", label="Root")
+    a = Node(id="a", label="A", depends_on=[root.id])
+    b = Node(id="b", label="B", depends_on=[root.id])
+    join = Node(id="join", label="Join", depends_on=[b.id, a.id, b.id])
+    later = Node(id="later", label="Later")
+    graph = ExecutionGraph(topology=[Topology.FORK_JOIN], nodes=[join, a, later, root, b])
+
+    assert graph._topo_sort() == [root, b, a, join, later]
+    assert graph.depth == 2
+    graph.validate()
+
+
+def test_unvalidated_missing_dependencies_retain_rendering_and_depth_behavior():
+    child = Node(id="child", label="Child", depends_on=["parent", "missing"])
+    parent = Node(id="parent", label="Parent", depends_on=["ghost"])
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[child, parent])
+
+    assert graph._topo_sort() == [parent, child]
+    assert graph.depth == 2
+    assert "depends on ghost" in str(graph)
+    with pytest.raises(ValueError, match="Node 'child' depends on unknown node 'missing'"):
+        graph.validate()
+
+
+@pytest.mark.parametrize("count", [1, 2, 5_000])
+def test_cycles_are_rejected_at_any_depth_but_private_walk_still_terminates(count):
+    nodes = _serial_nodes(count)
+    nodes[0].depends_on = [nodes[-1].id]
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=list(reversed(nodes)))
+
+    with pytest.raises(ValueError, match="^Execution graph contains a cycle$"):
+        graph.validate()
+    with pytest.raises(ValueError, match="^Execution graph contains a cycle$"):
+        _ = graph.depth
+    assert graph._topo_sort() == nodes
+
+
+def test_deep_reverse_chain_renders_the_complete_graph_and_depth():
+    graph = ExecutionGraph(
+        topology=[Topology.SERIAL], nodes=list(reversed(_serial_nodes(2_000))),
+        estimated_cost_usd=0.0,
+    )
+
+    rendered = str(graph)
+
+    assert "Depth: 1999" in rendered
+    assert rendered.index("n0: Step 0") < rendered.index("n1999: Step 1999")
+    assert rendered.count(": Step ") == 2_000
