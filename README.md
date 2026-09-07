@@ -173,6 +173,8 @@ prompts, responses, costs, and artifact receipts in a local HTML report.
 Lease epochs reject stale-worker journal writes after ownership changes.
 Persistent artifact namespaces and exclusive file publication preserve accepted
 outputs across custom run IDs and shared output directories.
+File checkpoints flush complete snapshots before atomic publication, using
+independent temporary files for separate store instances.
 Iterative graph traversal passes [5,000-node dependency-chain checks](docs/execution.md#deep-graphs),
 including complete offline serial execution and atomic revision validation.
 [Saved graph policies](docs/workflow-accounting.md#freeze-graph-limits) bound node
@@ -187,47 +189,51 @@ count, execution models, retries, and regeneration across planning and recovery.
 
 ## Quickstart
 
-Python 3.11+. Install the provider used below:
+Python 3.11+. Install Smythe 0.7.0 with the provider used below:
 
 ```bash
-pip install "smythe[openai]"
+pip install "smythe[openai]==0.7.0"
 ```
 
 Set `OPENAI_API_KEY`, then generate and inspect a text-only plan with
 [GPT-6 Astra](https://developers.openai.com/api/docs/models/gpt-6-astra):
 
 ```python
-from smythe import Swarm, Task
+from smythe import OpenAIResponsesProvider, SQLiteWorkflowStore, Swarm, Task
 
-swarm = Swarm(
-    model="gpt-6-astra",
-    parallel=True,
-    max_concurrency=8,
-)
+with SQLiteWorkflowStore("smythe-runs.db") as store:
+    swarm = Swarm(
+        model="gpt-6-astra",
+        provider=OpenAIResponsesProvider(
+            reasoning_effort="medium",
+            max_output_tokens=8192,
+        ),
+        run_store=store,
+        max_budget_usd=5.00,
+        parallel=True,
+        max_concurrency=8,
+    )
+    task = Task(
+        goal="Compare SQLite, PostgreSQL, and DuckDB for a local analytics app.",
+        constraints=[
+            "Keep the comparison under 400 words",
+            "Explain the tradeoffs and recommend one database",
+        ],
+    )
+    graph = swarm.plan(task)
+    print(graph)
 
-task = Task(
-    goal="Compare SQLite, PostgreSQL, and DuckDB for a local analytics app.",
-    constraints=[
-        "Keep the comparison under 400 words",
-        "Explain the tradeoffs and recommend one database",
-    ],
-)
-
-graph = swarm.plan(task)
-print(graph)
-
-result = swarm.execute(graph)
-print(result.output)
+    result = swarm.execute(graph)
+    print(result.output)
 ```
 
-This example uses the published Chat Completions provider and makes paid API
-calls without a spend cap. Its dollar totals use a blended token estimate and
-exclude planning. The current checkout adds an explicit
-[Responses provider](docs/openai-responses.md) with Astra/Sol function tools,
-native usage receipts, and model-specific token prices. Opt into
-[durable text workflows](docs/workflow-accounting.md) for request-bound quotes,
-one ledger across every phase, and local replay of saved responses.
-Anthropic and Gemini use the `smythe[anthropic]` and `smythe[gemini]` extras.
+This example makes paid API calls under a **$5 run allowance**. The
+[Responses provider](docs/openai-responses.md) supplies native usage receipts
+and model-specific prices; the [SQLite workflow ledger](docs/workflow-accounting.md)
+includes planning and execution, reserves each request before dispatch, and
+replays saved responses locally during recovery. Up to eight execution nodes
+run concurrently. Anthropic and Gemini use the `smythe[anthropic]` and
+`smythe[gemini]` extras outside this managed text-workflow path.
 
 Try the complete acquisition-diligence workflow without an API key:
 
@@ -257,8 +263,10 @@ team challenges the draft, and a final node writes the decision memo.
   human-calibrated quality comparisons with saved outputs and judge reasoning.
 - **Astra benchmarks:** matched model and orchestration comparisons with full
   usage accounting and blind quality scoring. The 13-task pack and schedules
-  for 12 pilot and 200 main workflows are prepared. See the
-  [campaign plan](benchmarks/astra_benchmark_plan.md).
+  for 12 pilot and 200 main workflows are prepared. The
+  [pilot runner](benchmarks/astra_runtime.md) binds spending allocations,
+  source hashes, and recoverable trial identities. Live execution awaits the
+  campaign allowance and [calibration gates](benchmarks/astra_benchmark_plan.md).
 
 [Specifications and priorities](ROADMAP.md#coming-soon) ·
 [Repository review](docs/project-review-2026-09-06.md).

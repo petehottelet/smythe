@@ -84,6 +84,29 @@ This is a single-host engineering check. It supports only the observed
 completion and recovery assertions. It provides no speedup estimate,
 production-image capacity claim, or statistical latency comparison.
 
+## Archive and review the frozen campaign
+
+The [archive tool](archive_jobs_scale.py) reviews the September 7 campaign
+against its frozen producer revision, `4bb7c0295cec658c7118d7bf9305764dae9b1c57`.
+It is specific to that schema-v3 workload. Wait for the producer to finish and
+all its workers to close before archiving; do not run it against live evidence.
+
+Supply `--campaign` for the complete evidence directory, `--result` for its
+external terminal JSON, `--source-root` for the frozen checkout, and `--out`
+for a new publication directory. The tool preserves the original result,
+archives every campaign file and the frozen source bytes, and writes an
+inventory plus independent review. It verifies every archive member before
+opening SQLite from an extracted copy. A failed or incomplete result remains
+diagnostic and cannot produce an approved chart.
+
+Historical accepted sets are reconstructed from the final ledger, provider
+logs, event timestamps, and retained receipt-subset hashes. The archive does
+not contain historical database snapshots. Review code is retained separately
+from producer code so their revisions remain explicit.
+
+[Publication plan](../plans/jobs-scale-publication.md) ·
+[Archive regression checks](../tests/test_jobs_scale_archive.py).
+
 ## Graph-depth coverage
 
 Jobs are flat artifact fan-out. Their scale result does not establish deep-DAG

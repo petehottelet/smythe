@@ -3,16 +3,19 @@
 Examples 01–05, 08–14, and the acquisition-diligence example run offline
 out of the box. A built-in `DemoProvider` returns deterministic responses so
 you can inspect planning, fan-out, budgets, recovery, and synthesis without an
-API key. Examples 06 and 07 are live MCP integration tours. Run examples from
-the repository root:
+API key. Examples 06 and 07 are live MCP integration tours. These examples
+target Smythe 0.7.0 and use files from the repository. Run them from its root:
 
 ```bash
 pip install -e .            # from the repo root
 python examples/01_quickstart_yaml.py
 ```
 
-The durable artifact-job example uses the installed CLI. It is completely
-offline and its approval token is bound to the exact manifest and budget:
+The durable artifact-job example uses the installed CLI. Install its optional
+dependencies with `pip install -e ".[jobs]"` from this checkout, or
+`pip install "smythe[jobs]==0.7.0"` for the release package. The example is
+completely offline and its approval token is bound to the exact manifest and
+budget:
 
 ```bash
 smythe jobs validate examples/12_jobs_manifest.yaml
@@ -38,15 +41,16 @@ cadence control, and the ten-minute travel/resize check.
 
 | Example | What it shows |
 |---|---|
-| [GPT-6 Astra quickstart](../README.md#quickstart) | Generate, inspect, and execute a text-only task graph with `gpt-6-astra` using the published package. |
-| [Native Astra/Sol Responses](../docs/openai-responses.md) | Count and quote an exact request before generation, inspect native token prices, and retain function-tool continuation and failed-response receipts. Requires the current repository checkout. |
+| [GPT-6 Astra quickstart](../README.md#quickstart) | Generate, inspect, and execute a text-only task graph through native Responses, with a $5 run allowance, concurrency eight, and planning included in the SQLite ledger. |
+| [Native Astra/Sol Responses](../docs/openai-responses.md) | Smythe 0.7.0 counts and quotes an exact request before generation, records native token prices, and retains function-tool continuation and failed-response receipts. |
 | [Astra campaign preparation](../benchmarks/astra_benchmark_plan.md#prepared-experiment) | Validate 13 original task/source packs and reproduce the 12-pilot/200-main schedule locally, with no API calls. Factual checks remain separate from quality scoring. |
+| [Astra pilot runner](../benchmarks/astra_runtime.md) | Inspect an unfunded runtime freeze without provider calls. Live pilot execution binds an explicit spending allocation and directory to native receipts and recoverable trial identities. |
 | [Glyph Rain](../screensaver/README.md) | A 192-node artifact workflow with verified native downloads using 56 reference and 192 original SVG shapes, mixed 90/10. The [web explorer](../screensaver/svg-preview/README.md) adapts the MIT reference renderer and base artwork, with Matrix green rain, presets, VT323 pixel controls, and a Trajan Bold outline logo. Browser interaction and stability checks pass; the [headless timing report](../benchmarks/renderer_performance_20260907_results.md) preserves its missed pacing target. [Fresh-generation measurements](../benchmarks/svg_glyph_benchmark.md) cover the original catalog; [controlled 64–256-node scaling](../benchmarks/glyph_screensaver_benchmark.md) has its own protocol. |
 | [01_quickstart_yaml.py](01_quickstart_yaml.py) | Load a declarative YAML DAG ([01_pipeline.yaml](01_pipeline.yaml)) with [halt, retry, and skip policies](../docs/execution.md) and per-node timeouts, execute it in parallel. Iterative graph traversal also supports [deep dependency chains](../docs/execution.md#deep-graphs). |
 | [02_dynamic_planning.py](02_dynamic_planning.py) | The `LLMArchitect` designs the execution graph from the task itself. Inspect it, then execute with the [complete task snapshot](../docs/tasks.md). |
 | [03_parallel_budget.py](03_parallel_budget.py) | Eight-node broadcast under a USD budget cap with `max_concurrency=3`, a per-node cost breakdown, and [strict cost guardrails](../docs/budgets.md). |
-| [04_resume_after_crash.py](04_resume_after_crash.py) | Durable execution: resume preserves completed nodes and their costs. [Verification recovery](../docs/verifier.md#recovery-and-concurrent-work) also completes pending rejection and regeneration decisions before dispatch. |
-| [05_mcp_filesystem.py](05_mcp_filesystem.py) | MCP tool use, fully offline: an agent reads real files through a bundled MCP server ([mcp_file_server.py](mcp_file_server.py)) via the bounded tool loop. Needs `pip install smythe[mcp]`. |
+| [04_resume_after_crash.py](04_resume_after_crash.py) | Resume preserves completed nodes and their costs. [File checkpoints](../docs/checkpoint-format.md) flush complete snapshots and use independent temporary files for atomic publication. [Verification recovery](../docs/verifier.md#recovery-and-concurrent-work) completes pending rejection and regeneration decisions before dispatch. |
+| [05_mcp_filesystem.py](05_mcp_filesystem.py) | MCP tool use, fully offline: an agent reads real files through a bundled MCP server ([mcp_file_server.py](mcp_file_server.py)) via the bounded tool loop. Needs `pip install "smythe[mcp]==0.7.0"`. |
 | [06_mcp_github.py](06_mcp_github.py) | The real GitHub MCP server with a mandatory tool allowlist and `env_passthrough` for the token. Env-gated: needs `GITHUB_PERSONAL_ACCESS_TOKEN`, an LLM key, and npx. |
 | [07_mcp_saas.py](07_mcp_saas.py) | Any SaaS MCP server over streamable HTTP (Linear, Notion, ...), configured entirely by environment variables. Env-gated. |
 | [08_learning_loop.py](08_learning_loop.py) | The learning loop, end to end: run 1's outcome is recorded by `PlannerMemory`, recalled into run 2's planning prompt, and the Architect returns a leaner plan (8 nodes → 3). |

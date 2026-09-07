@@ -42,6 +42,8 @@ double rule, or a dashed outline on white.
 - Put the result record and sample size on the asset itself.
 - Normalize JSON source-record newlines to LF before embedding a chart's
   source hash. Windows and Linux checkouts must identify the same record.
+  Evidence archives that bind original bytes instead use their recorded
+  byte hash and `.gitattributes` `-text`; never normalize a sealed raw receipt.
 - Use square rules and open space. Avoid rounded panels, pills, gradients,
   shadows, and glow effects.
 - A callout pairs one Trajan numeral with one exact comparison. It never

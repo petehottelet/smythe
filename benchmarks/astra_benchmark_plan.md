@@ -1,6 +1,6 @@
 # Astra benchmark plan
 
-**Status: offline preparation verified; no paid Astra campaign has run.** This protocol defines a
+**Status: offline preparation and pilot runner implemented; no paid Astra campaign has run.** This protocol defines a
 new comparison. It does not update, reprice, or replace historical results.
 
 ## Prepared experiment
@@ -34,9 +34,11 @@ every evaluator artifact for later review.
 
 [`WorkflowGraphPolicy`](../docs/workflow-accounting.md#freeze-graph-limits) now
 provides persisted node-count, execution-model, retry, and regeneration limits.
-The live campaign must bind that policy and complete phase-wide accounting in
-its runner, reserve a total allowance covering pilot, main, and judge work,
-and freeze judge identity and calibrated acceptance gates. A zero-retry recipe
+The [pilot runner](astra_runtime.md) binds that policy, complete phase-wide
+accounting, source hashes, and one campaign directory. Its spending envelope
+requires total, pilot, main, judge, and per-trial allocations before execution.
+The main campaign still requires a reviewed pilot, frozen judge identity,
+and calibrated acceptance gates. A zero-retry recipe
 must instruct its architect to emit `max_retries: 0` on every node; the default
 node value is one. No paid execution starts without the total spending ceiling.
 
@@ -44,17 +46,19 @@ node value is one. No paid execution starts without the total spending ceiling.
 
 Use the exact model ID `gpt-6-astra`. It supports text generation through
 Chat Completions and Responses. Astra function calling requires Responses.
-The current checkout provides an explicit
+Smythe 0.7.0 provides an explicit
 [`OpenAIResponsesProvider`](../docs/openai-responses.md) with function-tool
 continuation, native usage receipts, and model-specific prices. Automatic
-provider selection and the published 0.6.0 package still use Chat Completions.
+provider selection still uses Chat Completions. Install the explicit adapter
+with `pip install "smythe[openai]==0.7.0"`.
 For this campaign, use text-only requests with supplied source material.
 Astra supports `low`, `medium`, `high`, `xhigh`, and `max` reasoning effort.
 Remove unsupported sampling parameters, including `temperature`, `top_p`,
 and `logprobs`. See the [model card](https://developers.openai.com/api/docs/models/gpt-6-astra)
 and [migration guide](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra).
 
-The text-only README example passed an isolated published-package check on
+**Historical 0.6.0 quickstart check.** The earlier Chat Completions README
+example passed an isolated published-package check on
 **7 September 2026**, using `smythe==0.6.0`, Python 3.11.9, OpenAI SDK 3.8.0,
 and HTTPX2 2.12.0. The exact example generated a mocked four-node fork/join plan
 and completed all four nodes. Its five requests—one planning request and four
@@ -73,6 +77,10 @@ model behavior, or task quality. The 4,096-token cap covers visible output
 and reasoning together; it does not establish that every task will fit.
 `max_completion_tokens` is the current API parameter, while `max_tokens` is
 deprecated. [Chat Completions API reference](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create)
+
+That receipt describes the archived snippet, not the current native Responses
+quickstart. The 0.7.0 release uses a separate installed-wheel verification of
+its bounded example and complete planning/execution ledger.
 
 Smythe's [execution ledger](../smythe/budget.py) and the existing
 [benchmark usage wrapper](provider_usage.py) use a blended $3 per million

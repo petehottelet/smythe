@@ -49,10 +49,10 @@ Status: pre-1.0. Minor versions may break APIs (see [CHANGELOG.md](CHANGELOG.md)
 - ✅ **Judge variance measurement + bounded optimizer smoke test** — noisy
   candidates are reverted and every experiment is journaled
 
-## Unreleased: trust at production fan-out
+## v0.7.0: trust at production fan-out
 
-The current unreleased work hardens the guarantees users depend on before a
-5,000-item job is credible:
+Version 0.7.0 hardens the guarantees users depend on before a 5,000-item job
+is credible:
 
 1. **Fail-closed budget reservations** for image and other non-token outputs,
    using explicit inclusive per-call price ceilings
@@ -159,6 +159,10 @@ The current unreleased work hardens the guarantees users depend on before a
     run IDs and databases sharing an output root. Directory claims precede
     dispatch; exclusive publication preserves existing bytes. Migrated runs
     retain their receipt paths. [Journal and artifacts](docs/jobs.md#the-dispatch-journal).
+25. **Atomic file checkpoints** — independent save attempts use exclusive
+    temporary files, flush complete snapshots, and atomically replace the
+    checkpoint. Failure cleanup preserves other writers' files.
+    [Persistence and ownership scope](docs/checkpoint-format.md).
 
 ## Coming soon
 
@@ -166,8 +170,10 @@ The [GPT-6 Astra campaign plan](benchmarks/astra_benchmark_plan.md) specifies
 matched model and orchestration experiments. Native Responses and complete
 text-workflow accounting are implemented. The offline preparation package
 provides 13 task/source packs and balanced schedules for 12 pilot and 200 main
-workflows. Paid comparisons require the campaign spending envelope, accounted
-judge, bounded pilot, frozen acceptance gates, and reviewed result records.
+workflows. The [pilot runner](benchmarks/astra_runtime.md) binds the spending
+envelope, source identity, native ledger, and recovery of each calibration
+trial. Paid comparisons require the authorized campaign allowance, accounted
+judge, completed pilot, frozen acceptance gates, and reviewed result records.
 
 The [September repository review](docs/project-review-2026-09-06.md) defines
 the hardening work ahead of broader production claims:

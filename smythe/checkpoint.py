@@ -17,6 +17,7 @@ import json
 from copy import deepcopy
 import os
 import re
+import tempfile
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -190,8 +191,9 @@ class FileCheckpointStore(CheckpointStore):
     """Filesystem-backed store: one JSON file per execution.
 
     Files live in ``~/.smythe/checkpoints/`` by default.  Writes go to a
-    temp file and are moved into place with os.replace, so a crash
-    mid-write never corrupts the previous checkpoint.
+    unique temporary file, are flushed, and are moved into place with
+    os.replace. POSIX also flushes the containing directory after replacement.
+    Independent writers publish whole snapshots; the last replacement wins.
     """
 
     def __init__(self, directory: str | Path | None = None) -> None:
@@ -213,10 +215,34 @@ class FileCheckpointStore(CheckpointStore):
 
     def save(self, execution_id: str, state: dict[str, Any]) -> None:
         path = self._path(execution_id)
-        tmp = path.with_suffix(".json.tmp")
         with self._lock:
-            tmp.write_text(json.dumps(state, indent=2), encoding="utf-8")
-            os.replace(tmp, path)
+            serialized = json.dumps(state, indent=2)
+            temporary_path: Path | None = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="w", encoding="utf-8", dir=path.parent,
+                    prefix=f".{path.name}.", suffix=".tmp", delete=False,
+                ) as stream:
+                    temporary_path = Path(stream.name)
+                    stream.write(serialized)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(temporary_path, path)
+                temporary_path = None
+                if os.name != "nt":
+                    descriptor = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+                    try:
+                        os.fsync(descriptor)
+                    finally:
+                        os.close(descriptor)
+            finally:
+                if temporary_path is not None:
+                    try:
+                        temporary_path.unlink(missing_ok=True)
+                    except OSError:
+                        # Preserve the persistence error. A stranded file is
+                        # never grounds to remove another writer's temporary.
+                        pass
 
     def load(self, execution_id: str) -> dict[str, Any] | None:
         path = self._path(execution_id)

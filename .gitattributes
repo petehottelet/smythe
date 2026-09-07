@@ -48,3 +48,10 @@
 /benchmarks/renderer_performance_20260907.md text eol=lf
 /benchmarks/renderer_cadence_control_20260907.md text eol=lf
 /benchmarks/results/glyph_rain_regl_20260907*.json -text
+
+# Recovery evidence preserves original raw bytes and reproducible review code.
+/benchmarks/archive_jobs_scale.py text eol=lf
+/tests/test_jobs_scale_archive.py text eol=lf
+/benchmarks/results/jobs_scale_5000_20260907_f1/*.json -text
+/benchmarks/results/jobs_scale_5000_20260907_f1/*.zip -text
+/benchmarks/results/astra_pilot_runtime_20260907/* -text

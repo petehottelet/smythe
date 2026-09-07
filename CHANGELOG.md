@@ -21,6 +21,27 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-07
+
+Generated task graphs now run inside a durable, exact-cost execution journal.
+This release adds native Astra/Sol Responses, detached artifact Jobs, durable
+pause and recovery controls, current SVG screensaver downloads, and the
+offline-qualified Astra pilot runner.
+
+Upgrade notes: native Responses requires OpenAI SDK 3.8.0 or newer. Stop old
+Jobs workers before writable schema-v4 migration. File checkpoints write v3
+and read v1–v3; ambiguous legacy verification stops for reconciliation.
+Autotune development ledgers below schema v3 require a new ledger.
+
+### Added
+
+- **Astra pilot runtime**: bind the 12 calibration trials to explicit campaign
+  allocations, one directory, frozen sources and policies, and native workflow
+  receipts. Completed and failed outcomes remain immutable; interrupted trials
+  recover their existing identities. Saved outcomes reconcile against ledger,
+  request, response, and checkpoint evidence. Main and judging remain closed
+  pending their calibration and accounting prerequisites.
+
 - **Measured REGL renderer evidence**: all six frozen Classic/3D sessions are
   retained with raw timings and source identities. Each missed the pacing
   target. Three exploratory blank-page controls showed similar callback
@@ -45,8 +66,6 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   validate raw timings and browser/backend identity, and retain failed attempts.
   Benchmark completion restores one animation loop; lifecycle regressions catch
   duplicate callbacks across repeated measurements, pause/resume, and timeout.
-
-### Added
 
 - **Jobs lease fencing**: schema version 3 binds worker writes to live owner
   epochs and immutable attempt provenance. Expired owners cannot admit dispatch,
@@ -105,8 +124,9 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   rain palette and mint highlights accompany simple VT323 pixel controls,
   a Trajan Bold outline logo, and generous black padding. The UI uses Hottelet
   greens `#37FF6E` and `#9CFFBC`, borderless text controls, and no interface glow
-  or corner ornaments. Browser interaction checks pass; performance and
-  quantified reference parity remain unmeasured.
+  or corner ornaments. Browser interaction and ten-minute stability checks
+  pass; six headless timing sessions retain their missed pacing target.
+  Visible presentation and quantified reference parity remain pending.
   Native downloads share both current SVG catalogs. The previous Canvas renderer, screenshot, and hash-bound
   timing/soak receipts are preserved as superseded evidence.
 - **Glyph Rain screensaver ports** (`screensaver/`): a static fullscreen web
@@ -177,7 +197,7 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   worst-case cost preflight, and approvals bound to the exact manifest, plan,
   and spend ceiling.
 - The installed `smythe jobs` CLI provides `schema`, `validate`, `plan`, `run`,
-  `list`, `inspect`, `status`, `resume`, `reroll`, and `export`. A SQLite WAL dispatch journal
+  `list`, `inspect`, `status`, `attach`, `stop`, `resume`, `reroll`, and `export`. A SQLite WAL dispatch journal
   persists calls before provider dispatch, distinguishes safe recovery from
   `unknown_outcome`, retains attempt lineage and artifact hashes, and requires
   explicit acknowledgment before rerunning an ambiguous call.
@@ -276,8 +296,8 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 - Added a `benchmarks` optional dependency group and portable, MIME-correct
   artifact references for future asset-suite records. CI now runs the image
   concurrency harness and eight-asset suite offline on every change.
-- `Task` now normalizes goals and constraints, validates caller input, and
-  detaches mutable inputs. `PlannerMemory` recall includes constraints,
+- `Task` snapshots normalize goals and constraints, validate caller input, and
+  detach mutable values at submission and serialization. `PlannerMemory` recall includes constraints,
   validates result limits, and synchronizes history clearing.
 - Constrained planning serializes untrusted task and template data as JSON and
   explicitly rejects embedded instructions. OpenClaw skill hydration now
@@ -293,6 +313,14 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Fixed
 
+- **PyPI README links**: build metadata resolves repository images and guides
+  against the release tag while preserving the GitHub README and code examples.
+  The registry badge follows the latest published-version asset. The hook adds
+  no runtime dependency and is retained in the source distribution.
+- **Independent checkpoint writers**: replace the shared `.json.tmp` filename
+  with an exclusive temporary file per save. Flush file bytes before atomic
+  replacement and the parent directory where supported. Failed writes preserve
+  the previous snapshot and clean up only their own temporary file.
 - **Deep graph traversal**: replace recursive cycle detection, depth calculation,
   dependency ordering, and serial walks with iterative traversal. Preserve
   depth-first ordering and missing-dependency errors; validate deep revisions
@@ -359,10 +387,10 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   serialized with the rest of the task.
 
 - **Checkpoint compatibility is now explicit.** `CHECKPOINT_VERSION` is
-  `2`; `SUPPORTED_CHECKPOINT_VERSIONS` is `(1, 2)`. Both additions above
-  are additive, so v1 checkpoints still resume (with documented
-  defaults) rather than being rejected. A checkpoint this build cannot
-  read now fails with a message naming the versions it does read.
+  `3`; `SUPPORTED_CHECKPOINT_VERSIONS` is `(1, 2, 3)`. Older checkpoints
+  retain their documented defaults. Incomplete legacy verification with an
+  ambiguous verdict stops before provider dispatch. Unreadable versions fail
+  with a message naming the supported versions.
 
 ---
 
@@ -735,5 +763,6 @@ Initial public release.
   60ms sleep, which is too tight for `time.sleep()` precision on Windows.
   Passes consistently in isolation. Tracked for fix in 0.1.1.
 
-[Unreleased]: https://github.com/petehottelet/smythe/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/petehottelet/smythe/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/petehottelet/smythe/compare/v0.6.0...v0.7.0
 [0.1.0]: https://github.com/petehottelet/smythe/releases/tag/v0.1.0

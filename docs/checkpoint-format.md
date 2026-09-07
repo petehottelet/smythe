@@ -18,7 +18,24 @@ Verification decisions and regeneration transitions always force a save,
 regardless of the node interval. The state is a single JSON document per execution, so you can inspect—or
 repair—a checkpoint with any text editor.
 
-With the default `FileCheckpointStore`, checkpoints live at `~/.smythe/checkpoints/<execution_id>.json`. Writes are atomic (temp file + rename): a crash mid-write never corrupts the previous checkpoint.
+With the default `FileCheckpointStore`, checkpoints live at
+`~/.smythe/checkpoints/<execution_id>.json`. Each save writes its own exclusive
+temporary file in that directory, flushes its bytes, and atomically replaces
+the checkpoint. Independent store instances cannot overwrite each other's
+temporary files. Failed writes before replacement preserve the previous
+checkpoint and clean up only the current save's temporary file.
+
+POSIX systems also flush the directory entry after replacement. Windows flushes
+the file; Python's standard library cannot separately flush its directory
+entry. A directory-flush failure raises after replacement, so the new complete
+checkpoint may already be visible. Hard process termination can leave an
+unused temporary file; `list_ids()` excludes those files.
+
+The last completed replacement determines the saved snapshot. This file store
+does not coordinate competing workflow owners or guarantee their logical
+ordering. Use the [durable text journal](workflow-accounting.md) or
+[Jobs leases](jobs.md#jobs-database-upgrades) for their documented ownership
+and recovery controls.
 
 ## Schema
 

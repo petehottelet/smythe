@@ -4,11 +4,12 @@
 verification, supervision, and synthesis to one persistent call ledger.
 Separate `plan()` and `execute()` calls retain the same run identity and planning
 charges. `resume(execution_id)` continues that run under its original policy.
-This API requires the current repository checkout; PyPI 0.6.0 does not include it.
+Smythe 0.7.0 includes this managed text-workflow API.
 
 ## Start a bounded Astra workflow
 
-Install the checkout with `pip install -e ".[openai]"` and set `OPENAI_API_KEY`.
+Install `pip install "smythe[openai]==0.7.0"` and set
+`OPENAI_API_KEY`.
 This example makes paid generation calls under a $5 run allowance:
 
 ```python

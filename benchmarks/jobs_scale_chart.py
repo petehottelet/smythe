@@ -6,9 +6,6 @@ import hashlib
 import json
 from pathlib import Path
 
-from benchmarks.render_readme_charts import BLACK, MONO, SERIF, TRAJAN, _bar, _svg, _text
-
-
 REVIEW_CHECKS = (
     "archive_verified", "ledger_reconciled", "accepted_pointers_preserved",
     "artifacts_verified", "attempt_lineage_verified", "real_kill_verified",
@@ -117,6 +114,8 @@ def render_jobs_scale(record_path: str | Path, review_path: str | Path) -> str:
     Raw evidence hashes are byte-exact. Git must preserve these archived JSON
     bytes; translating line endings requires a new matching independent review.
     """
+    from benchmarks.render_readme_charts import BLACK, MONO, SERIF, TRAJAN, _bar, _svg, _text
+
     record_path, review_path = Path(record_path), Path(review_path)
     raw, review_raw = record_path.read_bytes(), review_path.read_bytes()
     digest = hashlib.sha256(raw).hexdigest()

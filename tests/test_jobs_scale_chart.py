@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
+import sys
 from xml.etree import ElementTree as ET
 
 import pytest
@@ -130,3 +132,14 @@ def test_requires_exact_raw_hash_review_and_durable_findings(evidence, tmp_path,
     review_path.write_text(json.dumps(review), encoding="utf-8", newline="\n")
     with pytest.raises(ValueError, match="Jobs scale evidence"):
         render_jobs_scale(record, review_path)
+def test_validation_import_does_not_load_current_runtime_or_drawing_dependencies():
+    result = subprocess.run(
+        [sys.executable, "-c", (
+            "from benchmarks.jobs_scale_chart import validate_jobs_scale; import sys; "
+            "assert not any(n == 'smythe' or n.startswith('smythe.') for n in sys.modules); "
+            "assert 'benchmarks.render_readme_charts' not in sys.modules; "
+            "print('pure-validation-import')"
+        )],
+        check=True, capture_output=True, text=True, timeout=15,
+    )
+    assert result.stdout.strip() == "pure-validation-import"
