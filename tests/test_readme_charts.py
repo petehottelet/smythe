@@ -126,10 +126,10 @@ def test_glyph_scaling_chart_uses_all_four_isolated_records():
 def test_readme_connects_glyph_rain_to_benchmark_evidence():
     readme = ROOT.joinpath("README.md").read_text(encoding="utf-8")
     ordered_markers = (
-        "## Glyph Rain",
+        "## Benchmark\n",
         "screensaver/svg-preview/preview.png",
         "**Native downloads:** [Windows `.scr`]",
-        "## Benchmarks",
+        "## Process\n",
         "### Original SVG generation",
         "assets/benchmarks/svg_workflow.svg",
         "### Glyph generation and scaling",
@@ -146,6 +146,8 @@ def test_readme_connects_glyph_rain_to_benchmark_evidence():
     )
     positions = [readme.index(marker) for marker in ordered_markers]
     assert positions == sorted(positions)
+    for anchor in ("benchmark", "process"):
+        assert f'href="#{anchor}"' in readme
 
     guide = ROOT.joinpath("screensaver/README.md").read_text(encoding="utf-8")
     for name in ("glyph_pipeline.svg", "glyph_specimens.svg"):
