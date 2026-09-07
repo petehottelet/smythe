@@ -31,7 +31,7 @@ model and pipeline, with blind cross-vendor judging.
 
 ## Glyph Rain
 
-One goal becomes 192 independent glyph tasks and a working screensaver. The
+As an example: one goal becomes 192 independent glyph tasks and a working screensaver. The
 original vector glyphs fall in luminous green streams across three depth
 layers, using the same catalog on web, Windows, macOS, and Linux.
 
