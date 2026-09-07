@@ -1,0 +1,84 @@
+{
+  "base_commit": "f1bffa53d5a060acc400dd85f4ceb9c408faa334",
+  "checkout_relation": "separate frozen worktree at base_commit plus the two explicit Astra files",
+  "environment_observed_now": {
+    "implementation": "CPython",
+    "machine": "AMD64",
+    "platform": "win32",
+    "pytest": "9.1.1",
+    "python": "3.12.10",
+    "ruff": "ruff 0.16.0"
+  },
+  "import_root_matches_frozen_checkout": true,
+  "imports": {
+    "benchmarks.astra_runtime": "benchmarks/astra_runtime.py",
+    "smythe": "smythe/__init__.py"
+  },
+  "kind": "postqualification_read_only_revalidation",
+  "main_explicit_runtime_files_match_tested_copies": true,
+  "network_or_paid_calls": false,
+  "observed_at_utc": "2026-09-07T20:46:17.672604+00:00",
+  "original_test_observation": {
+    "exit_code_source": "observed final qualification tool result; the raw pytest log records the summary only",
+    "process_exit_code": 0,
+    "summary_from_raw_log": "79 passed in 684.20s (0:11:24)"
+  },
+  "paths_are_relative_to": "frozen repository root",
+  "preparation": {
+    "files_sha256_lf": {
+      "benchmarks/astra_campaign/__init__.py": "f2c17616db6c0bb1865af848d61e7d38eaa7929bdeaf16ee245e9ed1c5814117",
+      "benchmarks/astra_campaign/_json.py": "d1848de307bb25b01d94f97fceedcdc8afc49fce76d93f04bbfbacc559427866",
+      "benchmarks/astra_campaign/data/pack-manifest.json": "ac6a84f818cebcd28a7c57656bd4eb220da0784e97695070f1371023219b23db",
+      "benchmarks/astra_campaign/data/protocol.json": "840d66c7839de68004df47bf70b0a5bcdcd8ced6da90fa8b5e808da3ec55551a",
+      "benchmarks/astra_campaign/data/sources/main-calendar.json": "d775aceda93fc53258ab54849a19d95b2532aeeba1baa4620446c6b6054ec9c7",
+      "benchmarks/astra_campaign/data/sources/main-capacity-chain.json": "b4f4a158f6a5b880eb779a5de30de20ffdcfc6e6b02533cba424221775f83d46",
+      "benchmarks/astra_campaign/data/sources/main-delivery-copy.json": "ec712a886f025e52b10ff672bff60d736caf22b792ca9e23bee221d934de6643",
+      "benchmarks/astra_campaign/data/sources/main-field-links.json": "f4f34e0f35090fba5a34e337c1ea851c5c636fb1005263576de7d91c18fe5b95",
+      "benchmarks/astra_campaign/data/sources/main-identifiers.json": "334222d65b577cd2fb81144f78f2ef14711379f2c12d87ac35db208e727e0d65",
+      "benchmarks/astra_campaign/data/sources/main-library-hours.json": "0446aa1719109e888c0f488becbedf3a01d7b9d42dac40abe04cff9edd600078",
+      "benchmarks/astra_campaign/data/sources/main-production-chain.json": "ce8fb18291977ed97afed17abfa8db40045abf7b95c024d5756a145cc5ea3cad",
+      "benchmarks/astra_campaign/data/sources/main-studio-copy.json": "c6d51aa683ba5d7c3e2d8d94d39d62588377181deccadd3562f1b3c24c453bf8",
+      "benchmarks/astra_campaign/data/sources/main-tunnel-links.json": "96a4e83c2954dcaeaf55e2e92eb9c72a5768a6a87becc9494f32b06fbfadbe60",
+      "benchmarks/astra_campaign/data/sources/main-warehouse-routing.json": "51e9efc61f07733ee2f898eb8598fb911e235b6af3d66a0b10eee6db58b87951",
+      "benchmarks/astra_campaign/data/sources/pilot-calendar.json": "0c9f0bc9971a39aa2585ff97d7e2b9bd86ab07a07177fc3b3846e45e0d37184c",
+      "benchmarks/astra_campaign/data/sources/pilot-membership.json": "595bdc4e51467f1505f243cc18b8604b9c30293412ffe10c1d468736593d7743",
+      "benchmarks/astra_campaign/data/sources/pilot-relays.json": "5b1294922e8b0a0a52de1d7115e3c39b1bf3836e45c5a342b017203e54411398",
+      "benchmarks/astra_campaign/data/tasks/main-calendar.json": "2fb7568cd7c1586323d699806d81f04ff7a8126539eeb27ab230e91fec787c58",
+      "benchmarks/astra_campaign/data/tasks/main-capacity-chain.json": "5eab1ebd8823fedfd35fa200626ed37e481b8ee9766a4491588f59324f46d949",
+      "benchmarks/astra_campaign/data/tasks/main-delivery-copy.json": "61c25dad9c2d4008e07afea425c507410a1be5bdd41eb2e3b9b745711dbd0ac3",
+      "benchmarks/astra_campaign/data/tasks/main-field-links.json": "d7585198b1272d9493670612f61cab47d0efd48af90452950c9d69e63e7ef79c",
+      "benchmarks/astra_campaign/data/tasks/main-identifiers.json": "81f77e499e0fd522476fb2fc6a9534c17fc3c542a811464ef94fcc5d95f2c64d",
+      "benchmarks/astra_campaign/data/tasks/main-library-hours.json": "e90fb6791593f957e7773e94d84c64ac3bffe6f788a142cf4b84a1d7e3896d2f",
+      "benchmarks/astra_campaign/data/tasks/main-production-chain.json": "29a4ee6d46b474ce89195d82d3ef65d0447d8b0aa1d87c2b5bc5d0c96b317392",
+      "benchmarks/astra_campaign/data/tasks/main-studio-copy.json": "d1a9c0b633cc75118d49067123878413a1119caa1f23a249b7ac200fa010440e",
+      "benchmarks/astra_campaign/data/tasks/main-tunnel-links.json": "623759a85bb80c3c3d57bc64c03ac62b88edd3df1d426d6b21822684c3f4448b",
+      "benchmarks/astra_campaign/data/tasks/main-warehouse-routing.json": "13e7d700f7c16a0436f9bf8186cbedcd38cc44b5d4dcafe03ba5253d551d775d",
+      "benchmarks/astra_campaign/data/tasks/pilot-calendar.json": "d3743df9dd8b3928f3b33fb6b544430d8a046b550d5c92c25a3a6af1409bb5d4",
+      "benchmarks/astra_campaign/data/tasks/pilot-membership.json": "f6fe44001355c8b6712ebf1c7c13a1e8c41e91e0ec3e0d0b107bbb3829ff82c6",
+      "benchmarks/astra_campaign/data/tasks/pilot-relays.json": "2d4a23843a40a54c725ed68eb333e3eb8c8a9d1c670a8f75c4e26d82d0722c6c",
+      "benchmarks/astra_campaign/protocol.py": "2b3b2ee1fb13d51b6cf906ef17ec96c8e8512f7147810aed4350aa3b16ae7c87",
+      "benchmarks/astra_campaign/schedule.py": "dfbdac22160172e8a9415469a7b125639774ab0ea5a7e84c4f7d79e40da43157",
+      "benchmarks/astra_campaign/tasks.py": "eead192194159d030133062c0caa6b5e2f46dee8ef0025fc60170804840f68f5",
+      "benchmarks/results/astra_preparation_20260907.json": "5276aecf6d28807ca032b7d92590176c2878e572f6218f9e7ce0003f318dfb0d"
+    },
+    "main_matches_frozen_preparation": true,
+    "preparation_sha256": "b903d7fd603714c9b6a0b98a4f78af0bdaf6084b4ec836f98629f92432ad1101",
+    "receipt_path": "benchmarks/results/astra_preparation_20260907.json",
+    "reproduces_historical_receipt": true,
+    "tracked_file_count": 34
+  },
+  "ruff": {
+    "capture": "postqualification revalidation",
+    "command": "python -m ruff check benchmarks/astra_runtime.py tests/test_astra_runtime.py",
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": "All checks passed!\n"
+  },
+  "schema_version": 1,
+  "source_manifest": {
+    "after_manifest_capture": "postqualification revalidation; the original end-of-test equality assertion was not saved as a standalone log",
+    "entries": 61,
+    "hash_algorithm": "sha256 after CRLF-to-LF normalization",
+    "matches_original_before_manifest": true
+  }
+}
