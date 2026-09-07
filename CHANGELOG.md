@@ -129,6 +129,29 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Changed
 
+- **README** now leads with the matched framework results: 77% fewer tokens
+  and 28% less mean wall time than CrewAI. Charts remain strictly black and
+  white. The quickstart installs its provider extra, and the CI badge links
+  to checks without asserting a static passing status.
+- **Benchmark accounting** now includes provider calls made during planning
+  in new campaign usage totals. A new offline campaign verifies all 15 task/arm
+  combinations and 40 provider responses, including five planning calls.
+  Historical task-shape cost
+  records exclude planning and no longer support total-workflow savings
+  headlines; the measured wall-time and quality results remain documented.
+- **Glyph Rain rendering** uses heavier authored strokes, distinct depth
+  scales, green cores, and varied bloom across web, Windows, macOS, and Linux.
+  The 192-glyph source catalog and historical generation records are preserved.
+- **Native screensaver validation** adds compiled load/render checks for Windows
+  and macOS, plus Linux X11 rendering and embedding checks. Compiled packages
+  are built by the screensavers workflow.
+- **Windows preview** attaches the child window before display, avoiding a
+  top-level window flash. The native smoke test exercises the real `/p`
+  subprocess, motion, resize, and clean shutdown.
+- **Repository review** records architecture findings and concrete acceptance
+  criteria for workflow accounting, verification, halt behavior, cost validation,
+  and full task propagation under the roadmap's Coming soon section.
+
 - The async executor now admits at most `max_concurrency` ready nodes, uses
   dependency indexes instead of repeated full-graph scans, and cancels and
   awaits active siblings after a fatal failure. Queued nodes never start after

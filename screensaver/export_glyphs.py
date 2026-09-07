@@ -1,8 +1,8 @@
 """Export the benchmark's generated glyph catalog for every screensaver port.
 
 One command regenerates the web data (glyphs.js), the Windows C# data file
-(windows/GlyphData.cs), and the macOS resource (macos/glyphs.json), so all
-three ports render the same framework-generated catalog. Run from the
+(windows/GlyphData.cs), the macOS resource (macos/glyphs.json), and the Linux
+C header (linux/glyph_data.h), so every port uses the same catalog. Run from the
 repository root after any glyph grammar change:
 
     python screensaver/export_glyphs.py
@@ -63,6 +63,39 @@ def _csharp(data: dict) -> str:
     )
 
 
+def _c_header(data: dict) -> str:
+    """Flatten the shared stroke program without a runtime JSON dependency."""
+    kind_codes = {"l": 0, "q": 1, "d": 2}
+    strokes = []
+    glyphs = []
+    for index, program in enumerate(data["strokes"]):
+        glyphs.append(
+            "    {%d, %d, %.8g, %d}"
+            % (len(strokes), len(program), data["speeds"][index], data["trails"][index])
+        )
+        for stroke in program:
+            values = [float(value) for value in stroke[1:]]
+            values.extend([0.0] * (7 - len(values)))
+            strokes.append(
+                "    {%d, {%s}}"
+                % (kind_codes[stroke[0]], ", ".join(f"{value:.8g}" for value in values))
+            )
+    return (
+        f"/* {HEADER}benchmark's GLYPH_SPECS. Do not edit by hand. */\n"
+        "#ifndef SMYTHE_GLYPH_DATA_H\n#define SMYTHE_GLYPH_DATA_H\n\n"
+        "typedef struct { int kind; double values[7]; } GlyphStroke;\n"
+        "typedef struct { int offset, count; double speed; int trail; } GlyphSpec;\n"
+        f"#define GLYPH_COUNT {len(glyphs)}\n"
+        f"#define GLYPH_CANVAS_W {float(data['canvas'][0]):.8g}\n"
+        f"#define GLYPH_CANVAS_H {float(data['canvas'][1]):.8g}\n"
+        "static const GlyphStroke GLYPH_STROKES[] = {\n"
+        + ",\n".join(strokes)
+        + "\n};\nstatic const GlyphSpec GLYPHS[] = {\n"
+        + ",\n".join(glyphs)
+        + "\n};\n#endif\n"
+    )
+
+
 def main() -> None:
     root = Path(__file__).parent
     data = _payload()
@@ -74,6 +107,7 @@ def main() -> None:
     )
     _write(root / "windows" / "GlyphData.cs", _csharp(data))
     _write(root / "macos" / "glyphs.json", compact + "\n")
+    _write(root / "linux" / "glyph_data.h", _c_header(data))
 
 
 if __name__ == "__main__":

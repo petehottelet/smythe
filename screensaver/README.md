@@ -1,15 +1,13 @@
 # Glyph Rain screensaver
 
-A high-fan-out example of Smythe's general-purpose execution model, built from
-the 192 original procedural cyber glyphs that the
-[glyph screensaver benchmark](../benchmarks/glyph_screensaver_benchmark.md)
-generates as one 192-node parallel Smythe run. The stroke programs, fall
-speeds, and trail lengths in every port are the benchmark's generated
-`GLYPH_SPECS` values, exported verbatim by [export_glyphs.py](export_glyphs.py).
+192 procedural glyphs, generated in a parallel Smythe run, descend through
+three depth planes. Bold angular strokes, luminous green bodies, and varied
+bloom give each stream a distinct weight against black space.
 
-The aesthetic is reference-inspired, not copied: original stroke-grammar
-marks, a black field, luminous descending columns, and bright leading glyphs.
-No font, logo, screenshot, or film frame is reproduced.
+Every port uses the [glyph benchmark's](../benchmarks/glyph_screensaver_benchmark.md)
+original stroke programs, speeds, and trail lengths. The renderer draws each
+bounded trail from cached sprites, keeping glyphs sharp as the code falls.
+The display changes preserve the benchmark catalog and its historical results.
 
 ## Ports
 
@@ -18,10 +16,12 @@ No font, logo, screenshot, or film frame is reproduced.
 | Web (this directory) | [index.html](index.html) + [glyphs.js](glyphs.js) | open `index.html` directly or deploy this static directory |
 | Windows 11 (`.scr`) | source [windows/](windows/), binary [dist/SmytheGlyphRain.scr](dist/SmytheGlyphRain.scr) | download the `.scr`, right-click → **Install** |
 | macOS 12+ (`.saver`) | source [macos/](macos/) | download the `GlyphRain-macos-saver` artifact from the [screensavers build](https://github.com/petehottelet/smythe/actions/workflows/screensavers.yml), or build on a Mac with `macos/build_macos.sh` |
+| Linux x86-64 / X11 | source and setup [linux/](linux/README.md) | download `SmytheGlyphRain-linux-x86_64` from the [screensavers build](https://github.com/petehottelet/smythe/actions/workflows/screensavers.yml), or build with `sh screensaver/linux/build_linux.sh` |
 
-All three implement the same simulation: three depth layers of overlapping
-columns, persistence-fade trails, glowing white-green heads, and per-glyph
-speeds and trail lengths from the generated catalog.
+The ports share layer sizes, column spacing, stroke weights, colors, and
+motion rules. Foreground glyphs are larger and brighter; distant streams are
+finer and slower. Trail brightness depends on position within the stream,
+so display refresh rate does not accumulate glow or leave faded ghost columns.
 
 ### Windows notes
 
@@ -40,6 +40,35 @@ Double-click to install, or copy to `~/Library/Screen Savers/`. The
 `screensavers` workflow builds the same bundle on GitHub's macOS runners and
 publishes it as a downloadable artifact.
 
+The download is an archive containing the `.saver` bundle. It is ad-hoc signed;
+Developer ID signing and notarization are planned. Build locally if macOS
+blocks installation of the downloaded bundle.
+
+### Linux notes
+
+The native ELF executable uses X11 and Cairo. Extract the archive, then run
+`./smythe-glyph-rain-linux-x86_64 --window` or configure it in XScreenSaver.
+The download targets x86-64 and Ubuntu 22.04-compatible system libraries.
+An XWayland preview is supported through X11; native Wayland screensaver and
+lock-screen integration is planned. [Dependencies and integration](linux/README.md).
+
+## Native verification
+
+The [build workflow](../.github/workflows/screensavers.yml) validates compiled
+artifacts before uploading them:
+
+- Windows loads the compiled `.scr`, checks rendering, motion and resize, and
+  launches its `/p` preview process inside a hidden host window through clean exit.
+- macOS loads the same universal bundle on Apple Silicon and Intel, then checks
+  preview/fullscreen rendering, motion, resize, and stop behavior.
+- Linux checks the same ELF on Ubuntu 22.04 and 24.04 under Xvfb, including
+  visible frames, animation, embedding, resizing, invalid input, and shutdown.
+
+Run the local checks with `windows/smoke_windows.ps1`,
+`bash macos/smoke_macos.sh`, or the [Linux smoke command](linux/README.md).
+Each check produces a rendering receipt. These checks validate native execution;
+OS installation policy and session locking remain separate concerns.
+
 ## Web controls
 
 - **Click / F** — toggle fullscreen
@@ -56,8 +85,8 @@ After any change to the glyph grammar in
 python screensaver/export_glyphs.py
 ```
 
-writes `glyphs.js` (web), `windows/GlyphData.cs`, and `macos/glyphs.json`
-from the same generated catalog.
+writes `glyphs.js` (web), `windows/GlyphData.cs`, `macos/glyphs.json`, and
+`linux/glyph_data.h` from the same generated catalog.
 
 ## Deploy (web)
 
@@ -68,5 +97,5 @@ cd screensaver
 vercel deploy --prod
 ```
 
-`glyph-rain-preview.png` (the Open Graph card) is the benchmark's assembled
-1920×1080 preview, copied from the committed benchmark artifacts.
+`glyph-rain-preview.png` is a 1920×1080 capture of the web renderer. Benchmark
+artifacts retain their original renderings and hash-bound receipts.

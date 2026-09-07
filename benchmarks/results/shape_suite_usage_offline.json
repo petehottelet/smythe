@@ -1,0 +1,844 @@
+{
+  "benchmark": "shape-suite",
+  "record_version": 2,
+  "cost_protocol": {
+    "scope": "planning_execution_synthesis",
+    "source": "provider_tokens_at_blended_rate",
+    "usd_per_token": 3e-06,
+    "invoice_cost": false
+  },
+  "environment": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "packages": {
+      "smythe": "0.6.0",
+      "openai": "2.45.0",
+      "google-genai": "2.11.0"
+    },
+    "installed_packages": {
+      "smythe": "0.1.0",
+      "openai": "2.45.0",
+      "google-genai": "2.11.0"
+    },
+    "smythe_source": {
+      "version": "0.6.0",
+      "module": "smythe/__init__.py"
+    },
+    "source_control": {
+      "revision": "63941dc72ff7e94bb445c19d3e0932097ff7a6de",
+      "dirty": true
+    }
+  },
+  "mode": "offline",
+  "executor_model": "offline",
+  "judge_model": null,
+  "reps": 1,
+  "summary": [
+    {
+      "baseline": "single_agent",
+      "runs": 5,
+      "quality_mean": null,
+      "quality_min": null,
+      "quality_terminal_mean": null,
+      "nodes_mean": 1,
+      "cost_total_usd": 0.0015
+    },
+    {
+      "baseline": "fixed_pipeline",
+      "runs": 5,
+      "quality_mean": null,
+      "quality_min": null,
+      "quality_terminal_mean": null,
+      "nodes_mean": 3,
+      "cost_total_usd": 0.0045
+    },
+    {
+      "baseline": "smythe_dynamic",
+      "runs": 5,
+      "quality_mean": null,
+      "quality_min": null,
+      "quality_terminal_mean": null,
+      "nodes_mean": 3,
+      "cost_total_usd": 0.01425
+    }
+  ],
+  "by_task": {
+    "adversarial-claim": {
+      "single_agent": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          1
+        ]
+      },
+      "fixed_pipeline": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      },
+      "smythe_dynamic": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      }
+    },
+    "deep-serial": {
+      "single_agent": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          1
+        ]
+      },
+      "fixed_pipeline": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      },
+      "smythe_dynamic": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      }
+    },
+    "mixed-audit": {
+      "single_agent": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          1
+        ]
+      },
+      "fixed_pipeline": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      },
+      "smythe_dynamic": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      }
+    },
+    "parallel-profiles": {
+      "single_agent": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          1
+        ]
+      },
+      "fixed_pipeline": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      },
+      "smythe_dynamic": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      }
+    },
+    "trivial-transform": {
+      "single_agent": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          1
+        ]
+      },
+      "fixed_pipeline": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      },
+      "smythe_dynamic": {
+        "quality": [
+          null
+        ],
+        "nodes": [
+          3
+        ]
+      }
+    }
+  },
+  "records": [
+    {
+      "task": "adversarial-claim",
+      "baseline": "single_agent",
+      "nodes": 1,
+      "depth": 0,
+      "topology": "serial",
+      "cost_usd": 0.0003,
+      "cost_source": "provider_tokens_at_blended_rate",
+      "cost_scope": "planning_execution_synthesis",
+      "cost_is_estimate": true,
+      "execution_cost_usd": 0.0003,
+      "usage": {
+        "scope": "planning_execution_synthesis",
+        "source": "provider_response_usage",
+        "call_count": 1,
+        "prompt_tokens": 40,
+        "completion_tokens": 60,
+        "total_tokens": 100,
+        "calls": [
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          }
+        ]
+      },
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "adversarial-claim",
+      "baseline": "fixed_pipeline",
+      "nodes": 3,
+      "depth": 2,
+      "topology": "serial",
+      "cost_usd": 0.0009,
+      "cost_source": "provider_tokens_at_blended_rate",
+      "cost_scope": "planning_execution_synthesis",
+      "cost_is_estimate": true,
+      "execution_cost_usd": 0.0009,
+      "usage": {
+        "scope": "planning_execution_synthesis",
+        "source": "provider_response_usage",
+        "call_count": 3,
+        "prompt_tokens": 120,
+        "completion_tokens": 180,
+        "total_tokens": 300,
+        "calls": [
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          }
+        ]
+      },
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "adversarial-claim",
+      "baseline": "smythe_dynamic",
+      "nodes": 3,
+      "depth": 1,
+      "topology": "fork_join",
+      "cost_usd": 0.00285,
+      "cost_source": "provider_tokens_at_blended_rate",
+      "cost_scope": "planning_execution_synthesis",
+      "cost_is_estimate": true,
+      "execution_cost_usd": 0.0009,
+      "usage": {
+        "scope": "planning_execution_synthesis",
+        "source": "provider_response_usage",
+        "call_count": 4,
+        "prompt_tokens": 370,
+        "completion_tokens": 580,
+        "total_tokens": 950,
+        "calls": [
+          {
+            "model": "demo-model",
+            "prompt_tokens": 250,
+            "completion_tokens": 400,
+            "total_tokens": 650
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          }
+        ]
+      },
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "deep-serial",
+      "baseline": "single_agent",
+      "nodes": 1,
+      "depth": 0,
+      "topology": "serial",
+      "cost_usd": 0.0003,
+      "cost_source": "provider_tokens_at_blended_rate",
+      "cost_scope": "planning_execution_synthesis",
+      "cost_is_estimate": true,
+      "execution_cost_usd": 0.0003,
+      "usage": {
+        "scope": "planning_execution_synthesis",
+        "source": "provider_response_usage",
+        "call_count": 1,
+        "prompt_tokens": 40,
+        "completion_tokens": 60,
+        "total_tokens": 100,
+        "calls": [
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          }
+        ]
+      },
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "deep-serial",
+      "baseline": "fixed_pipeline",
+      "nodes": 3,
+      "depth": 2,
+      "topology": "serial",
+      "cost_usd": 0.0009,
+      "cost_source": "provider_tokens_at_blended_rate",
+      "cost_scope": "planning_execution_synthesis",
+      "cost_is_estimate": true,
+      "execution_cost_usd": 0.0009,
+      "usage": {
+        "scope": "planning_execution_synthesis",
+        "source": "provider_response_usage",
+        "call_count": 3,
+        "prompt_tokens": 120,
+        "completion_tokens": 180,
+        "total_tokens": 300,
+        "calls": [
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          }
+        ]
+      },
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "deep-serial",
+      "baseline": "smythe_dynamic",
+      "nodes": 3,
+      "depth": 1,
+      "topology": "fork_join",
+      "cost_usd": 0.00285,
+      "cost_source": "provider_tokens_at_blended_rate",
+      "cost_scope": "planning_execution_synthesis",
+      "cost_is_estimate": true,
+      "execution_cost_usd": 0.0009,
+      "usage": {
+        "scope": "planning_execution_synthesis",
+        "source": "provider_response_usage",
+        "call_count": 4,
+        "prompt_tokens": 370,
+        "completion_tokens": 580,
+        "total_tokens": 950,
+        "calls": [
+          {
+            "model": "demo-model",
+            "prompt_tokens": 250,
+            "completion_tokens": 400,
+            "total_tokens": 650
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          }
+        ]
+      },
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "mixed-audit",
+      "baseline": "single_agent",
+      "nodes": 1,
+      "depth": 0,
+      "topology": "serial",
+      "cost_usd": 0.0003,
+      "cost_source": "provider_tokens_at_blended_rate",
+      "cost_scope": "planning_execution_synthesis",
+      "cost_is_estimate": true,
+      "execution_cost_usd": 0.0003,
+      "usage": {
+        "scope": "planning_execution_synthesis",
+        "source": "provider_response_usage",
+        "call_count": 1,
+        "prompt_tokens": 40,
+        "completion_tokens": 60,
+        "total_tokens": 100,
+        "calls": [
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          }
+        ]
+      },
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "mixed-audit",
+      "baseline": "fixed_pipeline",
+      "nodes": 3,
+      "depth": 2,
+      "topology": "serial",
+      "cost_usd": 0.0009,
+      "cost_source": "provider_tokens_at_blended_rate",
+      "cost_scope": "planning_execution_synthesis",
+      "cost_is_estimate": true,
+      "execution_cost_usd": 0.0009,
+      "usage": {
+        "scope": "planning_execution_synthesis",
+        "source": "provider_response_usage",
+        "call_count": 3,
+        "prompt_tokens": 120,
+        "completion_tokens": 180,
+        "total_tokens": 300,
+        "calls": [
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          }
+        ]
+      },
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "mixed-audit",
+      "baseline": "smythe_dynamic",
+      "nodes": 3,
+      "depth": 1,
+      "topology": "fork_join",
+      "cost_usd": 0.00285,
+      "cost_source": "provider_tokens_at_blended_rate",
+      "cost_scope": "planning_execution_synthesis",
+      "cost_is_estimate": true,
+      "execution_cost_usd": 0.0009,
+      "usage": {
+        "scope": "planning_execution_synthesis",
+        "source": "provider_response_usage",
+        "call_count": 4,
+        "prompt_tokens": 370,
+        "completion_tokens": 580,
+        "total_tokens": 950,
+        "calls": [
+          {
+            "model": "demo-model",
+            "prompt_tokens": 250,
+            "completion_tokens": 400,
+            "total_tokens": 650
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          }
+        ]
+      },
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "parallel-profiles",
+      "baseline": "single_agent",
+      "nodes": 1,
+      "depth": 0,
+      "topology": "serial",
+      "cost_usd": 0.0003,
+      "cost_source": "provider_tokens_at_blended_rate",
+      "cost_scope": "planning_execution_synthesis",
+      "cost_is_estimate": true,
+      "execution_cost_usd": 0.0003,
+      "usage": {
+        "scope": "planning_execution_synthesis",
+        "source": "provider_response_usage",
+        "call_count": 1,
+        "prompt_tokens": 40,
+        "completion_tokens": 60,
+        "total_tokens": 100,
+        "calls": [
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          }
+        ]
+      },
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "parallel-profiles",
+      "baseline": "fixed_pipeline",
+      "nodes": 3,
+      "depth": 2,
+      "topology": "serial",
+      "cost_usd": 0.0009,
+      "cost_source": "provider_tokens_at_blended_rate",
+      "cost_scope": "planning_execution_synthesis",
+      "cost_is_estimate": true,
+      "execution_cost_usd": 0.0009,
+      "usage": {
+        "scope": "planning_execution_synthesis",
+        "source": "provider_response_usage",
+        "call_count": 3,
+        "prompt_tokens": 120,
+        "completion_tokens": 180,
+        "total_tokens": 300,
+        "calls": [
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          }
+        ]
+      },
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "parallel-profiles",
+      "baseline": "smythe_dynamic",
+      "nodes": 3,
+      "depth": 1,
+      "topology": "fork_join",
+      "cost_usd": 0.00285,
+      "cost_source": "provider_tokens_at_blended_rate",
+      "cost_scope": "planning_execution_synthesis",
+      "cost_is_estimate": true,
+      "execution_cost_usd": 0.0009,
+      "usage": {
+        "scope": "planning_execution_synthesis",
+        "source": "provider_response_usage",
+        "call_count": 4,
+        "prompt_tokens": 370,
+        "completion_tokens": 580,
+        "total_tokens": 950,
+        "calls": [
+          {
+            "model": "demo-model",
+            "prompt_tokens": 250,
+            "completion_tokens": 400,
+            "total_tokens": 650
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          }
+        ]
+      },
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "trivial-transform",
+      "baseline": "single_agent",
+      "nodes": 1,
+      "depth": 0,
+      "topology": "serial",
+      "cost_usd": 0.0003,
+      "cost_source": "provider_tokens_at_blended_rate",
+      "cost_scope": "planning_execution_synthesis",
+      "cost_is_estimate": true,
+      "execution_cost_usd": 0.0003,
+      "usage": {
+        "scope": "planning_execution_synthesis",
+        "source": "provider_response_usage",
+        "call_count": 1,
+        "prompt_tokens": 40,
+        "completion_tokens": 60,
+        "total_tokens": 100,
+        "calls": [
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          }
+        ]
+      },
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "trivial-transform",
+      "baseline": "fixed_pipeline",
+      "nodes": 3,
+      "depth": 2,
+      "topology": "serial",
+      "cost_usd": 0.0009,
+      "cost_source": "provider_tokens_at_blended_rate",
+      "cost_scope": "planning_execution_synthesis",
+      "cost_is_estimate": true,
+      "execution_cost_usd": 0.0009,
+      "usage": {
+        "scope": "planning_execution_synthesis",
+        "source": "provider_response_usage",
+        "call_count": 3,
+        "prompt_tokens": 120,
+        "completion_tokens": 180,
+        "total_tokens": 300,
+        "calls": [
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          }
+        ]
+      },
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    },
+    {
+      "task": "trivial-transform",
+      "baseline": "smythe_dynamic",
+      "nodes": 3,
+      "depth": 1,
+      "topology": "fork_join",
+      "cost_usd": 0.00285,
+      "cost_source": "provider_tokens_at_blended_rate",
+      "cost_scope": "planning_execution_synthesis",
+      "cost_is_estimate": true,
+      "execution_cost_usd": 0.0009,
+      "usage": {
+        "scope": "planning_execution_synthesis",
+        "source": "provider_response_usage",
+        "call_count": 4,
+        "prompt_tokens": 370,
+        "completion_tokens": 580,
+        "total_tokens": 950,
+        "calls": [
+          {
+            "model": "demo-model",
+            "prompt_tokens": 250,
+            "completion_tokens": 400,
+            "total_tokens": 650
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          },
+          {
+            "model": "demo-model",
+            "prompt_tokens": 40,
+            "completion_tokens": 60,
+            "total_tokens": 100
+          }
+        ]
+      },
+      "wall_s": null,
+      "quality": null,
+      "quality_terminal": null,
+      "error": null,
+      "rep": 0
+    }
+  ]
+}

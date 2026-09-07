@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import html
 import json
+import math
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -131,6 +132,34 @@ def _framework_rows() -> dict[str, dict]:
         raise ValueError(f"framework comparison is missing: {', '.join(missing)}")
     if any(rows[name]["errors"] for name in required):
         raise ValueError("framework comparison contains failed runs")
+    cells = []
+    for name in required:
+        cell = [run for run in record["records"] if run["system"] == name]
+        if not cell or any(run.get("error") for run in cell):
+            raise ValueError("framework comparison contains missing or failed runs")
+        identities = {(run["task"], run["rep"]) for run in cell}
+        if len(identities) != len(cell) or len(cell) != rows[name]["runs_ok"]:
+            raise ValueError("framework comparison contains duplicate or missing runs")
+        for metric, source, precision in (
+            ("quality_mean", "quality", 2),
+            ("tokens_mean", "tokens", 0),
+            ("wall_s_mean", "wall_s", 2),
+        ):
+            values = [run.get(source) for run in cell]
+            if any(
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value <= 0
+                or (source == "quality" and (type(value) is not int or value > 10))
+                for value in values
+            ):
+                raise ValueError(f"framework comparison has invalid {source} values")
+            if round(sum(values) / len(values), precision) != rows[name][metric]:
+                raise ValueError(f"framework comparison summary disagrees with raw {source}")
+        cells.append(identities)
+    if any(cell != cells[0] for cell in cells[1:]):
+        raise ValueError("framework comparison has unmatched task/repetition cells")
     return rows
 
 
@@ -198,7 +227,7 @@ def render_framework_comparison() -> str:
     body += _text(
         40,
         505,
-        "15 runs per framework; zero errors; framework-native execution and accounting",
+        "15 runs per framework; zero errors; token usage measures the fixed pipeline",
         size=11.5,
     )
     body += _text(
@@ -215,7 +244,7 @@ def render_framework_comparison() -> str:
         body,
         label=(
             "Framework benchmark comparing Smythe, LangGraph, and CrewAI. "
-            "Smythe records the highest blind quality, fewest tokens, and lowest mean wall time."
+            "Smythe has the highest observed blind score, fewest tokens, and lowest mean wall time."
         ),
     )
 
@@ -224,10 +253,9 @@ def render_framework_callouts() -> str:
     """Render restrained headline callouts from the corrected framework run."""
     rows = _framework_rows()
     smythe = rows["smythe_fixed"]
-    langgraph = rows["langgraph_fixed"]
     crewai = rows["crewai_fixed"]
     token_reduction = 1 - smythe["tokens_mean"] / crewai["tokens_mean"]
-    wall_reduction = 1 - smythe["wall_s_mean"] / langgraph["wall_s_mean"]
+    wall_reduction = 1 - smythe["wall_s_mean"] / crewai["wall_s_mean"]
 
     body = _text(40, 36, "MEASURED ADVANTAGES", size=11, weight="700", tracking=2.2)
     body += f'<line x1="40" y1="54" x2="920" y2="54" stroke="{BLACK}" stroke-width="2"/>\n'
@@ -246,10 +274,10 @@ def render_framework_callouts() -> str:
     )
     body += _text(520, 142, f"{wall_reduction:.0%}", size=68, family=TRAJAN, weight="700")
     body += _text(
-        522, 174, "LOWER MEAN WALL TIME THAN LANGGRAPH", size=12, weight="700", tracking=1.2
+        522, 174, "LOWER MEAN WALL TIME THAN CREWAI", size=12, weight="700", tracking=1.2
     )
     body += _text(
-        522, 197, f'{smythe["wall_s_mean"]:.2f}s vs {langgraph["wall_s_mean"]:.2f}s', size=12
+        522, 197, f'{smythe["wall_s_mean"]:.2f}s vs {crewai["wall_s_mean"]:.2f}s', size=12
     )
     body += f'<line x1="40" y1="220" x2="920" y2="220" stroke="{BLACK}"/>\n'
     body += _text(40, 242, "Same fixed pipeline; 15 runs per framework", size=10.5)
@@ -260,7 +288,7 @@ def render_framework_callouts() -> str:
         body,
         label=(
             f"Smythe callouts: {token_reduction:.0%} lower mean token load than CrewAI "
-            f"and {wall_reduction:.0%} lower mean wall time than LangGraph."
+            f"and {wall_reduction:.0%} lower mean wall time than CrewAI."
         ),
     )
 
@@ -274,15 +302,45 @@ def render_shape_efficiency() -> str:
         raise ValueError("shape efficiency record is missing a required baseline")
 
     wall_means = {}
+    matched_cells = []
     for baseline in expected:
-        values = [
-            row["wall_s"]
-            for row in record["records"]
-            if row["baseline"] == baseline and row.get("error") is None
-        ]
-        if not values:
-            raise ValueError(f"shape efficiency has no passing {baseline} runs")
+        cell = [row for row in record["records"] if row["baseline"] == baseline]
+        if any(row.get("error") for row in cell):
+            raise ValueError("shape efficiency contains failed runs")
+        identities = {(row["task"], row["rep"]) for row in cell}
+        if len(identities) != len(cell) or len(cell) != rows[baseline]["runs"]:
+            raise ValueError("shape efficiency contains duplicate or missing runs")
+        matched_cells.append(identities)
+        if not cell:
+            raise ValueError(f"shape efficiency has no {baseline} runs")
+        for run in cell:
+            quality = run.get("quality")
+            wall = run.get("wall_s")
+            nodes = run.get("nodes")
+            if (
+                isinstance(quality, bool)
+                or not isinstance(quality, (int, float))
+                or not math.isfinite(quality)
+                or not 1 <= quality <= 10
+            ):
+                raise ValueError("shape efficiency has invalid or missing quality scores")
+            if (
+                isinstance(wall, bool)
+                or not isinstance(wall, (int, float))
+                or not math.isfinite(wall)
+                or wall <= 0
+            ):
+                raise ValueError("shape efficiency has invalid wall timing")
+            if isinstance(nodes, bool) or not isinstance(nodes, int) or nodes < 1:
+                raise ValueError("shape efficiency has invalid graph node counts")
+        for source, metric in (("quality", "quality_mean"), ("nodes", "nodes_mean")):
+            calculated = round(sum(run[source] for run in cell) / len(cell), 2)
+            if calculated != rows[baseline][metric]:
+                raise ValueError(f"shape efficiency summary disagrees with raw {source}")
+        values = [row["wall_s"] for row in cell]
         wall_means[baseline] = sum(values) / len(values)
+    if matched_cells[0] != matched_cells[1]:
+        raise ValueError("shape efficiency has unmatched task/repetition cells")
 
     dynamic = rows["smythe_dynamic"]
     fixed = rows["fixed_pipeline"]
@@ -294,8 +352,8 @@ def render_shape_efficiency() -> str:
         (label, row["quality_mean"], f'{row["quality_mean"]:.2f}', style)
         for label, style, row in series
     )
-    cost = tuple(
-        (label, row["cost_total_usd"], f'${row["cost_total_usd"]:.3f}', style)
+    nodes = tuple(
+        (label, row["nodes_mean"], f'{row["nodes_mean"]:.2f}', style)
         for label, style, row in series
     )
     wall = tuple(
@@ -322,10 +380,10 @@ def render_shape_efficiency() -> str:
     body += f'<line x1="330" y1="178" x2="330" y2="382" stroke="{BLACK}"/>\n'
     body += _metric_panel(
         x=350,
-        title="Total cost / 15 runs",
-        direction="Lower is better",
-        values=cost,
-        maximum=max(v for _, v, _, _ in cost),
+        title="Mean graph nodes",
+        direction="Task-shaped allocation",
+        values=nodes,
+        maximum=max(v for _, v, _, _ in nodes),
     )
     body += f'<line x1="640" y1="178" x2="640" y2="382" stroke="{BLACK}"/>\n'
     body += _metric_panel(
@@ -336,19 +394,17 @@ def render_shape_efficiency() -> str:
         maximum=max(v for _, v, _, _ in wall),
     )
 
-    cost_reduction = 1 - dynamic["cost_total_usd"] / fixed["cost_total_usd"]
     wall_reduction = 1 - wall_means["smythe_dynamic"] / wall_means["fixed_pipeline"]
-    efficiency_gain = 1 - dynamic["usd_per_quality_point"] / fixed["usd_per_quality_point"]
     body += f'<line x1="40" y1="406" x2="920" y2="406" stroke="{BLACK}"/>\n'
     body += _text(
         40,
         437,
-        f"{cost_reduction:.0%} lower cost   /   {wall_reduction:.0%} lower wall time   /   {efficiency_gain:.0%} lower cost per quality point",
+        f"{wall_reduction:.0%} lower end-to-end wall time   /   15 runs per arm   /   same executor model",
         size=14,
         weight="700",
         family=SERIF,
     )
-    body += _text(40, 468, "Quality remains in the same measured band", size=11.5)
+    body += _text(40, 468, "Planning included in wall time; quality is in the same measured band", size=11.5)
     body += _text(920, 468, "shape_suite_v3.json", size=11.5, anchor="end", family=MONO)
     return _svg(
         960,
@@ -356,7 +412,7 @@ def render_shape_efficiency() -> str:
         body,
         label=(
             "Task-shape benchmark. Smythe dynamic matches the fixed pipeline quality band "
-            "with lower measured cost and wall time."
+            "with lower end-to-end wall time, including planning."
         ),
     )
 
@@ -365,16 +421,40 @@ def _glyph_runs(name: str) -> tuple[dict, list[dict]]:
     record = _load(name)
     runs = record.get("runs", [])
     expected = record.get("protocol", {}).get("graph_nodes")
-    if record.get("status") != "passed" or not runs or expected not in (64, 128, 192, 256):
+    if (
+        record.get("status") != "passed"
+        or record.get("mode") != "offline"
+        or not runs
+        or expected not in (64, 128, 192, 256)
+    ):
         raise ValueError(f"{name} is not a passing 64-, 128-, 192-, or 256-node glyph record")
+    concurrencies = [run["concurrency"] for run in runs]
+    if (
+        concurrencies != record["protocol"]["concurrencies"]
+        or len(set(concurrencies)) != len(concurrencies)
+        or 1 not in concurrencies
+    ):
+        raise ValueError(f"{name} has an invalid concurrency sweep")
+    baseline = next(run for run in runs if run["concurrency"] == 1)
     for run in runs:
         validation = run.get("validation", {})
         if (
             run.get("status") != "passed"
+            or not validation.get("passed")
+            or run.get("completed_nodes") != expected
             or validation.get("valid_png_tiles") != expected
             or validation.get("unique_tile_hashes") != expected
         ):
             raise ValueError(f"{name} contains a non-claimable glyph run")
+        wall = run.get("generation_wall_s", 0)
+        if not math.isfinite(wall) or wall <= 0:
+            raise ValueError(f"{name} has invalid generation timing")
+        if not math.isclose(
+            baseline["generation_wall_s"] / wall,
+            run["speedup_vs_concurrency_1"],
+            abs_tol=0.0001,
+        ):
+            raise ValueError(f"{name} speedup disagrees with measured timing")
     return record, runs
 
 

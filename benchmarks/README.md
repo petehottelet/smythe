@@ -1,11 +1,10 @@
 # Smythe benchmark evidence
 
-The current framework comparison is decisive: **on the same fixed three-stage
-semantic pipeline, Smythe recorded the highest blind quality, the fewest mean
-tokens, and the lowest mean wall time across Smythe, LangGraph, and CrewAI.**
-The task-shape suite independently shows why generated topology matters:
-Smythe matches a strong fixed pipeline's quality band while using 19% less
-cost, 14% less wall time, and 20% less cost per quality point.
+**Smythe used 77% fewer mean tokens and 28% less mean wall time than CrewAI**
+on the same fixed three-stage semantic pipeline. Against LangGraph it used
+8% fewer tokens and 6% less wall time. The generated-topology task-shape
+suite recorded **14% lower end-to-end wall time** than its fixed pipeline,
+with observed quality in the same measured band.
 
 Every public number links to harness source and a committed raw record. Offline
 mechanics run in CI with deterministic providers and zero API cost.
@@ -14,11 +13,11 @@ mechanics run in CI with deterministic providers and zero API cost.
 
 | Campaign | Status | Current result |
 |---|---|---|
-| [Task-shape suite v3](shape_suite.md) | **Claimable** | Quality within judge variance of fixed; 19% lower cost; 14% lower wall time |
+| [Task-shape suite v3](shape_suite.md) | **Claimable for wall time and observed quality** | 14% lower end-to-end wall time; historical cost excludes planning |
 | [Hard-kill durability v2](durability_benchmark.md) | **Claimable** | 8 duplicate dispatches after resume versus LangGraph's 32, across 3 reps |
 | [Glyph Rain width-scaling sweep](glyph_screensaver_benchmark.md#width-scaling-from-64-to-256-nodes) | **Claimable** | 64, 128, 192, and 256 valid unique tiles at every concurrency; 40.37×–56.21× at concurrency 64; isolated outputs |
 | [Image concurrency sweep](image_benchmarks.md) | **Claimable** | 6.6× wall-clock speedup at concurrency 8; 72/72 valid images |
-| [Corrected framework head-to-head](#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12) | **Claimable** | Best blind quality, mean tokens, and mean wall time across the three fixed-pipeline implementations |
+| [Corrected framework head-to-head](#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12) | **Claimable for the fixed arms** | 77% fewer tokens and 28% less wall time than CrewAI; highest observed blind score |
 | Original self-baselines and pre-correction framework record | Diagnostic | Preserved because they found payload, assembly, and measurement defects; superseded by corrected campaigns |
 | [Control ablation](control_ablation.md) | Mechanism scope | Objective gates remain valuable; routine LLM supervision and judged-prose gating are not default quality paths |
 
@@ -36,8 +35,8 @@ Every task runs through all three, with the same provider and model:
 | `fixed_pipeline` | Research → analyze → write, serial, identical for every task | A hardcoded pipeline framework workflow |
 | `smythe_dynamic` | The `LLMArchitect` designs a task-specific graph | Smythe's generated topology |
 
-The fixed pipeline is deliberately reasonable — a strawman baseline
-would make the comparison worthless.
+Each fixed-pipeline implementation uses the same semantic stage goals and
+personas through its native framework API.
 
 ## Metrics
 
@@ -62,10 +61,9 @@ the committed [results/offline_sample.json](results/offline_sample.json).
 
 ## Tasks
 
-Task definitions live in [tasks/](tasks/) as YAML: a goal, constraints,
-and the rubric the judge scores against. Current set is small and will
-grow to ~5 tasks spanning analysis, research, and review work. Adding a
-task is a good first contribution — copy an existing YAML.
+Five task definitions live in [tasks/](tasks/) as YAML: a goal, constraints,
+and the rubric the judge scores against. They cover diligence, code review,
+competitive analysis, product launches, and research memos.
 
 ## Diagnostic campaigns — self-baselines and the fix loop (2026-07-06)
 
@@ -118,7 +116,7 @@ competitive-analysis kept its 6–7-node fan-out where it judges the
 parallel branches genuinely independent. Mean dynamic cost fell ~14%
 with quality flat within noise (8.2 → 8.0).
 
-### Current standings (v5)
+### Historical standings (v5; diagnostic)
 
 | Task | Single agent | Fixed pipeline | Smythe dynamic |
 |---|---:|---:|---:|
@@ -185,7 +183,7 @@ runs completed without error.
 | LangGraph | 9.53 [7–10] | 9,590 | 32.50s |
 | CrewAI | 9.53 [7–10] | 38,427 | 42.48s |
 
-**Smythe led every reported measure.** It used 8% fewer mean tokens and 6%
+Smythe recorded the highest observed blind score. It used 8% fewer mean tokens and 6%
 less mean wall time than LangGraph, plus **77% lower mean token load** and 28%
 less mean wall time than CrewAI. The chart and callouts in the project README
 are rendered directly from this corrected record.
@@ -194,6 +192,19 @@ This is an ecological end-to-end comparison: task semantics and the executor
 model are matched, while dependency context, message structure, and accounting
 flow through each framework's native implementation. The result measures the
 systems developers actually run.
+
+Token provenance was checked in the September 2026 audit. For the fixed
+Smythe arm, the provider's returned input and output tokens were multiplied
+by the Sentinel's constant $0.000003/token and divided by that same constant
+in the harness. This recovers the recorded provider token total; the fixed
+architect makes no provider calls. LangGraph and CrewAI expose native usage
+totals. The comparison establishes token load, not invoice savings. The
+0.20-point observed score lead does not establish superior quality.
+
+The optional dynamic arm's historical token count excludes planning and is
+not a claimable total-workflow token comparison. New runs record usage
+directly at the provider boundary, with per-call receipts including planning,
+execution, and synthesis. The original record is preserved unchanged.
 
 ### Superseded original record
 
@@ -332,13 +343,21 @@ python benchmarks/run_durability_benchmark.py --quick
 Do the control tiers earn their cost? Four arms, two campaigns, 120 live
 runs. Short answer: on judged prose, no. The supervisor was consulted 94
 times across 30 runs and proposed a change **zero** times; gating fired
-in 4 of 30 runs, cost 34% more, and left the number of bad runs
+in 4 of 30 runs, used 34% more recorded execution cost, and left the number of bad runs
 unchanged. Neither moved the floor, which was the pre-registered claim.
+
+Historical control USD totals exclude planning and supervisor reviews;
+they cannot establish whole-workflow cost.
 
 Full writeup, including the two invalidated arms and why they are
 published anyway: [control_ablation.md](control_ablation.md).
 
-## Planned
+## Coming soon
+
+- Full-workflow task-shape cost campaign using the corrected provider-call
+  recorder, with planning usage included and input/output pricing separated
+- Repeated, randomized campaign order and a larger external task set for
+  quality and latency comparisons
 
 - More reps on the `criteria` arm of the control ablation — stating
   acceptance criteria without enforcing them was the best-scoring arm

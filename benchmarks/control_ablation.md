@@ -12,6 +12,12 @@ Protocol: four arms against the [shape suite](shape_suite.md), executor
 `gpt-5.4-mini`, blind judging by `gemini-pro-latest`, 3 reps per cell,
 two full campaigns, zero run errors.
 
+**Cost scope, corrected September 2026:** the historical USD totals cover
+execution and synthesis only. They omit architect calls and supervisor
+reviews, so they cannot establish complete-workflow cost or cost ordering.
+The observed scores, failure counts, and mechanism-activity counts remain
+available within the stated protocol.
+
     plain        default planning; constraints only
     criteria     constraints restated as done_when, plus a review node
                  that runs and is paid for but cannot send work back
@@ -34,7 +40,7 @@ so and stop investing in them.
 Pooled across both campaigns (n=30 per arm; `criteria` is n=15, see
 [Two campaigns](#two-campaigns-and-why-both-are-published)):
 
-| Arm | Quality | Runs < 7 | Cost / run | Mechanism activity |
+| Arm | Quality | Runs < 7 | Execution cost estimate / run | Mechanism activity |
 |---|---:|---:|---:|---|
 | plain | 8.80 | 6/30 | **$0.0111** | — |
 | criteria | 9.67 | 1/15 | $0.0138 | — |
@@ -78,22 +84,23 @@ deliverable is visibly incomplete, which is exactly the failure the
 compensating for a bug that no longer exists.
 
 **Gating fires rarely and catches the wrong thing.** 4 regenerations in
-30 runs (13%), for **34% more cost per run** than plain. Floor runs are
+30 runs (13%), for **34% more recorded execution cost per run** than plain. Floor runs are
 identical to plain, 6/30 both. Most importantly, gated runs still
 produced 2s and 4s on `adversarial-claim` and `deep-serial` — the
 assembly failure mode. A verifier asked "does this meet the criteria"
 reads a fluent, well-formed partial deliverable and passes it. Gating
 catches malformed output; it does not catch *absent* output.
 
-**Cost ordering is stable.** gated ($0.0149) > criteria ($0.0138) >
+**Recorded execution cost ordering is stable.** gated ($0.0149) > criteria ($0.0138) >
 supervised ($0.0119) > plain ($0.0111). Gating is the most expensive
-arm in both campaigns.
+arm in both campaigns. Planning and the supervisor's 94 review calls are
+outside these historical totals.
 
 ## Acceptance criteria result to extend
 
 `criteria` scored 9.67 with 1/15 floor runs — the best of any arm. It
 differs from `gated` only in that a failed verdict is *not* enforced;
-same information, same graph, same token cost. If real, that says
+same information and graph specification. If real, that says
 stating acceptance criteria helps and enforcing them hurts.
 
 It is n=15, one campaign, and `plain` swung 1.20 across campaigns. **This
@@ -143,7 +150,8 @@ pending plan.
 ## Measurement scope
 
 Five tasks, one judge, one executor model, tasks authored by this
-project. Cost is the blended-rate estimate, not provider invoices.
+project. Cost is the execution/synthesis blended-rate estimate, excluding
+planning and supervision, not provider invoices.
 `mixed-audit` is unsolved by every arm and contributes disproportionately
 to the floor counts. The `criteria` arm has half the samples of the
 others. Nothing here measures gating on the objective checks it was built

@@ -17,9 +17,9 @@ Protocol notes:
   self-preference caveat published with the v5 results. Blind: the
   judge sees output + rubric, never the system name.
 - Metrics: blind quality (1-10), total tokens, wall seconds.
-- smythe token counts are derived from its blended-rate cost tracking
-  (cost / $3e-6); LangGraph counts come from usage_metadata; CrewAI
-  from crew usage metrics. Derivations are noted in the records.
+- Smythe counts response usage at the provider boundary, including planning;
+  LangGraph counts come from usage_metadata; CrewAI from crew usage metrics.
+  Historical records derived Smythe execution tokens from blended-rate cost.
 """
 
 from __future__ import annotations
@@ -39,11 +39,11 @@ sys.path.insert(0, str(Path(__file__).parent))
 from harness import PIPELINE_SPECS, BenchmarkTask, load_tasks, make_swarm  # noqa: E402
 
 from benchmarks.artifact_records import environment_snapshot  # noqa: E402
+from benchmarks.provider_usage import UsageRecordingProvider  # noqa: E402
 from smythe.provider import GeminiProvider, OpenAIProvider  # noqa: E402
 
 EXECUTOR_MODEL = "gpt-5.4-mini"
 JUDGE_MODEL = "gemini-pro-latest"
-BLENDED_RATE = 0.000003  # smythe Sentinel default $/token, for token derivation
 
 JUDGE_PROMPT = """Score this deliverable against the rubric. Be strict: \
 10 is rare. Respond with STRICT JSON only, no prose, no code fences: \
@@ -67,7 +67,8 @@ def step_prompt(prefix: str, task: BenchmarkTask, context: str | None) -> str:
 
 
 def run_smythe(baseline: str, task: BenchmarkTask) -> dict:
-    swarm = make_swarm(baseline, OpenAIProvider(), EXECUTOR_MODEL)
+    provider = UsageRecordingProvider(OpenAIProvider())
+    swarm = make_swarm(baseline, provider, EXECUTOR_MODEL)
     t0 = time.perf_counter()
     result = swarm.execute(task.to_task())
     wall_s = time.perf_counter() - t0
@@ -78,8 +79,9 @@ def run_smythe(baseline: str, task: BenchmarkTask) -> dict:
     return {
         "output": output,
         "wall_s": round(wall_s, 2),
-        "tokens": round(result.total_cost_usd / BLENDED_RATE),
-        "tokens_source": "derived_from_blended_cost",
+        "tokens": provider.total_tokens,
+        "tokens_source": "provider_response_usage",
+        "usage": provider.snapshot(),
         "nodes": len(graph.nodes),
     }
 
@@ -188,7 +190,8 @@ def judge(output: str, rubric: list[str]) -> int | None:
     if text.startswith("```"):
         text = text.split("```")[1].removeprefix("json").strip()
     try:
-        return int(json.loads(text)["overall"])
+        score = json.loads(text)["overall"]
+        return score if type(score) is int and 1 <= score <= 10 else None
     except (json.JSONDecodeError, KeyError, TypeError, ValueError):
         return None
 

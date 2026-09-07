@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import mimetypes
 import platform
+import subprocess
 from importlib import metadata
 from pathlib import Path
 
@@ -49,27 +50,48 @@ def resolve_record_path(path: str | Path, *, root: Path = REPO_ROOT) -> Path:
     return recorded if recorded.is_absolute() else root / recorded
 
 
+def _source_control_snapshot() -> dict:
+    """Distinguish a clean revision from measurements of an edited checkout."""
+    try:
+        revision = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, check=True,
+            capture_output=True, text=True, timeout=5,
+        ).stdout.strip()
+        status = subprocess.run(
+            ["git", "status", "--porcelain"], cwd=REPO_ROOT, check=True,
+            capture_output=True, text=True, timeout=5,
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return {"revision": None, "dirty": None}
+    return {"revision": revision, "dirty": bool(status.strip())}
+
+
 def environment_snapshot(*packages: str) -> dict:
-    """Capture interpreter and installed package versions for a result record."""
+    """Capture imported Smythe identity separately from installed metadata."""
     versions = {}
     for package in packages:
         try:
             versions[package] = metadata.version(package)
         except metadata.PackageNotFoundError:
-            if package == "smythe":
-                # Benchmarks commonly run straight from a checkout rather
-                # than an installed wheel. Preserve the source version instead
-                # of emitting a misleading null in that normal workflow.
-                try:
-                    from smythe import __version__
-                except ImportError:
-                    versions[package] = None
-                else:
-                    versions[package] = __version__
-            else:
-                versions[package] = None
+            versions[package] = None
+    installed_versions = dict(versions)
+    source = None
+    if "smythe" in versions:
+        try:
+            import smythe
+        except ImportError:
+            pass
+        else:
+            versions["smythe"] = smythe.__version__
+            source = {
+                "version": smythe.__version__,
+                "module": portable_path(smythe.__file__),
+            }
     return {
         "python": platform.python_version(),
         "platform": platform.platform(),
         "packages": versions,
+        "installed_packages": installed_versions,
+        "smythe_source": source,
+        "source_control": _source_control_snapshot(),
     }

@@ -74,7 +74,9 @@ The current unreleased work hardens the guarantees users depend on before a
 7. **Glyph Rain fan-out example** — isolated 64-, 128-, 192-, and 256-node
    partitions with objectively validated unique tiles, realistic-latency
    concurrency sweeps through k=64, live Gemini and GPT Image lanes, and assembled
-   preview/GIF/atlas/HTML deliverables plus web, Windows, and macOS ports
+   preview/GIF/atlas/HTML deliverables plus web, Windows, macOS, and Linux X11
+   ports with shared heavy glyph strokes and layered green trails; compiled
+   native ports have build and render smoke checks
 8. **Bounded Autotune v1**: immutable hash-bound contracts and allowlisted
    candidates, a zero-API-spend offline concurrency campaign, plan-bound async
    orchestration, atomic dispatch claims, paired confirmation and sealed
@@ -86,16 +88,34 @@ The current unreleased work hardens the guarantees users depend on before a
    execution, declarative verification gates regenerate rejected subtrees,
    supervisors revise only pending work under a persisted revision cap, and
    successful graphs distill into constrained-planning templates
-10. **Current task-shape evidence** — generated plans match a strong fixed
-    pipeline's quality band with 19% lower cost, 14% lower wall time, and 20%
-    lower cost per quality point
+10. **Current task-shape evidence** — generated plans record 14% lower wall
+    time, including planning, with observed quality in the fixed pipeline's
+    measured band. Historical cost totals cover execution and synthesis only;
+    complete-workflow cost comparisons require new measurements
     ([report](benchmarks/shape_suite.md))
 11. **Current framework evidence** — on the same fixed three-stage semantic
     pipeline, Smythe records the highest blind quality, fewest mean tokens, and
     lowest mean wall time across Smythe, LangGraph, and CrewAI
     ([report](benchmarks/README.md#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12))
 
-## Next
+## Coming soon
+
+The [September repository review](docs/project-review-2026-09-06.md) defines
+the hardening work ahead of broader production claims:
+
+| Priority | Change | Acceptance criteria |
+|---|---|---|
+| P1 | Complete workflow accounting | Planning, routing, supervision, execution, and synthesis reserve and reconcile spend in one ledger; result completeness covers every provider call. Publish fresh cost comparisons with native usage, declared prices, and all optimization trials retained. |
+| P1 | Verification and active work | A rejected target cancels or invalidates every active descendant before regeneration; no final result or resumed checkpoint contains output based on a rejected version. |
+| P1 | Serial halt | A fatal node failure prevents all later independent provider calls and retains the original exception and completed results. |
+| P1 | Numeric cost validation | Reject NaN, infinity, negative values, and invalid token counts at admission, reconciliation, and checkpoint restore; invalid usage cannot reduce spend or unlock a budget. |
+| P2 | Full task propagation | Preserve context, constraints, and acceptance criteria for single-node plans and inspected graph handoffs; supervisors, memory, and checkpoints receive the original task. |
+
+### Product and scale
+
+Native distribution work includes Developer ID signing and notarization for
+macOS downloads, plus native Wayland screensaver integration. The current
+Linux port targets X11; the macOS bundle uses an ad-hoc signature.
 
 1. **Deterministic deliverable contracts** — make every requested output part
    explicit in the graph and mechanically verify complete assembly, removing
@@ -124,7 +144,8 @@ The current unreleased work hardens the guarantees users depend on before a
    50/250/1,000-item trials with kill-and-resume and duplicate detection
 9. **Benchmarks, continued** — a discriminating judge, human calibration,
    repeated k=25 cells, repeated glyph live cells, and held-out
-   brand-consistency comparisons
+   brand-consistency comparisons; save delivered text and judge reasoning so
+   independent reviewers can rescore each quality result
 10. **Autotune generalization**: add campaign-wide leases, calibrated
    sample-size and repeated-comparison guidance, richer reports, process-
    supervised evaluator isolation, and conservative live-evaluator adapters
