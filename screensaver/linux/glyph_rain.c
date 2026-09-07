@@ -50,7 +50,8 @@ static int handle_x_error(Display *display, XErrorEvent *event) {
     }
     char message[256];
     XGetErrorText(display, event->error_code, message, sizeof(message));
-    fprintf(stderr, "X11: %s\n", message);
+    fprintf(stderr, "X11: %s (request=%u resource=0x%lx)\n",
+            message, event->request_code, event->resourceid);
     x_error = 1;
     stopping = 1;
     return 0;
@@ -317,7 +318,14 @@ invalid:
     }
     width = attributes.width; height = attributes.height;
     XSelectInput(display, window, ExposureMask | StructureNotifyMask | (owned ? KeyPressMask : 0));
-    cairo_surface_t *surface = cairo_xlib_surface_create(display, window, attributes.visual, width, height);
+    /* Cairo owns only our offscreen pixmap. A screensaver manager can destroy
+       its window at any point; that must not invalidate Cairo's resource
+       construction or teardown. Only the final CopyArea touches the window. */
+    Pixmap backbuffer = XCreatePixmap(display, attributes.root, (unsigned)width,
+                                      (unsigned)height, (unsigned)attributes.depth);
+    GC blit_gc = XCreateGC(display, backbuffer, 0, NULL);
+    cairo_surface_t *surface = cairo_xlib_surface_create(display, backbuffer,
+                                                        attributes.visual, width, height);
     Scene scene = {0};
     int result = 0;
     if (cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS || !build_scene(&scene, width, height)) {
@@ -346,7 +354,18 @@ invalid:
             if (event.type == ConfigureNotify &&
                 (event.xconfigure.width != scene.width || event.xconfigure.height != scene.height)) {
                 if (!build_scene(&scene, event.xconfigure.width, event.xconfigure.height)) { result = 1; stopping = 1; }
-                cairo_xlib_surface_set_size(surface, scene.width, scene.height);
+                if (!stopping) {
+                    cairo_surface_destroy(surface);
+                    XFreePixmap(display, backbuffer);
+                    backbuffer = XCreatePixmap(display, attributes.root,
+                                                (unsigned)scene.width, (unsigned)scene.height,
+                                                (unsigned)attributes.depth);
+                    surface = cairo_xlib_surface_create(display, backbuffer, attributes.visual,
+                                                         scene.width, scene.height);
+                    if (cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS) {
+                        result = 1; stopping = 1;
+                    }
+                }
             }
         }
         if (stopping) break;
@@ -359,6 +378,8 @@ invalid:
         if (cairo_status(cr) != CAIRO_STATUS_SUCCESS) { result = 1; stopping = 1; }
         cairo_destroy(cr);
         cairo_surface_flush(surface);
+        XCopyArea(display, backbuffer, window, blit_gc, 0, 0,
+                  (unsigned)scene.width, (unsigned)scene.height, 0, 0);
         XSync(display, False);
         frames++;
         if (frames_limit && frames >= frames_limit) break;
@@ -376,6 +397,8 @@ invalid:
 cleanup:
     free_scene(&scene);
     cairo_surface_destroy(surface);
+    XFreeGC(display, blit_gc);
+    XFreePixmap(display, backbuffer);
     if (owned && !x_error) XDestroyWindow(display, window);
     XCloseDisplay(display);
     return x_error ? 1 : result;
