@@ -1,0 +1,201 @@
+{
+  "schemaVersion": 1,
+  "campaignId": "glyph-rain-regl-20260907-followup1",
+  "status": "frozen-follow-up-plan-no-timing-samples",
+  "createdAt": "2026-09-07T18:54:41.511Z",
+  "gitRevisionAtPreparation": "4bb7c0295cec658c7118d7bf9305764dae9b1c57",
+  "revisionScope": "Prepared changes will be enclosed in a new frozen Git revision before sampling; content hashes below are authoritative.",
+  "protocol": {
+    "path": "benchmarks/renderer_performance_20260907.md",
+    "sha256": "47a524f5f8284b33c0beb82c00ab18514537aab520b05ce0f99374fe8949fa2e",
+    "changes": "None: identical primary workloads, five-second warmup, sixty-second samples, CD/DC/CD order, and all-repetition gates."
+  },
+  "reason": "Enable Chrome command-line metadata explicitly and classify the active GL context rather than an unused fallback adapter.",
+  "requiredLaunchArgument": "--enable-automation",
+  "retainedPredecessors": [
+    {
+      "path": "benchmarks/results/glyph_rain_regl_20260907_r1_classic.json",
+      "sha256": "3f68eea84024d0f75817f38d5e59e5f571e8cc2cd91c2206f51a10aafc32b6a9",
+      "scope": "Failed before sampling: command-line metadata required --enable-automation."
+    },
+    {
+      "path": "benchmarks/results/glyph_rain_regl_20260907_metadata_preflight_f1.json",
+      "sha256": "e522305e12c9daba84caa7cb49d72f9cc732b4ada35a61a19fea46f77100a8b6",
+      "scope": "Metadata-only preflight. Superseded software classification included an unused fallback adapter; original GL/device evidence remains unchanged."
+    }
+  ],
+  "metadataPreflight": {
+    "path": "benchmarks/results/glyph_rain_regl_20260907_metadata_preflight_f2.json",
+    "sha256": "ac8ab381b90fa0c767d8a58af23a4aeb8b69ca82e725f39f53826c1bfeae6e7f",
+    "scope": "Blank page and 2x2 context only; no performance samples",
+    "backend": "hardware-reported"
+  },
+  "review": {
+    "path": "benchmarks/partitions/glyph_rain_reference_v1/performance-preview-review-20260907.json",
+    "sha256": "42fa6eef9c5647705d89535e98ef4f64eedcf6c1a54ef42cfad4e16536316e16",
+    "scope": "31 passed checks against unchanged renderer bytes; no performance claim"
+  },
+  "sourceSha256": {
+    "base-glyphs.js": "8722d0bf011b22878695699b2e3cbe7b6ae27397cd3dcd88317024d80eff787e",
+    "config.mjs": "f823471fc6cc40a5193f9470bb5012d1edefbfc5ca73ec73a451e2f1203a6613",
+    "engine/bloomPass.js": "79f6009f6d6eaa2844bad93c78f1fdfd20204dd83ac9bc4560f9ff40b7d86c30",
+    "engine/colorToRGB.js": "cc868a9b4047c2c325ade036fb9bad79f4985705b58af338de10349370a0b9a9",
+    "engine/manifest.json": "708a7f9c1cb5e1c8fd15d14566c83109c868d24dd3fd8cc385b36068ba7b4a90",
+    "engine/palettePass.js": "9913f36fa9db86e405088bc975bf69f731c7019cca45f98de2d6a5c83e583e94",
+    "engine/rainPass.js": "70c51df478d33a73ebe9e9ca6fef1ed09f7a1a9ffd64b68911a67f0963cce93d",
+    "engine/shaders/bloomPass.blur.frag.glsl": "c1a2b01ad593d1d5bf95cbe2eb3a957c85840c0ede6fe893c61baf81fe610faa",
+    "engine/shaders/bloomPass.combine.frag.glsl": "a2cebf40734ecba772668548816a32235ef7e48439ee1c2ddb9fb20582060b0b",
+    "engine/shaders/bloomPass.highPass.frag.glsl": "727979238690fc06a8fcc14065468e43bd23d6710ab0b8fc4dbf985f6fa00034",
+    "engine/shaders/palettePass.frag.glsl": "d58298cd551be59495289463e93bf306a345eae7693617c147e7b332b7714e82",
+    "engine/shaders/rainPass.effect.frag.glsl": "6c0ee969bd62a7d313a69e19d8a29a0febf2884b5534a706685717496a3289b4",
+    "engine/shaders/rainPass.frag.glsl": "1cd3c2fbdb887965e0906b5a55cf16c0e95385f2deb15008fd8e1433b1000fa5",
+    "engine/shaders/rainPass.intro.frag.glsl": "d409f1f2fe372b6ce2b4a7aaaab00ce85c43853b87011e1c0030a3f45a70bb9e",
+    "engine/shaders/rainPass.raindrop.frag.glsl": "8f8ce9164ff8bf2005f10ad981959e75e4cb153b6f6a12d347586f3813820213",
+    "engine/shaders/rainPass.symbol.frag.glsl": "08f5220fce20c9191170086615061556401db5484994a153335aeda5569ca99c",
+    "engine/shaders/rainPass.vert.glsl": "365b7bb1f7c165103472adaea6198cb2ac5889141f2ef4f20ca62baa863b5adf",
+    "engine/upstream-config.mjs": "10a09629ba28592998e8e00054db13d17be1656fd57f632205e3c24b61ecc132",
+    "engine/utils.js": "5018541245bf7d8556fd43089b09110ff4c145db7352b102b62a7e29e426569e",
+    "fonts/VT323-Regular.ttf": "cf4de751ada78ceac033dbe16a687742939995b77bc2a052ae17a4957958594d",
+    "fonts/VT323.OFL.txt": "27d9af34210253e7ca1251fbace86c6f65b40031d6ce1a75493a1b2093631298",
+    "fonts/provenance.json": "820d9d15bc495c6125c915187b3b2c8edbc2ea7ad1069e62b768ed5d088c8beb",
+    "generated-sdf.json": "5ebafb2c0df7e475f237e689f0b382fd86bd28b7b107c981e1cd4d87aa1a0d99",
+    "generated-sdf.png": "0e8e3e43cc7f6c1973db06840ea1c69a390b5cb78329fb312bbe39aebf6a7c38",
+    "glyphs.js": "63967d8b1fe5c7dfb46ec665851b675682d88bd5c18e39a6a7f44ac692cbaabd",
+    "index.html": "df3ccdd32d2c6279c7ecd7773dbb544d830ee5211225329fa2425a672c47c573",
+    "lib/gl-matrix.js": "07855fa64096dbc30c3cf9088be433f29c8e344665c87b66c7463443d38c15a7",
+    "lib/regl.min.js": "1e85c84ef254125921378d82f4da4e457a0a399bc315880c8c997dd5af8c534d",
+    "rain.js": "590a027fb8891b1a042832992cd0731318beac7e1000952768d68384da8bc9d3",
+    "reference/LICENSE": "65333257cebb87e8af86201a65f0e550d65b3cf5a468bfee2a69c9d2b5d21123",
+    "reference/catalog.json": "6befd44f62a114b8627728b13c8300026e0d1f3c51c4b2b033f3ff1ea985e090",
+    "reference/matrixcode_msdf.png": "1fd4ed52f8e9cc4af6eaad69d28cd289bf6486f15f00c952548ff0533d6a83ab",
+    "reference/provenance.json": "b2d911aef1c5b6440a32ae4bee42c9f0566332db86dcdb1b698262c5d3f483b6",
+    "settings.css": "f722eb1588483d31b81513f42f8e4428b81b39aca0625e41a330068569ce0222",
+    "settings.mjs": "d660a83d282f411474458821e175dd89b5777941c0e4410528ab455051aa76ed",
+    "style.css": "7beb1ab4e5db96b992ea3a8e7a951b760497ea4ee9982d3e93af422a94960164",
+    "timing.mjs": "1a7ae6897b0564d71b897f1ee8129c7c9b914b9cf0a390236f2336487860d3f5",
+    "wordmark.svg": "e9b13d24a04522248a7f6cf11ae8b94840ffb4c8c30fbdd4fb3f130e1fbfd789"
+  },
+  "harnessSha256": {
+    "measure.mjs": "1060f6ce58d3abc1945ee24aec4e865f497bcd8185fe1f5ca08754fefce7fc89",
+    "measurement.mjs": "6b8f31e7e4963d544c31258a95bf361268db3919652fe538a3b857f3159c8079",
+    "aggregate-measurements.mjs": "95d328cfe021bf04c6b8dfc926d9e3619c4b1edcd1bfba86cbf0e828e75dc3b7",
+    "browser-metadata.mjs": "05f5d528ceb3f4c639a89079cd7d06fccd0d381f335c72dcba7a468a2df7fdb2",
+    "browser-launch.mjs": "4ccd3978851ad43293b558980a1b985fc095e3ff38a83fced56ff23f5f6e292d",
+    "provenance.mjs": "327debb738aa27a06f5c033a76d710889b7fada5057a6d4a8446ffde4ff1f420",
+    "browser-command.mjs": "8b98aa31695467a0a72d3ebb15853f2ea7740fc0ba849628ace21a102218530e",
+    "source-files.mjs": "466394893888dfc3d4fcad1c0fc28cde12c77a292d646c35cd645f63de56a999"
+  },
+  "settings": {
+    "classic": {
+      "preset": "classic",
+      "originalMix": 10,
+      "numColumns": 80,
+      "palette": "matrix",
+      "backgroundColor": "#000000",
+      "cursorColor": "#a2ffd8",
+      "fallSpeed": 0.3,
+      "cycleSpeed": 0.03,
+      "raindropLength": 0.75,
+      "animationSpeed": 1,
+      "bloomStrength": 0.7,
+      "bloomSize": 0.4,
+      "cursorIntensity": 2,
+      "resolution": 0.75,
+      "flip": false,
+      "rotation": 0,
+      "slant": 0,
+      "autoTravel": false,
+      "forwardSpeed": 0.25,
+      "density": 1,
+      "skipIntro": true,
+      "fps": 60
+    },
+    "3d": {
+      "preset": "3d",
+      "originalMix": 10,
+      "numColumns": 80,
+      "palette": "matrix",
+      "backgroundColor": "#000000",
+      "cursorColor": "#a2ffd8",
+      "fallSpeed": 0.5,
+      "cycleSpeed": 0.03,
+      "raindropLength": 0.3,
+      "animationSpeed": 1,
+      "bloomStrength": 0.7,
+      "bloomSize": 0.4,
+      "cursorIntensity": 2,
+      "resolution": 0.75,
+      "flip": false,
+      "rotation": 0,
+      "slant": 0,
+      "autoTravel": true,
+      "forwardSpeed": 0.25,
+      "density": 1,
+      "skipIntro": true,
+      "fps": 60
+    }
+  },
+  "hostDeclaration": "Observe and retain actual power/workload conditions at collection. Background desktop applications are not closed or assumed idle.",
+  "schedule": [
+    {
+      "position": 1,
+      "preset": "classic",
+      "repetition": 1,
+      "url": "http://127.0.0.1:8773/screensaver/svg-preview/?preset=classic",
+      "output": "benchmarks/results/glyph_rain_regl_20260907_f1_r1_classic.json",
+      "warmupSeconds": 5,
+      "durationSeconds": 60
+    },
+    {
+      "position": 2,
+      "preset": "3d",
+      "repetition": 1,
+      "url": "http://127.0.0.1:8773/screensaver/svg-preview/?preset=3d",
+      "output": "benchmarks/results/glyph_rain_regl_20260907_f1_r1_3d.json",
+      "warmupSeconds": 5,
+      "durationSeconds": 60
+    },
+    {
+      "position": 3,
+      "preset": "3d",
+      "repetition": 2,
+      "url": "http://127.0.0.1:8773/screensaver/svg-preview/?preset=3d",
+      "output": "benchmarks/results/glyph_rain_regl_20260907_f1_r2_3d.json",
+      "warmupSeconds": 5,
+      "durationSeconds": 60
+    },
+    {
+      "position": 4,
+      "preset": "classic",
+      "repetition": 2,
+      "url": "http://127.0.0.1:8773/screensaver/svg-preview/?preset=classic",
+      "output": "benchmarks/results/glyph_rain_regl_20260907_f1_r2_classic.json",
+      "warmupSeconds": 5,
+      "durationSeconds": 60
+    },
+    {
+      "position": 5,
+      "preset": "classic",
+      "repetition": 3,
+      "url": "http://127.0.0.1:8773/screensaver/svg-preview/?preset=classic",
+      "output": "benchmarks/results/glyph_rain_regl_20260907_f1_r3_classic.json",
+      "warmupSeconds": 5,
+      "durationSeconds": 60
+    },
+    {
+      "position": 6,
+      "preset": "3d",
+      "repetition": 3,
+      "url": "http://127.0.0.1:8773/screensaver/svg-preview/?preset=3d",
+      "output": "benchmarks/results/glyph_rain_regl_20260907_f1_r3_3d.json",
+      "warmupSeconds": 5,
+      "durationSeconds": 60
+    }
+  ],
+  "aggregateOutput": "benchmarks/results/glyph_rain_regl_20260907_f1.json",
+  "soakOutput": "benchmarks/results/glyph_rain_regl_20260907_f1_soak.json",
+  "overwriteExisting": false,
+  "automaticRetries": 0,
+  "apiCalls": 0,
+  "claimable": false
+}

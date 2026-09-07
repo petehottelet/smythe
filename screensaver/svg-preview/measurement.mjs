@@ -5,7 +5,7 @@ import {normalizeLaunchArguments} from './browser-metadata.mjs';
 
 export const PROTOCOL='regl-20260907-v1';
 export const SCHEDULE=[['classic',1],['3d',1],['3d',2],['classic',2],['classic',3],['3d',3]];
-export const HARNESS_FILES=['measure.mjs','measurement.mjs','aggregate-measurements.mjs','browser-metadata.mjs','provenance.mjs','browser-command.mjs','source-files.mjs'];
+export const HARNESS_FILES=['measure.mjs','measurement.mjs','aggregate-measurements.mjs','browser-metadata.mjs','browser-launch.mjs','provenance.mjs','browser-command.mjs','source-files.mjs'];
 const normalize=value=>value&&typeof value==='object'?(Array.isArray(value)?value.map(normalize)
   :Object.fromEntries(Object.keys(value).sort().map(key=>[key,normalize(value[key])]))):value;
 const canonical=value=>JSON.stringify(normalize(value));
@@ -47,11 +47,14 @@ export function classifyBackend(browser){
   const renderer=browser?.gl?.unmaskedRenderer??'';
   const devices=browser?.systemInfo?.gpu?.devices??[];
   const deviceNames=devices.map(device=>[device.vendorString,device.deviceString].filter(Boolean).join(' '));
-  const identity=[renderer,browser?.systemInfo?.gpu?.auxAttributes?.glRenderer,...deviceNames].join(' ');
-  if(/swiftshader|llvmpipe|softpipe|software|lavapipe|microsoft basic render/i.test(identity))return 'software';
+  const auxiliary=browser?.systemInfo?.gpu?.auxAttributes?.glRenderer??'';
+  const software=/swiftshader|llvmpipe|softpipe|software|lavapipe|microsoft basic render/i;
+  // An enumerated fallback adapter is not evidence that this context uses it.
+  if(software.test(renderer))return 'software';
+  if(software.test(auxiliary))return 'unknown';
   const vendors=[[/nvidia|geforce/i,[0x10de]],[/amd|radeon/i,[0x1002,0x1022]],[/intel/i,[0x8086]],
     [/apple/i,[0x106b]],[/qualcomm|adreno/i,[0x5143]],[/arm|mali/i,[0x13b5]]];
-  if(vendors.some(([pattern,ids])=>pattern.test(renderer)&&devices.some((device,index)=>
+  if(vendors.some(([pattern,ids])=>pattern.test(renderer)&&(!auxiliary||pattern.test(auxiliary))&&devices.some((device,index)=>
     ids.includes(device.vendorId)||pattern.test(deviceNames[index]))))return 'hardware-reported';
   return 'unknown';
 }

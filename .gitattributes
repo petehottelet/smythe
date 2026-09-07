@@ -43,3 +43,7 @@
 /screensaver/dist/verification/*.json text eol=lf
 /screensaver/dist/verification/*.md text eol=lf
 /screensaver/verification/*.py text eol=lf
+
+# Current renderer protocols and receipts retain their measured bytes.
+/benchmarks/renderer_performance_20260907.md text eol=lf
+/benchmarks/results/glyph_rain_regl_20260907*.json -text
