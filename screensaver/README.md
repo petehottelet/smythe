@@ -1,21 +1,24 @@
 # Glyph Rain screensaver
 
-192 procedural glyphs, generated in a parallel Smythe run, descend through
-three depth planes. Bold angular strokes, luminous green bodies, and varied
-bloom give each stream a distinct weight against black space.
+The Windows, macOS, and Linux downloads render the same SVG shapes as the
+[web explorer](svg-preview/README.md): **56 classic reference glyphs plus
+192 original Smythe glyphs**. The default mix selects an original 10% of the
+time; the remaining selections use the reference's 57 slots, including its
+intentional blank. Matrix green bodies and mint highlights descend through
+three native depth layers.
 
-The native ports and original web view use the [glyph benchmark's](../benchmarks/glyph_screensaver_benchmark.md)
-original stroke programs, speeds, and trail lengths. The renderer draws each
-bounded trail from cached sprites, keeping glyphs sharp as the code falls.
+The ports fill the actual vector contours, preserving cubic curves, spacing,
+closed counters, and detached marks. GDI+, Core Graphics, and Cairo cache the
+resulting sprites. The [shared export record](native-catalog.json) binds both
+catalogs and the native data files to their source hashes.
 
-The separate [web explorer](svg-preview/README.md) adapts the MIT-licensed
-rain, bloom, and palette renderer from m8e/Rezmason. It combines the reference's
-56 visible base glyphs and blank slot with Smythe's 192 original SVGs, using
-the originals for 10% of selections by default. Its
-[renderer interaction checkpoint](../benchmarks/partitions/glyph_rain_reference_v1/pixel-preview-review.json)
-passed before the final borderless styling; rendering performance remains unmeasured.
-The native downloads below retain the earlier stroke
-catalog and renderer.
+The native savers use their existing layered motion and host controls. The
+web explorer supplies the REGL exposure pipeline, 3D navigation, and pixel
+settings. Those behaviors are next for native exploration modes.
+
+The compiled Windows download, captured during verification:
+
+![Native Windows Glyph Rain](dist/verification/windows-render.png)
 
 ## Reference-based web explorer
 
@@ -52,9 +55,12 @@ uniqueness, and assembles the accepted artifacts:
 
 ![Glyph generation workflow](../assets/glyph_rain/glyph_pipeline.svg)
 
-Twelve specimens from the native ports' 192-glyph stroke catalog:
+The current originals, all produced by the measured SVG workflow:
 
-![Original glyph specimens](../assets/glyph_rain/glyph_specimens.svg)
+![Current 192 original SVG glyphs](../benchmarks/partitions/glyph_svg_v1/catalog/contact-sheet.png)
+
+The [earlier stroke specimens](../assets/glyph_rain/glyph_specimens.svg) belong
+to the controlled-latency benchmark and legacy web view.
 
 ## Ports
 
@@ -66,8 +72,7 @@ Twelve specimens from the native ports' 192-glyph stroke catalog:
 | macOS 12+ (`.saver`) | source [macos/](macos/), [universal ZIP](dist/GlyphRain-macos-universal.zip) | unzip, then double-click `GlyphRain.saver`; build locally with `macos/build_macos.sh` |
 | Linux x86-64 / X11 | source and setup [linux/](linux/README.md), [compiled archive](dist/SmytheGlyphRain-linux-x86_64.tar.gz) | extract and run `./smythe-glyph-rain-linux-x86_64 --window`; build with `sh screensaver/linux/build_linux.sh` |
 
-The native ports and legacy web view share layer sizes, column spacing, stroke weights, colors, and
-motion rules. Foreground glyphs are larger and brighter; distant streams are
+The native ports share layer sizes, column spacing, and bounded trail rules. Foreground glyphs are larger and brighter; distant streams are
 finer and slower. Trail brightness depends on position within the stream,
 so display refresh rate does not accumulate glow or leave faded ghost columns.
 
@@ -76,7 +81,7 @@ so display refresh rate does not accumulate glow or leave faded ghost columns.
 `windows/build_windows.cmd` compiles `windows/GlyphRainSaver.cs` +
 `windows/GlyphData.cs` with the C# compiler that ships inside Windows — no
 SDK, no NuGet, no network. The committed binary in `dist/` comes from that
-build in CI and passed native checks there and on Windows 11. Screensaver arguments `/s` (run),
+build in CI and passed the compiled Windows checks. Screensaver arguments `/s` (run),
 `/p <hwnd>` (settings preview), and `/c` (about) are implemented; `/w` runs
 in a window for debugging.
 
@@ -102,8 +107,9 @@ lock-screen integration is planned. [Dependencies and integration](linux/README.
 
 ## Native verification
 
-The [published build](https://github.com/petehottelet/smythe/actions/runs/34093505361)
-passed all five native jobs. Downloads in `dist/` are the artifacts from that run.
+The [published build](https://github.com/petehottelet/smythe/actions/runs/34123023804)
+passed the catalog export check and all five native jobs. Downloads in `dist/`
+are the exact artifacts from that run.
 [SHA-256 checksums](dist/SHA256SUMS) and [build provenance](dist/BUILD_INFO.json)
 identify the source commit, packages, and individual [verification receipts](dist/verification/).
 
@@ -119,7 +125,16 @@ artifacts before uploading them:
 
 Run the local checks with `windows/smoke_windows.ps1`,
 `bash macos/smoke_macos.sh`, or the [Linux smoke command](linux/README.md).
-Each check produces a rendering receipt. These checks validate native execution;
+Each check also renders the complete native glyph atlas, verifies the blank
+slot and filled counters, and records the catalog hashes and mixed selection.
+The same compiled artifacts pass the host checks and become the downloads.
+Inspect their complete atlases: [Windows](dist/verification/windows-atlas.png),
+[Apple Silicon](dist/verification/macos-arm64-atlas.png),
+[Intel Mac](dist/verification/macos-x86_64-atlas.png), and
+[Linux](dist/verification/linux-atlas.png).
+The [contour review](dist/verification/contour-review.md) compares native output
+with an independent source-SVG rendering and records rasterization differences.
+These checks validate native execution;
 OS installation policy and session locking remain separate concerns.
 Windows `/s` multi-monitor dispatch is not covered by these checks.
 
@@ -132,15 +147,19 @@ Windows `/s` multi-monitor dispatch is not covered by these checks.
 
 ## Regenerating the data
 
-After any change to the glyph grammar in
-`benchmarks/glyph_screensaver_assets.py`:
+Export the current canonical SVGs into all three native formats:
 
 ```bash
-python screensaver/export_glyphs.py
+python screensaver/export_native_glyphs.py
+python screensaver/export_native_glyphs.py --check
 ```
 
-writes `glyphs.js` (web), `windows/GlyphData.cs`, `macos/glyphs.json`, and
-`linux/glyph_data.h` from the same generated catalog.
+This writes `windows/GlyphData.cs`, `macos/glyphs.json`, `linux/glyph_data.h`,
+and `native-catalog.json`. It preserves the measured original SVG files and
+reference artwork; it does not run a new generation benchmark.
+
+`python screensaver/export_glyphs.py` updates only the legacy web `glyphs.js`.
+It cannot replace the current native data with the old stroke programs.
 
 ## Deploy (web)
 
@@ -151,7 +170,8 @@ cd screensaver
 vercel deploy --prod
 ```
 
-`glyph-rain-preview.png` is a 1920×1080 capture of the web renderer. Benchmark
+`svg-preview/preview.png` is the current README capture.
+`glyph-rain-preview.png` shows the legacy web renderer. Benchmark
 artifacts retain their original renderings and hash-bound receipts.
 
 ## Credits and references
@@ -166,7 +186,9 @@ The imported source is pinned to [revision 5ba9049](https://github.com/m8e/matri
 Its [MIT license](https://github.com/m8e/matrix-rain/blob/5ba90490453ceceb6812d6b1bc658a99a92411d0/LICENSE)
 credits **Copyright (c) 2018 Rezmason**. Copies of the notice accompany the
 [engine](svg-preview/engine/LICENSE) and [base artwork](svg-preview/reference/LICENSE).
-The [artwork provenance](svg-preview/reference/provenance.json) identifies the
+The native packages include the reference MIT notice; Windows and Linux also
+embed it in the executable. The macOS bundle includes it in its resources. The
+[artwork provenance](svg-preview/reference/provenance.json) identifies the
 source atlas and extracted outlines. The REGL rain, bloom, and palette passes
 are adapted licensed code; the additional 192 Smythe glyphs are independently
 authored and retain their own generation receipts.

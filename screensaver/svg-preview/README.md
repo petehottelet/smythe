@@ -156,10 +156,13 @@ the archived implementation.
 ## Native downloads and next checks
 
 The Windows, macOS, and Linux packages in the
-[native guide](../README.md#ports) retain the earlier 192-glyph stroke catalog.
-They do not contain this licensed base catalog, REGL renderer, or settings sheet.
-Native exports and explorer controls need their own compiled verification
-before download replacement.
+[native guide](../README.md#ports) use these same SVG outlines: 56 visible
+reference glyphs, the blank slot, and 192 originals, with a 10% original mix.
+Native GDI+, Core Graphics, and Cairo render the filled contours into cached
+sprites. The [catalog record](../native-catalog.json) binds both source catalogs;
+[compiled verification](../README.md#native-verification) covers the downloads.
+The native savers retain their three-layer motion. The REGL exposure pipeline,
+3D exploration, and pixel settings are next for the native ports.
 
 Next: measure reference-behavior tolerances and performance for the final
 preset and catalog configuration. Keep licensing, source hashes, screenshots,

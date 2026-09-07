@@ -47,15 +47,20 @@ fullscreen. Touch controls are included.
 [Linux x86-64 `.tar.gz`](https://github.com/petehottelet/smythe/raw/refs/heads/main/screensaver/dist/SmytheGlyphRain-linux-x86_64.tar.gz) ·
 [Native source and setup](screensaver/README.md).
 
-These binaries use the earlier [stroke catalog](assets/glyph_rain/glyph-atlas.png).
-They passed native rendering and motion checks on Windows,
+All three downloads now use the current SVG shapes: **56 reference glyphs plus
+192 original Smythe glyphs**, with the reference blank slot and a 10% original
+mix. Filled contours preserve curves, counters, and detached marks.
+The compiled packages passed rendering and motion checks on Windows,
 Apple Silicon, Intel Mac, and Ubuntu 22.04/24.04.
 [Checksums and verification](screensaver/README.md#native-verification).
 macOS uses an ad-hoc signature; Linux requires X11.
+The native savers use layered trails; the web explorer provides the REGL effect,
+3D navigation, and pixel settings.
 
 The web renderer adapts [m8e](https://github.com/m8e/matrix-rain),
 a fork of Rezmason, under its MIT license. It uses the reference's rain,
-glyph rendering, bloom, and palette pipeline. Smythe's 192 added shapes have
+glyph rendering, bloom, and palette pipeline. Native packages also include the
+licensed reference artwork and its MIT notice. Smythe's 192 added shapes have
 independently authored contours from a [measured style brief](docs/glyph-rain-plan.md).
 [Credits, licenses, and artwork provenance](screensaver/README.md#credits-and-references).
 
@@ -226,8 +231,8 @@ team challenges the draft, and a final node writes the decision memo.
   enforce serial halt behavior, reject invalid cost inputs, and carry the full
   task context through planning, execution, and resume.
 - **Operator tools:** inspect runs, detach long jobs, and approve durable pauses.
-- **Native SVG exploration:** port the new catalog and camera controls to
-  Windows, macOS, and Linux, then verify every compiled target against the
+- **Native exploration:** bring the web exposure pipeline, camera controls,
+  and settings to Windows, macOS, and Linux, then verify them against the
   [implementation plan](docs/glyph-rain-plan.md).
 - **Native distribution:** notarized macOS downloads and native Wayland integration.
 - **Renderer performance:** meet the 1080p frame-interval target with the new

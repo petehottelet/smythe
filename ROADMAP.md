@@ -75,7 +75,8 @@ The current unreleased work hardens the guarantees users depend on before a
    partitions with objectively validated unique tiles, realistic-latency
    concurrency sweeps through k=64, live Gemini and GPT Image lanes, and assembled
    preview/GIF/atlas/HTML deliverables plus web, Windows, macOS, and Linux X11
-   ports with shared heavy glyph strokes and layered green trails; compiled
+   ports with layered green trails; the native downloads now use the current
+   56 reference and 192 original SVG shapes with a 10% original mix. Compiled
    downloads pass native rendering checks on Windows, Apple Silicon, Intel Mac,
    and Ubuntu 22.04/24.04, with committed checksums and verification receipts
 8. **Bounded Autotune v1**: immutable hash-bound contracts and allowlisted
@@ -129,12 +130,12 @@ the hardening work ahead of broader production claims:
 
 ### Product and scale
 
-The [Glyph Rain design plan](docs/glyph-rain-plan.md) carries the licensed base
-catalog, original SVGs, and selected web behavior into native Windows, macOS,
-and Linux ports. Preserve normal screensaver input dismissal, retain required
-license notices, and verify compiled explorer controls before replacing current
-downloads. The web renderer and base artwork are adapted under the reference's
-MIT license; the measured original-glyph generation workload remains separate.
+The Windows, macOS, and Linux downloads now contain the licensed base catalog
+and current original SVGs, with compiled catalog, rendering, and host checks.
+Next, the [Glyph Rain design plan](docs/glyph-rain-plan.md) brings the web exposure
+pipeline, 3D navigation, and settings into native exploration modes. Preserve
+normal screensaver input dismissal and verify each compiled control. The
+original-glyph generation benchmark remains separate from renderer changes.
 
 Native distribution work includes Developer ID signing and notarization for
 macOS downloads, plus native Wayland screensaver integration. The current

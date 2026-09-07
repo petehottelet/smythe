@@ -37,7 +37,7 @@ verification, trace, artifact, and recovery controls.
 - [Image benchmarks](../benchmarks/image_benchmarks.md) — image fan-out and exact-spec finishing
 - [Glyph Rain benchmark](../benchmarks/glyph_screensaver_benchmark.md) — an artifact fan-out example with isolated 64-, 128-, 192-, and 256-node measurements
 - [Original SVG workflow](../benchmarks/svg_glyph_benchmark.md) — fresh geometry, complete style validation, catalog assembly, and repeated thread/process measurements
-- [Glyph Rain screensaver](../screensaver/README.md) — verified Windows, universal Mac, and Linux downloads using the earlier stroke catalog; separate web adaptation
+- [Glyph Rain screensaver](../screensaver/README.md) — verified Windows, universal Mac, and Linux downloads using the current 56 reference and 192 original SVG shapes, with a 10% original mix
 - [Web explorer](../screensaver/svg-preview/README.md) — MIT-licensed reference renderer and base glyphs, 10% original-glyph mix, Matrix green rain, presets, VT323 pixel controls, and a Trajan Bold outline logo; browser interaction checks pass, performance remains unmeasured
 - [Glyph Rain design plan](glyph-rain-plan.md) — measured original-glyph distributions, licensed renderer scope, and native porting criteria
 - [Reference behavior plan](glyph-rain-parity-plan.md) — pinned defaults, options, and acceptance checks for the adapted effect

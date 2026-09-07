@@ -7,8 +7,9 @@ passed before the final borderless styling.
 Performance and quantified reference parity remain unmeasured. The
 [explorer guide](../screensaver/svg-preview/README.md) documents this adaptation;
 the [generation benchmark](../benchmarks/svg_glyph_benchmark.md) still measures
-only Smythe's original catalog. Native downloads retain the earlier stroke
-catalog and renderer.
+only Smythe's original catalog. Native downloads now render both current SVG
+catalogs with their three-layer native renderers; web exposure and controls
+remain separate porting work.
 
 Build new, independently drawn SVG glyphs with the proportions, weight,
 terminals, negative space, and visual rhythm distilled from the reference
@@ -534,7 +535,11 @@ preserved. macOS needs a companion universal Explorer app using the same view;
 the system screensaver host owns input dismissal. Linux exploration belongs
 in a standalone X11 window; embedded/root modes leave keyboard ownership with
 the screensaver manager. Native Wayland and Mac notarization remain separate work.
-All current compiled downloads retain their earlier stroke catalog and controls.
+Current compiled downloads use the exact filled SVG catalogs and default
+90% reference / 10% original selection, while retaining their native controls.
+The [native catalog record](../screensaver/native-catalog.json) identifies both
+sources and the [build receipts](../screensaver/README.md#native-verification)
+record compiled glyph and host verification.
 
 ## Delivery and acceptance
 
@@ -553,9 +558,9 @@ remaining renderer work is:
    screenshot. Keep the earlier image with the v1 archive.
 6. Run a new performance campaign and movement/resize soak against frozen
    source, catalog, and settings hashes.
-7. Port selected behavior and both catalog exports to native Windows, macOS,
-   and Linux. Preserve OS screensaver policy and verify compiled artifacts
-   before replacing downloads.
+7. Both catalog exports now ship on Windows, macOS, and Linux with compiled
+   rendering checks. Next, port the web exposure pipeline and explorer controls,
+   preserve OS screensaver policy, and verify the new compiled behavior.
 
 Proposed measurement gates remain targets, not current achievements:
 
@@ -577,8 +582,8 @@ SVG contours after export, and normal screensaver dismissal. Windows must load
 and render the compiled `.scr` and exercise actual `/p` subprocess embedding.
 Both Apple Silicon and Intel must execute the same universal artifact. Ubuntu
 22.04 and 24.04 must execute the same Linux ELF with rendering, embedding,
-resize, input, and shutdown checks. These are porting requirements, not receipts
-for the new glyph catalog.
+resize, input, and shutdown checks. Current catalog and host receipts are linked
+above; explorer controls and performance targets require their own new evidence.
 
 Update screenshots, documentation, checksums, source provenance, and required
 MIT notices together. Run the full offline suite, Ruff, and local Markdown link

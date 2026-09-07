@@ -40,3 +40,5 @@
 /screensaver/linux/glyph_data.h text eol=lf
 /screensaver/dist/*.json text eol=lf
 /screensaver/dist/verification/*.json text eol=lf
+/screensaver/dist/verification/*.md text eol=lf
+/screensaver/verification/*.py text eol=lf
