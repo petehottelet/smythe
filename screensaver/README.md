@@ -189,7 +189,8 @@ cd screensaver
 vercel deploy --prod
 ```
 
-`svg-preview/preview.png` is the current README capture.
+[The animated README preview](svg-preview/README.md#readme-animation) uses the
+current renderer; `svg-preview/preview.png` remains the still-image alternative.
 `glyph-rain-preview.png` shows the legacy web renderer. Benchmark
 artifacts retain their original renderings and hash-bound receipts.
 

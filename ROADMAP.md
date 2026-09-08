@@ -188,6 +188,11 @@ It adds the following runtime guarantees and measured evidence:
 
 ## Coming soon
 
+**Astra status — 8 September 2026:** live benchmarks have not run. The
+[79 offline pilot checks](benchmarks/results/astra_pilot_runtime_20260907/README.md)
+validate software contracts, not model cost, speed, or quality. An agreed API
+spending ceiling is needed before starting the 12-workflow pilot.
+
 The [GPT-6 Astra campaign plan](benchmarks/astra_benchmark_plan.md) specifies
 matched model and orchestration experiments. Native Responses and complete
 text-workflow accounting are implemented. The offline preparation package

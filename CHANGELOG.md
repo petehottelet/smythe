@@ -38,6 +38,10 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Documentation
 
+- Replace the README rain still with a 900×506 animated GIF, retain the still
+  alternative, and record the export settings and source hashes. Clarify that
+  Astra has prepared tasks and offline runtime checks, with no live benchmark
+  results yet; update the native roadmap for source-only distribution.
 - Withdraw precompiled screensaver packages for Windows, macOS, and Linux
   from the release and current checkout. Keep source build instructions,
   licenses, historical checksums, and verification records. Remove Defender
