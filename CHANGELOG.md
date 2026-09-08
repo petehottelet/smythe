@@ -41,12 +41,22 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 - Link the README's native downloads to the published v0.7.0 release, update
   the verified PyPI badge, and align the release and renderer status guides.
 
+### Fixed
+
+- Concurrent SQLite initialization retries transient WAL contention within a
+  bounded wait. Jobs and workflow journals create their schema atomically and
+  revalidate after acquiring the write lock. Failed initialization rolls back;
+  existing evidence, store identities, and read-only access retain their behavior.
+
 ### Tests
 
 - Explicitly close SQLite connections in 36 test-fixture contexts while
   preserving their transaction behavior. All 298 affected tests pass; the
   allocation probe closes all 103 observed connections, including the 16
   fixture connections previously left open.
+- Give the remaining Jobs test stores explicit fixture teardown. All 45
+  affected cases pass; allocation tracing confirms explicit closure of all 50
+  connections, including 45 that previously relied on garbage collection.
 
 ## [0.7.0] - 2026-09-07
 

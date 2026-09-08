@@ -178,6 +178,10 @@ It adds the following runtime guarantees and measured evidence:
   migration preserves evidence and blocks already-open legacy writers.
   Explicit `lease=` tokens are a new low-level API requirement.
   [Ownership and migration scope](docs/optimize.md#campaign-ownership-unreleased).
+- **Concurrent journal initialization** — bounded WAL retries and atomic
+  schema creation prevent competing openers from seeing partial stores.
+  Existing evidence and identities remain intact.
+  [Implementation and verification plan](plans/sqlite-initialization-2026-09-07.md).
 
 ## Coming soon
 

@@ -377,6 +377,11 @@ risk explicitly during a selective reroll.
 
 ## Jobs database upgrades
 
+**Unreleased after 0.7.0:** concurrent openers use bounded retries for WAL
+setup, then revalidate and create or migrate the schema in one transaction.
+Failed initialization rolls back. This repair preserves schema version 4 and
+existing records; read-only inspection performs no migration or WAL setup.
+
 The writable store upgrades earlier Jobs databases to schema version 4. Stop
 older workers using their existing controls before upgrading; an unexpired
 earlier-version lease blocks migration. The new `jobs stop` command requires

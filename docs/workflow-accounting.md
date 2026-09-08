@@ -117,6 +117,11 @@ revisions. Heartbeats renew ownership during calls. A former owner can append
 immutable late evidence for its exact dispatch, but cannot advance the run.
 Recovery settles available late evidence before admitting new work.
 
+**Unreleased after 0.7.0:** concurrent journal openers use bounded WAL retries
+and create all tables and the persistent store identity in one transaction.
+Competing openers reuse that identity. Failed initialization rolls back;
+existing evidence and read-only inspection retain their behavior.
+
 Resume requires the same component descriptions, model configuration, budget,
 and concurrency policy. It does not refill allowances. An inspected pending
 plan can be edited before execution; a stale graph from an already progressing
