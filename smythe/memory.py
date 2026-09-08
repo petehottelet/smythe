@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import threading
 from dataclasses import asdict, dataclass, field
@@ -15,7 +16,10 @@ from smythe.task import Task, snapshot_task
 
 @dataclass
 class ExecutionOutcome:
-    """Record of a single task execution for planner feedback."""
+    """Record of a single task execution for planner feedback.
+
+    ``total_duration_ms`` sums recorded node-span times; it is not wall time.
+    """
 
     task_goal: str
     task_constraints: list[str]
@@ -138,10 +142,19 @@ class PlannerMemory:
                 if any(
                     not isinstance(values, list)
                     or any(not isinstance(value, str) for value in values)
-                    for values in (outcome.task_constraints, outcome.task_done_when)
+                    for values in (outcome.task_constraints, outcome.task_done_when, outcome.topology)
                 ):
                     continue
-            except (json.JSONDecodeError, TypeError, KeyError):
+                if type(outcome.success) is not bool:
+                    continue
+                if any(
+                    type(value) not in (int, float) or not math.isfinite(value) or value < 0
+                    for value in (outcome.total_cost_usd, outcome.total_duration_ms)
+                ):
+                    continue
+            except (ValueError, TypeError, KeyError, OverflowError):
+                # JSON integer limits and unformattable huge integers are
+                # malformed history rows, not reasons to abort planning.
                 continue
             stored_words = self._tokenize(
                 " ".join([

@@ -184,7 +184,7 @@ def build_user_prompt(
             goal = outcome.get("task_goal", "")
             history_lines.append(
                 f"- Goal: {goal!r} | Topology: {topo} | "
-                f"Cost: ${cost:.2f} | Duration: {duration:.0f}ms | "
+                f"Cost: ${cost:.2f} | Summed node time: {duration:.0f}ms | "
                 f"Outcome: {success}"
             )
         parts.append(
