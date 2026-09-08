@@ -1,6 +1,7 @@
 # Concurrent SQLite initialization
 
-Status: implemented, reviewed, and qualified offline. Unreleased after 0.7.0.
+Status: implemented, reviewed, and qualified locally and in platform CI.
+Unreleased after 0.7.0.
 This work preserves the existing journal formats, evidence, and public commands.
 
 ## Observed failures
@@ -82,8 +83,11 @@ A fresh unpublished wheel passes the documented offline Autotune command:
 event, or decision and returns identical output. Read-only inspection preserves
 the closed database bytes. Independent review verifies all 65 packaging inputs
 and all 59 installed runtime files against the frozen source. No provider
-calls were made. Platform results are recorded in
-[GitHub CI](https://github.com/petehottelet/smythe/actions/workflows/ci.yml).
+calls were made. All nine [platform CI jobs](https://github.com/petehottelet/smythe/actions/runs/34177548342)
+pass on published `151eb05`. Each Linux suite passes 3,383 tests with 24 skipped;
+Windows passes 3,392 with 15 skipped. The macOS operator lane passes 177 with
+12 skipped. Python 3.13 reports zero warnings, down from 53 SQLite resource
+warnings in the preceding recorded run.
 
 1. A real reader lock forces WAL contention; releasing it permits construction.
    Retain the old-source failure and verify the bounded retry and error paths.

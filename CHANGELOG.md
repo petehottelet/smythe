@@ -43,6 +43,9 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Fixed
 
+- Planner memory skips unusable recalled cost, duration, topology, and success
+  fields before ranking. Valid history and file bytes remain unchanged, and
+  prompts identify the timing value as summed node time.
 - Concurrent SQLite initialization retries transient WAL contention within a
   bounded wait. Jobs and workflow journals create their schema atomically and
   revalidate after acquiring the write lock. Failed initialization rolls back;
@@ -50,6 +53,8 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Tests
 
+- Extend macOS CI to the shared WAL, concurrent journal initialization,
+  Autotune ownership, and planner-memory regression files.
 - Explicitly close SQLite connections in 36 test-fixture contexts while
   preserving their transaction behavior. All 298 affected tests pass; the
   allocation probe closes all 103 observed connections, including the 16
