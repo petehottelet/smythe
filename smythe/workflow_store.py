@@ -22,6 +22,7 @@ import time
 from typing import Any
 from uuid import uuid4
 
+from smythe._sqlite import enable_wal
 from smythe.pricing import PRICE_VERSION, conservative_quote, price_native_response
 
 STORE_VERSION = 1
@@ -219,35 +220,48 @@ class SQLiteWorkflowStore:
         self._db = sqlite3.connect(target, uri=read_only, isolation_level=None, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
         try:
-            tables = {row[0] for row in self._db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-            if tables:
-                required = {"workflow_meta", "workflow_runs", "workflow_calls", "workflow_evidence",
-                            "workflow_checkpoints", "workflow_operations", "workflow_invocations", "workflow_events"}
-                if not required <= tables:
-                    raise WorkflowCorruptionError("Database is not a Smythe workflow journal")
-                meta = self._db.execute("SELECT kind, version FROM workflow_meta").fetchall()
-                if len(meta) != 1 or tuple(meta[0]) != (STORE_KIND, STORE_VERSION):
-                    raise WorkflowCorruptionError("Unsupported workflow journal version")
-            elif read_only:
-                raise WorkflowCorruptionError("Database has no workflow schema")
             self._db.execute("PRAGMA foreign_keys=ON")
             self._db.execute("PRAGMA busy_timeout=5000")
             if read_only:
                 self._db.execute("PRAGMA query_only=ON")
-            else:
-                self._db.execute("PRAGMA journal_mode=WAL")
+            self._store_id = self._validate_schema(allow_empty=not read_only)
+            if not read_only:
+                enable_wal(self._db, validate_before_write=lambda: self._validate_schema(allow_empty=True))
                 self._db.execute("PRAGMA synchronous=FULL")
-                if not tables:
-                    self._create_schema()
-            self._store_id = self._db.execute("SELECT store_id FROM workflow_meta").fetchone()[0]
-            if type(self._store_id) is not str or re.fullmatch("[0-9a-f]{32}", self._store_id) is None:
-                raise WorkflowCorruptionError("Invalid persistent workflow store identity")
+                # Schema, metadata and persistent identity become visible
+                # together. A competing initializer's committed identity wins.
+                with self._transaction() as db:
+                    if self._validate_schema_db(db, allow_empty=True) is None:
+                        self._create_schema(db)
+                    self._store_id = self._validate_schema_db(db, allow_empty=False)
         except sqlite3.DatabaseError as exc:
             self._db.close()
             raise WorkflowCorruptionError("Unreadable workflow journal schema") from exc
         except BaseException:
             self._db.close()
             raise
+
+    def _validate_schema(self, *, allow_empty):
+        with self._transaction(write=False) as db:
+            return self._validate_schema_db(db, allow_empty=allow_empty)
+
+    def _validate_schema_db(self, db, *, allow_empty):
+        tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if not tables:
+            if allow_empty:
+                return None
+            raise WorkflowCorruptionError("Database has no workflow schema")
+        required = {"workflow_meta", "workflow_runs", "workflow_calls", "workflow_evidence",
+                    "workflow_checkpoints", "workflow_operations", "workflow_invocations", "workflow_events"}
+        if not required <= tables:
+            raise WorkflowCorruptionError("Database is not a Smythe workflow journal")
+        meta = db.execute("SELECT kind, version, store_id FROM workflow_meta").fetchall()
+        if len(meta) != 1 or tuple(meta[0])[:2] != (STORE_KIND, STORE_VERSION):
+            raise WorkflowCorruptionError("Unsupported workflow journal version")
+        store_id = meta[0]["store_id"]
+        if type(store_id) is not str or re.fullmatch("[0-9a-f]{32}", store_id) is None:
+            raise WorkflowCorruptionError("Invalid persistent workflow store identity")
+        return store_id
 
     def __enter__(self):
         return self
@@ -263,16 +277,16 @@ class SQLiteWorkflowStore:
         with self._lock:
             self._db.close()
 
-    def _create_schema(self):
-        self._db.executescript("""
-        CREATE TABLE IF NOT EXISTS workflow_meta(kind TEXT PRIMARY KEY,version INTEGER NOT NULL,store_id TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS workflow_runs(
+    def _create_schema(self, db):
+        statements = (
+            """CREATE TABLE IF NOT EXISTS workflow_meta(kind TEXT PRIMARY KEY,version INTEGER NOT NULL,store_id TEXT NOT NULL)""",
+            """CREATE TABLE IF NOT EXISTS workflow_runs(
           run_id TEXT PRIMARY KEY,task_json TEXT NOT NULL,config_json TEXT NOT NULL,binding_sha TEXT NOT NULL,
           budget TEXT,confirmed TEXT NOT NULL,reserved TEXT NOT NULL,unknown TEXT NOT NULL,
           status TEXT NOT NULL,blocked_reason TEXT,revision INTEGER NOT NULL DEFAULT 0,
           owner TEXT,epoch INTEGER NOT NULL DEFAULT 0,expires INTEGER NOT NULL DEFAULT 0,
-          created INTEGER NOT NULL,updated INTEGER NOT NULL);
-        CREATE TABLE IF NOT EXISTS workflow_calls(
+          created INTEGER NOT NULL,updated INTEGER NOT NULL)""",
+            """CREATE TABLE IF NOT EXISTS workflow_calls(
           call_id TEXT PRIMARY KEY,run_id TEXT NOT NULL REFERENCES workflow_runs(run_id),key_json TEXT NOT NULL,
           request_json TEXT NOT NULL,tool_names_json TEXT NOT NULL,provider_json TEXT NOT NULL,
           price_version TEXT NOT NULL,binding_sha TEXT NOT NULL,request_sha TEXT NOT NULL,
@@ -280,31 +294,32 @@ class SQLiteWorkflowStore:
           quote_id TEXT,evidence_id TEXT,ceiling TEXT,cost TEXT,reserved TEXT NOT NULL,unknown TEXT NOT NULL,
           dispatch_token_sha TEXT,dispatch_epoch INTEGER,receipt_json TEXT,receipt_sha TEXT,
           result_json TEXT,result_sha TEXT,decoder_version TEXT,
-          error TEXT,created INTEGER NOT NULL,updated INTEGER NOT NULL,UNIQUE(run_id,key_json));
-        CREATE TABLE IF NOT EXISTS workflow_evidence(
+          error TEXT,created INTEGER NOT NULL,updated INTEGER NOT NULL,UNIQUE(run_id,key_json))""",
+            """CREATE TABLE IF NOT EXISTS workflow_evidence(
           evidence_id TEXT PRIMARY KEY,call_id TEXT NOT NULL REFERENCES workflow_calls(call_id),
           operation TEXT NOT NULL,body BLOB NOT NULL,response_sha TEXT NOT NULL,request_sha TEXT NOT NULL,
           status_code INTEGER,request_id TEXT,transport_error TEXT,metadata_sha TEXT NOT NULL,created INTEGER NOT NULL,
-          UNIQUE(call_id,operation,metadata_sha));
-        CREATE TABLE IF NOT EXISTS workflow_checkpoints(
+          UNIQUE(call_id,operation,metadata_sha))""",
+            """CREATE TABLE IF NOT EXISTS workflow_checkpoints(
           run_id TEXT NOT NULL REFERENCES workflow_runs(run_id),revision INTEGER NOT NULL,
           checkpoint_json TEXT NOT NULL,checkpoint_sha TEXT NOT NULL,consumed_json TEXT NOT NULL,
-          operations_json TEXT NOT NULL,kind TEXT NOT NULL,created INTEGER NOT NULL,PRIMARY KEY(run_id,revision));
-        CREATE TABLE IF NOT EXISTS workflow_operations(
+          operations_json TEXT NOT NULL,kind TEXT NOT NULL,created INTEGER NOT NULL,PRIMARY KEY(run_id,revision))""",
+            """CREATE TABLE IF NOT EXISTS workflow_operations(
           operation_id TEXT PRIMARY KEY,run_id TEXT NOT NULL REFERENCES workflow_runs(run_id),operation_key TEXT NOT NULL,
           kind TEXT NOT NULL,state TEXT NOT NULL,inputs_json TEXT NOT NULL,inputs_sha TEXT NOT NULL,
           result_json TEXT,result_sha TEXT,consumed_json TEXT NOT NULL,created INTEGER NOT NULL,updated INTEGER NOT NULL,
-          UNIQUE(run_id,operation_key));
-        CREATE TABLE IF NOT EXISTS workflow_invocations(
+          UNIQUE(run_id,operation_key))""",
+            """CREATE TABLE IF NOT EXISTS workflow_invocations(
           run_id TEXT NOT NULL REFERENCES workflow_runs(run_id),scope_json TEXT NOT NULL,operation_key TEXT NOT NULL,
-          ordinal INTEGER NOT NULL,PRIMARY KEY(run_id,scope_json,operation_key),UNIQUE(run_id,scope_json,ordinal));
-        CREATE TABLE IF NOT EXISTS workflow_events(
+          ordinal INTEGER NOT NULL,PRIMARY KEY(run_id,scope_json,operation_key),UNIQUE(run_id,scope_json,ordinal))""",
+            """CREATE TABLE IF NOT EXISTS workflow_events(
           sequence INTEGER PRIMARY KEY AUTOINCREMENT,run_id TEXT NOT NULL REFERENCES workflow_runs(run_id),
-          call_id TEXT,event_type TEXT NOT NULL,payload_json TEXT NOT NULL,created INTEGER NOT NULL);
-        CREATE INDEX IF NOT EXISTS workflow_calls_by_run ON workflow_calls(run_id,state);
-        """)
-        if self._db.execute("SELECT COUNT(*) FROM workflow_meta").fetchone()[0] == 0:
-            self._db.execute("INSERT OR IGNORE INTO workflow_meta VALUES (?,?,?)", (STORE_KIND, STORE_VERSION, uuid4().hex))
+          call_id TEXT,event_type TEXT NOT NULL,payload_json TEXT NOT NULL,created INTEGER NOT NULL)""",
+            """CREATE INDEX IF NOT EXISTS workflow_calls_by_run ON workflow_calls(run_id,state)""",
+        )
+        for statement in statements:
+            db.execute(statement)
+        db.execute("INSERT INTO workflow_meta VALUES (?,?,?)", (STORE_KIND, STORE_VERSION, uuid4().hex))
 
     @contextmanager
     def _transaction(self, *, write=True):

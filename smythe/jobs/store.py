@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterator
 from uuid import uuid4
 
+from smythe._sqlite import enable_wal
 from smythe.jobs.artifact_io import MAX_ARTIFACT_BYTES, MAX_IMAGE_PIXELS
 from smythe.jobs.preflight import JobApprovalV1, JobPlanV1, verify_approval
 
@@ -299,16 +300,21 @@ class SQLiteRunStore:
             if read_only:
                 self._connection.execute("PRAGMA query_only = ON")
             self._connection.execute("PRAGMA busy_timeout = 5000")
-            existing = self._validate_schema(allow_empty=not read_only)
+            self._validate_schema(allow_empty=not read_only)
             self._connection.execute("PRAGMA foreign_keys = ON")
             if not read_only:
-                self._connection.execute("PRAGMA journal_mode = WAL")
+                enable_wal(self._connection, validate_before_write=lambda: self._validate_schema(allow_empty=True))
                 self._connection.execute("PRAGMA synchronous = FULL")
-                if not existing:
-                    self._create_schema()
-                elif self.schema_version < STORE_VERSION:
-                    self._migrate_schema()
-                self.schema_version = STORE_VERSION
+                # A different opener may have initialized or migrated the
+                # journal since preflight. Observe its complete schema under
+                # the same write lock that protects our own DDL and version.
+                with self._transaction(upgrading=True) as cursor:
+                    existing = self._validate_schema_cursor(cursor, allow_empty=True)
+                    if not existing:
+                        self._create_schema(cursor)
+                    elif self.schema_version < STORE_VERSION:
+                        self._migrate_schema(cursor)
+                    self._validate_schema_cursor(cursor, allow_empty=False)
         except sqlite3.Error as exc:
             self._connection.close()
             raise RunStoreError("Invalid or unreadable Jobs database schema") from exc
@@ -318,40 +324,43 @@ class SQLiteRunStore:
 
     def _validate_schema(self, *, allow_empty: bool) -> bool:
         with self._read_transaction() as cursor:
-            tables = {row[0] for row in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-            version = cursor.execute("PRAGMA user_version").fetchone()[0]
-            self.schema_version = version
-            if not tables and version == 0 and allow_empty:
-                return False
-            supported_versions = (1, 2, 3, STORE_VERSION) if not self.read_only else (2, 3, STORE_VERSION)
-            if version not in supported_versions:
-                raise RunStoreError("Unsupported Jobs database version")
-            expected = dict(_SCHEMA_COLUMNS)
-            if version < 4:
-                expected.pop("run_controls")
-                expected["runs"] = " ".join(field for field in expected["runs"].split()
-                                             if field not in _ARTIFACT_COLUMNS)
-                if "run_controls" in tables:
-                    raise RunStoreError("Mixed Jobs pause schema; stop old writers before upgrading")
-            if version < 3:
-                expected = {table: " ".join(field for field in columns.split()
-                            if field not in _FENCING_COLUMNS.get(table, set()))
-                            for table, columns in expected.items()}
-            if version == 1 and not self.read_only and "run_leases" not in tables:
-                expected.pop("run_leases")  # Preserve the existing writable v1 upgrade.
-            if not expected.keys() <= tables:
-                raise RunStoreError("Database does not contain the required Jobs schema")
-            for table, columns in expected.items():
-                found = {row[1] for row in cursor.execute(f"PRAGMA table_info({table})")}
-                if version < 4 and table == "runs" and found & _ARTIFACT_COLUMNS:
-                    raise RunStoreError("Mixed Jobs artifact schema; stop old writers before upgrading")
-                if version < 3 and found & _FENCING_COLUMNS.get(table, set()):
-                    raise RunStoreError("Mixed Jobs lease-fencing schema; stop old writers before upgrading")
-                if not set(columns.split()) <= found:
-                    raise RunStoreError("Jobs database has an incomplete " + table + " table")
+            return self._validate_schema_cursor(cursor, allow_empty=allow_empty)
+
+    def _validate_schema_cursor(self, cursor: sqlite3.Cursor, *, allow_empty: bool) -> bool:
+        tables = {row[0] for row in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        version = cursor.execute("PRAGMA user_version").fetchone()[0]
+        self.schema_version = version
+        if not tables and version == 0 and allow_empty:
+            return False
+        supported_versions = (1, 2, 3, STORE_VERSION) if not self.read_only else (2, 3, STORE_VERSION)
+        if version not in supported_versions:
+            raise RunStoreError("Unsupported Jobs database version")
+        expected = dict(_SCHEMA_COLUMNS)
+        if version < 4:
+            expected.pop("run_controls")
+            expected["runs"] = " ".join(field for field in expected["runs"].split()
+                                         if field not in _ARTIFACT_COLUMNS)
+            if "run_controls" in tables:
+                raise RunStoreError("Mixed Jobs pause schema; stop old writers before upgrading")
+        if version < 3:
+            expected = {table: " ".join(field for field in columns.split()
+                        if field not in _FENCING_COLUMNS.get(table, set()))
+                        for table, columns in expected.items()}
+        if version == 1 and not self.read_only and "run_leases" not in tables:
+            expected.pop("run_leases")  # Preserve the existing writable v1 upgrade.
+        if not expected.keys() <= tables:
+            raise RunStoreError("Database does not contain the required Jobs schema")
+        for table, columns in expected.items():
+            found = {row[1] for row in cursor.execute(f"PRAGMA table_info({table})")}
+            if version < 4 and table == "runs" and found & _ARTIFACT_COLUMNS:
+                raise RunStoreError("Mixed Jobs artifact schema; stop old writers before upgrading")
+            if version < 3 and found & _FENCING_COLUMNS.get(table, set()):
+                raise RunStoreError("Mixed Jobs lease-fencing schema; stop old writers before upgrading")
+            if not set(columns.split()) <= found:
+                raise RunStoreError("Jobs database has an incomplete " + table + " table")
         return True
 
-    def _migrate_schema(self) -> None:
+    def _migrate_schema(self, cursor: sqlite3.Cursor) -> None:
         """Upgrade quiescent legacy journals without changing historical attempts.
 
         Already-running legacy binaries cannot enforce new fences. Operators
@@ -359,42 +368,41 @@ class SQLiteRunStore:
         Read-only v2/v3 inspection never enters this path. Version-3 workers
         enforce ownership but cannot honor durable pause requests.
         """
-        with self._transaction(upgrading=True) as cursor:
-            version = cursor.execute("PRAGMA user_version").fetchone()[0]
-            if version == STORE_VERSION:
-                return  # Another opener completed the same migration.
-            if version not in (1, 2, 3):
-                raise RunStoreError("Unsupported Jobs database version for migration")
-            tables = {row[0] for row in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-            if "run_leases" in tables:
-                if cursor.execute("SELECT 1 FROM run_leases WHERE expires_at_ns > ? LIMIT 1",
-                                  (self._clock_ns(),)).fetchone():
-                    raise RunLeaseError("Stop legacy Jobs workers before upgrading a database with live leases")
-                if version < 3:
-                    cursor.execute("ALTER TABLE run_leases ADD COLUMN epoch INTEGER NOT NULL DEFAULT 1")
-            else:
-                cursor.execute("""CREATE TABLE run_leases (
-                    run_id TEXT PRIMARY KEY REFERENCES runs(run_id) ON DELETE CASCADE,
-                    owner_id TEXT NOT NULL, acquired_at_ns INTEGER NOT NULL,
-                    heartbeat_at_ns INTEGER NOT NULL, expires_at_ns INTEGER NOT NULL,
-                    epoch INTEGER NOT NULL DEFAULT 1)""")
-                cursor.execute("CREATE INDEX run_leases_by_expiry ON run_leases(expires_at_ns)")
+        version = cursor.execute("PRAGMA user_version").fetchone()[0]
+        if version == STORE_VERSION:
+            return  # Another opener completed the same migration.
+        if version not in (1, 2, 3):
+            raise RunStoreError("Unsupported Jobs database version for migration")
+        tables = {row[0] for row in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if "run_leases" in tables:
+            if cursor.execute("SELECT 1 FROM run_leases WHERE expires_at_ns > ? LIMIT 1",
+                              (self._clock_ns(),)).fetchone():
+                raise RunLeaseError("Stop legacy Jobs workers before upgrading a database with live leases")
             if version < 3:
-                cursor.execute("ALTER TABLE runs ADD COLUMN lease_epoch INTEGER NOT NULL DEFAULT 0")
-                cursor.execute("ALTER TABLE attempts ADD COLUMN lease_owner_id TEXT")
-                cursor.execute("ALTER TABLE attempts ADD COLUMN lease_epoch INTEGER NOT NULL DEFAULT 0")
-                cursor.execute("""UPDATE runs SET lease_epoch=1 WHERE
-                    EXISTS(SELECT 1 FROM run_leases WHERE run_leases.run_id=runs.run_id) OR
-                    EXISTS(SELECT 1 FROM events WHERE events.run_id=runs.run_id
-                           AND event_type IN ('run_lease_acquired','run_lease_renewed'))""")
-            cursor.execute(_CONTROL_TABLE_SQL)
-            cursor.execute("INSERT INTO run_controls(run_id) SELECT run_id FROM runs")
-            cursor.execute("ALTER TABLE runs ADD COLUMN artifact_namespace TEXT")
-            cursor.execute("ALTER TABLE runs ADD COLUMN artifact_owner_id TEXT")
-            for row in cursor.execute("SELECT run_id FROM runs").fetchall():
-                cursor.execute("UPDATE runs SET artifact_owner_id=? WHERE run_id=?",
-                               (uuid4().hex, row["run_id"]))
-            cursor.execute("PRAGMA user_version = 4")
+                cursor.execute("ALTER TABLE run_leases ADD COLUMN epoch INTEGER NOT NULL DEFAULT 1")
+        else:
+            cursor.execute("""CREATE TABLE run_leases (
+                run_id TEXT PRIMARY KEY REFERENCES runs(run_id) ON DELETE CASCADE,
+                owner_id TEXT NOT NULL, acquired_at_ns INTEGER NOT NULL,
+                heartbeat_at_ns INTEGER NOT NULL, expires_at_ns INTEGER NOT NULL,
+                epoch INTEGER NOT NULL DEFAULT 1)""")
+            cursor.execute("CREATE INDEX run_leases_by_expiry ON run_leases(expires_at_ns)")
+        if version < 3:
+            cursor.execute("ALTER TABLE runs ADD COLUMN lease_epoch INTEGER NOT NULL DEFAULT 0")
+            cursor.execute("ALTER TABLE attempts ADD COLUMN lease_owner_id TEXT")
+            cursor.execute("ALTER TABLE attempts ADD COLUMN lease_epoch INTEGER NOT NULL DEFAULT 0")
+            cursor.execute("""UPDATE runs SET lease_epoch=1 WHERE
+                EXISTS(SELECT 1 FROM run_leases WHERE run_leases.run_id=runs.run_id) OR
+                EXISTS(SELECT 1 FROM events WHERE events.run_id=runs.run_id
+                       AND event_type IN ('run_lease_acquired','run_lease_renewed'))""")
+        cursor.execute(_CONTROL_TABLE_SQL)
+        cursor.execute("INSERT INTO run_controls(run_id) SELECT run_id FROM runs")
+        cursor.execute("ALTER TABLE runs ADD COLUMN artifact_namespace TEXT")
+        cursor.execute("ALTER TABLE runs ADD COLUMN artifact_owner_id TEXT")
+        for row in cursor.execute("SELECT run_id FROM runs").fetchall():
+            cursor.execute("UPDATE runs SET artifact_owner_id=? WHERE run_id=?",
+                           (uuid4().hex, row["run_id"]))
+        cursor.execute("PRAGMA user_version = 4")
 
     def close(self) -> None:
         with self._lock:
@@ -406,10 +414,9 @@ class SQLiteRunStore:
     def __exit__(self, *_args: object) -> None:
         self.close()
 
-    def _create_schema(self) -> None:
-        self._connection.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS runs (
+    def _create_schema(self, cursor: sqlite3.Cursor) -> None:
+        statements = (
+            """CREATE TABLE IF NOT EXISTS runs (
                 run_id TEXT PRIMARY KEY,
                 manifest_hash TEXT NOT NULL,
                 plan_hash TEXT NOT NULL,
@@ -430,9 +437,8 @@ class SQLiteRunStore:
                 lease_epoch INTEGER NOT NULL DEFAULT 0,
                 artifact_namespace TEXT,
                 artifact_owner_id TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS operations (
+            )""",
+            """CREATE TABLE IF NOT EXISTS operations (
                 run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
                 operation_id TEXT NOT NULL,
                 operation_key TEXT NOT NULL,
@@ -446,9 +452,8 @@ class SQLiteRunStore:
                 updated_at_ns INTEGER NOT NULL,
                 PRIMARY KEY (run_id, operation_id),
                 UNIQUE (run_id, operation_key)
-            );
-
-            CREATE TABLE IF NOT EXISTS attempts (
+            )""",
+            """CREATE TABLE IF NOT EXISTS attempts (
                 attempt_id TEXT PRIMARY KEY,
                 run_id TEXT NOT NULL,
                 operation_id TEXT NOT NULL,
@@ -465,9 +470,8 @@ class SQLiteRunStore:
                 FOREIGN KEY (run_id, operation_id)
                     REFERENCES operations(run_id, operation_id) ON DELETE CASCADE,
                 UNIQUE (run_id, operation_id, attempt_number)
-            );
-
-            CREATE TABLE IF NOT EXISTS calls (
+            )""",
+            """CREATE TABLE IF NOT EXISTS calls (
                 call_id TEXT PRIMARY KEY,
                 attempt_id TEXT NOT NULL REFERENCES attempts(attempt_id) ON DELETE CASCADE,
                 run_id TEXT NOT NULL,
@@ -484,9 +488,8 @@ class SQLiteRunStore:
                 created_at_ns INTEGER NOT NULL,
                 dispatched_at_ns INTEGER,
                 completed_at_ns INTEGER
-            );
-
-            CREATE TABLE IF NOT EXISTS artifacts (
+            )""",
+            """CREATE TABLE IF NOT EXISTS artifacts (
                 artifact_id TEXT PRIMARY KEY,
                 attempt_id TEXT NOT NULL REFERENCES attempts(attempt_id) ON DELETE CASCADE,
                 run_id TEXT NOT NULL,
@@ -499,39 +502,38 @@ class SQLiteRunStore:
                 height INTEGER,
                 accepted INTEGER NOT NULL,
                 created_at_ns INTEGER NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS events (
+            )""",
+            """CREATE TABLE IF NOT EXISTS events (
                 sequence INTEGER PRIMARY KEY AUTOINCREMENT,
                 run_id TEXT NOT NULL REFERENCES runs(run_id) ON DELETE CASCADE,
                 operation_id TEXT,
                 event_type TEXT NOT NULL,
                 payload_json TEXT NOT NULL,
                 created_at_ns INTEGER NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS run_leases (
+            )""",
+            """CREATE TABLE IF NOT EXISTS run_leases (
                 run_id TEXT PRIMARY KEY REFERENCES runs(run_id) ON DELETE CASCADE,
                 owner_id TEXT NOT NULL,
                 acquired_at_ns INTEGER NOT NULL,
                 heartbeat_at_ns INTEGER NOT NULL,
                 expires_at_ns INTEGER NOT NULL,
                 epoch INTEGER NOT NULL
-            );
-
-            CREATE INDEX IF NOT EXISTS operations_by_status
-                ON operations(run_id, status);
-            CREATE INDEX IF NOT EXISTS attempts_by_operation
-                ON attempts(run_id, operation_id, attempt_number);
-            CREATE INDEX IF NOT EXISTS calls_by_status
-                ON calls(run_id, status);
-            CREATE INDEX IF NOT EXISTS artifacts_by_operation
-                ON artifacts(run_id, operation_id, accepted);
-            CREATE INDEX IF NOT EXISTS run_leases_by_expiry
-                ON run_leases(expires_at_ns);
-            """
-            + _CONTROL_TABLE_SQL + "; PRAGMA user_version = 4;"
+            )""",
+            """CREATE INDEX IF NOT EXISTS operations_by_status
+                ON operations(run_id, status)""",
+            """CREATE INDEX IF NOT EXISTS attempts_by_operation
+                ON attempts(run_id, operation_id, attempt_number)""",
+            """CREATE INDEX IF NOT EXISTS calls_by_status
+                ON calls(run_id, status)""",
+            """CREATE INDEX IF NOT EXISTS artifacts_by_operation
+                ON artifacts(run_id, operation_id, accepted)""",
+            """CREATE INDEX IF NOT EXISTS run_leases_by_expiry
+                ON run_leases(expires_at_ns)""",
+            _CONTROL_TABLE_SQL,
+            "PRAGMA user_version = 4",
         )
+        for statement in statements:
+            cursor.execute(statement)
 
     @contextmanager
     def _transaction(self, *, upgrading: bool = False) -> Iterator[sqlite3.Cursor]:
