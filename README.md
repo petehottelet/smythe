@@ -46,7 +46,11 @@ binds this screenshot and passes 31 rendering and interaction checks.
 A separate ten-minute travel and resize check passed 57 cycles.
 [Rendering measurements and stability report](benchmarks/renderer_performance_20260907_results.md).
 
-**Native downloads:** [Windows `.scr`](https://github.com/petehottelet/smythe/releases/download/v0.7.0/SmytheGlyphRain.scr) ·
+**Windows notice — 7 September 2026:** Defender quarantined the v0.7.0
+`SmytheGlyphRain.scr` as `Trojan:Win32/Wacatac.H!ml`. The cause is unresolved;
+do not install or run it pending review. [Detection and review status](docs/windows-defender-2026-09-07.md).
+
+**Native downloads:** [Windows `.scr`](docs/windows-defender-2026-09-07.md) ·
 [macOS universal `.zip`](https://github.com/petehottelet/smythe/releases/download/v0.7.0/GlyphRain-macos-universal.zip) ·
 [Linux x86-64 `.tar.gz`](https://github.com/petehottelet/smythe/releases/download/v0.7.0/SmytheGlyphRain-linux-x86_64.tar.gz) ·
 [v0.7.0 release and checksums](https://github.com/petehottelet/smythe/releases/tag/v0.7.0) ·
