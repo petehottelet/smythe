@@ -1,7 +1,6 @@
 # Concurrent SQLite initialization
 
-Status: implemented and reviewed; full qualification in progress. Unreleased
-after 0.7.0.
+Status: implemented, reviewed, and qualified offline. Unreleased after 0.7.0.
 This work preserves the existing journal formats, evidence, and public commands.
 
 ## Observed failures
@@ -74,7 +73,17 @@ The regressions are committed in
 [shared WAL tests](../tests/test_sqlite_initialization.py),
 [Autotune constructor tests](../tests/test_optimize_lease.py), and
 [Jobs/workflow initialization tests](../tests/test_jobs_workflow_initialization.py).
-The full-suite result remains pending; focused checks do not replace it.
+The frozen `d1097f8` full suite passes **3,397 tests with 10 skipped** in
+1,243.11 seconds; Ruff passes and every tracked source hash is unchanged.
+The original `cf93435` failure remains retained separately.
+
+A fresh unpublished wheel passes the documented offline Autotune command:
+38 completed trials, 76 events, and one decision. Repeating it adds no trial,
+event, or decision and returns identical output. Read-only inspection preserves
+the closed database bytes. Independent review verifies all 65 packaging inputs
+and all 59 installed runtime files against the frozen source. No provider
+calls were made. Platform results are recorded in
+[GitHub CI](https://github.com/petehottelet/smythe/actions/workflows/ci.yml).
 
 1. A real reader lock forces WAL contention; releasing it permits construction.
    Retain the old-source failure and verify the bounded retry and error paths.
