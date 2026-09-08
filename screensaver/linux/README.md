@@ -20,9 +20,8 @@ screensaver/dist/smythe-glyph-rain-linux-x86_64 --window
 ```
 
 Runtime packages are `libx11-6` and `libcairo2`. The binary is architecture
-specific; rebuild on another architecture. The GitHub workflow builds the
-x86-64 Linux download on Ubuntu 22.04. Make a downloaded binary executable
-with `chmod +x smythe-glyph-rain-linux-x86_64`.
+specific; rebuild on another architecture. Precompiled binaries are not
+distributed. The build script sets up the executable in `screensaver/dist/`.
 
 Use `--fullscreen` for a standalone fullscreen preview. Escape closes the
 preview; SIGTERM stops it cleanly. Window resizing rebuilds the three depth
@@ -76,4 +75,4 @@ black silhouettes on white. `--mix 0` renders only reference glyphs;
 [Catalog provenance](https://github.com/petehottelet/smythe/blob/main/screensaver/native-catalog.json) binds the source SVGs and generated
 native data. [Third-party notices](https://github.com/petehottelet/smythe/blob/main/screensaver/svg-preview/THIRD_PARTY_NOTICES.md) identify
 the imported artwork and its license. Both MIT notices are embedded in the
-executable and included in the downloadable archive.
+executable. Retain their license notices when redistributing a local build.

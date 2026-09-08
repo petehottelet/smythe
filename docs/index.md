@@ -10,7 +10,7 @@ verification, trace, artifact, and recovery controls.
 - [Architecture](architecture.md) — the two core abstractions and component boundaries
 - [Examples](../examples/README.md) — offline-first feature tours plus explicitly gated live integrations
 - [Benchmarks](../benchmarks/README.md) — evidence status, protocols, and raw records
-- [Smythe 0.7.0 verification](release-0.7.0.md) — published package checks, current native screensaver downloads, checksums, and retained evidence
+- [Smythe 0.7.0 verification](release-0.7.0.md) — published package checks, historical native checksums, and retained evidence
 
 ## Plan and execute graphs
 
@@ -46,7 +46,7 @@ verification, trace, artifact, and recovery controls.
 - [Image benchmarks](../benchmarks/image_benchmarks.md) — image fan-out and exact-spec finishing
 - [Glyph Rain benchmark](../benchmarks/glyph_screensaver_benchmark.md) — an artifact fan-out example with isolated 64-, 128-, 192-, and 256-node measurements
 - [Original SVG workflow](../benchmarks/svg_glyph_benchmark.md) — fresh geometry, complete style validation, catalog assembly, and repeated thread/process measurements
-- [Glyph Rain screensaver](../screensaver/README.md) — native ports using the current 56 reference and 192 original SVG shapes, with a 10% original mix; [Windows Defender review](windows-defender-2026-09-07.md) is unresolved, and Windows installation is paused
+- [Glyph Rain screensaver](../screensaver/README.md) — source builds for Windows, macOS, and Linux using 56 reference and 192 original SVG shapes, with a 10% original mix; no precompiled distribution
 - [Web explorer](../screensaver/svg-preview/README.md) — MIT-licensed reference renderer and base glyphs, 10% original-glyph mix, Matrix green rain, presets, VT323 pixel controls, and a Trajan Bold outline logo
 - [Glyph Rain design plan](glyph-rain-plan.md) — measured original-glyph distributions, licensed renderer scope, and native porting criteria
 - [Reference behavior plan](glyph-rain-parity-plan.md) — pinned defaults, options, and acceptance checks for the adapted effect

@@ -1,21 +1,16 @@
 # Glyph Rain screensaver
 
-**Windows notice — 7 September 2026:** Defender quarantined the v0.7.0
-`SmytheGlyphRain.scr` as `Trojan:Win32/Wacatac.H!ml`. The cause is unresolved;
-keep it quarantined and do not install or run it pending review.
-[Detection, scope, and review status](../docs/windows-defender-2026-09-07.md).
-
-The Windows, macOS, and Linux downloads render the same SVG shapes as the
+The Windows, macOS, and Linux source ports render the same SVG shapes as the
 [web explorer](svg-preview/README.md): **56 classic reference glyphs plus
 192 original Smythe glyphs**. The default mix selects an original 10% of the
 time; the remaining selections use the reference's 57 slots, including its
 intentional blank. Matrix green bodies and mint highlights descend through
 three native depth layers.
 
-Download the packages, checksums, and build record from the
-[Smythe v0.7.0 release](https://github.com/petehottelet/smythe/releases/tag/v0.7.0).
-Their independent native version is 1.1; the build record identifies the
-exact source and platform checks.
+**Build from source.** Precompiled Windows, macOS, and Linux packages have
+been removed from the release and current repository. Build commands are
+listed below; run them from the repository root. Historical checksums and
+rendering receipts remain in [the verification archive](dist/README.md).
 
 The ports fill the actual vector contours, preserving cubic curves, spacing,
 closed counters, and detached marks. GDI+, Core Graphics, and Cairo cache the
@@ -26,7 +21,7 @@ The native savers use their existing layered motion and host controls. The
 web explorer supplies the REGL exposure pipeline, 3D navigation, and pixel
 settings. Those behaviors are next for native exploration modes.
 
-The compiled Windows download, captured during verification:
+The native Windows renderer, captured during earlier verification:
 
 ![Native Windows Glyph Rain](dist/verification/windows-render.png)
 
@@ -81,9 +76,9 @@ to the controlled-latency benchmark and legacy web view.
 |---|---|---|
 | Legacy web (this directory) | [index.html](index.html) + [glyphs.js](glyphs.js) | open `index.html` directly or deploy this static directory |
 | Reference-based web explorer | [svg-preview/](svg-preview/README.md) | serve the repository locally; Classic, 3D, and Operator presets; browser interaction checks pass |
-| Windows 11 (`.scr`) | source [windows/](windows/), [Defender review status](../docs/windows-defender-2026-09-07.md) | installation and execution paused pending review; keep quarantined copies quarantined |
-| macOS 12+ (`.saver`) | source [macos/](macos/), [universal ZIP](dist/GlyphRain-macos-universal.zip) | unzip, then double-click `GlyphRain.saver`; build locally with `macos/build_macos.sh` |
-| Linux x86-64 / X11 | source and setup [linux/](linux/README.md), [compiled archive](dist/SmytheGlyphRain-linux-x86_64.tar.gz) | extract and run `./smythe-glyph-rain-linux-x86_64 --window`; build with `sh screensaver/linux/build_linux.sh` |
+| Windows 11 (`.scr`) | [source](windows/) | run `screensaver\windows\build_windows.cmd`; [setup](#windows-notes) |
+| macOS 12+ (`.saver`) | [source](macos/) | run `bash screensaver/macos/build_macos.sh`; [setup](#macos-notes) |
+| Linux / X11 | [source and dependencies](linux/README.md) | run `sh screensaver/linux/build_linux.sh`; [setup](#linux-notes) |
 
 The native ports share layer sizes, column spacing, and bounded trail rules. Foreground glyphs are larger and brighter; distant streams are
 finer and slower. Trail brightness depends on position within the stream,
@@ -91,43 +86,54 @@ so display refresh rate does not accumulate glow or leave faded ghost columns.
 
 ### Windows notes
 
-`windows/build_windows.cmd` compiles `windows/GlyphRainSaver.cs` +
-`windows/GlyphData.cs` with the C# compiler that ships inside Windows — no
-SDK, no NuGet, no network. The committed binary in `dist/` comes from that
-build in CI and passed the compiled Windows checks. Screensaver arguments `/s` (run),
-`/p <hwnd>` (settings preview), and `/c` (about) are implemented; `/w` runs
-in a window for debugging.
+Build with the C# compiler bundled with Windows (.NET Framework):
+
+```bat
+screensaver\windows\build_windows.cmd
+```
+
+The output is `screensaver\dist\SmytheGlyphRain.scr`. Right-click your local
+build and choose **Install** to open Screen Saver Settings. Keep the file in
+its chosen location: moving or deleting it invalidates the registered path.
+Copying it into an arbitrary folder alone does not register it.
+Arguments are `/s` for fullscreen, `/p <hwnd>` for the settings preview,
+`/c` for the about box, and `/w` for a resizable preview window.
 
 ### macOS notes
 
-`macos/build_macos.sh` builds a universal (arm64 + x86_64) `GlyphRain.saver`
-with only the Xcode command-line tools and applies an ad-hoc signature.
-Double-click to install, or copy to `~/Library/Screen Savers/`. The
-`screensavers` workflow builds the universal bundle and tests it on Apple
-Silicon and Intel. The committed ZIP preserves the bundle and executable permissions.
+Install Xcode command-line tools, then build the universal bundle:
 
-The download is an archive containing the `.saver` bundle. It is ad-hoc signed;
-Developer ID signing and notarization are planned. Build locally if macOS
-blocks installation of the downloaded bundle.
+```sh
+bash screensaver/macos/build_macos.sh
+```
+
+The output is `screensaver/dist/GlyphRain.saver`, containing arm64 and x86_64
+slices. Double-click your local bundle to install it. The build applies an
+ad-hoc signature; Developer ID signing and notarization remain planned.
 
 ### Linux notes
 
-The native ELF executable uses X11 and Cairo. Extract the archive, then run
-`./smythe-glyph-rain-linux-x86_64 --window` or configure it in XScreenSaver.
-The download targets x86-64 and Ubuntu 22.04-compatible system libraries.
-An XWayland preview is supported through X11; native Wayland screensaver and
-lock-screen integration is planned. [Dependencies and integration](linux/README.md).
+Install the [X11 and Cairo build dependencies](linux/README.md), then build:
+
+```sh
+sh screensaver/linux/build_linux.sh
+screensaver/dist/smythe-glyph-rain-linux-x86_64 --window
+```
+
+The default output name follows the host architecture. Configure your local
+executable in XScreenSaver if desired. Native Wayland screensaver and
+lock-screen integration remain planned.
 
 ## Native verification
 
-The [published build](https://github.com/petehottelet/smythe/actions/runs/34123023804)
-passed the catalog export check and all five native jobs. Downloads in `dist/`
-are the exact artifacts from that run.
-[SHA-256 checksums](dist/SHA256SUMS) and [build provenance](dist/BUILD_INFO.json)
-identify the source commit, packages, and individual [verification receipts](dist/verification/).
+The [historical build](https://github.com/petehottelet/smythe/actions/runs/34123023804)
+passed the catalog export check and all five native jobs.
+[SHA-256 checksums](dist/SHA256SUMS), [build provenance](dist/BUILD_INFO.json),
+and [verification receipts](dist/verification/) identify those withdrawn
+artifacts. They do not describe a newly compiled local build.
 
-The [build workflow](../.github/workflows/screensavers.yml) validates compiled
-artifacts before uploading them:
+The [native CI workflow](../.github/workflows/screensavers.yml) is paused while
+precompiled distribution is suspended. Its functional checks cover:
 
 - Windows loads the compiled `.scr`, checks rendering, motion and resize, and
   launches its `/p` preview process inside a hidden host window through clean exit.
@@ -140,7 +146,7 @@ Run the local checks with `windows/smoke_windows.ps1`,
 `bash macos/smoke_macos.sh`, or the [Linux smoke command](linux/README.md).
 Each check also renders the complete native glyph atlas, verifies the blank
 slot and filled counters, and records the catalog hashes and mixed selection.
-The same compiled artifacts pass the host checks and become the downloads.
+Local builds need their own verification; historical receipts remain unchanged.
 Inspect their complete atlases: [Windows](dist/verification/windows-atlas.png),
 [Apple Silicon](dist/verification/macos-arm64-atlas.png),
 [Intel Mac](dist/verification/macos-x86_64-atlas.png), and

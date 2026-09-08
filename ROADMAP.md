@@ -76,10 +76,10 @@ It adds the following runtime guarantees and measured evidence:
    partitions with objectively validated unique tiles, realistic-latency
    concurrency sweeps through k=64, live Gemini and GPT Image lanes, and assembled
    preview/GIF/atlas/HTML deliverables plus web, Windows, macOS, and Linux X11
-   ports with layered green trails; the native downloads now use the current
-   56 reference and 192 original SVG shapes with a 10% original mix. Compiled
-   downloads pass native rendering checks on Windows, Apple Silicon, Intel Mac,
-   and Ubuntu 22.04/24.04, with committed checksums and verification receipts
+   ports with layered green trails using 56 reference and 192 original SVG
+   shapes with a 10% original mix. Native ports are distributed as source.
+   Historical rendering checks cover Windows, Apple Silicon, Intel Mac, and
+   Ubuntu 22.04/24.04; their checksums and receipts remain archived
 8. **Bounded Autotune v1**: immutable hash-bound contracts and allowlisted
    candidates, a zero-API-spend offline concurrency campaign, plan-bound async
    orchestration, atomic dispatch claims, paired confirmation and sealed
@@ -208,13 +208,14 @@ the hardening work ahead of broader production claims:
 ### Product and scale
 
 **Windows Defender review:** resolve the v0.7.0 `SmytheGlyphRain.scr`
-detection before promoting Windows installation again. Keep quarantined
+detection before restoring precompiled Windows downloads. Keep quarantined
 copies quarantined, obtain Microsoft analysis, investigate build provenance,
 and publish the review outcome with exact artifact identities. The cause
 is unresolved; [status and evidence](docs/windows-defender-2026-09-07.md).
 
-The Windows, macOS, and Linux downloads now contain the licensed base catalog
-and current original SVGs, with compiled catalog, rendering, and host checks.
+The Windows, macOS, and Linux source ports contain the licensed base catalog
+and current original SVGs. Earlier compiled catalog, rendering, and host
+checks remain archived; precompiled distribution is suspended.
 Next, the [Glyph Rain design plan](docs/glyph-rain-plan.md) brings the web exposure
 pipeline, 3D navigation, and settings into native exploration modes. Preserve
 normal screensaver input dismissal and verify each compiled control. The

@@ -178,14 +178,15 @@ records the prior screenshot, interaction checks, and twelve declared views
 with 70.15%–78.89% dark coverage. Those checks and cache figures apply only to
 the archived implementation.
 
-## Native downloads and next checks
+## Native source builds and next checks
 
-The Windows, macOS, and Linux packages in the
+The Windows, macOS, and Linux source ports in the
 [native guide](../README.md#ports) use these same SVG outlines: 56 visible
 reference glyphs, the blank slot, and 192 originals, with a 10% original mix.
 Native GDI+, Core Graphics, and Cairo render the filled contours into cached
 sprites. The [catalog record](../native-catalog.json) binds both source catalogs;
-[compiled verification](../README.md#native-verification) covers the downloads.
+[historical verification](../README.md#native-verification) records earlier builds.
+Precompiled packages are not distributed; the native guide lists build commands.
 The native savers retain their three-layer motion. The REGL exposure pipeline,
 3D exploration, and pixel settings are next for the native ports.
 
