@@ -172,6 +172,9 @@ It adds the following runtime guarantees and measured evidence:
 
 ## Implemented after 0.7.0 (Unreleased)
 
+- **Planner history validation** — skip malformed recalled fields without
+  rewriting history or changing valid ranking. Prompts identify summed node
+  time explicitly. [Learning loop](docs/architecture.md#learning-loop).
 - **Autotune campaign ownership** — one live owner and epoch govern trial
   mutations and decisions. Heartbeats survive event-loop statistical work;
   cancellation drains evaluators before release. Transactional v3-to-v4

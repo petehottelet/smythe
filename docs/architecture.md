@@ -129,8 +129,16 @@ graph around capabilities that actually exist.
 
 ## Learning loop
 
-`PlannerMemory` records the task, topology, cost, duration, and outcome of each
-completed run and recalls relevant outcomes into later planning prompts.
+`PlannerMemory` records the task, topology, cost, summed node time, and outcome
+of each completed run and recalls relevant outcomes into later planning prompts.
+Its `total_duration_ms` field sums recorded spans; overlapping nodes contribute
+their individual durations, so this value is not elapsed wall time.
+
+**Unreleased after 0.7.0:** recalled topology, success, cost, and duration fields
+are validated before ranking. Malformed records are skipped without rewriting
+the history file; valid values, legacy keys, and relevance ordering remain
+unchanged. Planner prompts label the recorded duration as “Summed node time.”
+
 `distill_template` turns a successful completed graph into a reusable
 `SubGraphTemplate`, moving a proven topology from autonomous planning into the
 constrained tier.

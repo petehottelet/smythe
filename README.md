@@ -202,9 +202,11 @@ count, execution models, retries, and regeneration across planning and recovery.
 [Durable text accounting](docs/workflow-accounting.md) ·
 [All guides and examples](docs/index.md).
 
-Repository development also adds [Autotune campaign ownership](docs/optimize.md#campaign-ownership-unreleased):
+Repository development adds [Autotune campaign ownership](docs/optimize.md#campaign-ownership-unreleased):
 one leased runner owns trial writes and decisions, with stale-owner rejection
-and conservative recovery. This is an unreleased addition after 0.7.0.
+and conservative recovery. [Planner history](docs/architecture.md#learning-loop)
+validates recalled records and labels summed node time. These updates are
+unreleased after 0.7.0.
 
 ## Quickstart
 

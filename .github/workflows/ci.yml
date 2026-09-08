@@ -168,7 +168,7 @@ jobs:
           python-version: "3.12"
       - name: Install operator test dependencies
         run: python -m pip install -e ".[dev,jobs]"
-      - name: Verify detached execution, observation, and durable pause
+      - name: Verify operator, journal initialization, and planner history
         run: >-
           python -m pytest -q
           tests/test_jobs_operator.py
@@ -177,3 +177,7 @@ jobs:
           tests/test_jobs_artifact_namespace.py
           tests/test_checkpoint_atomic.py
           tests/test_checkpoint.py
+          tests/test_sqlite_initialization.py
+          tests/test_jobs_workflow_initialization.py
+          tests/test_optimize_lease.py
+          tests/test_memory.py
