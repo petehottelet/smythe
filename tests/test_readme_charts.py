@@ -127,7 +127,7 @@ def test_readme_connects_glyph_rain_to_benchmark_evidence():
     readme = ROOT.joinpath("README.md").read_text(encoding="utf-8")
     ordered_markers = (
         "## Benchmark\n",
-        "screensaver/svg-preview/preview.png",
+        "screensaver/svg-preview/preview.gif",
         "**Build from source:** [Windows]",
         "## Process\n",
         "### Original SVG generation",

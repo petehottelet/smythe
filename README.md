@@ -31,7 +31,7 @@ model and pipeline, with blind cross-vendor judging.
 Example task: One workflow creates and validates 192 original SVG glyphs.
 
 <p align="center">
-  <img src="screensaver/svg-preview/preview.png" alt="Classic code rain with the reference character set and occasional original Smythe glyphs" width="900">
+  <img src="screensaver/svg-preview/preview.gif" alt="Animated classic code rain with reference characters and occasional original Smythe glyphs" width="900">
 </p>
 
 **Explore:** [Run the web explorer](screensaver/svg-preview/README.md) ·
@@ -42,7 +42,8 @@ Example task: One workflow creates and validates 192 original SVG glyphs.
 In 3D mode, arrow keys move through the field; Space pauses, R resets the view, and F enters
 fullscreen. Touch controls are included.
 The [current browser review](benchmarks/partitions/glyph_rain_reference_v1/performance-preview-review-20260907.json)
-binds this screenshot and passes 31 rendering and interaction checks.
+binds the [still image](screensaver/svg-preview/preview.png) and passes 31 rendering and interaction checks.
+The [animated preview](screensaver/svg-preview/README.md#readme-animation) uses the same renderer and catalogs.
 A separate ten-minute travel and resize check passed 57 cycles.
 [Rendering measurements and stability report](benchmarks/renderer_performance_20260907_results.md).
 
@@ -268,7 +269,7 @@ team challenges the draft, and a final node writes the decision memo.
 - **Native exploration:** bring the web exposure pipeline, camera controls,
   and settings to Windows, macOS, and Linux, then verify them against the
   [implementation plan](docs/glyph-rain-plan.md).
-- **Native distribution:** notarized macOS downloads and native Wayland integration.
+- **Native platform support:** native Wayland integration. Precompiled distribution remains paused.
 - **Renderer performance:** meet the 1080p frame-interval target with the new
   glyphs, then verify visible presentation and GPU timing. The
   [six-session headless study](benchmarks/renderer_performance_20260907_results.md)
@@ -276,12 +277,12 @@ team challenges the draft, and a final node writes the decision memo.
   was not met.
 - **Broader evidence:** bounded paid scale trials, repeated live glyph sweeps, and
   human-calibrated quality comparisons with saved outputs and judge reasoning.
-- **Astra benchmarks:** matched model and orchestration comparisons with full
-  usage accounting and blind quality scoring. The 13-task pack and schedules
-  for 12 pilot and 200 main workflows are prepared. The
-  [pilot runner](benchmarks/astra_runtime.md) binds spending allocations,
-  source hashes, and recoverable trial identities. Live execution awaits the
-  campaign allowance and [calibration gates](benchmarks/astra_benchmark_plan.md).
+- **Astra benchmarks — live runs not started.** The
+  [13-task protocol and 12-pilot/200-main schedules](benchmarks/astra_benchmark_plan.md)
+  are prepared; the [pilot runner passed 79 offline checks](benchmarks/results/astra_pilot_runtime_20260907/README.md).
+  No live Astra cost, speed, or quality results are published. Next: agree on
+  an API spending ceiling, run the [12-workflow pilot](benchmarks/astra_runtime.md),
+  then calibrate judging before the main comparison.
 
 [Specifications and priorities](ROADMAP.md#coming-soon) ·
 [Repository review](docs/project-review-2026-09-06.md).

@@ -34,8 +34,8 @@ verification, trace, artifact, and recovery controls.
 
 - [GPT-6 Astra quickstart](../README.md#quickstart) — native text planning and execution within one saved $5 allowance
 - [Native OpenAI Responses](openai-responses.md) — Astra/Sol function tools, exact token prices, request quotes, and retained failure receipts
-- [Astra benchmark plan](../benchmarks/astra_benchmark_plan.md) — prepared task packs and balanced schedules, complete usage accounting, and matched comparisons
-- [Astra pilot runner](../benchmarks/astra_runtime.md) — source-bound spending allocations, native workflow receipts, and recovery of the 12 calibration trials
+- [Astra benchmark plan](../benchmarks/astra_benchmark_plan.md) — prepared task packs and balanced schedules; live cost, speed, and quality benchmarks have not run
+- [Astra pilot runner](../benchmarks/astra_runtime.md) — prepared 12-workflow pilot; [79 offline checks](../benchmarks/results/astra_pilot_runtime_20260907/README.md) passed, with no live results or authorized campaign spending ceiling
 - [MCP](mcp.md) — tool discovery, allowlists, secrets, budgets, and timeouts
 - [Style](style.md) — visual language for diagrams and public assets
 
@@ -47,7 +47,7 @@ verification, trace, artifact, and recovery controls.
 - [Glyph Rain benchmark](../benchmarks/glyph_screensaver_benchmark.md) — an artifact fan-out example with isolated 64-, 128-, 192-, and 256-node measurements
 - [Original SVG workflow](../benchmarks/svg_glyph_benchmark.md) — fresh geometry, complete style validation, catalog assembly, and repeated thread/process measurements
 - [Glyph Rain screensaver](../screensaver/README.md) — source builds for Windows, macOS, and Linux using 56 reference and 192 original SVG shapes, with a 10% original mix; no precompiled distribution
-- [Web explorer](../screensaver/svg-preview/README.md) — MIT-licensed reference renderer and base glyphs, 10% original-glyph mix, Matrix green rain, presets, VT323 pixel controls, and a Trajan Bold outline logo
+- [Web explorer and animated preview](../screensaver/svg-preview/README.md) — MIT-licensed reference renderer and base glyphs, 10% original-glyph mix, Matrix green rain, presets, VT323 pixel controls, and a Trajan Bold outline logo
 - [Glyph Rain design plan](glyph-rain-plan.md) — measured original-glyph distributions, licensed renderer scope, and native porting criteria
 - [Reference behavior plan](glyph-rain-parity-plan.md) — pinned defaults, options, and acceptance checks for the adapted effect
 - [Renderer timing protocol](../benchmarks/renderer_performance_20260907.md) — six independent Classic/3D sessions, raw callback and CPU-submission samples, and explicit backend qualification

@@ -7,12 +7,27 @@ The explorer adapts the MIT-licensed rain, bloom, and palette renderer from
 appear in 10% of selections by default.
 
 The [current browser review](../../benchmarks/partitions/glyph_rain_reference_v1/performance-preview-review-20260907.json)
-passes 31 checks and binds the current source and README screenshot. It covers
+passes 31 checks and binds the source and [still image](preview.png). It covers
 fixed-step output, both catalogs, navigation/reset, and measurement interruption.
 The earlier [interaction](../../benchmarks/partitions/glyph_rain_reference_v1/pixel-preview-review.json)
 and [pixel-style](../../benchmarks/partitions/glyph_rain_reference_v1/style-pixel-simple-review.json)
 receipts remain historical checkpoints. Quantified reference parity remains
 unmeasured; rendering performance has a separate protocol below.
+
+## README animation
+
+[Animated GIF](preview.gif) · [Still image](preview.png) · [Capture record](preview-animation.json).
+
+The GIF shows Classic rain with the Matrix palette and 10% original glyphs,
+using the actual renderer. It is 900×506 pixels, loops every 3.4 seconds at
+20 playback frames per second, and is 9.44 MB. A 0.6-second dissolve joins the
+loop. The original still image and its review receipt remain unchanged.
+
+The export advances three 1/60-second simulation steps per captured frame,
+after 228 warm-up steps. FFmpeg scales the frames with Lanczos, uses a
+16-color palette without dithering, and encodes a repeating GIF. The capture
+record binds renderer source hashes and the final GIF. Playback timing is an
+export setting, not a renderer-performance measurement.
 
 ## Run and controls
 

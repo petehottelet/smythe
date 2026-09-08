@@ -23,7 +23,7 @@ mechanics run in CI with deterministic providers and zero API cost.
 | Original self-baselines and pre-correction framework record | Diagnostic | Preserved because they found payload, assembly, and measurement defects; superseded by corrected campaigns |
 | [Control ablation](control_ablation.md) | Mechanism scope | Objective gates remain valuable; routine LLM supervision and judged-prose gating are not default quality paths |
 | [Jobs at 5,000 operations](jobs_scale_5000_20260907_results.md) | **Claimable correctness observation** | One offline schema-v3 campaign: 5,000 accepted identical fixtures after a hard kill, safe resume, and eight explicit rerolls; zero accepted work reissued and zero calls on completed resume. No comparative timing or model-quality claim. |
-| [Astra/Sol matched campaign](astra_benchmark_plan.md) | Pilot runtime qualified offline | 13 task/source packs, balanced 12-pilot/200-main schedules, and [79 passed runtime checks](results/astra_pilot_runtime_20260907/README.md); no paid runs or model-quality results |
+| [Astra/Sol matched campaign](astra_benchmark_plan.md) | **Live benchmark not run**; pilot runtime qualified offline | 13 task/source packs, balanced 12-pilot/200-main schedules, and [79 passed runtime checks](results/astra_pilot_runtime_20260907/README.md); no paid runs or model-quality results |
 
 The authoritative deliverable is `Swarm.execute(...).output`, which is what a
 caller receives. The harness records the historical terminal-node join beside
@@ -382,7 +382,9 @@ published anyway: [control_ablation.md](control_ablation.md).
 
 ## Coming soon
 
-- [GPT-6 Astra campaign](astra_benchmark_plan.md): separate model capability
+- [GPT-6 Astra campaign](astra_benchmark_plan.md): no live results yet; the
+  [pilot runner passed 79 offline checks](results/astra_pilot_runtime_20260907/README.md).
+  Next, approve an API spending ceiling and run the pilot to separate model capability
   from orchestration effects, retain native usage and every attempted run,
   and compare blind quality against complete-workflow cost and time
 - Full-workflow task-shape cost campaign using the corrected provider-call
