@@ -60,9 +60,13 @@ provider calls and provide no model-quality result. The
 [Astra campaign](../benchmarks/astra_runtime.md) has separate spending and
 calibration gates.
 
-## Screensaver downloads
+## Historical screensaver packages
 
-The release includes the verified native **1.1** packages from source
+Precompiled screensaver packages were withdrawn on 7 September 2026.
+[Build the native ports from source](../screensaver/README.md#ports). The
+checksums and observations below are retained historical evidence.
+
+The release originally included native **1.1** packages from source
 `a0327aa58f80e6c7206f5c3eeeae1b48985953e6` and
 [build 34123023804](https://github.com/petehottelet/smythe/actions/runs/34123023804).
 They contain 56 visible reference glyphs, the reference blank slot, and all

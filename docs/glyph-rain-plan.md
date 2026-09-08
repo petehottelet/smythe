@@ -9,7 +9,7 @@ soak passed 57 travel/resize cycles. Visible presentation, GPU timing, and
 quantified reference parity remain unmeasured. The
 [explorer guide](../screensaver/svg-preview/README.md) documents this adaptation;
 the [generation benchmark](../benchmarks/svg_glyph_benchmark.md) still measures
-only Smythe's original catalog. Native downloads now render both current SVG
+only Smythe's original catalog. Native source ports render both current SVG
 catalogs with their three-layer native renderers; web exposure and controls
 remain separate porting work.
 
@@ -541,7 +541,7 @@ preserved. macOS needs a companion universal Explorer app using the same view;
 the system screensaver host owns input dismissal. Linux exploration belongs
 in a standalone X11 window; embedded/root modes leave keyboard ownership with
 the screensaver manager. Native Wayland and Mac notarization remain separate work.
-Current compiled downloads use the exact filled SVG catalogs and default
+Current native source ports use the exact filled SVG catalogs and default
 90% reference / 10% original selection, while retaining their native controls.
 The [native catalog record](../screensaver/native-catalog.json) identifies both
 sources and the [build receipts](../screensaver/README.md#native-verification)

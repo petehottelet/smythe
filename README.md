@@ -46,22 +46,12 @@ binds this screenshot and passes 31 rendering and interaction checks.
 A separate ten-minute travel and resize check passed 57 cycles.
 [Rendering measurements and stability report](benchmarks/renderer_performance_20260907_results.md).
 
-**Windows notice — 7 September 2026:** Defender quarantined the v0.7.0
-`SmytheGlyphRain.scr` as `Trojan:Win32/Wacatac.H!ml`. The cause is unresolved;
-do not install or run it pending review. [Detection and review status](docs/windows-defender-2026-09-07.md).
-
-**Native downloads:** [Windows `.scr`](docs/windows-defender-2026-09-07.md) ·
-[macOS universal `.zip`](https://github.com/petehottelet/smythe/releases/download/v0.7.0/GlyphRain-macos-universal.zip) ·
-[Linux x86-64 `.tar.gz`](https://github.com/petehottelet/smythe/releases/download/v0.7.0/SmytheGlyphRain-linux-x86_64.tar.gz) ·
-[v0.7.0 release and checksums](https://github.com/petehottelet/smythe/releases/tag/v0.7.0) ·
-[Native source and setup](screensaver/README.md).
-
-The compiled packages passed rendering and motion checks on Windows,
-Apple Silicon, Intel Mac, and Ubuntu 22.04/24.04.
-[Checksums and verification](screensaver/README.md#native-verification).
-macOS uses an ad-hoc signature; Linux requires X11.
-The native savers use layered trails; the web explorer provides the REGL effect,
-3D navigation, and pixel settings.
+**Build from source:** [Windows](screensaver/README.md#windows-notes) ·
+[macOS](screensaver/README.md#macos-notes) ·
+[Linux](screensaver/linux/README.md).
+Precompiled screensaver binaries are not distributed. The native ports use
+layered trails; the web explorer provides the REGL effect, 3D navigation,
+and pixel settings.
 
 The web renderer adapts [m8e](https://github.com/m8e/matrix-rain),
 a fork of Rezmason. Native packages also include the reference artwork. Smythe's 192 added screensaver shapes have

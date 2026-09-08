@@ -1,7 +1,11 @@
 # Windows Glyph Rain Defender notice — 7 September 2026
 
-**Status: unresolved; Windows installation and execution are paused pending
-review.** Microsoft Defender detected the native Windows `SmytheGlyphRain.scr`
+**Status: detection unresolved; precompiled distribution withdrawn.**
+Windows, macOS, and Linux release binaries and current-checkout packages
+have been removed. Source builds remain available; compiling locally does
+not establish that Defender will accept the result.
+
+Microsoft Defender detected the native Windows `SmytheGlyphRain.scr`
 distributed with Smythe v0.7.0 as `Trojan:Win32/Wacatac.H!ml` on 7 September
 2026. The downloaded copy and the repository distribution copy were
 quarantined. Keep those files quarantined; do not restore them, add Defender
@@ -52,7 +56,7 @@ their original scope.
    native execution and publication, recording the engine and intelligence
    versions, file hash, scan outcome, and any analyst determination. A scan
    failure or unavailable scanner must prevent publication.
-5. Update the Windows download and installation guidance only after the
+5. Restore precompiled Windows downloads only after the
    review establishes an evidence-backed resolution.
 
 The [screensaver guide](../screensaver/README.md) and

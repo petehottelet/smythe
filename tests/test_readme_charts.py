@@ -128,7 +128,7 @@ def test_readme_connects_glyph_rain_to_benchmark_evidence():
     ordered_markers = (
         "## Benchmark\n",
         "screensaver/svg-preview/preview.png",
-        "**Native downloads:** [Windows `.scr`]",
+        "**Build from source:** [Windows]",
         "## Process\n",
         "### Original SVG generation",
         "assets/benchmarks/svg_workflow.svg",

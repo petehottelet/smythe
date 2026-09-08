@@ -38,14 +38,16 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Documentation
 
+- Withdraw precompiled screensaver packages for Windows, macOS, and Linux
+  from the release and current checkout. Keep source build instructions,
+  licenses, historical checksums, and verification records. Remove Defender
+  notices from the READMEs and retain the separate investigation record.
+  Pause native binary distribution and ignore local build products.
 - **Windows Defender notice**: record the unresolved 7 September 2026
   `Trojan:Win32/Wacatac.H!ml` detection of the v0.7.0 Windows screensaver
-  and quarantine of downloaded and distribution copies. Direct Windows
-  download and installation guidance now points to the
-  [review status](docs/windows-defender-2026-09-07.md); no Microsoft review
-  has cleared the artifact.
-- Link the README's native downloads to the published v0.7.0 release, update
-  the verified PyPI badge, and align the release and renderer status guides.
+  and quarantine of downloaded and distribution copies in a separate
+  [investigation record](docs/windows-defender-2026-09-07.md).
+- Update the verified PyPI badge and align the release and renderer status guides.
 
 ### Fixed
 
