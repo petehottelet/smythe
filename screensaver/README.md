@@ -1,5 +1,10 @@
 # Glyph Rain screensaver
 
+**Windows notice — 7 September 2026:** Defender quarantined the v0.7.0
+`SmytheGlyphRain.scr` as `Trojan:Win32/Wacatac.H!ml`. The cause is unresolved;
+keep it quarantined and do not install or run it pending review.
+[Detection, scope, and review status](../docs/windows-defender-2026-09-07.md).
+
 The Windows, macOS, and Linux downloads render the same SVG shapes as the
 [web explorer](svg-preview/README.md): **56 classic reference glyphs plus
 192 original Smythe glyphs**. The default mix selects an original 10% of the
@@ -76,7 +81,7 @@ to the controlled-latency benchmark and legacy web view.
 |---|---|---|
 | Legacy web (this directory) | [index.html](index.html) + [glyphs.js](glyphs.js) | open `index.html` directly or deploy this static directory |
 | Reference-based web explorer | [svg-preview/](svg-preview/README.md) | serve the repository locally; Classic, 3D, and Operator presets; browser interaction checks pass |
-| Windows 11 (`.scr`) | source [windows/](windows/), binary [dist/SmytheGlyphRain.scr](dist/SmytheGlyphRain.scr) | download the `.scr`, right-click → **Install** |
+| Windows 11 (`.scr`) | source [windows/](windows/), [Defender review status](../docs/windows-defender-2026-09-07.md) | installation and execution paused pending review; keep quarantined copies quarantined |
 | macOS 12+ (`.saver`) | source [macos/](macos/), [universal ZIP](dist/GlyphRain-macos-universal.zip) | unzip, then double-click `GlyphRain.saver`; build locally with `macos/build_macos.sh` |
 | Linux x86-64 / X11 | source and setup [linux/](linux/README.md), [compiled archive](dist/SmytheGlyphRain-linux-x86_64.tar.gz) | extract and run `./smythe-glyph-rain-linux-x86_64 --window`; build with `sh screensaver/linux/build_linux.sh` |
 

@@ -207,6 +207,12 @@ the hardening work ahead of broader production claims:
 
 ### Product and scale
 
+**Windows Defender review:** resolve the v0.7.0 `SmytheGlyphRain.scr`
+detection before promoting Windows installation again. Keep quarantined
+copies quarantined, obtain Microsoft analysis, investigate build provenance,
+and publish the review outcome with exact artifact identities. The cause
+is unresolved; [status and evidence](docs/windows-defender-2026-09-07.md).
+
 The Windows, macOS, and Linux downloads now contain the licensed base catalog
 and current original SVGs, with compiled catalog, rendering, and host checks.
 Next, the [Glyph Rain design plan](docs/glyph-rain-plan.md) brings the web exposure
