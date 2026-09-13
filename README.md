@@ -28,7 +28,7 @@ model and pipeline, with blind cross-vendor judging.
 
 ## Benchmark
 
-Example task: One workflow creates and validates 192 original SVG glyphs.
+Example task: One workflow creates and validates 192 original SVG glyphs for a screensaver application.
 
 <p align="center">
   <img src="screensaver/svg-preview/preview.gif" alt="Animated classic code rain with reference characters and occasional original Smythe glyphs" width="900">
