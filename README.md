@@ -34,7 +34,7 @@ Example task: compile, validate, and export an original SVG glyph catalog for a 
   <img src="screensaver/svg-preview/preview.gif" alt="Animated rain showing only the 192 revised Smythe glyphs" width="900">
 </p>
 
-**Explore the new glyphs:** [Complete 192-glyph sheet](screensaver/glyph-design-v2/contact-sheet-128.png) ·
+[Complete 192-glyph sheet](screensaver/glyph-design-v2/contact-sheet-128.png) ·
 [Complete 256-glyph sheet](benchmarks/partitions/glyph_svg_v2_256/catalog/contact-sheet-128.png) ·
 [16 px](screensaver/glyph-design-v2/contact-sheet-16.png) ·
 [32 px](screensaver/glyph-design-v2/contact-sheet-32.png) ·
@@ -43,13 +43,7 @@ Example task: compile, validate, and export an original SVG glyph catalog for a 
 [Run the web explorer](screensaver/svg-preview/README.md) ·
 [All current materials](docs/current-materials.md).
 
-The v2 catalog uses clean cut ends, broad strokes, and deliberate openings.
-This animation shows **100% new Smythe glyphs**. The explorer also offers the
-licensed reference mix, 3D arrow-key travel, pause, reset, and fullscreen.
-[Current browser checks](screensaver/glyph-design-v2/browser-review.json) bind
-the new catalog and [still image](screensaver/svg-preview/preview.png).
-The [animation record](screensaver/svg-preview/preview-animation.json) records
-the export. The benchmark below compares the current 192-glyph set with a 256-glyph extension.
+This animation shows **Smythe-generated glyphs** created as part of this benchmark exercise. 
 
 **Build from source:** [Windows](screensaver/README.md#windows-notes) ·
 [macOS](screensaver/README.md#macos-notes) ·
@@ -59,7 +53,7 @@ layered trails; the web explorer provides the REGL effect, 3D navigation,
 and pixel settings.
 
 The web renderer adapts [m8e](https://github.com/m8e/matrix-rain),
-a fork of Rezmason. Native packages also include the reference artwork. Smythe's 192 added screensaver shapes have
+a fork of Rezmason. Native packages also include the reference artwork. Smythe's 256 added screensaver shapes have
 independently authored contours from a [measured style brief](docs/glyph-rain-plan.md).
 [Credits, licenses, and artwork provenance](screensaver/README.md#credits-and-references).
 
