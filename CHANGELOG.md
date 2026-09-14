@@ -23,6 +23,11 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Added
 
+- **Native Fable Messages**: text-only `AnthropicMessagesProvider`, exact
+  ordinary/cache/output prices, input-count quotes, durable settlement and
+  saved-response recovery. A frozen 12-pilot/100-main runner retains failed
+  attempts and requires actual pilot human review before main execution.
+
 - **Distribution checks and consumer typing**: exact source/wheel inventories,
   compressed size ceilings, isolated source rebuild and installed-package
   checks, a declared library-only test profile, `py.typed`, positive and

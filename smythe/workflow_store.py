@@ -497,7 +497,7 @@ class SQLiteWorkflowStore:
         if _canonical(request) != request_json or _canonical(names) != tool_names_json:
             raise WorkflowValidationError("Prepared request must use canonical JSON")
         kind = provider.get("kind")
-        if type(kind) is not str or kind not in {"openai_responses", "offline"}:
+        if type(kind) is not str or kind not in {"openai_responses", "anthropic_messages", "offline"}:
             raise WorkflowValidationError("Unsupported durable provider kind")
         for version in ("adapter_version", "decoder_version"):
             _text(provider.get(version), version)
@@ -523,6 +523,18 @@ class SQLiteWorkflowStore:
                 OpenAIResponsesProvider._validate_prepared(PreparedRequest(request_json, tool_names_json))
             except (TypeError, ValueError, KeyError) as exc:
                 raise WorkflowValidationError("Native request is outside supported text workflow scope") from exc
+        elif kind == "anthropic_messages":
+            from smythe.pricing_anthropic import PRICE_VERSION as MESSAGES_PRICE_VERSION
+            from smythe.provider_messages import AnthropicMessagesProvider
+            from smythe.provider_responses import PreparedRequest
+            if (price_version != MESSAGES_PRICE_VERSION
+                    or provider.get("endpoint_scope") != "global"
+                    or provider.get("endpoint", "https://api.anthropic.com") != "https://api.anthropic.com"):
+                raise WorkflowValidationError("Unsupported Messages price version or endpoint")
+            try:
+                AnthropicMessagesProvider._validate_prepared(PreparedRequest(request_json, tool_names_json))
+            except (TypeError, ValueError, KeyError) as exc:
+                raise WorkflowValidationError("Unsupported durable Messages request") from exc
         elif price_version != OFFLINE_PRICE_VERSION:
             raise WorkflowValidationError("Offline calls require the explicit zero-cost price version")
         provider_json = _canonical(provider)
@@ -702,6 +714,9 @@ class SQLiteWorkflowStore:
                     or type(raw.get("version")) is not int):
                 raise WorkflowValidationError("Invalid offline quote evidence")
             ceiling = 0
+        elif provider["kind"] == "anthropic_messages":
+            from smythe.pricing_anthropic import messages_quote_nanousd
+            ceiling = messages_quote_nanousd(count, request["max_tokens"], request["model"])
         else:
             quote = conservative_quote(count, request["max_output_tokens"], request["model"])
             digits = quote.as_tuple()
@@ -841,7 +856,11 @@ class SQLiteWorkflowStore:
                            "pricing_scope": "zero_external_api_cost", "cost_nanousd": "0" if valid else None,
                            "cost_usd": "0" if valid else None, "cost_is_complete": valid}
             else:
-                native = price_native_response(raw, requested_model=request["model"])
+                if provider["kind"] == "anthropic_messages":
+                    from smythe.pricing_anthropic import price_messages_response
+                    native = price_messages_response(raw, requested_model=request["model"])
+                else:
+                    native = price_native_response(raw, requested_model=request["model"])
                 cost, receipt = native.cost_nanousd, native.safe_summary()
                 if evidence["transport_error"] or evidence["status_code"] not in (None, 200):
                     cost = None

@@ -30,6 +30,7 @@ from smythe.provider import (
     ProviderAccountingCancelledError,
 )
 from smythe.provider_responses import OpenAIResponsesProvider
+from smythe.provider_messages import AnthropicMessagesProvider
 from smythe.pricing import NativeReceipt
 from smythe.workflow_binding import LocalOnly, WorkflowBindingError
 from smythe.workflow_policy import WorkflowGraphPolicy
@@ -65,6 +66,7 @@ from smythe.tools import (
 
 __all__ = [
     "AnthropicProvider",
+    "AnthropicMessagesProvider",
     "ArchitectError",
     "Artifact",
     "BudgetEstimateRequired",

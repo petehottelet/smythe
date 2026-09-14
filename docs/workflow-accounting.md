@@ -6,6 +6,9 @@ Separate `plan()` and `execute()` calls retain the same run identity and plannin
 charges. `resume(execution_id)` continues that run under its original policy.
 Smythe 0.7.0 includes this managed text-workflow API.
 
+**Unreleased:** [native Fable Messages](anthropic-messages.md) uses the same
+journal with Anthropic-specific cache categories, quotes, and response decoding.
+
 ## Start a bounded Astra workflow
 
 Install `pip install "smythe[openai]==0.7.0"` and set

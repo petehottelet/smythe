@@ -25,6 +25,7 @@
     "test_benchmarks.py": "Benchmark scripts and example process helper",
     "test_durability_benchmark.py": "Durability benchmark harness",
     "test_examples_smoke.py": "Repository example scripts",
+    "test_fable_runtime.py": "Fable benchmark harness and frozen task pack",
     "test_generated_sdf.py": "Screensaver SDF exporter",
     "test_glyph_design_v2.py": "Screensaver glyph generation and canonical catalog",
     "test_glyph_screensaver_assets.py": "Glyph benchmark assets",
