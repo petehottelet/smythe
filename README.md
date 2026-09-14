@@ -43,9 +43,7 @@ Example task: compile, validate, and export an original SVG glyph catalog for a 
 [Run the web explorer](screensaver/svg-preview/README.md) ·
 [All current materials](docs/current-materials.md).
 
-This animation shows **Smythe-generated glyphs** created as part of this benchmark exercise. 
-
-**Build from source:** [Windows](screensaver/README.md#windows-notes) ·
+This animation shows **Smythe-generated glyphs** created as part of this benchmark exercise.  **Build from source:** [Windows](screensaver/README.md#windows-notes) ·
 [macOS](screensaver/README.md#macos-notes) ·
 [Linux](screensaver/linux/README.md).
 Precompiled screensaver binaries are not distributed. The native ports use
