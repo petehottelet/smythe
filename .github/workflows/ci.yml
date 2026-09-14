@@ -8,7 +8,9 @@ on:
 
 jobs:
   large-file-review:
-    if: github.event_name == 'pull_request'
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -21,7 +23,7 @@ jobs:
           python-version: "3.11"
       - name: Review newly introduced large binary evidence
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: python tools/large_files.py --base "$BASE_SHA"
 
   lint:

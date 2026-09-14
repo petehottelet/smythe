@@ -82,6 +82,9 @@
 /benchmarks/results/astra_20260913/*.zip -text
 /benchmarks/results/astra_20260913_main/*.json -text
 /benchmarks/results/astra_20260913_main/*.zip -text
+# Preserve the submitted Windows review bytes, including their hashed CRLF endings.
+/benchmarks/results/astra_20260913_main/human-main-*.json -whitespace
+/benchmarks/results/astra_20260913_main/pre-human-review.json -whitespace
 
 # Windows operator qualification retains source bindings and raw proof/log bytes.
 /benchmarks/results/windows_operator_20260907/** -text
