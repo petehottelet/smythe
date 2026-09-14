@@ -14,6 +14,7 @@ mechanics run in CI with deterministic providers and zero API cost.
 | Campaign | Status | Current result |
 |---|---|---|
 | [V2 SVG catalog workflow](svg_v2_results.md) | **Claimable local workflow** | 256 glyphs in 8.06 s median; 2.20× same-backend c1 speed; all 36 matched 192/256 workflows pass, with sampled memory |
+| [Fable 5.1 extension](fable_51_benchmark_plan.md) | **Preparation only; not run** | 12 pilot and 100 main positions with matched task contracts. Native Claude accounting, durable integration, access checks, and pilot review precede execution. |
 | [Original SVG workflow](svg_glyph_benchmark.md) | **Historical v1 timing**; visual acceptance superseded | 192 original glyphs in 4.03 s median including full validation and assembly; 2.95× process-c1 speed; all 30 workflows accepted |
 | [REGL rendering and cadence control](renderer_performance_20260907_results.md) | Completed diagnostics; target not met | Six valid Classic/3D sessions: 56.21–56.24 draws/s, 18.10 ms P95 callback interval; three blank-page controls showed similar source cadence |
 | [Task-shape suite v3](shape_suite.md) | **Claimable for wall time and observed quality** | 14% lower end-to-end wall time; historical cost excludes planning |

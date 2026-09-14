@@ -225,6 +225,11 @@ Missing billing evidence blocks cost headlines even when latency is usable.
 
 ## Separate follow-up studies
 
+The [Fable 5.1 extension](fable_51_benchmark_plan.md) is prepared as a separate
+12-pilot/100-main cohort. It reuses the amended task contracts and adds native
+Claude accounting; no Fable calls or results are recorded. Cross-model tables
+must label collection cohorts rather than imply a jointly randomized study.
+
 - **Scheduler effect:** execute the same frozen graphs and model at concurrency
   one and eight, preserving request content. Report graph planning separately
   and keep this diagnostic distinct from complete-workflow results.

@@ -37,6 +37,7 @@ verification, trace, artifact, and recovery controls.
 - [Original Astra pilot results](../benchmarks/results/astra_20260913/README.md) — historical 24-workflow calibration snapshot with complete native receipts
 - [Astra/Sol main results](../benchmarks/results/astra_20260913_main/README.md) — all 200 outcomes, automatic scores, timing and reserved-cost bounds; human review pending
 - [Astra benchmark plan](../benchmarks/astra_benchmark_plan.md) — completed execution, pending human review, fixed acceptance gates and separate follow-up experiments
+- [Fable 5.1 extension](../benchmarks/fable_51_benchmark_plan.md) — prepared 12-pilot/100-main design; native Claude integration and access checks precede paid runs
 - [Astra method amendment](../benchmarks/astra_method_amendment_20260913.md) — planner-only instructions, explicit field types, 48 pilot workflows and preserved diagnostic charges
 - [Astra campaign runners](../benchmarks/astra_runtime.md) — pilot, main, approved reserved-cost continuation, blind judging and offline evidence analysis
 - [MCP](mcp.md) — tool discovery, allowlists, secrets, budgets, and timeouts

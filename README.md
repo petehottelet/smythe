@@ -299,6 +299,9 @@ team challenges the draft, and a final node writes the decision memo.
   was not met.
 - **Broader evidence:** bounded paid scale trials, repeated live glyph sweeps, and
   human-calibrated quality comparisons with saved outputs and judge reasoning.
+- **Fable 5.1:** [prepared extension](benchmarks/fable_51_benchmark_plan.md) with
+  12 pilot and 100 main workflows. Native Claude accounting and access checks
+  precede paid execution; no Fable results yet.
 - **Astra follow-ups:** compare concurrency one and eight on identical graphs,
   match modern framework adapters, and measure durable tool workflows. These
   [separate studies](benchmarks/astra_benchmark_plan.md#separate-follow-up-studies)

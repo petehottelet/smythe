@@ -23,6 +23,11 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Added
 
+- **Fable 5.1 experiment preparation**: bind a 12-workflow medium/high pilot and
+  100-workflow medium-effort main design to the existing task contracts, native
+  Claude accounting requirements, and a shared spending envelope. Preparation
+  only; no paid runner or Fable results. [Plan](benchmarks/fable_51_benchmark_plan.md).
+
 - **Planner-only instructions**: `LLMArchitect(planning_instructions="...")`
   records graph requirements in the workflow recipe without placing them in
   every executor's answer constraints. Existing empty-policy recipes retain

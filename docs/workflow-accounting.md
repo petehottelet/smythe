@@ -157,6 +157,10 @@ WhiteRabbit routing, static registries, LLM supervision, synthesis strategies,
 and token verification. Every reachable router tier and template is checked
 before routing can make a paid call. Provider instances are snapshotted per run.
 
+The [Fable 5.1 benchmark extension](../benchmarks/fable_51_benchmark_plan.md)
+requires a native Claude Messages adapter and journal integration. That support
+is planned; the ordinary `AnthropicProvider` cannot enter this managed path.
+
 Custom local architects, template builders, supervisors, and synthesizers use
 `LocalOnly(factory, identity, version, role=...)`. The factory must return a fresh
 component that performs no provider calls or external side effects. This is an

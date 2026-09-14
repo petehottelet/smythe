@@ -216,6 +216,12 @@ remain withheld. Scheduler, framework and tool experiments are separate
 Human review of eight flagged main answers remains pending. These records are
 not claimable until that review is complete; automatic classifications are retained.
 
+The [Fable 5.1 extension](benchmarks/fable_51_benchmark_plan.md) has a prepared
+12-workflow pilot and 100-workflow main schedule. Native Claude usage accounting,
+durable integration, access verification, and pilot review precede main runs.
+No Fable calls or results are recorded. Its $100 sublimit fits inside the
+existing $300 ceiling, with earlier charges and reservations retained.
+
 The [September repository review](docs/project-review-2026-09-06.md) defines
 the hardening work ahead of broader production claims:
 
