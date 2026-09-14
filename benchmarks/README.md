@@ -18,7 +18,7 @@ publishing benchmark updates.
 | Campaign | Status | Current result |
 |---|---|---|
 | [V2 SVG catalog workflow](svg_v2_results.md) | **Claimable local workflow** | 256 glyphs in 8.06 s median; 2.20× same-backend c1 speed; all 36 matched 192/256 workflows pass, with sampled memory |
-| [Fable 5.1 extension](results/fable_20260914_pilot/README.md) | **Pilots complete; human review pending** | 12 native workflows cost $1.40473; one Code Workflow pilot cost $0.5658735. All 13 passed contracts and blind judging. Human ratings gate 100 native main workflows; the separate ten-task Code comparison is underway. |
+| [Fable 5.1 extension](results/fable_20260914_pilot/README.md) | **Pilots and Code study complete; native main awaits human review** | 12 native pilot workflows cost $1.40473. The separate [ten-task Code Workflow cohort](results/fable_code_20260914/README.md) cost $3.77506525; its pilot and five diagnostic main attempts are retained separately. Human pilot ratings gate 100 native main workflows. |
 | [Original SVG workflow](svg_glyph_benchmark.md) | **Historical v1 timing**; visual acceptance superseded | 192 original glyphs in 4.03 s median including full validation and assembly; 2.95× process-c1 speed; all 30 workflows accepted |
 | [REGL rendering and cadence control](renderer_performance_20260907_results.md) | Completed diagnostics; target not met | Six valid Classic/3D sessions: 56.21–56.24 draws/s, 18.10 ms P95 callback interval; three blank-page controls showed similar source cadence |
 | [Task-shape suite v3](shape_suite.md) | **Claimable for wall time and observed quality** | 14% lower end-to-end wall time; historical cost excludes planning |

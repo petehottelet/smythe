@@ -1,13 +1,14 @@
 # Claude Fable 5.1 benchmark extension
 
-**Status: native and Code Workflow pilots completed; native main awaits human review.**
+**Status: pilots and ten-task Code study completed; native main awaits human review.**
 
 The [runner](fable_runtime.py) freezes current sources, dependencies, model
 access, prior spending, and offline validation before paid execution. Its
 12-run pilot passed every output contract; the blind judge scored all pilot
 answers at 4/4 on every criterion. Actual human ratings gate the 100-run main
 study. [Pilot outcomes, exact costs and raw evidence](results/fable_20260914_pilot/README.md)
-are published. The separately measured ten-task Code comparison is underway.
+are published. The [separate ten-task Code study](results/fable_code_20260914/README.md)
+is complete, including the retained five-task diagnostic cohort and all charges.
 
 Compare fixed and generated execution graphs with `claude-fable-5-1` through
 the native Claude Messages API. This tests whether the Astra/Sol observations

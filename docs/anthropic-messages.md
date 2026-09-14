@@ -44,3 +44,7 @@ no token-count or generation request. See [workflow accounting](workflow-account
 The [Fable protocol](../benchmarks/fable_51_benchmark_plan.md) defines the matched
 benchmark and the separately measured Claude Code Ultracode comparison.
 Ultracode uses Code's Workflow tool; it is not a Messages API effort value.
+The [native pilot](../benchmarks/results/fable_20260914_pilot/README.md) and
+[ten-task Code study](../benchmarks/results/fable_code_20260914/README.md) have
+complete execution and billing records. Actual human pilot ratings gate the
+100-run native main comparison.

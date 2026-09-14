@@ -302,9 +302,9 @@ packages, installed typing checks and a separately verified Repo Doctor ZIP.
   human-calibrated quality comparisons with saved outputs and judge reasoning.
 - **Fable 5.1:** [12-pilot/100-main study](benchmarks/fable_51_benchmark_plan.md),
   with [completed native and Ultracode pilots](benchmarks/results/fable_20260914_pilot/README.md).
-  All 13 pilot answers passed their contract checks and blind judging. Human
-  pilot review gates the 100-run native main study. The separate ten-task
-  Ultracode comparison is underway within the same $100 allocation.
+  The [separate ten-task Code Workflow study](benchmarks/results/fable_code_20260914/README.md)
+  is also complete, with all diagnostic attempts retained. Human pilot ratings
+  gate the 100-run native comparison. Both studies share the same $100 allocation.
 - **Astra follow-ups:** compare concurrency one and eight on identical graphs,
   match modern framework adapters, and measure durable tool workflows. These
   [separate studies](benchmarks/astra_benchmark_plan.md#separate-follow-up-studies)
