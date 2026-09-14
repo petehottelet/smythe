@@ -77,6 +77,10 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Documentation
 
+- Keep implementation plans and internal investigations in ignored private
+  storage, including the legacy glyph plans. Public screensaver guides link
+  directly to measured data, current controls and artifact acceptance records.
+
 - Incorporate the completed Astra human review and relocate nine legacy
   implementation plans and the September project review to ignored private
   storage. Public guides link to current behavior, tests and benchmark evidence.

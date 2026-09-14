@@ -60,7 +60,7 @@ and pixel settings.
 
 The web renderer adapts [m8e](https://github.com/m8e/matrix-rain),
 a fork of Rezmason. Native packages also include the reference artwork. Smythe's 192 added screensaver shapes have
-independently authored contours from a [measured style brief](docs/glyph-rain-plan.md).
+independently authored contours informed by [reference measurements](docs/data/glyph-style-summary.json).
 [Credits, licenses, and artwork provenance](screensaver/README.md#credits-and-references).
 
 ## Process
@@ -298,8 +298,8 @@ packages, installed typing checks and a separately verified Repo Doctor ZIP.
 ## Coming soon
 
 - **Native exploration:** bring the web exposure pipeline, camera controls,
-  and settings to Windows, macOS, and Linux, then verify them against the
-  [implementation plan](docs/glyph-rain-plan.md).
+  and settings to Windows, macOS, and Linux, with platform checks against the
+  [web explorer](screensaver/svg-preview/README.md).
 - **Native platform support:** native Wayland integration. Precompiled distribution remains paused.
 - **Renderer performance:** meet the 1080p frame-interval target with the new
   glyphs, then verify visible presentation and GPU timing. The

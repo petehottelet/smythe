@@ -126,9 +126,9 @@ render scale of 0.75. At 1920 × 1080 and DPR 1, those settings imply 24-pixel
 cells and a 1440 × 810 drawing buffer. These are configuration-derived sizes,
 not measured performance results.
 
-The [behavior plan](../../docs/glyph-rain-parity-plan.md) records pinned
-settings and acceptance checks. The [shape and porting plan](../../docs/glyph-rain-plan.md)
-keeps original-glyph acceptance separate from renderer behavior.
+The [reference provenance](reference/provenance.json) identifies the pinned
+artwork. [Original-glyph acceptance](../glyph-design-v2/README.md) has its own
+records; renderer checks and measurements are listed below.
 
 Settings schema and URL checks run without a browser:
 

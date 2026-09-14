@@ -209,5 +209,7 @@ source atlas and extracted outlines. The REGL rain, bloom, and palette passes
 are adapted licensed code; the additional 192 Smythe glyphs are independently
 authored and retain their own generation receipts.
 
-The [style and implementation plan](../docs/glyph-rain-plan.md) records the
-reference measurements and the specification for new original SVG glyphs.
+The [reference measurements](../docs/data/glyph-style-summary.json) and
+[measurement method](../docs/data/glyph-style-method.json) describe the source
+population. The [current catalog](glyph-design-v2/README.md) contains the
+independently authored SVGs and their acceptance records.
