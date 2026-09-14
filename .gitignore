@@ -45,4 +45,12 @@ Thumbs.db
 
 # Private plans, proposals, reviews, scorecards, and working notes; never publish.
 00_project_files/
+# Retired private-document locations: use 00_project_files instead.
+/plans/
+/docs/project-review-*.md
+/docs/distribution-plan-review-*.md
+/docs/data/distribution-review-*.json
+/docs/glyph-rain-plan.md
+/docs/glyph-rain-parity-plan.md
+/docs/windows-defender-*.md
 .claude/

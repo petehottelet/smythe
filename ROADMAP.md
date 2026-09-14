@@ -247,12 +247,12 @@ The remaining runtime and evidence priorities are:
 detection before restoring precompiled Windows downloads. Keep quarantined
 copies quarantined, obtain Microsoft analysis, investigate build provenance,
 and publish the review outcome with exact artifact identities. The cause
-is unresolved; [status and evidence](docs/windows-defender-2026-09-07.md).
+is unresolved; precompiled distribution remains suspended.
 
 The Windows, macOS, and Linux source ports contain the licensed base catalog
 and current original SVGs. Earlier compiled catalog, rendering, and host
 checks remain archived; precompiled distribution is suspended.
-Next, the [Glyph Rain design plan](docs/glyph-rain-plan.md) brings the web exposure
+Next, bring the [web explorer's](screensaver/svg-preview/README.md) exposure
 pipeline, 3D navigation, and settings into native exploration modes. Preserve
 normal screensaver input dismissal and verify each compiled control. The
 original-glyph generation benchmark remains separate from renderer changes.

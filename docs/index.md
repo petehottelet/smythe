@@ -56,8 +56,8 @@ verification, trace, artifact, and recovery controls.
 - [Historical v1 SVG workflow](../benchmarks/svg_glyph_benchmark.md) — archived geometry, validation, assembly, and timing records; current artwork is linked above
 - [Glyph Rain screensaver](../screensaver/README.md) — source builds for Windows, macOS, and Linux using 56 reference and 192 original SVG shapes, with the current v2 originals and a 10% original mix; no precompiled distribution
 - [Web explorer and animated preview](../screensaver/svg-preview/README.md) — new-glyph-only gallery and animation; adjustable reference mix, Matrix green rain, and pixel controls
-- [Glyph Rain design plan](glyph-rain-plan.md) — measured original-glyph distributions, licensed renderer scope, and native porting criteria
-- [Reference behavior plan](glyph-rain-parity-plan.md) — pinned defaults, options, and acceptance checks for the adapted effect
+- [Glyph reference measurements](data/glyph-style-summary.json) — source-population distributions; [measurement method](data/glyph-style-method.json)
+- [Explorer controls and checks](../screensaver/svg-preview/README.md) — current renderer behavior, settings and verification commands
 - [Renderer timing protocol](../benchmarks/renderer_performance_20260907.md) — six independent Classic/3D sessions, raw callback and CPU-submission samples, and explicit backend qualification
 - [Renderer measurements](../benchmarks/renderer_performance_20260907_results.md) — all six target-missing sessions, a separate blank-page cadence control, and a ten-minute travel/resize check
 
