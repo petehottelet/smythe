@@ -1,11 +1,13 @@
 # Claude Fable 5.1 benchmark extension
 
-**Status: native Messages runner implemented; pilot not yet executed.**
+**Status: native and Code Workflow pilots completed; native main awaits human review.**
 
 The [runner](fable_runtime.py) freezes current sources, dependencies, model
 access, prior spending, and offline validation before paid execution. Its
-12-run pilot must pass the medium-effort contracts and actual human review
-before the 100-run main study starts. No Fable results are published yet.
+12-run pilot passed every output contract; the blind judge scored all pilot
+answers at 4/4 on every criterion. Actual human ratings gate the 100-run main
+study. [Pilot outcomes, exact costs and raw evidence](results/fable_20260914_pilot/README.md)
+are published. The separately measured ten-task Code comparison is underway.
 
 Compare fixed and generated execution graphs with `claude-fable-5-1` through
 the native Claude Messages API. This tests whether the Astra/Sol observations
@@ -42,6 +44,11 @@ failure, not an Ultracode result. No Code trial enters the 100-run native estima
 describes Ultracode as Claude Code orchestration. It is not an API effort enum.
 The Code runner must verify bounded child-agent spending and retain complete
 usage evidence before its first paid trial.
+
+The initial Code tasks exposed repeated shorthand model-name failures. The
+[model-identifier amendment](fable_code_model_id_amendment_20260914.md) preserves
+those attempts as diagnostics and repeats the complete Code schedule with the
+exact API model identifier, using the same remaining allocation.
 
 ### Native matched schedule
 

@@ -1,0 +1,670 @@
+{
+  "version": 1,
+  "claimable": false,
+  "evidence_status": "completed-pilot-human-review-pending",
+  "scope": "Pilot compatibility, accounting, and output qualification; excluded from the native main estimate",
+  "native_workflows": 12,
+  "native_confirmed_nanousd": 1404730000,
+  "native_outcomes": [
+    {
+      "trial": {
+        "block": 0,
+        "effort": "medium",
+        "model": "claude-fable-5-1",
+        "ordinal": 0,
+        "position": 0,
+        "repetition": 1,
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-membership",
+        "trial_id": "fable51--pilot--pilot-membership--r1--medium--fixed_pipeline"
+      },
+      "run_id": "02d41fb2c7b299d93b329539bb85bfda26596c122032e654cf166afd2e35333c",
+      "status": "completed",
+      "output_sha256": "5b5fcfd4497fea65c7c55638937c49d2d3b41da42f123af44360ea0a94682dd3",
+      "record_sha256": "4cf0b07816d25c57aacc12f4e44c5d5fe8a5741e78e4774363b7edef7a229fbc",
+      "wall_time_ns": 29105170700,
+      "confirmed_nanousd": 108370000,
+      "provider_calls": 3,
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      },
+      "blind_scores": {
+        "criteria": [
+          {
+            "id": "criterion-1",
+            "reason": "The deliverable correctly identifies the spelling error 'recieve', explains the correct spelling, and corrects it to 'receive' in the final copy.",
+            "score": 4
+          },
+          {
+            "id": "criterion-2",
+            "reason": "The arithmetic for the discount is correctly recomputed as 16.67% (60/360), which is properly reflected in the defects, the corrected copy, and the facts section.",
+            "score": 4
+          },
+          {
+            "id": "criterion-3",
+            "reason": "The false promises 'Unlimited guest passes' and 'Phone support 24/7' are correctly identified as policy defects and removed/corrected in the final copy.",
+            "score": 4
+          },
+          {
+            "id": "criterion-4",
+            "reason": "The corrected copy is coherent, flows well, and accurately reflects all the constraints and supported offers from the authoritative policy.",
+            "score": 4
+          }
+        ],
+        "material_defects": []
+      }
+    },
+    {
+      "trial": {
+        "block": 0,
+        "effort": "medium",
+        "model": "claude-fable-5-1",
+        "ordinal": 1,
+        "position": 1,
+        "repetition": 1,
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-membership",
+        "trial_id": "fable51--pilot--pilot-membership--r1--medium--smythe_dynamic"
+      },
+      "run_id": "01c0e037256cc66e53dd14d85839149337ea81a2989966f11adf5dc43f034126",
+      "status": "completed",
+      "output_sha256": "5469ca96143f5adaf13ee893454101ff729dade4b2ceb169ea0e518da249acd5",
+      "record_sha256": "9e5ce879db74f07c8ef33061a53457a6df8e72a347e3ea369cb55ef579b05c23",
+      "wall_time_ns": 48739040100,
+      "confirmed_nanousd": 274510000,
+      "provider_calls": 5,
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      },
+      "blind_scores": {
+        "criteria": [
+          {
+            "id": "criterion-1",
+            "reason": "The spelling error 'recieve' is accurately identified, explained, and correctly spelled as 'receive' in the corrected copy.",
+            "score": 4
+          },
+          {
+            "id": "criterion-2",
+            "reason": "The deliverable correctly identifies the arithmetic error, recalculates the savings percent based on the authoritative inputs (16.67%), and updates both the facts and corrected copy accordingly.",
+            "score": 4
+          },
+          {
+            "id": "criterion-3",
+            "reason": "The false promises of 'Unlimited guest passes' and 'Phone support 24/7' are correctly identified as contradicting the policy and have been removed/adjusted in the corrected copy.",
+            "score": 4
+          },
+          {
+            "id": "criterion-4",
+            "reason": "The corrected copy is coherent, flows well, and accurately reflects all supported constraints and offers.",
+            "score": 4
+          }
+        ],
+        "material_defects": []
+      }
+    },
+    {
+      "trial": {
+        "block": 0,
+        "effort": "high",
+        "model": "claude-fable-5-1",
+        "ordinal": 2,
+        "position": 2,
+        "repetition": 1,
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-membership",
+        "trial_id": "fable51--pilot--pilot-membership--r1--high--smythe_dynamic"
+      },
+      "run_id": "c01c5a66f1753c09c6a62ad13f7c9203a0c0908bcde6af24d20dbd9dd2e7f732",
+      "status": "completed",
+      "output_sha256": "4f918af063a5a4b4cb0b05556b6aa96164feb03b9ad7542da070b230c27f6751",
+      "record_sha256": "c824d2b15f465bfa3362b3be5003c1247d83fdabc3f8b9aa1bf8baa0cb2e1501",
+      "wall_time_ns": 50298099500,
+      "confirmed_nanousd": 303010000,
+      "provider_calls": 5,
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      },
+      "blind_scores": {
+        "criteria": [
+          {
+            "id": "criterion-1",
+            "reason": "Accurately identifies 'recieve' as a spelling defect, provides an explanation, and uses the correct spelling 'receive' in the corrected copy.",
+            "score": 4
+          },
+          {
+            "id": "criterion-2",
+            "reason": "Correctly recomputes the annual savings (60 credits off 360) to 16.67% and updates the draft and facts accordingly.",
+            "score": 4
+          },
+          {
+            "id": "criterion-3",
+            "reason": "Successfully identifies the contradictory promises of 'Unlimited guest passes' and '24/7' phone support, explaining why they are wrong according to the policy and removing/fixing them.",
+            "score": 4
+          },
+          {
+            "id": "criterion-4",
+            "reason": "The corrected copy is highly coherent, accurately incorporates all corrections, and retains the supported elements of the original offer.",
+            "score": 4
+          }
+        ],
+        "material_defects": []
+      }
+    },
+    {
+      "trial": {
+        "block": 0,
+        "effort": "high",
+        "model": "claude-fable-5-1",
+        "ordinal": 3,
+        "position": 3,
+        "repetition": 1,
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-membership",
+        "trial_id": "fable51--pilot--pilot-membership--r1--high--fixed_pipeline"
+      },
+      "run_id": "a193c09982806f6bcfd52df595c73f165a2b9404a4b3dbaec8e08bf788ed4143",
+      "status": "completed",
+      "output_sha256": "eb48feaf531b22776f7183185d38dba7790d25c1cb3f72aa3d4aec6e6f31fcf2",
+      "record_sha256": "e2f5975a513102d28cff6f01bb6bf3777236efe3424b80b94fa3ee929177ea03",
+      "wall_time_ns": 28113249500,
+      "confirmed_nanousd": 119020000,
+      "provider_calls": 3,
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      },
+      "blind_scores": {
+        "criteria": [
+          {
+            "id": "criterion-1",
+            "reason": "The deliverable correctly identifies the spelling error 'recieve', explains the correct spelling 'receive', and implements the correction in the final copy.",
+            "score": 4
+          },
+          {
+            "id": "criterion-2",
+            "reason": "The deliverable correctly recomputes the discount based on the authoritative inputs (30 monthly, 300 annual). It correctly calculates the savings as 16.67% instead of the 25% stated in the draft, and includes the correct facts in the output.",
+            "score": 4
+          },
+          {
+            "id": "criterion-3",
+            "reason": "The deliverable accurately identifies and explains the policy contradictions ('Unlimited guest passes' and 'Phone support 24/7') against the authoritative product policy limits (3 passes, weekday phone support).",
+            "score": 4
+          },
+          {
+            "id": "criterion-4",
+            "reason": "The corrected copy successfully incorporates all corrections and removes contradictions, resulting in a coherent and accurate final text.",
+            "score": 4
+          }
+        ],
+        "material_defects": []
+      }
+    },
+    {
+      "trial": {
+        "block": 1,
+        "effort": "medium",
+        "model": "claude-fable-5-1",
+        "ordinal": 4,
+        "position": 0,
+        "repetition": 1,
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-calendar",
+        "trial_id": "fable51--pilot--pilot-calendar--r1--medium--smythe_dynamic"
+      },
+      "run_id": "7ac7f7eadcb5e48b9ca492886914f3b948d1aa8b5ad585de3ccfa490aa1ade06",
+      "status": "completed",
+      "output_sha256": "5f330c67a58bf43ec72f14414512aa25c8bc1e3330a541b087d81e4dfcb89ea9",
+      "record_sha256": "e9f8336286c37afbc2fcc79f667c691e000f4d83c2a082ee71aae454db995893",
+      "wall_time_ns": 18544334500,
+      "confirmed_nanousd": 45570000,
+      "provider_calls": 2,
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      },
+      "blind_scores": {
+        "criteria": [
+          {
+            "id": "criterion-1",
+            "reason": "All four dates were correctly converted to YYYY-MM-DD format as specified by the source document (including the MM/DD/YYYY slash format).",
+            "score": 4
+          },
+          {
+            "id": "criterion-2",
+            "reason": "The original order of the dates was strictly preserved and the semantic meaning of each date is exact.",
+            "score": 4
+          },
+          {
+            "id": "criterion-3",
+            "reason": "The deliverable consists solely of the required JSON array with no markdown formatting or extra text.",
+            "score": 4
+          }
+        ],
+        "material_defects": []
+      }
+    },
+    {
+      "trial": {
+        "block": 1,
+        "effort": "high",
+        "model": "claude-fable-5-1",
+        "ordinal": 5,
+        "position": 1,
+        "repetition": 1,
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-calendar",
+        "trial_id": "fable51--pilot--pilot-calendar--r1--high--fixed_pipeline"
+      },
+      "run_id": "e7c687a22260ce9bd97218bf62643c887a7d5b747af1a1b1cbf048b76948907a",
+      "status": "completed",
+      "output_sha256": "5f330c67a58bf43ec72f14414512aa25c8bc1e3330a541b087d81e4dfcb89ea9",
+      "record_sha256": "8ce82d5367af22f4ab3b518325413b8049bde4e4f897191230eae82a83028a98",
+      "wall_time_ns": 22045564200,
+      "confirmed_nanousd": 54020000,
+      "provider_calls": 3,
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      },
+      "blind_scores": {
+        "criteria": [
+          {
+            "id": "criterion-1",
+            "reason": "All four dates were correctly converted to YYYY-MM-DD format as specified by the source document (including the MM/DD/YYYY slash format).",
+            "score": 4
+          },
+          {
+            "id": "criterion-2",
+            "reason": "The original order of the dates was strictly preserved and the semantic meaning of each date is exact.",
+            "score": 4
+          },
+          {
+            "id": "criterion-3",
+            "reason": "The deliverable consists solely of the required JSON array with no markdown formatting or extra text.",
+            "score": 4
+          }
+        ],
+        "material_defects": []
+      }
+    },
+    {
+      "trial": {
+        "block": 1,
+        "effort": "medium",
+        "model": "claude-fable-5-1",
+        "ordinal": 6,
+        "position": 2,
+        "repetition": 1,
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-calendar",
+        "trial_id": "fable51--pilot--pilot-calendar--r1--medium--fixed_pipeline"
+      },
+      "run_id": "08a84de0b555000f85efcd7d78c2c94a2963c3e41a10769a88240aed449167d0",
+      "status": "completed",
+      "output_sha256": "5f330c67a58bf43ec72f14414512aa25c8bc1e3330a541b087d81e4dfcb89ea9",
+      "record_sha256": "2b43fa7b4f21790bcf803292d87bab09b2f862b5d2ccd5e5e0323d899ad91844",
+      "wall_time_ns": 17342199300,
+      "confirmed_nanousd": 31720000,
+      "provider_calls": 3,
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      },
+      "blind_scores": {
+        "criteria": [
+          {
+            "id": "criterion-1",
+            "reason": "All four dates were correctly converted to YYYY-MM-DD format as specified by the source document (including the MM/DD/YYYY slash format).",
+            "score": 4
+          },
+          {
+            "id": "criterion-2",
+            "reason": "The original order of the dates was strictly preserved and the semantic meaning of each date is exact.",
+            "score": 4
+          },
+          {
+            "id": "criterion-3",
+            "reason": "The deliverable consists solely of the required JSON array with no markdown formatting or extra text.",
+            "score": 4
+          }
+        ],
+        "material_defects": []
+      }
+    },
+    {
+      "trial": {
+        "block": 1,
+        "effort": "high",
+        "model": "claude-fable-5-1",
+        "ordinal": 7,
+        "position": 3,
+        "repetition": 1,
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-calendar",
+        "trial_id": "fable51--pilot--pilot-calendar--r1--high--smythe_dynamic"
+      },
+      "run_id": "9257a7b82f7f4943d529541deddc38af25fcd28fca0b465a24560adf62f62902",
+      "status": "completed",
+      "output_sha256": "5f330c67a58bf43ec72f14414512aa25c8bc1e3330a541b087d81e4dfcb89ea9",
+      "record_sha256": "20ff9cd98e478c42a4210dd6a78cceda83c4b5f476eef12fa82a74c8f7baa682",
+      "wall_time_ns": 13143710200,
+      "confirmed_nanousd": 40460000,
+      "provider_calls": 2,
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      },
+      "blind_scores": {
+        "criteria": [
+          {
+            "id": "criterion-1",
+            "reason": "All four dates were correctly converted to YYYY-MM-DD format as specified by the source document (including the MM/DD/YYYY slash format).",
+            "score": 4
+          },
+          {
+            "id": "criterion-2",
+            "reason": "The original order of the dates was strictly preserved and the semantic meaning of each date is exact.",
+            "score": 4
+          },
+          {
+            "id": "criterion-3",
+            "reason": "The deliverable consists solely of the required JSON array with no markdown formatting or extra text.",
+            "score": 4
+          }
+        ],
+        "material_defects": []
+      }
+    },
+    {
+      "trial": {
+        "block": 2,
+        "effort": "high",
+        "model": "claude-fable-5-1",
+        "ordinal": 8,
+        "position": 0,
+        "repetition": 1,
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-relays",
+        "trial_id": "fable51--pilot--pilot-relays--r1--high--fixed_pipeline"
+      },
+      "run_id": "f4b52a2c37e79433080bcc72254063c72267ce3694817c7d5178e053f34baca8",
+      "status": "completed",
+      "output_sha256": "acac5bcfec282714c03a9597aa1f6ef695777fd5607b7432bcca88e26f938d0c",
+      "record_sha256": "009f42f59c628d4aaf51edff99837610228722e84885c852ff66781101686305",
+      "wall_time_ns": 31901243100,
+      "confirmed_nanousd": 135950000,
+      "provider_calls": 3,
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      },
+      "blind_scores": {
+        "criteria": [
+          {
+            "id": "criterion-1",
+            "reason": "The deliverable successfully maps each candidate's measurements and weaknesses separately within the 'profiles' object.",
+            "score": 4
+          },
+          {
+            "id": "criterion-2",
+            "reason": "The deliverable correctly evaluates both the maximum energy (30 mJ) and minimum range (1000 m) limits for every candidate.",
+            "score": 4
+          },
+          {
+            "id": "criterion-3",
+            "reason": "The ranking correctly includes only the feasible candidates ('fern', 'pine') and orders them by energy ascending as stipulated.",
+            "score": 4
+          },
+          {
+            "id": "criterion-4",
+            "reason": "The reasoning effectively utilizes the provided figures to explain the outcome, explicitly acknowledging the exclusions of Moss and Ash with their respective failing metrics.",
+            "score": 4
+          }
+        ],
+        "material_defects": []
+      }
+    },
+    {
+      "trial": {
+        "block": 2,
+        "effort": "high",
+        "model": "claude-fable-5-1",
+        "ordinal": 9,
+        "position": 1,
+        "repetition": 1,
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-relays",
+        "trial_id": "fable51--pilot--pilot-relays--r1--high--smythe_dynamic"
+      },
+      "run_id": "fec6931855cfdb3ad37233e03ea6dd2950fcff110ce0f17398e9ac21262df014",
+      "status": "completed",
+      "output_sha256": "ad4f9ea78160cb6c3a0367db95ca5230dcf7981b12991af30af7a90e36dbe085",
+      "record_sha256": "e5377bdfbb38bf07eea220c9e83fad9b399f0d28ea79fbf1c13425e04e57400a",
+      "wall_time_ns": 19828063800,
+      "confirmed_nanousd": 84910000,
+      "provider_calls": 2,
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      },
+      "blind_scores": {
+        "criteria": [
+          {
+            "id": "criterion-1",
+            "reason": "The deliverable successfully maps each candidate's measurements, feasibility, and weaknesses separately in the profiles object.",
+            "score": 4
+          },
+          {
+            "id": "criterion-2",
+            "reason": "The deliverable correctly applies the maximum energy limit (30 mJ) and the minimum range limit (1000 m) to all four candidates.",
+            "score": 4
+          },
+          {
+            "id": "criterion-3",
+            "reason": "The deliverable correctly ranks only the feasible candidates (Fern and Pine) using the stated rule (energy ascending).",
+            "score": 4
+          },
+          {
+            "id": "criterion-4",
+            "reason": "The reasoning section clearly explains the result using the supplied figures and explicitly acknowledges the exclusion of Moss and Ash with their respective numbers.",
+            "score": 4
+          }
+        ],
+        "material_defects": []
+      }
+    },
+    {
+      "trial": {
+        "block": 2,
+        "effort": "medium",
+        "model": "claude-fable-5-1",
+        "ordinal": 10,
+        "position": 2,
+        "repetition": 1,
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-relays",
+        "trial_id": "fable51--pilot--pilot-relays--r1--medium--smythe_dynamic"
+      },
+      "run_id": "7e761c2912313f8182701dbb0c02954727d78e5c15837bc97579ea8ca2545d32",
+      "status": "completed",
+      "output_sha256": "6401f283d3a09a804531797f94a9594974344c5b40a3262f7a94669455f10764",
+      "record_sha256": "fcad7b12eef5a37e0ec92637c352335d934c57483ddee70fae43f4916925a8a1",
+      "wall_time_ns": 18197992700,
+      "confirmed_nanousd": 81870000,
+      "provider_calls": 2,
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      },
+      "blind_scores": {
+        "criteria": [
+          {
+            "id": "criterion-1",
+            "reason": "The deliverable accurately captures the measurements (energy, range) and weaknesses for all four candidates in the profiles object without mixing them.",
+            "score": 4
+          },
+          {
+            "id": "criterion-2",
+            "reason": "The deliverable correctly evaluates both the energy cap (30 mJ) and the minimum range (1000 m) for every candidate, resulting in correct boolean feasibility flags.",
+            "score": 4
+          },
+          {
+            "id": "criterion-3",
+            "reason": "The ranking accurately includes only the feasible candidates (Fern and Pine) and correctly orders them by energy ascending.",
+            "score": 4
+          },
+          {
+            "id": "criterion-4",
+            "reason": "The reasoning text clearly explains the exclusion of Moss and Ash using the numerical thresholds and values, and explains the final ranking using the supplied figures.",
+            "score": 4
+          }
+        ],
+        "material_defects": []
+      }
+    },
+    {
+      "trial": {
+        "block": 2,
+        "effort": "medium",
+        "model": "claude-fable-5-1",
+        "ordinal": 11,
+        "position": 3,
+        "repetition": 1,
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-relays",
+        "trial_id": "fable51--pilot--pilot-relays--r1--medium--fixed_pipeline"
+      },
+      "run_id": "36ff6de172d15f8569916eac86fcb2aaca513f37da6d0643f5dc8614619ebf95",
+      "status": "completed",
+      "output_sha256": "73ff475bd3e413700ff7cebde4435b9a86427eb1cb61552f3165068b59c89746",
+      "record_sha256": "7e39e423f31de93ed3d487a6bff41ed6cfd5abe40aca409878e595d7bb092cee",
+      "wall_time_ns": 32223853400,
+      "confirmed_nanousd": 125320000,
+      "provider_calls": 3,
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      },
+      "blind_scores": {
+        "criteria": [
+          {
+            "id": "criterion-1",
+            "reason": "The deliverable successfully maps each candidate to its specific measurements (energy_mj, range_m) and weakness within the profiles object, keeping them separate and accurate.",
+            "score": 4
+          },
+          {
+            "id": "criterion-2",
+            "reason": "The deliverable applies the maximum energy limit (30 mJ) and minimum range limit (1000 m) to all four candidates accurately, correctly marking Moss and Ash as infeasible and Fern and Pine as feasible.",
+            "score": 4
+          },
+          {
+            "id": "criterion-3",
+            "reason": "The ranking array excludes the infeasible candidates (Moss and Ash) and correctly ranks the feasible candidates (Fern, Pine) in ascending order of energy.",
+            "score": 4
+          },
+          {
+            "id": "criterion-4",
+            "reason": "The reasoning text thoroughly explains the feasibility and ranking of each candidate, citing the exact numeric figures from the source pack and explicitly addressing the exclusion of Moss and Ash.",
+            "score": 4
+          }
+        ],
+        "material_defects": []
+      }
+    }
+  ],
+  "native_execution_failures": 0,
+  "native_contract_failures": 0,
+  "code_pilot": {
+    "workflows": 1,
+    "workflow_invocations": 2,
+    "provider_calls": 8,
+    "confirmed_nanousd": 565873500,
+    "wall_time_ns": 82835741300,
+    "deterministic_checks": {
+      "deterministic_passed": true,
+      "failed_checks": [],
+      "quality_evaluated": false,
+      "accepted": null
+    },
+    "blind_scores": {
+      "criteria": [
+        {
+          "id": "criterion-1",
+          "reason": "The deliverable successfully isolates the misspelled word 'recieve', explains the error, and provides the correct spelling 'receive' in the corrected copy.",
+          "score": 4
+        },
+        {
+          "id": "criterion-2",
+          "reason": "The deliverable accurately recomputes the annual savings (360 credits vs 300 credits) to arrive at the correct 16.67%, properly documenting the math and updating the facts object to two decimal places.",
+          "score": 4
+        },
+        {
+          "id": "criterion-3",
+          "reason": "The deliverable correctly identifies the contradictory claims ('Unlimited guest passes' and 'Phone support 24/7') and replaces them with the stated policy limits (3 passes, weekdays 09:00-17:00).",
+          "score": 4
+        },
+        {
+          "id": "criterion-4",
+          "reason": "The provided corrected copy is fluent, grammatically sound, and successfully integrates all the corrected facts and constraints without including unsupported promises.",
+          "score": 4
+        }
+      ],
+      "material_defects": []
+    },
+    "recovery": "Code relaunched its generated workflow after an unrecognized model alias; both launches are retained"
+  },
+  "judge": {
+    "paid_judgments": 10,
+    "cost_lower_nanousd": 115147400,
+    "cost_upper_nanousd": 134762000,
+    "unresolved_attempts": 0,
+    "judge_freeze_sha256": "a153978496a524d060db5804442373fefa345a2046d4b71749e5cdf06a83c77c"
+  },
+  "pilot_cost_lower_nanousd": 2085750900,
+  "pilot_cost_upper_nanousd": 2105365500,
+  "human_review": {
+    "status": "pending",
+    "required_medium_samples": 6
+  },
+  "native_main_status": "not-started; actual pilot human ratings required",
+  "main_study_workflows": 100
+}
