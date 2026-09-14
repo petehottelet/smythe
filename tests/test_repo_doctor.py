@@ -116,3 +116,28 @@ def test_offline_audit_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     next_steps = (out / "NEXT_STEPS.md").read_text(encoding="utf-8")
     assert next_steps.startswith("# Next Steps")
     assert "## Done When" in next_steps
+
+
+def test_default_audit_output_stays_under_private_project_files(fixture_repo, tmp_path, monkeypatch):
+    for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.chdir(tmp_path)
+    assert audit_repo.main([str(fixture_repo)]) == 0
+    assert (tmp_path / "00_project_files/repo-doctor/PROJECT_SCORECARD.md").is_file()
+    assert not (tmp_path / "audit-output").exists()
+
+
+def test_snapshot_never_traverses_private_project_materials(fixture_repo, monkeypatch):
+    before = collect_snapshot(fixture_repo)
+    private = fixture_repo / "00_project_files"
+    private.mkdir()
+    (private / "credentials.txt").write_text(FAKE_TOKEN)
+    original = Path.iterdir
+
+    def guarded(directory):
+        if directory == private:
+            pytest.fail("Private working material was traversed")
+        return original(directory)
+
+    monkeypatch.setattr(Path, "iterdir", guarded)
+    assert collect_snapshot(fixture_repo) == before

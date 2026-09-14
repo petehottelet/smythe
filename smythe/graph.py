@@ -12,7 +12,7 @@ from uuid import uuid4
 from smythe.task import Task, task_to_dict
 
 
-def snapshot_run_ref(value: dict | None) -> dict | None:
+def snapshot_run_ref(value: dict[str, Any] | None) -> dict[str, Any] | None:
     """Detach a strict durable-run reference without copying the call ledger."""
     if value is None:
         return None
@@ -239,7 +239,7 @@ class ExecutionGraph:
     nodes: list[Node] = field(default_factory=list)
     estimated_cost_usd: float | None = None
     task: Task | None = None
-    run_ref: dict | None = None
+    run_ref: dict[str, Any] | None = None
 
     def roots(self) -> list[Node]:
         """Nodes with no dependencies — entry points for execution."""

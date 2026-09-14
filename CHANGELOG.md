@@ -23,6 +23,14 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Added
 
+- **Distribution checks and consumer typing**: exact source/wheel inventories,
+  compressed size ceilings, isolated source rebuild and installed-package
+  checks, a declared library-only test profile, `py.typed`, positive and
+  negative public type checks, and an explicit strict-module gate.
+- **Repo Doctor ZIP**: a deterministic committed-source archive with license,
+  exact runtime pin, source identity and checksums. CI verifies the released
+  runtime offline; release assets are published without overwriting old ones.
+
 - **Current materials index**: link revised 192/256 contact sheets, previews,
   source exports, and benchmark reports from one page. Require a materials
   check with each benchmark publication; label the archived v1 catalog,
@@ -56,6 +64,11 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   retain their reservations and block new admission.
 
 ### Changed
+
+- Source distributions retain library code, tests and build tools while
+  omitting repository media, benchmark archives, screensaver sources and
+  skills. Wheels retain the library and metadata. Full-checkout tests require
+  repository materials; sparse/source tests use explicit `--distribution`.
 
 - Autotune schema v4 transactionally upgrades v3 evidence and blocks writes
   from already-open v3 connections. Closed read-only v3 inspection remains

@@ -48,20 +48,64 @@ need a smaller local development environment.
 ## Running tests and lint
 
 ```bash
-ruff check smythe/ tests/ benchmarks/ examples/
+ruff check .
+python -m mypy
 pytest tests/ -q
 ```
 
 CI runs the same commands across the supported Python matrix. PRs must be
 green on both before merge.
 
+### Working with a slim checkout
+
+For library work, fetch history lazily and omit large artwork and benchmark
+trees from the checkout:
+
+```bash
+git clone --filter=blob:none --sparse https://github.com/petehottelet/smythe.git
+cd smythe
+git sparse-checkout set smythe tests tools docs examples
+pip install -e ".[dev]"
+python -m pytest tests/ --distribution -q
+```
+
+`--distribution` selects the documented library test profile; it does not
+claim to exercise omitted benchmarks, screensaver code or skills. The normal
+test command requires the full checkout and fails on missing materials.
+See [package contents and verification](docs/distribution.md).
+
+For all current files with lazy historical blobs:
+
+```bash
+git clone --filter=blob:none https://github.com/petehottelet/smythe.git
+```
+
+Partial cloning defers historical blob downloads. Sparse checkout omits
+current files; full checkout still downloads the current tree. Transfer and
+disk use depend on the revision and subsequent commands.
+
+### Evidence files
+
+Keep committed benchmark records and existing evidence bytes in place.
+New binary evidence over 1 MiB should use a retained release asset with a
+small manifest recording its source revision, byte size, SHA-256 and download
+URL. Include download verification and offline reproduction instructions,
+and retain a backup: checksums detect changes but cannot recover deleted bytes.
+Keep README display images available at their repository paths.
+
+CI warns when a change introduces a binary file above that threshold. Review
+decides whether its size and storage location are justified; the warning is
+not a hard limit. Internal implementation plans, project reviews and working
+notes always belong in gitignored `00_project_files/`.
+
 ## Project conventions
 
 - **Style:** [`ruff`](https://docs.astral.sh/ruff/) governs formatting and
   lint. Run it before pushing.
 - **Type hints:** all public APIs are fully type-hinted. New code should match.
-- **Async first:** core executors are async-native. If you add a sync wrapper,
-  keep the async path the source of truth.
+- **Execution:** serial and concurrent schedulers share provider, accounting
+  and persistence machinery. Preserve their ordering, cancellation and
+  recovery contracts when changing either path.
 - **No emojis** in commit messages, code, or docs unless explicitly requested.
 - **No "created with X" attribution** in commit messages.
 - **Tests live next to features.** New behavior needs a test. Bug fixes need

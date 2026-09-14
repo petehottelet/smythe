@@ -172,6 +172,11 @@ It adds the following runtime guarantees and measured evidence:
 
 ## Implemented after 0.7.0 (Unreleased)
 
+- **Distribution and typing** — explicit source-package contents and library
+  test profile, clean source rebuilds, installed consumer type checks, and a
+  versioned Repo Doctor ZIP with runtime pin and checksums.
+  [Packages, tests and installation](docs/distribution.md).
+
 - **Autotune inspection reports** — export saved decisions, paired comparison
   intervals, policies, trial details, and exact costs as a standalone monochrome
   page. Read-only validation and exclusive publication preserve the ledger and

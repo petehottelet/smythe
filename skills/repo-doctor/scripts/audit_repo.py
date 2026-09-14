@@ -1,6 +1,6 @@
 """Audit a local repository for open-source release readiness with smythe.
 
-    python audit_repo.py <path> [--output audit-output] [--target pypi] [--strictness alpha]
+    python audit_repo.py <path> [--output 00_project_files/repo-doctor] [--target pypi] [--strictness alpha]
 
 Collects a repo snapshot (never executing repo code), has smythe plan
 and run a specialist review graph, and writes PROJECT_SCORECARD.md,
@@ -439,7 +439,7 @@ def _final_result(graph: ExecutionGraph) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("path", help="local repository directory to audit")
-    parser.add_argument("--output", default="audit-output", help="directory for artifacts")
+    parser.add_argument("--output", default="00_project_files/repo-doctor", help="directory for private audit artifacts")
     parser.add_argument("--target", default="pypi", help="target release channel")
     parser.add_argument("--strictness", default="alpha", help="strictness level")
     args = parser.parse_args(argv)

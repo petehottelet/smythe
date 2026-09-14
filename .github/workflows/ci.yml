@@ -7,6 +7,23 @@ on:
     branches: [main]
 
 jobs:
+  large-file-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Review newly introduced large binary evidence
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python tools/large_files.py --base "$BASE_SHA"
+
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -16,7 +33,9 @@ jobs:
           python-version: "3.11"
       # Pinned: an unpinned linter makes CI non-reproducible.
       - run: pip install ruff==0.16.0
-      - run: ruff check smythe/ tests/ benchmarks/ examples/ hatch_build.py
+      - run: ruff check .
+      - run: pip install mypy==1.17.1
+      - run: python -m mypy
 
   test:
     runs-on: ubuntu-latest
@@ -136,6 +155,9 @@ jobs:
           python -m pip install --upgrade pip build hatchling pytest
           python -m pytest -q tests/test_pypi_readme.py
           python -m build
+          python tools/distribution.py --dist dist
+      - name: Verify isolated source rebuild, package tests, and consumer types
+        run: python tools/package_smoke.py --dist dist --work "$RUNNER_TEMP/source-package-check"
       - name: Install the wheel in a clean environment
         run: |
           python -m venv "$RUNNER_TEMP/smythe-wheel"
@@ -143,6 +165,7 @@ jobs:
           "$RUNNER_TEMP/smythe-wheel/bin/python" -m pip install dist/*.whl pillow
       - name: Smoke-test installed public surfaces
         run: |
+          cd "$RUNNER_TEMP"
           "$RUNNER_TEMP/smythe-wheel/bin/python" -c "import smythe, smythe.assets, smythe.jobs, smythe.optimize"
           "$RUNNER_TEMP/smythe-wheel/bin/smythe" --help
           "$RUNNER_TEMP/smythe-wheel/bin/smythe" jobs schema --json
@@ -154,6 +177,21 @@ jobs:
           "$RUNNER_TEMP/smythe-wheel/bin/python" -c "from pathlib import Path; import hashlib; Path('database.sha256').write_text(hashlib.sha256(Path('report.sqlite3').read_bytes()).hexdigest())"
           "$RUNNER_TEMP/smythe-wheel/bin/smythe" optimize inspect package-report --ledger report.sqlite3 --json --out report.html > after.json
           "$RUNNER_TEMP/smythe-wheel/bin/python" -c "from pathlib import Path; import hashlib,json; assert json.loads(Path('before.json').read_text()) == json.loads(Path('after.json').read_text()); assert hashlib.sha256(Path('report.sqlite3').read_bytes()).hexdigest() == Path('database.sha256').read_text(); page = Path('report.html').read_text(); assert '<html' in page and 'Content-Security-Policy' in page and 'package-report' in page; print('Installed report: unchanged inspection JSON and database bytes')"
+
+  skill-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Build the skill from the tested commit
+        run: python tools/skill_archive.py --out "$RUNNER_TEMP/skill-dist"
+      - name: Verify against the exact released runtime
+        run: |
+          python -m venv "$RUNNER_TEMP/skill-runtime"
+          "$RUNNER_TEMP/skill-runtime/bin/python" -m pip install -r skills/repo-doctor/runtime.txt
+          python tools/skill_archive.py --verify "$RUNNER_TEMP/skill-dist/"*.zip --python "$RUNNER_TEMP/skill-runtime/bin/python"
 
   windows-smoke:
     runs-on: windows-latest

@@ -69,6 +69,7 @@ Use a new output filename for each export.
 
 | Example | What it shows |
 |---|---|
+| [Packages and typing](../docs/distribution.md) | Unreleased: build and test a slim source package, verify typed sync/async consumers against an installed wheel, and install the standalone Repo Doctor skill. |
 | [Current materials](../docs/current-materials.md) | Revised 192/256 contact sheets, detail sheets, animation, still image, native source exports, and each benchmark's evidence status. |
 | [GPT-6 Astra quickstart](../README.md#quickstart) | Generate, inspect, and execute a text-only task graph through native Responses, with a $5 run allowance, concurrency eight, and planning included in the SQLite ledger. |
 | [Native Astra/Sol Responses](../docs/openai-responses.md) | Smythe 0.7.0 counts and quotes an exact request before generation, records native token prices, and retains function-tool continuation and failed-response receipts. |

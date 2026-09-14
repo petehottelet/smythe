@@ -290,6 +290,10 @@ Three specialists work in parallel, an editor assembles their findings, a red
 team challenges the draft, and a final node writes the decision memo.
 [Graph, trace, and expected output](examples/acquisition_diligence/).
 
+For library-only work, use a [slim checkout](CONTRIBUTING.md#working-with-a-slim-checkout).
+The unreleased [distribution updates](docs/distribution.md) add compact source
+packages, installed typing checks and a separately verified Repo Doctor ZIP.
+
 ## Coming soon
 
 - **Native exploration:** bring the web exposure pipeline, camera controls,

@@ -32,6 +32,8 @@ published or when a maintainer dispatches it manually.
    python -m pip install build twine
    python -m build --outdir release-dist
    python -m twine check release-dist/*
+   python tools/distribution.py --dist release-dist
+   python tools/package_smoke.py --dist release-dist --work /path/to/fresh/package-check
    # then install the wheel in a scratch venv and:
    python -c "import smythe; print(smythe.__version__)"
    ```
@@ -55,6 +57,24 @@ published or when a maintainer dispatches it manually.
    different source newlines, so local candidate hashes do not substitute for
    the publication workflow's artifact hashes.
    Update the PyPI badge only after the published version is available.
+
+## Skill and evidence assets
+
+The Repo Doctor workflow builds a ZIP from the exact source commit, verifies
+it against the published runtime pinned in `skills/repo-doctor/runtime.txt`,
+and attaches the archive and checksum receipt on release publication.
+Keep that pin on a tested, available runtime; a runtime upgrade requires an
+explicit compatibility check. Manual workflow runs retain candidates without
+publishing a release. Existing asset names are never overwritten.
+
+Before a release, review the package's exact file manifest and run the
+[distribution checks](docs/distribution.md). Internal plans and review notes
+must remain outside every package and release asset.
+
+For new binary benchmark evidence over 1 MiB, follow the
+[evidence retention policy](CONTRIBUTING.md#evidence-files): retain source
+identity, bytes, checksum, download URL, backup and offline reproduction
+instructions. Existing committed evidence and README image paths stay intact.
 
 ## If publishing fails
 

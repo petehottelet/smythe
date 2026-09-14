@@ -6,6 +6,8 @@ description: Use this skill when the user asks to rate, audit, review, improve, 
 
 # Repo Doctor
 
+Runtime: install the exact version in `runtime.txt` (`smythe==0.7.0`).
+
 ## What this skill does
 
 Audits a software repository for clarity, installability, packaging, tests, CI,
@@ -22,7 +24,7 @@ final synthesis.
 
 - Target release channel (`--target`, default `pypi`).
 - Strictness level (`--strictness`, default `alpha`).
-- Output directory (`--output`, default `audit-output`).
+- Output directory (`--output`); use the project's gitignored `00_project_files/repo-doctor/`.
 
 ## Workflow
 
@@ -53,5 +55,7 @@ Always include:
   only file and redacted stub.
 - Do not execute target repo code or install its dependencies.
 - Do not modify the audited repo; artifacts go to the output directory only.
+- Keep internal scorecards, review plans and working notes in gitignored
+  `00_project_files/`; never publish them as repository documentation.
 - Cite file evidence from the snapshot when available.
 - Be direct, practical, and specific; make uncertainty visible.

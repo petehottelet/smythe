@@ -38,7 +38,11 @@ jobs:
         run: python -m build
 
       - name: Check package
-        run: python -m twine check dist/*
+        run: |
+          python -m twine check dist/*
+          python tools/distribution.py --dist dist
+      - name: Verify source rebuild, installed types, and distribution tests
+        run: python tools/package_smoke.py --dist dist --work "$RUNNER_TEMP/publish-package-check"
 
       - name: Record exact distribution hashes
         run: sha256sum dist/*.whl dist/*.tar.gz > package-hashes.txt

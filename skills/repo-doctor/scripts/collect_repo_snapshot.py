@@ -18,7 +18,7 @@ from pathlib import Path
 SKIP_DIRS = {
     ".git", ".hg", ".svn", ".venv", "venv", "node_modules", "__pycache__",
     ".mypy_cache", ".ruff_cache", ".pytest_cache", ".tox", ".nox", ".idea",
-    ".vscode", "dist", "build", "htmlcov", ".eggs",
+    ".vscode", "dist", "build", "htmlcov", ".eggs", "00_project_files",
 }
 
 MAX_TREE_ENTRIES = 400

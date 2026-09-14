@@ -67,6 +67,7 @@ verification, trace, artifact, and recovery controls.
 - [Coming soon](../ROADMAP.md#coming-soon) — acceptance criteria for runtime and measurement improvements
 - [Benchmark delivery audit](benchmark-delivery-audit-2026-09-13.md) — completed studies and the remaining promised measurements
 - [Contributing](../CONTRIBUTING.md)
+- [Packages and typing](distribution.md) — unreleased slim source archives, explicit library tests, installed type checks and versioned Repo Doctor ZIPs
 - [Roadmap](../ROADMAP.md)
 - [Changelog](../CHANGELOG.md)
 - [Releasing](../RELEASING.md) — package builds, release assets, and PyPI publication
