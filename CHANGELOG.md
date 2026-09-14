@@ -108,6 +108,10 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Tests
 
+- Verify published checkout `95b52bd` with all nine GitHub CI jobs: Linux
+  Python 3.11–3.13, Windows, macOS operators, native Responses, packaging,
+  lint and benchmark smoke checks. Retain [exact counts and raw logs](benchmarks/results/astra_20260913_main/ci-verification.json).
+
 - Qualify the completed Astra campaign implementation on **3,928 offline tests with 6 skipped**, including 283 Astra checks. Ruff passes; all repository Python source hashes match before and after the suite. [Final qualification and retained logs](benchmarks/results/astra_20260913_main/qualification.json).
 
 - Add 60 offline checks for Astra follow-up execution, replay without repeat

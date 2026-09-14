@@ -172,6 +172,27 @@ across 133 files, including 283 Astra checks. Ruff passed.
 All repository Python sources matched before and after the run.
 [Qualification and source hashes](qualification.json) · [Complete logs and JUnit records](offline-verification.zip).
 
+
+The exact published checkout, `95b52bd`, also passed all nine
+[GitHub CI jobs](https://github.com/petehottelet/smythe/actions/runs/34798044465):
+
+| Platform or check | Result |
+|---|---:|
+| Linux, Python 3.11 | 3,799 passed; 24 skipped |
+| Linux, Python 3.12 | 3,799 passed; 24 skipped |
+| Linux, Python 3.13 | 3,799 passed; 24 skipped |
+| Windows | 3,808 passed; 15 skipped |
+| macOS operator checks | 349 passed; 12 skipped |
+| Native Responses contracts | 502 passed |
+| Package smoke tests | 22 passed; wheel installation passed |
+| Lint and benchmark smoke | Both passed |
+
+No job reported a ResourceWarning. The published tree excludes the unrelated
+local report extension present in the earlier full local qualification;
+[exact source inventory and CI receipt](ci-verification.json) and
+[all nine job logs](ci-verification.zip) bind these platform results.
+Software checks do not resolve the outstanding human benchmark review.
+
 ## Evidence and reproduction
 
 - [All 200 trial metrics, comparisons and phase charges](analysis.json)
