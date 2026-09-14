@@ -1,5 +1,9 @@
 # Glyph Rain screensaver
 
+The [current catalog](glyph-design-v2/README.md) contains **192 revised original
+SVG glyphs**. All generated-character sheets and previews show v2. The approved
+017 keeps its separate center bar; the complete set uses broad, flat-cut strokes.
+
 The Windows, macOS, and Linux source ports render the same SVG shapes as the
 [web explorer](svg-preview/README.md): **56 classic reference glyphs plus
 192 original Smythe glyphs**. The default mix selects an original 10% of the
@@ -21,9 +25,9 @@ The native savers use their existing layered motion and host controls. The
 web explorer supplies the REGL exposure pipeline, 3D navigation, and pixel
 settings. Those behaviors are next for native exploration modes.
 
-The native Windows renderer, captured during earlier verification:
+The current web effect, displaying only the new originals:
 
-![Native Windows Glyph Rain](dist/verification/windows-render.png)
+![Current Smythe glyph rain](svg-preview/preview.png)
 
 ## Reference-based web explorer
 
@@ -41,20 +45,15 @@ The renderer and reference artwork are licensed imports. Smythe's original
 192-glyph catalog remains an independently generated artifact, with separate
 hashes and acceptance records.
 
-[Complete 192-glyph contact sheet](../benchmarks/partitions/glyph_svg_v1/catalog/contact-sheet.png) ·
-[24-glyph calibration sheet](../benchmarks/partitions/glyph_svg_v1/catalog/calibration-sheet.png) ·
-[Individual SVGs and manifest](../benchmarks/partitions/glyph_svg_v1/catalog/) ·
+[Complete 192-glyph contact sheet](glyph-design-v2/contact-sheet-128.png) ·
+[Small-size sheets and individual SVGs](glyph-design-v2/README.md) ·
 [Run the explorer](svg-preview/README.md).
 
-The [new benchmark](../benchmarks/svg_glyph_benchmark.md) measures fresh original
-SVG geometry, style validation, duplicate detection, and catalog assembly
-through Smythe. Its 4.03-second median workflow result excludes imported base
-artwork and browser rendering. The adapted renderer's
-[six-session headless study](../benchmarks/renderer_performance_20260907_results.md)
-measured 56.21–56.24 draws/second and missed its frozen pacing target.
-A separate ten-minute travel/resize check passed 57 cycles. The
-[previous renderer's records](../benchmarks/partitions/glyph_svg_v1/renderer-v1/)
-remain superseded diagnostics.
+The [current 192/256-glyph benchmark](../benchmarks/svg_v2_results.md) measures
+contour compilation, four-size validation, pair comparisons, catalog export,
+and memory across 36 workflows. The [256-glyph sheets](../benchmarks/partitions/glyph_svg_v2_256/README.md)
+add 64 benchmark designs; the live catalog remains 192. Historical renderer
+timing and stability receipts retain their recorded v1 inputs.
 
 ## From goal to screensaver
 
@@ -63,18 +62,17 @@ uniqueness, and assembles the accepted artifacts:
 
 ![Glyph generation workflow](../assets/glyph_rain/glyph_pipeline.svg)
 
-The current originals, all produced by the measured SVG workflow:
+The complete current originals:
 
-![Current 192 original SVG glyphs](../benchmarks/partitions/glyph_svg_v1/catalog/contact-sheet.png)
+![Current 192 original SVG glyphs](glyph-design-v2/contact-sheet-128.png)
 
-The [earlier stroke specimens](../assets/glyph_rain/glyph_specimens.svg) belong
-to the controlled-latency benchmark and legacy web view.
+[Selected v2 specimens](../assets/glyph_rain/glyph_specimens.svg).
 
 ## Ports
 
 | Port | Where | Run it |
 |---|---|---|
-| Legacy web (this directory) | [index.html](index.html) + [glyphs.js](glyphs.js) | open `index.html` directly or deploy this static directory |
+| Layered Canvas web (this directory) | [index.html](index.html) + [glyphs.js](glyphs.js) | open `index.html` directly or deploy this static directory |
 | Reference-based web explorer | [svg-preview/](svg-preview/README.md) | serve the repository locally; Classic, 3D, and Operator presets; browser interaction checks pass |
 | Windows 11 (`.scr`) | [source](windows/) | run `screensaver\windows\build_windows.cmd`; [setup](#windows-notes) |
 | macOS 12+ (`.saver`) | [source](macos/) | run `bash screensaver/macos/build_macos.sh`; [setup](#macos-notes) |
@@ -147,17 +145,15 @@ Run the local checks with `windows/smoke_windows.ps1`,
 Each check also renders the complete native glyph atlas, verifies the blank
 slot and filled counters, and records the catalog hashes and mixed selection.
 Local builds need their own verification; historical receipts remain unchanged.
-Inspect their complete atlases: [Windows](dist/verification/windows-atlas.png),
-[Apple Silicon](dist/verification/macos-arm64-atlas.png),
-[Intel Mac](dist/verification/macos-x86_64-atlas.png), and
-[Linux](dist/verification/linux-atlas.png).
+The archived atlases remain with their original receipts in
+[historical verification](dist/README.md).
 The [contour review](dist/verification/contour-review.md) compares native output
 with an independent source-SVG rendering and records rasterization differences.
 These checks validate native execution;
 OS installation policy and session locking remain separate concerns.
 Windows `/s` multi-monitor dispatch is not covered by these checks.
 
-## Legacy web controls
+## Layered Canvas web controls
 
 - **Click / F** — toggle fullscreen
 - **Space** — pause
@@ -174,11 +170,11 @@ python screensaver/export_native_glyphs.py --check
 ```
 
 This writes `windows/GlyphData.cs`, `macos/glyphs.json`, `linux/glyph_data.h`,
-and `native-catalog.json`. It preserves the measured original SVG files and
-reference artwork; it does not run a new generation benchmark.
+and `native-catalog.json`. It reads the current v2 SVGs and preserves the licensed
+reference artwork; it does not run a generation benchmark.
 
-`python screensaver/export_glyphs.py` updates only the legacy web `glyphs.js`.
-It cannot replace the current native data with the old stroke programs.
+`python screensaver/export_glyphs.py` exports the same v2 contours to the
+layered Canvas web view. It retains that view's motion settings.
 
 ## Deploy (web)
 
@@ -191,8 +187,8 @@ vercel deploy --prod
 
 [The animated README preview](svg-preview/README.md#readme-animation) uses the
 current renderer; `svg-preview/preview.png` remains the still-image alternative.
-`glyph-rain-preview.png` shows the legacy web renderer. Benchmark
-artifacts retain their original renderings and hash-bound receipts.
+`glyph-rain-preview.png` shows the layered Canvas renderer with v2 glyphs.
+Historical benchmark artifacts retain their original hash-bound receipts.
 
 ## Credits and references
 

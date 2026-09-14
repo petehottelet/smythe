@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="635" viewBox="0 0 1100 635" role="img" aria-label="Measured memory tradeoff for 192 and 256 SVG glyph workflows across thread and process worker counts">
+<rect width="1100" height="635" fill="#ffffff"/>
+<text x="40" y="39" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="1.6">PARALLELISM / MEMORY</text>
+<text x="40" y="79" font-family="Georgia,'Times New Roman',serif" font-size="30" fill="#000000" text-anchor="start" font-weight="700">The memory cost of more workers</text>
+<text x="40" y="109" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="normal">Median sampled peak RSS · parent plus worker processes · three repetitions per cell</text>
+<text x="40" y="157" font-family="Georgia,'Times New Roman',serif" font-size="24" fill="#000000" text-anchor="start" font-weight="700">192 glyphs</text>
+<text x="40" y="199" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Process / c1</text>
+<rect x="158" y="185" width="81.1806" height="20" fill="#ffffff" stroke="#000000"/>
+<circle cx="236.0957" cy="211" r="2.5" fill="#000000"/>
+<circle cx="239.1806" cy="211" r="2.5" fill="#000000"/>
+<circle cx="240.6704" cy="211" r="2.5" fill="#000000"/>
+<text x="530" y="200" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">241 MiB</text>
+<text x="40" y="244" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Process / c4</text>
+<rect x="158" y="230" width="158.2915" height="20" fill="#ffffff" stroke="#000000"/>
+<circle cx="308.9877" cy="256" r="2.5" fill="#000000"/>
+<circle cx="316.2915" cy="256" r="2.5" fill="#000000"/>
+<circle cx="318.8609" cy="256" r="2.5" fill="#000000"/>
+<text x="530" y="245" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">469 MiB</text>
+<text x="40" y="289" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Process / c8</text>
+<rect x="158" y="275" width="261.3410" height="20" fill="#ffffff" stroke="#000000"/>
+<circle cx="417.1433" cy="301" r="2.5" fill="#000000"/>
+<circle cx="419.3410" cy="301" r="2.5" fill="#000000"/>
+<circle cx="423.5690" cy="301" r="2.5" fill="#000000"/>
+<text x="530" y="290" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">774 MiB</text>
+<text x="40" y="334" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Thread / c1</text>
+<rect x="158" y="320" width="54.6684" height="20" fill="#ffffff" stroke="#000000"/>
+<circle cx="206.8953" cy="346" r="2.5" fill="#000000"/>
+<circle cx="212.6684" cy="346" r="2.5" fill="#000000"/>
+<circle cx="213.9920" cy="346" r="2.5" fill="#000000"/>
+<text x="530" y="335" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">162 MiB</text>
+<text x="40" y="379" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Thread / c4</text>
+<rect x="158" y="365" width="53.8787" height="20" fill="#ffffff" stroke="#000000"/>
+<circle cx="211.1444" cy="391" r="2.5" fill="#000000"/>
+<circle cx="211.8787" cy="391" r="2.5" fill="#000000"/>
+<circle cx="215.9788" cy="391" r="2.5" fill="#000000"/>
+<text x="530" y="380" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">160 MiB</text>
+<text x="40" y="424" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Thread / c8</text>
+<rect x="158" y="410" width="55.2340" height="20" fill="#ffffff" stroke="#000000"/>
+<circle cx="208.2493" cy="436" r="2.5" fill="#000000"/>
+<circle cx="213.2340" cy="436" r="2.5" fill="#000000"/>
+<circle cx="214.5787" cy="436" r="2.5" fill="#000000"/>
+<text x="530" y="425" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">164 MiB</text>
+<text x="158.0" y="484" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">0</text>
+<text x="225.5" y="484" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">200</text>
+<text x="293.0" y="484" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">400</text>
+<text x="360.5" y="484" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">600</text>
+<text x="428.0" y="484" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">800</text>
+<text x="158" y="507" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="normal">Sampled peak RSS (MiB) · lower is better</text>
+<text x="580" y="157" font-family="Georgia,'Times New Roman',serif" font-size="24" fill="#000000" text-anchor="start" font-weight="700">256 glyphs</text>
+<text x="580" y="199" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Process / c1</text>
+<rect x="698" y="185" width="84.6070" height="20" fill="#000000" stroke="#000000"/>
+<circle cx="781.5352" cy="211" r="2.5" fill="#000000"/>
+<circle cx="782.6070" cy="211" r="2.5" fill="#000000"/>
+<circle cx="784.7625" cy="211" r="2.5" fill="#000000"/>
+<text x="1070" y="200" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">251 MiB</text>
+<text x="580" y="244" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Process / c4</text>
+<rect x="698" y="230" width="162.9070" height="20" fill="#000000" stroke="#000000"/>
+<circle cx="859.6203" cy="256" r="2.5" fill="#000000"/>
+<circle cx="860.9070" cy="256" r="2.5" fill="#000000"/>
+<circle cx="863.4712" cy="256" r="2.5" fill="#000000"/>
+<text x="1070" y="245" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">483 MiB</text>
+<text x="580" y="289" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Process / c8</text>
+<rect x="698" y="275" width="266.3692" height="20" fill="#000000" stroke="#000000"/>
+<circle cx="960.0424" cy="301" r="2.5" fill="#000000"/>
+<circle cx="964.3692" cy="301" r="2.5" fill="#000000"/>
+<circle cx="967.7719" cy="301" r="2.5" fill="#000000"/>
+<text x="1070" y="290" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">789 MiB</text>
+<text x="580" y="334" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Thread / c1</text>
+<rect x="698" y="320" width="58.3044" height="20" fill="#000000" stroke="#000000"/>
+<circle cx="753.5187" cy="346" r="2.5" fill="#000000"/>
+<circle cx="756.3044" cy="346" r="2.5" fill="#000000"/>
+<circle cx="757.8061" cy="346" r="2.5" fill="#000000"/>
+<text x="1070" y="335" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">173 MiB</text>
+<text x="580" y="379" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Thread / c4</text>
+<rect x="698" y="365" width="57.7204" height="20" fill="#000000" stroke="#000000"/>
+<circle cx="747.3488" cy="391" r="2.5" fill="#000000"/>
+<circle cx="755.7204" cy="391" r="2.5" fill="#000000"/>
+<circle cx="759.6531" cy="391" r="2.5" fill="#000000"/>
+<text x="1070" y="380" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">171 MiB</text>
+<text x="580" y="424" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Thread / c8</text>
+<rect x="698" y="410" width="60.4138" height="20" fill="#000000" stroke="#000000"/>
+<circle cx="754.5866" cy="436" r="2.5" fill="#000000"/>
+<circle cx="758.4138" cy="436" r="2.5" fill="#000000"/>
+<circle cx="759.4540" cy="436" r="2.5" fill="#000000"/>
+<text x="1070" y="425" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">179 MiB</text>
+<text x="698.0" y="484" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">0</text>
+<text x="765.5" y="484" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">200</text>
+<text x="833.0" y="484" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">400</text>
+<text x="900.5" y="484" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">600</text>
+<text x="968.0" y="484" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">800</text>
+<text x="698" y="507" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="normal">Sampled peak RSS (MiB) · lower is better</text>
+<text x="40" y="554" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">20 ms sampling can miss short peaks; RSS counts shared pages in each process. This is not GPU memory.</text>
+<text x="40" y="580" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">More workers trade memory for shorter completion time. Both panels share the same scale.</text>
+<text x="40" y="614" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="start" font-weight="normal">Source: glyph_svg_v2_20260913.json · SHA-256 5b9d3868462984d7</text>
+</svg>

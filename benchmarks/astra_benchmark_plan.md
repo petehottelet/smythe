@@ -1,20 +1,43 @@
 # Astra benchmark plan
 
-**Status: offline preparation and pilot runner implemented; no paid Astra campaign has run.** This protocol defines a
-new comparison. It does not update, reprice, or replace historical results.
+**Status: all 200 scheduled workflows are recorded and automatically scored; human review is pending.**
+The [complete report](results/astra_20260913_main/README.md) includes every
+outcome, native ledger, blind judgment, graph size and cost bound. One failed
+call has no usage receipt; the [approved continuation](astra_connection_continuation_20260913.md)
+retained its full $0.169645 reserve and ran only the remaining 53 entries.
+Exact affected cost comparisons remain withheld.
+
+Human review of eight flagged main answers remains pending. These records are
+not claimable until that review is complete; automatic classifications are retained.
+
+The [original 24-workflow pilot snapshot](results/astra_20260913/README.md)
+and [method amendment](astra_method_amendment_20260913.md) preserve the
+diagnostic history and changed input contracts. The approved campaign
+ceiling is $300: $60 pilot, $200 main and $40 judging, with $5 per workflow.
+This comparison does not update, reprice, or replace historical results.
+
+The original pilot exposed an unstated JSON string requirement. A separate
+12-workflow follow-up made existing text-type checks explicit in provider
+inputs; all 12 passed. Both pilot records remain available. The fixed main
+acceptance gates are ≥3/4 per rubric criterion, no material defects, and all
+deterministic checks; the minimum arm success rate is 90%. Quality
+noninferiority uses a 0.25-point margin on mean anchored 0–4 scores, with
+10,000 whole-task bootstrap draws and seed 14173. These gates preceded the
+first main run and remain unchanged. The amended study reuses tasks examined
+during diagnosis; it is not an untouched holdout.
 
 ## Prepared experiment
 
 The [offline preparation package](astra_campaign/) contains 13 original
 synthetic tasks with self-contained source packs: three pilot tasks and ten
-held-out tasks, two for each task shape. Rubrics and factual answer checks are
+main tasks, originally held out, two for each task shape. Rubrics and factual answer checks are
 stored separately from provider inputs. Deterministic checks cover format and
-facts; quality and overall acceptance remain unevaluated.
+facts; blind judging supplies separate quality scores and overall acceptance.
 
 The seeded schedule contains **12 pilot workflows and 200 main workflows**.
 Each task/repetition block contains all four model/strategy arms. A four-arm
 Williams design balances arm position and directed predecessor counts to
-within one across the main schedule. The ten held-out tasks remain the
+within one across the main schedule. The ten main tasks remain the
 independent sampling units.
 
 ```python
@@ -37,8 +60,8 @@ provides persisted node-count, execution-model, retry, and regeneration limits.
 The [pilot runner](astra_runtime.md) binds that policy, complete phase-wide
 accounting, source hashes, and one campaign directory. Its spending envelope
 requires total, pilot, main, judge, and per-trial allocations before execution.
-The main campaign still requires a reviewed pilot, frozen judge identity,
-and calibrated acceptance gates. A zero-retry recipe
+The main campaign requires a reviewed pilot, frozen judge identity,
+and actual human calibration. The submitted human ratings passed. A zero-retry recipe
 must instruct its architect to emit `max_retries: 0` on every node; the default
 node value is one. No paid execution starts without the total spending ceiling.
 
@@ -106,8 +129,8 @@ and confirmatory campaign still require an explicit total API-spend ceiling.
 
 ## Published prices and cost formula
 
-The official Standard prices checked on **7 September 2026** are USD per
-million tokens. Freeze a dated copy of the applicable schedule with the campaign.
+The official Standard prices checked on **7 September 2026** and rechecked
+unchanged on **13 September 2026** are USD per million tokens. Freeze a dated copy of the applicable schedule with the campaign.
 
 | Model | Ordinary input | Cache read | Cache write | Output |
 | --- | ---: | ---: | ---: | ---: |
@@ -141,7 +164,7 @@ repetitions = 200 complete workflow runs**:
 | --- | --- |
 | Model | `gpt-6-astra`, `gpt-5.6-sol` |
 | Strategy | Fixed research → analysis → writing pipeline; Smythe generated DAG |
-| Task set | Two held-out tasks for each of the five [shape-suite categories](shape_suite.md) |
+| Task set | Two tasks per [shape-suite category](shape_suite.md); amended study reuses the diagnosed pack |
 | Repetitions | Five per task, model, and strategy |
 
 Use the same executor model for planning and execution within each arm.
@@ -151,7 +174,7 @@ Report the interaction: a faster model and a better topology are different
 changes, and their benefits may not add together.
 
 Run a separate 12-workflow pilot on three calibration tasks across the four
-arms. Exclude it from confirmatory results. Freeze the held-out task pack,
+arms. Exclude all pilots and the stopped diagnostic from main results. Freeze the main task pack,
 source packs, prompts, rubrics, software versions, and policy before the main
 campaign. Obtain a cost estimate and spending authorization before paid runs.
 
@@ -184,7 +207,7 @@ Define acceptance with deterministic task checks and a frozen rubric. Blind
 model and strategy labels for a fixed external judge; have a human review a
 balanced sample and every disputed outcome. Keep complete outputs and judge
 receipts. Set the quality noninferiority margin and minimum acceptable success
-rate after the pilot but before held-out execution. Do not select them from
+rate after the pilot but before main execution. Do not select them from
 the final results.
 
 Report all repetitions, medians, tails, paired differences, and task-clustered

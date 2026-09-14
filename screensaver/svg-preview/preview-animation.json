@@ -1,11 +1,14 @@
 {
-  "schemaVersion": 1,
-  "createdAt": "2026-09-08T07:38:25.918Z",
-  "purpose": "README animation; visual demonstration, not frame-rate or model benchmark evidence",
-  "sourceCommit": "ea7fcd685b88b2745c1afb5d26f4fc7ecb3bb038",
+  "schemaVersion": 2,
+  "createdAt": "2026-09-13T04:23:05.388Z",
+  "purpose": "Current v2 README animation; visual demonstration, not benchmark evidence",
+  "sourceCommit": "8663cdf453e26545326dab1e8debbf45fc7ed08b",
+  "sourceState": "edited working tree; exact file hashes below",
   "rendererVersion": "2",
+  "catalogVersion": "glyph-svg-v2-1",
+  "catalogCount": 192,
   "preset": "classic",
-  "originalMixPercent": 10,
+  "originalMixPercent": 100,
   "palette": "matrix",
   "capture": {
     "width": 960,
@@ -14,19 +17,19 @@
     "warmupSimulationSteps": 228,
     "simulationHz": 60,
     "simulationStepsPerFrame": 3,
-    "capturedFrames": 180,
+    "capturedFrames": 84,
     "usedSourceFrames": 80,
     "browserErrors": [],
     "servedSourcesMatched": true,
-    "rendererUnchanged": true
+    "rendererUnchangedDuringCapture": true
   },
   "gif": {
     "file": "preview.gif",
     "width": 900,
     "height": 506,
-    "frames": 68,
-    "distinctFrames": 68,
-    "durationMs": 3400,
+    "frames": 67,
+    "distinctFrames": 67,
+    "durationMs": 3350,
     "frameDurationMs": 50,
     "playbackFramesPerSecond": 20,
     "loop": "infinite",
@@ -34,21 +37,21 @@
     "dither": "none",
     "resampling": "Lanczos",
     "loopTransitionMs": 600,
-    "loopTransition": "Last 0.6 seconds dissolve into first 0.6 seconds; playback continues after that opening segment",
-    "bytes": 9438218,
-    "sha256": "04d70ee4edc2e7e81958e78a0c9d91acd5680c2d3cc47c11910333d8ebcf8286"
+    "bytes": 7650886,
+    "sha256": "c99dc7d9851fd55ae1beb0e75bcddb1bb035c0bda026144ae8aca66841770ff9"
   },
   "encoding": {
     "tool": "FFmpeg",
-    "filter": "trim=end=4; scale=900:506:lanczos; loop crossfade 0.6s; fps=20; palettegen=16; paletteuse=dither=none",
+    "method": "Four-second capture, 900x506 Lanczos scale, 0.6-second tail/head dissolve, 16-color palette, no dither",
     "notMeasured": [
       "browser frame rate",
       "GPU timing",
+      "generation time",
       "provider cost",
       "model quality"
     ]
   },
-  "rendererSourceGitBlobSha256": {
+  "rendererSourceSha256": {
     "base-glyphs.js": "8722d0bf011b22878695699b2e3cbe7b6ae27397cd3dcd88317024d80eff787e",
     "config.mjs": "f823471fc6cc40a5193f9470bb5012d1edefbfc5ca73ec73a451e2f1203a6613",
     "engine/bloomPass.js": "79f6009f6d6eaa2844bad93c78f1fdfd20204dd83ac9bc4560f9ff40b7d86c30",
@@ -71,9 +74,9 @@
     "fonts/VT323-Regular.ttf": "cf4de751ada78ceac033dbe16a687742939995b77bc2a052ae17a4957958594d",
     "fonts/VT323.OFL.txt": "27d9af34210253e7ca1251fbace86c6f65b40031d6ce1a75493a1b2093631298",
     "fonts/provenance.json": "820d9d15bc495c6125c915187b3b2c8edbc2ea7ad1069e62b768ed5d088c8beb",
-    "generated-sdf.json": "5ebafb2c0df7e475f237e689f0b382fd86bd28b7b107c981e1cd4d87aa1a0d99",
-    "generated-sdf.png": "0e8e3e43cc7f6c1973db06840ea1c69a390b5cb78329fb312bbe39aebf6a7c38",
-    "glyphs.js": "63967d8b1fe5c7dfb46ec665851b675682d88bd5c18e39a6a7f44ac692cbaabd",
+    "generated-sdf.json": "aa66872298d55f3f769ab74419bfd1d97128b1a1bf2644e1fb11861716111e61",
+    "generated-sdf.png": "40a59a09e75e6da8455594b17cc63effe2175d1c61db0912cff2c205ad179580",
+    "glyphs.js": "79907c522f4bd8695e981bf0250bc2ee23dd36056153cd17d48d761e1c0e4fa2",
     "index.html": "df3ccdd32d2c6279c7ecd7773dbb544d830ee5211225329fa2425a672c47c573",
     "lib/gl-matrix.js": "07855fa64096dbc30c3cf9088be433f29c8e344665c87b66c7463443d38c15a7",
     "lib/regl.min.js": "1e85c84ef254125921378d82f4da4e457a0a399bc315880c8c997dd5af8c534d",
@@ -85,9 +88,9 @@
     "timing.mjs": "1a7ae6897b0564d71b897f1ee8129c7c9b914b9cf0a390236f2336487860d3f5",
     "wordmark.svg": "e9b13d24a04522248a7f6cf11ae8b94840ffb4c8c30fbdd4fb3f130e1fbfd789"
   },
-  "originalPng": {
+  "still": {
     "file": "preview.png",
-    "sha256": "7c27b2a2c16abed59672fc5cc2ce8adf56eba165b022660b302b522d2afb1af8",
-    "unchanged": true
+    "sha256": "6b47a76bdcb93230234f2919935fc1d648bf1f6ea3e225c62ab25ed850983fe0",
+    "originalMixPercent": 100
   }
 }

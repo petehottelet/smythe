@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1140" height="605" viewBox="0 0 1140 605" role="img" aria-label="Paired generated-minus-fixed cost and time differences for Astra and Sol with task-clustered uncertainty">
+<rect width="1140" height="605" fill="#ffffff"/>
+<text x="40" y="38" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="1.5">GENERATED TOPOLOGY / FIXED PIPELINE</text>
+<text x="40" y="80" font-family="Georgia,'Times New Roman',serif" font-size="30" fill="#000000" text-anchor="start" font-weight="700">The orchestration effect, within each model</text>
+<text x="40" y="111" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Generated minus fixed · 95% task-clustered bootstrap intervals · 10 tasks, not 50 independent samples</text>
+<text x="40" y="166" font-family="Georgia,'Times New Roman',serif" font-size="19" fill="#000000" text-anchor="start" font-weight="700">Difference in mean wall time (s)</text>
+<path d="M317.5 195v173" stroke="#000000" stroke-dasharray="4 4"/>
+<text x="40" y="244" font-family="Georgia,'Times New Roman',serif" font-size="16" fill="#000000" text-anchor="start" font-weight="700">Astra</text>
+<path d="M319.3450 239H469.5833M319.3450 233v12M469.5833 233v12" stroke="#000000"/>
+<circle cx="392.9761" cy="239" r="5" fill="#000000"/>
+<text x="317.5" y="269" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="middle" font-weight="normal">+8.9250 [+0.2182, +17.9838]</text>
+<text x="40" y="342" font-family="Georgia,'Times New Roman',serif" font-size="16" fill="#000000" text-anchor="start" font-weight="700">Sol</text>
+<path d="M349.5288 337H453.8596M349.5288 331v12M453.8596 331v12" stroke="#000000"/>
+<circle cx="401.8102" cy="337" r="5" fill="#000000"/>
+<text x="317.5" y="367" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="middle" font-weight="normal">+9.9696 [+3.7874, +16.1244]</text>
+<text x="135.0" y="407" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="middle" font-weight="normal">-21.58</text>
+<text x="317.5" y="407" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="middle" font-weight="normal">0</text>
+<text x="500.0" y="407" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="middle" font-weight="normal">+21.58</text>
+<text x="135" y="436" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">← Favors generated</text>
+<text x="500" y="436" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="end" font-weight="normal">Favors fixed →</text>
+<text x="590" y="166" font-family="Georgia,'Times New Roman',serif" font-size="19" fill="#000000" text-anchor="start" font-weight="700">Difference in mean generation cost ($)</text>
+<path d="M867.5 195v173" stroke="#000000" stroke-dasharray="4 4"/>
+<text x="590" y="244" font-family="Georgia,'Times New Roman',serif" font-size="16" fill="#000000" text-anchor="start" font-weight="700">Astra</text>
+<path d="M874.4294 239H1019.5833M874.4294 233v12M1019.5833 233v12" stroke="#000000"/>
+<circle cx="943.8171" cy="239" r="5" fill="#000000"/>
+<text x="867.5" y="269" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="middle" font-weight="normal">+0.0361 [+0.0033, +0.0719]</text>
+<text x="590" y="342" font-family="Georgia,'Times New Roman',serif" font-size="16" fill="#000000" text-anchor="start" font-weight="700">Sol</text>
+<text x="867.5" y="342" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="middle" font-weight="normal">Cost interval withheld: one unknown charge</text>
+<text x="685.0" y="407" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="middle" font-weight="normal">-0.09</text>
+<text x="867.5" y="407" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="middle" font-weight="normal">0</text>
+<text x="1050.0" y="407" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="middle" font-weight="normal">+0.09</text>
+<text x="685" y="436" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">← Favors generated</text>
+<text x="1050" y="436" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="end" font-weight="normal">Favors fixed →</text>
+<text x="40" y="492" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Intervals resample ten whole-task means (10,000 draws; seed 14173). The main study&#x27;s failed run stays included.</text>
+<text x="40" y="518" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">The report includes quality/success gates, both model contrasts, and the model-by-strategy interaction.</text>
+<text x="40" y="544" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Reused project-authored tasks limit generalization. An interval spanning zero does not establish a directional effect.</text>
+<text x="40" y="580" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="start" font-weight="normal">Source: astra_20260913_main/analysis.json · SHA-256 4184ff54fd79e8f2</text>
+</svg>

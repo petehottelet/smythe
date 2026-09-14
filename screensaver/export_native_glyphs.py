@@ -18,7 +18,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VERSION = "native-mixed-svg-v1"
 REFERENCE = Path("screensaver/svg-preview/reference")
-ORIGINAL = Path("benchmarks/partitions/glyph_svg_v1/catalog")
+ORIGINAL = Path("screensaver/glyph-design-v2")
 TOKEN = re.compile(r"[A-Za-z]|[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?")
 ARITY = {"M": 2, "L": 2, "C": 6, "Z": 0}
 CODES = {name: index for index, name in enumerate(ARITY)}

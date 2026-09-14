@@ -1,0 +1,34 @@
+{
+  "status": "passed",
+  "checks": [
+    {
+      "width": 1280,
+      "height": 900,
+      "count": 192,
+      "oldLinks": 0,
+      "overflow": false,
+      "version": "glyph-svg-v2-1"
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "count": 192,
+      "oldLinks": 0,
+      "overflow": false,
+      "version": "glyph-svg-v2-1"
+    }
+  ],
+  "matchedSvgLinks": 192,
+  "legacy": {
+    "canvas": [
+      100,
+      100
+    ],
+    "count": 192,
+    "pixels": 256037,
+    "version": "glyph-svg-v2-1"
+  },
+  "errors": {
+    "errors": []
+  }
+}

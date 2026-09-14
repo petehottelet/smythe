@@ -17,10 +17,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 if __package__:
-    from .glyph_screensaver_assets import GlyphSpec, get_glyph_specs
+    from .glyph_screensaver_assets import GlyphSpec
 else:
     sys.path.insert(0, str(Path(__file__).parents[1]))
-    from glyph_screensaver_assets import GlyphSpec, get_glyph_specs
+    from glyph_screensaver_assets import GlyphSpec
 
 ROOT = Path(__file__).parents[1]
 RESULTS = ROOT / "benchmarks" / "results"
@@ -858,9 +858,9 @@ def _glyph_strokes(spec: GlyphSpec, *, x: float, y: float, scale: float) -> str:
 
 
 def render_glyph_specimens() -> str:
-    """Render selected committed glyph stroke programs as a line-art specimen table."""
+    """Render selected current SVG contours as a specimen table."""
     selected = (0, 3, 5, 12, 14, 21, 32, 44, 63, 80, 107, 151)
-    catalog = get_glyph_specs()
+    catalog = json.loads((ROOT / "screensaver/glyph-design-v2/catalog.json").read_text(encoding="utf-8"))["glyphs"]
     specs = tuple(catalog[index] for index in selected)
     body = _text(40, 49, "SELECTED GLYPHS", size=11, weight="700", tracking=2.2)
     body += _text(40, 86, "Twelve marks from the generated catalog", size=29, weight="700", family=SERIF)
@@ -879,14 +879,16 @@ def render_glyph_specimens() -> str:
             f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell_width:.1f}" '
             f'height="{cell_height:.1f}" fill="{WHITE}" stroke="{BLACK}"/>\n'
         )
-        scale = 0.68
+        scale = 0.90
         mark_x = x + (cell_width - 100 * scale) / 2
         mark_y = y + 7
-        body += _glyph_strokes(spec, x=mark_x, y=mark_y, scale=scale)
+        body += f'<g transform="translate({mark_x:.1f} {mark_y:.1f}) scale({scale:.3f})">'
+        body += "".join(f'<path d="{html.escape(path)}" fill="{BLACK}" fill-rule="nonzero"/>'
+                        for path in spec["paths"]) + "</g>"
         body += _text(
             x + cell_width / 2,
             y + 139,
-            spec.id.upper(),
+            spec["glyph_id"],
             size=9.5,
             anchor="middle",
             family=MONO,
@@ -896,10 +898,10 @@ def render_glyph_specimens() -> str:
     body += _text(
         40,
         452,
-        "Original deterministic stroke programs; no font or source-image extraction",
+        "Current v2 filled contours; flat terminals and deliberate openings",
         size=11,
     )
-    body += _text(920, 452, "GLYPH_SPECS", size=11, anchor="end", family=MONO)
+    body += _text(920, 452, "CATALOG V2", size=11, anchor="end", family=MONO)
     return _svg(
         960,
         470,
@@ -919,7 +921,21 @@ def render_jobs_scale_observation() -> str:
     return render_jobs_scale(campaign / "result.json", campaign / "review.json")
 
 
+def render_astra_distributions() -> str:
+    from benchmarks.astra_charts import render_distributions
+
+    return render_distributions(RESULTS / "astra_20260913_main" / "analysis.json")
+
+
+def render_astra_differences() -> str:
+    from benchmarks.astra_charts import render_differences
+
+    return render_differences(RESULTS / "astra_20260913_main" / "analysis.json")
+
+
 def main() -> None:
+    from benchmarks.svg_v2_charts import RECORD, render_memory, render_workflow
+
     OUT.mkdir(parents=True, exist_ok=True)
     GLYPH_OUT.mkdir(parents=True, exist_ok=True)
     charts: dict[Path, Callable[[], str]] = {
@@ -928,8 +944,12 @@ def main() -> None:
         OUT / "shape_efficiency.svg": render_shape_efficiency,
         OUT / "glyph_scaling.svg": render_glyph_scaling,
         OUT / "svg_workflow.svg": render_svg_workflow,
+        OUT / "svg_v2_workflow.svg": lambda: render_workflow(RESULTS / RECORD),
+        OUT / "svg_v2_memory.svg": lambda: render_memory(RESULTS / RECORD),
         OUT / "recovery.svg": render_recovery,
         OUT / "jobs_scale.svg": render_jobs_scale_observation,
+        OUT / "astra_workflows.svg": render_astra_distributions,
+        OUT / "astra_differences.svg": render_astra_differences,
         GLYPH_OUT / "glyph_pipeline.svg": render_glyph_pipeline,
         GLYPH_OUT / "glyph_specimens.svg": render_glyph_specimens,
     }

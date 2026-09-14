@@ -5,7 +5,7 @@ to **256 unique fictional characters** without changing the existing
 screensaver, its exported 192-character catalog, or any existing result
 record.
 
-![256-glyph digital-rain preview](assets/glyph-rain-preview.png)
+Historical stroke-catalog evidence. See the [current v2 glyphs](../../../screensaver/glyph-design-v2/README.md) for the designs now shown in the project.
 
 ## Result
 

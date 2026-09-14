@@ -10,6 +10,8 @@ import pytest
 
 from benchmarks import render_readme_charts
 from benchmarks.render_readme_charts import (
+    render_astra_differences,
+    render_astra_distributions,
     render_framework_callouts,
     render_framework_comparison,
     render_glyph_pipeline,
@@ -47,6 +49,8 @@ def test_framework_callouts_are_computed_and_use_trajan():
 
 def test_generated_public_charts_are_strictly_black_and_white():
     for renderer in (
+        render_astra_distributions,
+        render_astra_differences,
         render_framework_comparison,
         render_framework_callouts,
         render_shape_efficiency,
@@ -72,6 +76,8 @@ def test_committed_graph_assets_are_strictly_black_and_white():
 
 def test_committed_benchmark_charts_match_the_current_evidence_renderer():
     charts = {
+        "astra_workflows.svg": render_astra_distributions,
+        "astra_differences.svg": render_astra_differences,
         "framework_comparison.svg": render_framework_comparison,
         "framework_callouts.svg": render_framework_callouts,
         "shape_efficiency.svg": render_shape_efficiency,
@@ -130,8 +136,11 @@ def test_readme_connects_glyph_rain_to_benchmark_evidence():
         "screensaver/svg-preview/preview.gif",
         "**Build from source:** [Windows]",
         "## Process\n",
-        "### Original SVG generation",
-        "assets/benchmarks/svg_workflow.svg",
+        "### SVG catalog workflow",
+        "assets/benchmarks/svg_v2_workflow.svg",
+        "assets/benchmarks/svg_v2_memory.svg",
+        "### Astra and Sol",
+        "assets/benchmarks/astra_workflows.svg",
         "### Glyph generation and scaling",
         "assets/benchmarks/glyph_scaling.svg",
         "### Jobs at 5,000 operations",

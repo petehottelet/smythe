@@ -58,9 +58,8 @@ try{
   const originalProvenance=evaluate('({count:SVG_GLYPHS.glyphs.length,version:SVG_GLYPHS.version,catalogSha256:SVG_GLYPHS.catalog_sha256})');
   command('open',new URL('catalog.html',url).href);command('wait','--fn','document.querySelectorAll("#catalog svg").length > 0');
   const inspectCatalog=()=>evaluate('({svgs:document.querySelectorAll("#catalog svg").length,paths:document.querySelectorAll("#catalog path").length,emptyPaths:[...document.querySelectorAll("#catalog path")].filter(path=>!path.getAttribute("d")?.trim()).length,emptyGlyphs:[...document.querySelectorAll("#catalog svg")].filter(svg=>!svg.querySelector("path")).length,active:document.querySelector(".catalog-heading button[aria-pressed=true]")?.id})');
-  const originals=inspectCatalog();check('originalCatalog',originals,originals.svgs===192&&originals.paths>=192&&!originals.emptyPaths&&!originals.emptyGlyphs&&originals.active==='originals','Default catalog displays 192 nonempty original SVGs');
-  command('click','#reference');const reference=inspectCatalog();check('referenceCatalog',reference,reference.svgs===56&&reference.paths>=56&&!reference.emptyPaths&&!reference.emptyGlyphs&&reference.active==='reference','Reference button displays 56 nonempty imported SVGs');
-  const screenshotFrame=openScene('classic',10);command('wait','--fn','document.body.classList.contains("idle")');
+  const originals=inspectCatalog();check('originalCatalog',originals,originals.svgs===192&&originals.paths>=192&&!originals.emptyPaths&&!originals.emptyGlyphs,'Default catalog displays 192 nonempty original SVGs');
+  const screenshotFrame=openScene('classic',100);command('wait','--fn','document.body.classList.contains("idle")');
   const screenshotState=evaluate('({idle:document.body.classList.contains("idle"),paused:GlyphRainPreview.stats().paused,rainTime:GlyphRainPreview.stats().rainTime,focused:document.activeElement?.tagName})');
   check('screenshotState',screenshotState,screenshotState.idle&&screenshotState.paused&&Math.abs(screenshotState.rainTime-3.8)<1e-10,'Normal idle chrome at paused 3.8 seconds');
   command('screenshot',join(directory,'preview.png'));const png=readFileSync(join(directory,'preview.png'));

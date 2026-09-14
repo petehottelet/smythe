@@ -2,20 +2,45 @@
 
 import hashlib
 import json
+import zipfile
 
 import pytest
 
 from benchmarks import verify_renderer_performance_20260907 as verifier
 
 
-def test_retained_v2_review_is_reproduced_exactly():
-    result = (json.dumps(verifier.verify_campaign(), indent=2) + "\n").encode()
+@pytest.fixture
+def frozen_source(tmp_path):
+    archive = verifier.ROOT / "benchmarks/partitions/glyph_rain_reference_v1/renderer-20260907.zip"
+    manifest = json.loads(archive.with_suffix(".json").read_bytes())
+    assert hashlib.sha256(archive.read_bytes()).hexdigest() == manifest["archive_sha256"]
+    with zipfile.ZipFile(archive) as snapshot:
+        for name, digest in manifest["files"].items():
+            destination = (tmp_path / name).resolve()
+            assert destination.is_relative_to(tmp_path.resolve())
+            content = snapshot.read(name)
+            assert hashlib.sha256(content).hexdigest() == digest
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(content)
+    return tmp_path
+
+
+def test_retained_v2_review_is_reproduced_exactly(frozen_source):
+    review = verifier.verify_campaign(source_root=frozen_source)
+    result = (json.dumps(review, indent=2) + "\n").encode()
     retained = verifier.ROOT / "benchmarks/results/glyph_rain_regl_20260907_f1_review_v2.json"
     assert result == retained.read_bytes()
-    assert len(verifier.verify_campaign()["sourceVerification"]["files"]) == 50
+    assert len(review["sourceVerification"]["files"]) == 50
 
 
-def test_actual_source_bytes_are_required(monkeypatch):
+def test_new_catalog_cannot_be_substituted_for_measured_artwork(frozen_source):
+    name = "screensaver/svg-preview/generated-sdf.json"
+    (frozen_source / name).write_bytes((verifier.ROOT / name).read_bytes())
+    with pytest.raises(ValueError, match="Frozen source bytes mismatch:.*generated-sdf.json"):
+        verifier.verify_campaign(source_root=frozen_source)
+
+
+def test_actual_source_bytes_are_required(monkeypatch, frozen_source):
     original = verifier._sha
 
     def changed_source(path):
@@ -25,11 +50,11 @@ def test_actual_source_bytes_are_required(monkeypatch):
 
     monkeypatch.setattr(verifier, "_sha", changed_source)
     with pytest.raises(ValueError, match="Frozen source bytes mismatch"):
-        verifier.verify_campaign()
+        verifier.verify_campaign(source_root=frozen_source)
 
 
 @pytest.mark.parametrize("damage", ["renderer", "auxiliary", "device", "viewport", "overlap", "boolean_rep"])
-def test_control_environment_and_chronology_are_independently_checked(monkeypatch, damage):
+def test_control_environment_and_chronology_are_independently_checked(monkeypatch, damage, frozen_source):
     original = verifier._load
 
     def changed_control(path):
@@ -52,4 +77,4 @@ def test_control_environment_and_chronology_are_independently_checked(monkeypatc
 
     monkeypatch.setattr(verifier, "_load", changed_control)
     with pytest.raises(ValueError, match="GL|physical device|Auxiliary|viewport|chronology|order"):
-        verifier.verify_campaign()
+        verifier.verify_campaign(source_root=frozen_source)

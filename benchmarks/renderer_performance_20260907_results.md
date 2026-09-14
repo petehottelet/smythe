@@ -1,5 +1,9 @@
 # REGL renderer: measured pacing and stability
 
+This campaign used the historical v1 glyph catalog. Current previews use the
+[revised 192-glyph catalog](../screensaver/glyph-design-v2/README.md); these
+measurements do not describe its artwork.
+
 **The six-session campaign completed with valid evidence and did not meet its
 pacing target.** Classic and 3D produced 56.21–56.24 measured draws/second, with
 an 18.10 ms P95 callback interval in every run. A separate blank-page control
@@ -111,7 +115,7 @@ diagnostic. The corrected
 passed before any follow-up timing. Both fixes have focused regressions.
 No primary workload, artwork, shader, or numerical target changed.
 
-The [current browser review](partitions/glyph_rain_reference_v1/performance-preview-review-20260907.json)
+The [campaign browser review](partitions/glyph_rain_reference_v1/performance-preview-review-20260907.json)
 passed 31 checks and five visual samples against the same renderer source.
 It covers both catalogs, navigation, settings, lifecycle, and interruption.
 The screenshot SHA-256 is
@@ -144,12 +148,14 @@ node screensaver/svg-preview/verify-lifecycle.mjs
 node screensaver/svg-preview/verify-measurement.mjs
 node screensaver/svg-preview/verify-browser-metadata.mjs
 node screensaver/svg-preview/verify-raf-control.mjs
-python benchmarks/verify_renderer_performance_20260907.py --out new-renderer-review.json
+python benchmarks/verify_renderer_performance_20260907.py --source-root FROZEN_SOURCE --out new-renderer-review.json
 ```
 
-If the working renderer has since changed, pass `--source-root` pointing to a
-checkout retaining the frozen primary and control source bytes. The verifier
-rejects mismatched bytes instead of substituting newer source files.
+Extract the [frozen source snapshot](partitions/glyph_rain_reference_v1/renderer-20260907.zip)
+into `FROZEN_SOURCE`, or point `--source-root` to a checkout retaining those
+primary and control bytes. The [snapshot manifest](partitions/glyph_rain_reference_v1/renderer-20260907.json)
+binds all 50 measured files and their license notices. The verifier rejects
+mismatched bytes, including substitution of the new glyph catalog.
 
 The next performance step is a separately declared visible-browser campaign
 with measured display cadence, followed by disjoint-safe GPU timing if supported.

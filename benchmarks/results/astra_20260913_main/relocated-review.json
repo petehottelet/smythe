@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "provider_calls": 0,
+  "members_verified": 1232,
+  "archive_sha256": "110e612ce24805bfc98da8eeabf80d824fdadbebabecf2786bc1fdbdba02a8ff",
+  "stages": {
+    "typed-pilot": {
+      "completed_workflows": 12,
+      "confirmed_nanousd": 580745000,
+      "execution_failures": 0,
+      "deterministic_failures": 0
+    },
+    "planner-pilot": {
+      "completed_workflows": 12,
+      "confirmed_nanousd": 619288000,
+      "execution_failures": 0,
+      "deterministic_failures": 1
+    },
+    "diagnostic-main": {
+      "completed_workflows": 31,
+      "confirmed_nanousd": 1764665500,
+      "execution_failures": 0,
+      "deterministic_failures": 12
+    },
+    "combined-main": {
+      "workflows": 200,
+      "segments": [
+        147,
+        53
+      ],
+      "confirmed_nanousd": 12607693200,
+      "unknown_nanousd": 169645000
+    }
+  },
+  "analysis_reproduced": true,
+  "workflow_usage_unknown": 1,
+  "held_unknown_nanousd": 169645000,
+  "scope": "Fresh extraction, byte hashes, native ledgers, outputs, frozen source, blind judgment bindings and all statistical values."
+}

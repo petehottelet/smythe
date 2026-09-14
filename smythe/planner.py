@@ -98,6 +98,7 @@ class LLMArchitect(Architect):
         avg_tokens_per_node: int = 2000,
         registry: Registry | None = None,
         *,
+        planning_instructions: str = "",
         run_binding: ComponentBinding | None = None,
     ) -> None:
         self._provider = provider
@@ -109,12 +110,17 @@ class LLMArchitect(Architect):
         # When set, the planning prompt includes an inventory of these
         # agents (and their tools) so plans can be designed around them.
         self._registry = registry
+        if type(planning_instructions) is not str:
+            raise ValueError("planning_instructions must be a string")
+        self._planning_instructions = planning_instructions
         self._run_binding = run_binding
 
     def workflow_description(self, **defaults) -> dict:
         require_exact(self, LLMArchitect)
         if self._memory is not None:
             raise WorkflowBindingError("Journaled workflows do not support live planner memory")
+        if type(self._planning_instructions) is not str:
+            raise WorkflowBindingError("planning_instructions must be a string")
         validate_token_count(self._max_retries, "max_retries")
         validate_token_count(self._avg_tokens_per_node, "avg_tokens_per_node")
         Sentinel(cost_per_token=self._cost_per_token)
@@ -122,6 +128,8 @@ class LLMArchitect(Architect):
                 **provider_description(self._provider, self._planning_model),
                 "max_retries": self._max_retries, "cost_per_token": self._cost_per_token,
                 "avg_tokens_per_node": self._avg_tokens_per_node,
+                **({"planning_instructions": self._planning_instructions}
+                   if self._planning_instructions else {}),
                 "registry": describe_component(self._registry, role="registry")}
 
     def workflow_providers(self) -> tuple[Provider, ...]:
@@ -134,6 +142,7 @@ class LLMArchitect(Architect):
             max_retries=self._max_retries, cost_per_token=self._cost_per_token,
             avg_tokens_per_node=self._avg_tokens_per_node,
             registry=self._registry.bind_run(binding.child("registry")) if self._registry else None,
+            planning_instructions=self._planning_instructions,
             run_binding=binding,
         )
 
@@ -146,6 +155,11 @@ class LLMArchitect(Architect):
         history = self._get_history(task)
         inventory = build_agent_inventory(self._registry)
         user_prompt = build_user_prompt(task, history, agent_inventory=inventory)
+        if self._planning_instructions:
+            user_prompt += ("\n\n## Execution graph policy\n"
+                            "These instructions govern the plan, not the task's answer. "
+                            "Do not add them to the deliverable schema.\n"
+                            + self._planning_instructions)
 
         last_error: Exception | None = None
         for attempt in range(1 + self._max_retries):

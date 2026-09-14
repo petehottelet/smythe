@@ -1,0 +1,258 @@
+[
+  {
+    "recipe": "columns-rise-leaning-pair",
+    "outline": "M 27 16 L 27 60 L 44 60 L 44 75 L 14 75 L 14 16 Z M 56 84 L 56 69 L 86 59 L 86 74 Z M 56 41 L 56 26 L 86 16 L 86 31 Z"
+  },
+  {
+    "recipe": "columns-heavy-hook-interrupted-roof",
+    "outline": "M 44 16 L 44 84 C 24 82 14 69 14 50 L 25 50 C 25 58 27 64 31 67 L 31 16 Z M 56 84 L 56 53 L 69 53 L 69 84 Z M 56 41 L 56 16 L 86 16 L 86 31 L 69 31 L 69 41 Z"
+  },
+  {
+    "recipe": "columns-middle-short-elbow-mark",
+    "outline": "M 27 16 L 27 40 L 44 40 L 44 56 L 27 56 L 27 84 L 14 84 L 14 16 Z M 56 84 L 56 45 L 86 45 L 86 60 L 69 60 L 69 84 Z M 69 31 L 69 16 L 86 16 L 86 31 Z"
+  },
+  {
+    "recipe": "tiers-downturn-double-corner",
+    "outline": "M 16 14 L 84 14 L 84 44 L 69 44 L 69 27 L 16 27 Z M 84 86 L 56 86 L 56 73 L 69 73 L 69 56 L 84 56 Z M 44 86 L 29 86 L 29 69 L 16 69 L 16 56 L 44 56 Z"
+  },
+  {
+    "recipe": "tiers-middle-double-corner",
+    "outline": "M 16 31 L 40 31 L 40 14 L 56 14 L 56 31 L 84 31 L 84 44 L 16 44 Z M 84 86 L 56 86 L 56 73 L 69 73 L 69 56 L 84 56 Z M 44 86 L 29 86 L 29 69 L 16 69 L 16 56 L 44 56 Z"
+  },
+  {
+    "recipe": "columns-rise-short-elbow-mark",
+    "outline": "M 27 16 L 27 60 L 44 60 L 44 75 L 14 75 L 14 16 Z M 56 84 L 56 45 L 86 45 L 86 60 L 69 60 L 69 84 Z M 69 31 L 69 16 L 86 16 L 86 31 Z"
+  },
+  {
+    "recipe": "tiers-elbow-diagonal",
+    "outline": "M 16 14 L 61 14 L 61 31 L 84 31 L 84 44 L 46 44 L 46 27 L 16 27 Z M 84 70 L 31 86 L 16 86 L 16 73 L 80 56 Z"
+  },
+  {
+    "recipe": "tiers-interrupted-roof-leaning-pair",
+    "outline": "M 16 14 L 47 14 L 47 27 L 16 27 Z M 59 14 L 84 14 L 84 44 L 69 44 L 69 27 L 59 27 Z M 84 86 L 69 86 L 59 56 L 74 56 Z M 41 86 L 26 86 L 16 56 L 31 56 Z"
+  },
+  {
+    "recipe": "tiers-low-return-heavy-hook",
+    "outline": "M 16 14 L 31 14 L 31 31 L 69 31 L 69 22 L 84 22 L 84 44 L 16 44 Z M 84 86 L 16 86 C 18 66 31 56 50 56 L 50 67 C 42 67 36 69 33 73 L 84 73 Z"
+  },
+  {
+    "recipe": "tiers-downturn-sloping-header-stem",
+    "outline": "M 16 14 L 84 14 L 84 44 L 69 44 L 69 27 L 16 27 Z M 84 70 L 32 86 L 16 86 L 16 56 L 31 56 L 31 72 L 80 56 Z"
+  },
+  {
+    "recipe": "columns-offset-low-return",
+    "outline": "M 44 16 L 44 49 L 31 49 L 31 16 Z M 28 61 L 28 84 L 14 84 L 14 61 Z M 56 84 L 56 69 L 73 69 L 73 31 L 64 31 L 64 16 L 86 16 L 86 84 Z"
+  },
+  {
+    "recipe": "tiers-down-sweep-interrupted-roof",
+    "outline": "M 16 14 L 50 14 C 71 14 84 24 84 44 L 69 44 C 69 32 59 27 46 27 L 16 27 Z M 84 86 L 53 86 L 53 73 L 84 73 Z M 41 86 L 16 86 L 16 56 L 31 56 L 31 73 L 41 73 Z"
+  },
+  {
+    "recipe": "columns-elbow-paired-uprights",
+    "outline": "M 44 16 L 44 61 L 27 61 L 27 84 L 14 84 L 14 46 L 31 46 L 31 16 Z M 56 84 L 56 68 L 86 68 L 86 84 Z M 56 32 L 56 16 L 86 16 L 86 32 Z"
+  },
+  {
+    "recipe": "tiers-shoulder-heavy-hook",
+    "outline": "M 16 31 C 16 19 28 14 50 14 L 84 14 L 84 27 L 50 27 C 38 27 32 32 32 44 L 16 44 Z M 84 86 L 16 86 C 18 66 31 56 50 56 L 50 67 C 42 67 36 69 33 73 L 84 73 Z"
+  },
+  {
+    "recipe": "tiers-paired-uprights-short-elbow-mark",
+    "outline": "M 16 14 L 32 14 L 32 44 L 16 44 Z M 68 14 L 84 14 L 84 44 L 68 44 Z M 84 86 L 45 86 L 45 56 L 60 56 L 60 73 L 84 73 Z M 31 73 L 16 73 L 16 56 L 31 56 Z"
+  },
+  {
+    "recipe": "tiers-offset-pillar-offset-shelf",
+    "outline": "M 16 14 L 32 14 L 32 44 L 16 44 Z M 44 31 L 84 31 L 84 44 L 44 44 Z M 84 86 L 69 86 L 69 69 L 53 69 L 53 56 L 84 56 Z M 41 86 L 16 86 L 16 73 L 41 73 Z"
+  },
+  {
+    "recipe": "columns-rise-cut-crescent",
+    "outline": "M 27 16 L 27 60 L 44 60 L 44 75 L 14 75 L 14 16 Z M 56 84 L 56 69 C 67 66 73 49 73 16 L 86 16 C 86 58 76 80 56 84 Z"
+  },
+  {
+    "recipe": "columns-downturn-double-corner",
+    "outline": "M 44 16 L 44 84 L 14 84 L 14 69 L 31 69 L 31 16 Z M 56 84 L 56 56 L 69 56 L 69 69 L 86 69 L 86 84 Z M 56 44 L 56 29 L 73 29 L 73 16 L 86 16 L 86 44 Z"
+  },
+  {
+    "recipe": "columns-offset-leaning-pair",
+    "outline": "M 44 16 L 44 49 L 31 49 L 31 16 Z M 28 61 L 28 84 L 14 84 L 14 61 Z M 56 84 L 56 69 L 86 59 L 86 74 Z M 56 41 L 56 26 L 86 16 L 86 31 Z"
+  },
+  {
+    "recipe": "columns-open-corner-interrupted-roof",
+    "outline": "M 44 16 L 44 31 L 27 31 L 27 61 L 14 61 L 14 16 Z M 44 72 L 44 84 L 27 84 L 27 72 Z M 56 84 L 56 53 L 69 53 L 69 84 Z M 56 41 L 56 16 L 86 16 L 86 31 L 69 31 L 69 41 Z"
+  },
+  {
+    "recipe": "tiers-open-corner-split-sweep",
+    "outline": "M 16 14 L 31 14 L 31 31 L 61 31 L 61 44 L 16 44 Z M 72 14 L 84 14 L 84 31 L 72 31 Z M 84 86 L 62 86 L 62 73 L 84 73 Z M 46 86 L 31 86 C 31 73 26 69 16 69 L 16 56 C 36 56 46 66 46 86 Z"
+  },
+  {
+    "recipe": "tiers-elbow-downturn",
+    "outline": "M 16 14 L 61 14 L 61 31 L 84 31 L 84 44 L 46 44 L 46 27 L 16 27 Z M 84 86 L 16 86 L 16 56 L 31 56 L 31 73 L 84 73 Z"
+  },
+  {
+    "recipe": "tiers-sweep-offset-pillar",
+    "outline": "M 16 14 L 32 14 C 32 25 49 31 84 31 L 84 44 C 36 44 16 36 16 14 Z M 84 86 L 68 86 L 68 56 L 84 56 Z M 56 69 L 16 69 L 16 56 L 56 56 Z"
+  },
+  {
+    "recipe": "columns-offset-split-sweep",
+    "outline": "M 44 16 L 44 49 L 31 49 L 31 16 Z M 28 61 L 28 84 L 14 84 L 14 61 Z M 56 84 L 56 62 L 69 62 L 69 84 Z M 56 46 L 56 31 C 69 31 73 26 73 16 L 86 16 C 86 36 76 46 56 46 Z"
+  },
+  {
+    "recipe": "tiers-unequal-squares-stepped-diagonal",
+    "outline": "M 16 14 L 38 14 L 38 32 L 16 32 Z M 58 22 L 84 22 L 84 44 L 58 44 Z M 84 69 L 59 69 L 35 86 L 16 86 L 16 73 L 30 73 L 54 56 L 84 56 Z"
+  },
+  {
+    "recipe": "tiers-rise-interrupted-roof",
+    "outline": "M 16 31 L 60 31 L 60 14 L 75 14 L 75 44 L 16 44 Z M 84 86 L 53 86 L 53 73 L 84 73 Z M 41 86 L 16 86 L 16 56 L 31 56 L 31 73 L 41 73 Z"
+  },
+  {
+    "recipe": "tiers-middle-cut-crescent",
+    "outline": "M 16 31 L 40 31 L 40 14 L 56 14 L 56 31 L 84 31 L 84 44 L 16 44 Z M 84 86 L 69 86 C 66 75 49 69 16 69 L 16 56 C 58 56 80 66 84 86 Z"
+  },
+  {
+    "recipe": "tiers-diagonal-stepped-diagonal",
+    "outline": "M 16 30 L 69 14 L 84 14 L 84 27 L 20 44 Z M 84 69 L 59 69 L 35 86 L 16 86 L 16 73 L 30 73 L 54 56 L 84 56 Z"
+  },
+  {
+    "recipe": "tiers-sweep-short-elbow-mark",
+    "outline": "M 16 14 L 32 14 C 32 25 49 31 84 31 L 84 44 C 36 44 16 36 16 14 Z M 84 86 L 45 86 L 45 56 L 60 56 L 60 73 L 84 73 Z M 31 73 L 16 73 L 16 56 L 31 56 Z"
+  },
+  {
+    "recipe": "tiers-double-corner-cut-crescent",
+    "outline": "M 16 14 L 44 14 L 44 27 L 31 27 L 31 44 L 16 44 Z M 56 14 L 71 14 L 71 31 L 84 31 L 84 44 L 56 44 Z M 84 86 L 69 86 C 66 75 49 69 16 69 L 16 56 C 58 56 80 66 84 86 Z"
+  },
+  {
+    "recipe": "tiers-short-elbow-mark-leaning-pair",
+    "outline": "M 16 14 L 55 14 L 55 44 L 40 44 L 40 27 L 16 27 Z M 69 27 L 84 27 L 84 44 L 69 44 Z M 84 86 L 69 86 L 59 56 L 74 56 Z M 41 86 L 26 86 L 16 56 L 31 56 Z"
+  },
+  {
+    "recipe": "columns-sweep-split-sweep",
+    "outline": "M 44 16 L 44 32 C 33 32 27 49 27 84 L 14 84 C 14 36 22 16 44 16 Z M 56 84 L 56 62 L 69 62 L 69 84 Z M 56 46 L 56 31 C 69 31 73 26 73 16 L 86 16 C 86 36 76 46 56 46 Z"
+  },
+  {
+    "recipe": "columns-elbow-cut-crescent",
+    "outline": "M 44 16 L 44 61 L 27 61 L 27 84 L 14 84 L 14 46 L 31 46 L 31 16 Z M 56 84 L 56 69 C 67 66 73 49 73 16 L 86 16 C 86 58 76 80 56 84 Z"
+  },
+  {
+    "recipe": "columns-paired-uprights-heavy-hook",
+    "outline": "M 44 16 L 44 32 L 14 32 L 14 16 Z M 44 68 L 44 84 L 14 84 L 14 68 Z M 56 84 L 56 16 C 76 18 86 31 86 50 L 75 50 C 75 42 73 36 69 33 L 69 84 Z"
+  },
+  {
+    "recipe": "tiers-paired-uprights-low-return",
+    "outline": "M 16 14 L 32 14 L 32 44 L 16 44 Z M 68 14 L 84 14 L 84 44 L 68 44 Z M 84 86 L 69 86 L 69 69 L 31 69 L 31 78 L 16 78 L 16 56 L 84 56 Z"
+  },
+  {
+    "recipe": "columns-double-corner-leaning-pair",
+    "outline": "M 44 16 L 44 44 L 31 44 L 31 31 L 14 31 L 14 16 Z M 44 56 L 44 71 L 27 71 L 27 84 L 14 84 L 14 56 Z M 56 84 L 56 69 L 86 59 L 86 74 Z M 56 41 L 56 26 L 86 16 L 86 31 Z"
+  },
+  {
+    "recipe": "tiers-shoulder-sloping-header-stem",
+    "outline": "M 16 31 C 16 19 28 14 50 14 L 84 14 L 84 27 L 50 27 C 38 27 32 32 32 44 L 16 44 Z M 84 70 L 32 86 L 16 86 L 16 56 L 31 56 L 31 72 L 80 56 Z"
+  },
+  {
+    "recipe": "columns-rise-stepped-diagonal",
+    "outline": "M 27 16 L 27 60 L 44 60 L 44 75 L 14 75 L 14 16 Z M 73 84 L 73 59 L 56 35 L 56 16 L 69 16 L 69 30 L 86 54 L 86 84 Z"
+  },
+  {
+    "recipe": "tiers-shoulder-unequal-squares",
+    "outline": "M 16 31 C 16 19 28 14 50 14 L 84 14 L 84 27 L 50 27 C 38 27 32 32 32 44 L 16 44 Z M 84 86 L 62 86 L 62 68 L 84 68 Z M 42 78 L 16 78 L 16 56 L 42 56 Z"
+  },
+  {
+    "recipe": "columns-diagonal-stepped-diagonal",
+    "outline": "M 28 16 L 44 69 L 44 84 L 31 84 L 14 20 Z M 73 84 L 73 59 L 56 35 L 56 16 L 69 16 L 69 30 L 86 54 L 86 84 Z"
+  },
+  {
+    "recipe": "tiers-paired-uprights-double-corner",
+    "outline": "M 16 14 L 32 14 L 32 44 L 16 44 Z M 68 14 L 84 14 L 84 44 L 68 44 Z M 84 86 L 56 86 L 56 73 L 69 73 L 69 56 L 84 56 Z M 44 86 L 29 86 L 29 69 L 16 69 L 16 56 L 44 56 Z"
+  },
+  {
+    "recipe": "columns-offset-unequal-squares",
+    "outline": "M 44 16 L 44 49 L 31 49 L 31 16 Z M 28 61 L 28 84 L 14 84 L 14 61 Z M 56 84 L 56 62 L 74 62 L 74 84 Z M 64 42 L 64 16 L 86 16 L 86 42 Z"
+  },
+  {
+    "recipe": "columns-split-sweep-offset-shelf",
+    "outline": "M 44 16 L 44 38 L 31 38 L 31 16 Z M 44 54 L 44 69 C 31 69 27 74 27 84 L 14 84 C 14 64 24 54 44 54 Z M 56 84 L 56 69 L 73 69 L 73 53 L 86 53 L 86 84 Z M 56 41 L 56 16 L 69 16 L 69 41 Z"
+  },
+  {
+    "recipe": "tiers-heavy-hook-unequal-squares",
+    "outline": "M 16 14 L 84 14 C 82 34 69 44 50 44 L 50 33 C 58 33 64 31 67 27 L 16 27 Z M 84 86 L 62 86 L 62 68 L 84 68 Z M 42 78 L 16 78 L 16 56 L 42 56 Z"
+  },
+  {
+    "recipe": "columns-offset-diagonal",
+    "outline": "M 44 16 L 44 49 L 31 49 L 31 16 Z M 28 61 L 28 84 L 14 84 L 14 61 Z M 72 84 L 56 31 L 56 16 L 69 16 L 86 80 Z"
+  },
+  {
+    "recipe": "columns-interrupted-low-return",
+    "outline": "M 44 16 L 44 32 L 14 32 L 14 16 Z M 44 44 L 44 84 L 31 84 L 31 44 Z M 56 84 L 56 69 L 73 69 L 73 31 L 64 31 L 64 16 L 86 16 L 86 84 Z"
+  },
+  {
+    "recipe": "columns-rise-double-corner",
+    "outline": "M 27 16 L 27 60 L 44 60 L 44 75 L 14 75 L 14 16 Z M 56 84 L 56 56 L 69 56 L 69 69 L 86 69 L 86 84 Z M 56 44 L 56 29 L 73 29 L 73 16 L 86 16 L 86 44 Z"
+  },
+  {
+    "recipe": "tiers-sweep-split-sweep",
+    "outline": "M 16 14 L 32 14 C 32 25 49 31 84 31 L 84 44 C 36 44 16 36 16 14 Z M 84 86 L 62 86 L 62 73 L 84 73 Z M 46 86 L 31 86 C 31 73 26 69 16 69 L 16 56 C 36 56 46 66 46 86 Z"
+  },
+  {
+    "recipe": "columns-offset-sweep",
+    "outline": "M 44 16 L 44 49 L 31 49 L 31 16 Z M 28 61 L 28 84 L 14 84 L 14 61 Z M 56 84 L 56 68 C 67 68 73 51 73 16 L 86 16 C 86 64 78 84 56 84 Z"
+  },
+  {
+    "recipe": "tiers-middle-offset-pillar",
+    "outline": "M 16 31 L 40 31 L 40 14 L 56 14 L 56 31 L 84 31 L 84 44 L 16 44 Z M 84 86 L 68 86 L 68 56 L 84 56 Z M 56 69 L 16 69 L 16 56 L 56 56 Z"
+  },
+  {
+    "recipe": "tiers-short-elbow-mark-stepped-diagonal",
+    "outline": "M 16 14 L 55 14 L 55 44 L 40 44 L 40 27 L 16 27 Z M 69 27 L 84 27 L 84 44 L 69 44 Z M 84 69 L 59 69 L 35 86 L 16 86 L 16 73 L 30 73 L 54 56 L 84 56 Z"
+  },
+  {
+    "recipe": "tiers-offset-rise",
+    "outline": "M 16 14 L 49 14 L 49 27 L 16 27 Z M 61 30 L 84 30 L 84 44 L 61 44 Z M 84 69 L 40 69 L 40 86 L 25 86 L 25 56 L 84 56 Z"
+  },
+  {
+    "recipe": "tiers-offset-offset-shelf",
+    "outline": "M 16 14 L 49 14 L 49 27 L 16 27 Z M 61 30 L 84 30 L 84 44 L 61 44 Z M 84 86 L 69 86 L 69 69 L 53 69 L 53 56 L 84 56 Z M 41 86 L 16 86 L 16 73 L 41 73 Z"
+  },
+  {
+    "recipe": "columns-unequal-squares-leaning-pair",
+    "outline": "M 44 16 L 44 38 L 26 38 L 26 16 Z M 36 58 L 36 84 L 14 84 L 14 58 Z M 56 84 L 56 69 L 86 59 L 86 74 Z M 56 41 L 56 26 L 86 16 L 86 31 Z"
+  },
+  {
+    "recipe": "columns-middle-paired-uprights",
+    "outline": "M 27 16 L 27 40 L 44 40 L 44 56 L 27 56 L 27 84 L 14 84 L 14 16 Z M 56 84 L 56 68 L 86 68 L 86 84 Z M 56 32 L 56 16 L 86 16 L 86 32 Z"
+  },
+  {
+    "recipe": "tiers-offset-sweep",
+    "outline": "M 16 14 L 49 14 L 49 27 L 16 27 Z M 61 30 L 84 30 L 84 44 L 61 44 Z M 84 86 L 68 86 C 68 75 51 69 16 69 L 16 56 C 64 56 84 64 84 86 Z"
+  },
+  {
+    "recipe": "tiers-middle-unequal-squares",
+    "outline": "M 16 31 L 40 31 L 40 14 L 56 14 L 56 31 L 84 31 L 84 44 L 16 44 Z M 84 86 L 62 86 L 62 68 L 84 68 Z M 42 78 L 16 78 L 16 56 L 42 56 Z"
+  },
+  {
+    "recipe": "tiers-offset-unequal-squares",
+    "outline": "M 16 14 L 49 14 L 49 27 L 16 27 Z M 61 30 L 84 30 L 84 44 L 61 44 Z M 84 86 L 62 86 L 62 68 L 84 68 Z M 42 78 L 16 78 L 16 56 L 42 56 Z"
+  },
+  {
+    "recipe": "tiers-offset-paired-uprights",
+    "outline": "M 16 14 L 49 14 L 49 27 L 16 27 Z M 61 30 L 84 30 L 84 44 L 61 44 Z M 84 86 L 68 86 L 68 56 L 84 56 Z M 32 86 L 16 86 L 16 56 L 32 56 Z"
+  },
+  {
+    "recipe": "columns-elbow-short-elbow-mark",
+    "outline": "M 44 16 L 44 61 L 27 61 L 27 84 L 14 84 L 14 46 L 31 46 L 31 16 Z M 56 84 L 56 45 L 86 45 L 86 60 L 69 60 L 69 84 Z M 69 31 L 69 16 L 86 16 L 86 31 Z"
+  },
+  {
+    "recipe": "tiers-low-return-offset-pillar",
+    "outline": "M 16 14 L 31 14 L 31 31 L 69 31 L 69 22 L 84 22 L 84 44 L 16 44 Z M 84 86 L 68 86 L 68 56 L 84 56 Z M 56 69 L 16 69 L 16 56 L 56 56 Z"
+  },
+  {
+    "recipe": "tiers-double-corner-leaning-pair",
+    "outline": "M 16 14 L 44 14 L 44 27 L 31 27 L 31 44 L 16 44 Z M 56 14 L 71 14 L 71 31 L 84 31 L 84 44 L 56 44 Z M 84 86 L 69 86 L 59 56 L 74 56 Z M 41 86 L 26 86 L 16 56 L 31 56 Z"
+  },
+  {
+    "recipe": "columns-paired-uprights-double-corner",
+    "outline": "M 44 16 L 44 32 L 14 32 L 14 16 Z M 44 68 L 44 84 L 14 84 L 14 68 Z M 56 84 L 56 56 L 69 56 L 69 69 L 86 69 L 86 84 Z M 56 44 L 56 29 L 73 29 L 73 16 L 86 16 L 86 44 Z"
+  },
+  {
+    "recipe": "tiers-offset-interrupted-roof",
+    "outline": "M 16 14 L 49 14 L 49 27 L 16 27 Z M 61 30 L 84 30 L 84 44 L 61 44 Z M 84 86 L 53 86 L 53 73 L 84 73 Z M 41 86 L 16 86 L 16 56 L 31 56 L 31 73 L 41 73 Z"
+  }
+]

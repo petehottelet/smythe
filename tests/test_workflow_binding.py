@@ -96,6 +96,27 @@ def test_planner_repairs_have_explicit_attempts_and_fresh_bound_provider():
     assert not source.calls
 
 
+def test_planning_policy_is_bound_and_never_mutates_the_deliverable_task():
+    task, factory = Task("Return JSON", constraints=["Use source facts"]), Factory(PLAN)
+    original = LLMArchitect(OfflineProvider(), planning_model="test",
+                            planning_instructions="Every node must set max_retries: 0.")
+    before = describe_component(original)
+    bound = bind_component(original, binding(factory))
+    original._planning_instructions = "changed later"
+    bound.plan(task)
+    assert bound.workflow_description() == before
+    assert "Every node must set max_retries: 0." in factory.calls[0][3]
+    assert "Do not add them to the deliverable schema" in factory.calls[0][3]
+    assert "changed later" not in factory.calls[0][3]
+    assert task.constraints == ["Use source facts"]
+
+
+@pytest.mark.parametrize("value", [None, 1, ["policy"], {"x": "policy"}])
+def test_planning_instructions_require_plain_text(value):
+    with pytest.raises(ValueError, match="planning_instructions"):
+        LLMArchitect(OfflineProvider(), planning_instructions=value)
+
+
 def test_bound_planner_does_not_repair_terminal_native_failure():
     error = ProviderResponseError("native output unavailable")
     factory = Factory(error)

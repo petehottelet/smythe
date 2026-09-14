@@ -1,0 +1,79 @@
+{
+  "status": "passed",
+  "reviewed_at": "2026-09-13T05:55:57.078484+00:00",
+  "publication": "local working tree; not pushed",
+  "record_sha256": "5b9d3868462984d79e256d9d064c465c2f5f8be5258e784e313b451a20521353",
+  "archive_index_sha256": "cabc1c3cf6641e57edc61307472c1e2dcac8e7b748fa773c0a1fca6f1d3d1525",
+  "workflow_count": 36,
+  "measured_source_hashes_current": true,
+  "complete_schedule_and_summaries_reproduced": true,
+  "all_timed_svg_files_rehashed": 8064,
+  "all_assembly_bindings_rehashed": 108,
+  "archived_source_and_catalog_members_rehashed": true,
+  "default_192_catalog_and_presentation_unchanged": true,
+  "charts": [
+    {
+      "name": "svg_v2_workflow",
+      "labels": 62,
+      "outside": []
+    },
+    {
+      "name": "svg_v2_memory",
+      "labels": 44,
+      "outside": []
+    }
+  ],
+  "offline_suite": {
+    "status": "passed",
+    "reviewed_at": "2026-09-13T05:55:57.025939+00:00",
+    "collected_tests": 3807,
+    "latest_outcomes": {
+      "passed": 3797,
+      "skipped": 10
+    },
+    "file_count": 124,
+    "method": "Every collected offline test ran in four disjoint, duration-balanced groups. All JUnit test identities reconcile exactly to the collected suite, without duplicate executions or exclusions.",
+    "excluded_tests": [],
+    "attempts": [
+      {
+        "receipt": "full-suite-1.xml",
+        "sha256": "cd67213eb324a66209024d104e708e3e85955f241eddecfc472f1d802a1328e5",
+        "counts": {
+          "passed": 919,
+          "skipped": 4
+        }
+      },
+      {
+        "receipt": "full-suite-2.xml",
+        "sha256": "c2dc3e29e663fa19d743e01000d53c99e0f105f8a6a748990dc9f7b9593aaaa6",
+        "counts": {
+          "passed": 1196,
+          "skipped": 1
+        }
+      },
+      {
+        "receipt": "full-suite-3.xml",
+        "sha256": "987f4cabbbdbedefd30b5ceb27d701c159dbdc34c17b2e5503f40b37e8b8df81",
+        "counts": {
+          "passed": 884,
+          "skipped": 5
+        }
+      },
+      {
+        "receipt": "full-suite-4.xml",
+        "sha256": "41e2580fa0d33f56cfdd5cfe894df4aac9bf400cf497c8151bd08d2f7e7a41a4",
+        "counts": {
+          "passed": 798
+        }
+      }
+    ],
+    "ruff": "passed",
+    "paid_provider_calls": 0
+  },
+  "local_markdown_links": {
+    "checked": 726,
+    "files": 61,
+    "status": "passed"
+  },
+  "paid_provider_calls": 0
+}

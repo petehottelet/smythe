@@ -6,28 +6,23 @@ The explorer adapts the MIT-licensed rain, bloom, and palette renderer from
 2D grid. The reference's base glyphs carry the effect; Smythe's original SVGs
 appear in 10% of selections by default.
 
-The [current browser review](../../benchmarks/partitions/glyph_rain_reference_v1/performance-preview-review-20260907.json)
-passes 31 checks and binds the source and [still image](preview.png). It covers
-fixed-step output, both catalogs, navigation/reset, and measurement interruption.
-The earlier [interaction](../../benchmarks/partitions/glyph_rain_reference_v1/pixel-preview-review.json)
-and [pixel-style](../../benchmarks/partitions/glyph_rain_reference_v1/style-pixel-simple-review.json)
-receipts remain historical checkpoints. Quantified reference parity remains
-unmeasured; rendering performance has a separate protocol below.
+The [current browser review](../glyph-design-v2/browser-review.json) checks the
+v2 catalog, all presets, mix endpoints, navigation, reset, and interruption.
+It binds the current [still image](preview.png). Earlier performance receipts
+remain historical evidence for their recorded renderer and v1 catalog.
+
+The separate [192/256-glyph workflow benchmark](../../benchmarks/svg_v2_results.md)
+measures the current authoring method and memory use. The live viewer still
+uses 192 originals; the extra 64 remain in the benchmark contact sheets.
 
 ## README animation
 
 [Animated GIF](preview.gif) · [Still image](preview.png) · [Capture record](preview-animation.json).
 
-The GIF shows Classic rain with the Matrix palette and 10% original glyphs,
-using the actual renderer. It is 900×506 pixels, loops every 3.4 seconds at
-20 playback frames per second, and is 9.44 MB. A 0.6-second dissolve joins the
-loop. The original still image and its review receipt remain unchanged.
-
-The export advances three 1/60-second simulation steps per captured frame,
-after 228 warm-up steps. FFmpeg scales the frames with Lanczos, uses a
-16-color palette without dithering, and encodes a repeating GIF. The capture
-record binds renderer source hashes and the final GIF. Playback timing is an
-export setting, not a renderer-performance measurement.
+Both current previews show **100% of selections from the new 192-glyph Smythe
+catalog**, using the actual Classic renderer and Matrix palette. The GIF is
+900×506 pixels and loops at 20 playback frames per second. A short dissolve
+joins the loop. Frame timing is an export setting, not a performance result.
 
 ## Run and controls
 
@@ -38,7 +33,7 @@ python -m http.server 8000 --bind 127.0.0.1
 ```
 
 Open [the explorer](http://localhost:8000/screensaver/svg-preview/) or
-[the original 192-glyph catalog](http://localhost:8000/screensaver/svg-preview/catalog.html).
+[the new 192-glyph catalog](http://localhost:8000/screensaver/svg-preview/catalog.html).
 The static preview requires a WebGL-capable browser, with no API key or build step.
 
 | Input | Action |
@@ -93,7 +88,6 @@ original catalog with a default probability of 10%; other selections use the
 original catalog does not dominate the effect. The setting is adjustable
 from 0% to 100%.
 
-[Base contact sheet](reference/contact-sheet.png) ·
 [Base SVGs and source](reference/README.md) ·
 [Artwork provenance](reference/provenance.json) ·
 [Artwork MIT notice](reference/LICENSE) ·
@@ -105,19 +99,16 @@ Credit to Rezmason and the reference project's contributors. Smythe adapts
 licensed renderer code and base artwork; its additional 192 glyphs are
 independently authored.
 
-[Original 192-glyph sheet](../../benchmarks/partitions/glyph_svg_v1/catalog/contact-sheet.png) ·
-[24-glyph calibration sheet](../../benchmarks/partitions/glyph_svg_v1/catalog/calibration-sheet.png) ·
-[Original SVG files and manifest](../../benchmarks/partitions/glyph_svg_v1/catalog/).
+[New 192-glyph sheet](../glyph-design-v2/contact-sheet-128.png) ·
+[16 px](../glyph-design-v2/contact-sheet-16.png) ·
+[32 px](../glyph-design-v2/contact-sheet-32.png) ·
+[64 px](../glyph-design-v2/contact-sheet-64.png) ·
+[SVG files and manifest](../glyph-design-v2/README.md).
 
-Small-size original-glyph review:
-[16px](../../benchmarks/partitions/glyph_svg_v1/contact-sheet-16.png) ·
-[32px](../../benchmarks/partitions/glyph_svg_v1/contact-sheet-32.png) ·
-[64px](../../benchmarks/partitions/glyph_svg_v1/contact-sheet-64.png).
-
+The gallery shows only these new original glyphs. The live effect keeps its
+adjustable reference mix; use **Original glyphs: 100%** to see only v2.
 The [4.03-second generation result](../../benchmarks/svg_glyph_benchmark.md)
-measures construction, full validation, and assembly of those 192 originals.
-It excludes the imported base artwork, renderer adaptation, and animation.
-Changing the display mix does not change that measured workload.
+belongs to the historical v1 workflow. V2 has no measured generation result yet.
 
 ## Renderer and checks
 

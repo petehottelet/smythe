@@ -157,7 +157,7 @@ $catalog = $diagnostics.GetMethod('Verify', $staticFlags).Invoke($null, $null)
 $expectedCatalog = Get-Content -LiteralPath $CatalogManifest -Raw | ConvertFrom-Json
 if ($catalog.catalog_sha256 -ne $expectedCatalog.catalog_sha256 -or
     $catalog.reference_sha256 -ne $expectedCatalog.source_sha256.'screensaver/svg-preview/reference/catalog.json' -or
-    $catalog.original_sha256 -ne $expectedCatalog.source_sha256.'benchmarks/partitions/glyph_svg_v1/catalog/manifest.json') {
+    $catalog.original_sha256 -ne $expectedCatalog.source_sha256.'screensaver/glyph-design-v2/manifest.json') {
     throw 'Compiled catalog identities do not match the expected native catalog manifest'
 }
 $binaryVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo((Resolve-Path -LiteralPath $Binary).Path).FileVersion

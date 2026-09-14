@@ -1,0 +1,17 @@
+{
+  "status": "passed",
+  "review": "Codex browser rendering and visual inspection",
+  "analysis_sha256": "4184ff54fd79e8f290db52742546ad534c1bf1e64e7ab275a8fb96643c5d6436",
+  "svg_text_bounds": "All text inside each SVG viewBox",
+  "palette": "Black and white",
+  "images": {
+    "astra_workflows": "8505a299cfa701724ce11c589134b3ed84504ca2243210754017985675f9955d",
+    "astra_differences": "3c4e8058950dc0c4898a6bbe7933acdffcc9fc8f6ba2189af1269c31ac451501"
+  },
+  "scope": "Charts display every trial; missing charge uses retained reservation bounds. Publication review remains separate.",
+  "preview_svg_sha256": {
+    "astra_workflows": "dc9e93eb6dc8962e5717b8a863085f0eeb5407ed7d44d81a07decb20ca3210e6",
+    "astra_differences": "c4089241595a445b7296102c076ab680a55a682ee8ef345acc767c92895cedab"
+  },
+  "export_check": "Published SVG text exactly matches visually reviewed preview after CRLF/LF normalization."
+}

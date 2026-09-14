@@ -1,8 +1,14 @@
-# Original SVG glyph workflow benchmark
+# Original SVG glyph workflow benchmark — historical v1
+
+The current artwork is the [192-glyph v2 catalog](../screensaver/glyph-design-v2/README.md).
+This report measures v1 only. Its visual acceptance was superseded by the
+[12 September contour review](../docs/glyph-contour-review-2026-09-12.md); the
+timing records retain their original inputs and results. No v2 timing claim
+is derived from this campaign.
 
 This protocol measures fresh procedural SVG creation through Smythe, complete validation, and delivery of a usable catalog. It is separate from the historical 192-glyph stroke benchmark. Historical records and their simulated-latency results are unchanged.
 
-The new generator authors original geometry. Reference glyph images inform aggregate style measurements; source images, copied paths, and imported character outlines are not benchmark inputs or deliverables. The web explorer separately imports the reference character set and mixes these 192 originals into it. That display composition and its derived GPU textures are outside this generation benchmark.
+The v1 generator authors original geometry. Reference glyph images inform aggregate style measurements; source images, copied paths, and imported character outlines are not benchmark inputs or deliverables. The contemporary web explorer separately imported the reference character set and mixed these 192 v1 originals into it. That display composition and its derived GPU textures are outside this generation benchmark.
 
 ## Results: 7 September 2026
 
@@ -14,7 +20,7 @@ identical SVG, pixel, and measurement hashes. The campaign is **claimable for
 this local procedural workflow**, with no known measurement defects.
 
 [Raw record](results/glyph_svg_v1.json) ·
-[Complete contact sheet](partitions/glyph_svg_v1/catalog/contact-sheet.png) ·
+[Current v2 contact sheet](../screensaver/glyph-design-v2/contact-sheet-128.png) ·
 [SVGs and manifest](partitions/glyph_svg_v1/catalog/).
 
 ![Complete SVG workflow and stage breakdown](../assets/benchmarks/svg_workflow.svg)
@@ -40,7 +46,7 @@ in their medians. C16 is the mechanical lowest-median selection; the record
 does not establish a meaningful advantage over c8. The main measured gain
 comes from parallelizing the complete validation work with process workers.
 
-The published catalog comes from **process c16, repetition 3**, the actual
+The archived v1 catalog comes from **process c16, repetition 3**, the actual
 median run. Its measured stages are 0.8680 s generation, 2.4756 s validation,
 0.5444 s assembly, and 0.1411 s setup/shutdown/remaining overhead. Complete
 wall time is 4.0292 s. Parent CPU time was 1.5781 s; worker tasks used 13.0313

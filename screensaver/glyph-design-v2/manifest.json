@@ -1,0 +1,1737 @@
+{
+  "version": "glyph-svg-v2-1",
+  "status": "current-catalog",
+  "count": 192,
+  "benchmark_claimable": false,
+  "reference_artwork_included": false,
+  "glyphs": [
+    {
+      "glyph_id": "GLYPH-000",
+      "version": "glyph-svg-v2-1",
+      "recipe": "offset-bars",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-000.svg",
+      "svg_sha256": "ed5cb9ef81e2242e5b1bfbfdb8fbf64f5949108df0ce226ca601fb4281cce8a5",
+      "sha256": "ed5cb9ef81e2242e5b1bfbfdb8fbf64f5949108df0ce226ca601fb4281cce8a5"
+    },
+    {
+      "glyph_id": "GLYPH-001",
+      "version": "glyph-svg-v2-1",
+      "recipe": "roof-descender",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-001.svg",
+      "svg_sha256": "c539f668a2feeed375182febcaf82a05410e2c91b7ca313f30687fd0cace357b",
+      "sha256": "c539f668a2feeed375182febcaf82a05410e2c91b7ca313f30687fd0cace357b"
+    },
+    {
+      "glyph_id": "GLYPH-002",
+      "version": "glyph-svg-v2-1",
+      "recipe": "stepped-marks",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-002.svg",
+      "svg_sha256": "cb0dad4ead4bd50449f73936a61b75043cb3d34d142e678a630642f0c748565b",
+      "sha256": "cb0dad4ead4bd50449f73936a61b75043cb3d34d142e678a630642f0c748565b"
+    },
+    {
+      "glyph_id": "GLYPH-003",
+      "version": "glyph-svg-v2-1",
+      "recipe": "paired-diagonals",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-003.svg",
+      "svg_sha256": "90016bdf3594fb440b6af75b151e55e500936563a4298c3fcdaaed6318be700d",
+      "sha256": "90016bdf3594fb440b6af75b151e55e500936563a4298c3fcdaaed6318be700d"
+    },
+    {
+      "glyph_id": "GLYPH-004",
+      "version": "glyph-svg-v2-1",
+      "recipe": "roof-return",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-004.svg",
+      "svg_sha256": "e52c97a84920574dc1604a6ea8fb5eedffdf329b8138de756aa8528487e0abfb",
+      "sha256": "e52c97a84920574dc1604a6ea8fb5eedffdf329b8138de756aa8528487e0abfb"
+    },
+    {
+      "glyph_id": "GLYPH-005",
+      "version": "glyph-svg-v2-1",
+      "recipe": "split-bowl-stem",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-005.svg",
+      "svg_sha256": "31af84c611a68c6013c15f6593dc1b201791713a3f28aee9de644da5bdb21d27",
+      "sha256": "31af84c611a68c6013c15f6593dc1b201791713a3f28aee9de644da5bdb21d27"
+    },
+    {
+      "glyph_id": "GLYPH-006",
+      "version": "glyph-svg-v2-1",
+      "recipe": "upper-counter-sweep",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-006.svg",
+      "svg_sha256": "50b7737c58ca222657401e4a4893a6788ba4da121c5bc0d00c67ec7f165d4ccf",
+      "sha256": "50b7737c58ca222657401e4a4893a6788ba4da121c5bc0d00c67ec7f165d4ccf"
+    },
+    {
+      "glyph_id": "GLYPH-007",
+      "version": "glyph-svg-v2-1",
+      "recipe": "offset-crossbar-foot",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-007.svg",
+      "svg_sha256": "cd044eb7ec48b9824e6ea3622075eab04797ecae6c8ad13eb75b61a1a912964c",
+      "sha256": "cd044eb7ec48b9824e6ea3622075eab04797ecae6c8ad13eb75b61a1a912964c"
+    },
+    {
+      "glyph_id": "GLYPH-008",
+      "version": "glyph-svg-v2-1",
+      "recipe": "short-bar",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-008.svg",
+      "svg_sha256": "ee08a711acbf6651cfdc51a117a190a303f4289011ea3dd032822bdb54140306",
+      "sha256": "ee08a711acbf6651cfdc51a117a190a303f4289011ea3dd032822bdb54140306"
+    },
+    {
+      "glyph_id": "GLYPH-009",
+      "version": "glyph-svg-v2-1",
+      "recipe": "offset-stem-shoulder",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-009.svg",
+      "svg_sha256": "c5566a20cb9d7fc74b2f0a85adc86aa1bb1e57629c2c49362b124cf5758813d1",
+      "sha256": "c5566a20cb9d7fc74b2f0a85adc86aa1bb1e57629c2c49362b124cf5758813d1"
+    },
+    {
+      "glyph_id": "GLYPH-010",
+      "version": "glyph-svg-v2-1",
+      "recipe": "split-roof-shoulder",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-010.svg",
+      "svg_sha256": "175fd197b8018a47e9745499297d859cfb2ec7acceb247fb127946a0a109147b",
+      "sha256": "175fd197b8018a47e9745499297d859cfb2ec7acceb247fb127946a0a109147b"
+    },
+    {
+      "glyph_id": "GLYPH-011",
+      "version": "glyph-svg-v2-1",
+      "recipe": "counter-pedestal",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-011.svg",
+      "svg_sha256": "c6419e769eff63ff7a98386e3c8a9b92a9da25f75755ad3235a524a522343292",
+      "sha256": "c6419e769eff63ff7a98386e3c8a9b92a9da25f75755ad3235a524a522343292"
+    },
+    {
+      "glyph_id": "GLYPH-012",
+      "version": "glyph-svg-v2-1",
+      "recipe": "unequal-bars",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-012.svg",
+      "svg_sha256": "de4f926cb12e38efc10890ff26a9943c96ef2f751af2e066b34a8f536cc182ca",
+      "sha256": "de4f926cb12e38efc10890ff26a9943c96ef2f751af2e066b34a8f536cc182ca"
+    },
+    {
+      "glyph_id": "GLYPH-013",
+      "version": "glyph-svg-v2-1",
+      "recipe": "open-diagonal-bowl",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-013.svg",
+      "svg_sha256": "847b4e8a4a7c96cb6c1a040a1fda1dab380c10aa2f26f8779d4294ee69b33e16",
+      "sha256": "847b4e8a4a7c96cb6c1a040a1fda1dab380c10aa2f26f8779d4294ee69b33e16"
+    },
+    {
+      "glyph_id": "GLYPH-014",
+      "version": "glyph-svg-v2-1",
+      "recipe": "slanted-roof-hook",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-014.svg",
+      "svg_sha256": "2d1a4faa88a80150391020f8a142948dca7617a45ca91312189314457a46a570",
+      "sha256": "2d1a4faa88a80150391020f8a142948dca7617a45ca91312189314457a46a570"
+    },
+    {
+      "glyph_id": "GLYPH-015",
+      "version": "glyph-svg-v2-1",
+      "recipe": "roof-bowl",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-015.svg",
+      "svg_sha256": "a5b75a87668cdab4548412d1817c53c88c5dbdd009091ad95b3f4dc7a7795eaa",
+      "sha256": "a5b75a87668cdab4548412d1817c53c88c5dbdd009091ad95b3f4dc7a7795eaa"
+    },
+    {
+      "glyph_id": "GLYPH-016",
+      "version": "glyph-svg-v2-1",
+      "recipe": "offset-rising-arm",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-016.svg",
+      "svg_sha256": "993636b96e22837b347f3cefd481d10eef71dd9bcfd2f689ed2e8642d1ca3a4c",
+      "sha256": "993636b96e22837b347f3cefd481d10eef71dd9bcfd2f689ed2e8642d1ca3a4c"
+    },
+    {
+      "glyph_id": "GLYPH-017",
+      "version": "glyph-svg-v2-1",
+      "recipe": "roof-hook-floating-bar",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-017.svg",
+      "svg_sha256": "329ab252f1f8e8c6870b8ccc2a39a763340a7134b79be814c5db788ba4e57573",
+      "sha256": "329ab252f1f8e8c6870b8ccc2a39a763340a7134b79be814c5db788ba4e57573"
+    },
+    {
+      "glyph_id": "GLYPH-018",
+      "version": "glyph-svg-v2-1",
+      "recipe": "stepped-bars-sweep",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-018.svg",
+      "svg_sha256": "303c04ccbb599bebb689b6101297e32b536172d1b969fe754c6a524d2f81a6fb",
+      "sha256": "303c04ccbb599bebb689b6101297e32b536172d1b969fe754c6a524d2f81a6fb"
+    },
+    {
+      "glyph_id": "GLYPH-019",
+      "version": "glyph-svg-v2-1",
+      "recipe": "offset-elbow-sweep",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-019.svg",
+      "svg_sha256": "63c775acaa3222b3f807a648f433c212d2a8fa7859b297fe4caa3e4d84438546",
+      "sha256": "63c775acaa3222b3f807a648f433c212d2a8fa7859b297fe4caa3e4d84438546"
+    },
+    {
+      "glyph_id": "GLYPH-020",
+      "version": "glyph-svg-v2-1",
+      "recipe": "split-crossbar-crook",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-020.svg",
+      "svg_sha256": "e63490f8f67aa334b4b819a27c23528fbbf61c3c25b19b11aa2000890817d370",
+      "sha256": "e63490f8f67aa334b4b819a27c23528fbbf61c3c25b19b11aa2000890817d370"
+    },
+    {
+      "glyph_id": "GLYPH-021",
+      "version": "glyph-svg-v2-1",
+      "recipe": "split-double-arm",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-021.svg",
+      "svg_sha256": "cc426259ce5ff26429742bed74ec12a15a444fb63a8ffca768afdededf1b8c1e",
+      "sha256": "cc426259ce5ff26429742bed74ec12a15a444fb63a8ffca768afdededf1b8c1e"
+    },
+    {
+      "glyph_id": "GLYPH-022",
+      "version": "glyph-svg-v2-1",
+      "recipe": "frame-with-mark",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-022.svg",
+      "svg_sha256": "2ec3874cd2b376c53f4eba22c9dde25e716353e890c56a5a1fec2c90cec6f914",
+      "sha256": "2ec3874cd2b376c53f4eba22c9dde25e716353e890c56a5a1fec2c90cec6f914"
+    },
+    {
+      "glyph_id": "GLYPH-023",
+      "version": "glyph-svg-v2-1",
+      "recipe": "staggered-crook",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-023.svg",
+      "svg_sha256": "90baeaf7ebb37b5ce0f51bb7f1b772b7e69f00c93129ad9008ae795c286166ae",
+      "sha256": "90baeaf7ebb37b5ce0f51bb7f1b772b7e69f00c93129ad9008ae795c286166ae"
+    },
+    {
+      "glyph_id": "GLYPH-024",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-open-corner-offset-shelf",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-024.svg",
+      "svg_sha256": "5b90f5f5c3aa382d6d3d862793fe5452a07e98b1fda232cb7cd7c316a1b9ab1b",
+      "sha256": "5b90f5f5c3aa382d6d3d862793fe5452a07e98b1fda232cb7cd7c316a1b9ab1b"
+    },
+    {
+      "glyph_id": "GLYPH-025",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-offset-offset-shelf",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-025.svg",
+      "svg_sha256": "39c6b7a1749e9065f6ad8b0c54c59252f77a50d6aa7e4bfcd0c4e1bbf7018456",
+      "sha256": "39c6b7a1749e9065f6ad8b0c54c59252f77a50d6aa7e4bfcd0c4e1bbf7018456"
+    },
+    {
+      "glyph_id": "GLYPH-026",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-split-sweep-short-elbow-mark",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-026.svg",
+      "svg_sha256": "c809856c96734d69708abf24f032322f80475698e672902fea94836dd7eb7b54",
+      "sha256": "c809856c96734d69708abf24f032322f80475698e672902fea94836dd7eb7b54"
+    },
+    {
+      "glyph_id": "GLYPH-027",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-offset-stepped-diagonal",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-027.svg",
+      "svg_sha256": "e3cbd726d5c78fe16a517feb38a1636d6ed214163f290fd649bf1dfc11fa42e1",
+      "sha256": "e3cbd726d5c78fe16a517feb38a1636d6ed214163f290fd649bf1dfc11fa42e1"
+    },
+    {
+      "glyph_id": "GLYPH-028",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-paired-uprights-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-028.svg",
+      "svg_sha256": "8c76b17a5923aedacd084043079968a97c89781f11bb8310f9a029595a12d332",
+      "sha256": "8c76b17a5923aedacd084043079968a97c89781f11bb8310f9a029595a12d332"
+    },
+    {
+      "glyph_id": "GLYPH-029",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-offset-split-sweep",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-029.svg",
+      "svg_sha256": "e3329f3a6b6dfac8387ad0feb3356e83eb7364503a408b68a7166da89506d735",
+      "sha256": "e3329f3a6b6dfac8387ad0feb3356e83eb7364503a408b68a7166da89506d735"
+    },
+    {
+      "glyph_id": "GLYPH-030",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-middle-paired-uprights",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-030.svg",
+      "svg_sha256": "a1885cdd0d21896566f1390c66b353a5786728faef02f7508db042d7741618e8",
+      "sha256": "a1885cdd0d21896566f1390c66b353a5786728faef02f7508db042d7741618e8"
+    },
+    {
+      "glyph_id": "GLYPH-031",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-interrupted-middle",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-031.svg",
+      "svg_sha256": "880ae92b11f03c33850b95af080cce65c8fa68a7d7b10956515af9896d1fe576",
+      "sha256": "880ae92b11f03c33850b95af080cce65c8fa68a7d7b10956515af9896d1fe576"
+    },
+    {
+      "glyph_id": "GLYPH-032",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-rise-offset-pillar",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-032.svg",
+      "svg_sha256": "9e3c5b43ed152c5efa8297d329b5f0671ae43b92692364f3284b19b1d2bb90f5",
+      "sha256": "9e3c5b43ed152c5efa8297d329b5f0671ae43b92692364f3284b19b1d2bb90f5"
+    },
+    {
+      "glyph_id": "GLYPH-033",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-sweep-cut-crescent",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-033.svg",
+      "svg_sha256": "0be4d8b46d8da02bd65cb9a8e17133b454a8b1284ee2f3f41ee42883e0f57852",
+      "sha256": "0be4d8b46d8da02bd65cb9a8e17133b454a8b1284ee2f3f41ee42883e0f57852"
+    },
+    {
+      "glyph_id": "GLYPH-034",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-rise-diagonal",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-034.svg",
+      "svg_sha256": "00eb34f712afa0d1bec30a7df0821de243fe631056966fef76cf0387d661e902",
+      "sha256": "00eb34f712afa0d1bec30a7df0821de243fe631056966fef76cf0387d661e902"
+    },
+    {
+      "glyph_id": "GLYPH-035",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-sloping-header-stem-double-corner",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-035.svg",
+      "svg_sha256": "75b6d39278d80c21effa9c8a2379401eecc08fd02921a8446226fc1fb530406f",
+      "sha256": "75b6d39278d80c21effa9c8a2379401eecc08fd02921a8446226fc1fb530406f"
+    },
+    {
+      "glyph_id": "GLYPH-036",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-heavy-hook-unequal-squares",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-036.svg",
+      "svg_sha256": "bcc095895c4fdec91fa6af36881c2c7e109b1dbc8f773667bd4d3ba400fd9ee3",
+      "sha256": "bcc095895c4fdec91fa6af36881c2c7e109b1dbc8f773667bd4d3ba400fd9ee3"
+    },
+    {
+      "glyph_id": "GLYPH-037",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-offset-pillar-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-037.svg",
+      "svg_sha256": "0b682fc4246df0fd278e8ff7b011c70198bed92261a01436aa3a06ce46c0917a",
+      "sha256": "0b682fc4246df0fd278e8ff7b011c70198bed92261a01436aa3a06ce46c0917a"
+    },
+    {
+      "glyph_id": "GLYPH-038",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-paired-uprights-down-sweep",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-038.svg",
+      "svg_sha256": "e25bffc1f5d41a40f6dde2d5b0d38919d36bdab668db6781e7857c91b4ead569",
+      "sha256": "e25bffc1f5d41a40f6dde2d5b0d38919d36bdab668db6781e7857c91b4ead569"
+    },
+    {
+      "glyph_id": "GLYPH-039",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-diagonal-short-elbow-mark",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-039.svg",
+      "svg_sha256": "3a290ea4d4099f468387a907315acf5f4ab48f96ddcf7ef493dbf2aaddb4edb2",
+      "sha256": "3a290ea4d4099f468387a907315acf5f4ab48f96ddcf7ef493dbf2aaddb4edb2"
+    },
+    {
+      "glyph_id": "GLYPH-040",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-open-corner-offset-shelf",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-040.svg",
+      "svg_sha256": "2baf1fe4ad4f13dfd98e4fead818a38506b970805208cacc95e3f450e38b503c",
+      "sha256": "2baf1fe4ad4f13dfd98e4fead818a38506b970805208cacc95e3f450e38b503c"
+    },
+    {
+      "glyph_id": "GLYPH-041",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-open-corner-cut-crescent",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-041.svg",
+      "svg_sha256": "db0141f02f5cb86eb254ac4b777c07e86bdd60c19278e551e5a277cece9f9e7e",
+      "sha256": "db0141f02f5cb86eb254ac4b777c07e86bdd60c19278e551e5a277cece9f9e7e"
+    },
+    {
+      "glyph_id": "GLYPH-042",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-unequal-squares-sloping-header-stem",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-042.svg",
+      "svg_sha256": "f0ea22ab67c393b7685ba6fda6895463d9d3c6964dd8c0a3b50a0a71dc1cc022",
+      "sha256": "f0ea22ab67c393b7685ba6fda6895463d9d3c6964dd8c0a3b50a0a71dc1cc022"
+    },
+    {
+      "glyph_id": "GLYPH-043",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-shoulder-split-sweep",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-043.svg",
+      "svg_sha256": "a4ced762c03abac77a804f6ec9dff6ba7952ba66b09b1c3da0d95347c9c1d794",
+      "sha256": "a4ced762c03abac77a804f6ec9dff6ba7952ba66b09b1c3da0d95347c9c1d794"
+    },
+    {
+      "glyph_id": "GLYPH-044",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-downturn-cut-crescent",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-044.svg",
+      "svg_sha256": "0f1cc4b98553dc3eea7f4c37b0ea5415c89abd6e0e3fe9b21ecf64f4aeb8936f",
+      "sha256": "0f1cc4b98553dc3eea7f4c37b0ea5415c89abd6e0e3fe9b21ecf64f4aeb8936f"
+    },
+    {
+      "glyph_id": "GLYPH-045",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-rise-split-sweep",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-045.svg",
+      "svg_sha256": "a6289d20070604071661f4205b1bdfd06a6744c5487e78823bdd7747475eacba",
+      "sha256": "a6289d20070604071661f4205b1bdfd06a6744c5487e78823bdd7747475eacba"
+    },
+    {
+      "glyph_id": "GLYPH-046",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-stepped-diagonal-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-046.svg",
+      "svg_sha256": "e538a291f487cc31c3e659e26073c54868b2b2db54030ee847ff50c98dd6e886",
+      "sha256": "e538a291f487cc31c3e659e26073c54868b2b2db54030ee847ff50c98dd6e886"
+    },
+    {
+      "glyph_id": "GLYPH-047",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-elbow-short-elbow-mark",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-047.svg",
+      "svg_sha256": "2c0c9b17f5237ef3256235bb6fa024ac209318016252d7dc117add010b7bda0a",
+      "sha256": "2c0c9b17f5237ef3256235bb6fa024ac209318016252d7dc117add010b7bda0a"
+    },
+    {
+      "glyph_id": "GLYPH-048",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-offset-interrupted-roof",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-048.svg",
+      "svg_sha256": "8a91c43152418910578f8553320b4b6e0863730a5ec2e02b9fa246e3dccb8c7f",
+      "sha256": "8a91c43152418910578f8553320b4b6e0863730a5ec2e02b9fa246e3dccb8c7f"
+    },
+    {
+      "glyph_id": "GLYPH-049",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-rise-middle",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-049.svg",
+      "svg_sha256": "5932ef2e970f4ff5c3412ac91d9709cbcfbdba6553e5b45016dc27443acb919a",
+      "sha256": "5932ef2e970f4ff5c3412ac91d9709cbcfbdba6553e5b45016dc27443acb919a"
+    },
+    {
+      "glyph_id": "GLYPH-050",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-down-sweep-cut-crescent",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-050.svg",
+      "svg_sha256": "4712a7af4d664d0ffdb605a3456a7bef6ba8c8f111b5f44c584107227a6a872f",
+      "sha256": "4712a7af4d664d0ffdb605a3456a7bef6ba8c8f111b5f44c584107227a6a872f"
+    },
+    {
+      "glyph_id": "GLYPH-051",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-heavy-hook-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-051.svg",
+      "svg_sha256": "b2f9062973f98b6fb24c6d255ba84cd498ca1e33f3c748eb8164f1e64770ded8",
+      "sha256": "b2f9062973f98b6fb24c6d255ba84cd498ca1e33f3c748eb8164f1e64770ded8"
+    },
+    {
+      "glyph_id": "GLYPH-052",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-open-corner-heavy-hook",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-052.svg",
+      "svg_sha256": "46de3d8dedc54710519140b7c9f0bccea69acf86677b5e1f1716b719f8e89dfa",
+      "sha256": "46de3d8dedc54710519140b7c9f0bccea69acf86677b5e1f1716b719f8e89dfa"
+    },
+    {
+      "glyph_id": "GLYPH-053",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-elbow-offset-pillar",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-053.svg",
+      "svg_sha256": "de29c31af6188ccc08378d5aa98df2832881085d377fa2ec6a0f3b45caf8bc1c",
+      "sha256": "de29c31af6188ccc08378d5aa98df2832881085d377fa2ec6a0f3b45caf8bc1c"
+    },
+    {
+      "glyph_id": "GLYPH-054",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-middle-heavy-hook",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-054.svg",
+      "svg_sha256": "a73267de16685b2e6afebe19182083bce657a4f286b7d399c6bd3734f9fdc8e4",
+      "sha256": "a73267de16685b2e6afebe19182083bce657a4f286b7d399c6bd3734f9fdc8e4"
+    },
+    {
+      "glyph_id": "GLYPH-055",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-sloping-header-stem-offset-shelf",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-055.svg",
+      "svg_sha256": "77d6aa6000959347fe606d008e05f09850df4379695aac3974afd9e3bc48d91e",
+      "sha256": "77d6aa6000959347fe606d008e05f09850df4379695aac3974afd9e3bc48d91e"
+    },
+    {
+      "glyph_id": "GLYPH-056",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-interrupted-double-corner",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-056.svg",
+      "svg_sha256": "fbc61fc89857dd25d14072f434768d36287b6ba7ea3e3d94ccc1cc12ca791531",
+      "sha256": "fbc61fc89857dd25d14072f434768d36287b6ba7ea3e3d94ccc1cc12ca791531"
+    },
+    {
+      "glyph_id": "GLYPH-057",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-short-elbow-mark-offset-shelf",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-057.svg",
+      "svg_sha256": "8c2b057f0067ba7a28c82a8d81d2b5ed5a86705370a17b5b82ccc30b92a4e646",
+      "sha256": "8c2b057f0067ba7a28c82a8d81d2b5ed5a86705370a17b5b82ccc30b92a4e646"
+    },
+    {
+      "glyph_id": "GLYPH-058",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-split-sweep-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-058.svg",
+      "svg_sha256": "1283279693394f27cfff9332042d54fb5ab745af1685ce13de209e86bdb869f1",
+      "sha256": "1283279693394f27cfff9332042d54fb5ab745af1685ce13de209e86bdb869f1"
+    },
+    {
+      "glyph_id": "GLYPH-059",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-diagonal-sloping-header-stem",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-059.svg",
+      "svg_sha256": "6fcf7fa8a6e2ef4b5760f1ad341cb212e9f248e93a6b5323a7f3cef7b8908318",
+      "sha256": "6fcf7fa8a6e2ef4b5760f1ad341cb212e9f248e93a6b5323a7f3cef7b8908318"
+    },
+    {
+      "glyph_id": "GLYPH-060",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-offset-offset-pillar",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-060.svg",
+      "svg_sha256": "b99044ca09f06f4d8c8cb11de836df1bba3bbcbceafaccef62aaba063a192a03",
+      "sha256": "b99044ca09f06f4d8c8cb11de836df1bba3bbcbceafaccef62aaba063a192a03"
+    },
+    {
+      "glyph_id": "GLYPH-061",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-stepped-diagonal-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-061.svg",
+      "svg_sha256": "843376b98dfe30cc0567771621fbe74e926f849d4c9f7d50017a993db37fcc03",
+      "sha256": "843376b98dfe30cc0567771621fbe74e926f849d4c9f7d50017a993db37fcc03"
+    },
+    {
+      "glyph_id": "GLYPH-062",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-paired-uprights-cut-crescent",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-062.svg",
+      "svg_sha256": "f6592761cc8d0818e143d93ae611ba6afd717d28a9d6f8e7c900df7296a6e843",
+      "sha256": "f6592761cc8d0818e143d93ae611ba6afd717d28a9d6f8e7c900df7296a6e843"
+    },
+    {
+      "glyph_id": "GLYPH-063",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-interrupted-paired-uprights",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-063.svg",
+      "svg_sha256": "20d3340ac2df078a8ebf7a752612f6b376b3222c2017c9413904b7ab47ae2ee8",
+      "sha256": "20d3340ac2df078a8ebf7a752612f6b376b3222c2017c9413904b7ab47ae2ee8"
+    },
+    {
+      "glyph_id": "GLYPH-064",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-diagonal-heavy-hook",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-064.svg",
+      "svg_sha256": "5f75e14a77cf87f8f3b9dfd8f65a6348e922d7cf3b53e3364690e753c765b4bf",
+      "sha256": "5f75e14a77cf87f8f3b9dfd8f65a6348e922d7cf3b53e3364690e753c765b4bf"
+    },
+    {
+      "glyph_id": "GLYPH-065",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-stepped-diagonal-cut-crescent",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-065.svg",
+      "svg_sha256": "c6b8ca6703774a65a6fe648d16753a9837cbb7a8f0eb63439302d24989b57994",
+      "sha256": "c6b8ca6703774a65a6fe648d16753a9837cbb7a8f0eb63439302d24989b57994"
+    },
+    {
+      "glyph_id": "GLYPH-066",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-rise-down-sweep",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-066.svg",
+      "svg_sha256": "7d6b06bce305ebf7b9b9826182dd410d9879581b8219a9c9d70ec820f996a926",
+      "sha256": "7d6b06bce305ebf7b9b9826182dd410d9879581b8219a9c9d70ec820f996a926"
+    },
+    {
+      "glyph_id": "GLYPH-067",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-diagonal-offset-shelf",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-067.svg",
+      "svg_sha256": "c8e9206d02a6977be613c5e281ea2148f56db953ede8f43efa8cce5ea8e83272",
+      "sha256": "c8e9206d02a6977be613c5e281ea2148f56db953ede8f43efa8cce5ea8e83272"
+    },
+    {
+      "glyph_id": "GLYPH-068",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-offset-shoulder",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-068.svg",
+      "svg_sha256": "37e35026c941dc57db33717e02dc6efaf6789118a2dc4b5b9db9e66f160f3157",
+      "sha256": "37e35026c941dc57db33717e02dc6efaf6789118a2dc4b5b9db9e66f160f3157"
+    },
+    {
+      "glyph_id": "GLYPH-069",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-elbow-double-corner",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-069.svg",
+      "svg_sha256": "ac2085b5b9fe521869eb0d4ff7df58105869a6dcb076253cc3ab8e8f5974ac60",
+      "sha256": "ac2085b5b9fe521869eb0d4ff7df58105869a6dcb076253cc3ab8e8f5974ac60"
+    },
+    {
+      "glyph_id": "GLYPH-070",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-low-return-double-corner",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-070.svg",
+      "svg_sha256": "ef592445a955b31eb67760f9f61ec3a90feacc1023d38bb4bf4a9a49edb1bd64",
+      "sha256": "ef592445a955b31eb67760f9f61ec3a90feacc1023d38bb4bf4a9a49edb1bd64"
+    },
+    {
+      "glyph_id": "GLYPH-071",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-unequal-squares-offset-shelf",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-071.svg",
+      "svg_sha256": "5baca1ad7aa95fb541f60a2efa9ea0fa79aef82789d085d10c65180411a1169d",
+      "sha256": "5baca1ad7aa95fb541f60a2efa9ea0fa79aef82789d085d10c65180411a1169d"
+    },
+    {
+      "glyph_id": "GLYPH-072",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-sweep-cut-crescent",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-072.svg",
+      "svg_sha256": "bff6fe4e02257a6010e33105f5d6cef4e323c9072843b4436f38f733fc4e799d",
+      "sha256": "bff6fe4e02257a6010e33105f5d6cef4e323c9072843b4436f38f733fc4e799d"
+    },
+    {
+      "glyph_id": "GLYPH-073",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-diagonal-cut-crescent",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-073.svg",
+      "svg_sha256": "8b0468bfd6f407ef79ea533364951f9c743a62df9aa0b00b3a7a0ddca3bc7953",
+      "sha256": "8b0468bfd6f407ef79ea533364951f9c743a62df9aa0b00b3a7a0ddca3bc7953"
+    },
+    {
+      "glyph_id": "GLYPH-074",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-open-corner-interrupted-roof",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-074.svg",
+      "svg_sha256": "636a02070abd54d11565cf5f6045b0630d1bccb98ebb4629976620e0ac3e1971",
+      "sha256": "636a02070abd54d11565cf5f6045b0630d1bccb98ebb4629976620e0ac3e1971"
+    },
+    {
+      "glyph_id": "GLYPH-075",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-offset-double-corner",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-075.svg",
+      "svg_sha256": "4146ac0f3f1af31d5a1ecbc35395f39368f4d9f1626ade7f5de58d882819b25b",
+      "sha256": "4146ac0f3f1af31d5a1ecbc35395f39368f4d9f1626ade7f5de58d882819b25b"
+    },
+    {
+      "glyph_id": "GLYPH-076",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-low-return-double-corner",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-076.svg",
+      "svg_sha256": "e9424055cae3abade66b5d514c10c0ddfd699b80c09d68425315929e2f7ce280",
+      "sha256": "e9424055cae3abade66b5d514c10c0ddfd699b80c09d68425315929e2f7ce280"
+    },
+    {
+      "glyph_id": "GLYPH-077",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-sweep-middle",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-077.svg",
+      "svg_sha256": "b3bed98bb7d3a21c803c276a5e936482514324941bd0c811eda2335ccb451fb3",
+      "sha256": "b3bed98bb7d3a21c803c276a5e936482514324941bd0c811eda2335ccb451fb3"
+    },
+    {
+      "glyph_id": "GLYPH-078",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-diagonal-heavy-hook",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-078.svg",
+      "svg_sha256": "aeb20917437aef513983f0bbcba5e76da821927562656e9916029e257be4ad7f",
+      "sha256": "aeb20917437aef513983f0bbcba5e76da821927562656e9916029e257be4ad7f"
+    },
+    {
+      "glyph_id": "GLYPH-079",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-wide-half-counter-offset-shelf",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-079.svg",
+      "svg_sha256": "b7070d274cf2b6e12b2e24fec2212b30fed318bb828c69daf5e19825b5f7c294",
+      "sha256": "b7070d274cf2b6e12b2e24fec2212b30fed318bb828c69daf5e19825b5f7c294"
+    },
+    {
+      "glyph_id": "GLYPH-080",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-short-elbow-mark-sloping-header-stem",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-080.svg",
+      "svg_sha256": "5dca8cb70bf354133d5c107774ac6dca0c3a4826cd17f239916f57b0a88cf973",
+      "sha256": "5dca8cb70bf354133d5c107774ac6dca0c3a4826cd17f239916f57b0a88cf973"
+    },
+    {
+      "glyph_id": "GLYPH-081",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-offset-pillar-interrupted-roof",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-081.svg",
+      "svg_sha256": "9808d2fae752c652acc03337c8bf85f2a3a3efef1889fa62dc4568cda2f36964",
+      "sha256": "9808d2fae752c652acc03337c8bf85f2a3a3efef1889fa62dc4568cda2f36964"
+    },
+    {
+      "glyph_id": "GLYPH-082",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-open-corner-unequal-squares",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-082.svg",
+      "svg_sha256": "3567218db61df7fa4fcd714106eb2dce01242719b42a810baf658a7c3968588d",
+      "sha256": "3567218db61df7fa4fcd714106eb2dce01242719b42a810baf658a7c3968588d"
+    },
+    {
+      "glyph_id": "GLYPH-083",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-short-elbow-mark-interrupted-roof",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-083.svg",
+      "svg_sha256": "fa9eb17b41de0bb301c520a2402c1b2c603956a31f9b67cbef982548b3fb97aa",
+      "sha256": "fa9eb17b41de0bb301c520a2402c1b2c603956a31f9b67cbef982548b3fb97aa"
+    },
+    {
+      "glyph_id": "GLYPH-084",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-unequal-squares-interrupted-roof",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-084.svg",
+      "svg_sha256": "81444fb0c7d5edc2bab3bb42334a2bad359283e4b1761372cb2f0dcd184da871",
+      "sha256": "81444fb0c7d5edc2bab3bb42334a2bad359283e4b1761372cb2f0dcd184da871"
+    },
+    {
+      "glyph_id": "GLYPH-085",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-rise-cut-crescent",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-085.svg",
+      "svg_sha256": "99c13fd00533b858e50a447b5afac3bf3b9d0c71efa20e96e8dc494709242062",
+      "sha256": "99c13fd00533b858e50a447b5afac3bf3b9d0c71efa20e96e8dc494709242062"
+    },
+    {
+      "glyph_id": "GLYPH-086",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-open-corner-short-elbow-mark",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-086.svg",
+      "svg_sha256": "c93bfe239d0b9adfbf4b7e04738fe2d0f840d0c21b685c122e4d4bd15d822536",
+      "sha256": "c93bfe239d0b9adfbf4b7e04738fe2d0f840d0c21b685c122e4d4bd15d822536"
+    },
+    {
+      "glyph_id": "GLYPH-087",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-diagonal-unequal-squares",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-087.svg",
+      "svg_sha256": "3f4c64b38186d17e0de059d85bb4a6d437a4ccb32287edef64e09b776d71a814",
+      "sha256": "3f4c64b38186d17e0de059d85bb4a6d437a4ccb32287edef64e09b776d71a814"
+    },
+    {
+      "glyph_id": "GLYPH-088",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-rise-sloping-header-stem",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-088.svg",
+      "svg_sha256": "b7175b30b63a68b968ddef3997c455b5180fef8918c4a7b6f079258dc0f570f1",
+      "sha256": "b7175b30b63a68b968ddef3997c455b5180fef8918c4a7b6f079258dc0f570f1"
+    },
+    {
+      "glyph_id": "GLYPH-089",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-elbow-heavy-hook",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-089.svg",
+      "svg_sha256": "2b125d7bcdf9f1c81b94ddce342720914f8d6e3f7fe0e97444fe13825829b284",
+      "sha256": "2b125d7bcdf9f1c81b94ddce342720914f8d6e3f7fe0e97444fe13825829b284"
+    },
+    {
+      "glyph_id": "GLYPH-090",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-sweep-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-090.svg",
+      "svg_sha256": "1c77d0cd09884c831c7d8a8a63a81aa9ccc254dcf312affdd4d7046e6898509d",
+      "sha256": "1c77d0cd09884c831c7d8a8a63a81aa9ccc254dcf312affdd4d7046e6898509d"
+    },
+    {
+      "glyph_id": "GLYPH-091",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-middle-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-091.svg",
+      "svg_sha256": "7297a7bbc2e1a9b37edb2f60a80ca4ce6d46cd985b0d6e0016b382ce37741135",
+      "sha256": "7297a7bbc2e1a9b37edb2f60a80ca4ce6d46cd985b0d6e0016b382ce37741135"
+    },
+    {
+      "glyph_id": "GLYPH-092",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-offset-pillar-stepped-diagonal",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-092.svg",
+      "svg_sha256": "b926d7b0bfb2b9582290aa80b9024ba69bed9db7116afa69875fd8b4c7bbbbca",
+      "sha256": "b926d7b0bfb2b9582290aa80b9024ba69bed9db7116afa69875fd8b4c7bbbbca"
+    },
+    {
+      "glyph_id": "GLYPH-093",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-shoulder-interrupted",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-093.svg",
+      "svg_sha256": "113e7efba5012119a17a5b6997ba91cba327450975fd3f838af8a55de175c5fb",
+      "sha256": "113e7efba5012119a17a5b6997ba91cba327450975fd3f838af8a55de175c5fb"
+    },
+    {
+      "glyph_id": "GLYPH-094",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-downturn-heavy-hook",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-094.svg",
+      "svg_sha256": "8f4de5beeacc54378526b67d74314f090dcadac78016239494acaa8f9da20609",
+      "sha256": "8f4de5beeacc54378526b67d74314f090dcadac78016239494acaa8f9da20609"
+    },
+    {
+      "glyph_id": "GLYPH-095",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-sweep-sloping-header-stem",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-095.svg",
+      "svg_sha256": "997ad80f7d8f80a7d84977808860487800d6f8905d9cde74824c3949bcb8110d",
+      "sha256": "997ad80f7d8f80a7d84977808860487800d6f8905d9cde74824c3949bcb8110d"
+    },
+    {
+      "glyph_id": "GLYPH-096",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-interrupted-short-elbow-mark",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-096.svg",
+      "svg_sha256": "892cbf32121e6d5c399730317ffd7f2d2d77031b4f020c1b0878bc0c14d86503",
+      "sha256": "892cbf32121e6d5c399730317ffd7f2d2d77031b4f020c1b0878bc0c14d86503"
+    },
+    {
+      "glyph_id": "GLYPH-097",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-offset-middle",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-097.svg",
+      "svg_sha256": "54acd5f9f71489c5cbcff563ee9de4bebe74725ec393cf4481ae10a9f9536110",
+      "sha256": "54acd5f9f71489c5cbcff563ee9de4bebe74725ec393cf4481ae10a9f9536110"
+    },
+    {
+      "glyph_id": "GLYPH-098",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-rise-open-corner",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-098.svg",
+      "svg_sha256": "8eedf3c74d2a722893889965a159c08782de1fdb7d9d769016878366391170a4",
+      "sha256": "8eedf3c74d2a722893889965a159c08782de1fdb7d9d769016878366391170a4"
+    },
+    {
+      "glyph_id": "GLYPH-099",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-split-sweep-wide-half-counter",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-099.svg",
+      "svg_sha256": "2e910eca177b0e8d554e13fcd34797dfcc04047be6e7e1786e43cda408bfabcc",
+      "sha256": "2e910eca177b0e8d554e13fcd34797dfcc04047be6e7e1786e43cda408bfabcc"
+    },
+    {
+      "glyph_id": "GLYPH-100",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-offset-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-100.svg",
+      "svg_sha256": "a74b183cc87767a88de4b09f979fbce4422ca06d282cce19b506216d08a7f71b",
+      "sha256": "a74b183cc87767a88de4b09f979fbce4422ca06d282cce19b506216d08a7f71b"
+    },
+    {
+      "glyph_id": "GLYPH-101",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-diagonal-offset-pillar",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-101.svg",
+      "svg_sha256": "319e5c6e269f53c9eb9fec40cc42fce8d96a135bd3bdb7541c384771c33be9b8",
+      "sha256": "319e5c6e269f53c9eb9fec40cc42fce8d96a135bd3bdb7541c384771c33be9b8"
+    },
+    {
+      "glyph_id": "GLYPH-102",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-sweep-interrupted",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-102.svg",
+      "svg_sha256": "14eb3f7985100d2f65792b60e9e8971566368f777132a8e7283bbdd187299191",
+      "sha256": "14eb3f7985100d2f65792b60e9e8971566368f777132a8e7283bbdd187299191"
+    },
+    {
+      "glyph_id": "GLYPH-103",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-split-sweep-stepped-diagonal",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-103.svg",
+      "svg_sha256": "2a24375c037872dd28e60310a6b2a77d26187bc66763dae77116099e5028f70a",
+      "sha256": "2a24375c037872dd28e60310a6b2a77d26187bc66763dae77116099e5028f70a"
+    },
+    {
+      "glyph_id": "GLYPH-104",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-interrupted-double-corner",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-104.svg",
+      "svg_sha256": "ca0c4b98e00dd21da636a031b11a245a5228b66cf33aaf74cd584511b0658e89",
+      "sha256": "ca0c4b98e00dd21da636a031b11a245a5228b66cf33aaf74cd584511b0658e89"
+    },
+    {
+      "glyph_id": "GLYPH-105",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-interrupted-heavy-hook",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-105.svg",
+      "svg_sha256": "48079a004efdf8a89511c39d6ce2ef939eef019006ee4817b8621b3c3a38b745",
+      "sha256": "48079a004efdf8a89511c39d6ce2ef939eef019006ee4817b8621b3c3a38b745"
+    },
+    {
+      "glyph_id": "GLYPH-106",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-middle-sloping-header-stem",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-106.svg",
+      "svg_sha256": "807038884c54768e8779204f6ae129accd9b4285de11d573200cbb9b6b124f17",
+      "sha256": "807038884c54768e8779204f6ae129accd9b4285de11d573200cbb9b6b124f17"
+    },
+    {
+      "glyph_id": "GLYPH-107",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-rise-offset-shelf",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-107.svg",
+      "svg_sha256": "20e5dce971767df30d5455f8d521ca027b76a362b49d467835415339b934e461",
+      "sha256": "20e5dce971767df30d5455f8d521ca027b76a362b49d467835415339b934e461"
+    },
+    {
+      "glyph_id": "GLYPH-108",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-elbow-offset",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-108.svg",
+      "svg_sha256": "d150862d5729f241ce50173bb7f21b2bf3d8a68af6f64ec00212884c21ffff78",
+      "sha256": "d150862d5729f241ce50173bb7f21b2bf3d8a68af6f64ec00212884c21ffff78"
+    },
+    {
+      "glyph_id": "GLYPH-109",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-sweep-paired-uprights",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-109.svg",
+      "svg_sha256": "e4fa14140109fc29988749a0e9319348cec0291fd3c2012f9702ce18fa75c429",
+      "sha256": "e4fa14140109fc29988749a0e9319348cec0291fd3c2012f9702ce18fa75c429"
+    },
+    {
+      "glyph_id": "GLYPH-110",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-split-sweep-paired-uprights",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-110.svg",
+      "svg_sha256": "d9c315b7974bd291c1ca6d299d897dffd86e04545b2fdc2a69f1bb12f33c3af0",
+      "sha256": "d9c315b7974bd291c1ca6d299d897dffd86e04545b2fdc2a69f1bb12f33c3af0"
+    },
+    {
+      "glyph_id": "GLYPH-111",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-unequal-squares-cut-crescent",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-111.svg",
+      "svg_sha256": "b642fe7ad9120a097508c6bde0b76e6e5b20e2361c1a4a100857ee72e60bc0e5",
+      "sha256": "b642fe7ad9120a097508c6bde0b76e6e5b20e2361c1a4a100857ee72e60bc0e5"
+    },
+    {
+      "glyph_id": "GLYPH-112",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-interrupted-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-112.svg",
+      "svg_sha256": "67fed0c68b76f3e54ccc97059bc2ab674c6a9ddffae368c10028c31c2c65cec9",
+      "sha256": "67fed0c68b76f3e54ccc97059bc2ab674c6a9ddffae368c10028c31c2c65cec9"
+    },
+    {
+      "glyph_id": "GLYPH-113",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-open-corner-offset-pillar",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-113.svg",
+      "svg_sha256": "77d74a95aa9f3bd73a90af771cc2ad5abd9c274f719beff97da35f4835f029c8",
+      "sha256": "77d74a95aa9f3bd73a90af771cc2ad5abd9c274f719beff97da35f4835f029c8"
+    },
+    {
+      "glyph_id": "GLYPH-114",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-short-elbow-mark-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-114.svg",
+      "svg_sha256": "43ae5abc6754e08a59869e6556335da18fb4f30edfce0279bb66268d33753963",
+      "sha256": "43ae5abc6754e08a59869e6556335da18fb4f30edfce0279bb66268d33753963"
+    },
+    {
+      "glyph_id": "GLYPH-115",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-interrupted-sloping-header-stem",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-115.svg",
+      "svg_sha256": "63e7c2e303ca41d5d778eab89a96d085d3ee1f0500cf199b43b1da413ed2c196",
+      "sha256": "63e7c2e303ca41d5d778eab89a96d085d3ee1f0500cf199b43b1da413ed2c196"
+    },
+    {
+      "glyph_id": "GLYPH-116",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-low-return-short-elbow-mark",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-116.svg",
+      "svg_sha256": "5f0f88dffa6834b2e411468652b5c2cb69338e5c0ee8b939dcb11971d30f41ef",
+      "sha256": "5f0f88dffa6834b2e411468652b5c2cb69338e5c0ee8b939dcb11971d30f41ef"
+    },
+    {
+      "glyph_id": "GLYPH-117",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-interrupted-interrupted-roof",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-117.svg",
+      "svg_sha256": "f7b033700c3bb3c1efd018852720eac884c5396caaad7d03f588be796dd7da1a",
+      "sha256": "f7b033700c3bb3c1efd018852720eac884c5396caaad7d03f588be796dd7da1a"
+    },
+    {
+      "glyph_id": "GLYPH-118",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-interrupted-stepped-diagonal",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-118.svg",
+      "svg_sha256": "b7a69c25fcbbcd28bbba6f3ae7759cab3f2cd5bf993df44572c77e4ebcdd7731",
+      "sha256": "b7a69c25fcbbcd28bbba6f3ae7759cab3f2cd5bf993df44572c77e4ebcdd7731"
+    },
+    {
+      "glyph_id": "GLYPH-119",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-split-sweep-unequal-squares",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-119.svg",
+      "svg_sha256": "a113364f4567da41c65adad21abe44082214e9ba6517eca4568f7e3b4565452a",
+      "sha256": "a113364f4567da41c65adad21abe44082214e9ba6517eca4568f7e3b4565452a"
+    },
+    {
+      "glyph_id": "GLYPH-120",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-offset-pillar-wide-half-counter",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-120.svg",
+      "svg_sha256": "de8c8a4a3a4172ee7d5a72f9463543ce54111bda60724b82d65e4718c24bf686",
+      "sha256": "de8c8a4a3a4172ee7d5a72f9463543ce54111bda60724b82d65e4718c24bf686"
+    },
+    {
+      "glyph_id": "GLYPH-121",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-diagonal-sloping-header-stem",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-121.svg",
+      "svg_sha256": "6f0073009b36141b87bd94e350ddda9c1c3919f3e729efd66688d9bebdd23944",
+      "sha256": "6f0073009b36141b87bd94e350ddda9c1c3919f3e729efd66688d9bebdd23944"
+    },
+    {
+      "glyph_id": "GLYPH-122",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-shoulder-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-122.svg",
+      "svg_sha256": "00f0151b83046f149f58154f9c5fd8f094418b2d0a51444005d3c25e4d340c2a",
+      "sha256": "00f0151b83046f149f58154f9c5fd8f094418b2d0a51444005d3c25e4d340c2a"
+    },
+    {
+      "glyph_id": "GLYPH-123",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-sweep-short-elbow-mark",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-123.svg",
+      "svg_sha256": "c3e940512080be42b067b2f267ad7c723377317473231d59b8cbd03f0a5fe533",
+      "sha256": "c3e940512080be42b067b2f267ad7c723377317473231d59b8cbd03f0a5fe533"
+    },
+    {
+      "glyph_id": "GLYPH-124",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-sloping-header-stem-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-124.svg",
+      "svg_sha256": "1a8bfc2ca211421488b1a0d9819f1715a8faf643ec33eade3d6af458834f6ccc",
+      "sha256": "1a8bfc2ca211421488b1a0d9819f1715a8faf643ec33eade3d6af458834f6ccc"
+    },
+    {
+      "glyph_id": "GLYPH-125",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-diagonal-interrupted",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-125.svg",
+      "svg_sha256": "595977bcc7af6bae1c11c3cbefbd640d4e4fee81d2d69df61e9bc1a9ce908aec",
+      "sha256": "595977bcc7af6bae1c11c3cbefbd640d4e4fee81d2d69df61e9bc1a9ce908aec"
+    },
+    {
+      "glyph_id": "GLYPH-126",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-diagonal-open-corner",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-126.svg",
+      "svg_sha256": "d28e0c897e90eb7e3485c69d9a576106d2d66657f86bca588b14c13cfe539ab2",
+      "sha256": "d28e0c897e90eb7e3485c69d9a576106d2d66657f86bca588b14c13cfe539ab2"
+    },
+    {
+      "glyph_id": "GLYPH-127",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-diagonal-split-sweep",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-127.svg",
+      "svg_sha256": "237c09d57072232406d78796139c07970743f91e441c7444cd8bb0af3cfc39ea",
+      "sha256": "237c09d57072232406d78796139c07970743f91e441c7444cd8bb0af3cfc39ea"
+    },
+    {
+      "glyph_id": "GLYPH-128",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-low-return-stepped-diagonal",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-128.svg",
+      "svg_sha256": "b4544ecc22c194c49e0bf6a3cb841bc18dcecfc77e7a163c2a334b0e04f50946",
+      "sha256": "b4544ecc22c194c49e0bf6a3cb841bc18dcecfc77e7a163c2a334b0e04f50946"
+    },
+    {
+      "glyph_id": "GLYPH-129",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-unequal-squares-cut-crescent",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-129.svg",
+      "svg_sha256": "c6271e15522e6ae0418e7ebb470f6586a8133beeea1697581c828d79bbc87672",
+      "sha256": "c6271e15522e6ae0418e7ebb470f6586a8133beeea1697581c828d79bbc87672"
+    },
+    {
+      "glyph_id": "GLYPH-130",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-elbow-interrupted",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-130.svg",
+      "svg_sha256": "300b2ea5cb0bb7a318101bc5fea4d3761ae1146be73b29f092e970c82eb15a8d",
+      "sha256": "300b2ea5cb0bb7a318101bc5fea4d3761ae1146be73b29f092e970c82eb15a8d"
+    },
+    {
+      "glyph_id": "GLYPH-131",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-offset-shelf-stepped-diagonal",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-131.svg",
+      "svg_sha256": "b0f4ad804d0a6928c76892e46e1355a3a531067b8c23f0700ba705a8b79f46f5",
+      "sha256": "b0f4ad804d0a6928c76892e46e1355a3a531067b8c23f0700ba705a8b79f46f5"
+    },
+    {
+      "glyph_id": "GLYPH-132",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-interrupted-offset-shelf",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-132.svg",
+      "svg_sha256": "4906040c5c6c19577967bdcb40e4aa238d801db4c7e3cd3041e8bf4088e85b08",
+      "sha256": "4906040c5c6c19577967bdcb40e4aa238d801db4c7e3cd3041e8bf4088e85b08"
+    },
+    {
+      "glyph_id": "GLYPH-133",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-open-corner-sloping-header-stem",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-133.svg",
+      "svg_sha256": "54fccba248b923ae7543b0d897d9638629198e852b07cd302510ceb395b3d6a8",
+      "sha256": "54fccba248b923ae7543b0d897d9638629198e852b07cd302510ceb395b3d6a8"
+    },
+    {
+      "glyph_id": "GLYPH-134",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-open-corner-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-134.svg",
+      "svg_sha256": "9826a92ea76013ef6323dd5c095b177da9d01e3cbff7601e08c91fe510928433",
+      "sha256": "9826a92ea76013ef6323dd5c095b177da9d01e3cbff7601e08c91fe510928433"
+    },
+    {
+      "glyph_id": "GLYPH-135",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-shoulder-offset-pillar",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-135.svg",
+      "svg_sha256": "a5f3bcd77153cbb5054ea0c5caa3bd4f24561aeb6d335e857332536d01972aa3",
+      "sha256": "a5f3bcd77153cbb5054ea0c5caa3bd4f24561aeb6d335e857332536d01972aa3"
+    },
+    {
+      "glyph_id": "GLYPH-136",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-offset-pillar-sloping-header-stem",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-136.svg",
+      "svg_sha256": "eca40c6b3d64f6dd9fca24def0ffd76a0d9fa1e0e96746131a6e9d993bbf0f43",
+      "sha256": "eca40c6b3d64f6dd9fca24def0ffd76a0d9fa1e0e96746131a6e9d993bbf0f43"
+    },
+    {
+      "glyph_id": "GLYPH-137",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-middle-split-sweep",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-137.svg",
+      "svg_sha256": "10056aba8971521ca829e384e5a636ef712dc0bd06304ab66eadc7c61b8a2dd5",
+      "sha256": "10056aba8971521ca829e384e5a636ef712dc0bd06304ab66eadc7c61b8a2dd5"
+    },
+    {
+      "glyph_id": "GLYPH-138",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-sloping-header-stem-interrupted-roof",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-138.svg",
+      "svg_sha256": "4539257dc9a50de4f97a7e8ee55607e7bf220aa7e9f58273c719522953ef00bc",
+      "sha256": "4539257dc9a50de4f97a7e8ee55607e7bf220aa7e9f58273c719522953ef00bc"
+    },
+    {
+      "glyph_id": "GLYPH-139",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-sweep-shoulder",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-139.svg",
+      "svg_sha256": "b62d9e4046ff7504a1210b7035b454aac0e0624edbcd0aa1ddaf793340429596",
+      "sha256": "b62d9e4046ff7504a1210b7035b454aac0e0624edbcd0aa1ddaf793340429596"
+    },
+    {
+      "glyph_id": "GLYPH-140",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-unequal-squares-double-corner",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-140.svg",
+      "svg_sha256": "dc78ad14e3392354a6b7ae0bf77377af7019129d9adadedeec22123f2c112959",
+      "sha256": "dc78ad14e3392354a6b7ae0bf77377af7019129d9adadedeec22123f2c112959"
+    },
+    {
+      "glyph_id": "GLYPH-141",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-elbow-stepped-diagonal",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-141.svg",
+      "svg_sha256": "81aa70e2c37ca84ae87190f0d582281d1ad0a4f9cfa5ad37190984ec011afcb1",
+      "sha256": "81aa70e2c37ca84ae87190f0d582281d1ad0a4f9cfa5ad37190984ec011afcb1"
+    },
+    {
+      "glyph_id": "GLYPH-142",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-middle-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-142.svg",
+      "svg_sha256": "a9d0ba5d42050e77eb9bf409b04e175570b8629e60a804a460ae780a5cf784e6",
+      "sha256": "a9d0ba5d42050e77eb9bf409b04e175570b8629e60a804a460ae780a5cf784e6"
+    },
+    {
+      "glyph_id": "GLYPH-143",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-paired-uprights-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-143.svg",
+      "svg_sha256": "d618682f17c67a7ce74af18de21c61a21335617384f55ebd824d6599c91dc052",
+      "sha256": "d618682f17c67a7ce74af18de21c61a21335617384f55ebd824d6599c91dc052"
+    },
+    {
+      "glyph_id": "GLYPH-144",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-open-corner-low-return",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-144.svg",
+      "svg_sha256": "9afa972fb8414dd8acc830dc93a54297e09c025f7896d563b54d7c27597867ab",
+      "sha256": "9afa972fb8414dd8acc830dc93a54297e09c025f7896d563b54d7c27597867ab"
+    },
+    {
+      "glyph_id": "GLYPH-145",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-interrupted-roof-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-145.svg",
+      "svg_sha256": "4c096dc0926d0459b8d2f8ff2d19dd752eb59dd3a7bfd9e489b3fd0dad2edcb7",
+      "sha256": "4c096dc0926d0459b8d2f8ff2d19dd752eb59dd3a7bfd9e489b3fd0dad2edcb7"
+    },
+    {
+      "glyph_id": "GLYPH-146",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-elbow-cut-crescent",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-146.svg",
+      "svg_sha256": "19a6b57047e95857c67b24aa36c4cc755785310439d9b230a66581001082f1b1",
+      "sha256": "19a6b57047e95857c67b24aa36c4cc755785310439d9b230a66581001082f1b1"
+    },
+    {
+      "glyph_id": "GLYPH-147",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-sloping-header-stem-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-147.svg",
+      "svg_sha256": "c46975244cdd1c9ee684f1ca52cbd59e61c32f44477f72d04c000847c292e7cb",
+      "sha256": "c46975244cdd1c9ee684f1ca52cbd59e61c32f44477f72d04c000847c292e7cb"
+    },
+    {
+      "glyph_id": "GLYPH-148",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-rise-short-elbow-mark",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-148.svg",
+      "svg_sha256": "daddf66ae8e0c92aa7471e14eefc4e7bd65afe3dd69eb653dcd6687dfc65e112",
+      "sha256": "daddf66ae8e0c92aa7471e14eefc4e7bd65afe3dd69eb653dcd6687dfc65e112"
+    },
+    {
+      "glyph_id": "GLYPH-149",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-shoulder-open-corner",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-149.svg",
+      "svg_sha256": "9da37fb49e1c925647216de0f31cd0eb207cffbee198ab990d0a4abdc012466a",
+      "sha256": "9da37fb49e1c925647216de0f31cd0eb207cffbee198ab990d0a4abdc012466a"
+    },
+    {
+      "glyph_id": "GLYPH-150",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-elbow-shoulder",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-150.svg",
+      "svg_sha256": "e655eb285214a51797c7a5be4ccf27f06b1741982b56041f73e16e2f1d03e12e",
+      "sha256": "e655eb285214a51797c7a5be4ccf27f06b1741982b56041f73e16e2f1d03e12e"
+    },
+    {
+      "glyph_id": "GLYPH-151",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-rise-unequal-squares",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-151.svg",
+      "svg_sha256": "e4822f97a598fa2245c6f3c686964bf10c5fcad30c8130a99f7703a7f7099b06",
+      "sha256": "e4822f97a598fa2245c6f3c686964bf10c5fcad30c8130a99f7703a7f7099b06"
+    },
+    {
+      "glyph_id": "GLYPH-152",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-open-corner-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-152.svg",
+      "svg_sha256": "b34ba3ad539a706a038a5b91735f46d67efd211778462aaf5684896543b22e9d",
+      "sha256": "b34ba3ad539a706a038a5b91735f46d67efd211778462aaf5684896543b22e9d"
+    },
+    {
+      "glyph_id": "GLYPH-153",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-paired-uprights-offset-shelf",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-153.svg",
+      "svg_sha256": "f39ef1a4caba0497907a48cb7c76ba8e52f6b1cce088ba2a102f1d3e115527a8",
+      "sha256": "f39ef1a4caba0497907a48cb7c76ba8e52f6b1cce088ba2a102f1d3e115527a8"
+    },
+    {
+      "glyph_id": "GLYPH-154",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-split-sweep-down-sweep",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-154.svg",
+      "svg_sha256": "40309adceca96b875aaaea56062d157b911a64571fbb67c0fa8adb8c2f8fbf25",
+      "sha256": "40309adceca96b875aaaea56062d157b911a64571fbb67c0fa8adb8c2f8fbf25"
+    },
+    {
+      "glyph_id": "GLYPH-155",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-diagonal-middle",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-155.svg",
+      "svg_sha256": "cdfdddb24a236865e373ad5e56364ec518819f919bf190dd256ccceff26218cf",
+      "sha256": "cdfdddb24a236865e373ad5e56364ec518819f919bf190dd256ccceff26218cf"
+    },
+    {
+      "glyph_id": "GLYPH-156",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-elbow-sloping-header-stem",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-156.svg",
+      "svg_sha256": "d6ac55cd2926f6f9252c9eef71019f1ce30c3afafab3ace7f78a548c21959e56",
+      "sha256": "d6ac55cd2926f6f9252c9eef71019f1ce30c3afafab3ace7f78a548c21959e56"
+    },
+    {
+      "glyph_id": "GLYPH-157",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-paired-uprights-low-return",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-157.svg",
+      "svg_sha256": "627d21a1518b5a9a8bd9bf0d7ced03757b7dbbb77846574ccf0d375f782027aa",
+      "sha256": "627d21a1518b5a9a8bd9bf0d7ced03757b7dbbb77846574ccf0d375f782027aa"
+    },
+    {
+      "glyph_id": "GLYPH-158",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-sweep-heavy-hook",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-158.svg",
+      "svg_sha256": "8bca103d03f2a3d6011b7ecee04f26c20dac735a7ae991654f0d4636b56d90ad",
+      "sha256": "8bca103d03f2a3d6011b7ecee04f26c20dac735a7ae991654f0d4636b56d90ad"
+    },
+    {
+      "glyph_id": "GLYPH-159",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-heavy-hook-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-159.svg",
+      "svg_sha256": "2ccf158d74175bfb5900ca8b6596a46f56afe55943b1a7f4adcfeedb4ab6ddc9",
+      "sha256": "2ccf158d74175bfb5900ca8b6596a46f56afe55943b1a7f4adcfeedb4ab6ddc9"
+    },
+    {
+      "glyph_id": "GLYPH-160",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-interrupted-low-return",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-160.svg",
+      "svg_sha256": "2aa6cb882025e34616da96b5eb7bc62795f52f6d967190112d018c8e8f8e9bb1",
+      "sha256": "2aa6cb882025e34616da96b5eb7bc62795f52f6d967190112d018c8e8f8e9bb1"
+    },
+    {
+      "glyph_id": "GLYPH-161",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-split-sweep-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-161.svg",
+      "svg_sha256": "b7b256a60524e9e1945a5d0908463f0506f2cbbdf91651e3591a3d0ecdd099eb",
+      "sha256": "b7b256a60524e9e1945a5d0908463f0506f2cbbdf91651e3591a3d0ecdd099eb"
+    },
+    {
+      "glyph_id": "GLYPH-162",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-sweep-offset-pillar",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-162.svg",
+      "svg_sha256": "1e6fac82fafac2528d5ced090bd78ec225c66588f660183be320aa3180016676",
+      "sha256": "1e6fac82fafac2528d5ced090bd78ec225c66588f660183be320aa3180016676"
+    },
+    {
+      "glyph_id": "GLYPH-163",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-diagonal-wide-half-counter",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-163.svg",
+      "svg_sha256": "2609ba06ecf7fc002284719b52fb69ec6d69466c14e0b99e6112f8562c72796c",
+      "sha256": "2609ba06ecf7fc002284719b52fb69ec6d69466c14e0b99e6112f8562c72796c"
+    },
+    {
+      "glyph_id": "GLYPH-164",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-split-sweep-offset-pillar",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-164.svg",
+      "svg_sha256": "f3df1e6101ae75f525b9d699a8485a5f6882554af744e643678095f0871153d9",
+      "sha256": "f3df1e6101ae75f525b9d699a8485a5f6882554af744e643678095f0871153d9"
+    },
+    {
+      "glyph_id": "GLYPH-165",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-middle-open-corner",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-165.svg",
+      "svg_sha256": "22c244d2776f10c5af62159432d6bea743a6e600a2e49a268f1172db2fba290b",
+      "sha256": "22c244d2776f10c5af62159432d6bea743a6e600a2e49a268f1172db2fba290b"
+    },
+    {
+      "glyph_id": "GLYPH-166",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-rise-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-166.svg",
+      "svg_sha256": "0d859e2023ec7a1c0a9e6b8f9f412641b55205d6afe05cd8b894309449b2feef",
+      "sha256": "0d859e2023ec7a1c0a9e6b8f9f412641b55205d6afe05cd8b894309449b2feef"
+    },
+    {
+      "glyph_id": "GLYPH-167",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-rise-interrupted",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-167.svg",
+      "svg_sha256": "c5eb2445d4b2060ce97d5c4d9b441d61eb369d5219f4f74cde85e081d2ed1cc4",
+      "sha256": "c5eb2445d4b2060ce97d5c4d9b441d61eb369d5219f4f74cde85e081d2ed1cc4"
+    },
+    {
+      "glyph_id": "GLYPH-168",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-diagonal-paired-uprights",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-168.svg",
+      "svg_sha256": "d1e3de080250d098be1adfea42973444088091d5414f6fca74a7a57f493d15d2",
+      "sha256": "d1e3de080250d098be1adfea42973444088091d5414f6fca74a7a57f493d15d2"
+    },
+    {
+      "glyph_id": "GLYPH-169",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-stepped-diagonal-interrupted-roof",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-169.svg",
+      "svg_sha256": "5638b25578e5e2f79963fd67a87ffc22eaf058f6334a8fa60e00150b9aa4c76f",
+      "sha256": "5638b25578e5e2f79963fd67a87ffc22eaf058f6334a8fa60e00150b9aa4c76f"
+    },
+    {
+      "glyph_id": "GLYPH-170",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-shoulder-open-corner",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-170.svg",
+      "svg_sha256": "59a891dec32cea9843a8db6e1feb170b1d891d7ab8e5f2db59c8bc2b3f6fbf44",
+      "sha256": "59a891dec32cea9843a8db6e1feb170b1d891d7ab8e5f2db59c8bc2b3f6fbf44"
+    },
+    {
+      "glyph_id": "GLYPH-171",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-heavy-hook-offset-shelf",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-171.svg",
+      "svg_sha256": "471327008a8be7e9f0956476e4371c4c7351eab8739e56cb3eac68718b898b5b",
+      "sha256": "471327008a8be7e9f0956476e4371c4c7351eab8739e56cb3eac68718b898b5b"
+    },
+    {
+      "glyph_id": "GLYPH-172",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-cut-crescent-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-172.svg",
+      "svg_sha256": "4dc18d5a73e3f76485b0a8874f256259c81adb0e13b8e3cb8daa1fe4a87d2c6f",
+      "sha256": "4dc18d5a73e3f76485b0a8874f256259c81adb0e13b8e3cb8daa1fe4a87d2c6f"
+    },
+    {
+      "glyph_id": "GLYPH-173",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-double-corner-stepped-diagonal",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-173.svg",
+      "svg_sha256": "79893c644e9e0c1e536bfbf7e3bac3463d632e031a91aefe9c7c891d2a2151fd",
+      "sha256": "79893c644e9e0c1e536bfbf7e3bac3463d632e031a91aefe9c7c891d2a2151fd"
+    },
+    {
+      "glyph_id": "GLYPH-174",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-double-corner-cut-crescent",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-174.svg",
+      "svg_sha256": "31daea6a5c0ba80abe1d7794ea610f4083271a68b6779d7b21fd5bff0e500eff",
+      "sha256": "31daea6a5c0ba80abe1d7794ea610f4083271a68b6779d7b21fd5bff0e500eff"
+    },
+    {
+      "glyph_id": "GLYPH-175",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-middle-heavy-hook",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-175.svg",
+      "svg_sha256": "fc8781154826f468778019b2df2bf994a038870091b924191baf0f223178d26c",
+      "sha256": "fc8781154826f468778019b2df2bf994a038870091b924191baf0f223178d26c"
+    },
+    {
+      "glyph_id": "GLYPH-176",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-elbow-open-corner",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-176.svg",
+      "svg_sha256": "7f7ba8b26557b5e1afe089f160d553a912a640f826b6fc9a03133cebf62ad281",
+      "sha256": "7f7ba8b26557b5e1afe089f160d553a912a640f826b6fc9a03133cebf62ad281"
+    },
+    {
+      "glyph_id": "GLYPH-177",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-stepped-diagonal-interrupted-roof",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-177.svg",
+      "svg_sha256": "156ec8450367f2ac1ec5d278088535a928b24b57803f94b7eaea38303653dd35",
+      "sha256": "156ec8450367f2ac1ec5d278088535a928b24b57803f94b7eaea38303653dd35"
+    },
+    {
+      "glyph_id": "GLYPH-178",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-interrupted-interrupted-roof",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-178.svg",
+      "svg_sha256": "9c3247019d40e0cbdf4499b99c2cd1d404330a6b2bf5f5bd3674bdca9785571e",
+      "sha256": "9c3247019d40e0cbdf4499b99c2cd1d404330a6b2bf5f5bd3674bdca9785571e"
+    },
+    {
+      "glyph_id": "GLYPH-179",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-middle-open-corner",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-179.svg",
+      "svg_sha256": "3d4079c9415af5aee10654012914734be27f64c02b77ba8866d7ba197216471c",
+      "sha256": "3d4079c9415af5aee10654012914734be27f64c02b77ba8866d7ba197216471c"
+    },
+    {
+      "glyph_id": "GLYPH-180",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-split-sweep-offset-pillar",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-180.svg",
+      "svg_sha256": "40f5b6520b4247a880bbec7da7f1aa345c6c7b2b6444fe8da4ed3c2b23d9becc",
+      "sha256": "40f5b6520b4247a880bbec7da7f1aa345c6c7b2b6444fe8da4ed3c2b23d9becc"
+    },
+    {
+      "glyph_id": "GLYPH-181",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-offset-heavy-hook",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-181.svg",
+      "svg_sha256": "6e6098e18bc26294be19d332b1b8e3cb7db1402c020a8b85662c3661b93dbab6",
+      "sha256": "6e6098e18bc26294be19d332b1b8e3cb7db1402c020a8b85662c3661b93dbab6"
+    },
+    {
+      "glyph_id": "GLYPH-182",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-rise-shoulder",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-182.svg",
+      "svg_sha256": "dff4f21938ff03e675d14bc65ad407b9634c5d03b0b9fe91a7f4bef03fa70e07",
+      "sha256": "dff4f21938ff03e675d14bc65ad407b9634c5d03b0b9fe91a7f4bef03fa70e07"
+    },
+    {
+      "glyph_id": "GLYPH-183",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-rise-heavy-hook",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-183.svg",
+      "svg_sha256": "4ab55e6582bcaf4b4d09e36e958f2bc77a3a3db8c8d921f2322a88fa581e3ad7",
+      "sha256": "4ab55e6582bcaf4b4d09e36e958f2bc77a3a3db8c8d921f2322a88fa581e3ad7"
+    },
+    {
+      "glyph_id": "GLYPH-184",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-interrupted-middle",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-184.svg",
+      "svg_sha256": "a489169eb55784a0d102c1c60c8d8b6bff072eda638fe1e4d1e97402971162bb",
+      "sha256": "a489169eb55784a0d102c1c60c8d8b6bff072eda638fe1e4d1e97402971162bb"
+    },
+    {
+      "glyph_id": "GLYPH-185",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-interrupted-unequal-squares",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-185.svg",
+      "svg_sha256": "2b2732e8c5df25e4437e6b5e55899630438008e1d2c8e6b1230b5417850256b6",
+      "sha256": "2b2732e8c5df25e4437e6b5e55899630438008e1d2c8e6b1230b5417850256b6"
+    },
+    {
+      "glyph_id": "GLYPH-186",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-unequal-squares-interrupted-roof",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-186.svg",
+      "svg_sha256": "2154245d4c83c8326bb2c5026c00b417401000fc2b7019392ecc4207388d34da",
+      "sha256": "2154245d4c83c8326bb2c5026c00b417401000fc2b7019392ecc4207388d34da"
+    },
+    {
+      "glyph_id": "GLYPH-187",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-offset-pillar-leaning-pair",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-187.svg",
+      "svg_sha256": "1335094406be4735bcd9343cd91cb437aa16a57bf789f5725a41f6cfc464a60d",
+      "sha256": "1335094406be4735bcd9343cd91cb437aa16a57bf789f5725a41f6cfc464a60d"
+    },
+    {
+      "glyph_id": "GLYPH-188",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-rise-offset-pillar",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-188.svg",
+      "svg_sha256": "f2ecdab82932e5938ac37515ca900c89052ee6a0541bf6f93a791a2045e1b38b",
+      "sha256": "f2ecdab82932e5938ac37515ca900c89052ee6a0541bf6f93a791a2045e1b38b"
+    },
+    {
+      "glyph_id": "GLYPH-189",
+      "version": "glyph-svg-v2-1",
+      "recipe": "tiers-unequal-squares-short-elbow-mark",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-189.svg",
+      "svg_sha256": "6ae12c565a2a4e8155b700d1059165906f6893788235de7a4bf2bc9a5aacdb69",
+      "sha256": "6ae12c565a2a4e8155b700d1059165906f6893788235de7a4bf2bc9a5aacdb69"
+    },
+    {
+      "glyph_id": "GLYPH-190",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-open-corner-cut-crescent",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-190.svg",
+      "svg_sha256": "c49c29fdd8bfe3e1e3bb21f640999120cee72f089c93210c9770e455ba6ff808",
+      "sha256": "c49c29fdd8bfe3e1e3bb21f640999120cee72f089c93210c9770e455ba6ff808"
+    },
+    {
+      "glyph_id": "GLYPH-191",
+      "version": "glyph-svg-v2-1",
+      "recipe": "columns-short-elbow-mark-interrupted-roof",
+      "terminal_policy": "flat-cut",
+      "file": "GLYPH-191.svg",
+      "svg_sha256": "7f29945a28deb5c4ce50d6d73a8296381a31ef9c19f365b3677723b3dca2931c",
+      "sha256": "7f29945a28deb5c4ce50d6d73a8296381a31ef9c19f365b3677723b3dca2931c"
+    }
+  ]
+}

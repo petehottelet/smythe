@@ -13,7 +13,8 @@ mechanics run in CI with deterministic providers and zero API cost.
 
 | Campaign | Status | Current result |
 |---|---|---|
-| [Original SVG workflow](svg_glyph_benchmark.md) | **Claimable** | 192 original glyphs in 4.03 s median including full validation and assembly; 2.95× process-c1 speed; all 30 workflows accepted |
+| [V2 SVG catalog workflow](svg_v2_results.md) | **Claimable local workflow** | 256 glyphs in 8.06 s median; 2.20× same-backend c1 speed; all 36 matched 192/256 workflows pass, with sampled memory |
+| [Original SVG workflow](svg_glyph_benchmark.md) | **Historical v1 timing**; visual acceptance superseded | 192 original glyphs in 4.03 s median including full validation and assembly; 2.95× process-c1 speed; all 30 workflows accepted |
 | [REGL rendering and cadence control](renderer_performance_20260907_results.md) | Completed diagnostics; target not met | Six valid Classic/3D sessions: 56.21–56.24 draws/s, 18.10 ms P95 callback interval; three blank-page controls showed similar source cadence |
 | [Task-shape suite v3](shape_suite.md) | **Claimable for wall time and observed quality** | 14% lower end-to-end wall time; historical cost excludes planning |
 | [Hard-kill durability v2](durability_benchmark.md) | **Claimable** | 8 duplicate dispatches after resume versus LangGraph's 32, across 3 reps |
@@ -23,7 +24,7 @@ mechanics run in CI with deterministic providers and zero API cost.
 | Original self-baselines and pre-correction framework record | Diagnostic | Preserved because they found payload, assembly, and measurement defects; superseded by corrected campaigns |
 | [Control ablation](control_ablation.md) | Mechanism scope | Objective gates remain valuable; routine LLM supervision and judged-prose gating are not default quality paths |
 | [Jobs at 5,000 operations](jobs_scale_5000_20260907_results.md) | **Claimable correctness observation** | One offline schema-v3 campaign: 5,000 accepted identical fixtures after a hard kill, safe resume, and eight explicit rerolls; zero accepted work reissued and zero calls on completed resume. No comparative timing or model-quality claim. |
-| [Astra/Sol matched campaign](astra_benchmark_plan.md) | **Live benchmark not run**; pilot runtime qualified offline | 13 task/source packs, balanced 12-pilot/200-main schedules, and [79 passed runtime checks](results/astra_pilot_runtime_20260907/README.md); no paid runs or model-quality results |
+| [Astra/Sol amended study](results/astra_20260913_main/README.md) | **Execution complete; human review pending; not claimable** | All 200 workflows retained, 191 accepted, anonymous judging, graph/phase breakdowns and task-clustered comparisons. One failed call retains its full $0.169645 reserve. Reused synthetic tasks; all earlier diagnostics and charges remain separate. |
 
 The authoritative deliverable is `Swarm.execute(...).output`, which is what a
 caller receives. The harness records the historical terminal-node join beside
@@ -255,7 +256,16 @@ zero rate-limit events on one paid key. Full table, protocol, and
 measurement scope (including an observed near-duplicate pair):
 [image_benchmarks.md](image_benchmarks.md).
 
-## Original SVG workflow
+## Current v2 SVG catalog workflow
+
+The [192/256-glyph report](svg_v2_results.md) measures the current authored-contour
+method through Smythe, including four-size validation, all-pairs comparisons,
+assembly and worker lifecycle. All repetitions and sampled memory are retained.
+
+## Original SVG workflow — historical v1
+
+This campaign measures the historical v1 catalog. The current v2 glyphs
+require a fresh timing campaign; the old visual acceptance is superseded.
 
 The [SVG campaign](svg_glyph_benchmark.md) measures 192 fresh filled-contour
 glyphs through Smythe, complete numeric and silhouette validation, and a
@@ -263,7 +273,7 @@ delivered catalog. Thread and process backends use five concurrency settings
 and three repetitions each. Every configuration remains in the record;
 the headline selects the lowest median complete workflow time.
 
-[Full contact sheet](partitions/glyph_svg_v1/catalog/contact-sheet.png) ·
+[Current v2 contact sheet](../screensaver/glyph-design-v2/contact-sheet-128.png) ·
 [Raw campaign](results/glyph_svg_v1.json) ·
 [Navigable web explorer](../screensaver/svg-preview/README.md).
 
@@ -382,11 +392,13 @@ published anyway: [control_ablation.md](control_ablation.md).
 
 ## Coming soon
 
-- [GPT-6 Astra campaign](astra_benchmark_plan.md): no live results yet; the
-  [pilot runner passed 79 offline checks](results/astra_pilot_runtime_20260907/README.md).
-  Next, approve an API spending ceiling and run the pilot to separate model capability
-  from orchestration effects, retain native usage and every attempted run,
-  and compare blind quality against complete-workflow cost and time
+The [delivery audit](../docs/benchmark-delivery-audit-2026-09-13.md) consolidates
+the remaining promises, their existing evidence and the work needed to close them.
+
+- [Astra follow-up studies](astra_benchmark_plan.md#separate-follow-up-studies):
+  scheduler concurrency on identical graphs, matched modern framework adapters,
+  and durable tool workflows. The [200-workflow primary comparison](results/astra_20260913_main/README.md)
+  has complete execution and scoring; human review and one failed call's native usage remain unresolved.
 - Full-workflow task-shape cost campaign using the corrected provider-call
   recorder, with planning usage included and input/output pricing separated
 - Repeated, randomized campaign order and a larger external task set for

@@ -1,0 +1,15 @@
+{
+  "status": "passed",
+  "archive_sha256": "6fee1bc87bf369c2de413661d89eaafaf04ed33737148313320ef04e9c496639",
+  "members_verified": 107,
+  "original_outcomes": 12,
+  "corrected_outcomes": 12,
+  "paid_judgments": 10,
+  "unresolved_judge_attempts": 0,
+  "source_freezes_verified": 2,
+  "relocated_ledger_reconciliation": true,
+  "verification_makes_provider_calls": false,
+  "claimable": false,
+  "human_calibration": "pending",
+  "main_workflows": 0
+}

@@ -44,7 +44,7 @@ def _catalog():
         "blank_index": 4, "canvas": [100, 100], "fill_rule": "nonzero",
         "default_original_mix": 0.1, "catalog_sha256": receipt["catalog_sha256"],
         "reference_sha256": hashlib.sha256((ROOT / "screensaver/svg-preview/reference/catalog.json").read_bytes()).hexdigest(),
-        "original_sha256": hashlib.sha256((ROOT / "benchmarks/partitions/glyph_svg_v1/catalog/manifest.json").read_bytes()).hexdigest(),
+        "original_sha256": hashlib.sha256((ROOT / "screensaver/glyph-design-v2/manifest.json").read_bytes()).hexdigest(),
     }
 
 

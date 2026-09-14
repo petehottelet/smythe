@@ -73,6 +73,11 @@ contribute a distinct work product. That right-sizing policy is what lets the
 same system use one node for a transformation and a wide graph for parallel
 artifact generation.
 
+**Unreleased:** `LLMArchitect(planning_instructions="...")` keeps graph-policy
+instructions in the planning request and saved recipe. Answer requirements
+remain in `Task.constraints`, which reaches every executor.
+[Bounded planning example](workflow-accounting.md#freeze-graph-limits).
+
 ## 2. Durable execution envelope
 
 The graph runs through one set of controls regardless of who designed it.

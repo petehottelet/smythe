@@ -34,20 +34,26 @@ verification, trace, artifact, and recovery controls.
 
 - [GPT-6 Astra quickstart](../README.md#quickstart) — native text planning and execution within one saved $5 allowance
 - [Native OpenAI Responses](openai-responses.md) — Astra/Sol function tools, exact token prices, request quotes, and retained failure receipts
-- [Astra benchmark plan](../benchmarks/astra_benchmark_plan.md) — prepared task packs and balanced schedules; live cost, speed, and quality benchmarks have not run
-- [Astra pilot runner](../benchmarks/astra_runtime.md) — prepared 12-workflow pilot; [79 offline checks](../benchmarks/results/astra_pilot_runtime_20260907/README.md) passed, with no live results or authorized campaign spending ceiling
+- [Original Astra pilot results](../benchmarks/results/astra_20260913/README.md) — historical 24-workflow calibration snapshot with complete native receipts
+- [Astra/Sol main results](../benchmarks/results/astra_20260913_main/README.md) — all 200 outcomes, automatic scores, timing and reserved-cost bounds; human review pending
+- [Astra benchmark plan](../benchmarks/astra_benchmark_plan.md) — completed execution, pending human review, fixed acceptance gates and separate follow-up experiments
+- [Astra method amendment](../benchmarks/astra_method_amendment_20260913.md) — planner-only instructions, explicit field types, 48 pilot workflows and preserved diagnostic charges
+- [Astra campaign runners](../benchmarks/astra_runtime.md) — pilot, main, approved reserved-cost continuation, blind judging and offline evidence analysis
 - [MCP](mcp.md) — tool discovery, allowlists, secrets, budgets, and timeouts
 - [Style](style.md) — visual language for diagrams and public assets
 
 ## Artifact workflows
 
+- [Glyph contour review](glyph-contour-review-2026-09-12.md) — reference measurements and the full 192-glyph v2 replacement catalog
+- [192/256-glyph workflow results](../benchmarks/svg_v2_results.md) — 36 completed v2 workflows, timing and memory charts; [protocol](../benchmarks/svg_v2_protocol.md) and raw receipts
+- [256-glyph contact sheets](../benchmarks/partitions/glyph_svg_v2_256/README.md) — the reviewed 192 plus 64 additional structures, with no changes to the live catalog
 - [Jobs at 5,000 operations](../benchmarks/jobs_scale_5000_20260907_results.md) — one reconciled offline recovery campaign, with all artifacts, journal entries, source hashes, and interrupted-attempt lineage retained
 - [Framework comparison](../benchmarks/README.md#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12) — matched Smythe, LangGraph, and CrewAI evidence
 - [Image benchmarks](../benchmarks/image_benchmarks.md) — image fan-out and exact-spec finishing
 - [Glyph Rain benchmark](../benchmarks/glyph_screensaver_benchmark.md) — an artifact fan-out example with isolated 64-, 128-, 192-, and 256-node measurements
 - [Original SVG workflow](../benchmarks/svg_glyph_benchmark.md) — fresh geometry, complete style validation, catalog assembly, and repeated thread/process measurements
-- [Glyph Rain screensaver](../screensaver/README.md) — source builds for Windows, macOS, and Linux using 56 reference and 192 original SVG shapes, with a 10% original mix; no precompiled distribution
-- [Web explorer and animated preview](../screensaver/svg-preview/README.md) — MIT-licensed reference renderer and base glyphs, 10% original-glyph mix, Matrix green rain, presets, VT323 pixel controls, and a Trajan Bold outline logo
+- [Glyph Rain screensaver](../screensaver/README.md) — source builds for Windows, macOS, and Linux using 56 reference and 192 original SVG shapes, with the current v2 originals and a 10% original mix; no precompiled distribution
+- [Web explorer and animated preview](../screensaver/svg-preview/README.md) — new-glyph-only gallery and animation; adjustable reference mix, Matrix green rain, and pixel controls
 - [Glyph Rain design plan](glyph-rain-plan.md) — measured original-glyph distributions, licensed renderer scope, and native porting criteria
 - [Reference behavior plan](glyph-rain-parity-plan.md) — pinned defaults, options, and acceptance checks for the adapted effect
 - [Renderer timing protocol](../benchmarks/renderer_performance_20260907.md) — six independent Classic/3D sessions, raw callback and CPU-submission samples, and explicit backend qualification
@@ -57,6 +63,7 @@ verification, trace, artifact, and recovery controls.
 
 - [Repository review](project-review-2026-09-06.md) — architecture assessment, reproduced defects, and hardening priorities
 - [Coming soon](../ROADMAP.md#coming-soon) — acceptance criteria for runtime and measurement improvements
+- [Benchmark delivery audit](benchmark-delivery-audit-2026-09-13.md) — completed studies and the remaining promised measurements
 - [Contributing](../CONTRIBUTING.md)
 - [Roadmap](../ROADMAP.md)
 - [Changelog](../CHANGELOG.md)

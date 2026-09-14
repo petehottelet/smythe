@@ -21,7 +21,7 @@ from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "benchmarks/partitions/glyph_svg_v1/catalog"
+SOURCE = ROOT / "screensaver/glyph-design-v2"
 PREVIEW = ROOT / "screensaver/svg-preview"
 VERSION = "original-glyph-msdf-v1"
 COUNT, COLUMNS, ROWS, CELL, RANGE = 192, 16, 12, 128, 16

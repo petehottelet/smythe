@@ -72,6 +72,26 @@ requires a durable `run_store`; omitting it preserves existing recipe identities
 architect to declare `max_retries: 0` on every node, including `HALT` nodes.
 Include the graph limits in the planning instructions for a bounded experiment.
 
+**Unreleased:** pass graph-only requirements through
+`LLMArchitect(planning_instructions="...")`. This text is recorded in the
+workflow recipe and sent only to the planner. Keep answer requirements in
+`Task.constraints`, which every executor receives. For example:
+
+```python
+from smythe.planner import LLMArchitect
+
+architect = LLMArchitect(
+    provider, planning_model="gpt-6-astra", max_retries=0,
+    planning_instructions=(
+        "Use at most eight nodes. Set max_retries: 0 and max_regenerations: 0 "
+        "on every node. Produce one terminal deliverable."
+    ),
+)
+```
+
+The prompt guides construction; `WorkflowGraphPolicy` enforces the limits.
+An empty `planning_instructions` preserves existing recipe identities.
+
 ## Admission and cost
 
 Each native request is frozen before the input-token count. The resulting quote

@@ -1,0 +1,12 @@
+{
+  "count": 256,
+  "additional_glyphs": 64,
+  "preserved_prefix": 192,
+  "candidate_count": 482,
+  "maximum_selected_overlap": 0.7858823529411765,
+  "pairs": 32640,
+  "near_matches": 0,
+  "contours_sha256": "13f9b473dc70b7007f11e135dbd7a92f826b775fd5bddd43402634c63c37c14b",
+  "timing_claimable": false,
+  "selection_scope": "Design calibration outside all workflow timers."
+}

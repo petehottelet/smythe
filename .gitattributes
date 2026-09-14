@@ -5,6 +5,15 @@
 /benchmarks/partitions/glyph_svg_v1/**/*.json text eol=lf
 /benchmarks/partitions/glyph_svg_v1/**/*.svg text eol=lf
 /benchmarks/partitions/glyph_svg_v1/**/*.png -text
+/benchmarks/partitions/glyph_svg_v2_256/**/*.json text eol=lf
+/benchmarks/partitions/glyph_svg_v2_256/**/*.svg text eol=lf
+/benchmarks/partitions/glyph_svg_v2_256/**/*.js text eol=lf
+/benchmarks/partitions/glyph_svg_v2_256/**/*.png -text
+/benchmarks/partitions/glyph_svg_v2_256/*.json text eol=lf
+/benchmarks/results/glyph_svg_v2_20260913.json -text
+/benchmarks/run_svg_v2_benchmark.py text eol=lf
+/benchmarks/svg_v2_evidence.py text eol=lf
+/benchmarks/svg_v2_protocol.md text eol=lf
 /docs/data/glyph-style-summary.json text eol=lf
 /screensaver/svg-preview/*.js text eol=lf
 /screensaver/svg-preview/*.mjs text eol=lf
@@ -31,6 +40,7 @@
 /screensaver/svg-preview/settings.css -text
 /assets/wordmark.svg -text
 /benchmarks/partitions/glyph_rain_reference_v1/*.json -text
+/benchmarks/partitions/glyph_rain_reference_v1/*.zip -text
 /benchmarks/partitions/glyph_svg_v1/renderer-v1/** -text
 
 # Native exports and receipts carry cross-platform catalog and package hashes.
@@ -39,6 +49,15 @@
 /screensaver/windows/GlyphData.cs text eol=lf
 /screensaver/macos/glyphs.json text eol=lf
 /screensaver/linux/glyph_data.h text eol=lf
+/screensaver/glyph_design_v2.py text eol=lf
+/screensaver/glyph_contours_v2.json text eol=lf
+/screensaver/glyph-design-v2/*.svg text eol=lf
+/screensaver/glyph-design-v2/*.json text eol=lf
+/screensaver/glyph-design-v2/*.js text eol=lf
+/screensaver/glyph-design-v2/*.png -text
+/screensaver/glyphs.js text eol=lf
+/screensaver/svg-preview/preview-animation.json text eol=lf
+/assets/glyph_rain/glyph_specimens.svg text eol=lf
 /screensaver/dist/*.json text eol=lf
 /screensaver/dist/verification/*.json text eol=lf
 /screensaver/dist/verification/*.md text eol=lf
@@ -55,6 +74,14 @@
 /benchmarks/results/jobs_scale_5000_20260907_f1/*.json -text
 /benchmarks/results/jobs_scale_5000_20260907_f1/*.zip -text
 /benchmarks/results/astra_pilot_runtime_20260907/* -text
+
+# Live Astra calibration keeps native receipts and measured source identities.
+/benchmarks/astra_*.py text eol=lf
+/tests/test_astra_*.py text eol=lf
+/benchmarks/results/astra_20260913/*.json -text
+/benchmarks/results/astra_20260913/*.zip -text
+/benchmarks/results/astra_20260913_main/*.json -text
+/benchmarks/results/astra_20260913_main/*.zip -text
 
 # Windows operator qualification retains source bindings and raw proof/log bytes.
 /benchmarks/results/windows_operator_20260907/** -text

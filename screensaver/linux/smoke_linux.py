@@ -30,7 +30,7 @@ def inspect_catalog(catalog: dict, root: Path = REPO_ROOT) -> dict:
     receipt_path = root / "screensaver/native-catalog.json"
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
     reference_path = root / "screensaver/svg-preview/reference/catalog.json"
-    original_path = root / "benchmarks/partitions/glyph_svg_v1/catalog/manifest.json"
+    original_path = root / "screensaver/glyph-design-v2/manifest.json"
     expected = {
         "version": "native-mixed-svg-v1", "glyph_count": GLYPH_COUNT,
         "reference_count": REFERENCE_COUNT, "reference_visible_count": 56,
@@ -50,7 +50,7 @@ def inspect_catalog(catalog: dict, root: Path = REPO_ROOT) -> dict:
 def source_sheet_svg(root: Path = REPO_ROOT, *, tile_size: int = SHEET_TILE,
                      margin: float = 4, white_ink: bool = False) -> bytes:
     """Build a verification sheet from source SVGs, never the C header."""
-    directory = root / "benchmarks/partitions/glyph_svg_v1/catalog"
+    directory = root / "screensaver/glyph-design-v2"
     originals = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
     reference = json.loads((root / "screensaver/svg-preview/reference/catalog.json").read_text(
         encoding="utf-8"))

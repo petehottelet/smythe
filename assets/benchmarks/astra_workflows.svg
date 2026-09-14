@@ -1,0 +1,476 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1140" height="870" viewBox="0 0 1140 870" role="img" aria-label="All 200 Astra and Sol workflow costs or reserved-cost bounds, timings and acceptance counts">
+<rect width="1140" height="870" fill="#ffffff"/>
+<text x="40" y="38" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="1.5">ASTRA / SOL · MATCHED WORKFLOWS</text>
+<text x="40" y="80" font-family="Georgia,'Times New Roman',serif" font-size="30" fill="#000000" text-anchor="start" font-weight="700">All workflows, with cost and timing evidence.</text>
+<text x="40" y="111" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="normal">200 runs · 10 synthetic tasks × 5 repetitions × 4 arms · planning included</text>
+<text x="40" y="163" font-family="Georgia,'Times New Roman',serif" font-size="20" fill="#000000" text-anchor="start" font-weight="700">Wall time (seconds)</text>
+<text x="40" y="188" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="normal">Lower is better · shared scale across both models</text>
+<text x="40" y="251" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="600">Astra / fixed</text>
+<rect x="246.8969" y="234" width="26.1874" height="26" fill="#ffffff" stroke="#000000"/>
+<path d="M257.8528 230v34" stroke="#000000" stroke-width="2"/>
+<circle cx="222.2964" cy="229" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="12.1030741"/>
+<circle cx="226.4826" cy="250" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="13.4615552"/>
+<circle cx="227.1806" cy="232" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="13.6880603"/>
+<circle cx="227.4352" cy="253" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="13.7706867"/>
+<circle cx="231.0478" cy="235" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="14.9429919"/>
+<circle cx="235.3591" cy="256" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="16.3420638"/>
+<circle cx="236.0545" cy="238" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="16.5677385"/>
+<circle cx="238.0282" cy="259" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="17.2082279"/>
+<circle cx="239.6800" cy="241" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="17.7442624"/>
+<circle cx="243.1180" cy="262" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="18.8599062"/>
+<circle cx="244.7284" cy="244" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="19.3825012"/>
+<circle cx="245.7751" cy="265" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="19.7221608"/>
+<circle cx="246.2635" cy="247" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="19.8806809"/>
+<circle cx="248.7969" cy="229" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="20.7027742"/>
+<circle cx="249.9372" cy="250" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="21.0728269"/>
+<circle cx="250.0112" cy="232" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="21.09684"/>
+<circle cx="250.6577" cy="253" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="21.3066297"/>
+<circle cx="250.7205" cy="235" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="21.3270013"/>
+<circle cx="251.9154" cy="256" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="21.7147711"/>
+<circle cx="253.1092" cy="238" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="22.1021758"/>
+<circle cx="254.0654" cy="259" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="22.4124557"/>
+<circle cx="254.4356" cy="241" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="22.532605"/>
+<circle cx="255.6157" cy="262" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="22.9155617"/>
+<circle cx="257.1485" cy="244" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="23.4129544"/>
+<circle cx="257.5588" cy="265" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="23.5461038"/>
+<circle cx="258.1469" cy="247" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="23.7369501"/>
+<circle cx="258.1776" cy="229" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="23.7469145"/>
+<circle cx="258.7572" cy="250" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="23.935002"/>
+<circle cx="261.4938" cy="232" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="24.8230649"/>
+<circle cx="261.6990" cy="253" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="24.8896563"/>
+<circle cx="262.6559" cy="235" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="25.2001655"/>
+<circle cx="266.5118" cy="256" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="26.4514646"/>
+<circle cx="267.7845" cy="238" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="26.8644738"/>
+<circle cx="268.2751" cy="259" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="27.0236653"/>
+<circle cx="269.2734" cy="241" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="27.3476179"/>
+<circle cx="271.9097" cy="262" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="28.2031368"/>
+<circle cx="272.6739" cy="244" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="28.4511316"/>
+<circle cx="273.2210" cy="265" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="28.6286759"/>
+<circle cx="274.8987" cy="247" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="29.1731044"/>
+<circle cx="287.6013" cy="229" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="33.295219"/>
+<circle cx="309.6400" cy="250" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="40.447023"/>
+<circle cx="310.3871" cy="232" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="40.6894691"/>
+<circle cx="313.7931" cy="253" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="41.7947523"/>
+<circle cx="318.7723" cy="235" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="43.4105521"/>
+<circle cx="319.3697" cy="256" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="43.6044169"/>
+<circle cx="326.4769" cy="238" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="45.9107878"/>
+<circle cx="328.1548" cy="259" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="46.4552815"/>
+<circle cx="335.9879" cy="241" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="48.9972101"/>
+<circle cx="345.2012" cy="262" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="51.9870253"/>
+<circle cx="352.9841" cy="244" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="54.5126417"/>
+<text x="545" y="251" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="end" font-weight="700">23.6</text>
+<text x="40" y="334" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="600">Astra / generated</text>
+<rect x="237.9217" y="317" width="111.0671" height="26" fill="#ffffff" stroke="#000000"/>
+<path d="M249.5622 313v34" stroke="#000000" stroke-width="2"/>
+<circle cx="210.5115" cy="312" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="8.278765"/>
+<circle cx="217.0657" cy="333" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="10.4056538"/>
+<circle cx="217.9015" cy="315" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="10.6768984"/>
+<circle cx="221.2485" cy="336" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="11.7630214"/>
+<circle cx="224.1477" cy="318" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="12.7038474"/>
+<circle cx="225.9169" cy="339" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="13.277973"/>
+<circle cx="227.2478" cy="321" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="13.7098748"/>
+<circle cx="229.0272" cy="342" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="14.287307"/>
+<circle cx="230.4264" cy="324" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="14.741347"/>
+<circle cx="235.9650" cy="345" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="16.5386902"/>
+<circle cx="237.4850" cy="327" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="17.0319619"/>
+<circle cx="237.5362" cy="348" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="17.048575"/>
+<circle cx="237.7100" cy="330" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="17.104961"/>
+<circle cx="238.5569" cy="312" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="17.3798008"/>
+<circle cx="238.9880" cy="333" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="17.519687"/>
+<circle cx="239.6832" cy="315" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="17.7452813"/>
+<circle cx="241.8219" cy="336" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="18.439325"/>
+<circle cx="242.4361" cy="318" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="18.638634"/>
+<circle cx="243.7658" cy="339" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="19.0701286"/>
+<circle cx="244.6579" cy="321" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="19.3596232"/>
+<circle cx="247.0432" cy="342" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="20.1336982"/>
+<circle cx="248.0603" cy="324" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="20.4637491"/>
+<circle cx="248.9349" cy="345" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="20.7475706"/>
+<circle cx="249.2116" cy="327" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="20.837352"/>
+<circle cx="249.3680" cy="348" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="20.888102"/>
+<circle cx="249.7563" cy="330" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="21.0141263"/>
+<circle cx="250.8887" cy="312" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="21.3815888"/>
+<circle cx="257.1252" cy="333" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="23.4054037"/>
+<circle cx="312.7534" cy="315" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="41.4573602"/>
+<circle cx="313.2411" cy="336" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="41.615604"/>
+<circle cx="321.8274" cy="318" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="44.4019659"/>
+<circle cx="327.8248" cy="339" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="46.3481878"/>
+<circle cx="333.4707" cy="321" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="48.1803262"/>
+<circle cx="337.3205" cy="342" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="49.4296475"/>
+<circle cx="337.6747" cy="324" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="49.5445772"/>
+<circle cx="342.6364" cy="345" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="51.1546973"/>
+<circle cx="347.2395" cy="327" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="52.6484566"/>
+<circle cx="349.5720" cy="348" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="53.4053702"/>
+<circle cx="356.8014" cy="330" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="55.7514087"/>
+<circle cx="365.2789" cy="312" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="58.5024405"/>
+<circle cx="384.1093" cy="333" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="64.6131034"/>
+<circle cx="386.4110" cy="315" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="65.3600266"/>
+<circle cx="386.4517" cy="336" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="65.3732495"/>
+<circle cx="390.2049" cy="318" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="66.5912005"/>
+<circle cx="394.3836" cy="339" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="67.9472185"/>
+<circle cx="407.0476" cy="321" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="72.0568352"/>
+<circle cx="413.6180" cy="342" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="74.1889885"/>
+<circle cx="426.0932" cy="324" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="78.2373399"/>
+<circle cx="430.2509" cy="345" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="79.5865461"/>
+<circle cx="439.7170" cy="327" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="82.6584028"/>
+<text x="545" y="334" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="end" font-weight="700">21.0</text>
+<text x="40" y="417" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="600">Sol / fixed</text>
+<rect x="236.3634" y="400" width="28.2366" height="26" fill="#ffffff" stroke="#000000"/>
+<path d="M244.3567 396v34" stroke="#000000" stroke-width="2"/>
+<circle cx="217.6707" cy="395" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="10.6019841"/>
+<circle cx="218.3375" cy="416" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="10.8183744"/>
+<circle cx="222.0469" cy="398" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="12.0221296"/>
+<circle cx="223.6195" cy="419" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="12.5324477"/>
+<circle cx="223.9186" cy="401" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="12.6295158"/>
+<circle cx="225.5037" cy="422" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="13.1438889"/>
+<circle cx="230.5679" cy="404" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="14.7872871"/>
+<circle cx="231.6492" cy="425" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="15.1381679"/>
+<circle cx="232.9904" cy="407" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="15.5734063"/>
+<circle cx="233.3332" cy="428" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="15.6846593"/>
+<circle cx="233.6839" cy="410" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="15.7984589"/>
+<circle cx="236.0988" cy="431" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="16.5821172"/>
+<circle cx="236.1980" cy="413" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="16.6142981"/>
+<circle cx="236.8597" cy="395" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="16.8290342"/>
+<circle cx="237.9440" cy="416" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="17.1808905"/>
+<circle cx="238.1301" cy="398" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="17.2412814"/>
+<circle cx="238.8282" cy="419" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="17.4678153"/>
+<circle cx="238.8556" cy="401" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="17.4767166"/>
+<circle cx="239.1660" cy="422" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="17.5774579"/>
+<circle cx="239.5962" cy="404" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="17.7170704"/>
+<circle cx="239.7589" cy="425" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="17.769864"/>
+<circle cx="239.9871" cy="407" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="17.8439156"/>
+<circle cx="240.3854" cy="428" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="17.973148"/>
+<circle cx="241.1577" cy="410" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="18.2237746"/>
+<circle cx="242.4903" cy="431" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="18.6562221"/>
+<circle cx="246.2232" cy="413" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="19.8675803"/>
+<circle cx="246.7314" cy="395" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="20.032506"/>
+<circle cx="248.2555" cy="416" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="20.5270792"/>
+<circle cx="249.2856" cy="398" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="20.8613642"/>
+<circle cx="249.5587" cy="419" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="20.9499842"/>
+<circle cx="251.6101" cy="401" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="21.6156843"/>
+<circle cx="253.5015" cy="422" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="22.2294775"/>
+<circle cx="255.7233" cy="404" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="22.9504736"/>
+<circle cx="257.4027" cy="425" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="23.4954606"/>
+<circle cx="257.5308" cy="407" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="23.5370251"/>
+<circle cx="262.2154" cy="428" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="25.0572435"/>
+<circle cx="262.8175" cy="410" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="25.2526083"/>
+<circle cx="265.1941" cy="431" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="26.023865"/>
+<circle cx="267.7355" cy="413" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="26.8485537"/>
+<circle cx="271.1414" cy="395" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="27.9537984"/>
+<circle cx="273.8176" cy="416" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="28.8222799"/>
+<circle cx="276.0022" cy="398" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="29.5311877"/>
+<circle cx="285.4408" cy="419" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="32.5941292"/>
+<circle cx="291.5180" cy="401" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="34.5662407"/>
+<circle cx="292.5782" cy="422" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="34.9102976"/>
+<circle cx="294.4635" cy="404" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="35.522074"/>
+<circle cx="294.8557" cy="425" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="35.6493694"/>
+<circle cx="303.7042" cy="407" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="38.5207781"/>
+<circle cx="304.7328" cy="428" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="38.8545819"/>
+<circle cx="306.0459" cy="410" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="39.2806944"/>
+<text x="545" y="417" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="end" font-weight="700">19.3</text>
+<text x="40" y="500" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="600">Sol / generated</text>
+<rect x="234.0750" y="483" width="75.3653" height="26" fill="#ffffff" stroke="#000000"/>
+<path d="M276.4483 479v34" stroke="#000000" stroke-width="2"/>
+<circle cx="210.8202" cy="478" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="8.3789335"/>
+<circle cx="219.4646" cy="499" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="11.1841225"/>
+<circle cx="220.3369" cy="481" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="11.4672186"/>
+<circle cx="221.3361" cy="502" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="11.7914493"/>
+<circle cx="221.3399" cy="484" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="11.7926976"/>
+<circle cx="223.9776" cy="505" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="12.648657"/>
+<circle cx="224.5259" cy="487" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="12.8265737"/>
+<circle cx="225.6423" cy="508" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="13.1888479"/>
+<circle cx="225.9053" cy="490" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="13.2741971"/>
+<circle cx="228.4925" cy="511" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="14.1137696"/>
+<circle cx="233.2485" cy="493" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="15.6571668"/>
+<circle cx="233.3986" cy="514" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="15.7058544"/>
+<circle cx="234.0151" cy="496" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="15.9059127"/>
+<circle cx="234.2548" cy="478" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="15.983712"/>
+<circle cx="235.8000" cy="499" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="16.4851468"/>
+<circle cx="237.7387" cy="481" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="17.1142806"/>
+<circle cx="239.8748" cy="502" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="17.807458"/>
+<circle cx="243.4665" cy="484" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="18.9729968"/>
+<circle cx="245.7084" cy="505" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="19.70054"/>
+<circle cx="250.4901" cy="487" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="21.2522274"/>
+<circle cx="272.6158" cy="508" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="28.4322626"/>
+<circle cx="273.3039" cy="490" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="28.6555673"/>
+<circle cx="273.9697" cy="511" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="28.8716242"/>
+<circle cx="274.6732" cy="493" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="29.0999095"/>
+<circle cx="275.2161" cy="514" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="29.2761059"/>
+<circle cx="277.6805" cy="496" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="30.075804"/>
+<circle cx="279.2243" cy="478" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="30.576802"/>
+<circle cx="279.2899" cy="499" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="30.5980929"/>
+<circle cx="285.0324" cy="481" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="32.4615868"/>
+<circle cx="288.5477" cy="502" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="33.602352"/>
+<circle cx="291.0756" cy="484" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="34.4226647"/>
+<circle cx="296.9696" cy="505" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="36.3353458"/>
+<circle cx="297.9907" cy="487" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="36.6666995"/>
+<circle cx="298.5455" cy="508" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="36.8467411"/>
+<circle cx="299.2203" cy="490" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="37.0657282"/>
+<circle cx="301.7087" cy="511" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="37.8732434"/>
+<circle cx="309.1858" cy="493" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="40.2996261"/>
+<circle cx="309.5252" cy="514" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="40.4097579"/>
+<circle cx="311.8659" cy="496" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="41.1693607"/>
+<circle cx="328.1736" cy="478" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="46.4613648"/>
+<circle cx="332.7430" cy="499" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="47.9441873"/>
+<circle cx="353.8543" cy="481" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="54.7950334"/>
+<circle cx="359.6704" cy="502" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="56.6824175"/>
+<circle cx="363.5836" cy="484" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="57.9523101"/>
+<circle cx="366.8968" cy="505" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="59.0274722"/>
+<circle cx="375.6478" cy="487" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="61.867273"/>
+<circle cx="384.3074" cy="508" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="64.6773842"/>
+<circle cx="390.1678" cy="490" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="66.5791538"/>
+<circle cx="391.1927" cy="511" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="66.9117583"/>
+<circle cx="391.2505" cy="493" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="66.9305113"/>
+<text x="545" y="500" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="end" font-weight="700">29.7</text>
+<path d="M185 551h270" stroke="#000000"/>
+<text x="185.0" y="571" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">0</text>
+<text x="252.5" y="571" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">22</text>
+<text x="320.0" y="571" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">44</text>
+<text x="387.5" y="571" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">66</text>
+<text x="455.0" y="571" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">88</text>
+<text x="590" y="163" font-family="Georgia,'Times New Roman',serif" font-size="20" fill="#000000" text-anchor="start" font-weight="700">Generation cost (USD)</text>
+<text x="590" y="188" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="normal">Lower is better · shared scale across both models</text>
+<text x="590" y="251" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="600">Astra / fixed</text>
+<rect x="783.1446" y="234" width="40.4442" height="26" fill="#ffffff" stroke="#000000"/>
+<path d="M806.7418 230v34" stroke="#000000" stroke-width="2"/>
+<circle cx="752.5964" cy="229" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.01667"/>
+<circle cx="753.2297" cy="250" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.01727"/>
+<circle cx="753.7047" cy="232" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.01772"/>
+<circle cx="754.0742" cy="253" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.01807"/>
+<circle cx="754.3908" cy="235" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.01837"/>
+<circle cx="755.3092" cy="256" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.01924"/>
+<circle cx="756.1536" cy="238" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.02004"/>
+<circle cx="756.3647" cy="259" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.02024"/>
+<circle cx="757.2620" cy="241" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.02109"/>
+<circle cx="757.6842" cy="262" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.02149"/>
+<circle cx="782.2579" cy="244" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.04477"/>
+<circle cx="782.5218" cy="265" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.04502"/>
+<circle cx="782.9545" cy="247" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.04543"/>
+<circle cx="783.7146" cy="229" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.04615"/>
+<circle cx="787.5991" cy="250" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.04983"/>
+<circle cx="787.8313" cy="232" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.05005"/>
+<circle cx="788.3907" cy="253" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.05058"/>
+<circle cx="788.3907" cy="235" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.05058"/>
+<circle cx="788.6441" cy="256" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.05082"/>
+<circle cx="789.7102" cy="238" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.05183"/>
+<circle cx="802.9682" cy="259" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.06439"/>
+<circle cx="804.8471" cy="241" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.06617"/>
+<circle cx="805.2165" cy="262" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.06652"/>
+<circle cx="805.4699" cy="244" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.06676"/>
+<circle cx="805.8076" cy="265" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.06708"/>
+<circle cx="807.6760" cy="247" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.06885"/>
+<circle cx="809.0694" cy="229" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.07017"/>
+<circle cx="810.1460" cy="250" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.07119"/>
+<circle cx="812.7533" cy="232" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.07366"/>
+<circle cx="816.5322" cy="253" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.07724"/>
+<circle cx="820.5645" cy="235" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.08106"/>
+<circle cx="820.6331" cy="256" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.081125"/>
+<circle cx="822.3168" cy="238" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.08272"/>
+<circle cx="822.4250" cy="259" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.0828225"/>
+<circle cx="822.7232" cy="241" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.083105"/>
+<circle cx="822.9976" cy="262" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.083365"/>
+<circle cx="823.3591" cy="244" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.0837075"/>
+<circle cx="823.6652" cy="265" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.0839975"/>
+<circle cx="824.0215" cy="247" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.084335"/>
+<circle cx="824.9662" cy="229" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.08523"/>
+<circle cx="865.3919" cy="250" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.1235275"/>
+<circle cx="871.4615" cy="232" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.1292775"/>
+<circle cx="873.3483" cy="253" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.131065"/>
+<circle cx="876.6206" cy="235" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.134165"/>
+<circle cx="876.8976" cy="256" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.1344275"/>
+<circle cx="884.6350" cy="238" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.1417575"/>
+<circle cx="887.5510" cy="259" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.14452"/>
+<circle cx="889.0684" cy="241" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.1459575"/>
+<circle cx="889.7809" cy="262" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.1466325"/>
+<circle cx="891.3642" cy="244" r="2.3" fill="#ffffff" stroke="#000000" data-arm="astra-fixed" data-value="0.1481325"/>
+<text x="1095" y="251" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="end" font-weight="700">0.0680</text>
+<text x="590" y="334" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="600">Astra / generated</text>
+<rect x="775.6635" y="317" width="173.8440" height="26" fill="#ffffff" stroke="#000000"/>
+<path d="M787.9928 313v34" stroke="#000000" stroke-width="2"/>
+<circle cx="751.8089" cy="312" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.015924"/>
+<circle cx="751.9567" cy="333" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.016064"/>
+<circle cx="752.4000" cy="315" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.016484"/>
+<circle cx="752.5214" cy="336" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.016599"/>
+<circle cx="752.5478" cy="318" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.016624"/>
+<circle cx="753.1653" cy="339" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.017209"/>
+<circle cx="756.9865" cy="321" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.020829"/>
+<circle cx="756.9875" cy="342" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.02083"/>
+<circle cx="757.0931" cy="324" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.02093"/>
+<circle cx="758.6052" cy="345" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.0223625"/>
+<circle cx="773.0069" cy="327" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.036006"/>
+<circle cx="775.1602" cy="348" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.038046"/>
+<circle cx="775.6563" cy="330" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.038516"/>
+<circle cx="775.6848" cy="312" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.038543"/>
+<circle cx="776.1071" cy="333" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.038943"/>
+<circle cx="779.4532" cy="315" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.042113"/>
+<circle cx="780.0412" cy="336" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.04267"/>
+<circle cx="780.4560" cy="318" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.043063"/>
+<circle cx="780.8761" cy="339" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.043461"/>
+<circle cx="781.7749" cy="321" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.0443125"/>
+<circle cx="782.1550" cy="342" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.0446725"/>
+<circle cx="783.7895" cy="324" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.046221"/>
+<circle cx="783.9426" cy="345" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.046366"/>
+<circle cx="785.0509" cy="327" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.047416"/>
+<circle cx="785.1723" cy="348" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.047531"/>
+<circle cx="790.8133" cy="330" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.052875"/>
+<circle cx="791.4677" cy="312" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.053495"/>
+<circle cx="794.1726" cy="333" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.0560575"/>
+<circle cx="868.3058" cy="315" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.126288"/>
+<circle cx="878.8093" cy="336" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.1362385"/>
+<circle cx="885.5781" cy="318" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.142651"/>
+<circle cx="912.5706" cy="339" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.1682225"/>
+<circle cx="936.7437" cy="321" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.191123"/>
+<circle cx="943.0634" cy="342" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.19711"/>
+<circle cx="945.5023" cy="324" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.1994205"/>
+<circle cx="945.5889" cy="345" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.1995025"/>
+<circle cx="948.3809" cy="327" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.2021475"/>
+<circle cx="949.8829" cy="348" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.2035705"/>
+<circle cx="950.5131" cy="330" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.2041675"/>
+<circle cx="953.5595" cy="312" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.2070535"/>
+<circle cx="954.1311" cy="333" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.207595"/>
+<circle cx="954.5005" cy="315" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.207945"/>
+<circle cx="956.5119" cy="336" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.2098505"/>
+<circle cx="956.8555" cy="318" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.210176"/>
+<circle cx="961.2139" cy="339" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.214305"/>
+<circle cx="973.2036" cy="321" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.2256635"/>
+<circle cx="980.0517" cy="342" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.232151"/>
+<circle cx="982.7898" cy="324" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.234745"/>
+<circle cx="985.4588" cy="345" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.2372735"/>
+<circle cx="989.7170" cy="327" r="2.3" fill="#000000" stroke="#000000" data-arm="astra-dynamic" data-value="0.2413075"/>
+<text x="1095" y="334" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="end" font-weight="700">0.0502</text>
+<text x="590" y="417" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="600">Sol / fixed</text>
+<rect x="752.8602" y="400" width="13.8987" height="26" fill="#ffffff" stroke="#000000"/>
+<path d="M762.2548 396v34" stroke="#000000" stroke-width="2"/>
+<circle cx="742.4608" cy="395" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.007068"/>
+<circle cx="742.4819" cy="416" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.007088"/>
+<circle cx="742.4819" cy="398" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.007088"/>
+<circle cx="742.6930" cy="419" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.007288"/>
+<circle cx="742.7014" cy="401" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.007296"/>
+<circle cx="742.8830" cy="422" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.007468"/>
+<circle cx="743.3981" cy="404" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.007956"/>
+<circle cx="743.6515" cy="425" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.008196"/>
+<circle cx="744.3270" cy="407" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.008836"/>
+<circle cx="744.4326" cy="428" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.008936"/>
+<circle cx="751.9820" cy="410" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.016088"/>
+<circle cx="752.7716" cy="431" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.016836"/>
+<circle cx="752.8518" cy="413" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.016912"/>
+<circle cx="752.8856" cy="395" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.016944"/>
+<circle cx="753.1305" cy="416" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.017176"/>
+<circle cx="753.2149" cy="398" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.017256"/>
+<circle cx="753.3247" cy="419" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.01736"/>
+<circle cx="753.6498" cy="401" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.017668"/>
+<circle cx="753.8060" cy="422" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.017816"/>
+<circle cx="753.8398" cy="404" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.017848"/>
+<circle cx="761.0261" cy="425" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.024656"/>
+<circle cx="761.4484" cy="407" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.025056"/>
+<circle cx="761.8537" cy="428" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.02544"/>
+<circle cx="761.9719" cy="410" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.025552"/>
+<circle cx="762.0606" cy="431" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.025636"/>
+<circle cx="762.4490" cy="413" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.026004"/>
+<circle cx="762.4575" cy="395" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.026012"/>
+<circle cx="762.6095" cy="416" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.026156"/>
+<circle cx="762.7066" cy="398" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.026248"/>
+<circle cx="762.7150" cy="419" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.026256"/>
+<circle cx="763.4371" cy="401" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.02694"/>
+<circle cx="763.5342" cy="422" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.027032"/>
+<circle cx="765.9155" cy="404" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.029288"/>
+<circle cx="766.2195" cy="425" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.029576"/>
+<circle cx="766.2998" cy="407" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.029652"/>
+<circle cx="766.3589" cy="428" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.029708"/>
+<circle cx="766.7431" cy="410" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.030072"/>
+<circle cx="766.7642" cy="431" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.030092"/>
+<circle cx="767.9971" cy="413" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.03126"/>
+<circle cx="772.3165" cy="395" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.035352"/>
+<circle cx="778.2319" cy="416" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.040956"/>
+<circle cx="780.4750" cy="398" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.043081"/>
+<circle cx="781.6541" cy="419" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.044198"/>
+<circle cx="785.1111" cy="401" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.047473"/>
+<circle cx="785.8584" cy="422" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.048181"/>
+<circle cx="786.3968" cy="404" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.048691"/>
+<circle cx="786.4833" cy="425" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.048773"/>
+<circle cx="787.3362" cy="407" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.049581"/>
+<circle cx="788.8584" cy="428" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.051023"/>
+<circle cx="789.6131" cy="410" r="2.3" fill="#ffffff" stroke="#000000" data-arm="sol-fixed" data-value="0.051738"/>
+<text x="1095" y="417" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="end" font-weight="700">0.0258</text>
+<text x="590" y="500" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="600">Sol / generated</text>
+<rect x="748.8830" y="483" width="63.5951" height="26" fill="#ffffff" stroke="#000000"/>
+<path d="M802.3622 479v34" stroke="#000000" stroke-width="2"/>
+<path d="M804.0505 479v34" stroke="#000000" stroke-width="2"/>
+<circle cx="741.6264" cy="478" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0062776"/>
+<circle cx="742.0423" cy="499" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0066716"/>
+<circle cx="742.0466" cy="481" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0066756"/>
+<circle cx="742.3062" cy="502" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0069216"/>
+<circle cx="742.6187" cy="484" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0072176"/>
+<circle cx="742.7236" cy="505" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.007317"/>
+<circle cx="743.3555" cy="487" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0079156"/>
+<circle cx="743.3745" cy="508" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0079336"/>
+<circle cx="743.8330" cy="490" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.008368"/>
+<circle cx="743.9259" cy="511" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.008456"/>
+<circle cx="747.4076" cy="493" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0117544"/>
+<circle cx="747.8877" cy="514" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0122092"/>
+<circle cx="748.8221" cy="496" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0130944"/>
+<circle cx="749.0657" cy="478" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0133252"/>
+<circle cx="749.3667" cy="499" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0136104"/>
+<circle cx="749.3950" cy="481" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0136372"/>
+<circle cx="749.7621" cy="502" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.013985"/>
+<circle cx="749.8297" cy="484" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.014049"/>
+<circle cx="750.0313" cy="505" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.01424"/>
+<circle cx="751.1473" cy="487" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0152972"/>
+<path d="M768.6465 508H947.7187M768.6465 504v8M947.7187 504v8" stroke="#000000" stroke-dasharray="3 2" data-arm="sol-dynamic" data-unknown="true" data-lower="0.0318752" data-upper="0.2015202"/>
+<circle cx="797.8434" cy="490" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.059535"/>
+<circle cx="799.9201" cy="511" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0615024"/>
+<circle cx="801.2911" cy="493" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0628012"/>
+<circle cx="802.1452" cy="514" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0636104"/>
+<circle cx="802.5791" cy="496" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0640214"/>
+<circle cx="805.5220" cy="478" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0668094"/>
+<circle cx="805.8397" cy="499" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0671104"/>
+<circle cx="806.6314" cy="481" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0678604"/>
+<circle cx="806.7178" cy="502" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0679422"/>
+<circle cx="807.3872" cy="484" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0685764"/>
+<circle cx="807.6374" cy="505" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0688134"/>
+<circle cx="807.7545" cy="487" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0689244"/>
+<circle cx="807.7879" cy="508" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.068956"/>
+<circle cx="808.3948" cy="490" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.069531"/>
+<circle cx="808.5525" cy="511" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0696804"/>
+<circle cx="810.1598" cy="493" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.071203"/>
+<circle cx="810.6329" cy="514" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0716512"/>
+<circle cx="813.0932" cy="496" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.073982"/>
+<circle cx="813.2811" cy="478" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.07416"/>
+<circle cx="814.1101" cy="499" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0749454"/>
+<circle cx="814.8275" cy="481" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.075625"/>
+<circle cx="817.9541" cy="502" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.078587"/>
+<circle cx="818.5737" cy="484" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.079174"/>
+<circle cx="820.1309" cy="505" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0806492"/>
+<circle cx="824.1535" cy="487" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.08446"/>
+<circle cx="824.1908" cy="508" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.0844954"/>
+<circle cx="824.9135" cy="490" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.08518"/>
+<circle cx="836.5955" cy="511" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.096247"/>
+<circle cx="841.7511" cy="493" r="2.3" fill="#000000" stroke="#000000" data-arm="sol-dynamic" data-value="0.1011312"/>
+<text x="1095" y="500" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="end" font-weight="700">0.064–0.065</text>
+<path d="M735 551h270" stroke="#000000"/>
+<text x="735.0" y="571" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">$0.00</text>
+<text x="802.5" y="571" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">$0.06</text>
+<text x="870.0" y="571" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">$0.13</text>
+<text x="937.5" y="571" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">$0.19</text>
+<text x="1005.0" y="571" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">$0.26</text>
+<text x="40" y="620" font-family="Georgia,'Times New Roman',serif" font-size="15" fill="#000000" text-anchor="start" font-weight="700">Astra / fixed</text>
+<text x="40" y="648" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="14" fill="#000000" text-anchor="start" font-weight="normal">Accepted: 50/50</text>
+<text x="40" y="673" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Rubric mean: 4.00/4</text>
+<text x="40" y="697" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Cost / accepted: $0.0716</text>
+<text x="315" y="620" font-family="Georgia,'Times New Roman',serif" font-size="15" fill="#000000" text-anchor="start" font-weight="700">Astra / generated</text>
+<text x="315" y="648" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="14" fill="#000000" text-anchor="start" font-weight="normal">Accepted: 49/50</text>
+<text x="315" y="673" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Rubric mean: 4.00/4</text>
+<text x="315" y="697" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Cost / accepted: $0.1099</text>
+<text x="590" y="620" font-family="Georgia,'Times New Roman',serif" font-size="15" fill="#000000" text-anchor="start" font-weight="700">Sol / fixed</text>
+<text x="590" y="648" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="14" fill="#000000" text-anchor="start" font-weight="normal">Accepted: 47/50</text>
+<text x="590" y="673" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Rubric mean: 3.98/4</text>
+<text x="590" y="697" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Cost / accepted: $0.0272</text>
+<text x="865" y="620" font-family="Georgia,'Times New Roman',serif" font-size="15" fill="#000000" text-anchor="start" font-weight="700">Sol / generated</text>
+<text x="865" y="648" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="14" fill="#000000" text-anchor="start" font-weight="normal">Accepted: 45/50</text>
+<text x="865" y="673" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Rubric mean: 3.89/4</text>
+<text x="865" y="697" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Cost / accepted: $0.0526–$0.0564</text>
+<text x="40" y="741" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Points show known observations; boxes span observed or bounded quartiles; ticks and values mark medians.</text>
+<text x="40" y="765" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Dashed cost range: one failed call has no usage receipt. Its full reserve bounds the charge; no point is invented.</text>
+<text x="40" y="789" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">All failures remain included. Charges use recorded usage × dated list prices; judge fees are separate.</text>
+<text x="40" y="813" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Amended study on reused tasks · descriptive comparison, not an external benchmark or untouched holdout.</text>
+<text x="40" y="846" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="start" font-weight="normal">Source: astra_20260913_main/analysis.json · SHA-256 4184ff54fd79e8f2</text>
+</svg>

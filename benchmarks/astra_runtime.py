@@ -287,7 +287,7 @@ class _FixedArchitect:
         return ExecutionGraph(topology=[Topology.SERIAL], nodes=nodes, task=task), registry
 
 
-def _swarm(store, row, cap):
+def _swarm(store, row, cap, *, planning_instructions=""):
     from smythe import Swarm, WorkflowGraphPolicy
     from smythe.planner import LLMArchitect
     from smythe.provider_responses import OpenAIResponsesProvider
@@ -297,7 +297,8 @@ def _swarm(store, row, cap):
     provider = OpenAIResponsesProvider(max_output_tokens=8192, reasoning_effort="medium", request_timeout_s=600)
     architect = (LocalOnly(_FixedArchitect, identity="astra-fixed-research-analysis-writing", version="1")
                  if row["strategy"] == "fixed_pipeline"
-                 else LLMArchitect(provider, planning_model=row["model"], max_retries=0))
+                 else LLMArchitect(provider, planning_model=row["model"], max_retries=0,
+                                   planning_instructions=planning_instructions))
     return Swarm(model=row["model"], provider=provider, architect=architect,
                  synthesizer=Synthesizer(SynthesisStrategy.DELIVERABLE), run_store=store,
                  max_budget_usd=_budget_usd(cap), parallel=True, max_concurrency=8, max_revisions=0,

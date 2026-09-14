@@ -28,24 +28,26 @@ model and pipeline, with blind cross-vendor judging.
 
 ## Benchmark
 
-Example task: One workflow creates and validates 192 original SVG glyphs.
+Example task: compile, validate, and export an original SVG glyph catalog for a screensaver application.
 
 <p align="center">
-  <img src="screensaver/svg-preview/preview.gif" alt="Animated classic code rain with reference characters and occasional original Smythe glyphs" width="900">
+  <img src="screensaver/svg-preview/preview.gif" alt="Animated rain showing only the 192 revised Smythe glyphs" width="900">
 </p>
 
-**Explore:** [Run the web explorer](screensaver/svg-preview/README.md) ·
-[Complete 192-glyph contact sheet](benchmarks/partitions/glyph_svg_v1/catalog/contact-sheet.png) ·
-[56 reference glyphs](screensaver/svg-preview/reference/contact-sheet.png) ·
-[24-glyph calibration sheet](benchmarks/partitions/glyph_svg_v1/catalog/calibration-sheet.png) ·
-[Individual SVGs and manifest](benchmarks/partitions/glyph_svg_v1/catalog/).
-In 3D mode, arrow keys move through the field; Space pauses, R resets the view, and F enters
-fullscreen. Touch controls are included.
-The [current browser review](benchmarks/partitions/glyph_rain_reference_v1/performance-preview-review-20260907.json)
-binds the [still image](screensaver/svg-preview/preview.png) and passes 31 rendering and interaction checks.
-The [animated preview](screensaver/svg-preview/README.md#readme-animation) uses the same renderer and catalogs.
-A separate ten-minute travel and resize check passed 57 cycles.
-[Rendering measurements and stability report](benchmarks/renderer_performance_20260907_results.md).
+**Explore the new glyphs:** [Complete 192-glyph sheet](screensaver/glyph-design-v2/contact-sheet-128.png) ·
+[16 px](screensaver/glyph-design-v2/contact-sheet-16.png) ·
+[32 px](screensaver/glyph-design-v2/contact-sheet-32.png) ·
+[64 px](screensaver/glyph-design-v2/contact-sheet-64.png) ·
+[Individual SVGs and manifest](screensaver/glyph-design-v2/README.md) ·
+[Run the web explorer](screensaver/svg-preview/README.md).
+
+The v2 catalog uses clean cut ends, broad strokes, and deliberate openings.
+This animation shows **100% new Smythe glyphs**. The explorer also offers the
+licensed reference mix, 3D arrow-key travel, pause, reset, and fullscreen.
+[Current browser checks](screensaver/glyph-design-v2/browser-review.json) bind
+the new catalog and [still image](screensaver/svg-preview/preview.png).
+The [animation record](screensaver/svg-preview/preview-animation.json) records
+the export. The benchmark below compares the current 192-glyph set with a 256-glyph extension.
 
 **Build from source:** [Windows](screensaver/README.md#windows-notes) ·
 [macOS](screensaver/README.md#macos-notes) ·
@@ -65,25 +67,45 @@ The glyph workload measures parallel artifact generation. Separate matched
 suites measure recovery, framework overhead, and generated plans. Each result
 links to its protocol and committed records.
 
-### Original SVG generation
+### SVG catalog workflow
 
-**192 original SVG glyphs in 4.03 seconds median**, including generation,
-complete validation, and assembly. The best tested configuration used eight
-process workers and ran **2.95× faster** than process execution at concurrency 1.
-All 30 workflows delivered complete, accepted catalogs with identical hashes.
+**256 SVG glyphs in 8.06 seconds median**, including contour
+compilation, validation at four sizes, every pair comparison, and file export.
+The best tested configuration uses 8 process workers and is
+**2.20× faster** than its concurrency-one baseline.
+The 192-glyph set completes in **6.66 seconds median**.
 
-The new workflow measures fresh contour construction, full style and
-distinctness checks, and delivery of the SVG catalog and raster atlas.
-It runs locally through Smythe from a calibrated procedural grammar, with no
-simulated delay and **$0 provider API charges**. Hardware and design work are
-outside that API-cost figure.
+All 36 workflows pass, with identical SVG and pixel hashes across three
+repetitions per setting. The designs are authored before timing; each
+measured node compiles a fresh SVG through Smythe. **Zero API calls and
+$0 provider API charges**; hardware, electricity and design work are unpriced.
 
 <p align="center">
-  <img src="assets/benchmarks/svg_workflow.svg" alt="Complete SVG workflow times across thread and process configurations, with all repetitions and a measured stage breakdown" width="900">
+  <img src="assets/benchmarks/svg_v2_workflow.svg" alt="All 36 complete v2 workflows at 192 and 256 glyphs, with medians, ranges and one actual run's stages" width="900">
 </p>
 
-[Workflow results and protocol](benchmarks/svg_glyph_benchmark.md) ·
-[Raw record](benchmarks/results/glyph_svg_v1.json).
+Process workers trade more memory for shorter completion time:
+
+<p align="center">
+  <img src="assets/benchmarks/svg_v2_memory.svg" alt="Measured parent-plus-worker memory at each catalog size and concurrency" width="900">
+</p>
+
+[Results and scope](benchmarks/svg_v2_results.md) ·
+[Raw trials](benchmarks/results/glyph_svg_v2_20260913.json) ·
+[256-glyph contact sheet](benchmarks/partitions/glyph_svg_v2_256/catalog/contact-sheet-128.png) ·
+[Historical v1 study](benchmarks/svg_glyph_benchmark.md).
+
+### Astra and Sol
+
+Execution and automatic scoring are complete for the 200-workflow Astra/Sol
+study. Human review of eight flagged answers remains pending, so the study
+is not yet claimable. Generated graphs took more time on average in this task
+set; every run and the unresolved cost range remain in the records.
+
+[Study report and review status](benchmarks/results/astra_20260913_main/README.md) ·
+[Cost and timing distributions](assets/benchmarks/astra_workflows.svg) ·
+[Paired differences](assets/benchmarks/astra_differences.svg) ·
+[Every trial](benchmarks/results/astra_20260913_main/analysis.json).
 
 ### Glyph generation and scaling
 
@@ -200,8 +222,8 @@ count, execution models, retries, and regeneration across planning and recovery.
 Repository development adds [Autotune campaign ownership](docs/optimize.md#campaign-ownership-unreleased):
 one leased runner owns trial writes and decisions, with stale-owner rejection
 and conservative recovery. [Planner history](docs/architecture.md#learning-loop)
-validates recalled records and labels summed node time. These updates are
-unreleased after 0.7.0.
+validates recalled records and labels summed node time.
+These updates are unreleased after 0.7.0.
 
 ## Quickstart
 
@@ -277,13 +299,12 @@ team challenges the draft, and a final node writes the decision memo.
   was not met.
 - **Broader evidence:** bounded paid scale trials, repeated live glyph sweeps, and
   human-calibrated quality comparisons with saved outputs and judge reasoning.
-- **Astra benchmarks — live runs not started.** The
-  [13-task protocol and 12-pilot/200-main schedules](benchmarks/astra_benchmark_plan.md)
-  are prepared; the [pilot runner passed 79 offline checks](benchmarks/results/astra_pilot_runtime_20260907/README.md).
-  No live Astra cost, speed, or quality results are published. Next: agree on
-  an API spending ceiling, run the [12-workflow pilot](benchmarks/astra_runtime.md),
-  then calibrate judging before the main comparison.
+- **Astra follow-ups:** compare concurrency one and eight on identical graphs,
+  match modern framework adapters, and measure durable tool workflows. These
+  [separate studies](benchmarks/astra_benchmark_plan.md#separate-follow-up-studies)
+  extend the 200-workflow text comparison. Its eight disputed answers still need human review.
 
+[Outstanding benchmark checklist](docs/benchmark-delivery-audit-2026-09-13.md) ·
 [Specifications and priorities](ROADMAP.md#coming-soon) ·
 [Repository review](docs/project-review-2026-09-06.md).
 

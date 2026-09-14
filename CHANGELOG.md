@@ -23,6 +23,17 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Added
 
+- **Planner-only instructions**: `LLMArchitect(planning_instructions="...")`
+  records graph requirements in the workflow recipe without placing them in
+  every executor's answer constraints. Existing empty-policy recipes retain
+  their identity.
+
+- **Astra follow-up study and blind evaluation**: execute explicit-format pilot
+  and gated main schedules under separate stage allocations. Preserve native
+  Gemini receipts and conservative judge-cost bounds; bind human calibration
+  to anonymous saved outputs. Add offline evidence reconciliation and complete
+  200-workflow analysis with task-clustered intervals and retained failures.
+
 - **Autotune campaign ownership**: renewable campaign leases and owner epochs
   fence trial transitions and promotion decisions. Competing runners fail
   before evaluation; stale owners cannot settle work or release a successor.
@@ -38,10 +49,37 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Documentation
 
+- Record both live Astra/Sol pilots: 24 workflows, zero execution failures,
+  12/12 corrected format checks, original-output blind judging, and planted-error
+  detection. Retain the original prompt/type defect, raw ledgers and source
+  snapshots. Human calibration subsequently passed; the
+  [method amendment](benchmarks/astra_method_amendment_20260913.md) records 48
+  pilot workflows, a final 12/12 contract pass and the stopped 31-workflow
+  diagnostic. The [200-workflow main report](benchmarks/results/astra_20260913_main/README.md)
+  records 191 automatically accepted answers, all native outcomes, blind judgments, graph
+  sizes and paired comparisons. The explicitly approved continuation retains
+  one failed workflow and its full $0.169645 unresolved reservation. Charts
+  show cost bounds and withhold affected exact cost contrasts. Human review
+  of eight flagged answers remains pending; the study is not yet claimable.
+
+- Measure 192 and 256 authored v2 SVG glyphs across 36 matched thread/process
+  workflows. Retain compilation, four-size validation, all-pairs comparison,
+  export, sampled memory and every trial. Add 64 benchmark designs without
+  changing the live 192-glyph catalog, publish monochrome timing/memory figures,
+  and consolidate the outstanding benchmark promises into a delivery audit.
+
+- Replace the original screensaver artwork with a complete 192-glyph v2
+  catalog: broad cut strokes, deliberate openings, and the approved detached
+  center bar in 017. Update all current sheets, specimen plates, web galleries,
+  stills, animation, and native source exports. Current showcases display only
+  the new originals. Retain historical benchmark evidence without applying
+  its generation timings to v2. Preserve the earlier renderer's 50 measured
+  source files and license notices in a hash-checked snapshot so its offline
+  review remains reproducible after the catalog replacement.
 - Replace the README rain still with a 900×506 animated GIF, retain the still
   alternative, and record the export settings and source hashes. Clarify that
-  Astra has prepared tasks and offline runtime checks, with no live benchmark
-  results yet; update the native roadmap for source-only distribution.
+  Astra's preparation status at the time of that export; the later live-pilot
+  report above supersedes that status. Update the native roadmap for source-only distribution.
 - Withdraw precompiled screensaver packages for Windows, macOS, and Linux
   from the release and current checkout. Keep source build instructions,
   licenses, historical checksums, and verification records. Remove Defender
@@ -55,6 +93,11 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Fixed
 
+- Separate Astra benchmark planning controls from executor answer constraints.
+  State checked numeric/string types and both arithmetic decision labels
+  explicitly. Preserve superseded receipts and subtract every prior attempt
+  from its original stage allowance before new paid work.
+
 - Planner memory skips unusable recalled cost, duration, topology, and success
   fields before ranking. Valid history and file bytes remain unchanged, and
   prompts identify the timing value as summed node time.
@@ -64,6 +107,14 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   existing evidence, store identities, and read-only access retain their behavior.
 
 ### Tests
+
+- Qualify the completed Astra campaign implementation on **3,928 offline tests with 6 skipped**, including 283 Astra checks. Ruff passes; all repository Python source hashes match before and after the suite. [Final qualification and retained logs](benchmarks/results/astra_20260913_main/qualification.json).
+
+- Add 60 offline checks for Astra follow-up execution, replay without repeat
+  charges, human calibration, native judge evidence, conservative pricing and
+  task-clustered analysis. That earlier source snapshot passed 3,861 tests with six
+  skipped; [qualification and logs](benchmarks/results/astra_20260913/qualification.json)
+  bind the tested source.
 
 - Extend macOS CI to the shared WAL, concurrent journal initialization,
   Autotune ownership, and planner-memory regression files.

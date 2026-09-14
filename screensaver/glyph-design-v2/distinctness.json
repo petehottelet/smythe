@@ -1,0 +1,15 @@
+{
+  "method": "tight crop; longest dimension uniform-scaled; centered; bounded translation; x/y reflections",
+  "comparison_size": 64,
+  "translation_radius": 2,
+  "threshold": 0.85,
+  "count": 192,
+  "compared_pairs": 18336,
+  "exact_duplicates": [],
+  "normalized_duplicates": [],
+  "reflected_duplicates": [],
+  "aligned_exact_pairs": [],
+  "near_matches": [],
+  "requires_optical_review": false,
+  "originality_claim": false
+}

@@ -125,5 +125,12 @@ Its request quote replaces the legacy per-call estimate for admission.
 Existing Chat Completions calls continue to use the blended estimate when
 their provider supplies no explicit cost.
 
+**Unreleased:** [planner-only instructions](workflow-accounting.md#freeze-graph-limits)
+keep graph limits out of executor answer requirements. The
+[Astra method amendment](../benchmarks/astra_method_amendment_20260913.md)
+uses this separation after human calibration and a complete final pilot.
+
 [Cost guardrails](budgets.md) · [Task handoffs](tasks.md) ·
-[Astra campaign plan](../benchmarks/astra_benchmark_plan.md).
+[Astra campaign plan](../benchmarks/astra_benchmark_plan.md) ·
+[Astra/Sol 200-workflow results](../benchmarks/results/astra_20260913_main/README.md) ·
+[Historical pilot evidence](../benchmarks/results/astra_20260913/README.md).

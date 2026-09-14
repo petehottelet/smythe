@@ -1,6 +1,6 @@
 {
   "version": "native-mixed-svg-v1",
-  "catalog_sha256": "168fa9e14488e37d98af007abbd33792587ba52d9a97eeeffbf9839f60bed9a3",
+  "catalog_sha256": "01dba5e91e9bc06eaeddce8a1b8130b284775fecdef4976c0ea99ad53c633b6d",
   "count": 249,
   "reference_count": 57,
   "reference_visible_count": 56,
@@ -24,13 +24,13 @@
   "source_hash_basis": "Text sources use UTF-8 after CRLF-to-LF normalization. Per-glyph svg_sha256 and output_sha256 bind exact bytes.",
   "motion": "Legacy web speeds/trails repeated by native index modulo 192; weighted 90% reference branch and 10% original branch belongs to native renderers.",
   "source_sha256": {
-    "screensaver/export_native_glyphs.py": "deda0973e1e9a77f46441720eea15fd48cf90ac10423c590682eb8a48554eef2",
-    "screensaver/glyphs.js": "ed06b8702d87a80ae296c6eaeafb1aa3a014e82a6b3eada62784bc7e1c14cac1",
+    "screensaver/export_native_glyphs.py": "31f45fab1d7d3c7fbdea210382e5e7934551a0092ef7bbe2fc4b085a4d267fd4",
+    "screensaver/glyphs.js": "c3360ff8d39c9153f011b0c174d7d18f9377eb5f09753b0d879be76f7c67b774",
     "LICENSE": "31ddadfea6fbccca7b9f7c2584e8bb2e1fa447576a8d004d1af6801576f5fc03",
     "screensaver/svg-preview/reference/catalog.json": "6befd44f62a114b8627728b13c8300026e0d1f3c51c4b2b033f3ff1ea985e090",
     "screensaver/svg-preview/reference/provenance.json": "b2d911aef1c5b6440a32ae4bee42c9f0566332db86dcdb1b698262c5d3f483b6",
     "screensaver/svg-preview/reference/LICENSE": "65333257cebb87e8af86201a65f0e550d65b3cf5a468bfee2a69c9d2b5d21123",
-    "benchmarks/partitions/glyph_svg_v1/catalog/manifest.json": "9667056dfcbfd34558b0db4b2e3f044aa6d91d6bb7df52e92bf4d6719dea511a"
+    "screensaver/glyph-design-v2/manifest.json": "a4d29072ab56d49fb05eca150ee510f823e727e59f9b861d76a28a92e7c34168"
   },
   "source_glyphs": [
     {
@@ -435,1352 +435,1352 @@
     {
       "index": 57,
       "glyph_id": "GLYPH-000",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-000.svg",
-      "svg_sha256": "f518cf74bf57df859da5dea9832a6a55130ef84dfda159bd54cccfcd6632dc65",
-      "command_count": 106
+      "file": "screensaver/glyph-design-v2/GLYPH-000.svg",
+      "svg_sha256": "ed5cb9ef81e2242e5b1bfbfdb8fbf64f5949108df0ce226ca601fb4281cce8a5",
+      "command_count": 10
     },
     {
       "index": 58,
       "glyph_id": "GLYPH-001",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-001.svg",
-      "svg_sha256": "d16206e90eabcd43d366e71ea36551dcab2c3b5d97f2de5d4ec49878664b726b",
-      "command_count": 471
+      "file": "screensaver/glyph-design-v2/GLYPH-001.svg",
+      "svg_sha256": "c539f668a2feeed375182febcaf82a05410e2c91b7ca313f30687fd0cace357b",
+      "command_count": 135
     },
     {
       "index": 59,
       "glyph_id": "GLYPH-002",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-002.svg",
-      "svg_sha256": "6af8edd34bb846527a8bc2778949ec330d2f0c66cfa660b4589842d99cb8300f",
-      "command_count": 159
+      "file": "screensaver/glyph-design-v2/GLYPH-002.svg",
+      "svg_sha256": "cb0dad4ead4bd50449f73936a61b75043cb3d34d142e678a630642f0c748565b",
+      "command_count": 15
     },
     {
       "index": 60,
       "glyph_id": "GLYPH-003",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-003.svg",
-      "svg_sha256": "97355b9167c66ddf044c5c23870461f20e08ca060c33f53f41a3708444ebad4b",
-      "command_count": 425
+      "file": "screensaver/glyph-design-v2/GLYPH-003.svg",
+      "svg_sha256": "90016bdf3594fb440b6af75b151e55e500936563a4298c3fcdaaed6318be700d",
+      "command_count": 15
     },
     {
       "index": 61,
       "glyph_id": "GLYPH-004",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-004.svg",
-      "svg_sha256": "5705a724d74fd4095f70474fdf11961985a6b6fae5ca5282554a585a1db0ec93",
-      "command_count": 515
+      "file": "screensaver/glyph-design-v2/GLYPH-004.svg",
+      "svg_sha256": "e52c97a84920574dc1604a6ea8fb5eedffdf329b8138de756aa8528487e0abfb",
+      "command_count": 140
     },
     {
       "index": 62,
       "glyph_id": "GLYPH-005",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-005.svg",
-      "svg_sha256": "83ef0e018feaeb8001ca75a022c62386205dd73d4b818784a98e4edddb33e83b",
-      "command_count": 582
+      "file": "screensaver/glyph-design-v2/GLYPH-005.svg",
+      "svg_sha256": "31af84c611a68c6013c15f6593dc1b201791713a3f28aee9de644da5bdb21d27",
+      "command_count": 270
     },
     {
       "index": 63,
       "glyph_id": "GLYPH-006",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-006.svg",
-      "svg_sha256": "eb501ebfa1ef1292821136d007e7e9c1d9b4e5e0f102e00409b99343250e682b",
-      "command_count": 746
+      "file": "screensaver/glyph-design-v2/GLYPH-006.svg",
+      "svg_sha256": "50b7737c58ca222657401e4a4893a6788ba4da121c5bc0d00c67ec7f165d4ccf",
+      "command_count": 523
     },
     {
       "index": 64,
       "glyph_id": "GLYPH-007",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-007.svg",
-      "svg_sha256": "1935a3fa7d985c8cd047633e54a61b1dcef47b7b5c57bf5b7d2712eb0dcb000b",
-      "command_count": 170
+      "file": "screensaver/glyph-design-v2/GLYPH-007.svg",
+      "svg_sha256": "cd044eb7ec48b9824e6ea3622075eab04797ecae6c8ad13eb75b61a1a912964c",
+      "command_count": 12
     },
     {
       "index": 65,
       "glyph_id": "GLYPH-008",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-008.svg",
-      "svg_sha256": "861894245a6c1b3c5f20f1354b4382946715c9466e9371b0f8ebe0be684c424b",
-      "command_count": 53
+      "file": "screensaver/glyph-design-v2/GLYPH-008.svg",
+      "svg_sha256": "ee08a711acbf6651cfdc51a117a190a303f4289011ea3dd032822bdb54140306",
+      "command_count": 5
     },
     {
       "index": 66,
       "glyph_id": "GLYPH-009",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-009.svg",
-      "svg_sha256": "320628da88e98e07bfe97e967da8ae07b3089aee662f6356b569c2217d6b4c7d",
-      "command_count": 468
+      "file": "screensaver/glyph-design-v2/GLYPH-009.svg",
+      "svg_sha256": "c5566a20cb9d7fc74b2f0a85adc86aa1bb1e57629c2c49362b124cf5758813d1",
+      "command_count": 144
     },
     {
       "index": 67,
       "glyph_id": "GLYPH-010",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-010.svg",
-      "svg_sha256": "f9fb92b5fa61063f77a62242c52fea832821a81375c6e6c28016d3d571a98c87",
-      "command_count": 391
+      "file": "screensaver/glyph-design-v2/GLYPH-010.svg",
+      "svg_sha256": "175fd197b8018a47e9745499297d859cfb2ec7acceb247fb127946a0a109147b",
+      "command_count": 141
     },
     {
       "index": 68,
       "glyph_id": "GLYPH-011",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-011.svg",
-      "svg_sha256": "b133add5b94090ae56335bcfeaf9968495ec394e31536c79d5378e9ec8fc7e1e",
-      "command_count": 767
+      "file": "screensaver/glyph-design-v2/GLYPH-011.svg",
+      "svg_sha256": "c6419e769eff63ff7a98386e3c8a9b92a9da25f75755ad3235a524a522343292",
+      "command_count": 399
     },
     {
       "index": 69,
       "glyph_id": "GLYPH-012",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-012.svg",
-      "svg_sha256": "c16cf170504f6733ba681f292c07a32d46bebee9341c3482f46bf6c744872aab",
-      "command_count": 106
+      "file": "screensaver/glyph-design-v2/GLYPH-012.svg",
+      "svg_sha256": "de4f926cb12e38efc10890ff26a9943c96ef2f751af2e066b34a8f536cc182ca",
+      "command_count": 10
     },
     {
       "index": 70,
       "glyph_id": "GLYPH-013",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-013.svg",
-      "svg_sha256": "9137caea6dc56df24c193eced66340483a94fa145d81d7f0fa4ad2af718aa702",
-      "command_count": 737
+      "file": "screensaver/glyph-design-v2/GLYPH-013.svg",
+      "svg_sha256": "847b4e8a4a7c96cb6c1a040a1fda1dab380c10aa2f26f8779d4294ee69b33e16",
+      "command_count": 652
     },
     {
       "index": 71,
       "glyph_id": "GLYPH-014",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-014.svg",
-      "svg_sha256": "1591a23cf93645711c48d19fc4bf64fecd0acb9ed147c0a122b59996cc2798c6",
-      "command_count": 345
+      "file": "screensaver/glyph-design-v2/GLYPH-014.svg",
+      "svg_sha256": "2d1a4faa88a80150391020f8a142948dca7617a45ca91312189314457a46a570",
+      "command_count": 141
     },
     {
       "index": 72,
       "glyph_id": "GLYPH-015",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-015.svg",
-      "svg_sha256": "8ccadaafb4f3541554143484cecc3bb42ca522eba3f8477b5635d3fe6c459715",
-      "command_count": 481
+      "file": "screensaver/glyph-design-v2/GLYPH-015.svg",
+      "svg_sha256": "a5b75a87668cdab4548412d1817c53c88c5dbdd009091ad95b3f4dc7a7795eaa",
+      "command_count": 262
     },
     {
       "index": 73,
       "glyph_id": "GLYPH-016",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-016.svg",
-      "svg_sha256": "bb7a38f17b4b37f84de0ed7c50ca6d22a83bf3978a52a439f565ee6b2c4e1c2d",
-      "command_count": 131
+      "file": "screensaver/glyph-design-v2/GLYPH-016.svg",
+      "svg_sha256": "993636b96e22837b347f3cefd481d10eef71dd9bcfd2f689ed2e8642d1ca3a4c",
+      "command_count": 13
     },
     {
       "index": 74,
       "glyph_id": "GLYPH-017",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-017.svg",
-      "svg_sha256": "73b2c276f5e02213fda7eb56ec9d32bee3e758f920924ebd0b768a4f767e4453",
-      "command_count": 469
+      "file": "screensaver/glyph-design-v2/GLYPH-017.svg",
+      "svg_sha256": "329ab252f1f8e8c6870b8ccc2a39a763340a7134b79be814c5db788ba4e57573",
+      "command_count": 268
     },
     {
       "index": 75,
       "glyph_id": "GLYPH-018",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-018.svg",
-      "svg_sha256": "b67b15a8c12dc9a3ad123019bcb014b2376fd8d1a303439aaf2909d1b9b3c647",
-      "command_count": 881
+      "file": "screensaver/glyph-design-v2/GLYPH-018.svg",
+      "svg_sha256": "303c04ccbb599bebb689b6101297e32b536172d1b969fe754c6a524d2f81a6fb",
+      "command_count": 143
     },
     {
       "index": 76,
       "glyph_id": "GLYPH-019",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-019.svg",
-      "svg_sha256": "c8e4d5a7cc57de3cb52b9b2b889e8ec9e2df4cfb52e0589df41328ad9f128674",
-      "command_count": 301
+      "file": "screensaver/glyph-design-v2/GLYPH-019.svg",
+      "svg_sha256": "63c775acaa3222b3f807a648f433c212d2a8fa7859b297fe4caa3e4d84438546",
+      "command_count": 142
     },
     {
       "index": 77,
       "glyph_id": "GLYPH-020",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-020.svg",
-      "svg_sha256": "2323e3cae2ffcba2f831ef6740c354a4dcfc07df8022f29d8906d5d73208db12",
-      "command_count": 811
+      "file": "screensaver/glyph-design-v2/GLYPH-020.svg",
+      "svg_sha256": "e63490f8f67aa334b4b819a27c23528fbbf61c3c25b19b11aa2000890817d370",
+      "command_count": 143
     },
     {
       "index": 78,
       "glyph_id": "GLYPH-021",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-021.svg",
-      "svg_sha256": "5bc60f859c4f6b6593cceddf4e9636d47fd97964601e3d1ea4711326d8b5fd94",
-      "command_count": 209
+      "file": "screensaver/glyph-design-v2/GLYPH-021.svg",
+      "svg_sha256": "cc426259ce5ff26429742bed74ec12a15a444fb63a8ffca768afdededf1b8c1e",
+      "command_count": 14
     },
     {
       "index": 79,
       "glyph_id": "GLYPH-022",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-022.svg",
-      "svg_sha256": "4a2914020db1fbce3a86bbcf85b3cbaba5129f6b682f01ee680d9e22996730ad",
-      "command_count": 206
+      "file": "screensaver/glyph-design-v2/GLYPH-022.svg",
+      "svg_sha256": "2ec3874cd2b376c53f4eba22c9dde25e716353e890c56a5a1fec2c90cec6f914",
+      "command_count": 14
     },
     {
       "index": 80,
       "glyph_id": "GLYPH-023",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-023.svg",
-      "svg_sha256": "4097e8cba3112637b27e75104096ccd5f5a8d314d620d4ef904ce89f686b8831",
-      "command_count": 854
+      "file": "screensaver/glyph-design-v2/GLYPH-023.svg",
+      "svg_sha256": "90baeaf7ebb37b5ce0f51bb7f1b772b7e69f00c93129ad9008ae795c286166ae",
+      "command_count": 144
     },
     {
       "index": 81,
       "glyph_id": "GLYPH-024",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-024.svg",
-      "svg_sha256": "ba2082c71336ef3fb87f650d2f55e430d7c124d6237d173dc258ff0377c005d5",
-      "command_count": 184
+      "file": "screensaver/glyph-design-v2/GLYPH-024.svg",
+      "svg_sha256": "5b90f5f5c3aa382d6d3d862793fe5452a07e98b1fda232cb7cd7c316a1b9ab1b",
+      "command_count": 24
     },
     {
       "index": 82,
       "glyph_id": "GLYPH-025",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-025.svg",
-      "svg_sha256": "4b7c7a9bf0a982b3e21f95b1881dc1b8fce5cc4723e8a1c2512f74ed25da3d4f",
-      "command_count": 436
+      "file": "screensaver/glyph-design-v2/GLYPH-025.svg",
+      "svg_sha256": "39c6b7a1749e9065f6ad8b0c54c59252f77a50d6aa7e4bfcd0c4e1bbf7018456",
+      "command_count": 22
     },
     {
       "index": 83,
       "glyph_id": "GLYPH-026",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-026.svg",
-      "svg_sha256": "9fad21ad56d079a7eefbf115897de0eec5588a62f6c224a9162b890aec9fcab9",
-      "command_count": 400
+      "file": "screensaver/glyph-design-v2/GLYPH-026.svg",
+      "svg_sha256": "c809856c96734d69708abf24f032322f80475698e672902fea94836dd7eb7b54",
+      "command_count": 148
     },
     {
       "index": 84,
       "glyph_id": "GLYPH-027",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-027.svg",
-      "svg_sha256": "e45d407974da7b19e5cc8799d19cf07b6ef86bfd279a13f74a1f86e01fd02cb4",
-      "command_count": 875
+      "file": "screensaver/glyph-design-v2/GLYPH-027.svg",
+      "svg_sha256": "e3cbd726d5c78fe16a517feb38a1636d6ed214163f290fd649bf1dfc11fa42e1",
+      "command_count": 19
     },
     {
       "index": 85,
       "glyph_id": "GLYPH-028",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-028.svg",
-      "svg_sha256": "dc54e1f68c2fb8baa962e2b27fa23cb8ccd95e1c0f0c2e256e55a97f88b960bc",
-      "command_count": 823
+      "file": "screensaver/glyph-design-v2/GLYPH-028.svg",
+      "svg_sha256": "8c76b17a5923aedacd084043079968a97c89781f11bb8310f9a029595a12d332",
+      "command_count": 20
     },
     {
       "index": 86,
       "glyph_id": "GLYPH-029",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-029.svg",
-      "svg_sha256": "296e4735a12d4db73278b2ee43e7fc364a4e1c816a99033d1d5c9f2797c01f26",
-      "command_count": 209
+      "file": "screensaver/glyph-design-v2/GLYPH-029.svg",
+      "svg_sha256": "e3329f3a6b6dfac8387ad0feb3356e83eb7364503a408b68a7166da89506d735",
+      "command_count": 146
     },
     {
       "index": 87,
       "glyph_id": "GLYPH-030",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-030.svg",
-      "svg_sha256": "4ac903d1ef7ce9482c9f8f58121d1376a1a01e2e5e9e565016035651c59d30b6",
-      "command_count": 478
+      "file": "screensaver/glyph-design-v2/GLYPH-030.svg",
+      "svg_sha256": "a1885cdd0d21896566f1390c66b353a5786728faef02f7508db042d7741618e8",
+      "command_count": 19
     },
     {
       "index": 88,
       "glyph_id": "GLYPH-031",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-031.svg",
-      "svg_sha256": "9b3cb81275d709ce222168984f42dbc4c587153b3bfb347bf1a2c5479d7f9217",
-      "command_count": 578
+      "file": "screensaver/glyph-design-v2/GLYPH-031.svg",
+      "svg_sha256": "880ae92b11f03c33850b95af080cce65c8fa68a7d7b10956515af9896d1fe576",
+      "command_count": 19
     },
     {
       "index": 89,
       "glyph_id": "GLYPH-032",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-032.svg",
-      "svg_sha256": "c8c53f1e51099e46cecd13711951a159af51d6aefc0968b225856525d3caf324",
-      "command_count": 771
+      "file": "screensaver/glyph-design-v2/GLYPH-032.svg",
+      "svg_sha256": "9e3c5b43ed152c5efa8297d329b5f0671ae43b92692364f3284b19b1d2bb90f5",
+      "command_count": 17
     },
     {
       "index": 90,
       "glyph_id": "GLYPH-033",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-033.svg",
-      "svg_sha256": "4631099d7f516851c2467b3d19c0efad423f4d56dcdf9473069aaf076723a9d7",
-      "command_count": 180
+      "file": "screensaver/glyph-design-v2/GLYPH-033.svg",
+      "svg_sha256": "0be4d8b46d8da02bd65cb9a8e17133b454a8b1284ee2f3f41ee42883e0f57852",
+      "command_count": 262
     },
     {
       "index": 91,
       "glyph_id": "GLYPH-034",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-034.svg",
-      "svg_sha256": "63555f27f6ab82ae69f837c77daa618bf80804aabd97b65bbf23127001519916",
-      "command_count": 364
+      "file": "screensaver/glyph-design-v2/GLYPH-034.svg",
+      "svg_sha256": "00eb34f712afa0d1bec30a7df0821de243fe631056966fef76cf0387d661e902",
+      "command_count": 13
     },
     {
       "index": 92,
       "glyph_id": "GLYPH-035",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-035.svg",
-      "svg_sha256": "31f39e6cff1c21d4b17bdd20ae28a64209e108f14fc0197013587b8ce426387b",
-      "command_count": 669
+      "file": "screensaver/glyph-design-v2/GLYPH-035.svg",
+      "svg_sha256": "75b6d39278d80c21effa9c8a2379401eecc08fd02921a8446226fc1fb530406f",
+      "command_count": 22
     },
     {
       "index": 93,
       "glyph_id": "GLYPH-036",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-036.svg",
-      "svg_sha256": "8338c771f77378429507fc868af277a42c80559fa62629b936a02ca98962f80f",
-      "command_count": 345
+      "file": "screensaver/glyph-design-v2/GLYPH-036.svg",
+      "svg_sha256": "bcc095895c4fdec91fa6af36881c2c7e109b1dbc8f773667bd4d3ba400fd9ee3",
+      "command_count": 143
     },
     {
       "index": 94,
       "glyph_id": "GLYPH-037",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-037.svg",
-      "svg_sha256": "7f7418ec137d2996aeba937a7181e14dcc1ed3eb6ddbde8a68fc6e00a618421e",
-      "command_count": 488
+      "file": "screensaver/glyph-design-v2/GLYPH-037.svg",
+      "svg_sha256": "0b682fc4246df0fd278e8ff7b011c70198bed92261a01436aa3a06ce46c0917a",
+      "command_count": 20
     },
     {
       "index": 95,
       "glyph_id": "GLYPH-038",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-038.svg",
-      "svg_sha256": "9eeba3d8b0e36acae0071466236d523446c1cb3e0e83abd1dcd436584e5dcc9f",
-      "command_count": 670
+      "file": "screensaver/glyph-design-v2/GLYPH-038.svg",
+      "svg_sha256": "e25bffc1f5d41a40f6dde2d5b0d38919d36bdab668db6781e7857c91b4ead569",
+      "command_count": 143
     },
     {
       "index": 96,
       "glyph_id": "GLYPH-039",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-039.svg",
-      "svg_sha256": "67421bf1876f38dc9145b1c3902617b2b599cb095aaccad4a43e3706bbc0ace8",
-      "command_count": 363
+      "file": "screensaver/glyph-design-v2/GLYPH-039.svg",
+      "svg_sha256": "3a290ea4d4099f468387a907315acf5f4ab48f96ddcf7ef493dbf2aaddb4edb2",
+      "command_count": 18
     },
     {
       "index": 97,
       "glyph_id": "GLYPH-040",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-040.svg",
-      "svg_sha256": "72b689baadbcb163848dc99af8ac251f77058e2f00529e4213173c1218976561",
-      "command_count": 395
+      "file": "screensaver/glyph-design-v2/GLYPH-040.svg",
+      "svg_sha256": "2baf1fe4ad4f13dfd98e4fead818a38506b970805208cacc95e3f450e38b503c",
+      "command_count": 24
     },
     {
       "index": 98,
       "glyph_id": "GLYPH-041",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-041.svg",
-      "svg_sha256": "1806a13ecaa055d0a980dbd0b21f175a6b92e92a030ddbf64e781f2ba129a409",
-      "command_count": 506
+      "file": "screensaver/glyph-design-v2/GLYPH-041.svg",
+      "svg_sha256": "db0141f02f5cb86eb254ac4b777c07e86bdd60c19278e551e5a277cece9f9e7e",
+      "command_count": 143
     },
     {
       "index": 99,
       "glyph_id": "GLYPH-042",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-042.svg",
-      "svg_sha256": "90c2a90f0c61b19843e09a57b66bedec646cd503d85cb1d16dee5d0137e77b5c",
-      "command_count": 871
+      "file": "screensaver/glyph-design-v2/GLYPH-042.svg",
+      "svg_sha256": "f0ea22ab67c393b7685ba6fda6895463d9d3c6964dd8c0a3b50a0a71dc1cc022",
+      "command_count": 18
     },
     {
       "index": 100,
       "glyph_id": "GLYPH-043",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-043.svg",
-      "svg_sha256": "eaac06c64580293988a524fc9c3b81643c7997fc4361ebe79be14ff6f28b0891",
-      "command_count": 474
+      "file": "screensaver/glyph-design-v2/GLYPH-043.svg",
+      "svg_sha256": "a4ced762c03abac77a804f6ec9dff6ba7952ba66b09b1c3da0d95347c9c1d794",
+      "command_count": 270
     },
     {
       "index": 101,
       "glyph_id": "GLYPH-044",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-044.svg",
-      "svg_sha256": "93d0c497eb18652195c83ac301c83b1a51f14fd8dd5d3aecd01d673d93c2ac03",
-      "command_count": 572
+      "file": "screensaver/glyph-design-v2/GLYPH-044.svg",
+      "svg_sha256": "0f1cc4b98553dc3eea7f4c37b0ea5415c89abd6e0e3fe9b21ecf64f4aeb8936f",
+      "command_count": 138
     },
     {
       "index": 102,
       "glyph_id": "GLYPH-045",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-045.svg",
-      "svg_sha256": "275ff77c0e8ffe3c7891962a74d9fdd4d50955a1683c1494af76261680f9e276",
-      "command_count": 320
+      "file": "screensaver/glyph-design-v2/GLYPH-045.svg",
+      "svg_sha256": "a6289d20070604071661f4205b1bdfd06a6744c5487e78823bdd7747475eacba",
+      "command_count": 143
     },
     {
       "index": 103,
       "glyph_id": "GLYPH-046",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-046.svg",
-      "svg_sha256": "44da992e78e25aa2c82e5332dca914bd3ca9f85e5f0ed91e7efbf77d5b6b8fb8",
-      "command_count": 482
+      "file": "screensaver/glyph-design-v2/GLYPH-046.svg",
+      "svg_sha256": "e538a291f487cc31c3e659e26073c54868b2b2db54030ee847ff50c98dd6e886",
+      "command_count": 19
     },
     {
       "index": 104,
       "glyph_id": "GLYPH-047",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-047.svg",
-      "svg_sha256": "0eacbe925726d927084c8a1a5b6351eb0b990fad2dbcc429c2e8b4f46b2da0bd",
-      "command_count": 718
+      "file": "screensaver/glyph-design-v2/GLYPH-047.svg",
+      "svg_sha256": "2c0c9b17f5237ef3256235bb6fa024ac209318016252d7dc117add010b7bda0a",
+      "command_count": 21
     },
     {
       "index": 105,
       "glyph_id": "GLYPH-048",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-048.svg",
-      "svg_sha256": "0010d43a957f159fb298f109daab12c91e6ab0fcde34cf8d26fbb74ffecf5655",
-      "command_count": 257
+      "file": "screensaver/glyph-design-v2/GLYPH-048.svg",
+      "svg_sha256": "8a91c43152418910578f8553320b4b6e0863730a5ec2e02b9fa246e3dccb8c7f",
+      "command_count": 22
     },
     {
       "index": 106,
       "glyph_id": "GLYPH-049",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-049.svg",
-      "svg_sha256": "e7b446336cd6d5ae191e9ef189bd78622c32162e7b69baadbc08b336454171c0",
-      "command_count": 223
+      "file": "screensaver/glyph-design-v2/GLYPH-049.svg",
+      "svg_sha256": "5932ef2e970f4ff5c3412ac91d9709cbcfbdba6553e5b45016dc27443acb919a",
+      "command_count": 16
     },
     {
       "index": 107,
       "glyph_id": "GLYPH-050",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-050.svg",
-      "svg_sha256": "ab51da406c0e5dcb17a0af3f485ad0306d1a9a26ff9c9b6f65df6677992e1248",
-      "command_count": 311
+      "file": "screensaver/glyph-design-v2/GLYPH-050.svg",
+      "svg_sha256": "4712a7af4d664d0ffdb605a3456a7bef6ba8c8f111b5f44c584107227a6a872f",
+      "command_count": 264
     },
     {
       "index": 108,
       "glyph_id": "GLYPH-051",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-051.svg",
-      "svg_sha256": "974fee452646c781cb6374ad9f6c8f4b23c592e7ad7212958723a6b84fbc8846",
-      "command_count": 544
+      "file": "screensaver/glyph-design-v2/GLYPH-051.svg",
+      "svg_sha256": "b2f9062973f98b6fb24c6d255ba84cd498ca1e33f3c748eb8164f1e64770ded8",
+      "command_count": 143
     },
     {
       "index": 109,
       "glyph_id": "GLYPH-052",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-052.svg",
-      "svg_sha256": "b364b8b16a3e17e7662f8e58d7c6742a8b41ae7b2e7f79f0b11cb4a6ca86a4d6",
-      "command_count": 727
+      "file": "screensaver/glyph-design-v2/GLYPH-052.svg",
+      "svg_sha256": "46de3d8dedc54710519140b7c9f0bccea69acf86677b5e1f1716b719f8e89dfa",
+      "command_count": 145
     },
     {
       "index": 110,
       "glyph_id": "GLYPH-053",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-053.svg",
-      "svg_sha256": "4958f31f2acdaf44698cfe1725adbeea01628ce7a15097693f91c79b67aeac96",
-      "command_count": 577
+      "file": "screensaver/glyph-design-v2/GLYPH-053.svg",
+      "svg_sha256": "de29c31af6188ccc08378d5aa98df2832881085d377fa2ec6a0f3b45caf8bc1c",
+      "command_count": 19
     },
     {
       "index": 111,
       "glyph_id": "GLYPH-054",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-054.svg",
-      "svg_sha256": "9f4880a9aa97b0e96e9015167e6abcc32d55430c95cc846d04e8e3e5d21e740b",
-      "command_count": 581
+      "file": "screensaver/glyph-design-v2/GLYPH-054.svg",
+      "svg_sha256": "a73267de16685b2e6afebe19182083bce657a4f286b7d399c6bd3734f9fdc8e4",
+      "command_count": 142
     },
     {
       "index": 112,
       "glyph_id": "GLYPH-055",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-055.svg",
-      "svg_sha256": "50e27cfa07ef85ea4aeb045326c6074aebf1762302ac8821b95996c61a099f5d",
-      "command_count": 289
+      "file": "screensaver/glyph-design-v2/GLYPH-055.svg",
+      "svg_sha256": "77d6aa6000959347fe606d008e05f09850df4379695aac3974afd9e3bc48d91e",
+      "command_count": 20
     },
     {
       "index": 113,
       "glyph_id": "GLYPH-056",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-056.svg",
-      "svg_sha256": "fa327f72247f5c735f94bed09a389d51a9dbcf42a5cc56ee26b01347e1b7ea88",
-      "command_count": 609
+      "file": "screensaver/glyph-design-v2/GLYPH-056.svg",
+      "svg_sha256": "fbc61fc89857dd25d14072f434768d36287b6ba7ea3e3d94ccc1cc12ca791531",
+      "command_count": 24
     },
     {
       "index": 114,
       "glyph_id": "GLYPH-057",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-057.svg",
-      "svg_sha256": "7341e8f7093fb96de585619b1d3432ef602fbc01ddc29d213cf8ba55a1a98619",
-      "command_count": 544
+      "file": "screensaver/glyph-design-v2/GLYPH-057.svg",
+      "svg_sha256": "8c2b057f0067ba7a28c82a8d81d2b5ed5a86705370a17b5b82ccc30b92a4e646",
+      "command_count": 24
     },
     {
       "index": 115,
       "glyph_id": "GLYPH-058",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-058.svg",
-      "svg_sha256": "ae675219a6c2beb6fd4dd96932b151d54efda6fb68322273513f212dbdbdf51d",
-      "command_count": 539
+      "file": "screensaver/glyph-design-v2/GLYPH-058.svg",
+      "svg_sha256": "1283279693394f27cfff9332042d54fb5ab745af1685ce13de209e86bdb869f1",
+      "command_count": 146
     },
     {
       "index": 116,
       "glyph_id": "GLYPH-059",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-059.svg",
-      "svg_sha256": "7cc8f254c3a86cca8317a6ecf72be27ff6a9b6e215a4911b5eb933e1724bc254",
-      "command_count": 586
+      "file": "screensaver/glyph-design-v2/GLYPH-059.svg",
+      "svg_sha256": "6fcf7fa8a6e2ef4b5760f1ad341cb212e9f248e93a6b5323a7f3cef7b8908318",
+      "command_count": 14
     },
     {
       "index": 117,
       "glyph_id": "GLYPH-060",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-060.svg",
-      "svg_sha256": "f085b0414eedabf709cf757ab027a2d41b42bf7871310bf76fc5db345672393a",
-      "command_count": 118
+      "file": "screensaver/glyph-design-v2/GLYPH-060.svg",
+      "svg_sha256": "b99044ca09f06f4d8c8cb11de836df1bba3bbcbceafaccef62aaba063a192a03",
+      "command_count": 20
     },
     {
       "index": 118,
       "glyph_id": "GLYPH-061",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-061.svg",
-      "svg_sha256": "a6ec45047505f8c520f724d84d3529695c53c7c747cd29dbdf0ea07c0bf9c607",
-      "command_count": 303
+      "file": "screensaver/glyph-design-v2/GLYPH-061.svg",
+      "svg_sha256": "843376b98dfe30cc0567771621fbe74e926f849d4c9f7d50017a993db37fcc03",
+      "command_count": 19
     },
     {
       "index": 119,
       "glyph_id": "GLYPH-062",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-062.svg",
-      "svg_sha256": "dfd0203022d2ae8c1d74a64bc72cf7a2b9d38cfb36385f2525e42e19ebaa28c9",
-      "command_count": 711
+      "file": "screensaver/glyph-design-v2/GLYPH-062.svg",
+      "svg_sha256": "f6592761cc8d0818e143d93ae611ba6afd717d28a9d6f8e7c900df7296a6e843",
+      "command_count": 141
     },
     {
       "index": 120,
       "glyph_id": "GLYPH-063",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-063.svg",
-      "svg_sha256": "85e16d8f169d2e58620027fdbc1946a1a36d9f0dafdde2c72b9be1e75eea4d20",
-      "command_count": 284
+      "file": "screensaver/glyph-design-v2/GLYPH-063.svg",
+      "svg_sha256": "20d3340ac2df078a8ebf7a752612f6b376b3222c2017c9413904b7ab47ae2ee8",
+      "command_count": 20
     },
     {
       "index": 121,
       "glyph_id": "GLYPH-064",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-064.svg",
-      "svg_sha256": "a9944068fd2e9a7dc47a0dab1f3992330033f9d432525a0ae06062ec65daa03b",
-      "command_count": 470
+      "file": "screensaver/glyph-design-v2/GLYPH-064.svg",
+      "svg_sha256": "5f75e14a77cf87f8f3b9dfd8f65a6348e922d7cf3b53e3364690e753c765b4bf",
+      "command_count": 139
     },
     {
       "index": 122,
       "glyph_id": "GLYPH-065",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-065.svg",
-      "svg_sha256": "393f11fc7ad2a47649895498df7f94f0df2381f6a473771ce71ad528946b7ade",
-      "command_count": 159
+      "file": "screensaver/glyph-design-v2/GLYPH-065.svg",
+      "svg_sha256": "c6b8ca6703774a65a6fe648d16753a9837cbb7a8f0eb63439302d24989b57994",
+      "command_count": 140
     },
     {
       "index": 123,
       "glyph_id": "GLYPH-066",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-066.svg",
-      "svg_sha256": "ea61245f012dbc26b36636e0cc236ddd1dc2990caaa50f441fbc37f02902f35a",
-      "command_count": 159
+      "file": "screensaver/glyph-design-v2/GLYPH-066.svg",
+      "svg_sha256": "7d6b06bce305ebf7b9b9826182dd410d9879581b8219a9c9d70ec820f996a926",
+      "command_count": 140
     },
     {
       "index": 124,
       "glyph_id": "GLYPH-067",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-067.svg",
-      "svg_sha256": "dc67550e6563648f2be22362c9af8924642bd466cf248567f9def8ac82b7f9cd",
-      "command_count": 734
+      "file": "screensaver/glyph-design-v2/GLYPH-067.svg",
+      "svg_sha256": "c8e9206d02a6977be613c5e281ea2148f56db953ede8f43efa8cce5ea8e83272",
+      "command_count": 18
     },
     {
       "index": 125,
       "glyph_id": "GLYPH-068",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-068.svg",
-      "svg_sha256": "b5ee1a6a6023f5b25a1222ced5221b3cc6b60fee973bc78f39ff9dca62dcf7cc",
-      "command_count": 587
+      "file": "screensaver/glyph-design-v2/GLYPH-068.svg",
+      "svg_sha256": "37e35026c941dc57db33717e02dc6efaf6789118a2dc4b5b9db9e66f160f3157",
+      "command_count": 144
     },
     {
       "index": 126,
       "glyph_id": "GLYPH-069",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-069.svg",
-      "svg_sha256": "a4ff675e45aee33ffff348d8fbab72233a64249df68db7d109490380228badae",
-      "command_count": 425
+      "file": "screensaver/glyph-design-v2/GLYPH-069.svg",
+      "svg_sha256": "ac2085b5b9fe521869eb0d4ff7df58105869a6dcb076253cc3ab8e8f5974ac60",
+      "command_count": 23
     },
     {
       "index": 127,
       "glyph_id": "GLYPH-070",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-070.svg",
-      "svg_sha256": "8a9ed903dafbda9003ec1c3839bb302ac45be1d5bf531f0c2750837c9658dd39",
-      "command_count": 170
+      "file": "screensaver/glyph-design-v2/GLYPH-070.svg",
+      "svg_sha256": "ef592445a955b31eb67760f9f61ec3a90feacc1023d38bb4bf4a9a49edb1bd64",
+      "command_count": 23
     },
     {
       "index": 128,
       "glyph_id": "GLYPH-071",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-071.svg",
-      "svg_sha256": "ca6daf4c52c7ac5563f605532271607f64898d118fc50192363257d8b0eca8da",
-      "command_count": 146
+      "file": "screensaver/glyph-design-v2/GLYPH-071.svg",
+      "svg_sha256": "5baca1ad7aa95fb541f60a2efa9ea0fa79aef82789d085d10c65180411a1169d",
+      "command_count": 22
     },
     {
       "index": 129,
       "glyph_id": "GLYPH-072",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-072.svg",
-      "svg_sha256": "89cad41e6065e61e83032cc676b8d4198be1ff80794625a49c4184c67f18fcc6",
-      "command_count": 547
+      "file": "screensaver/glyph-design-v2/GLYPH-072.svg",
+      "svg_sha256": "bff6fe4e02257a6010e33105f5d6cef4e323c9072843b4436f38f733fc4e799d",
+      "command_count": 262
     },
     {
       "index": 130,
       "glyph_id": "GLYPH-073",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-073.svg",
-      "svg_sha256": "8b4664a0dd47d5fd88629306e08988e06a6e3624d2d522a1a0e9551b437204ac",
-      "command_count": 798
+      "file": "screensaver/glyph-design-v2/GLYPH-073.svg",
+      "svg_sha256": "8b0468bfd6f407ef79ea533364951f9c743a62df9aa0b00b3a7a0ddca3bc7953",
+      "command_count": 137
     },
     {
       "index": 131,
       "glyph_id": "GLYPH-074",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-074.svg",
-      "svg_sha256": "78810cafb3ab96cb5d4dfad1658f2883776a61f6f2a4e88b703696f3adaa3132",
-      "command_count": 461
+      "file": "screensaver/glyph-design-v2/GLYPH-074.svg",
+      "svg_sha256": "636a02070abd54d11565cf5f6045b0630d1bccb98ebb4629976620e0ac3e1971",
+      "command_count": 24
     },
     {
       "index": 132,
       "glyph_id": "GLYPH-075",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-075.svg",
-      "svg_sha256": "0842601c326b8c1929952cd36a6228b6ae9081e44d9ef7abe980dfb070c81982",
-      "command_count": 460
+      "file": "screensaver/glyph-design-v2/GLYPH-075.svg",
+      "svg_sha256": "4146ac0f3f1af31d5a1ecbc35395f39368f4d9f1626ade7f5de58d882819b25b",
+      "command_count": 24
     },
     {
       "index": 133,
       "glyph_id": "GLYPH-076",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-076.svg",
-      "svg_sha256": "9131067813268af5ad0499bd42f0887ec439dd2c35810167012257395c9f6fa9",
-      "command_count": 232
+      "file": "screensaver/glyph-design-v2/GLYPH-076.svg",
+      "svg_sha256": "e9424055cae3abade66b5d514c10c0ddfd699b80c09d68425315929e2f7ce280",
+      "command_count": 23
     },
     {
       "index": 134,
       "glyph_id": "GLYPH-077",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-077.svg",
-      "svg_sha256": "df5efa0201511ab51cd9b24851942de9528c0b42a2784ead3d1bfbe6db1d22c5",
-      "command_count": 520
+      "file": "screensaver/glyph-design-v2/GLYPH-077.svg",
+      "svg_sha256": "b3bed98bb7d3a21c803c276a5e936482514324941bd0c811eda2335ccb451fb3",
+      "command_count": 140
     },
     {
       "index": 135,
       "glyph_id": "GLYPH-078",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-078.svg",
-      "svg_sha256": "d8e2a0b411b6248ab8ad456072895f38dc1be55a9ee68eb69871a58e7d3aad7c",
-      "command_count": 799
+      "file": "screensaver/glyph-design-v2/GLYPH-078.svg",
+      "svg_sha256": "aeb20917437aef513983f0bbcba5e76da821927562656e9916029e257be4ad7f",
+      "command_count": 139
     },
     {
       "index": 136,
       "glyph_id": "GLYPH-079",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-079.svg",
-      "svg_sha256": "935755ddca7713f3c868ede0ad816e39763e4e6050941f95ee4e0613f3003a5c",
-      "command_count": 275
+      "file": "screensaver/glyph-design-v2/GLYPH-079.svg",
+      "svg_sha256": "b7070d274cf2b6e12b2e24fec2212b30fed318bb828c69daf5e19825b5f7c294",
+      "command_count": 21
     },
     {
       "index": 137,
       "glyph_id": "GLYPH-080",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-080.svg",
-      "svg_sha256": "7f8f2019ce5ca26d54df22221936b193fb629322874c1cd92f61aaa8d9f21166",
-      "command_count": 578
+      "file": "screensaver/glyph-design-v2/GLYPH-080.svg",
+      "svg_sha256": "5dca8cb70bf354133d5c107774ac6dca0c3a4826cd17f239916f57b0a88cf973",
+      "command_count": 20
     },
     {
       "index": 138,
       "glyph_id": "GLYPH-081",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-081.svg",
-      "svg_sha256": "516656dae1f5ff943fb4c2fc7e6f51bb402ad2cec14741ad551b52be2d89ed71",
-      "command_count": 783
+      "file": "screensaver/glyph-design-v2/GLYPH-081.svg",
+      "svg_sha256": "9808d2fae752c652acc03337c8bf85f2a3a3efef1889fa62dc4568cda2f36964",
+      "command_count": 22
     },
     {
       "index": 139,
       "glyph_id": "GLYPH-082",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-082.svg",
-      "svg_sha256": "3c5a67cb1ed4fe0388fffc15a21b77d614756a15a7cd570e462f98f179649808",
-      "command_count": 339
+      "file": "screensaver/glyph-design-v2/GLYPH-082.svg",
+      "svg_sha256": "3567218db61df7fa4fcd714106eb2dce01242719b42a810baf658a7c3968588d",
+      "command_count": 22
     },
     {
       "index": 140,
       "glyph_id": "GLYPH-083",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-083.svg",
-      "svg_sha256": "516deaf8693a365d9ccf5e0c525cf3ed400751b4e4e4d0e7134d20a3024c77dd",
-      "command_count": 553
+      "file": "screensaver/glyph-design-v2/GLYPH-083.svg",
+      "svg_sha256": "fa9eb17b41de0bb301c520a2402c1b2c603956a31f9b67cbef982548b3fb97aa",
+      "command_count": 24
     },
     {
       "index": 141,
       "glyph_id": "GLYPH-084",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-084.svg",
-      "svg_sha256": "80964f855f7e0657ccd003e3e2752fa1cccc9e8b349d13220ed9d38f8ff1da1c",
-      "command_count": 209
+      "file": "screensaver/glyph-design-v2/GLYPH-084.svg",
+      "svg_sha256": "81444fb0c7d5edc2bab3bb42334a2bad359283e4b1761372cb2f0dcd184da871",
+      "command_count": 22
     },
     {
       "index": 142,
       "glyph_id": "GLYPH-085",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-085.svg",
-      "svg_sha256": "50dbc9b3d5eb95bd7a935126e065cfc86664c187f02fa7d140b31ee27bc4d34c",
-      "command_count": 338
+      "file": "screensaver/glyph-design-v2/GLYPH-085.svg",
+      "svg_sha256": "99c13fd00533b858e50a447b5afac3bf3b9d0c71efa20e96e8dc494709242062",
+      "command_count": 138
     },
     {
       "index": 143,
       "glyph_id": "GLYPH-086",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-086.svg",
-      "svg_sha256": "57f38e5733c938c2dfcf8cce34c46706edbb191132c053d2496ca938f89a641d",
-      "command_count": 480
+      "file": "screensaver/glyph-design-v2/GLYPH-086.svg",
+      "svg_sha256": "c93bfe239d0b9adfbf4b7e04738fe2d0f840d0c21b685c122e4d4bd15d822536",
+      "command_count": 24
     },
     {
       "index": 144,
       "glyph_id": "GLYPH-087",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-087.svg",
-      "svg_sha256": "d12f9bfd245c7bec7061e69ec051077230ce813893202872e861d0abe45465ee",
-      "command_count": 876
+      "file": "screensaver/glyph-design-v2/GLYPH-087.svg",
+      "svg_sha256": "3f4c64b38186d17e0de059d85bb4a6d437a4ccb32287edef64e09b776d71a814",
+      "command_count": 16
     },
     {
       "index": 145,
       "glyph_id": "GLYPH-088",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-088.svg",
-      "svg_sha256": "ac720aff2d2c3d91b9a2946122d6c0ca1032b3652b08b623faf2b1d63b04004d",
-      "command_count": 445
+      "file": "screensaver/glyph-design-v2/GLYPH-088.svg",
+      "svg_sha256": "b7175b30b63a68b968ddef3997c455b5180fef8918c4a7b6f079258dc0f570f1",
+      "command_count": 15
     },
     {
       "index": 146,
       "glyph_id": "GLYPH-089",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-089.svg",
-      "svg_sha256": "ab4a91e7a87c4d5646fb2173558ddcfa8c0416f7648a9f364e771a681146ae28",
-      "command_count": 402
+      "file": "screensaver/glyph-design-v2/GLYPH-089.svg",
+      "svg_sha256": "2b125d7bcdf9f1c81b94ddce342720914f8d6e3f7fe0e97444fe13825829b284",
+      "command_count": 142
     },
     {
       "index": 147,
       "glyph_id": "GLYPH-090",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-090.svg",
-      "svg_sha256": "e4a0eaa5bbc8553024d8ffb8171559fd0527f238cade74638b457a1a37a73371",
-      "command_count": 621
+      "file": "screensaver/glyph-design-v2/GLYPH-090.svg",
+      "svg_sha256": "1c77d0cd09884c831c7d8a8a63a81aa9ccc254dcf312affdd4d7046e6898509d",
+      "command_count": 141
     },
     {
       "index": 148,
       "glyph_id": "GLYPH-091",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-091.svg",
-      "svg_sha256": "333fb8b8f4fee4c1a3df7876590adedf396b84c3bd6f15fb156ef345cfe5ecf0",
-      "command_count": 297
+      "file": "screensaver/glyph-design-v2/GLYPH-091.svg",
+      "svg_sha256": "7297a7bbc2e1a9b37edb2f60a80ca4ce6d46cd985b0d6e0016b382ce37741135",
+      "command_count": 19
     },
     {
       "index": 149,
       "glyph_id": "GLYPH-092",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-092.svg",
-      "svg_sha256": "9d2b5664464dd726dc28397e819e3934ef9fd527e927b2cb09ee056b96e94c21",
-      "command_count": 923
+      "file": "screensaver/glyph-design-v2/GLYPH-092.svg",
+      "svg_sha256": "b926d7b0bfb2b9582290aa80b9024ba69bed9db7116afa69875fd8b4c7bbbbca",
+      "command_count": 19
     },
     {
       "index": 150,
       "glyph_id": "GLYPH-093",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-093.svg",
-      "svg_sha256": "636b5c1d6727372f6d2324b439f5f7b2763e1b7735e63896df34f956b6963762",
-      "command_count": 326
+      "file": "screensaver/glyph-design-v2/GLYPH-093.svg",
+      "svg_sha256": "113e7efba5012119a17a5b6997ba91cba327450975fd3f838af8a55de175c5fb",
+      "command_count": 144
     },
     {
       "index": 151,
       "glyph_id": "GLYPH-094",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-094.svg",
-      "svg_sha256": "155159f276b8ff1e5effa4a79d31dd3a5618ea22346ca671f3ed05a30f164bd8",
-      "command_count": 208
+      "file": "screensaver/glyph-design-v2/GLYPH-094.svg",
+      "svg_sha256": "8f4de5beeacc54378526b67d74314f090dcadac78016239494acaa8f9da20609",
+      "command_count": 140
     },
     {
       "index": 152,
       "glyph_id": "GLYPH-095",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-095.svg",
-      "svg_sha256": "7346eb930f514bcb24956836e24de4603ecea3b2b92ca3f614f0a550c94fcef8",
-      "command_count": 365
+      "file": "screensaver/glyph-design-v2/GLYPH-095.svg",
+      "svg_sha256": "997ad80f7d8f80a7d84977808860487800d6f8905d9cde74824c3949bcb8110d",
+      "command_count": 139
     },
     {
       "index": 153,
       "glyph_id": "GLYPH-096",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-096.svg",
-      "svg_sha256": "23d9790367ed0be7c7a4da18d1868ac01ae710214fac98e50acacfa20205164f",
-      "command_count": 911
+      "file": "screensaver/glyph-design-v2/GLYPH-096.svg",
+      "svg_sha256": "892cbf32121e6d5c399730317ffd7f2d2d77031b4f020c1b0878bc0c14d86503",
+      "command_count": 22
     },
     {
       "index": 154,
       "glyph_id": "GLYPH-097",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-097.svg",
-      "svg_sha256": "eae3d1158fda2e24ede834b516a9d38d0f9b519492bee5128130eefbb85171a3",
-      "command_count": 338
+      "file": "screensaver/glyph-design-v2/GLYPH-097.svg",
+      "svg_sha256": "54acd5f9f71489c5cbcff563ee9de4bebe74725ec393cf4481ae10a9f9536110",
+      "command_count": 19
     },
     {
       "index": 155,
       "glyph_id": "GLYPH-098",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-098.svg",
-      "svg_sha256": "13e272aeae61aff2467eb7fa73c49661191fd120004fdeda1a2158b6902e56ac",
-      "command_count": 364
+      "file": "screensaver/glyph-design-v2/GLYPH-098.svg",
+      "svg_sha256": "8eedf3c74d2a722893889965a159c08782de1fdb7d9d769016878366391170a4",
+      "command_count": 19
     },
     {
       "index": 156,
       "glyph_id": "GLYPH-099",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-099.svg",
-      "svg_sha256": "dea82560831aaabc396b711b3f356db4eaa0ccecbfe9f829fe954af65f75c5fe",
-      "command_count": 507
+      "file": "screensaver/glyph-design-v2/GLYPH-099.svg",
+      "svg_sha256": "2e910eca177b0e8d554e13fcd34797dfcc04047be6e7e1786e43cda408bfabcc",
+      "command_count": 145
     },
     {
       "index": 157,
       "glyph_id": "GLYPH-100",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-100.svg",
-      "svg_sha256": "02398342d61cc812a96d54b7bcdf2e846a81703f4a2d56474a6d5e72d2f118fc",
-      "command_count": 797
+      "file": "screensaver/glyph-design-v2/GLYPH-100.svg",
+      "svg_sha256": "a74b183cc87767a88de4b09f979fbce4422ca06d282cce19b506216d08a7f71b",
+      "command_count": 20
     },
     {
       "index": 158,
       "glyph_id": "GLYPH-101",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-101.svg",
-      "svg_sha256": "e94028cb759c435f2d5b71079938818c0907bc1c48b31f98260d452ffb9f0b24",
-      "command_count": 465
+      "file": "screensaver/glyph-design-v2/GLYPH-101.svg",
+      "svg_sha256": "319e5c6e269f53c9eb9fec40cc42fce8d96a135bd3bdb7541c384771c33be9b8",
+      "command_count": 16
     },
     {
       "index": 159,
       "glyph_id": "GLYPH-102",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-102.svg",
-      "svg_sha256": "5e7523e3c9647a6d0f22352664f33605f14dcdd50c60ecbe3cc9350c1cc805d6",
-      "command_count": 587
+      "file": "screensaver/glyph-design-v2/GLYPH-102.svg",
+      "svg_sha256": "14eb3f7985100d2f65792b60e9e8971566368f777132a8e7283bbdd187299191",
+      "command_count": 141
     },
     {
       "index": 160,
       "glyph_id": "GLYPH-103",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-103.svg",
-      "svg_sha256": "a14f916e9390c7b8b8bf103d509c5368c6eb94f527f1e475d08b889c25e9dedf",
-      "command_count": 488
+      "file": "screensaver/glyph-design-v2/GLYPH-103.svg",
+      "svg_sha256": "2a24375c037872dd28e60310a6b2a77d26187bc66763dae77116099e5028f70a",
+      "command_count": 145
     },
     {
       "index": 161,
       "glyph_id": "GLYPH-104",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-104.svg",
-      "svg_sha256": "23cb639ec62d6e57a63a4e1860b748446c255860e21356e4b3a1b0af547e2aa4",
-      "command_count": 326
+      "file": "screensaver/glyph-design-v2/GLYPH-104.svg",
+      "svg_sha256": "ca0c4b98e00dd21da636a031b11a245a5228b66cf33aaf74cd584511b0658e89",
+      "command_count": 24
     },
     {
       "index": 162,
       "glyph_id": "GLYPH-105",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-105.svg",
-      "svg_sha256": "ed9788d33d8c216a8ba4121f14611ee7c305aa731908562d7666a2a15666e2d5",
-      "command_count": 535
+      "file": "screensaver/glyph-design-v2/GLYPH-105.svg",
+      "svg_sha256": "48079a004efdf8a89511c39d6ce2ef939eef019006ee4817b8621b3c3a38b745",
+      "command_count": 143
     },
     {
       "index": 163,
       "glyph_id": "GLYPH-106",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-106.svg",
-      "svg_sha256": "770eab9a5a019f485bc66690258e9be3dc56c7493176e232fc36945dbec93aae",
-      "command_count": 352
+      "file": "screensaver/glyph-design-v2/GLYPH-106.svg",
+      "svg_sha256": "807038884c54768e8779204f6ae129accd9b4285de11d573200cbb9b6b124f17",
+      "command_count": 17
     },
     {
       "index": 164,
       "glyph_id": "GLYPH-107",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-107.svg",
-      "svg_sha256": "ca610ab3e9b2c56d205a81c401374bc0910962b932d7f7c235720bbd1690b442",
-      "command_count": 555
+      "file": "screensaver/glyph-design-v2/GLYPH-107.svg",
+      "svg_sha256": "20e5dce971767df30d5455f8d521ca027b76a362b49d467835415339b934e461",
+      "command_count": 19
     },
     {
       "index": 165,
       "glyph_id": "GLYPH-108",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-108.svg",
-      "svg_sha256": "f08542f54537e2dc62a4a74f1caa2bc764d94ad68e95eb93ae2943e2f0d68f5a",
-      "command_count": 491
+      "file": "screensaver/glyph-design-v2/GLYPH-108.svg",
+      "svg_sha256": "d150862d5729f241ce50173bb7f21b2bf3d8a68af6f64ec00212884c21ffff78",
+      "command_count": 19
     },
     {
       "index": 166,
       "glyph_id": "GLYPH-109",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-109.svg",
-      "svg_sha256": "4fd40f052af5305b6bdda0d7c64ead0c4e426d44213701e1acc14ece115dae62",
-      "command_count": 606
+      "file": "screensaver/glyph-design-v2/GLYPH-109.svg",
+      "svg_sha256": "e4fa14140109fc29988749a0e9319348cec0291fd3c2012f9702ce18fa75c429",
+      "command_count": 141
     },
     {
       "index": 167,
       "glyph_id": "GLYPH-110",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-110.svg",
-      "svg_sha256": "bee20ab25956d1bb95161995509fb6bde38a1f96b19a44be2400571f9112b137",
-      "command_count": 397
+      "file": "screensaver/glyph-design-v2/GLYPH-110.svg",
+      "svg_sha256": "d9c315b7974bd291c1ca6d299d897dffd86e04545b2fdc2a69f1bb12f33c3af0",
+      "command_count": 146
     },
     {
       "index": 168,
       "glyph_id": "GLYPH-111",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-111.svg",
-      "svg_sha256": "6d313a8223b723027c9b9f696059bff93b8b1541d28e2afab69dc73ca2b925c0",
-      "command_count": 545
+      "file": "screensaver/glyph-design-v2/GLYPH-111.svg",
+      "svg_sha256": "b642fe7ad9120a097508c6bde0b76e6e5b20e2361c1a4a100857ee72e60bc0e5",
+      "command_count": 141
     },
     {
       "index": 169,
       "glyph_id": "GLYPH-112",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-112.svg",
-      "svg_sha256": "d644a000b97570871dd9402c6bdbe2b02a582613259b533d1584b31bbafbc364",
-      "command_count": 665
+      "file": "screensaver/glyph-design-v2/GLYPH-112.svg",
+      "svg_sha256": "67fed0c68b76f3e54ccc97059bc2ab674c6a9ddffae368c10028c31c2c65cec9",
+      "command_count": 20
     },
     {
       "index": 170,
       "glyph_id": "GLYPH-113",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-113.svg",
-      "svg_sha256": "fee344bb4871cece337a287eaa61215b4871bfd0bb00c58d156c03f7bc31716e",
-      "command_count": 302
+      "file": "screensaver/glyph-design-v2/GLYPH-113.svg",
+      "svg_sha256": "77d74a95aa9f3bd73a90af771cc2ad5abd9c274f719beff97da35f4835f029c8",
+      "command_count": 22
     },
     {
       "index": 171,
       "glyph_id": "GLYPH-114",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-114.svg",
-      "svg_sha256": "12969b68bf6aaed899619b8e6841bba366be8de4ee00bebfd029b7663b283f9e",
-      "command_count": 432
+      "file": "screensaver/glyph-design-v2/GLYPH-114.svg",
+      "svg_sha256": "43ae5abc6754e08a59869e6556335da18fb4f30edfce0279bb66268d33753963",
+      "command_count": 22
     },
     {
       "index": 172,
       "glyph_id": "GLYPH-115",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-115.svg",
-      "svg_sha256": "08406d811927854d51d2abeb5f18881698b48ac1ccfe58f234e4e5056084c06e",
-      "command_count": 809
+      "file": "screensaver/glyph-design-v2/GLYPH-115.svg",
+      "svg_sha256": "63e7c2e303ca41d5d778eab89a96d085d3ee1f0500cf199b43b1da413ed2c196",
+      "command_count": 18
     },
     {
       "index": 173,
       "glyph_id": "GLYPH-116",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-116.svg",
-      "svg_sha256": "ba163c04c4d7b3a42db451f561200a60ca966b12963d9d427a67038630243c7b",
-      "command_count": 528
+      "file": "screensaver/glyph-design-v2/GLYPH-116.svg",
+      "svg_sha256": "5f0f88dffa6834b2e411468652b5c2cb69338e5c0ee8b939dcb11971d30f41ef",
+      "command_count": 21
     },
     {
       "index": 174,
       "glyph_id": "GLYPH-117",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-117.svg",
-      "svg_sha256": "93300ab4992b784d0d3419371b312c8f3bf46281d57660b10139f2b5ec38804b",
-      "command_count": 511
+      "file": "screensaver/glyph-design-v2/GLYPH-117.svg",
+      "svg_sha256": "f7b033700c3bb3c1efd018852720eac884c5396caaad7d03f588be796dd7da1a",
+      "command_count": 22
     },
     {
       "index": 175,
       "glyph_id": "GLYPH-118",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-118.svg",
-      "svg_sha256": "6231158412344b96c57acb8a9e0f6d1b530ac6d096f8346dd365847b7b9c7f51",
-      "command_count": 545
+      "file": "screensaver/glyph-design-v2/GLYPH-118.svg",
+      "svg_sha256": "b7a69c25fcbbcd28bbba6f3ae7759cab3f2cd5bf993df44572c77e4ebcdd7731",
+      "command_count": 19
     },
     {
       "index": 176,
       "glyph_id": "GLYPH-119",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-119.svg",
-      "svg_sha256": "51f73d82ff1d311a2f8a321ab033482cd4d73862584ece09e0014a286a461dbc",
-      "command_count": 415
+      "file": "screensaver/glyph-design-v2/GLYPH-119.svg",
+      "svg_sha256": "a113364f4567da41c65adad21abe44082214e9ba6517eca4568f7e3b4565452a",
+      "command_count": 146
     },
     {
       "index": 177,
       "glyph_id": "GLYPH-120",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-120.svg",
-      "svg_sha256": "9217ab5b674cec90de83e6aa205c5215b16d3836abefe49f6d1f5c403f492bb8",
-      "command_count": 729
+      "file": "screensaver/glyph-design-v2/GLYPH-120.svg",
+      "svg_sha256": "de8c8a4a3a4172ee7d5a72f9463543ce54111bda60724b82d65e4718c24bf686",
+      "command_count": 19
     },
     {
       "index": 178,
       "glyph_id": "GLYPH-121",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-121.svg",
-      "svg_sha256": "9508b585425dca675a4b90904bdc4d7cff41959551f87267ff0dc5910212324e",
-      "command_count": 244
+      "file": "screensaver/glyph-design-v2/GLYPH-121.svg",
+      "svg_sha256": "6f0073009b36141b87bd94e350ddda9c1c3919f3e729efd66688d9bebdd23944",
+      "command_count": 14
     },
     {
       "index": 179,
       "glyph_id": "GLYPH-122",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-122.svg",
-      "svg_sha256": "42c05b5126c97219f42f24bf74a4d06caf6b1de6e91068e2ba65426df64dd730",
-      "command_count": 652
+      "file": "screensaver/glyph-design-v2/GLYPH-122.svg",
+      "svg_sha256": "00f0151b83046f149f58154f9c5fd8f094418b2d0a51444005d3c25e4d340c2a",
+      "command_count": 144
     },
     {
       "index": 180,
       "glyph_id": "GLYPH-123",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-123.svg",
-      "svg_sha256": "60a0882ad7d37beda7b80039674c0c86baa56e62fdd077ae2fe9ac83cd082585",
-      "command_count": 589
+      "file": "screensaver/glyph-design-v2/GLYPH-123.svg",
+      "svg_sha256": "c3e940512080be42b067b2f267ad7c723377317473231d59b8cbd03f0a5fe533",
+      "command_count": 143
     },
     {
       "index": 181,
       "glyph_id": "GLYPH-124",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-124.svg",
-      "svg_sha256": "578e21fda3ed22e0460ac346db83aa41e8e44e948f5627a003290126db563f41",
-      "command_count": 290
+      "file": "screensaver/glyph-design-v2/GLYPH-124.svg",
+      "svg_sha256": "1a8bfc2ca211421488b1a0d9819f1715a8faf643ec33eade3d6af458834f6ccc",
+      "command_count": 18
     },
     {
       "index": 182,
       "glyph_id": "GLYPH-125",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-125.svg",
-      "svg_sha256": "7eeb6514b87edbe0baa15f9e5bb352a07e812e28e43190b01f702c3d0cd74986",
-      "command_count": 772
+      "file": "screensaver/glyph-design-v2/GLYPH-125.svg",
+      "svg_sha256": "595977bcc7af6bae1c11c3cbefbd640d4e4fee81d2d69df61e9bc1a9ce908aec",
+      "command_count": 16
     },
     {
       "index": 183,
       "glyph_id": "GLYPH-126",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-126.svg",
-      "svg_sha256": "5a795264637eddeb8b68d737990995af31432ecaba16edabbcffc1f926500495",
-      "command_count": 572
+      "file": "screensaver/glyph-design-v2/GLYPH-126.svg",
+      "svg_sha256": "d28e0c897e90eb7e3485c69d9a576106d2d66657f86bca588b14c13cfe539ab2",
+      "command_count": 18
     },
     {
       "index": 184,
       "glyph_id": "GLYPH-127",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-127.svg",
-      "svg_sha256": "42b8c5e0d618f75c2eb7c8dc4064150b77b81deaaa494cc3ee7ac4c176408a84",
-      "command_count": 389
+      "file": "screensaver/glyph-design-v2/GLYPH-127.svg",
+      "svg_sha256": "237c09d57072232406d78796139c07970743f91e441c7444cd8bb0af3cfc39ea",
+      "command_count": 142
     },
     {
       "index": 185,
       "glyph_id": "GLYPH-128",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-128.svg",
-      "svg_sha256": "363ebae5bdd174d35d995f39e06d7e7a0887ab5ddc5ad756d08808695fa0067a",
-      "command_count": 455
+      "file": "screensaver/glyph-design-v2/GLYPH-128.svg",
+      "svg_sha256": "b4544ecc22c194c49e0bf6a3cb841bc18dcecfc77e7a163c2a334b0e04f50946",
+      "command_count": 18
     },
     {
       "index": 186,
       "glyph_id": "GLYPH-129",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-129.svg",
-      "svg_sha256": "deb1aaafe381d15c43939ad992413d02409cece8174150cf468e6bbbc8847086",
-      "command_count": 501
+      "file": "screensaver/glyph-design-v2/GLYPH-129.svg",
+      "svg_sha256": "c6271e15522e6ae0418e7ebb470f6586a8133beeea1697581c828d79bbc87672",
+      "command_count": 141
     },
     {
       "index": 187,
       "glyph_id": "GLYPH-130",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-130.svg",
-      "svg_sha256": "c2a323e1299378b3f3fc6004066127323ed439b1f6fadd3513ccb082daeb7209",
-      "command_count": 159
+      "file": "screensaver/glyph-design-v2/GLYPH-130.svg",
+      "svg_sha256": "300b2ea5cb0bb7a318101bc5fea4d3761ae1146be73b29f092e970c82eb15a8d",
+      "command_count": 19
     },
     {
       "index": 188,
       "glyph_id": "GLYPH-131",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-131.svg",
-      "svg_sha256": "46e444c3d162211ee53eda083b4b9dc8e334c1cf44b494d5792e185f92b77855",
-      "command_count": 160
+      "file": "screensaver/glyph-design-v2/GLYPH-131.svg",
+      "svg_sha256": "b0f4ad804d0a6928c76892e46e1355a3a531067b8c23f0700ba705a8b79f46f5",
+      "command_count": 21
     },
     {
       "index": 189,
       "glyph_id": "GLYPH-132",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-132.svg",
-      "svg_sha256": "4e64dc72980fd3523f82e804fcb3245299fc734ec55c7e4bf6fe819e14687656",
-      "command_count": 799
+      "file": "screensaver/glyph-design-v2/GLYPH-132.svg",
+      "svg_sha256": "4906040c5c6c19577967bdcb40e4aa238d801db4c7e3cd3041e8bf4088e85b08",
+      "command_count": 22
     },
     {
       "index": 190,
       "glyph_id": "GLYPH-133",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-133.svg",
-      "svg_sha256": "a086cafbef3ffc07c8d4c6ffd0a67b91af173985e225ede720a69252cb71d26c",
-      "command_count": 947
+      "file": "screensaver/glyph-design-v2/GLYPH-133.svg",
+      "svg_sha256": "54fccba248b923ae7543b0d897d9638629198e852b07cd302510ceb395b3d6a8",
+      "command_count": 20
     },
     {
       "index": 191,
       "glyph_id": "GLYPH-134",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-134.svg",
-      "svg_sha256": "53ff7347d8651a15a0cc8fc275c76f2951c482ed5dc4d7a7c52c91e408d5f16e",
-      "command_count": 444
+      "file": "screensaver/glyph-design-v2/GLYPH-134.svg",
+      "svg_sha256": "9826a92ea76013ef6323dd5c095b177da9d01e3cbff7601e08c91fe510928433",
+      "command_count": 22
     },
     {
       "index": 192,
       "glyph_id": "GLYPH-135",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-135.svg",
-      "svg_sha256": "4c230114e887e54b613e4a8cef3537e865fa51b4313084dff1cdbaac2c10383e",
-      "command_count": 106
+      "file": "screensaver/glyph-design-v2/GLYPH-135.svg",
+      "svg_sha256": "a5f3bcd77153cbb5054ea0c5caa3bd4f24561aeb6d335e857332536d01972aa3",
+      "command_count": 144
     },
     {
       "index": 193,
       "glyph_id": "GLYPH-136",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-136.svg",
-      "svg_sha256": "aab873a380afa13c3955cd173d86bd67b5aba47dfdaa744ca867165c95f1818e",
-      "command_count": 790
+      "file": "screensaver/glyph-design-v2/GLYPH-136.svg",
+      "svg_sha256": "eca40c6b3d64f6dd9fca24def0ffd76a0d9fa1e0e96746131a6e9d993bbf0f43",
+      "command_count": 18
     },
     {
       "index": 194,
       "glyph_id": "GLYPH-137",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-137.svg",
-      "svg_sha256": "3e6e46de34c3a2e148783e938c0bc27d564fb32c0e701a965babeb52c989d981",
-      "command_count": 212
+      "file": "screensaver/glyph-design-v2/GLYPH-137.svg",
+      "svg_sha256": "10056aba8971521ca829e384e5a636ef712dc0bd06304ab66eadc7c61b8a2dd5",
+      "command_count": 145
     },
     {
       "index": 195,
       "glyph_id": "GLYPH-138",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-138.svg",
-      "svg_sha256": "e6924ef6370180503e783b8d49d27f70b5af54fdc7fa67b4f563a5269c851af0",
-      "command_count": 529
+      "file": "screensaver/glyph-design-v2/GLYPH-138.svg",
+      "svg_sha256": "4539257dc9a50de4f97a7e8ee55607e7bf220aa7e9f58273c719522953ef00bc",
+      "command_count": 20
     },
     {
       "index": 196,
       "glyph_id": "GLYPH-139",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-139.svg",
-      "svg_sha256": "30ae56379f596bfe41e98c23bf79c4e0b1cbd15e8d27545490397553b31245e6",
-      "command_count": 522
+      "file": "screensaver/glyph-design-v2/GLYPH-139.svg",
+      "svg_sha256": "b62d9e4046ff7504a1210b7035b454aac0e0624edbcd0aa1ddaf793340429596",
+      "command_count": 265
     },
     {
       "index": 197,
       "glyph_id": "GLYPH-140",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-140.svg",
-      "svg_sha256": "c9e020846c32b2bbe6cb43c053ced920f3a835a328c4e6f4d5cda91aeaab8614",
-      "command_count": 214
+      "file": "screensaver/glyph-design-v2/GLYPH-140.svg",
+      "svg_sha256": "dc78ad14e3392354a6b7ae0bf77377af7019129d9adadedeec22123f2c112959",
+      "command_count": 24
     },
     {
       "index": 198,
       "glyph_id": "GLYPH-141",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-141.svg",
-      "svg_sha256": "53a460e2bbdb153a62360af152df43f6e0abf1553b3ffb0e0828ca472d58725c",
-      "command_count": 556
+      "file": "screensaver/glyph-design-v2/GLYPH-141.svg",
+      "svg_sha256": "81aa70e2c37ca84ae87190f0d582281d1ad0a4f9cfa5ad37190984ec011afcb1",
+      "command_count": 18
     },
     {
       "index": 199,
       "glyph_id": "GLYPH-142",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-142.svg",
-      "svg_sha256": "aecfb0475ff4cbc605084babd5032c284bff291df87a01834b6fab27df8e7e54",
-      "command_count": 791
+      "file": "screensaver/glyph-design-v2/GLYPH-142.svg",
+      "svg_sha256": "a9d0ba5d42050e77eb9bf409b04e175570b8629e60a804a460ae780a5cf784e6",
+      "command_count": 19
     },
     {
       "index": 200,
       "glyph_id": "GLYPH-143",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-143.svg",
-      "svg_sha256": "2ca03ee585ec15539dc8a4c2bfe61d66aedf59da36bbad24c468256d5665ec75",
-      "command_count": 461
+      "file": "screensaver/glyph-design-v2/GLYPH-143.svg",
+      "svg_sha256": "d618682f17c67a7ce74af18de21c61a21335617384f55ebd824d6599c91dc052",
+      "command_count": 20
     },
     {
       "index": 201,
       "glyph_id": "GLYPH-144",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-144.svg",
-      "svg_sha256": "088e9e727da610fdab8dacda6aabe620b7c4831814e39718904df0a5a5c4415b",
-      "command_count": 184
+      "file": "screensaver/glyph-design-v2/GLYPH-144.svg",
+      "svg_sha256": "9afa972fb8414dd8acc830dc93a54297e09c025f7896d563b54d7c27597867ab",
+      "command_count": 21
     },
     {
       "index": 202,
       "glyph_id": "GLYPH-145",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-145.svg",
-      "svg_sha256": "a93b5e2ec510d9fd841a03b350bb7118c49524325652d3306f32633c11410652",
-      "command_count": 568
+      "file": "screensaver/glyph-design-v2/GLYPH-145.svg",
+      "svg_sha256": "4c096dc0926d0459b8d2f8ff2d19dd752eb59dd3a7bfd9e489b3fd0dad2edcb7",
+      "command_count": 22
     },
     {
       "index": 203,
       "glyph_id": "GLYPH-146",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-146.svg",
-      "svg_sha256": "55eca32cd76fa0150f88881836d3dc78fb9e1ac170fcebc94edd97790ce47635",
-      "command_count": 815
+      "file": "screensaver/glyph-design-v2/GLYPH-146.svg",
+      "svg_sha256": "19a6b57047e95857c67b24aa36c4cc755785310439d9b230a66581001082f1b1",
+      "command_count": 140
     },
     {
       "index": 204,
       "glyph_id": "GLYPH-147",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-147.svg",
-      "svg_sha256": "5e62f6df512881d4cafa003496ed85d4d724b66f3c98d2491ed6fdced02bfd41",
-      "command_count": 445
+      "file": "screensaver/glyph-design-v2/GLYPH-147.svg",
+      "svg_sha256": "c46975244cdd1c9ee684f1ca52cbd59e61c32f44477f72d04c000847c292e7cb",
+      "command_count": 18
     },
     {
       "index": 205,
       "glyph_id": "GLYPH-148",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-148.svg",
-      "svg_sha256": "faa67f57220ebd6a83a6592f89a9b76e959a53d873017bc5e6e32d16e70a52bf",
-      "command_count": 286
+      "file": "screensaver/glyph-design-v2/GLYPH-148.svg",
+      "svg_sha256": "daddf66ae8e0c92aa7471e14eefc4e7bd65afe3dd69eb653dcd6687dfc65e112",
+      "command_count": 19
     },
     {
       "index": 206,
       "glyph_id": "GLYPH-149",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-149.svg",
-      "svg_sha256": "3ba59c872e21a20de27fad7da93f587759061fadd01676be644eb790378dccd4",
-      "command_count": 467
+      "file": "screensaver/glyph-design-v2/GLYPH-149.svg",
+      "svg_sha256": "9da37fb49e1c925647216de0f31cd0eb207cffbee198ab990d0a4abdc012466a",
+      "command_count": 146
     },
     {
       "index": 207,
       "glyph_id": "GLYPH-150",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-150.svg",
-      "svg_sha256": "55370475b84c2f3b6c6dccba691217485178f9564b7ef2c1092aaca4aa3a7448",
-      "command_count": 482
+      "file": "screensaver/glyph-design-v2/GLYPH-150.svg",
+      "svg_sha256": "e655eb285214a51797c7a5be4ccf27f06b1741982b56041f73e16e2f1d03e12e",
+      "command_count": 143
     },
     {
       "index": 208,
       "glyph_id": "GLYPH-151",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-151.svg",
-      "svg_sha256": "565900819ef10b90904d40c485df782f2293cc389b1964d29bb91f58b29f491f",
-      "command_count": 637
+      "file": "screensaver/glyph-design-v2/GLYPH-151.svg",
+      "svg_sha256": "e4822f97a598fa2245c6f3c686964bf10c5fcad30c8130a99f7703a7f7099b06",
+      "command_count": 17
     },
     {
       "index": 209,
       "glyph_id": "GLYPH-152",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-152.svg",
-      "svg_sha256": "d6caeec31f4e70bbd4890e0f0847eb9ea40181253e0949155144f12f2537e262",
-      "command_count": 189
+      "file": "screensaver/glyph-design-v2/GLYPH-152.svg",
+      "svg_sha256": "b34ba3ad539a706a038a5b91735f46d67efd211778462aaf5684896543b22e9d",
+      "command_count": 22
     },
     {
       "index": 210,
       "glyph_id": "GLYPH-153",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-153.svg",
-      "svg_sha256": "97c1c9e662d2215bb586efd4f94ef2b0fbc30dfc3dde265a4b5850996bf7e07a",
-      "command_count": 475
+      "file": "screensaver/glyph-design-v2/GLYPH-153.svg",
+      "svg_sha256": "f39ef1a4caba0497907a48cb7c76ba8e52f6b1cce088ba2a102f1d3e115527a8",
+      "command_count": 22
     },
     {
       "index": 211,
       "glyph_id": "GLYPH-154",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-154.svg",
-      "svg_sha256": "be79f83dedab6175305886f4526dbec4c982e71df005b674137954808610c094",
-      "command_count": 522
+      "file": "screensaver/glyph-design-v2/GLYPH-154.svg",
+      "svg_sha256": "40309adceca96b875aaaea56062d157b911a64571fbb67c0fa8adb8c2f8fbf25",
+      "command_count": 269
     },
     {
       "index": 212,
       "glyph_id": "GLYPH-155",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-155.svg",
-      "svg_sha256": "4ea6581473869a2452b13b677cba548d2dca4f33c35740de7d61976ec90c6ec3",
-      "command_count": 646
+      "file": "screensaver/glyph-design-v2/GLYPH-155.svg",
+      "svg_sha256": "cdfdddb24a236865e373ad5e56364ec518819f919bf190dd256ccceff26218cf",
+      "command_count": 15
     },
     {
       "index": 213,
       "glyph_id": "GLYPH-156",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-156.svg",
-      "svg_sha256": "71055c8254ca5f0ec88269a8db7933e139a5f3ba1cd11cedf037860923499e6b",
-      "command_count": 479
+      "file": "screensaver/glyph-design-v2/GLYPH-156.svg",
+      "svg_sha256": "d6ac55cd2926f6f9252c9eef71019f1ce30c3afafab3ace7f78a548c21959e56",
+      "command_count": 17
     },
     {
       "index": 214,
       "glyph_id": "GLYPH-157",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-157.svg",
-      "svg_sha256": "2576327d90d0f63a27324de4c2136958bbb7a87c111d8b86c7bbcaa409ffe289",
-      "command_count": 351
+      "file": "screensaver/glyph-design-v2/GLYPH-157.svg",
+      "svg_sha256": "627d21a1518b5a9a8bd9bf0d7ced03757b7dbbb77846574ccf0d375f782027aa",
+      "command_count": 19
     },
     {
       "index": 215,
       "glyph_id": "GLYPH-158",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-158.svg",
-      "svg_sha256": "43bd639521cea049fd177c5f8c3cdc4cefafa785032e34b1b0383d63dfdc4dfa",
-      "command_count": 564
+      "file": "screensaver/glyph-design-v2/GLYPH-158.svg",
+      "svg_sha256": "8bca103d03f2a3d6011b7ecee04f26c20dac735a7ae991654f0d4636b56d90ad",
+      "command_count": 264
     },
     {
       "index": 216,
       "glyph_id": "GLYPH-159",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-159.svg",
-      "svg_sha256": "a99d3f6ca95d01f41d35828e165f7b3d4c713442c622b3a50f44cee6271729f9",
-      "command_count": 285
+      "file": "screensaver/glyph-design-v2/GLYPH-159.svg",
+      "svg_sha256": "2ccf158d74175bfb5900ca8b6596a46f56afe55943b1a7f4adcfeedb4ab6ddc9",
+      "command_count": 143
     },
     {
       "index": 217,
       "glyph_id": "GLYPH-160",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-160.svg",
-      "svg_sha256": "da190b435986bb8268d54455b608d630c713ad77619f4a18d54a4ca048f1c330",
-      "command_count": 651
+      "file": "screensaver/glyph-design-v2/GLYPH-160.svg",
+      "svg_sha256": "2aa6cb882025e34616da96b5eb7bc62795f52f6d967190112d018c8e8f8e9bb1",
+      "command_count": 19
     },
     {
       "index": 218,
       "glyph_id": "GLYPH-161",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-161.svg",
-      "svg_sha256": "eb4911c9f6089b0f45aa910b5270e08f3f868e8c608764143790d9971de47e99",
-      "command_count": 243
+      "file": "screensaver/glyph-design-v2/GLYPH-161.svg",
+      "svg_sha256": "b7b256a60524e9e1945a5d0908463f0506f2cbbdf91651e3591a3d0ecdd099eb",
+      "command_count": 146
     },
     {
       "index": 219,
       "glyph_id": "GLYPH-162",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-162.svg",
-      "svg_sha256": "07da05fc09a7a9be2803293aa2561345f06a11b9f4bf2e92bdd9e2fcbc562ae7",
-      "command_count": 387
+      "file": "screensaver/glyph-design-v2/GLYPH-162.svg",
+      "svg_sha256": "1e6fac82fafac2528d5ced090bd78ec225c66588f660183be320aa3180016676",
+      "command_count": 141
     },
     {
       "index": 220,
       "glyph_id": "GLYPH-163",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-163.svg",
-      "svg_sha256": "2fb2c68293fb6fa5364b644d566bbe77c5b09a63dcaf42ac19e5565712359577",
-      "command_count": 831
+      "file": "screensaver/glyph-design-v2/GLYPH-163.svg",
+      "svg_sha256": "2609ba06ecf7fc002284719b52fb69ec6d69466c14e0b99e6112f8562c72796c",
+      "command_count": 15
     },
     {
       "index": 221,
       "glyph_id": "GLYPH-164",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-164.svg",
-      "svg_sha256": "f80ff66f8eaf81dfc9a468e52f46bc8bdb7a7fb274c199d90419f6630e678fd9",
-      "command_count": 296
+      "file": "screensaver/glyph-design-v2/GLYPH-164.svg",
+      "svg_sha256": "f3df1e6101ae75f525b9d699a8485a5f6882554af744e643678095f0871153d9",
+      "command_count": 146
     },
     {
       "index": 222,
       "glyph_id": "GLYPH-165",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-165.svg",
-      "svg_sha256": "6379f3dc14981a7c45e9e527894c6633f537986ccaf0839eecd34ba2ff13f3c4",
-      "command_count": 572
+      "file": "screensaver/glyph-design-v2/GLYPH-165.svg",
+      "svg_sha256": "22c244d2776f10c5af62159432d6bea743a6e600a2e49a268f1172db2fba290b",
+      "command_count": 21
     },
     {
       "index": 223,
       "glyph_id": "GLYPH-166",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-166.svg",
-      "svg_sha256": "c0522b0c8e2de48a43303e9a3ad9057d74e4058eb873feb2a5e846f116733220",
-      "command_count": 519
+      "file": "screensaver/glyph-design-v2/GLYPH-166.svg",
+      "svg_sha256": "0d859e2023ec7a1c0a9e6b8f9f412641b55205d6afe05cd8b894309449b2feef",
+      "command_count": 17
     },
     {
       "index": 224,
       "glyph_id": "GLYPH-167",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-167.svg",
-      "svg_sha256": "e54e166d88032e08781d1d0a1107c8768f9688ca2a35a4b156516b1f73c324b7",
-      "command_count": 675
+      "file": "screensaver/glyph-design-v2/GLYPH-167.svg",
+      "svg_sha256": "c5eb2445d4b2060ce97d5c4d9b441d61eb369d5219f4f74cde85e081d2ed1cc4",
+      "command_count": 17
     },
     {
       "index": 225,
       "glyph_id": "GLYPH-168",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-168.svg",
-      "svg_sha256": "06a2214eddebea2a9f57e0bc5347cbcb2fc0f97d43255a42ad5b0acf67c5d134",
-      "command_count": 556
+      "file": "screensaver/glyph-design-v2/GLYPH-168.svg",
+      "svg_sha256": "d1e3de080250d098be1adfea42973444088091d5414f6fca74a7a57f493d15d2",
+      "command_count": 16
     },
     {
       "index": 226,
       "glyph_id": "GLYPH-169",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-169.svg",
-      "svg_sha256": "0cb0411aa2c189d783ad01dae8aa9fa7bbb3abfc33b3bbdff5408bff69191746",
-      "command_count": 516
+      "file": "screensaver/glyph-design-v2/GLYPH-169.svg",
+      "svg_sha256": "5638b25578e5e2f79963fd67a87ffc22eaf058f6334a8fa60e00150b9aa4c76f",
+      "command_count": 21
     },
     {
       "index": 227,
       "glyph_id": "GLYPH-170",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-170.svg",
-      "svg_sha256": "acb9f101e7fe2d9646fd3b96791c67eb4dd4bbf3786b692d93386c85faa970b0",
-      "command_count": 821
+      "file": "screensaver/glyph-design-v2/GLYPH-170.svg",
+      "svg_sha256": "59a891dec32cea9843a8db6e1feb170b1d891d7ab8e5f2db59c8bc2b3f6fbf44",
+      "command_count": 146
     },
     {
       "index": 228,
       "glyph_id": "GLYPH-171",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-171.svg",
-      "svg_sha256": "ac4369098a64a069f62118bd7a38d3c5f2c79d988b9fd84b02aea16a52c89b85",
-      "command_count": 846
+      "file": "screensaver/glyph-design-v2/GLYPH-171.svg",
+      "svg_sha256": "471327008a8be7e9f0956476e4371c4c7351eab8739e56cb3eac68718b898b5b",
+      "command_count": 145
     },
     {
       "index": 229,
       "glyph_id": "GLYPH-172",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-172.svg",
-      "svg_sha256": "35869f54b51c151b711d7e5745177008a171c8d42ef5ede1fb9bfac8afdd4a52",
-      "command_count": 458
+      "file": "screensaver/glyph-design-v2/GLYPH-172.svg",
+      "svg_sha256": "4dc18d5a73e3f76485b0a8874f256259c81adb0e13b8e3cb8daa1fe4a87d2c6f",
+      "command_count": 141
     },
     {
       "index": 230,
       "glyph_id": "GLYPH-173",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-173.svg",
-      "svg_sha256": "6f4ff448cb7fbc50a61d4d055aeb2d830da6713da4ec97ff36b8d8e9193983dd",
-      "command_count": 289
+      "file": "screensaver/glyph-design-v2/GLYPH-173.svg",
+      "svg_sha256": "79893c644e9e0c1e536bfbf7e3bac3463d632e031a91aefe9c7c891d2a2151fd",
+      "command_count": 23
     },
     {
       "index": 231,
       "glyph_id": "GLYPH-174",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-174.svg",
-      "svg_sha256": "2a63c66b26a4fecaa0acfa5e2797eaa821d364304792175ec284cd2abf68452b",
-      "command_count": 570
+      "file": "screensaver/glyph-design-v2/GLYPH-174.svg",
+      "svg_sha256": "31daea6a5c0ba80abe1d7794ea610f4083271a68b6779d7b21fd5bff0e500eff",
+      "command_count": 145
     },
     {
       "index": 232,
       "glyph_id": "GLYPH-175",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-175.svg",
-      "svg_sha256": "1fbce399f08c22b58ec83a7831907c98887127f407d7797ffcf93329431c8e92",
-      "command_count": 846
+      "file": "screensaver/glyph-design-v2/GLYPH-175.svg",
+      "svg_sha256": "fc8781154826f468778019b2df2bf994a038870091b924191baf0f223178d26c",
+      "command_count": 142
     },
     {
       "index": 233,
       "glyph_id": "GLYPH-176",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-176.svg",
-      "svg_sha256": "4faaf22bd19e73311ed115b24477fee0dd7694d296846e734c9534b56195acf0",
-      "command_count": 364
+      "file": "screensaver/glyph-design-v2/GLYPH-176.svg",
+      "svg_sha256": "7f7ba8b26557b5e1afe089f160d553a912a640f826b6fc9a03133cebf62ad281",
+      "command_count": 21
     },
     {
       "index": 234,
       "glyph_id": "GLYPH-177",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-177.svg",
-      "svg_sha256": "0b476f0774437dcf53701ae2a3e45be5669ea2af73237247b06987b37b5aadce",
-      "command_count": 338
+      "file": "screensaver/glyph-design-v2/GLYPH-177.svg",
+      "svg_sha256": "156ec8450367f2ac1ec5d278088535a928b24b57803f94b7eaea38303653dd35",
+      "command_count": 21
     },
     {
       "index": 235,
       "glyph_id": "GLYPH-178",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-178.svg",
-      "svg_sha256": "925206b2da1fe1e0aad6eebb8d0d83f1529b49f2f93954284f2e15b56cecedfc",
-      "command_count": 795
+      "file": "screensaver/glyph-design-v2/GLYPH-178.svg",
+      "svg_sha256": "9c3247019d40e0cbdf4499b99c2cd1d404330a6b2bf5f5bd3674bdca9785571e",
+      "command_count": 22
     },
     {
       "index": 236,
       "glyph_id": "GLYPH-179",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-179.svg",
-      "svg_sha256": "368f88143ea8105672fe1b0e3b94e7f8ba18b94ab2550eb20b2ddb235fcd6112",
-      "command_count": 555
+      "file": "screensaver/glyph-design-v2/GLYPH-179.svg",
+      "svg_sha256": "3d4079c9415af5aee10654012914734be27f64c02b77ba8866d7ba197216471c",
+      "command_count": 21
     },
     {
       "index": 237,
       "glyph_id": "GLYPH-180",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-180.svg",
-      "svg_sha256": "30d6cb36436f91b4cbbe97c50d7085c75ba84aba1d85cf6fffc30d950601ca1c",
-      "command_count": 689
+      "file": "screensaver/glyph-design-v2/GLYPH-180.svg",
+      "svg_sha256": "40f5b6520b4247a880bbec7da7f1aa345c6c7b2b6444fe8da4ed3c2b23d9becc",
+      "command_count": 146
     },
     {
       "index": 238,
       "glyph_id": "GLYPH-181",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-181.svg",
-      "svg_sha256": "f7897f1ead5fc5e2c9d0e8532306c60d182c54377cc3371d8b0b4a88317e8c0a",
-      "command_count": 542
+      "file": "screensaver/glyph-design-v2/GLYPH-181.svg",
+      "svg_sha256": "6e6098e18bc26294be19d332b1b8e3cb7db1402c020a8b85662c3661b93dbab6",
+      "command_count": 143
     },
     {
       "index": 239,
       "glyph_id": "GLYPH-182",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-182.svg",
-      "svg_sha256": "08e1f883446fda9e47d5be51fe590eb009bc48a455e2cf6c5b9f6e37a848b62d",
-      "command_count": 604
+      "file": "screensaver/glyph-design-v2/GLYPH-182.svg",
+      "svg_sha256": "dff4f21938ff03e675d14bc65ad407b9634c5d03b0b9fe91a7f4bef03fa70e07",
+      "command_count": 141
     },
     {
       "index": 240,
       "glyph_id": "GLYPH-183",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-183.svg",
-      "svg_sha256": "9c69ee57bdce85330f07c2904efaef5f4c7189525992cd227fa5ff49bbce03a6",
-      "command_count": 495
+      "file": "screensaver/glyph-design-v2/GLYPH-183.svg",
+      "svg_sha256": "4ab55e6582bcaf4b4d09e36e958f2bc77a3a3db8c8d921f2322a88fa581e3ad7",
+      "command_count": 140
     },
     {
       "index": 241,
       "glyph_id": "GLYPH-184",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-184.svg",
-      "svg_sha256": "6a911709a3e2c5ddc43455f9e7f5b900d984a6290780761dc76ca8b74490438e",
-      "command_count": 271
+      "file": "screensaver/glyph-design-v2/GLYPH-184.svg",
+      "svg_sha256": "a489169eb55784a0d102c1c60c8d8b6bff072eda638fe1e4d1e97402971162bb",
+      "command_count": 19
     },
     {
       "index": 242,
       "glyph_id": "GLYPH-185",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-185.svg",
-      "svg_sha256": "d5ada6e57ae7f2d8a22987641d3f1d1dfbe00874b23f1adef22934cf571d54a2",
-      "command_count": 782
+      "file": "screensaver/glyph-design-v2/GLYPH-185.svg",
+      "svg_sha256": "2b2732e8c5df25e4437e6b5e55899630438008e1d2c8e6b1230b5417850256b6",
+      "command_count": 20
     },
     {
       "index": 243,
       "glyph_id": "GLYPH-186",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-186.svg",
-      "svg_sha256": "62a8018a23a9b8fc4ae9492f2503bbfd7e1aa99589b48f9c7868f1977d75abf7",
-      "command_count": 511
+      "file": "screensaver/glyph-design-v2/GLYPH-186.svg",
+      "svg_sha256": "2154245d4c83c8326bb2c5026c00b417401000fc2b7019392ecc4207388d34da",
+      "command_count": 22
     },
     {
       "index": 244,
       "glyph_id": "GLYPH-187",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-187.svg",
-      "svg_sha256": "b187ed77449913ecc38ca1ae063b189ee7e5483fe5f1f23223b3c44310892a48",
-      "command_count": 872
+      "file": "screensaver/glyph-design-v2/GLYPH-187.svg",
+      "svg_sha256": "1335094406be4735bcd9343cd91cb437aa16a57bf789f5725a41f6cfc464a60d",
+      "command_count": 20
     },
     {
       "index": 245,
       "glyph_id": "GLYPH-188",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-188.svg",
-      "svg_sha256": "46e19191f9c588e406eeec8aaaf5ea693db25f0e98d64d6d4ee7ecbe864ed4c4",
-      "command_count": 554
+      "file": "screensaver/glyph-design-v2/GLYPH-188.svg",
+      "svg_sha256": "f2ecdab82932e5938ac37515ca900c89052ee6a0541bf6f93a791a2045e1b38b",
+      "command_count": 17
     },
     {
       "index": 246,
       "glyph_id": "GLYPH-189",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-189.svg",
-      "svg_sha256": "db1caa36330f9e83768ef083f91199e33f68abd0c5d70a543b2cf2e816f44e72",
-      "command_count": 822
+      "file": "screensaver/glyph-design-v2/GLYPH-189.svg",
+      "svg_sha256": "6ae12c565a2a4e8155b700d1059165906f6893788235de7a4bf2bc9a5aacdb69",
+      "command_count": 22
     },
     {
       "index": 247,
       "glyph_id": "GLYPH-190",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-190.svg",
-      "svg_sha256": "bc6c14e80c44294ab6e5eacf71bee58071f04dacd6ed8a0c16f5fdc3804c7ad0",
-      "command_count": 298
+      "file": "screensaver/glyph-design-v2/GLYPH-190.svg",
+      "svg_sha256": "c49c29fdd8bfe3e1e3bb21f640999120cee72f089c93210c9770e455ba6ff808",
+      "command_count": 143
     },
     {
       "index": 248,
       "glyph_id": "GLYPH-191",
-      "file": "benchmarks/partitions/glyph_svg_v1/catalog/GLYPH-191.svg",
-      "svg_sha256": "1d668e7b5d18423758a26045ae481efafac4bbd8b62bbe4508ff19bdc64470a4",
-      "command_count": 537
+      "file": "screensaver/glyph-design-v2/GLYPH-191.svg",
+      "svg_sha256": "7f29945a28deb5c4ce50d6d73a8296381a31ef9c19f365b3677723b3dca2931c",
+      "command_count": 24
     }
   ],
   "output_sha256": {
-    "screensaver/windows/GlyphData.cs": "79be65eaa1cc6d1ab474f673a4839328549dfbb2839ccdb0d04ee42715228b9a",
-    "screensaver/macos/glyphs.json": "0dc50a9e86d5358b3d9e7a7d39d86e506e7b7223b0696c26b90707b3b2c1404f",
-    "screensaver/linux/glyph_data.h": "1c7d721225d24c809be8c0d87fe05e062e95fc9eddbc8a4ab46f154b1e96028f"
+    "screensaver/windows/GlyphData.cs": "298d36fbf94ce746b5ebdb755a60f105b621ba7666dadb477db066c9f3ebd660",
+    "screensaver/macos/glyphs.json": "92dc6a65d7bc0229debee6df4e7cdb5ba3afcc41a866c44b57a7f7218d387055",
+    "screensaver/linux/glyph_data.h": "bc7e301198cc4e31d66b1c8cc441a5be62f6dbbaedbf9658e88721ede0b8b783"
   },
   "licenses": [
     {

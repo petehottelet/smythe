@@ -112,9 +112,9 @@ def test_all_native_serializations_have_identical_commands_and_motion(outputs, p
 
 
 def test_nonzero_contours_keep_opposite_orientation(payload):
-    # GLYPH-004 has one exterior and two counters. Their signs must remain
-    # opposite; filling separate polygons would erase the two openings.
-    glyph = payload["commands"][57 + 4]
+    # GLYPH-006 has one exterior and one counter. Their signs must remain
+    # opposite; filling separate polygons would erase the opening.
+    glyph = payload["commands"][57 + 6]
     contours, points = [], []
     for command in glyph:
         if command[0] in {0, 1}:
@@ -124,7 +124,7 @@ def test_nonzero_contours_keep_opposite_orientation(payload):
             points = []
     areas = [sum(a[0]*b[1] - b[0]*a[1] for a, b in zip(poly, poly[1:] + poly[:1], strict=True))
              for poly in contours]
-    assert len(areas) == 3
+    assert len(areas) == 2
     assert any(area > 0 for area in areas)
     assert any(area < 0 for area in areas)
 
@@ -162,7 +162,7 @@ def test_changed_source_hash_is_rejected(tmp_path):
     for relative in [exporter.REFERENCE, exporter.ORIGINAL]:
         shutil.copytree(exporter.REPO_ROOT / relative, tmp_path / relative)
     changed = tmp_path / exporter.ORIGINAL / "GLYPH-000.svg"
-    changed.write_bytes(changed.read_bytes().replace(b"37.327", b"37.328", 1))
+    changed.write_bytes(changed.read_bytes().replace(b"#000000", b"#010000", 1))
     with pytest.raises(ValueError, match="hash mismatch"):
         exporter.build_payload(tmp_path)
 

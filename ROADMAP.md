@@ -188,19 +188,33 @@ It adds the following runtime guarantees and measured evidence:
 
 ## Coming soon
 
-**Astra status — 8 September 2026:** live benchmarks have not run. The
-[79 offline pilot checks](benchmarks/results/astra_pilot_runtime_20260907/README.md)
-validate software contracts, not model cost, speed, or quality. An agreed API
-spending ceiling is needed before starting the 12-workflow pilot.
+The [12 September glyph review](docs/glyph-contour-review-2026-09-12.md)
+identifies contour defects missed by the old numerical gates. The complete
+[192-glyph v2 catalog](screensaver/glyph-design-v2/README.md), small-size sheets,
+web previews, and native source exports are now updated. The
+[192/256-glyph v2 benchmark](benchmarks/svg_v2_results.md) completes 36 matched
+compilation, validation and export workflows, with timing and memory evidence.
+Newly compiled native builds still need platform qualification. The
+[benchmark delivery audit](docs/benchmark-delivery-audit-2026-09-13.md) lists
+every remaining measurement commitment.
 
-The [GPT-6 Astra campaign plan](benchmarks/astra_benchmark_plan.md) specifies
-matched model and orchestration experiments. Native Responses and complete
-text-workflow accounting are implemented. The offline preparation package
-provides 13 task/source packs and balanced schedules for 12 pilot and 200 main
-workflows. The [pilot runner](benchmarks/astra_runtime.md) binds the spending
-envelope, source identity, native ledger, and recovery of each calibration
-trial. Paid comparisons require the authorized campaign allowance, accounted
-judge, completed pilot, frozen acceptance gates, and reviewed result records.
+**Astra status — 13 September 2026:** human calibration passed, and the
+final pilot passed all 12 output contracts. Four pilot stages total 48
+workflows and $2.6596199. A 31-workflow diagnostic cost $1.7646655 and remains
+excluded from the amended main comparison. The
+[amendment](benchmarks/astra_method_amendment_20260913.md) preserves the
+input-contract defects and every earlier charge within the original $300 cap.
+
+The [main comparison](benchmarks/results/astra_20260913_main/README.md) now
+contains all 200 scheduled outcomes, with 191 accepted by the frozen automatic rule.
+The [approved continuation](benchmarks/astra_connection_continuation_20260913.md)
+retains one failed call and its full $0.169645 unresolved reserve. Timing,
+quality, graph sizes and phase costs are audited; affected exact cost contrasts
+remain withheld. Scheduler, framework and tool experiments are separate
+[follow-up studies](benchmarks/astra_benchmark_plan.md#separate-follow-up-studies).
+
+Human review of eight flagged main answers remains pending. These records are
+not claimable until that review is complete; automatic classifications are retained.
 
 The [September repository review](docs/project-review-2026-09-06.md) defines
 the hardening work ahead of broader production claims:

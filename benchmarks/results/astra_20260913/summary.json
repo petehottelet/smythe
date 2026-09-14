@@ -1,0 +1,801 @@
+{
+  "version": 1,
+  "recorded_on": "2026-09-13",
+  "status": "pilot-complete-awaiting-human-calibration",
+  "claimable": false,
+  "workflow_runs": 24,
+  "original_pilot": {
+    "workflows": 12,
+    "deterministic_passes": 11,
+    "execution_failures": 0,
+    "workflow_nanousd": 780595500,
+    "known_measurement_defect": "pilot-relays/check-20 requires a string at reasoning, but the original task did not state that type. Astra fixed returned a reasoning object. Original result is retained."
+  },
+  "format_pilot": {
+    "version": 1,
+    "stage": "format-pilot",
+    "freeze_sha256": "f1d83d273280a4f48429f446b1628645f7c000b9d83887b63eccd6eaeb3e107f",
+    "claimable": false,
+    "completed_workflows": 12,
+    "planned_workflows": 12,
+    "execution_failures": 0,
+    "deterministic_failures": 0,
+    "confirmed_nanousd": 678991400,
+    "quality_evaluated": false
+  },
+  "judging": {
+    "paid_judgments": 10,
+    "cost_lower_nanousd": 105442800,
+    "cost_upper_nanousd": 124980000,
+    "unresolved_attempts": 0,
+    "judge_freeze_sha256": "03f7a1bf258a0c18b1230e497361a950f836e8935c02e546d4f7c81f660b29f6"
+  },
+  "human_calibration": {
+    "status": "awaiting-user-ratings",
+    "required_samples": 6
+  },
+  "main": {
+    "completed_workflows": 0,
+    "planned_workflows": 200,
+    "status": "not-started"
+  },
+  "approved_allowances": {
+    "judge_nanousd": 40000000000,
+    "main_nanousd": 200000000000,
+    "per_trial_nanousd": 5000000000,
+    "pilot_nanousd": 60000000000,
+    "total_nanousd": 300000000000
+  },
+  "workflow_total_nanousd": 1459586900,
+  "campaign_cost_lower_nanousd": 1565029700,
+  "campaign_cost_upper_nanousd": 1584566900,
+  "predeclared_main_gates": {
+    "criterion_minimum": 3,
+    "material_defects_allowed": 0,
+    "minimum_success_rate": 0.9,
+    "quality_noninferiority_margin": 0.25,
+    "quality_margin_unit": "mean anchored 0..4 criterion score",
+    "sampling_unit": "task",
+    "bootstrap_seed": 14173,
+    "bootstrap_repetitions": 10000,
+    "human_calibration_required": true
+  },
+  "trials": [
+    {
+      "stage": "format-pilot",
+      "trial": {
+        "arm_id": "astra-fixed",
+        "block": 0,
+        "model": "gpt-6-astra",
+        "ordinal": 0,
+        "position": 0,
+        "repetition": 1,
+        "source_sha256": "5b1294922e8b0a0a52de1d7115e3c39b1bf3836e45c5a342b017203e54411398",
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-relays",
+        "task_sha256": "2d4a23843a40a54c725ed68eb333e3eb8c8a9d1c670a8f75c4e26d82d0722c6c",
+        "trial_id": "pilot--pilot-relays--r1--astra-fixed"
+      },
+      "run_id": "92401781699d63f7398f12d56d9c77ddd519177a1eb76c735525863bb60f8245",
+      "record_sha256": "177f314fa0bea4937f9d1b75b07f6cb3fcad914cf12037c0f3819ae0868353b4",
+      "output_sha256": "a349e88ca0bfebcf6b425d636afcb0b831fb04d94c54d7224acec0d99e644f19",
+      "workflow_nanousd": 90620000,
+      "wall_time_ns": 31797027100,
+      "provider_calls": 3,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "format-pilot",
+      "trial": {
+        "arm_id": "sol-fixed",
+        "block": 0,
+        "model": "gpt-5.6-sol",
+        "ordinal": 1,
+        "position": 1,
+        "repetition": 1,
+        "source_sha256": "5b1294922e8b0a0a52de1d7115e3c39b1bf3836e45c5a342b017203e54411398",
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-relays",
+        "task_sha256": "2d4a23843a40a54c725ed68eb333e3eb8c8a9d1c670a8f75c4e26d82d0722c6c",
+        "trial_id": "pilot--pilot-relays--r1--sol-fixed"
+      },
+      "run_id": "05be0264b16729482d00a0393839ced755e21c781534624c3b719f8ac88534ad",
+      "record_sha256": "890e9e1fc8d94ec2a4135fb626470f7835464d99bc4b0543517247bd7da07b0d",
+      "output_sha256": "37eac774038fe563d0d1e026a0287051ea7075b44dcff42025104b87406ddcc5",
+      "workflow_nanousd": 26736000,
+      "wall_time_ns": 15770345000,
+      "provider_calls": 3,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "format-pilot",
+      "trial": {
+        "arm_id": "sol-dynamic",
+        "block": 0,
+        "model": "gpt-5.6-sol",
+        "ordinal": 2,
+        "position": 2,
+        "repetition": 1,
+        "source_sha256": "5b1294922e8b0a0a52de1d7115e3c39b1bf3836e45c5a342b017203e54411398",
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-relays",
+        "task_sha256": "2d4a23843a40a54c725ed68eb333e3eb8c8a9d1c670a8f75c4e26d82d0722c6c",
+        "trial_id": "pilot--pilot-relays--r1--sol-dynamic"
+      },
+      "run_id": "2819baa0ef0f487a767544128c105215440e0b9766ae677a72370765ceb53977",
+      "record_sha256": "81c6f0d5f0aebf50e4fc403fd8b9167f068e964e00bd804b3eef1796b5c76109",
+      "output_sha256": "b26634bf0a616153789c7d09f0ac6babe522b2abf29778d91a9d31c9f5a0df72",
+      "workflow_nanousd": 86220000,
+      "wall_time_ns": 30656909700,
+      "provider_calls": 6,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "format-pilot",
+      "trial": {
+        "arm_id": "astra-dynamic",
+        "block": 0,
+        "model": "gpt-6-astra",
+        "ordinal": 3,
+        "position": 3,
+        "repetition": 1,
+        "source_sha256": "5b1294922e8b0a0a52de1d7115e3c39b1bf3836e45c5a342b017203e54411398",
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-relays",
+        "task_sha256": "2d4a23843a40a54c725ed68eb333e3eb8c8a9d1c670a8f75c4e26d82d0722c6c",
+        "trial_id": "pilot--pilot-relays--r1--astra-dynamic"
+      },
+      "run_id": "7d45ecd2df8217b75f4280529ff6d7c951747fe279d0e96b44d15771fa97a900",
+      "record_sha256": "d01b339f8f34796d12ceedb409711e3f1f8d4edc63a4103c7f187db4b5d98dcf",
+      "output_sha256": "f2bc0606eda2d955b601e9ef2e275b3b66883ef906a0d22249514d3deb454a53",
+      "workflow_nanousd": 67440000,
+      "wall_time_ns": 22888856800,
+      "provider_calls": 2,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "format-pilot",
+      "trial": {
+        "arm_id": "sol-fixed",
+        "block": 1,
+        "model": "gpt-5.6-sol",
+        "ordinal": 4,
+        "position": 0,
+        "repetition": 1,
+        "source_sha256": "595bdc4e51467f1505f243cc18b8604b9c30293412ffe10c1d468736593d7743",
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-membership",
+        "task_sha256": "f6fe44001355c8b6712ebf1c7c13a1e8c41e91e0ec3e0d0b107bbb3829ff82c6",
+        "trial_id": "pilot--pilot-membership--r1--sol-fixed"
+      },
+      "run_id": "1fdd671164293f1fc7221e1f899b408faa1930e2c2a9305a2c299165c13be719",
+      "record_sha256": "c807b166cf3b12f4b357a1af68768c927acb2003ab3a5721cb565683ebc6b34d",
+      "output_sha256": "e252383ec634b29a2a93ac47b8ecdf29e28441362d8a72a8c0755e7f1c3e2a24",
+      "workflow_nanousd": 28388000,
+      "wall_time_ns": 21699167300,
+      "provider_calls": 3,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "format-pilot",
+      "trial": {
+        "arm_id": "astra-dynamic",
+        "block": 1,
+        "model": "gpt-6-astra",
+        "ordinal": 5,
+        "position": 1,
+        "repetition": 1,
+        "source_sha256": "595bdc4e51467f1505f243cc18b8604b9c30293412ffe10c1d468736593d7743",
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-membership",
+        "task_sha256": "f6fe44001355c8b6712ebf1c7c13a1e8c41e91e0ec3e0d0b107bbb3829ff82c6",
+        "trial_id": "pilot--pilot-membership--r1--astra-dynamic"
+      },
+      "run_id": "e52f268269151135d0c25a370dd89ff8c1bef8fff91382454503c6be4896d025",
+      "record_sha256": "0e1a0546f0213bd6e3a253dd9cd46fd18a7b549ae2e4b17f6abddec6c55a1458",
+      "output_sha256": "0a44028babb762c80300207567eb8cc316f1b05a17caa1e4fbbcaf9f5ccea225",
+      "workflow_nanousd": 183875000,
+      "wall_time_ns": 49095792600,
+      "provider_calls": 6,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "format-pilot",
+      "trial": {
+        "arm_id": "astra-fixed",
+        "block": 1,
+        "model": "gpt-6-astra",
+        "ordinal": 6,
+        "position": 2,
+        "repetition": 1,
+        "source_sha256": "595bdc4e51467f1505f243cc18b8604b9c30293412ffe10c1d468736593d7743",
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-membership",
+        "task_sha256": "f6fe44001355c8b6712ebf1c7c13a1e8c41e91e0ec3e0d0b107bbb3829ff82c6",
+        "trial_id": "pilot--pilot-membership--r1--astra-fixed"
+      },
+      "run_id": "655d0b0d1f82c85182ddde7c144b3b42df2ae5dec68cf5a5e4e8a887c66b229a",
+      "record_sha256": "38e8416000a380d92f8ac76ae8cae52020cd1d8301d2627d2dbdabf846501340",
+      "output_sha256": "f26dcdffcd86db2dc76fe929ab664a4b62547b959d18dcd634a28ce6190aa76c",
+      "workflow_nanousd": 73980000,
+      "wall_time_ns": 27061250800,
+      "provider_calls": 3,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "format-pilot",
+      "trial": {
+        "arm_id": "sol-dynamic",
+        "block": 1,
+        "model": "gpt-5.6-sol",
+        "ordinal": 7,
+        "position": 3,
+        "repetition": 1,
+        "source_sha256": "595bdc4e51467f1505f243cc18b8604b9c30293412ffe10c1d468736593d7743",
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-membership",
+        "task_sha256": "f6fe44001355c8b6712ebf1c7c13a1e8c41e91e0ec3e0d0b107bbb3829ff82c6",
+        "trial_id": "pilot--pilot-membership--r1--sol-dynamic"
+      },
+      "run_id": "61ed74e03c007dba9f35af0f1db3026f425e5c166dc1065784523f48a845599c",
+      "record_sha256": "ed7788994b44a9e0997ca2997a89c9e494c2443a88a97e28f995892926150879",
+      "output_sha256": "440c86cc1c25fc0bb7e76151a41a719eaf8780f9baa9e28c95aa8bb4fc512bdc",
+      "workflow_nanousd": 63103000,
+      "wall_time_ns": 32706707200,
+      "provider_calls": 5,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "format-pilot",
+      "trial": {
+        "arm_id": "astra-dynamic",
+        "block": 2,
+        "model": "gpt-6-astra",
+        "ordinal": 8,
+        "position": 0,
+        "repetition": 1,
+        "source_sha256": "0c9f0bc9971a39aa2585ff97d7e2b9bd86ab07a07177fc3b3846e45e0d37184c",
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-calendar",
+        "task_sha256": "d3743df9dd8b3928f3b33fb6b544430d8a046b550d5c92c25a3a6af1409bb5d4",
+        "trial_id": "pilot--pilot-calendar--r1--astra-dynamic"
+      },
+      "run_id": "5c6bc32e166ab38864beb8a75a998db408201da05257abde706906cfe79601ce",
+      "record_sha256": "62ad58bae590b7d2c99c23cc5f40f49044ae8159cbaf44258be0735a666cd814",
+      "output_sha256": "5f330c67a58bf43ec72f14414512aa25c8bc1e3330a541b087d81e4dfcb89ea9",
+      "workflow_nanousd": 24971000,
+      "wall_time_ns": 15134852000,
+      "provider_calls": 2,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "format-pilot",
+      "trial": {
+        "arm_id": "sol-dynamic",
+        "block": 2,
+        "model": "gpt-5.6-sol",
+        "ordinal": 9,
+        "position": 1,
+        "repetition": 1,
+        "source_sha256": "0c9f0bc9971a39aa2585ff97d7e2b9bd86ab07a07177fc3b3846e45e0d37184c",
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-calendar",
+        "task_sha256": "d3743df9dd8b3928f3b33fb6b544430d8a046b550d5c92c25a3a6af1409bb5d4",
+        "trial_id": "pilot--pilot-calendar--r1--sol-dynamic"
+      },
+      "run_id": "f5f2e1d38689c646b861633c70dbbc897b9f6fb48991d7198b5568c55d8d63d9",
+      "record_sha256": "8c58d68ae22ef5a8f452cc6090c1e493646ebca118d6ddf7bbb738fbdf463505",
+      "output_sha256": "5f330c67a58bf43ec72f14414512aa25c8bc1e3330a541b087d81e4dfcb89ea9",
+      "workflow_nanousd": 6956400,
+      "wall_time_ns": 11631862400,
+      "provider_calls": 2,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "format-pilot",
+      "trial": {
+        "arm_id": "sol-fixed",
+        "block": 2,
+        "model": "gpt-5.6-sol",
+        "ordinal": 10,
+        "position": 2,
+        "repetition": 1,
+        "source_sha256": "0c9f0bc9971a39aa2585ff97d7e2b9bd86ab07a07177fc3b3846e45e0d37184c",
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-calendar",
+        "task_sha256": "d3743df9dd8b3928f3b33fb6b544430d8a046b550d5c92c25a3a6af1409bb5d4",
+        "trial_id": "pilot--pilot-calendar--r1--sol-fixed"
+      },
+      "run_id": "174a17c72fb5dab04c2315eec01d44d97639b5a4173f7e35a96bef66dece4d5e",
+      "record_sha256": "aaaa6d78ba74bfeb630aad523dfdb4318b86d4c92038b7b84b1bb065ad5f66b2",
+      "output_sha256": "5f330c67a58bf43ec72f14414512aa25c8bc1e3330a541b087d81e4dfcb89ea9",
+      "workflow_nanousd": 7772000,
+      "wall_time_ns": 17060927000,
+      "provider_calls": 3,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "format-pilot",
+      "trial": {
+        "arm_id": "astra-fixed",
+        "block": 2,
+        "model": "gpt-6-astra",
+        "ordinal": 11,
+        "position": 3,
+        "repetition": 1,
+        "source_sha256": "0c9f0bc9971a39aa2585ff97d7e2b9bd86ab07a07177fc3b3846e45e0d37184c",
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-calendar",
+        "task_sha256": "d3743df9dd8b3928f3b33fb6b544430d8a046b550d5c92c25a3a6af1409bb5d4",
+        "trial_id": "pilot--pilot-calendar--r1--astra-fixed"
+      },
+      "run_id": "a6bf45886e501d4682b72477596f56c434d2fd4f94a459e81f39ab4b73272396",
+      "record_sha256": "aceb7e56468869687f97ea32b6c77e3176155f1d98307a75d10fd61d8d7d9087",
+      "output_sha256": "5f330c67a58bf43ec72f14414512aa25c8bc1e3330a541b087d81e4dfcb89ea9",
+      "workflow_nanousd": 18930000,
+      "wall_time_ns": 12956266000,
+      "provider_calls": 3,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "pilot",
+      "trial": {
+        "arm_id": "astra-fixed",
+        "block": 0,
+        "model": "gpt-6-astra",
+        "ordinal": 0,
+        "position": 0,
+        "repetition": 1,
+        "source_sha256": "5b1294922e8b0a0a52de1d7115e3c39b1bf3836e45c5a342b017203e54411398",
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-relays",
+        "task_sha256": "2d4a23843a40a54c725ed68eb333e3eb8c8a9d1c670a8f75c4e26d82d0722c6c",
+        "trial_id": "pilot--pilot-relays--r1--astra-fixed"
+      },
+      "run_id": "d4123d46d1c4caa3ff9b1b2d69bf9ca3cccba4649340ff623ea7ce5a20d3c9b1",
+      "record_sha256": "865e368f6e8bcf6e3c39f2f3680120b4c1970a637766440a413da404b9395e5d",
+      "output_sha256": "8d2b0f010a83374c8bf31c9d854f5a513f7bd3f89597349369b624536bc54784",
+      "workflow_nanousd": 107575000,
+      "wall_time_ns": 32795157700,
+      "provider_calls": 3,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": false,
+        "failed_checks": [
+          "check-20"
+        ],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "pilot",
+      "trial": {
+        "arm_id": "sol-fixed",
+        "block": 0,
+        "model": "gpt-5.6-sol",
+        "ordinal": 1,
+        "position": 1,
+        "repetition": 1,
+        "source_sha256": "5b1294922e8b0a0a52de1d7115e3c39b1bf3836e45c5a342b017203e54411398",
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-relays",
+        "task_sha256": "2d4a23843a40a54c725ed68eb333e3eb8c8a9d1c670a8f75c4e26d82d0722c6c",
+        "trial_id": "pilot--pilot-relays--r1--sol-fixed"
+      },
+      "run_id": "8213c17dee81f0358bbad47e02ffcd042626bbc1074551167f1062175e29ccca",
+      "record_sha256": "c2bd07409be95fe92105fbc2ab9ea893dfadf7a26cee3a0383977ed9ed881134",
+      "output_sha256": "be7a4c4d3d8f6c5716b3730c70aeab53f85584c94f7b9707bf416703eb112078",
+      "workflow_nanousd": 27008000,
+      "wall_time_ns": 16122133000,
+      "provider_calls": 3,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "pilot",
+      "trial": {
+        "arm_id": "sol-dynamic",
+        "block": 0,
+        "model": "gpt-5.6-sol",
+        "ordinal": 2,
+        "position": 2,
+        "repetition": 1,
+        "source_sha256": "5b1294922e8b0a0a52de1d7115e3c39b1bf3836e45c5a342b017203e54411398",
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-relays",
+        "task_sha256": "2d4a23843a40a54c725ed68eb333e3eb8c8a9d1c670a8f75c4e26d82d0722c6c",
+        "trial_id": "pilot--pilot-relays--r1--sol-dynamic"
+      },
+      "run_id": "6ead25f758f22e784604c7e1b4d43b59e71050e5840f02045c341f2762d2b410",
+      "record_sha256": "ae930801e7c90cc78d266e46557b9e19902671c39af37f7f6340d2be6716750d",
+      "output_sha256": "668877c56103a9edc25e1ff08343225ea9403f1505489573e3a21e860387ccef",
+      "workflow_nanousd": 64855000,
+      "wall_time_ns": 30521081400,
+      "provider_calls": 6,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "pilot",
+      "trial": {
+        "arm_id": "astra-dynamic",
+        "block": 0,
+        "model": "gpt-6-astra",
+        "ordinal": 3,
+        "position": 3,
+        "repetition": 1,
+        "source_sha256": "5b1294922e8b0a0a52de1d7115e3c39b1bf3836e45c5a342b017203e54411398",
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-relays",
+        "task_sha256": "2d4a23843a40a54c725ed68eb333e3eb8c8a9d1c670a8f75c4e26d82d0722c6c",
+        "trial_id": "pilot--pilot-relays--r1--astra-dynamic"
+      },
+      "run_id": "bec2eaf10eb0eb6787c23d0ffbcbf43c2f49579c79268b500c36d210522e1de5",
+      "record_sha256": "ea83ebdacdb6cdaeb229408c44e313788896b03ed14554af52f078a73f7f62f8",
+      "output_sha256": "051017fdcea35e0b29f9b976f01641a59da7613f097bd6c7c4ec07272997fabb",
+      "workflow_nanousd": 154755000,
+      "wall_time_ns": 37566373600,
+      "provider_calls": 6,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "pilot",
+      "trial": {
+        "arm_id": "sol-fixed",
+        "block": 1,
+        "model": "gpt-5.6-sol",
+        "ordinal": 4,
+        "position": 0,
+        "repetition": 1,
+        "source_sha256": "595bdc4e51467f1505f243cc18b8604b9c30293412ffe10c1d468736593d7743",
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-membership",
+        "task_sha256": "f6fe44001355c8b6712ebf1c7c13a1e8c41e91e0ec3e0d0b107bbb3829ff82c6",
+        "trial_id": "pilot--pilot-membership--r1--sol-fixed"
+      },
+      "run_id": "46e01a47c57d8425dc88cae39b755a106da9da7bfada4405cb87be17de65a722",
+      "record_sha256": "9c6ac05c9dca33b0f42e77e723bad9452b0d0474593742692e022feea0688db6",
+      "output_sha256": "18495aca5f353b39ebfdaa4922a4a62cb9827ba14059b5a2a4fbfa87c6b8fca5",
+      "workflow_nanousd": 24156000,
+      "wall_time_ns": 21716100200,
+      "provider_calls": 3,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "pilot",
+      "trial": {
+        "arm_id": "astra-dynamic",
+        "block": 1,
+        "model": "gpt-6-astra",
+        "ordinal": 5,
+        "position": 1,
+        "repetition": 1,
+        "source_sha256": "595bdc4e51467f1505f243cc18b8604b9c30293412ffe10c1d468736593d7743",
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-membership",
+        "task_sha256": "f6fe44001355c8b6712ebf1c7c13a1e8c41e91e0ec3e0d0b107bbb3829ff82c6",
+        "trial_id": "pilot--pilot-membership--r1--astra-dynamic"
+      },
+      "run_id": "e481418c6e5656dcba56df2d178f20205901efa3594c5d4caf6ec86be9856f53",
+      "record_sha256": "cdceecd58f9b5821ed487b56c5a03f938496c5901475383dab4e3b041865f742",
+      "output_sha256": "22193f7a5b52c188993c1ddfdb0a822a73788ea251b4fed5c3773d3129b27ce0",
+      "workflow_nanousd": 208702500,
+      "wall_time_ns": 52663500100,
+      "provider_calls": 6,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "pilot",
+      "trial": {
+        "arm_id": "astra-fixed",
+        "block": 1,
+        "model": "gpt-6-astra",
+        "ordinal": 6,
+        "position": 2,
+        "repetition": 1,
+        "source_sha256": "595bdc4e51467f1505f243cc18b8604b9c30293412ffe10c1d468736593d7743",
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-membership",
+        "task_sha256": "f6fe44001355c8b6712ebf1c7c13a1e8c41e91e0ec3e0d0b107bbb3829ff82c6",
+        "trial_id": "pilot--pilot-membership--r1--astra-fixed"
+      },
+      "run_id": "25fb5b963293a12c605c0bdfc15e213775367f434e438fa07621c961bbce7b78",
+      "record_sha256": "d2335ac6983c71c0a7bd05996f81bf44473b4b81df2105874a67b468516bc997",
+      "output_sha256": "960b820f936906c9649ecd55da4b5e67e743dfc5a27d7294d29a2a97a89a71c9",
+      "workflow_nanousd": 73750000,
+      "wall_time_ns": 25741490800,
+      "provider_calls": 3,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "pilot",
+      "trial": {
+        "arm_id": "sol-dynamic",
+        "block": 1,
+        "model": "gpt-5.6-sol",
+        "ordinal": 7,
+        "position": 3,
+        "repetition": 1,
+        "source_sha256": "595bdc4e51467f1505f243cc18b8604b9c30293412ffe10c1d468736593d7743",
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-membership",
+        "task_sha256": "f6fe44001355c8b6712ebf1c7c13a1e8c41e91e0ec3e0d0b107bbb3829ff82c6",
+        "trial_id": "pilot--pilot-membership--r1--sol-dynamic"
+      },
+      "run_id": "e8259b6db24a22e130ae1cd04ae1aa45a7842ac347d1b5ba414525b9b274e0d9",
+      "record_sha256": "2e7db27a47e9335db0d122f333bd1a41c67ae2e6bcab5f47b46079c7e47c36e0",
+      "output_sha256": "2f28cbaf081416b07db92c1648a746d3db90e447bbfbabe35c65e5bb541de718",
+      "workflow_nanousd": 57885000,
+      "wall_time_ns": 31258386100,
+      "provider_calls": 5,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "pilot",
+      "trial": {
+        "arm_id": "astra-dynamic",
+        "block": 2,
+        "model": "gpt-6-astra",
+        "ordinal": 8,
+        "position": 0,
+        "repetition": 1,
+        "source_sha256": "0c9f0bc9971a39aa2585ff97d7e2b9bd86ab07a07177fc3b3846e45e0d37184c",
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-calendar",
+        "task_sha256": "d3743df9dd8b3928f3b33fb6b544430d8a046b550d5c92c25a3a6af1409bb5d4",
+        "trial_id": "pilot--pilot-calendar--r1--astra-dynamic"
+      },
+      "run_id": "bd2b98a42bf4495a87e431184f9ecbfcb8c472df0b2b2b3431d667e807acd400",
+      "record_sha256": "de754e0973029b04449e979cb0f93995a1833409eb322b1a1e7df2bb3d25ab2c",
+      "output_sha256": "5f330c67a58bf43ec72f14414512aa25c8bc1e3330a541b087d81e4dfcb89ea9",
+      "workflow_nanousd": 25675000,
+      "wall_time_ns": 10883991300,
+      "provider_calls": 2,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "pilot",
+      "trial": {
+        "arm_id": "sol-dynamic",
+        "block": 2,
+        "model": "gpt-5.6-sol",
+        "ordinal": 9,
+        "position": 1,
+        "repetition": 1,
+        "source_sha256": "0c9f0bc9971a39aa2585ff97d7e2b9bd86ab07a07177fc3b3846e45e0d37184c",
+        "stage": "pilot",
+        "strategy": "smythe_dynamic",
+        "task_id": "pilot-calendar",
+        "task_sha256": "d3743df9dd8b3928f3b33fb6b544430d8a046b550d5c92c25a3a6af1409bb5d4",
+        "trial_id": "pilot--pilot-calendar--r1--sol-dynamic"
+      },
+      "run_id": "997c8edce1dfa36f266f646cc21406caa2bd27a567be005d22fd481435d0c43b",
+      "record_sha256": "455e418351d737e58f862ff41d7162316ce51986e7c408c2a5085b683b60a856",
+      "output_sha256": "5f330c67a58bf43ec72f14414512aa25c8bc1e3330a541b087d81e4dfcb89ea9",
+      "workflow_nanousd": 8522000,
+      "wall_time_ns": 10120241800,
+      "provider_calls": 2,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "pilot",
+      "trial": {
+        "arm_id": "sol-fixed",
+        "block": 2,
+        "model": "gpt-5.6-sol",
+        "ordinal": 10,
+        "position": 2,
+        "repetition": 1,
+        "source_sha256": "0c9f0bc9971a39aa2585ff97d7e2b9bd86ab07a07177fc3b3846e45e0d37184c",
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-calendar",
+        "task_sha256": "d3743df9dd8b3928f3b33fb6b544430d8a046b550d5c92c25a3a6af1409bb5d4",
+        "trial_id": "pilot--pilot-calendar--r1--sol-fixed"
+      },
+      "run_id": "41ac2468e2f6668cd3be27d3c5106b926aa819137be60d9603f275aa0044e6b7",
+      "record_sha256": "adf91eace21868c67ffb093db015839ab79cdd9a456fad98fe91a294e839561a",
+      "output_sha256": "5f330c67a58bf43ec72f14414512aa25c8bc1e3330a541b087d81e4dfcb89ea9",
+      "workflow_nanousd": 7232000,
+      "wall_time_ns": 8038111200,
+      "provider_calls": 3,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    },
+    {
+      "stage": "pilot",
+      "trial": {
+        "arm_id": "astra-fixed",
+        "block": 2,
+        "model": "gpt-6-astra",
+        "ordinal": 11,
+        "position": 3,
+        "repetition": 1,
+        "source_sha256": "0c9f0bc9971a39aa2585ff97d7e2b9bd86ab07a07177fc3b3846e45e0d37184c",
+        "stage": "pilot",
+        "strategy": "fixed_pipeline",
+        "task_id": "pilot-calendar",
+        "task_sha256": "d3743df9dd8b3928f3b33fb6b544430d8a046b550d5c92c25a3a6af1409bb5d4",
+        "trial_id": "pilot--pilot-calendar--r1--astra-fixed"
+      },
+      "run_id": "e80fb85a06b30c7acc2fb82c6e24ce8332f19b6084c8506098c1dd9ee263f1a5",
+      "record_sha256": "80ebdb22a19471bed1cec4886109c03fe66e8601be7307a5425aae35aeb5cdaa",
+      "output_sha256": "5f330c67a58bf43ec72f14414512aa25c8bc1e3330a541b087d81e4dfcb89ea9",
+      "workflow_nanousd": 20480000,
+      "wall_time_ns": 17435693700,
+      "provider_calls": 3,
+      "execution_status": "completed",
+      "deterministic_checks": {
+        "accepted": null,
+        "deterministic_passed": true,
+        "failed_checks": [],
+        "quality_evaluated": false
+      }
+    }
+  ],
+  "evidence_archive": {
+    "path": "pilot-evidence.zip",
+    "sha256": "6fee1bc87bf369c2de413661d89eaafaf04ed33737148313320ef04e9c496639",
+    "bytes": 1593742,
+    "members": 107
+  },
+  "limitations": [
+    "Calibration only: three tasks and one repetition per arm in each pilot; not confirmatory performance evidence.",
+    "Windows development host; concurrent development and offline checks were not excluded from pilot timing.",
+    "All 12 original outputs scored 4/4 on every rubric criterion; one deliberately flawed control was rejected. This does not establish sensitivity to subtle differences.",
+    "Corrected format-pilot outputs have deterministic checks; they have not been independently judged.",
+    "Gemini omitted cached-input counters; judge charges are a native-usage-derived interval, budgeted at the upper bound.",
+    "No human calibration or main-study result is represented by this record."
+  ]
+}

@@ -1,0 +1,137 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="800" viewBox="0 0 1100 800" role="img" aria-label="192 and 256 authored SVG glyph workflows: all 36 measurements and an actual median-run phase breakdown">
+<rect width="1100" height="800" fill="#ffffff"/>
+<defs>
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse">
+    <rect width="8" height="8" fill="#ffffff"/>
+    <path d="M-2 2L2-2M0 8L8 0M6 10L10 6" fill="none" stroke="#000000" stroke-width="2"/>
+  </pattern>
+</defs>
+<text x="40" y="36" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="1.6">AUTHORED SVG WORKFLOW / V2</text>
+<text x="40" y="76" font-family="Georgia,'Times New Roman',serif" font-size="30" fill="#000000" text-anchor="start" font-weight="700">More glyphs. The same complete workflow.</text>
+<text x="40" y="106" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="normal">Three repetitions per cell · compilation, four-size validation, pair comparisons, file export</text>
+<text x="40" y="163" font-family="'Trajan Pro 3','Trajan Pro',Trajan,Cinzel,Georgia,serif" font-size="42" fill="#000000" text-anchor="start" font-weight="700">192</text>
+<text x="152" y="148" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="18" fill="#000000" text-anchor="start" font-weight="700">6.66s best median</text>
+<text x="152" y="173" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Process c4 · 2.06× its c1 baseline</text>
+<text x="40" y="224" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Process / c1</text>
+<rect x="158" y="210" width="92.4137" height="20" fill="#ffffff" stroke="#000000"/>
+<path d="M243.6825 235H255.6627M243.6825 231V239M255.6627 231V239" fill="none" stroke="#000000"/>
+<text x="530" y="225" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">13.69s</text>
+<circle cx="255.6627" cy="235" r="2.5" fill="#000000" data-seconds="14.468547399999807"/>
+<circle cx="250.4137" cy="235" r="2.5" fill="#000000" data-seconds="13.690916899999138"/>
+<circle cx="243.6825" cy="235" r="2.5" fill="#000000" data-seconds="12.69370349998644"/>
+<text x="40" y="269" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Process / c4</text>
+<rect x="158" y="255" width="44.9479" height="20" fill="#ffffff" stroke="#000000"/>
+<path d="M199.8057 280H207.3254M199.8057 276V284M207.3254 276V284" fill="none" stroke="#000000"/>
+<text x="530" y="270" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">6.66s</text>
+<circle cx="199.8057" cy="280" r="2.5" fill="#000000" data-seconds="6.1934334999969"/>
+<circle cx="207.3254" cy="280" r="2.5" fill="#000000" data-seconds="7.307464600002277"/>
+<circle cx="202.9479" cy="280" r="2.5" fill="#000000" data-seconds="6.658949600008782"/>
+<text x="40" y="314" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Process / c8</text>
+<rect x="158" y="300" width="47.6106" height="20" fill="#ffffff" stroke="#000000"/>
+<path d="M198.9200 325H207.2299M198.9200 321V329M207.2299 321V329" fill="none" stroke="#000000"/>
+<text x="530" y="315" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">7.05s</text>
+<circle cx="207.2299" cy="325" r="2.5" fill="#000000" data-seconds="7.293311600005836"/>
+<circle cx="205.6106" cy="325" r="2.5" fill="#000000" data-seconds="7.053420600001118"/>
+<circle cx="198.9200" cy="325" r="2.5" fill="#000000" data-seconds="6.062221599990153"/>
+<text x="40" y="359" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Thread / c1</text>
+<rect x="158" y="345" width="111.6860" height="20" fill="#ffffff" stroke="#000000"/>
+<path d="M267.3536 370H272.7747M267.3536 366V374M272.7747 366V374" fill="none" stroke="#000000"/>
+<text x="530" y="360" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">16.55s</text>
+<circle cx="269.6860" cy="370" r="2.5" fill="#000000" data-seconds="16.546069099989836"/>
+<circle cx="272.7747" cy="370" r="2.5" fill="#000000" data-seconds="17.00365439998859"/>
+<circle cx="267.3536" cy="370" r="2.5" fill="#000000" data-seconds="16.20052630000282"/>
+<text x="40" y="404" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Thread / c4</text>
+<rect x="158" y="390" width="169.6093" height="20" fill="#ffffff" stroke="#000000"/>
+<path d="M314.7038 415H329.1275M314.7038 411V419M329.1275 411V419" fill="none" stroke="#000000"/>
+<text x="530" y="405" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">25.13s</text>
+<circle cx="329.1275" cy="415" r="2.5" fill="#000000" data-seconds="25.352229300013278"/>
+<circle cx="327.6093" cy="415" r="2.5" fill="#000000" data-seconds="25.12730069999816"/>
+<circle cx="314.7038" cy="415" r="2.5" fill="#000000" data-seconds="23.21537510000053"/>
+<text x="40" y="449" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Thread / c8</text>
+<rect x="158" y="435" width="169.7113" height="20" fill="#ffffff" stroke="#000000"/>
+<path d="M325.2333 460H349.4639M325.2333 456V464M349.4639 456V464" fill="none" stroke="#000000"/>
+<text x="530" y="450" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">25.14s</text>
+<circle cx="327.7113" cy="460" r="2.5" fill="#000000" data-seconds="25.14241289999336"/>
+<circle cx="325.2333" cy="460" r="2.5" fill="#000000" data-seconds="24.775309999997262"/>
+<circle cx="349.4639" cy="460" r="2.5" fill="#000000" data-seconds="28.365017799995258"/>
+<path d="M158 492h270" stroke="#000000"/>
+<text x="158.0" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">0</text>
+<text x="191.75" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">5</text>
+<text x="225.5" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">10</text>
+<text x="259.25" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">15</text>
+<text x="293.0" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">20</text>
+<text x="326.75" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">25</text>
+<text x="360.5" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">30</text>
+<text x="394.25" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">35</text>
+<text x="428.0" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">40</text>
+<text x="158" y="533" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="normal">Complete wall time (seconds) · lower is better</text>
+<text x="580" y="163" font-family="'Trajan Pro 3','Trajan Pro',Trajan,Cinzel,Georgia,serif" font-size="42" fill="#000000" text-anchor="start" font-weight="700">256</text>
+<text x="692" y="148" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="18" fill="#000000" text-anchor="start" font-weight="700">8.06s best median</text>
+<text x="692" y="173" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Process c8 · 2.20× its c1 baseline</text>
+<text x="580" y="224" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Process / c1</text>
+<rect x="698" y="210" width="119.4068" height="20" fill="#000000" stroke="#000000"/>
+<path d="M816.0107 235H821.7660M816.0107 231V239M821.7660 231V239" fill="none" stroke="#000000"/>
+<text x="1070" y="225" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">17.69s</text>
+<circle cx="821.7660" cy="235" r="2.5" fill="#000000" data-seconds="18.335697699993034"/>
+<circle cx="816.0107" cy="235" r="2.5" fill="#000000" data-seconds="17.483065700012958"/>
+<circle cx="817.4068" cy="235" r="2.5" fill="#000000" data-seconds="17.689894399998593"/>
+<text x="580" y="269" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Process / c4</text>
+<rect x="698" y="255" width="58.7503" height="20" fill="#000000" stroke="#000000"/>
+<path d="M755.5906 280H774.3089M755.5906 276V284M774.3089 276V284" fill="none" stroke="#000000"/>
+<text x="1070" y="270" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">8.70s</text>
+<circle cx="774.3089" cy="280" r="2.5" fill="#000000" data-seconds="11.305027599999448"/>
+<circle cx="755.5906" cy="280" r="2.5" fill="#000000" data-seconds="8.531939799999236"/>
+<circle cx="756.7503" cy="280" r="2.5" fill="#000000" data-seconds="8.703743000005488"/>
+<text x="580" y="314" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Process / c8</text>
+<rect x="698" y="300" width="54.3918" height="20" fill="#000000" stroke="#000000"/>
+<path d="M747.2199 325H773.2994M747.2199 321V329M773.2994 321V329" fill="none" stroke="#000000"/>
+<text x="1070" y="315" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">8.06s</text>
+<circle cx="747.2199" cy="325" r="2.5" fill="#000000" data-seconds="7.291834499992547"/>
+<circle cx="752.3918" cy="325" r="2.5" fill="#000000" data-seconds="8.05804750000243"/>
+<circle cx="773.2994" cy="325" r="2.5" fill="#000000" data-seconds="11.155471599995508"/>
+<text x="580" y="359" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Thread / c1</text>
+<rect x="698" y="345" width="151.6095" height="20" fill="#000000" stroke="#000000"/>
+<path d="M839.5416 370H853.1062M839.5416 366V374M853.1062 366V374" fill="none" stroke="#000000"/>
+<text x="1070" y="360" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">22.46s</text>
+<circle cx="839.5416" cy="370" r="2.5" fill="#000000" data-seconds="20.969121899994207"/>
+<circle cx="853.1062" cy="370" r="2.5" fill="#000000" data-seconds="22.97869139999966"/>
+<circle cx="849.6095" cy="370" r="2.5" fill="#000000" data-seconds="22.460665899998276"/>
+<text x="580" y="404" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Thread / c4</text>
+<rect x="698" y="390" width="226.0252" height="20" fill="#000000" stroke="#000000"/>
+<path d="M921.1554 415H926.9426M921.1554 411V419M926.9426 411V419" fill="none" stroke="#000000"/>
+<text x="1070" y="405" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">33.49s</text>
+<circle cx="921.1554" cy="415" r="2.5" fill="#000000" data-seconds="33.060058199989726"/>
+<circle cx="924.0252" cy="415" r="2.5" fill="#000000" data-seconds="33.48521800000162"/>
+<circle cx="926.9426" cy="415" r="2.5" fill="#000000" data-seconds="33.91742950001208"/>
+<text x="580" y="449" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Thread / c8</text>
+<rect x="698" y="435" width="230.3638" height="20" fill="#000000" stroke="#000000"/>
+<path d="M920.8036 460H935.9602M920.8036 456V464M935.9602 456V464" fill="none" stroke="#000000"/>
+<text x="1070" y="450" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="end" font-weight="700">34.13s</text>
+<circle cx="928.3638" cy="460" r="2.5" fill="#000000" data-seconds="34.12797210000281"/>
+<circle cx="920.8036" cy="460" r="2.5" fill="#000000" data-seconds="33.007946199999424"/>
+<circle cx="935.9602" cy="460" r="2.5" fill="#000000" data-seconds="35.25335640000412"/>
+<path d="M698 492h270" stroke="#000000"/>
+<text x="698.0" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">0</text>
+<text x="731.75" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">5</text>
+<text x="765.5" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">10</text>
+<text x="799.25" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">15</text>
+<text x="833.0" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">20</text>
+<text x="866.75" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">25</text>
+<text x="900.5" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">30</text>
+<text x="934.25" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">35</text>
+<text x="968.0" y="511" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="middle" font-weight="normal">40</text>
+<text x="698" y="533" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="11" fill="#000000" text-anchor="start" font-weight="normal">Complete wall time (seconds) · lower is better</text>
+<text x="40" y="589" font-family="Georgia,'Times New Roman',serif" font-size="17" fill="#000000" text-anchor="start" font-weight="700">Inside one actual 256-glyph run: process c8, repetition 2</text>
+<rect x="40.00000" y="610" width="133.89851" height="25" fill="#000000" stroke="#000000" data-phase="Compile" data-seconds="1.057804500000202"/>
+<text x="40" y="661" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Compile: 1.06s</text>
+<rect x="173.89851" y="610" width="685.75060" height="25" fill="url(#hatch)" stroke="#000000" data-phase="Validate" data-seconds="5.417461700009881"/>
+<text x="295" y="661" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Validate: 5.42s</text>
+<rect x="859.64912" y="610" width="175.24164" height="25" fill="#ffffff" stroke="#000000" data-phase="Export" data-seconds="1.3844171000091592"/>
+<text x="550" y="661" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Export: 1.38s</text>
+<rect x="1034.89076" y="610" width="25.10924" height="25" fill="#ffffff" stroke="#000000" stroke-dasharray="3 2" data-phase="Setup / shutdown / overhead" data-seconds="0.19836419998318888"/>
+<text x="805" y="661" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Setup / shutdown / overhead: 0.20s</text>
+<text x="40" y="702" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">36 workflows · zero API calls · hardware, energy and design labor unpriced</text>
+<text x="40" y="726" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Bars: medians. Points and whiskers: every repetition and min–max. Both panels share the same scale.</text>
+<text x="40" y="750" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Authored contours are fixed before sampling. This measures neither creative design nor screensaver FPS.</text>
+<text x="40" y="780" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="start" font-weight="normal">Source: glyph_svg_v2_20260913.json · SHA-256 5b9d3868462984d7</text>
+</svg>

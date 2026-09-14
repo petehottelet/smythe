@@ -40,7 +40,8 @@ function scene(reduced = false) {
         this.stamps++; this.rendered.push([sprite.id, x, y, this.globalAlpha]);
       },
       clearRect() { this.rendered = []; }, beginPath() {}, arc() {}, fill() {}, moveTo() {},
-      lineTo() {}, quadraticCurveTo() {}, stroke() {}
+      lineTo() {}, quadraticCurveTo() {}, stroke() {},
+      save() {}, restore() {}, translate() {}, scale() {}
     };
     return { getContext: () => context };
   }
@@ -51,6 +52,7 @@ function scene(reduced = false) {
     matchMedia: () => ({ matches: reduced }),
     performance: { now: () => 0 },
     OffscreenCanvas: function() { return canvas(); },
+    Path2D: function(path) { assert.ok(path.includes('M')); this.path = path; },
     requestAnimationFrame: () => ++rafCalls,
     cancelAnimationFrame: handle => { cancelled.push(handle); },
     setTimeout: callback => { events.timeout = callback; }, clearTimeout() {},

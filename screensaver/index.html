@@ -58,10 +58,9 @@
 <script src="glyphs.js"></script>
 <script>
 "use strict";
-// GLYPHS (from glyphs.js) carries the framework-generated stroke programs:
-// ("l", x1,y1,x2,y2,w) lines, ("q", x1,y1,cx,cy,x2,y2,w) curves, and
-// ("d", x,y,r) dots on a 100x140 canvas, plus per-glyph speed and trail.
-const COUNT = GLYPHS.strokes.length;
+// Complete filled contours share the current web and native SVG catalog.
+const COUNT = GLYPHS.paths.length;
+const PATHS = GLYPHS.paths.map(paths => new Path2D(paths.join(" ")));
 const [CW, CH] = GLYPHS.canvas;
 
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -76,26 +75,12 @@ const LAYERS = [
 ];
 
 function drawGlyphPath(ctx, index, ox, oy, glyphH, color) {
-  const gw = glyphH * CW / CH;
-  const sx = gw / CW, sy = glyphH / CH;
-  ctx.strokeStyle = color;
+  ctx.save();
+  ctx.translate(ox, oy);
+  ctx.scale(glyphH / CH, glyphH / CH);
   ctx.fillStyle = color;
-  ctx.lineCap = "square";
-  ctx.lineJoin = "bevel";
-  for (const s of GLYPHS.strokes[index]) {
-    if (s[0] === "d") {
-      ctx.beginPath();
-      ctx.arc(ox + s[1] * sx, oy + s[2] * sy, Math.max(0.6 * dpr, s[3] * sx * 1.2), 0, 7);
-      ctx.fill();
-      continue;
-    }
-    ctx.beginPath();
-    ctx.lineWidth = Math.max(0.8 * dpr, s[s.length - 1] * sx * 1.38);
-    ctx.moveTo(ox + s[1] * sx, oy + s[2] * sy);
-    if (s[0] === "l") ctx.lineTo(ox + s[3] * sx, oy + s[4] * sy);
-    else ctx.quadraticCurveTo(ox + s[3] * sx, oy + s[4] * sy, ox + s[5] * sx, oy + s[6] * sy);
-    ctx.stroke();
-  }
+  ctx.fill(PATHS[index], "nonzero");
+  ctx.restore();
 }
 
 // Pre-render every glyph twice per layer: a trail sprite in layer green and a
