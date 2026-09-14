@@ -115,7 +115,7 @@ set; every run and the unresolved cost range remain in the records.
 ran **56.2× faster** than serial execution. This is a controlled offline
 measurement with 5.8 seconds of simulated provider latency per call.
 All measured 64-, 128-, 192-, and 256-node runs produced complete sets of valid,
-unique tiles. This measures artifact generation, not screensaver frame rate.
+unique tiles.
 
 <p align="center">
   <img src="assets/benchmarks/glyph_scaling.svg" alt="Controlled offline glyph generation at four graph widths, with all tiles valid and unique at every measured concurrency" width="900">
