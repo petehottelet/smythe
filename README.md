@@ -300,9 +300,10 @@ packages, installed typing checks and a separately verified Repo Doctor ZIP.
   was not met.
 - **Broader evidence:** bounded paid scale trials, repeated live glyph sweeps, and
   human-calibrated quality comparisons with saved outputs and judge reasoning.
-- **Fable 5.1:** [prepared extension](benchmarks/fable_51_benchmark_plan.md) with
-  12 pilot and 100 main workflows. Native Claude accounting and access checks
-  precede paid execution; no Fable results yet.
+- **Fable 5.1:** [12-pilot/100-main study](benchmarks/fable_51_benchmark_plan.md),
+  with native Claude billing and saved-response recovery. The runner requires
+  completed pilot checks and human review before main execution. Ultracode is
+  a separate comparison within the same $100 allocation; no Fable results yet.
 - **Astra follow-ups:** compare concurrency one and eight on identical graphs,
   match modern framework adapters, and measure durable tool workflows. These
   [separate studies](benchmarks/astra_benchmark_plan.md#separate-follow-up-studies)

@@ -1,6 +1,11 @@
 # Claude Fable 5.1 benchmark extension
 
-**Status: preparation only; no Fable provider calls or results.**
+**Status: native Messages runner implemented; pilot not yet executed.**
+
+The [runner](fable_runtime.py) freezes current sources, dependencies, model
+access, prior spending, and offline validation before paid execution. Its
+12-run pilot must pass the medium-effort contracts and actual human review
+before the 100-run main study starts. No Fable results are published yet.
 
 Compare fixed and generated execution graphs with `claude-fable-5-1` through
 the native Claude Messages API. This tests whether the Astra/Sol observations
@@ -13,6 +18,32 @@ The [preparation record](fable_51_preparation_20260913.json) binds the proposed
 source hashes. It is not an executable runner, paid-runtime freeze, or result.
 
 ## Experiment
+
+### Separate Ultracode allocation
+
+The approved $100 extension now also includes a separately labeled Claude Code
+Workflow comparison. Native pilot/main receive caps of $10/$60; Code pilot/main
+receive $5/$15; judging keeps $10. These tighter subcaps preserve the original
+$15 pilot, $75 main, and $10 judging allocations. Each workflow still reserves
+$5 before dispatch. No stage borrows from another. Prior Astra/Sol charges and
+held unknown exposure remain included under the $300 overall ceiling.
+
+The native Messages schedule is unchanged. The Code comparison starts with
+one `pilot-membership` workflow, then one workflow for each of the ten main
+tasks if the pilot and budget gates pass. Compare these with repetition one
+of the native generated-graph arm, using the same answer contracts and source
+packs. Report this smaller comparison separately: Code's prompts, execution
+runtime, retries, and Workflow scheduling are different experimental conditions.
+Retain generated orchestration scripts, all outcomes, native billing evidence,
+and observed Workflow use. A run that never invokes Workflow is a protocol
+failure, not an Ultracode result. No Code trial enters the 100-run native estimate.
+
+[Anthropic's Workflow documentation](https://platform.claude.com/cookbook/claude-agent-sdk-08-dynamic-workflows)
+describes Ultracode as Claude Code orchestration. It is not an API effort enum.
+The Code runner must verify bounded child-agent spending and retain complete
+usage evidence before its first paid trial.
+
+### Native matched schedule
 
 | Stage | Design | Workflows | Use |
 |---|---|---:|---|
@@ -123,19 +154,18 @@ continuation authorized one specific Astra/Sol incident, not future incidents.
 ## Implementation and launch gates
 
 1. **Credential and access.** Configure `ANTHROPIC_API_KEY` locally. Retrieve
-   the exact model's metadata and retain a sanitized access receipt. This
-   checkout currently has no Anthropic key in its environment or `.env`.
+   the exact model's metadata and retain a sanitized access receipt. A local
+   key is configured; fresh metadata is bound into the runtime freeze.
    Never change account retention settings automatically.
    [Model metadata endpoint](https://platform.claude.com/docs/en/api/models/retrieve).
-2. **Native adapter.** Add a Messages adapter with explicit effort, zero
+2. **Native adapter.** The Messages adapter supplies explicit effort, zero
    retries, exact request counting/quotes, integer pricing, raw evidence,
    refusal/truncation handling, cancellation accounting, and offline replay.
    The existing `AnthropicProvider` reads ordinary input/output only and uses
    the generic cost fallback; it is unsuitable for this cost comparison.
-3. **Durable integration.** Extend the provider descriptor, journal settlement,
-   replay decoder, and workflow factory. `workflow_provider.py` currently
-   accepts native OpenAI Responses and stateless offline providers only.
-   Adding a model string to the Astra runner cannot satisfy this gate.
+3. **Durable integration.** Messages is integrated into the provider descriptor,
+   journal settlement, replay decoder, and workflow factory. Its Anthropic
+   pricing path is separate from native OpenAI Responses and offline calls.
 4. **Offline qualification.** Cover cache categories, malformed/missing usage,
    unexpected model/tier, output caps, refusals, known-charge parse failures,
    disconnects, cancellation, concurrency reservations, replay without calls,

@@ -23,6 +23,7 @@ from smythe.provider_responses import (
     _json_dump,
 )
 from smythe.tools import ChatMessage, ToolSpec
+from smythe.provider_messages import AnthropicMessagesProvider
 from smythe.workflow_store import WorkflowError
 
 if TYPE_CHECKING:
@@ -40,8 +41,8 @@ class WorkflowQuoteError(ResponseQuoteError, WorkflowError):
 
 def describe_provider(provider: Provider) -> dict:
     """Preflight an exact supported built-in without SDK, network or secrets."""
-    if type(provider) not in (OpenAIResponsesProvider, OfflineProvider):
-        raise ValueError("Durable workflows require native Responses or stateless OfflineProvider")
+    if type(provider) not in (OpenAIResponsesProvider, AnthropicMessagesProvider, OfflineProvider):
+        raise ValueError("Durable workflows require native Responses, Messages or stateless OfflineProvider")
     return json.loads(_json_dump(provider.workflow_descriptor()))
 
 
@@ -139,7 +140,7 @@ class WorkflowProviderContext:
                 source = self._providers[provider_id]
                 self._pooled[provider_id] = (
                     await self._stack.enter_async_context(source.session())
-                    if type(source) is OpenAIResponsesProvider else source
+                    if type(source) in (OpenAIResponsesProvider, AnthropicMessagesProvider) else source
                 )
             return self._pooled[provider_id]
 
@@ -172,7 +173,7 @@ class JournaledProvider(Provider):
                        or message.tool_calls or message.tool_results
                        or message.provider_continuation is not None for message in messages)):
             raise ValueError("Durable workflows currently accept plain text messages without tools")
-        if type(source) is OpenAIResponsesProvider:
+        if type(source) in (OpenAIResponsesProvider, AnthropicMessagesProvider):
             prepared = source.prepare(system, messages, model)
         else:
             if len(messages) != 1 or messages[0].role != "user":
@@ -320,7 +321,7 @@ class JournaledProvider(Provider):
             # A billing latch is not a semantic rejection. Leave saved output
             # pending so resolving another call can unlock local decoding.
             try:
-                if type(source) is OpenAIResponsesProvider:
+                if type(source) in (OpenAIResponsesProvider, AnthropicMessagesProvider):
                     native = source.extract_receipt(envelope)
                     billing = CompletionResult(
                         "", prompt_tokens=native.input_tokens, completion_tokens=native.output_tokens,
@@ -341,7 +342,7 @@ class JournaledProvider(Provider):
                 receipt=record["receipt"], billing_result=billing,
             ), record, replayed=replayed)
         try:
-            if type(source) is OpenAIResponsesProvider:
+            if type(source) in (OpenAIResponsesProvider, AnthropicMessagesProvider):
                 result = source.decode(envelope)
             else:
                 raw = envelope.json()

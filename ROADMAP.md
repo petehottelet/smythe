@@ -228,11 +228,12 @@ Human review is complete: all eight flagged main answers were accepted at 4/4.
 The records are claimable within their documented descriptive scope; the
 191/200 automatic classifications and affected cost bounds are retained.
 
-The [Fable 5.1 extension](benchmarks/fable_51_benchmark_plan.md) has a prepared
-12-workflow pilot and 100-workflow main schedule. Native Claude usage accounting,
-durable integration, access verification, and pilot review precede main runs.
-No Fable calls or results are recorded. Its $100 sublimit fits inside the
-existing $300 ceiling, with earlier charges and reservations retained.
+The [Fable 5.1 extension](benchmarks/fable_51_benchmark_plan.md) has a native
+Messages runner for its 12-workflow pilot and 100-workflow main schedule.
+Usage accounting and saved-response recovery are integrated into the durable
+ledger. Pilot checks and human review gate main execution. A separate
+Ultracode comparison shares its $100 sublimit inside the existing $300 ceiling.
+Earlier charges and reservations remain counted; no Fable results yet.
 
 The remaining runtime and evidence priorities are:
 
