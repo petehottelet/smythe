@@ -45,6 +45,7 @@ verification, trace, artifact, and recovery controls.
 
 ## Artifact workflows
 
+- [Current materials](current-materials.md) — direct links to revised contact sheets, previews, exports, reports, and the publication completion check
 - [Glyph contour review](glyph-contour-review-2026-09-12.md) — reference measurements and the full 192-glyph v2 replacement catalog
 - [192/256-glyph workflow results](../benchmarks/svg_v2_results.md) — 36 completed v2 workflows, timing and memory charts; [protocol](../benchmarks/svg_v2_protocol.md) and raw receipts
 - [256-glyph contact sheets](../benchmarks/partitions/glyph_svg_v2_256/README.md) — the reviewed 192 plus 64 additional structures, with no changes to the live catalog
@@ -52,7 +53,7 @@ verification, trace, artifact, and recovery controls.
 - [Framework comparison](../benchmarks/README.md#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12) — matched Smythe, LangGraph, and CrewAI evidence
 - [Image benchmarks](../benchmarks/image_benchmarks.md) — image fan-out and exact-spec finishing
 - [Glyph Rain benchmark](../benchmarks/glyph_screensaver_benchmark.md) — an artifact fan-out example with isolated 64-, 128-, 192-, and 256-node measurements
-- [Original SVG workflow](../benchmarks/svg_glyph_benchmark.md) — fresh geometry, complete style validation, catalog assembly, and repeated thread/process measurements
+- [Historical v1 SVG workflow](../benchmarks/svg_glyph_benchmark.md) — archived geometry, validation, assembly, and timing records; current artwork is linked above
 - [Glyph Rain screensaver](../screensaver/README.md) — source builds for Windows, macOS, and Linux using 56 reference and 192 original SVG shapes, with the current v2 originals and a 10% original mix; no precompiled distribution
 - [Web explorer and animated preview](../screensaver/svg-preview/README.md) — new-glyph-only gallery and animation; adjustable reference mix, Matrix green rain, and pixel controls
 - [Glyph Rain design plan](glyph-rain-plan.md) — measured original-glyph distributions, licensed renderer scope, and native porting criteria

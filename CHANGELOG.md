@@ -23,6 +23,11 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Added
 
+- **Current materials index**: link revised 192/256 contact sheets, previews,
+  source exports, and benchmark reports from one page. Require a materials
+  check with each benchmark publication; label the archived v1 catalog,
+  correct the preview's no-JavaScript link, and keep native releases source-only.
+
 - **Fable 5.1 experiment preparation**: bind a 12-workflow medium/high pilot and
   100-workflow medium-effort main design to the existing task contracts, native
   Claude accounting requirements, and a shared spending envelope. Preparation

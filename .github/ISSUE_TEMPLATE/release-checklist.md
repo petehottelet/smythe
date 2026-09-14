@@ -14,7 +14,7 @@ Follow [RELEASING.md](https://github.com/petehottelet/smythe/blob/main/RELEASING
 - Wheel and sdist filenames with SHA-256 hashes:
 - Installed-wheel/SDK quickstart receipt:
 - Release notes and benchmark evidence links:
-- Native asset build records and hashes, when attached:
+- Native source-export hashes and platform qualification status:
 
 ## Preflight
 
@@ -34,7 +34,8 @@ Follow [RELEASING.md](https://github.com/petehottelet/smythe/blob/main/RELEASING
 - [ ] The version commit is pushed and its CI checks pass; tag `vX.Y.Z` points to that tested commit.
 - [ ] `.github/workflows/publish.yml` exists and uses the GitHub environment `pypi` with `id-token: write`.
 - [ ] The GitHub release uses the matching tag and reviewed release notes.
-- [ ] Attached native packages include `SHA256SUMS` and `BUILD_INFO.json`; their independent native version and source commit are explicit. Attaching an existing verified build does not imply a rebuild.
+- [ ] Current contact sheets, previews, source exports, charts, and documentation pass the [materials check](https://github.com/petehottelet/smythe/blob/main/docs/current-materials.md#completion-check-for-every-benchmark-update).
+- [ ] Screensaver distribution remains source-only while precompiled releases are paused; native source exports match `screensaver/native-catalog.json` and no compiled native packages are attached.
 
 ## PyPI
 

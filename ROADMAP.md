@@ -188,6 +188,8 @@ It adds the following runtime guarantees and measured evidence:
 
 ## Coming soon
 
+Every benchmark publication includes the [materials completion check](docs/current-materials.md#completion-check-for-every-benchmark-update): current glyph sheets, previews, exports, charts, links, and consistent documentation.
+
 The [12 September glyph review](docs/glyph-contour-review-2026-09-12.md)
 identifies contour defects missed by the old numerical gates. The complete
 [192-glyph v2 catalog](screensaver/glyph-design-v2/README.md), small-size sheets,

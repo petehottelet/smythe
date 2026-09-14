@@ -108,7 +108,14 @@ independently authored.
 The gallery shows only these new original glyphs. The live effect keeps its
 adjustable reference mix; use **Original glyphs: 100%** to see only v2.
 The [4.03-second generation result](../../benchmarks/svg_glyph_benchmark.md)
-belongs to the historical v1 workflow. V2 has no measured generation result yet.
+belongs to the historical v1 workflow. The [current v2 report](../../benchmarks/svg_v2_results.md)
+measures compilation, validation, and export of authored contours at 192 and
+256 glyphs. It does not time the design work or a model generating new shapes.
+
+[All current sheets, media, and benchmark reports](../../docs/current-materials.md).
+The capture record retains its original source hashes. The later no-JavaScript
+fallback-link correction changes no visible rain or glyph input; the
+[materials check](../../docs/data/materials-review-2026-09-13.json) records that difference.
 
 ## Renderer and checks
 

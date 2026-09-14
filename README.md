@@ -35,11 +35,13 @@ Example task: compile, validate, and export an original SVG glyph catalog for a 
 </p>
 
 **Explore the new glyphs:** [Complete 192-glyph sheet](screensaver/glyph-design-v2/contact-sheet-128.png) ·
+[Complete 256-glyph sheet](benchmarks/partitions/glyph_svg_v2_256/catalog/contact-sheet-128.png) ·
 [16 px](screensaver/glyph-design-v2/contact-sheet-16.png) ·
 [32 px](screensaver/glyph-design-v2/contact-sheet-32.png) ·
 [64 px](screensaver/glyph-design-v2/contact-sheet-64.png) ·
 [Individual SVGs and manifest](screensaver/glyph-design-v2/README.md) ·
-[Run the web explorer](screensaver/svg-preview/README.md).
+[Run the web explorer](screensaver/svg-preview/README.md) ·
+[All current materials](docs/current-materials.md).
 
 The v2 catalog uses clean cut ends, broad strokes, and deliberate openings.
 This animation shows **100% new Smythe glyphs**. The explorer also offers the

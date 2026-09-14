@@ -4,6 +4,8 @@ This inventory reconciles the README, roadmap, benchmark index and subsystem
 protocols. Software tests and prepared experiments are distinguished from
 completed measurement campaigns.
 
+Each completed campaign also needs the [materials check](current-materials.md#completion-check-for-every-benchmark-update): refresh affected charts, contact sheets, previews, exports, and documentation before publication.
+
 ## Current glyph work
 
 The [v2 protocol](../benchmarks/svg_v2_protocol.md) compares **192 and 256

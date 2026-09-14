@@ -55,6 +55,7 @@ available from the checkout after 0.7.0 and are not in the pinned package above.
 
 | Example | What it shows |
 |---|---|
+| [Current materials](../docs/current-materials.md) | Revised 192/256 contact sheets, detail sheets, animation, still image, native source exports, and each benchmark's evidence status. |
 | [GPT-6 Astra quickstart](../README.md#quickstart) | Generate, inspect, and execute a text-only task graph through native Responses, with a $5 run allowance, concurrency eight, and planning included in the SQLite ledger. |
 | [Native Astra/Sol Responses](../docs/openai-responses.md) | Smythe 0.7.0 counts and quotes an exact request before generation, records native token prices, and retains function-tool continuation and failed-response receipts. |
 | [Astra campaign preparation](../benchmarks/astra_benchmark_plan.md#prepared-experiment) | Validate 13 original task/source packs and reproduce the 12-pilot/200-main schedule locally, with no API calls. Factual checks remain separate from quality scoring. |

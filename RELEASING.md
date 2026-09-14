@@ -21,6 +21,8 @@ published or when a maintainer dispatches it manually.
 
 1. Complete the release's code review, Ruff check, full offline suite, and
    platform checks. Confirm the tested commit is on `main`.
+   Complete the [materials check](docs/current-materials.md#completion-check-for-every-benchmark-update)
+   for contact sheets, media, charts, benchmark status, and documentation links.
 2. Bump `version` in `pyproject.toml` **and** `__version__` in `smythe/__init__.py`.
    Move the completed `Unreleased` entries into a dated section for that version;
    keep older released sections unchanged. Update installation and feature
@@ -43,9 +45,9 @@ published or when a maintainer dispatches it manually.
    the tested commit, check URLs, package hashes, and release notes.
 5. Push the version commit and verify its CI checks. Create tag `vX.Y.Z` at
    that exact commit and publish its GitHub release. This triggers `publish.yml`.
-6. Attach the verified native screensaver packages with `SHA256SUMS` and
-   `BUILD_INFO.json`. Their independent native version and source commit remain
-   explicit in the build record; attaching them does not imply a new rebuild.
+6. Keep the screensaver distribution source-only while precompiled releases
+   are paused. Verify the Windows, macOS, and Linux source exports against
+   `screensaver/native-catalog.json`; do not attach compiled native packages.
 7. Verify the successful publish workflow. In a fresh environment, install
    `smythe==X.Y.Z` from PyPI, check its version, and exercise the installed CLI.
    Download the workflow's retained distributions and `package-hashes.txt`;

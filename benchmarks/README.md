@@ -9,6 +9,10 @@ with observed quality in the same measured band.
 Every public number links to harness source and a committed raw record. Offline
 mechanics run in CI with deterministic providers and zero API cost.
 
+[Current sheets, previews, and reports](../docs/current-materials.md) provide
+direct links to the revised glyphs. Complete the linked materials check when
+publishing benchmark updates.
+
 ## Evidence status
 
 | Campaign | Status | Current result |
@@ -265,8 +269,10 @@ assembly and worker lifecycle. All repetitions and sampled memory are retained.
 
 ## Original SVG workflow — historical v1
 
-This campaign measures the historical v1 catalog. The current v2 glyphs
-require a fresh timing campaign; the old visual acceptance is superseded.
+This campaign measures the historical v1 catalog; its visual acceptance is
+superseded. The [completed v2 campaign](svg_v2_results.md) measures compilation,
+validation, and export of 192/256 authored contours. Neither campaign measures
+the time spent reviewing and revising the current designs.
 
 The [SVG campaign](svg_glyph_benchmark.md) measures 192 fresh filled-contour
 glyphs through Smythe, complete numeric and silhouette validation, and a

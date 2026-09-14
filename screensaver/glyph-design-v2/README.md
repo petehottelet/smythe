@@ -4,6 +4,8 @@
 source exports use this catalog. The README animation selects only these new
 originals. The live reference mix remains adjustable.
 
+[All current sheets, previews, and benchmark reports](../../docs/current-materials.md).
+
 ![All 192 revised glyphs](contact-sheet-128.png)
 
 [Full-resolution sheet](contact-sheet-128.png) ·

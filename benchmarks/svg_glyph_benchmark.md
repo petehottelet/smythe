@@ -21,7 +21,7 @@ this local procedural workflow**, with no known measurement defects.
 
 [Raw record](results/glyph_svg_v1.json) ·
 [Current v2 contact sheet](../screensaver/glyph-design-v2/contact-sheet-128.png) ·
-[SVGs and manifest](partitions/glyph_svg_v1/catalog/).
+[Historical v1 SVGs and manifest](partitions/glyph_svg_v1/catalog/).
 
 ![Complete SVG workflow and stage breakdown](../assets/benchmarks/svg_workflow.svg)
 
