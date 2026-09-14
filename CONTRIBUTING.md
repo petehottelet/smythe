@@ -93,7 +93,9 @@ URL. Include download verification and offline reproduction instructions,
 and retain a backup: checksums detect changes but cannot recover deleted bytes.
 Keep README display images available at their repository paths.
 
-CI warns when a change introduces a binary file above that threshold. Review
+CI warns when an ordinary push or pull request introduces a binary file above
+that threshold. Deliberate history rewrites need a separate history audit;
+their prior commit may no longer be fetchable. Review
 decides whether its size and storage location are justified; the warning is
 not a hard limit. Internal implementation plans, project reviews and working
 notes always belong in gitignored `00_project_files/`.

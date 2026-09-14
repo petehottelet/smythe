@@ -8,9 +8,11 @@ on:
 
 jobs:
   large-file-review:
+    # A deliberately rewritten history has no guaranteed fetchable before-SHA.
+    # Such cleanup requires its own complete history audit before publication.
     if: >-
       github.event_name == 'pull_request' ||
-      (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000')
+      (github.event_name == 'push' && !github.event.forced && github.event.before != '0000000000000000000000000000000000000000')
     runs-on: ubuntu-latest
     permissions:
       contents: read
