@@ -271,6 +271,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="inspect one campaign without mutating its ledger",
     )
     inspect.add_argument("campaign_id")
+    inspect.add_argument("--out", default=None, metavar="HTML_PATH",
+                         help="publish a new standalone report without replacing existing files")
     _add_optimize_output_options(inspect, inherited=True)
     return parser
 
@@ -550,6 +552,31 @@ def _write_html(path: Path, html: str) -> Path:
     return path
 
 
+def _optimization_report_destination(path: str | Path, ledger_path: str | Path) -> Path:
+    """Protect lexical and resolved database/sidecar identities, without writes."""
+    requested = Path(os.path.abspath(path))
+    source = Path(os.path.abspath(ledger_path))
+    protected = set()
+    for base in (source, source.resolve()):
+        for suffix in ("", "-wal", "-shm", "-journal"):
+            candidate = Path(str(base) + suffix)
+            protected.update((candidate, candidate.resolve()))
+    destination = requested.resolve()
+    if requested in protected or destination in protected:
+        raise ValueError("Output path must not replace the optimization ledger or its SQLite sidecars")
+    for candidate in protected:
+        try:
+            if requested.samefile(candidate):
+                raise ValueError("Output path aliases the optimization ledger or its SQLite sidecars")
+        except FileNotFoundError:
+            pass
+    try:
+        requested.lstat()
+    except FileNotFoundError:
+        return destination
+    raise ValueError("Report output already exists; choose a new path")
+
+
 def _terminal_text(value: Any, *, limit: int = 300) -> str:
     """Keep stored names and errors from executing terminal control sequences."""
     value = str(value)
@@ -787,14 +814,36 @@ async def _run_optimize_concurrency(args: argparse.Namespace) -> dict[str, Any]:
 def _dispatch_optimize(args: argparse.Namespace) -> int:
     command = args.optimize_command
     if command == "inspect":
+        destination = _optimization_report_destination(args.out, args.ledger) if args.out is not None else None
         with ExperimentLedger(args.ledger, read_only=True) as ledger:
-            snapshot = ledger.snapshot(args.campaign_id)
-            evaluator_hashes = sorted(
-                {
-                    trial.evaluator_hash
-                    for trial in ledger.list_trials(args.campaign_id)
-                }
-            )
+            if destination is not None:
+                from smythe.optimize.inspection import collect_optimization_report
+
+                report = collect_optimization_report(ledger, args.campaign_id)
+                snapshot = report["ledger_snapshot"]
+                evaluator_hashes = report["evaluator_hashes"]
+            else:
+                snapshot = ledger.snapshot(args.campaign_id)
+                evaluator_hashes = sorted(
+                    {
+                        trial.evaluator_hash
+                        for trial in ledger.list_trials(args.campaign_id)
+                    }
+                )
+        if destination is not None:
+            from smythe.jobs.artifact_io import atomic_publish_bytes
+            from smythe.optimize.report import render_optimization_report
+
+            # Close-time fingerprint/WAL validation must succeed before any
+            # output directory or file is created. Recheck aliases immediately
+            # before the atomic, no-clobber publication boundary.
+            if _optimization_report_destination(args.out, args.ledger) != destination:
+                raise ValueError("Report output path changed during inspection")
+            try:
+                html = render_optimization_report(report)
+                atomic_publish_bytes(destination, html.encode("utf-8"))
+            except (ValueError, TypeError, KeyError, OverflowError, RecursionError) as exc:
+                raise ExperimentLedgerError("Cannot publish retained Autotune report evidence") from exc
         _emit(
             args,
             command,

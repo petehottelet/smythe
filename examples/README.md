@@ -53,6 +53,20 @@ update acquires and renews a lease automatically; the CLI needs no new flags.
 Low-level ledger callers must pass explicit lease tokens. These changes are
 available from the checkout after 0.7.0 and are not in the pinned package above.
 
+Export a completed local campaign with the unreleased report command:
+
+```bash
+smythe optimize concurrency --ledger local-experiment.sqlite3 --json
+# Copy campaign_id from the output.
+smythe optimize inspect CAMPAIGN_ID --ledger local-experiment.sqlite3 --out report.html
+```
+
+The first command runs the built-in simulator with zero provider calls. The
+second exports its saved evidence; open `report.html` in a browser. It shows
+decisions, comparison intervals, policies, trial details, and exact costs.
+Use a new output filename for each export.
+[Report limits and evidence scope](../docs/optimize.md#export-a-campaign-report-unreleased).
+
 | Example | What it shows |
 |---|---|
 | [Current materials](../docs/current-materials.md) | Revised 192/256 contact sheets, detail sheets, animation, still image, native source exports, and each benchmark's evidence status. |

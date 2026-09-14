@@ -44,6 +44,11 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   to anonymous saved outputs. Add offline evidence reconciliation and complete
   200-workflow analysis with task-clustered intervals and retained failures.
 
+- **Autotune HTML reports**: `smythe optimize inspect CAMPAIGN_ID --out report.html`
+  exports recorded decisions, comparison intervals, policies, bounded trial
+  details, and exact costs. Read-only evidence validation precedes exclusive
+  publication; existing files are preserved and inspection JSON is unchanged.
+  Reports use the monochrome house style with offline disclosure controls.
 - **Autotune campaign ownership**: renewable campaign leases and owner epochs
   fence trial transitions and promotion decisions. Competing runners fail
   before evaluation; stale owners cannot settle work or release a successor.

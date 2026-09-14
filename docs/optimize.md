@@ -27,6 +27,7 @@ ambiguous after a connection failure.
 | `smythe.optimize.statistics` | Direction-normalized paired comparisons, seeded bootstrap intervals, and promotion policy |
 | `smythe.optimize.ledger` | Durable campaign, candidate, trial-event, cost-exposure, and decision history |
 | `smythe.optimize.engine` | Bounded development, confirmation, and holdout orchestration with conservative recovery |
+| `smythe.optimize.inspection` and `smythe.optimize.report` | Read-only evidence collection and standalone HTML reports (unreleased) |
 
 These modules are deliberately separable from proposal generation. A human,
 an agent, or a deterministic grid can propose candidates, but every candidate
@@ -36,8 +37,8 @@ The package is pre-1.0 and its API may change. The programmatic runner is
 `OptimizationRunner` in `smythe.optimize.engine`.
 
 The [0.7.0 release](https://github.com/petehottelet/smythe/blob/v0.7.0/docs/optimize.md)
-uses ledger schema v3. Campaign ownership and schema v4 below are **unreleased**
-changes available from the repository checkout.
+uses ledger schema v3. Campaign ownership, schema v4, and HTML reports below
+are **unreleased** changes available from the repository checkout.
 
 ## Experiment contracts and budgets
 
@@ -235,6 +236,57 @@ SQLite sidecars and the database fingerprint before and immediately after open
 and again at close. This detects practical races, but it is not a filesystem
 lock: an external writer that bypasses Smythe and starts and checkpoints wholly
 between checks is outside the guarantee.
+
+### Export a campaign report (Unreleased)
+
+Add `--out` to inspect a closed campaign as a standalone HTML document:
+
+```bash
+smythe optimize inspect CAMPAIGN_ID --ledger saved.sqlite3 --out report.html
+```
+
+The report opens with the recorded promotion or rejection, its reason, trial
+states, and exact USD balances. It separates confirmed completed-trial cost,
+held reservations, unknown exposure, and the contract's budget limit. Unknown
+outcomes remain visible even when their reserved cost is zero.
+
+Saved development scores, confirmation and holdout comparisons, candidate
+policies, and trial observations follow. Black-and-white interval plots show
+the recorded improvement and confidence interval, sample count, and objective
+direction. Positive improvement means better. Raw metric bounds and secondary
+mean-regression rules remain distinct from the primary confidence threshold.
+Metric names are preserved; the contract does not declare physical units.
+
+Export does not rerun an evaluator, recompute statistics, rank candidates, or
+change a decision. Campaigns that advanced beyond development retain only the
+selected development score; the report shows that saved evidence. Custom
+assessments without recognized comparisons remain available as text. Malformed
+plot values or inconsistent retained decision evidence stop export.
+
+The first 500 trial records appear in detail, with the returned and total counts
+shown explicitly. Whole-campaign balances, counts, policies, and saved decisions
+remain complete. Programmatic callers can set `trial_limit` from 1 to 1,000
+with `collect_optimization_report`; the limit bounds displayed detail, not the
+ledger work needed to validate the campaign.
+
+The report includes a SHA-256 fingerprint of its finite canonical JSON evidence,
+plus the contract, plan, evaluator, and policy identities. This identifies the
+exported evidence, not the database file or an independently attested benchmark.
+Evaluator hashes alone do not establish whether a campaign used simulation or
+a live provider.
+
+The source must be closed and checkpointed, as for ordinary inspection. Export
+validates the saved decision inventory and completes the final read-only ledger
+check before publishing. Existing output files and database or sidecar targets
+are refused. Publication uses an exclusive atomic link, requires a filesystem
+that supports that operation, and limits the report to 32 MiB. Failed publication
+does not overwrite another file. The existing inspection JSON remains unchanged,
+including when `--json` and `--out` are combined.
+
+Reports contain escaped local evidence with native disclosure controls. They
+load no scripts, remote resources, or artifacts and work offline on desktop and
+mobile browsers. Recorded policies, trial errors, and decision details are part
+of the exported document.
 
 ### Programmatic runner
 
@@ -438,7 +490,7 @@ The following pieces remain future work:
 - CLI adapters for general or provider-backed evaluators with conservative
   per-trial price ceilings;
 - calibrated sample-size guidance and repeated-comparison controls; and
-- richer export, comparison, and human-approval surfaces.
+- cross-campaign comparison and human-approval surfaces.
 
 The installed concurrency campaign is intentionally offline. Custom in-process
 evaluators can use `OptimizationRunner`, but a live evaluator must supply its

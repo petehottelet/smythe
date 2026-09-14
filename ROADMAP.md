@@ -172,6 +172,10 @@ It adds the following runtime guarantees and measured evidence:
 
 ## Implemented after 0.7.0 (Unreleased)
 
+- **Autotune inspection reports** — export saved decisions, paired comparison
+  intervals, policies, trial details, and exact costs as a standalone monochrome
+  page. Read-only validation and exclusive publication preserve the ledger and
+  existing files. [Report command and evidence scope](docs/optimize.md#export-a-campaign-report-unreleased).
 - **Planner history validation** — skip malformed recalled fields without
   rewriting history or changing valid ranking. Prompts identify summed node
   time explicitly. [Learning loop](docs/architecture.md#learning-loop).
@@ -277,7 +281,7 @@ Linux port targets X11; the macOS bundle uses an ad-hoc signature.
    brand-consistency comparisons; save delivered text and judge reasoning so
    independent reviewers can rescore each quality result
 8. **Autotune generalization**: add calibrated sample-size and
-   repeated-comparison guidance, richer reports, process-
+   repeated-comparison guidance, cross-campaign reports, process-
    supervised evaluator isolation, and conservative live-evaluator adapters
    after the offline campaign
 

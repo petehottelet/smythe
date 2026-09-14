@@ -98,13 +98,21 @@ strictly black-and-white charts.
 
 ## Operator reports
 
-Local Jobs reports use the same black-and-white editorial system. Put run
-state, exceptional operation counts, and exact cost balances before detailed
+Local Jobs and Autotune reports use the same black-and-white editorial system. Put run
+state or saved decisions, exceptional counts, and exact cost balances before detailed
 records. Keep completeness and estimate qualifiers beside the cost table.
 Use native disclosures for prompts, responses, and lineage. On narrow screens,
 stack labeled record fields so inspection controls and expanded text remain
 visible without horizontal scrolling. Reports are self-contained: no scripts,
 remote resources, or automatic artifact loading.
+Long reports include a native section-anchor index near the header.
+
+Autotune comparison plots display persisted means and intervals, with sample
+counts, metric direction, and separate scales. Keep raw metric bounds, secondary
+mean-regression rules, and primary confidence thresholds distinct. Missing
+comparisons remain unplotted; reports do not recompute statistical evidence.
+Keep direction labels in HTML outside scalable SVG so their type remains
+readable at narrow widths.
 
 ## Verification
 

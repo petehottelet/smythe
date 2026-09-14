@@ -225,6 +225,8 @@ Repository development adds [Autotune campaign ownership](docs/optimize.md#campa
 one leased runner owns trial writes and decisions, with stale-owner rejection
 and conservative recovery. [Planner history](docs/architecture.md#learning-loop)
 validates recalled records and labels summed node time.
+[Autotune reports](docs/optimize.md#export-a-campaign-report-unreleased) show
+saved decisions, comparison charts, and exact costs in a standalone page.
 These updates are unreleased after 0.7.0.
 
 ## Quickstart
