@@ -86,6 +86,10 @@
 /benchmarks/results/astra_20260913_main/human-main-*.json -whitespace
 /benchmarks/results/astra_20260913_main/pre-human-review.json -whitespace
 
+# Fable records retain their evidence and human-review hashes across platforms.
+/benchmarks/results/fable_*/*.json -text
+/benchmarks/results/fable_*/*.zip -text
+
 # Windows operator qualification retains source bindings and raw proof/log bytes.
 /benchmarks/results/windows_operator_20260907/** -text
 /benchmarks/results/windows_operator_20260907/logs/** -whitespace

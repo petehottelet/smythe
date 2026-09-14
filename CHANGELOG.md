@@ -23,6 +23,10 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Added
 
+- **Fable pilot evidence**: 12 native workflows and a separate Code Workflow
+  pilot, with raw billing, saved outputs and blind-judge reasoning. Every pilot
+  answer passed its output contract; human ratings gate the native main study.
+
 - **Native Fable Messages**: text-only `AnthropicMessagesProvider`, exact
   ordinary/cache/output prices, input-count quotes, durable settlement and
   saved-response recovery. A frozen 12-pilot/100-main runner retains failed

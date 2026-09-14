@@ -231,9 +231,10 @@ The records are claimable within their documented descriptive scope; the
 The [Fable 5.1 extension](benchmarks/fable_51_benchmark_plan.md) has a native
 Messages runner for its 12-workflow pilot and 100-workflow main schedule.
 Usage accounting and saved-response recovery are integrated into the durable
-ledger. Pilot checks and human review gate main execution. A separate
-Ultracode comparison shares its $100 sublimit inside the existing $300 ceiling.
-Earlier charges and reservations remain counted; no Fable results yet.
+ledger. [All 12 native pilot workflows and the separate Code Workflow pilot](benchmarks/results/fable_20260914_pilot/README.md)
+passed contract checks and blind judging. Human pilot ratings gate the native
+main study. The ten-task Ultracode comparison is underway and shares the $100
+sublimit inside the existing $300 ceiling. Earlier charges and reservations remain counted.
 
 The remaining runtime and evidence priorities are:
 
