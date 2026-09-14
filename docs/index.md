@@ -39,6 +39,7 @@ verification, trace, artifact, and recovery controls.
 - [Astra benchmark plan](../benchmarks/astra_benchmark_plan.md) — completed execution and human review, fixed acceptance gates and separate follow-up experiments
 - [Fable 5.1 extension](../benchmarks/fable_51_benchmark_plan.md) — native Messages runner, 12-pilot/100-main design, human review gates and a separate Ultracode comparison
 - [Fable pilot results](../benchmarks/results/fable_20260914_pilot/README.md) — 12 native workflows and one Code Workflow pilot; raw receipts, exact native costs, blind judging, and pending human review
+- [Fable Code Workflow results](../benchmarks/results/fable_code_20260914/README.md) — ten completed tasks, five retained diagnostics, native billing and blind-judge reasoning; native comparison awaits pilot ratings
 - [Native Claude Messages](anthropic-messages.md) — exact Fable cache billing, conservative request quotes, and saved-response recovery (unreleased)
 - [Astra method amendment](../benchmarks/astra_method_amendment_20260913.md) — planner-only instructions, explicit field types, 48 pilot workflows and preserved diagnostic charges
 - [Astra campaign runners](../benchmarks/astra_runtime.md) — pilot, main, approved reserved-cost continuation, blind judging and offline evidence analysis

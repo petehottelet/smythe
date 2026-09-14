@@ -1,0 +1,835 @@
+{
+  "version": 1,
+  "claimable": false,
+  "evidence_status": "code-descriptive-complete-native-comparison-awaits-human-pilot-review",
+  "model": "claude-fable-5-1",
+  "effort": "medium",
+  "sdk_version": "0.2.152",
+  "code_version": "2.1.259",
+  "scope": "Ten synthetic tasks, one Workflow run each; separate from native Fable and Astra/Sol studies",
+  "cohorts": {
+    "diagnostic": [
+      {
+        "task_id": "main-calendar",
+        "cost_nanousd": 324686750,
+        "api_calls": 7,
+        "workflow_invocations": 2,
+        "wall_time_ns": 60311178000,
+        "error": null,
+        "contract_passed": true,
+        "protocol_passed": true,
+        "cost_categories_nanousd": {
+          "ordinary_input": 1020000,
+          "cache_read": 11316750,
+          "cache_write_5m": 126200000,
+          "cache_write_1h": 0,
+          "output": 186150000
+        },
+        "request_efforts": {
+          "medium": 7
+        },
+        "stop_reasons": {
+          "tool_use": 5,
+          "end_turn": 2
+        },
+        "output_sha256": "cd27d2283c83283ad522024ac7861c044f24ac064b1d45fa8c1fcb0dc38aad4b",
+        "outcome_sha256": "c559148b745bcfafa472b449f59759018f22bf247c2b6e28d7072038b10fcaec",
+        "blind_scores": {
+          "criteria": [
+            {
+              "id": "criterion-1",
+              "reason": "The slash dates '03/12/2035' and '08/09/2032' were correctly resolved to '2035-12-03' and '2032-09-08' using the stated DD/MM/YYYY rule.",
+              "score": 4
+            },
+            {
+              "id": "criterion-2",
+              "reason": "All six dates, including the leap day (2036-02-29), were correctly converted and presented in the original order.",
+              "score": 4
+            },
+            {
+              "id": "criterion-3",
+              "reason": "The deliverable is a valid, exact JSON array of six strings as requested, without any additions.",
+              "score": 4
+            }
+          ],
+          "material_defects": []
+        },
+        "judgment_identity": "ddfbca64f33f72d4d1f81e9eed902931763d555eaf957dc8bc2c1e94782460e2",
+        "accepted": true
+      },
+      {
+        "task_id": "main-identifiers",
+        "cost_nanousd": 415423000,
+        "api_calls": 10,
+        "workflow_invocations": 2,
+        "wall_time_ns": 71572060800,
+        "error": null,
+        "contract_passed": true,
+        "protocol_passed": true,
+        "cost_categories_nanousd": {
+          "ordinary_input": 1170000,
+          "cache_read": 10153000,
+          "cache_write_5m": 252500000,
+          "cache_write_1h": 0,
+          "output": 151600000
+        },
+        "request_efforts": {
+          "medium": 5,
+          "low": 5
+        },
+        "stop_reasons": {
+          "tool_use": 8,
+          "end_turn": 2
+        },
+        "output_sha256": "042d57d8a56bd0a95ee4b93cd5b07f92ebcb619e42e4427db11c056b2ccb1a3f",
+        "outcome_sha256": "feb2e345f74fbd3f3870eb0dcce309dacfdafa4229c76eea0111de2bad9c74dd",
+        "blind_scores": {
+          "criteria": [
+            {
+              "id": "criterion-1",
+              "reason": "The deliverable successfully applies all normalization rules (trimming whitespace, uppercasing prefixes, removing separators, and padding numbers to four digits) to all inputs without changing their numeric identity.",
+              "score": 4
+            },
+            {
+              "id": "criterion-2",
+              "reason": "The deliverable correctly handles 'RC-0310' which was already padded, as well as 'zx_0000' which correctly outputs as 'ZX-0000', preserving the zero.",
+              "score": 4
+            },
+            {
+              "id": "criterion-3",
+              "reason": "The output is exactly the required array of strings, with no additional text or Markdown, and fully preserves the input order.",
+              "score": 4
+            }
+          ],
+          "material_defects": []
+        },
+        "judgment_identity": "27fb4119a72293f2d054295fe09c85290c481c45d72a970a8f30d2f118a128f5",
+        "accepted": true
+      },
+      {
+        "task_id": "main-library-hours",
+        "cost_nanousd": 731597500,
+        "api_calls": 7,
+        "workflow_invocations": 2,
+        "wall_time_ns": 121987210500,
+        "error": null,
+        "contract_passed": true,
+        "protocol_passed": true,
+        "cost_categories_nanousd": {
+          "ordinary_input": 1020000,
+          "cache_read": 12640000,
+          "cache_write_5m": 242537500,
+          "cache_write_1h": 0,
+          "output": 475400000
+        },
+        "request_efforts": {
+          "medium": 7
+        },
+        "stop_reasons": {
+          "tool_use": 3,
+          "end_turn": 4
+        },
+        "output_sha256": "b48053ebe5dafb609cb9367ad69c600e200e78562940e0b50f3e3be60553fe27",
+        "outcome_sha256": "2617ebaa05a8d226c329d676c581107a3a84038800030a3e0bf1b5a49245ed03",
+        "blind_scores": {
+          "criteria": [
+            {
+              "id": "criterion-1",
+              "reason": "The deliverable effectively constructs the strongest possible case using the actual favorable evidence (the 72% support survey statistic and the 28% rise in pilot evening visits), while also correctly integrating the costs and available options.",
+              "score": 4
+            },
+            {
+              "id": "criterion-2",
+              "reason": "The critique thoroughly and accurately dismantles the generalizations made in the case by citing the specific limitations outlined in the sources (survey self-selection, single-branch 10pm pilot with no control, visits concentrated before 8pm, and the 110,000 credit budget shortfall with lack of security).",
+              "score": 4
+            },
+            {
+              "id": "criterion-3",
+              "reason": "The deliverable explicitly outlines the two supported bounded actions ('bounded-pilot' and 'representative-survey') and correctly attaches their operational conditions (e.g., 50,000 credit ceiling, existing security contract, representative sampling) derived directly from the sources.",
+              "score": 4
+            },
+            {
+              "id": "criterion-4",
+              "reason": "All conclusions are soundly connected to the supplied documents. The unsupported claims ('funded-rollout' and 'universal-demand') are correctly identified from the claims list, and all provided source IDs are referenced.",
+              "score": 4
+            }
+          ],
+          "material_defects": []
+        },
+        "judgment_identity": "71ddaaed2545af5ed9e6ab2e461e10e1a5c505b7092ca4701d50edf0ab5d4cf6",
+        "accepted": true
+      },
+      {
+        "task_id": "main-studio-copy",
+        "cost_nanousd": 581312750,
+        "api_calls": 9,
+        "workflow_invocations": 2,
+        "wall_time_ns": 95882584000,
+        "error": null,
+        "contract_passed": true,
+        "protocol_passed": true,
+        "cost_categories_nanousd": {
+          "ordinary_input": 1100000,
+          "cache_read": 12825250,
+          "cache_write_5m": 216837500,
+          "cache_write_1h": 0,
+          "output": 350550000
+        },
+        "request_efforts": {
+          "medium": 9
+        },
+        "stop_reasons": {
+          "tool_use": 7,
+          "end_turn": 2
+        },
+        "output_sha256": "d1fce88c960c930342dd57fd4b5524387bd0ef5e940cba6d84bba2091a9f2797",
+        "outcome_sha256": "32c31e9dda7e35c32dc5c1bb95a77c77a2d4b947020da1f4bfe1397e8bc737f0",
+        "blind_scores": {
+          "criteria": [
+            {
+              "id": "criterion-1",
+              "reason": "The deliverable correctly identifies the misspelling of 'gauranteed' in the draft, explains the correction, and properly removes the invalid claim from the final corrected copy.",
+              "score": 4
+            },
+            {
+              "id": "criterion-2",
+              "reason": "The deliverable thoroughly recomputes the discount, correctly showing that 384 vs 480 (40 x 12) is a 20% savings, not 25%. It updates both the facts and the corrected copy accurately.",
+              "score": 4
+            },
+            {
+              "id": "criterion-3",
+              "reason": "The deliverable successfully flags all overpromises ('unlimited storage', 'gauranteed', 'one-minute support', 'around the clock') and explains exactly how they contradict the authoritative policy.",
+              "score": 4
+            },
+            {
+              "id": "criterion-4",
+              "reason": "The corrected copy is coherent, flows well, and successfully incorporates all the limits and corrected facts from the policy.",
+              "score": 4
+            }
+          ],
+          "material_defects": []
+        },
+        "judgment_identity": "27f8036635353e79d7e5cd0f57a65a4c0cdf36eaf02c82e53a73db05e1782a48",
+        "accepted": true
+      },
+      {
+        "task_id": "main-tunnel-links",
+        "cost_nanousd": 465389500,
+        "api_calls": 9,
+        "workflow_invocations": 2,
+        "wall_time_ns": 74399296000,
+        "error": null,
+        "contract_passed": true,
+        "protocol_passed": true,
+        "cost_categories_nanousd": {
+          "ordinary_input": 1120000,
+          "cache_read": 13107000,
+          "cache_write_5m": 186962500,
+          "cache_write_1h": 0,
+          "output": 264200000
+        },
+        "request_efforts": {
+          "medium": 9
+        },
+        "stop_reasons": {
+          "tool_use": 6,
+          "end_turn": 3
+        },
+        "output_sha256": "4d0c9e2c8d109a52ae1e50443499a9e56594403e770a6a09501750da46068c17",
+        "outcome_sha256": "c759a0b13a5c6c4591a3e8991e5118bfe17b02ecbdf367c8835687ab96a3e2d9",
+        "blind_scores": {
+          "criteria": [
+            {
+              "id": "criterion-1",
+              "reason": "The deliverable successfully separates and lists all candidate measurements and weaknesses correctly in the 'profiles' object.",
+              "score": 4
+            },
+            {
+              "id": "criterion-2",
+              "reason": "Both limits (maximum energy 30 mJ and minimum range 800 m) are applied and evaluated for every candidate.",
+              "score": 4
+            },
+            {
+              "id": "criterion-3",
+              "reason": "The ranking only includes the feasible candidates ('amber' and 'cobalt') and correctly orders them ascending by energy as specified.",
+              "score": 4
+            },
+            {
+              "id": "criterion-4",
+              "reason": "The reasoning text thoroughly explains the result, uses the supplied figures, and explicitly acknowledges both excluded candidates.",
+              "score": 4
+            }
+          ],
+          "material_defects": []
+        },
+        "judgment_identity": "6eaf135b7460e7f2a4df3400658c152a9b82378cb350c522411ad14ae293e704",
+        "accepted": true
+      }
+    ],
+    "revised": [
+      {
+        "task_id": "main-identifiers",
+        "cost_nanousd": 316976750,
+        "api_calls": 9,
+        "workflow_invocations": 1,
+        "wall_time_ns": 52154321200,
+        "error": null,
+        "contract_passed": true,
+        "protocol_passed": true,
+        "cost_categories_nanousd": {
+          "ordinary_input": 1100000,
+          "cache_read": 6189250,
+          "cache_write_5m": 211087500,
+          "cache_write_1h": 0,
+          "output": 98600000
+        },
+        "request_efforts": {
+          "medium": 9
+        },
+        "stop_reasons": {
+          "tool_use": 7,
+          "end_turn": 2
+        },
+        "output_sha256": "042d57d8a56bd0a95ee4b93cd5b07f92ebcb619e42e4427db11c056b2ccb1a3f",
+        "outcome_sha256": "f0abed12ff1fa6b23e6be0fb03881492f7fa8d87307d15b94db7cfed09e7d2f8",
+        "blind_scores": {
+          "criteria": [
+            {
+              "id": "criterion-1",
+              "reason": "The deliverable successfully applies all normalization rules (trimming whitespace, uppercasing prefixes, removing separators, and padding numbers to four digits) to all inputs without changing their numeric identity.",
+              "score": 4
+            },
+            {
+              "id": "criterion-2",
+              "reason": "The deliverable correctly handles 'RC-0310' which was already padded, as well as 'zx_0000' which correctly outputs as 'ZX-0000', preserving the zero.",
+              "score": 4
+            },
+            {
+              "id": "criterion-3",
+              "reason": "The output is exactly the required array of strings, with no additional text or Markdown, and fully preserves the input order.",
+              "score": 4
+            }
+          ],
+          "material_defects": []
+        },
+        "judgment_identity": "27fb4119a72293f2d054295fe09c85290c481c45d72a970a8f30d2f118a128f5",
+        "accepted": true
+      },
+      {
+        "task_id": "main-studio-copy",
+        "cost_nanousd": 409671500,
+        "api_calls": 7,
+        "workflow_invocations": 1,
+        "wall_time_ns": 64152002700,
+        "error": null,
+        "contract_passed": true,
+        "protocol_passed": true,
+        "cost_categories_nanousd": {
+          "ordinary_input": 1020000,
+          "cache_read": 7964000,
+          "cache_write_5m": 159587500,
+          "cache_write_1h": 0,
+          "output": 241100000
+        },
+        "request_efforts": {
+          "medium": 7
+        },
+        "stop_reasons": {
+          "tool_use": 5,
+          "end_turn": 2
+        },
+        "output_sha256": "4784f11525e7c806473257d30e0621520d728227907746c1aa39ba8693d3793f",
+        "outcome_sha256": "0cbfd5f1b2cc123b6deb2498221468bf9c780bd84859fa9662ca84fd9611b840",
+        "blind_scores": {
+          "criteria": [
+            {
+              "id": "criterion-1",
+              "reason": "The deliverable correctly identifies the spelling error ('gauranteed'), explains the misspelling, and addresses it in the final copy by removing the unsupportable guarantee entirely.",
+              "score": 4
+            },
+            {
+              "id": "criterion-2",
+              "reason": "The deliverable recalculates the discount based on the monthly and annual rates, correctly determining that the savings is 20%, not 25%, and updates the facts and corrected copy accordingly.",
+              "score": 4
+            },
+            {
+              "id": "criterion-3",
+              "reason": "The deliverable identifies all policy contradictions (unlimited storage, guarantee, one-minute support, around the clock) and successfully removes these unsupported promises.",
+              "score": 4
+            },
+            {
+              "id": "criterion-4",
+              "reason": "The corrected copy is coherent, flows well, and accurately reflects the authoritative limits and service policy without making false promises.",
+              "score": 4
+            }
+          ],
+          "material_defects": []
+        },
+        "judgment_identity": "6181c46f7a0ec97ac49ccb302e18f6a290586fc89f78f5166cb8c39079f43f78",
+        "accepted": true
+      },
+      {
+        "task_id": "main-library-hours",
+        "cost_nanousd": 637352000,
+        "api_calls": 7,
+        "workflow_invocations": 1,
+        "wall_time_ns": 115623545600,
+        "error": null,
+        "contract_passed": true,
+        "protocol_passed": true,
+        "cost_categories_nanousd": {
+          "ordinary_input": 1060000,
+          "cache_read": 8029500,
+          "cache_write_5m": 215662500,
+          "cache_write_1h": 0,
+          "output": 412600000
+        },
+        "request_efforts": {
+          "medium": 7
+        },
+        "stop_reasons": {
+          "tool_use": 3,
+          "end_turn": 4
+        },
+        "output_sha256": "1a8f11d6b20f3785db33965a6f7684c8705cffcac591c653ebf579d1d97c68b8",
+        "outcome_sha256": "905ad5da61982620d169e30495dcd3f536fecc03d5cd22e4719cbdfcedd3e837",
+        "blind_scores": {
+          "criteria": [
+            {
+              "id": "criterion-1",
+              "reason": "The case effectively synthesizes the favorable survey and pilot data to present the strongest evidence-bounded argument for the proposal while explicitly incorporating the actual constraints (cost and security) from the sources.",
+              "score": 4
+            },
+            {
+              "id": "criterion-2",
+              "reason": "The critique thoroughly unpacks the inference limits of the survey (self-selection, low response rate) and the pilot (lack of control, hours tested versus proposed, timing of visits) and accurately details the financial and operational constraints (budget shortfall and security hours).",
+              "score": 4
+            },
+            {
+              "id": "criterion-3",
+              "reason": "The deliverable successfully outlines the bounded actions ('bounded-pilot' and 'representative-survey') in the survivors object, complete with accurate operational conditions and constraints from the options document.",
+              "score": 4
+            },
+            {
+              "id": "criterion-4",
+              "reason": "Conclusions are correctly tied to bracketed source citations. The unsupported claims ('funded-rollout' and 'universal-demand') are accurately identified in lexicographical order, and all source IDs are listed.",
+              "score": 4
+            }
+          ],
+          "material_defects": []
+        },
+        "judgment_identity": "6c47e05a0b3fb62b7ef53d6f845a1e2b3accd03a55e1f1f4047822524cd8f561",
+        "accepted": true
+      },
+      {
+        "task_id": "main-calendar",
+        "cost_nanousd": 188047000,
+        "api_calls": 5,
+        "workflow_invocations": 1,
+        "wall_time_ns": 43783537800,
+        "error": null,
+        "contract_passed": true,
+        "protocol_passed": true,
+        "cost_categories_nanousd": {
+          "ordinary_input": 940000,
+          "cache_read": 7069500,
+          "cache_write_5m": 91137500,
+          "cache_write_1h": 0,
+          "output": 88900000
+        },
+        "request_efforts": {
+          "medium": 5
+        },
+        "stop_reasons": {
+          "tool_use": 3,
+          "end_turn": 2
+        },
+        "output_sha256": "cd27d2283c83283ad522024ac7861c044f24ac064b1d45fa8c1fcb0dc38aad4b",
+        "outcome_sha256": "170b1b0aaba0836c0d57c1ef19a976b770ebec5262f33d9dac5039a08409c993",
+        "blind_scores": {
+          "criteria": [
+            {
+              "id": "criterion-1",
+              "reason": "The slash dates '03/12/2035' and '08/09/2032' were correctly resolved to '2035-12-03' and '2032-09-08' using the stated DD/MM/YYYY rule.",
+              "score": 4
+            },
+            {
+              "id": "criterion-2",
+              "reason": "All six dates, including the leap day (2036-02-29), were correctly converted and presented in the original order.",
+              "score": 4
+            },
+            {
+              "id": "criterion-3",
+              "reason": "The deliverable is a valid, exact JSON array of six strings as requested, without any additions.",
+              "score": 4
+            }
+          ],
+          "material_defects": []
+        },
+        "judgment_identity": "ddfbca64f33f72d4d1f81e9eed902931763d555eaf957dc8bc2c1e94782460e2",
+        "accepted": true
+      },
+      {
+        "task_id": "main-tunnel-links",
+        "cost_nanousd": 333389000,
+        "api_calls": 8,
+        "workflow_invocations": 1,
+        "wall_time_ns": 56668673500,
+        "error": null,
+        "contract_passed": true,
+        "protocol_passed": true,
+        "cost_categories_nanousd": {
+          "ordinary_input": 1080000,
+          "cache_read": 8484000,
+          "cache_write_5m": 141625000,
+          "cache_write_1h": 0,
+          "output": 182200000
+        },
+        "request_efforts": {
+          "medium": 8
+        },
+        "stop_reasons": {
+          "tool_use": 6,
+          "end_turn": 2
+        },
+        "output_sha256": "128a1ca02b73ae4f0d90bc1e9985c641bbfb2b72e1f5a71e60ba9cd0c45a57e0",
+        "outcome_sha256": "6514385d553ed8c857f3869744a926e1a3e6e4ef4af8ef330ca23c56d8d9c88b",
+        "blind_scores": {
+          "criteria": [
+            {
+              "id": "criterion-1",
+              "reason": "The deliverable successfully maps all measurements and weaknesses to their respective candidates within the 'profiles' object, keeping them separate.",
+              "score": 4
+            },
+            {
+              "id": "criterion-2",
+              "reason": "Both limits (maximum energy 30 mJ, minimum range 800 m) are explicitly checked for every candidate, with 'feasible' boolean values accurately set in the profiles.",
+              "score": 4
+            },
+            {
+              "id": "criterion-3",
+              "reason": "Only the feasible candidates (amber and cobalt) are included in the ranking array, ordered correctly by energy ascending.",
+              "score": 4
+            },
+            {
+              "id": "criterion-4",
+              "reason": "The reasoning provides a clear explanation with numeric comparisons from the sources, thoroughly acknowledging and explaining the exclusion of ivory and umber.",
+              "score": 4
+            }
+          ],
+          "material_defects": []
+        },
+        "judgment_identity": "77c38092a4d90feac9c0773960ba8e09160fad90ad332959fe32dd259730e9e3",
+        "accepted": true
+      },
+      {
+        "task_id": "main-delivery-copy",
+        "cost_nanousd": 387432250,
+        "api_calls": 7,
+        "workflow_invocations": 1,
+        "wall_time_ns": 63926650000,
+        "error": null,
+        "contract_passed": true,
+        "protocol_passed": true,
+        "cost_categories_nanousd": {
+          "ordinary_input": 1020000,
+          "cache_read": 7612250,
+          "cache_write_5m": 169500000,
+          "cache_write_1h": 0,
+          "output": 209300000
+        },
+        "request_efforts": {
+          "medium": 7
+        },
+        "stop_reasons": {
+          "tool_use": 5,
+          "end_turn": 2
+        },
+        "output_sha256": "ee37daff987fb2037181f7b841b6cd8f10efec6e07032f57aa00586096ba02a6",
+        "outcome_sha256": "2f30c418d699dff959c2d4b3b70ef969cb9a91ad23c9397593ef8bce08206867",
+        "blind_scores": {
+          "criteria": [
+            {
+              "id": "criterion-1",
+              "reason": "The spelling defect ('Recieve') was correctly identified, explained, and fixed in the corrected copy.",
+              "score": 4
+            },
+            {
+              "id": "criterion-2",
+              "reason": "The unit price (4.5) and the discount percentage (10%) were accurately recomputed from the authoritative inputs and explained.",
+              "score": 4
+            },
+            {
+              "id": "criterion-3",
+              "reason": "The false promises regarding next-day delivery and island coverage were successfully identified, explained as policy defects, and removed from the corrected copy.",
+              "score": 4
+            },
+            {
+              "id": "criterion-4",
+              "reason": "The corrected copy is coherent, retains the original intent where supported, and integrates the correct constraints from the authoritative policy.",
+              "score": 4
+            }
+          ],
+          "material_defects": []
+        },
+        "judgment_identity": "db07afd322fe0efc2f5d719b183118efd0e1862d2e0d9bc429d1eb5dcabd9352",
+        "accepted": true
+      },
+      {
+        "task_id": "main-capacity-chain",
+        "cost_nanousd": 344799000,
+        "api_calls": 7,
+        "workflow_invocations": 1,
+        "wall_time_ns": 55816070900,
+        "error": null,
+        "contract_passed": true,
+        "protocol_passed": true,
+        "cost_categories_nanousd": {
+          "ordinary_input": 1060000,
+          "cache_read": 8251500,
+          "cache_write_5m": 124837500,
+          "cache_write_1h": 0,
+          "output": 210650000
+        },
+        "request_efforts": {
+          "medium": 7
+        },
+        "stop_reasons": {
+          "tool_use": 5,
+          "end_turn": 2
+        },
+        "output_sha256": "0d29e2068fd3091308884d84f301eef27af529ce806e982bea4146f8b3f120b6",
+        "outcome_sha256": "e4d8be010cc1abfd31ee2c409aa0e4658cf5938199eaf9dafda3a8947d45e560",
+        "blind_scores": {
+          "criteria": [
+            {
+              "id": "criterion-1",
+              "reason": "The deliverable correctly calculates gross minutes (3 * 720 = 2160) and derives net minutes by subtracting the 15% downtime (2160 - 324 = 1836), explicitly detailing this in the explanation.",
+              "score": 4
+            },
+            {
+              "id": "criterion-2",
+              "reason": "The deliverable accurately converts net capacity to started units (1836 / 6 = 306) and correctly calculates and floors the passing units (306 * 0.92 = 281.52 -> 281), as shown in the step-by-step breakdown.",
+              "score": 4
+            },
+            {
+              "id": "criterion-3",
+              "reason": "The deliverable computes the deliverable units in full boxes (281 / 20 * 20 = 280) and calculates the correct shortfall against the 290-unit order (290 - 280 = 10).",
+              "score": 4
+            },
+            {
+              "id": "criterion-4",
+              "reason": "The deliverable provides a complete explanation mapping the full dependency chain from machine capacity through yield and boxing to the final decision to use overtime because the deliverable units fell short of the order.",
+              "score": 4
+            }
+          ],
+          "material_defects": []
+        },
+        "judgment_identity": "50c11cf02cb26a8fa58e1d3a4e5c8560bad83491bb744579edf99b7c7a3ab61f",
+        "accepted": true
+      },
+      {
+        "task_id": "main-production-chain",
+        "cost_nanousd": 277902000,
+        "api_calls": 5,
+        "workflow_invocations": 1,
+        "wall_time_ns": 50318212000,
+        "error": null,
+        "contract_passed": true,
+        "protocol_passed": true,
+        "cost_categories_nanousd": {
+          "ordinary_input": 960000,
+          "cache_read": 7417000,
+          "cache_write_5m": 119275000,
+          "cache_write_1h": 0,
+          "output": 150250000
+        },
+        "request_efforts": {
+          "medium": 5
+        },
+        "stop_reasons": {
+          "tool_use": 3,
+          "end_turn": 2
+        },
+        "output_sha256": "1ad41407776a6428e6ef061aa09c9a0957b2337478740c73b8c66b56202a9d35",
+        "outcome_sha256": "e6b8c10e551219105c9474c69fe3abf6588caa3e7ec18ded4bc1e3a4e3e41aeb",
+        "blind_scores": {
+          "criteria": [
+            {
+              "id": "criterion-1",
+              "reason": "The deliverable correctly calculates the yield at each stage (1080 after test, 1026 after coating) and accurately subtracts the 30 reserve units to find the allocated units (996).",
+              "score": 4
+            },
+            {
+              "id": "criterion-2",
+              "reason": "The deliverable correctly determines there are 41 full cartons and accounts for the 984 shipped units, accurately excluding the remaining loose units.",
+              "score": 4
+            },
+            {
+              "id": "criterion-3",
+              "reason": "The backlog is correctly computed as the order units (1020) minus the actually shipped units (984), resulting in 36.",
+              "score": 4
+            },
+            {
+              "id": "criterion-4",
+              "reason": "The expedite threshold is correctly applied (36 > 24, so expedite) and the entire arithmetic chain is clearly explained step-by-step.",
+              "score": 4
+            }
+          ],
+          "material_defects": []
+        },
+        "judgment_identity": "bc16b270aed2a6030d673b9524cb0e6e098d004bcb30bc3e0e3afcad71d599fd",
+        "accepted": true
+      },
+      {
+        "task_id": "main-field-links",
+        "cost_nanousd": 322707750,
+        "api_calls": 8,
+        "workflow_invocations": 1,
+        "wall_time_ns": 67083120900,
+        "error": null,
+        "contract_passed": true,
+        "protocol_passed": true,
+        "cost_categories_nanousd": {
+          "ordinary_input": 1110000,
+          "cache_read": 8535250,
+          "cache_write_5m": 130162500,
+          "cache_write_1h": 0,
+          "output": 182900000
+        },
+        "request_efforts": {
+          "medium": 8
+        },
+        "stop_reasons": {
+          "tool_use": 5,
+          "end_turn": 3
+        },
+        "output_sha256": "32df32ffce686d34b453ec94f00ae58280226de7a1871be051628d3223910b01",
+        "outcome_sha256": "a79d267e8cea96cf29f0e4b893823bccb2874b254f7395971222c7a110f92863",
+        "blind_scores": {
+          "criteria": [
+            {
+              "id": "criterion-1",
+              "reason": "The deliverable successfully maps each candidate's specifications (energy, range, weakness) separately in the profiles object.",
+              "score": 4
+            },
+            {
+              "id": "criterion-2",
+              "reason": "Both limits (maximum energy 40 mJ, minimum range 1500 m) are accurately applied to every candidate in the feasibility assessment and explicitly detailed in the reasoning.",
+              "score": 4
+            },
+            {
+              "id": "criterion-3",
+              "reason": "The deliverable correctly identifies only 'reed' and 'vale' as feasible and ranks them by energy ascending (reed: 12 mJ, vale: 35 mJ) as specified by the rule.",
+              "score": 4
+            },
+            {
+              "id": "criterion-4",
+              "reason": "The reasoning text thoroughly explains the feasibility and ranking of each candidate, citing all relevant figures and explicitly acknowledging the exclusion of 'spire' and 'crest'.",
+              "score": 4
+            }
+          ],
+          "material_defects": []
+        },
+        "judgment_identity": "3186849f1d89363bf2dc13f6c9499a7ae6a2232fa101bfd8324301b7deb2f21b",
+        "accepted": true
+      },
+      {
+        "task_id": "main-warehouse-routing",
+        "cost_nanousd": 556788000,
+        "api_calls": 7,
+        "workflow_invocations": 1,
+        "wall_time_ns": 111213001000,
+        "error": null,
+        "contract_passed": true,
+        "protocol_passed": true,
+        "cost_categories_nanousd": {
+          "ordinary_input": 1040000,
+          "cache_read": 8023000,
+          "cache_write_5m": 197075000,
+          "cache_write_1h": 0,
+          "output": 350650000
+        },
+        "request_efforts": {
+          "medium": 7
+        },
+        "stop_reasons": {
+          "tool_use": 5,
+          "end_turn": 2
+        },
+        "output_sha256": "7d19076bd11488c449411b12246f43cc444a9b1d80edf136a8ed55fe0ba3c3f7",
+        "outcome_sha256": "7f2adbb7305e31314ed3715ca019101a061d236c5bb9dabd74d8ea717f6b6b61",
+        "blind_scores": {
+          "criteria": [
+            {
+              "id": "criterion-1",
+              "reason": "The deliverable effectively builds the strongest case by citing the 18% pick time reduction, the zero shipment loss record, and management's option to roll out, while maintaining honesty about the boundaries of the data.",
+              "score": 4
+            },
+            {
+              "id": "criterion-2",
+              "reason": "The critique thoroughly attacks the proposal by pointing out that the safety record is conditional on supervisor presence, highlights the limits of the sample (excluding oversize, night shifts), and leverages the arithmetic impossibility of training four supervisors in three weeks.",
+              "score": 4
+            },
+            {
+              "id": "criterion-3",
+              "reason": "The supported bounded actions ('staffed-trial' and 'broader-testing') are correctly derived from the options document and strictly conditioned on the operational realities of supervisor availability and exception rates.",
+              "score": 4
+            },
+            {
+              "id": "criterion-4",
+              "reason": "All conclusions are explicitly linked to the provided source documents. The deliverable accurately evaluates all claims, correctly identifying 'ready-this-month' and 'universal-speedup' as unsupported.",
+              "score": 4
+            }
+          ],
+          "material_defects": []
+        },
+        "judgment_identity": "9b1406242333221a8a2b78f9834a713af3b357bcfd0740e237811e4a74c1927a",
+        "accepted": true
+      }
+    ]
+  },
+  "summary": {
+    "diagnostic": {
+      "workflows": 5,
+      "accepted": 5,
+      "contract_passed": 5,
+      "total_cost_nanousd": 2518409500,
+      "api_calls": 42,
+      "workflow_invocations": 10,
+      "mean_seconds": 84.83046586,
+      "median_seconds": 74.399296,
+      "range_seconds": [
+        60.311178,
+        121.9872105
+      ]
+    },
+    "revised": {
+      "workflows": 10,
+      "accepted": 10,
+      "contract_passed": 10,
+      "total_cost_nanousd": 3775065250,
+      "api_calls": 70,
+      "workflow_invocations": 10,
+      "mean_seconds": 68.07391356,
+      "median_seconds": 60.29766175,
+      "range_seconds": [
+        43.7835378,
+        115.6235456
+      ]
+    }
+  },
+  "code_main_all_attempts_nanousd": 6293474750,
+  "judge": {
+    "paid_judgments": 23,
+    "cost_lower_nanousd": 262999200,
+    "cost_upper_nanousd": 313284000,
+    "unresolved_attempts": 0,
+    "judge_freeze_sha256": "a153978496a524d060db5804442373fefa345a2046d4b71749e5cdf06a83c77c"
+  },
+  "fable_extension_lower_nanousd": 8527077450,
+  "fable_extension_upper_nanousd": 8577362250,
+  "combined_campaign_upper_nanousd": 28061811850,
+  "native_main_status": "not-started; actual human pilot ratings required",
+  "diagnostic_main_reservation_charged_to_same_15_usd_cap": true
+}

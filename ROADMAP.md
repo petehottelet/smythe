@@ -233,8 +233,9 @@ Messages runner for its 12-workflow pilot and 100-workflow main schedule.
 Usage accounting and saved-response recovery are integrated into the durable
 ledger. [All 12 native pilot workflows and the separate Code Workflow pilot](benchmarks/results/fable_20260914_pilot/README.md)
 passed contract checks and blind judging. Human pilot ratings gate the native
-main study. The ten-task Ultracode comparison is underway and shares the $100
-sublimit inside the existing $300 ceiling. Earlier charges and reservations remain counted.
+main study. The [ten-task Code Workflow study](benchmarks/results/fable_code_20260914/README.md)
+is complete; its five earlier diagnostic attempts and charges remain recorded.
+Both studies share the $100 sublimit inside the existing $300 ceiling.
 
 The remaining runtime and evidence priorities are:
 
