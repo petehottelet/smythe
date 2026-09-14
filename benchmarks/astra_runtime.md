@@ -20,8 +20,9 @@ amended main study has [200 recorded and automatically scored outcomes](results/
 Its [approved 53-workflow continuation](astra_connection_continuation_20260913.md)
 preserves one failed outcome and its unresolved reservation.
 
-Human review of eight flagged main answers remains pending. These records are
-not claimable until that review is complete; automatic classifications are retained.
+Human review accepted all eight flagged main answers at 4/4. The study is
+claimable within its documented descriptive scope; the frozen automatic
+classifications and affected cost bounds are retained.
 The [experiment protocol](astra_benchmark_plan.md) defines the publication gates.
 The original [79 offline checks](results/astra_pilot_runtime_20260907/README.md)
 remain historical qualification, separate from these live results.
@@ -205,6 +206,12 @@ python -m benchmarks.astra_main_evidence --main-directory MAIN_STUDY --judge-dir
 
 This produces a complete analysis and a separate audit record. It never
 approves a performance claim automatically.
+
+The [published main study](results/astra_20260913_main/README.md#human-review)
+now includes all eight submitted human ratings, bound to the archived output
+hashes. Its publication review approves the stated descriptive scope; the
+191/200 automatic classifications and affected cost bounds remain unchanged.
+Reproducing the native audit above does not replace that separate human review.
 
 [Provider guide](../docs/openai-responses.md) ·
 [Workflow accounting](../docs/workflow-accounting.md) ·

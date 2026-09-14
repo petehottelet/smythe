@@ -168,7 +168,6 @@ prompt mutation.
 - A resumed run keeps completed results, recorded spend, and consumed control allowances.
 
 The [cost guardrails](budgets.md) reject malformed usage and block unresolved
-accounting on resume. The [repository review](project-review-2026-09-06.md)
-records the original defects and dated follow-up work. Managed accounting does
+accounting on resume. Managed accounting does
 not expand the supported text-workflow boundary to tools, attachments, or
 arbitrary paid custom components; those retain their separate documented scopes.

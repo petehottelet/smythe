@@ -1,6 +1,6 @@
 # Astra and Sol: 200 matched workflows
 
-**Evidence status: human review pending; not claimable.**
+**Evidence status: human review complete; claimable within the recorded descriptive scope.**
 
 The frozen automatic checks accept 191/200 workflows. Each run uses GPT-6 Astra or GPT-5.6 Sol
 through a fixed research → analysis → writing pipeline or a generated Smythe graph.
@@ -103,14 +103,21 @@ The missing output remains failed; no human score is invented for it.
 
 | Sample | Task | Human score | Human decision | Notes |
 |---|---|---:|---|---|
-| A–H | Seven capacity-chain answers and one delivery-copy answer | Pending | Pending | No ratings submitted yet |
+| A, B, D–H | Seven capacity-chain answers | 4/4 each | Accepted | Correct arithmetic and decision; the omitted final comparison in the explanation was not penalized. |
+| C | Delivery-copy answer | 4/4 | Accepted | Correct arithmetic, spelling diagnosis, policy corrections and rewritten copy. |
 
-Human ratings are pending. All eight original
+All eight ratings were submitted on 14 September 2026. The
+[unaltered responses and notes](human-main-response.json) are bound to the
+[anonymous samples and output hashes](human-main-manifest.json). Every sample
+matches its original archived outcome. All eight original
 automatic rejections remain in the reported 191/200 primary acceptance count.
 Disagreement limits interpretation of judge-based quality differences; this study makes no
 quality-superiority claim. Raw answers, judge reasons, pilot human ratings and the
-pending main review manifest are available in the evidence archive, with hashes
-bound in [the review](review.json).
+original main review manifest are available in the evidence archive. The
+completed main ratings are published alongside that immutable archive, with
+hashes bound in [the review](review.json). The [pre-review record](pre-human-review.json)
+retains the earlier publication status. Human review resolves the disputed-answer
+gate; the missing usage receipt still limits affected exact cost claims.
 
 ## Calibration, amendments and spending
 
@@ -191,12 +198,14 @@ No job reported a ResourceWarning. The published tree excludes the unrelated
 local report extension present in the earlier full local qualification;
 [exact source inventory and CI receipt](ci-verification.json) and
 [all nine job logs](ci-verification.zip) bind these platform results.
-Software checks do not resolve the outstanding human benchmark review.
+These software checks qualify the runtime. The separate human review above
+completes the disputed-answer gate.
 
 ## Evidence and reproduction
 
 - [All 200 trial metrics, comparisons and phase charges](analysis.json)
 - [Native evidence review](review.json) and [all campaign spending](campaign-spending.json)
+- [Completed human ratings](human-main-response.json), [bound samples](human-main-manifest.json) and [prior publication status](pre-human-review.json)
 - [Complete evidence archive](evidence.zip) and [member hashes](archive-manifest.json)
 - [Fresh-extraction reproduction](relocated-review.json) and [chart inspection](visual-review.json)
 - [Original 24-workflow pilot snapshot](../astra_20260913/README.md)
@@ -204,7 +213,9 @@ Software checks do not resolve the outstanding human benchmark review.
 Archive SHA-256: `110e612ce24805bfc98da8eeabf80d824fdadbebabecf2786bc1fdbdba02a8ff`.
 
 The archive includes every main output, the native SQLite ledgers, frozen sources, judge requests and
-responses, pilot human ratings, the pending main review sheet, and diagnostic history. Extract to a new directory; the nested original
+responses, pilot human ratings, the original main review sheet, and diagnostic history.
+The completed main ratings are a separate, hash-bound supplement; the archive is unchanged.
+Extract to a new directory; the nested original
 pilot archive preserves its earlier snapshot. Inspect without paid calls:
 
 ```bash

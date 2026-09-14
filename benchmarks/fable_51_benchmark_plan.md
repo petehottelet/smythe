@@ -5,8 +5,8 @@
 Compare fixed and generated execution graphs with `claude-fable-5-1` through
 the native Claude Messages API. This tests whether the Astra/Sol observations
 extend to another provider. The [Astra/Sol records](results/astra_20260913_main/README.md)
-remain a separate, completed execution cohort with eight answers awaiting
-human review. Do not append Fable trials to that frozen 200-run campaign.
+remain a separate, completed and human-reviewed cohort. Do not append Fable
+trials to that frozen 200-run campaign.
 
 The [preparation record](fable_51_preparation_20260913.json) binds the proposed
 112 trial positions, task inputs, rubrics, prior spending, and policy to local

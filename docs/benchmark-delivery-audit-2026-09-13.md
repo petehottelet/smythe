@@ -23,7 +23,7 @@ both sizes have complete timing, memory and artifact evidence.
 | Commitment | What exists | What remains |
 |---|---|---|
 | [Fable 5.1 extension](../benchmarks/fable_51_benchmark_plan.md) | A bound 12-pilot/100-main preparation record, dated price card, matched task contracts and shared spending plan; no provider calls | Native Messages receipts and durable integration, API access, offline qualification, pilot human review, then all 100 main outcomes and an audited report. |
-| [Astra review and follow-ups](../benchmarks/astra_benchmark_plan.md#separate-follow-up-studies) | The [primary 200-workflow comparison](../benchmarks/results/astra_20260913_main/README.md) has complete execution, automatic scoring and native audit, including its failed outcome and retained reserve | Complete human review of eight flagged answers; reconcile one missing native usage receipt. Run separately frozen scheduler, modern framework and tool studies; broaden the external task set. |
+| [Astra follow-ups](../benchmarks/astra_benchmark_plan.md#separate-follow-up-studies) | The [primary 200-workflow comparison](../benchmarks/results/astra_20260913_main/README.md) has complete execution, automatic scoring, native audit and human review; all eight flagged answers were accepted at 4/4 | Reconcile one missing native usage receipt before exact affected cost claims. Run separately frozen scheduler, modern framework and tool studies; broaden the external task set. |
 | [Complete-workflow task-shape cost](../benchmarks/shape_suite.md) | Wall time includes planning; historical cost uses execution/synthesis estimates | New native-ledger cost measurements including planning, input/output prices, failed attempts and judging. The cost-per-quality hypothesis is still open. |
 | [Broader quality and latency evidence](../benchmarks/README.md#coming-soon) | Small project-authored suites and one independent judge | Larger external task set, repeated randomized execution, stronger score discrimination and human calibration with retained outputs/judge reasoning. Astra's prepared synthetic tasks alone do not fulfill the external-task promise. |
 | [Additional criteria-arm repetitions](../benchmarks/control_ablation.md) | One valid 15-run criteria campaign; other arms have more samples | Replicate the criteria result and measure the unresolved complete-deliverable failure cases. |
@@ -41,8 +41,9 @@ both sizes have complete timing, memory and artifact evidence.
   phase costs and one retained unknown reservation are reconciled as bounds.
   Exact cost contrasts touching that failed call remain withheld.
 
-Human review of eight flagged main answers remains pending. These records are
-not claimable until that review is complete; automatic classifications are retained.
+  Human review is complete: all eight flagged answers were accepted at 4/4.
+  The study is claimable within its documented descriptive scope; the original
+  automatic classifications are retained.
 
 - The [64/128/192/256-node controlled width sweep](../benchmarks/glyph_screensaver_benchmark.md)
   exists. It uses the earlier tile method and simulated provider latency.

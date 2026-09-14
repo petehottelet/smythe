@@ -193,7 +193,7 @@ It adds the following runtime guarantees and measured evidence:
 - **Concurrent journal initialization** — bounded WAL retries and atomic
   schema creation prevent competing openers from seeing partial stores.
   Existing evidence and identities remain intact.
-  [Implementation and verification plan](plans/sqlite-initialization-2026-09-07.md).
+  [Concurrent initialization regression checks](tests/test_jobs_workflow_initialization.py).
 
 ## Coming soon
 
@@ -224,8 +224,9 @@ quality, graph sizes and phase costs are audited; affected exact cost contrasts
 remain withheld. Scheduler, framework and tool experiments are separate
 [follow-up studies](benchmarks/astra_benchmark_plan.md#separate-follow-up-studies).
 
-Human review of eight flagged main answers remains pending. These records are
-not claimable until that review is complete; automatic classifications are retained.
+Human review is complete: all eight flagged main answers were accepted at 4/4.
+The records are claimable within their documented descriptive scope; the
+191/200 automatic classifications and affected cost bounds are retained.
 
 The [Fable 5.1 extension](benchmarks/fable_51_benchmark_plan.md) has a prepared
 12-workflow pilot and 100-workflow main schedule. Native Claude usage accounting,
@@ -233,8 +234,7 @@ durable integration, access verification, and pilot review precede main runs.
 No Fable calls or results are recorded. Its $100 sublimit fits inside the
 existing $300 ceiling, with earlier charges and reservations retained.
 
-The [September repository review](docs/project-review-2026-09-06.md) defines
-the hardening work ahead of broader production claims:
+The remaining runtime and evidence priorities are:
 
 | Priority | Change | Acceptance criteria |
 |---|---|---|

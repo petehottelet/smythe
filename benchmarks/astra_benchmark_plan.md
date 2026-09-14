@@ -1,14 +1,15 @@
 # Astra benchmark plan
 
-**Status: all 200 scheduled workflows are recorded and automatically scored; human review is pending.**
+**Status: all 200 scheduled workflows are recorded; automatic scoring and human review are complete.**
 The [complete report](results/astra_20260913_main/README.md) includes every
 outcome, native ledger, blind judgment, graph size and cost bound. One failed
 call has no usage receipt; the [approved continuation](astra_connection_continuation_20260913.md)
 retained its full $0.169645 reserve and ran only the remaining 53 entries.
 Exact affected cost comparisons remain withheld.
 
-Human review of eight flagged main answers remains pending. These records are
-not claimable until that review is complete; automatic classifications are retained.
+Human review accepted all eight flagged main answers at 4/4. The study is
+claimable within its recorded descriptive scope; the 191/200 automatic
+classifications and affected cost bounds are retained.
 
 The [original 24-workflow pilot snapshot](results/astra_20260913/README.md)
 and [method amendment](astra_method_amendment_20260913.md) preserve the

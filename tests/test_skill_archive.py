@@ -73,3 +73,35 @@ def test_external_receipt_hashes_the_actual_archive(skill_repo, tmp_path):
     receipt = json.loads(archive.with_suffix(".json").read_text())
     assert receipt["bytes"] == archive.stat().st_size
     assert receipt["sha256"] == hashlib.sha256(archive.read_bytes()).hexdigest()
+
+
+@pytest.mark.parametrize("helper", ["skill", "consumer"])
+def test_verification_preserves_the_virtual_environment_interpreter(skill_repo, tmp_path, monkeypatch, helper):
+    import os
+    import venv
+
+    from tools.check_consumer_types import verify as verify_types
+
+    archive = build(tmp_path / "out", root=skill_repo)
+    environment = tmp_path / "isolated-runtime"
+    venv.EnvBuilder(with_pip=False, symlinks=os.name != "nt").create(environment)
+    python = environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    original_run = subprocess.run
+
+    class InterpreterChecked(Exception):
+        pass
+
+    def inspect_interpreter(command, **kwargs):
+        actual = original_run(
+            [command[0], "-I", "-c", "import sys; print(sys.prefix)"],
+            cwd=kwargs["cwd"], env=kwargs["env"], capture_output=True, text=True, check=True,
+        )
+        assert Path(actual.stdout.strip()).resolve() == environment.resolve()
+        raise InterpreterChecked
+
+    monkeypatch.setattr(subprocess, "check_output" if helper == "skill" else "run", inspect_interpreter)
+    with pytest.raises(InterpreterChecked):
+        if helper == "skill":
+            verify(archive, python)
+        else:
+            verify_types(python)

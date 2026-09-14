@@ -74,6 +74,8 @@ def checked_members(path: Path) -> tuple[dict, dict[str, bytes]]:
 
 
 def verify(path: Path, python: Path) -> dict:
+    # On Unix, venv Python is a symlink; resolving it loses the installed runtime.
+    python = python.absolute()
     manifest, members = checked_members(path)
     environment = dict(os.environ)
     for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY",
@@ -83,7 +85,7 @@ def verify(path: Path, python: Path) -> dict:
     with tempfile.TemporaryDirectory(prefix="smythe-skill-") as scratch:
         work = Path(scratch)
         installed = subprocess.check_output(
-            [str(python.resolve()), "-I", "-c", "import smythe; print(smythe.__version__)"],
+            [str(python), "-I", "-c", "import smythe; print(smythe.__version__)"],
             cwd=work, env=environment, text=True,
         ).strip()
         if "smythe==" + installed != manifest["runtime"]:
@@ -98,7 +100,7 @@ def verify(path: Path, python: Path) -> dict:
         (fixture / "pyproject.toml").write_text('[project]\nname="fixture"\nversion="1.0.0"\n')
         output = work / "result"
         subprocess.run(
-            [str(python.resolve()), "-I", str(work / "repo-doctor/scripts/audit_repo.py"),
+            [str(python), "-I", str(work / "repo-doctor/scripts/audit_repo.py"),
              str(fixture), "--output", str(output)],
             cwd=work, env=environment, check=True, capture_output=True, text=True, timeout=60,
         )

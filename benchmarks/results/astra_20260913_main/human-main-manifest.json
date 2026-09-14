@@ -1,0 +1,90 @@
+[
+  {
+    "case_id": "main-capacity-chain",
+    "output_sha256": "0ef14499a28a631de7332686545f938eba2ac21ed97c9ee55c37602d17815e62",
+    "output": "{\"steps\":{\"gross_minutes\":2160,\"net_minutes\":1836,\"started_units\":306,\"passing_units\":281,\"explanation\":\"Gross minutes = 3 \u00d7 720 = 2160. Net minutes = 2160 \u00d7 (1 - 0.15) = 1836. Started units = floor(1836 \u00f7 6) = 306. Passing units = floor(306 \u00d7 0.92) = floor(281.52) = 281. Deliverable units = floor(281 \u00f7 20) \u00d7 20 = 280.\"},\"deliverable_units\":280,\"shortfall\":10,\"decision\":\"overtime\"}",
+    "judgment_identity": "8815c451b566350aa5163624608d10a09fd29cead831d8e07038ba9a9916b604",
+    "judgment_record_sha256": "50b8137e93bd89562e07046175f077c270d77deb2440d355db65eb7ca06f0548",
+    "run_ids": [
+      "0d88b4ca9ab2f49e40398e97bafc8dbbe9de8671fe56aa49b5e28d42e98b088f"
+    ],
+    "sample_id": "A"
+  },
+  {
+    "case_id": "main-capacity-chain",
+    "output_sha256": "670cd485b78063da99c6e38e5a69a8eb80a5c0ae0f4de6c389b239962148a610",
+    "output": "{\"steps\":{\"gross_minutes\":2160,\"net_minutes\":1836,\"started_units\":306,\"passing_units\":281,\"explanation\":\"3 machines \u00d7 720 minutes = 2160 gross minutes; subtract 15% downtime to get 1836 net minutes; floor(1836 \u00f7 6) = 306 started units; floor(306 \u00d7 92%) = 281 passing units; full boxes only: floor(281 \u00f7 20) \u00d7 20 = 280 deliverable units.\"},\"deliverable_units\":280,\"shortfall\":10,\"decision\":\"overtime\"}",
+    "judgment_identity": "869df74f5501430b1ef97accec25edf1c9e2f719acaec21df3625b7cc049a825",
+    "judgment_record_sha256": "3fc7464875dacbac495f00248a0459e09bf7e9258968fc30df5af70d5b98a311",
+    "run_ids": [
+      "e9be35da4f5309d3db16238465509f3131a41c38cf582b5e5672ca33569b8af1"
+    ],
+    "sample_id": "B"
+  },
+  {
+    "case_id": "main-delivery-copy",
+    "output_sha256": "c19d1f83792af0ff14e9e91c4fce4f2c28364883f8995f00469f85a08f64857a",
+    "output": "{\n  \"defects\": {\n    \"spelling\": {\n      \"Recieve\": \"Misspelled; the correct spelling is \\\"Receive\\\".\"\n    },\n    \"arithmetic\": {\n      \"only 4 credits per label\": \"54 credits divided by 12 labels equals 4.5 credits per label, not 4.\",\n      \"15% off our single-label price of 5 credits\": \"The savings are (5 - 4.5) / 5 \u00d7 100 = 10%, not 15%.\"\n    },\n    \"policy\": {\n      \"Delivery is always next-day\": \"The authoritative policy specifies delivery in two business days on mainland routes, not an unconditional next-day promise.\",\n      \"to every district, including excluded island routes\": \"The authoritative policy states that island routes are unavailable, contradicting the claim of delivery to every district and island routes.\"\n    }\n  },\n  \"corrected_copy\": \"Dispatch packs contain 12 labels for 54 credits: 4.5 credits per label. Save 10% compared with our single-label price of 5 credits. Delivery takes two business days on mainland routes; island routes are unavailable.\",\n  \"facts\": {\n    \"labels_per_pack\": 12,\n    \"pack_credits\": 54,\n    \"unit_credits\": 4.5,\n    \"savings_percent\": 10\n  }\n}",
+    "judgment_identity": "ad469b28b8aff64c3601d3e0a99a1f2841c7d01c671454f8567db0690d1852b2",
+    "judgment_record_sha256": "9ee795bc40802d154c8142748c9bcc5360a4f2cd64867d21d4de54d79f109c88",
+    "run_ids": [
+      "3ffd79d43587202b2b1ad6beebdf035e4b0589202acda6c3042cb10d5ce65911"
+    ],
+    "sample_id": "C"
+  },
+  {
+    "case_id": "main-capacity-chain",
+    "output_sha256": "1a1b235195cf2166fb0b3f0394d5a1606dd9fb5116c79e91fb2c4809a7208b0f",
+    "output": "{\"steps\":{\"gross_minutes\":2160,\"net_minutes\":1836,\"started_units\":306,\"passing_units\":281,\"explanation\":\"Gross: 3 \u00d7 720 = 2160 minutes. Net after 15% downtime: 2160 \u00d7 0.85 = 1836 minutes. Started units: floor(1836 \u00f7 6) = 306. Passing units: floor(306 \u00d7 0.92) = 281. Full-box delivery: floor(281 \u00f7 20) \u00d7 20 = 280 units.\"},\"deliverable_units\":280,\"shortfall\":10,\"decision\":\"overtime\"}",
+    "judgment_identity": "75b309bcf14aac3790931f4f889a22d56c94b0a09516babbf736195c7c9218a2",
+    "judgment_record_sha256": "28909e35592eb3fb0161db4f1fcf1f0a618edf823de2b7f303400f58e3fe0c02",
+    "run_ids": [
+      "2b81aa41f58e806fc4d8079f440ced9cea7efb74b6e040a542546aee23ccaa8c"
+    ],
+    "sample_id": "D"
+  },
+  {
+    "case_id": "main-capacity-chain",
+    "output_sha256": "491774f0cd2a393c3157bcd57e33fc611567f1d35832ba0d0f8bfa12243fcb3a",
+    "output": "{\"steps\":{\"gross_minutes\":2160,\"net_minutes\":1836,\"started_units\":306,\"passing_units\":281,\"explanation\":\"3 \u00d7 720 = 2160 gross minutes; after 15% downtime, 2160 \u00d7 0.85 = 1836 net minutes; floor(1836 \u00f7 6) = 306 started units; floor(306 \u00d7 0.92) = 281 passing units; floor(281 \u00f7 20) \u00d7 20 = 280 deliverable units.\"},\"deliverable_units\":280,\"shortfall\":10,\"decision\":\"overtime\"}",
+    "judgment_identity": "90ae7facd1cebaa8dcbbfaa3dbb3f5e03ad1eca1ba71562628f4f24a4b97c38c",
+    "judgment_record_sha256": "cabb08cedf8f3651116aa49b43ab53f40e744badbdc0aa8a6b588478ebf42285",
+    "run_ids": [
+      "1a10e903e719641beefce76a869cb1db84ec0dc275a33e1861ef7418380e43fa"
+    ],
+    "sample_id": "E"
+  },
+  {
+    "case_id": "main-capacity-chain",
+    "output_sha256": "3610a14e4d675009ed539b6896c62198fb6a906a825f234e60b61cedc1b9efd6",
+    "output": "{\"steps\":{\"gross_minutes\":2160,\"net_minutes\":1836,\"started_units\":306,\"passing_units\":281,\"explanation\":\"3 \u00d7 720 = 2160 gross minutes; 2160 \u00d7 85% = 1836 net minutes; floor(1836 \u00f7 6) = 306 started units; floor(306 \u00d7 92%) = 281 passing units; 14 full boxes \u00d7 20 = 280 deliverable units.\"},\"deliverable_units\":280,\"shortfall\":10,\"decision\":\"overtime\"}",
+    "judgment_identity": "e3a05f551c8ccde1ee18f8559ab03c30e631d7616f0c729fbfa8db7dc2994e26",
+    "judgment_record_sha256": "575dc410d987556af537591e97ecc0561effedd2894a6ebed50473494785e9d6",
+    "run_ids": [
+      "ac4c3a297f45f752c30bd801b917be79634ec427bb817382936d2c27542845f3"
+    ],
+    "sample_id": "F"
+  },
+  {
+    "case_id": "main-capacity-chain",
+    "output_sha256": "ed293d2be438cf0094296d1875236fd194ec1a0ac50c72bbea37314c9baa5a0c",
+    "output": "{\"steps\":{\"gross_minutes\":2160,\"net_minutes\":1836,\"started_units\":306,\"passing_units\":281,\"explanation\":\"3 machines \u00d7 720 minutes = 2160 gross minutes; subtract 15% downtime to get 1836 net minutes; 1836 \u00f7 6 minutes per unit = 306 started units; floor(306 \u00d7 92%) = floor(281.52) = 281 passing units; partial boxes are not allowed, so floor(281 \u00f7 20) \u00d7 20 = 280 deliverable units.\"},\"deliverable_units\":280,\"shortfall\":10,\"decision\":\"overtime\"}",
+    "judgment_identity": "046d01d8789026f41d1440fd24537ce501cf56f1ab12623656fac47181f34edd",
+    "judgment_record_sha256": "926e6118a4bd0c4e67361b209bcd840f886e38c5f2de512fb2619361af4ebf9f",
+    "run_ids": [
+      "bd6754f98c29e7df40cdaf996b472e8da4b550bf9936a8784bc234612a6295e1"
+    ],
+    "sample_id": "G"
+  },
+  {
+    "case_id": "main-capacity-chain",
+    "output_sha256": "b43f2c066ef8816c9f29ae065a607eff3eb434a9860125419871c06a079bb45e",
+    "output": "{\"steps\":{\"gross_minutes\":2160,\"net_minutes\":1836,\"started_units\":306,\"passing_units\":281,\"explanation\":\"3 machines \u00d7 720 minutes = 2160 gross minutes; 2160 \u00d7 0.85 = 1836 net minutes after 15% downtime; floor(1836 \u00f7 6) = 306 started units; floor(306 \u00d7 0.92) = 281 passing units; floor(281 \u00f7 20) \u00d7 20 = 280 deliverable units.\"},\"deliverable_units\":280,\"shortfall\":10,\"decision\":\"overtime\"}",
+    "judgment_identity": "ebb1aa8b528829a2b87e4d77b81db914947dd7961087fa8ba29c44dcd55658ae",
+    "judgment_record_sha256": "b89e799a27d8e22802b54474026a8504ae9ff2d91ffbb61626fa3b7629051f8f",
+    "run_ids": [
+      "2ce2908d0fcfae56fd19488428e2b91cc31ab56275f904a908be62b8cd003e84"
+    ],
+    "sample_id": "H"
+  }
+]

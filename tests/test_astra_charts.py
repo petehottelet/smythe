@@ -2,7 +2,9 @@
 
 import hashlib
 import json
+from pathlib import Path
 import xml.etree.ElementTree as ET
+import zipfile
 
 import pytest
 
@@ -92,3 +94,38 @@ def test_boolean_is_not_a_price_even_when_equal_to_numeric_bounds(record):
     path.write_text(json.dumps(review), encoding="utf-8")
     with pytest.raises(ValueError, match="finite number"):
         checked_record(record)
+
+
+def test_published_human_review_binds_every_dispute_without_rewriting_primary_results():
+    root = Path(__file__).resolve().parents[1] / "benchmarks/results/astra_20260913_main"
+    analysis, review, _ = checked_record(root / "analysis.json")
+    response_bytes = (root / "human-main-response.json").read_bytes()
+    manifest_bytes = (root / "human-main-manifest.json").read_bytes()
+    response, manifest = json.loads(response_bytes), json.loads(manifest_bytes)
+    human = review["human_main_review"]
+    assert review["claimable"] is True and review["claim_scope"] and review["withheld_claims"]
+    assert human["status"] == "complete" and human["samples"] == human["accepted"] == 8
+    assert human["response_sha256"] == hashlib.sha256(response_bytes).hexdigest()
+    assert human["manifest_sha256"] == response["sample_manifest_sha256"] == hashlib.sha256(manifest_bytes).hexdigest()
+    assert human["primary_automatic_classifications_changed"] is False
+    assert review["unreviewed_disputed_output_run_ids"] == []
+    assert sum(arm["accepted"] for arm in analysis["arms"].values()) == 191
+    assert len(review["missing_output_failure_run_ids"]) == 1
+    assert review["held_unknown_nanousd"] == 169645000
+    assert review["native_review_sha256"] == hashlib.sha256((root / "native-review.json").read_bytes()).hexdigest()
+    samples = {sample["sample_id"]: sample for sample in manifest}
+    assert len(samples) == len(response["ratings"]) == len(human["ratings"]) == 8
+    assert {row["sample_id"] for row in response["ratings"]} == set(samples)
+    assert sorted(run for sample in manifest for run in sample["run_ids"]) == sorted(review["disputed_output_run_ids"])
+    with zipfile.ZipFile(root / "evidence.zip") as archive:
+        assert archive.read("calibration/main-human-review-manifest.json") == manifest_bytes
+        for row, published in zip(response["ratings"], human["ratings"], strict=True):
+            sample = samples[row["sample_id"]]
+            assert published == {**row, "task_id": sample["case_id"], "run_ids": sample["run_ids"]}
+            assert row["score"] == 4 and row["accepted"] is True and row["note"].strip()
+            assert row["output_sha256"] == hashlib.sha256(sample["output"].encode()).hexdigest()
+            for run in sample["run_ids"]:
+                names = [name for name in (f"main/{run}.outcome.json", f"main-continuation/{run}.outcome.json")
+                         if name in archive.namelist()]
+                assert len(names) == 1
+                assert json.loads(archive.read(names[0]))["output"] == sample["output"]

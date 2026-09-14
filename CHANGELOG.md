@@ -77,6 +77,13 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Documentation
 
+- Incorporate the completed Astra human review and relocate nine legacy
+  implementation plans and the September project review to ignored private
+  storage. Public guides link to current behavior, tests and benchmark evidence.
+- Correct Linux package and skill verification to preserve the virtual
+  environment's Python entry point instead of resolving its symlink to the
+  base interpreter. Both paths have an isolated-runtime regression check.
+
 - Record both live Astra/Sol pilots: 24 workflows, zero execution failures,
   12/12 corrected format checks, original-output blind judging, and planted-error
   detection. Retain the original prompt/type defect, raw ledgers and source
@@ -87,8 +94,10 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   records 191 automatically accepted answers, all native outcomes, blind judgments, graph
   sizes and paired comparisons. The explicitly approved continuation retains
   one failed workflow and its full $0.169645 unresolved reservation. Charts
-  show cost bounds and withhold affected exact cost contrasts. Human review
-  of eight flagged answers remains pending; the study is not yet claimable.
+  show cost bounds and withhold affected exact cost contrasts. All eight
+  flagged answers now have human acceptance at 4/4, bound to the original
+  outputs. The study is claimable within its recorded descriptive scope;
+  the frozen 191/200 automatic result and original evidence archive are unchanged.
 
 - Measure 192 and 256 authored v2 SVG glyphs across 36 matched thread/process
   workflows. Retain compilation, four-size validation, all-pairs comparison,

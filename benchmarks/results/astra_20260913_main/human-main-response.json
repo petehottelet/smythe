@@ -1,0 +1,64 @@
+{
+  "status": "submitted",
+  "source": "local-user-review-form",
+  "submitted_at": "2026-09-14T02:58:23.667669+00:00",
+  "sample_manifest_sha256": "43738cdd620d4996bb8def010dac5a48ea6a83390540a760263055aec80a22bd",
+  "ratings": [
+    {
+      "sample_id": "A",
+      "output_sha256": "0ef14499a28a631de7332686545f938eba2ac21ed97c9ee55c37602d17815e62",
+      "score": 4,
+      "accepted": true,
+      "note": "Verified: identical correct chain (2160 gross, 1836 net, 306 started, floor(281.52)=281 passing, 280 full-box units; shortfall 10; 280<290 => overtime). Shared quibble: explanation stops at 280 and does not restate the 280<290 tie-off; uniform across all capacity answers, not penalized."
+    },
+    {
+      "sample_id": "B",
+      "output_sha256": "670cd485b78063da99c6e38e5a69a8eb80a5c0ae0f4de6c389b239962148a610",
+      "score": 4,
+      "accepted": true,
+      "note": "Verified: identical correct chain (2160 gross, 1836 net, 306 started, floor(281.52)=281 passing, 280 full-box units; shortfall 10; 280<290 => overtime). Shared quibble: explanation stops at 280 and does not restate the 280<290 tie-off; uniform across all capacity answers, not penalized."
+    },
+    {
+      "sample_id": "C",
+      "output_sha256": "c19d1f83792af0ff14e9e91c4fce4f2c28364883f8995f00469f85a08f64857a",
+      "score": 4,
+      "accepted": true,
+      "note": "Verified: 54/12 = 4.5 unit credits; savings (5-4.5)/5 = 10%; 'Recieve' is the sole spelling defect; both policy contradictions (next-day vs two business days mainland; island routes unavailable) caught and corrected; corrected copy retains the supported offer with correct facts."
+    },
+    {
+      "sample_id": "D",
+      "output_sha256": "1a1b235195cf2166fb0b3f0394d5a1606dd9fb5116c79e91fb2c4809a7208b0f",
+      "score": 4,
+      "accepted": true,
+      "note": "Verified: identical correct chain (2160 gross, 1836 net, 306 started, floor(281.52)=281 passing, 280 full-box units; shortfall 10; 280<290 => overtime). Shared quibble: explanation stops at 280 and does not restate the 280<290 tie-off; uniform across all capacity answers, not penalized."
+    },
+    {
+      "sample_id": "E",
+      "output_sha256": "491774f0cd2a393c3157bcd57e33fc611567f1d35832ba0d0f8bfa12243fcb3a",
+      "score": 4,
+      "accepted": true,
+      "note": "Verified: identical correct chain (2160 gross, 1836 net, 306 started, floor(281.52)=281 passing, 280 full-box units; shortfall 10; 280<290 => overtime). Shared quibble: explanation stops at 280 and does not restate the 280<290 tie-off; uniform across all capacity answers, not penalized."
+    },
+    {
+      "sample_id": "F",
+      "output_sha256": "3610a14e4d675009ed539b6896c62198fb6a906a825f234e60b61cedc1b9efd6",
+      "score": 4,
+      "accepted": true,
+      "note": "Verified: correct chain; '14 full boxes x 20 = 280' is equivalent to the floor notation. Verified: identical correct chain (2160 gross, 1836 net, 306 started, floor(281.52)=281 passing, 280 full-box units; shortfall 10; 280<290 => overtime). Shared quibble: explanation stops at 280 and does not restate the 280<290 tie-off; uniform across all capacity answers, not penalized."
+    },
+    {
+      "sample_id": "G",
+      "output_sha256": "ed293d2be438cf0094296d1875236fd194ec1a0ac50c72bbea37314c9baa5a0c",
+      "score": 4,
+      "accepted": true,
+      "note": "Verified: correct chain; started-units floor left implicit but 1836/6 = 306 is exact, and the source only states an explicit floor for the quality step; credits the partial-box rule. Verified: identical correct chain (2160 gross, 1836 net, 306 started, floor(281.52)=281 passing, 280 full-box units; shortfall 10; 280<290 => overtime). Shared quibble: explanation stops at 280 and does not restate the 280<290 tie-off; uniform across all capacity answers, not penalized."
+    },
+    {
+      "sample_id": "H",
+      "output_sha256": "b43f2c066ef8816c9f29ae065a607eff3eb434a9860125419871c06a079bb45e",
+      "score": 4,
+      "accepted": true,
+      "note": "Verified: identical correct chain (2160 gross, 1836 net, 306 started, floor(281.52)=281 passing, 280 full-box units; shortfall 10; 280<290 => overtime). Shared quibble: explanation stops at 280 and does not restate the 280<290 tie-off; uniform across all capacity answers, not penalized."
+    }
+  ]
+}

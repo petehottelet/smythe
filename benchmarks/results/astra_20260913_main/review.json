@@ -2,7 +2,7 @@
   "analysis_sha256": "4184ff54fd79e8f290db52742546ad534c1bf1e64e7ab275a8fb96643c5d6436",
   "analysis_source_sha256": "cb980f5a013666fe968e1e71fbf59d07405ce598803cc071be9749d2f7df7717",
   "audit_source_sha256": "c255b03ba8071f66c7b082a303685bc2e115d552be01df90d52eeee4a8c8a287",
-  "claimable": false,
+  "claimable": true,
   "continuation": {
     "claimable": false,
     "confirmed_nanousd": 12607693200,
@@ -272,28 +272,136 @@
   "validated_outcomes": 200,
   "validated_request_policies": 654,
   "validated_task_inputs": 10,
-  "publication_status": "execution and automatic scoring complete; human review pending",
-  "reviewer": "Codex native evidence audit; final claim review pending user ratings",
+  "reviewed_at": "2026-09-14T05:38:00.947477+00:00",
+  "reviewer": "Codex evidence review; human ratings submitted separately by the repository owner",
   "native_review_sha256": "9e67755f74be85a411b01affd0a9edbce2cc57a458d0a126aba020f2c86cb6b7",
-  "unreviewed_disputed_output_run_ids": [
-    "2ce2908d0fcfae56fd19488428e2b91cc31ab56275f904a908be62b8cd003e84",
-    "ac4c3a297f45f752c30bd801b917be79634ec427bb817382936d2c27542845f3",
-    "2b81aa41f58e806fc4d8079f440ced9cea7efb74b6e040a542546aee23ccaa8c",
-    "bd6754f98c29e7df40cdaf996b472e8da4b550bf9936a8784bc234612a6295e1",
-    "1a10e903e719641beefce76a869cb1db84ec0dc275a33e1861ef7418380e43fa",
-    "0d88b4ca9ab2f49e40398e97bafc8dbbe9de8671fe56aa49b5e28d42e98b088f",
-    "e9be35da4f5309d3db16238465509f3131a41c38cf582b5e5672ca33569b8af1",
-    "3ffd79d43587202b2b1ad6beebdf035e4b0589202acda6c3042cb10d5ce65911"
+  "publication_status": "human review complete; claimable within the recorded descriptive scope",
+  "claim_scope": [
+    "Descriptive records for this amended, reused ten-task study: 200 scheduled outcomes, 199 available outputs, and 191 accepted by the unchanged automatic rule.",
+    "Complete observed workflow timing, graph sizes, native request policy and phase-accounting coverage.",
+    "Known usage valued at dated list prices; unresolved usage displayed only as a confirmed-plus-reservation bound.",
+    "All paired timing and recorded-score contrasts; exact cost comparisons only where both arms have complete usage."
   ],
-  "human_main_review": {
-    "status": "pending",
-    "samples": 8,
-    "ratings": [],
-    "manifest_sha256": "43738cdd620d4996bb8def010dac5a48ea6a83390540a760263055aec80a22bd"
-  },
   "withheld_claims": [
-    "All README result headlines until human disputed-output review and final evidence review complete.",
-    "Exact affected cost comparisons while one native usage receipt is missing.",
-    "Quality superiority or lower average time/cost for generated graphs."
-  ]
+    "Any exact cost contrast, point value, or cost headline involving Sol/generated or the missing native usage receipt.",
+    "Quality superiority, independently validated quality equivalence, or treating automatic acceptance as universal human acceptance.",
+    "Lower mean time or cost for generated graphs: the observed study does not support those benefits.",
+    "External benchmark, untouched holdout, isolated scheduler/framework effect, SVG design quality, or screensaver performance."
+  ],
+  "known_scope_limitations": [
+    "One generation call has no HTTP or native usage receipt; its full reservation remains held. This limits exact cost scope, not outcome or timing completeness.",
+    "Seven flagged capacity answers contain correct numeric fields but omit the final decision justification in their explanation; one copy answer substitutes Save for Receive. Judge severity is interpretive.",
+    "The judge assigns either 2 or 3 to comparable omitted-justification explanations. All material-defect flags remain binding under the frozen primary rule; human disagreements are reported separately.",
+    "Ten reused, project-authored tasks in five related families, provider aliases/shared infrastructure, ordinal scores, and unadjusted task-clustered intervals limit generalization."
+  ],
+  "reviewed_disputed_output_run_ids": [
+    "0d88b4ca9ab2f49e40398e97bafc8dbbe9de8671fe56aa49b5e28d42e98b088f",
+    "1a10e903e719641beefce76a869cb1db84ec0dc275a33e1861ef7418380e43fa",
+    "2b81aa41f58e806fc4d8079f440ced9cea7efb74b6e040a542546aee23ccaa8c",
+    "2ce2908d0fcfae56fd19488428e2b91cc31ab56275f904a908be62b8cd003e84",
+    "3ffd79d43587202b2b1ad6beebdf035e4b0589202acda6c3042cb10d5ce65911",
+    "ac4c3a297f45f752c30bd801b917be79634ec427bb817382936d2c27542845f3",
+    "bd6754f98c29e7df40cdaf996b472e8da4b550bf9936a8784bc234612a6295e1",
+    "e9be35da4f5309d3db16238465509f3131a41c38cf582b5e5672ca33569b8af1"
+  ],
+  "unreviewed_disputed_output_run_ids": [],
+  "human_main_review": {
+    "status": "complete",
+    "submitted_at": "2026-09-14T02:58:23.667669+00:00",
+    "manifest_sha256": "43738cdd620d4996bb8def010dac5a48ea6a83390540a760263055aec80a22bd",
+    "response_sha256": "f6ee4b06db6804f2b67de2c28060d4ada4ba9ed479c542e012d6eadfc262885a",
+    "samples": 8,
+    "accepted": 8,
+    "ratings": [
+      {
+        "sample_id": "A",
+        "output_sha256": "0ef14499a28a631de7332686545f938eba2ac21ed97c9ee55c37602d17815e62",
+        "score": 4,
+        "accepted": true,
+        "note": "Verified: identical correct chain (2160 gross, 1836 net, 306 started, floor(281.52)=281 passing, 280 full-box units; shortfall 10; 280<290 => overtime). Shared quibble: explanation stops at 280 and does not restate the 280<290 tie-off; uniform across all capacity answers, not penalized.",
+        "task_id": "main-capacity-chain",
+        "run_ids": [
+          "0d88b4ca9ab2f49e40398e97bafc8dbbe9de8671fe56aa49b5e28d42e98b088f"
+        ]
+      },
+      {
+        "sample_id": "B",
+        "output_sha256": "670cd485b78063da99c6e38e5a69a8eb80a5c0ae0f4de6c389b239962148a610",
+        "score": 4,
+        "accepted": true,
+        "note": "Verified: identical correct chain (2160 gross, 1836 net, 306 started, floor(281.52)=281 passing, 280 full-box units; shortfall 10; 280<290 => overtime). Shared quibble: explanation stops at 280 and does not restate the 280<290 tie-off; uniform across all capacity answers, not penalized.",
+        "task_id": "main-capacity-chain",
+        "run_ids": [
+          "e9be35da4f5309d3db16238465509f3131a41c38cf582b5e5672ca33569b8af1"
+        ]
+      },
+      {
+        "sample_id": "C",
+        "output_sha256": "c19d1f83792af0ff14e9e91c4fce4f2c28364883f8995f00469f85a08f64857a",
+        "score": 4,
+        "accepted": true,
+        "note": "Verified: 54/12 = 4.5 unit credits; savings (5-4.5)/5 = 10%; 'Recieve' is the sole spelling defect; both policy contradictions (next-day vs two business days mainland; island routes unavailable) caught and corrected; corrected copy retains the supported offer with correct facts.",
+        "task_id": "main-delivery-copy",
+        "run_ids": [
+          "3ffd79d43587202b2b1ad6beebdf035e4b0589202acda6c3042cb10d5ce65911"
+        ]
+      },
+      {
+        "sample_id": "D",
+        "output_sha256": "1a1b235195cf2166fb0b3f0394d5a1606dd9fb5116c79e91fb2c4809a7208b0f",
+        "score": 4,
+        "accepted": true,
+        "note": "Verified: identical correct chain (2160 gross, 1836 net, 306 started, floor(281.52)=281 passing, 280 full-box units; shortfall 10; 280<290 => overtime). Shared quibble: explanation stops at 280 and does not restate the 280<290 tie-off; uniform across all capacity answers, not penalized.",
+        "task_id": "main-capacity-chain",
+        "run_ids": [
+          "2b81aa41f58e806fc4d8079f440ced9cea7efb74b6e040a542546aee23ccaa8c"
+        ]
+      },
+      {
+        "sample_id": "E",
+        "output_sha256": "491774f0cd2a393c3157bcd57e33fc611567f1d35832ba0d0f8bfa12243fcb3a",
+        "score": 4,
+        "accepted": true,
+        "note": "Verified: identical correct chain (2160 gross, 1836 net, 306 started, floor(281.52)=281 passing, 280 full-box units; shortfall 10; 280<290 => overtime). Shared quibble: explanation stops at 280 and does not restate the 280<290 tie-off; uniform across all capacity answers, not penalized.",
+        "task_id": "main-capacity-chain",
+        "run_ids": [
+          "1a10e903e719641beefce76a869cb1db84ec0dc275a33e1861ef7418380e43fa"
+        ]
+      },
+      {
+        "sample_id": "F",
+        "output_sha256": "3610a14e4d675009ed539b6896c62198fb6a906a825f234e60b61cedc1b9efd6",
+        "score": 4,
+        "accepted": true,
+        "note": "Verified: correct chain; '14 full boxes x 20 = 280' is equivalent to the floor notation. Verified: identical correct chain (2160 gross, 1836 net, 306 started, floor(281.52)=281 passing, 280 full-box units; shortfall 10; 280<290 => overtime). Shared quibble: explanation stops at 280 and does not restate the 280<290 tie-off; uniform across all capacity answers, not penalized.",
+        "task_id": "main-capacity-chain",
+        "run_ids": [
+          "ac4c3a297f45f752c30bd801b917be79634ec427bb817382936d2c27542845f3"
+        ]
+      },
+      {
+        "sample_id": "G",
+        "output_sha256": "ed293d2be438cf0094296d1875236fd194ec1a0ac50c72bbea37314c9baa5a0c",
+        "score": 4,
+        "accepted": true,
+        "note": "Verified: correct chain; started-units floor left implicit but 1836/6 = 306 is exact, and the source only states an explicit floor for the quality step; credits the partial-box rule. Verified: identical correct chain (2160 gross, 1836 net, 306 started, floor(281.52)=281 passing, 280 full-box units; shortfall 10; 280<290 => overtime). Shared quibble: explanation stops at 280 and does not restate the 280<290 tie-off; uniform across all capacity answers, not penalized.",
+        "task_id": "main-capacity-chain",
+        "run_ids": [
+          "bd6754f98c29e7df40cdaf996b472e8da4b550bf9936a8784bc234612a6295e1"
+        ]
+      },
+      {
+        "sample_id": "H",
+        "output_sha256": "b43f2c066ef8816c9f29ae065a607eff3eb434a9860125419871c06a079bb45e",
+        "score": 4,
+        "accepted": true,
+        "note": "Verified: identical correct chain (2160 gross, 1836 net, 306 started, floor(281.52)=281 passing, 280 full-box units; shortfall 10; 280<290 => overtime). Shared quibble: explanation stops at 280 and does not restate the 280<290 tie-off; uniform across all capacity answers, not penalized.",
+        "task_id": "main-capacity-chain",
+        "run_ids": [
+          "2ce2908d0fcfae56fd19488428e2b91cc31ab56275f904a908be62b8cd003e84"
+        ]
+      }
+    ],
+    "primary_automatic_classifications_changed": false
+  }
 }

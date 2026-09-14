@@ -50,6 +50,10 @@ behavior belongs in the linked guide for that subsystem.
   to push repository updates does not authorize publishing these materials.
 - Public documentation is for user guides, product roadmaps, and benchmark
   protocols and results. Internal implementation assessments stay private.
+- The legacy `plans/` documents and September project review have been moved
+  to private storage. Historical references inside immutable released changelog
+  entries and frozen evidence remain provenance; they do not authorize new
+  public implementation plans or reviews.
 
 ## Code quality
 

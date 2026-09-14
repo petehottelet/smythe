@@ -29,7 +29,7 @@ publishing benchmark updates.
 | Original self-baselines and pre-correction framework record | Diagnostic | Preserved because they found payload, assembly, and measurement defects; superseded by corrected campaigns |
 | [Control ablation](control_ablation.md) | Mechanism scope | Objective gates remain valuable; routine LLM supervision and judged-prose gating are not default quality paths |
 | [Jobs at 5,000 operations](jobs_scale_5000_20260907_results.md) | **Claimable correctness observation** | One offline schema-v3 campaign: 5,000 accepted identical fixtures after a hard kill, safe resume, and eight explicit rerolls; zero accepted work reissued and zero calls on completed resume. No comparative timing or model-quality claim. |
-| [Astra/Sol amended study](results/astra_20260913_main/README.md) | **Execution complete; human review pending; not claimable** | All 200 workflows retained, 191 accepted, anonymous judging, graph/phase breakdowns and task-clustered comparisons. One failed call retains its full $0.169645 reserve. Reused synthetic tasks; all earlier diagnostics and charges remain separate. |
+| [Astra/Sol amended study](results/astra_20260913_main/README.md) | **Human review complete; claimable within recorded descriptive scope** | All 200 workflows retained, 191 automatically accepted; all eight flagged answers accepted by human review at 4/4. Anonymous judging, graph/phase breakdowns and task-clustered comparisons. One failed call retains its full $0.169645 reserve. Reused synthetic tasks; all earlier diagnostics and charges remain separate. |
 
 The authoritative deliverable is `Swarm.execute(...).output`, which is what a
 caller receives. The harness records the historical terminal-node join beside

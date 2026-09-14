@@ -35,13 +35,15 @@ Swarm().execute(123)
 
 
 def verify(python: Path) -> None:
+    # Keep the venv entry point: resolving its symlink selects the base runtime.
+    python = python.absolute()
     environment = dict(os.environ)
     for key in ("PYTHONPATH", "PYTHONHOME", "MYPYPATH"):
         environment.pop(key, None)
     with tempfile.TemporaryDirectory(prefix="smythe-consumer-types-") as scratch:
         root = Path(scratch)
         subprocess.run(
-            [str(python.resolve()), "-I", "-c",
+            [str(python), "-I", "-c",
              "import importlib.resources as r; assert r.files('smythe').joinpath('py.typed').is_file()"],
             cwd=root, env=environment, check=True,
         )
@@ -49,7 +51,7 @@ def verify(python: Path) -> None:
         for name, source in (("positive.py", POSITIVE), ("negative.py", NEGATIVE)):
             (root / name).write_text(source, encoding="utf-8")
             result = subprocess.run(
-                [str(python.resolve()), "-I", "-m", "mypy", "--config-file", "mypy.ini", name],
+                [str(python), "-I", "-m", "mypy", "--config-file", "mypy.ini", name],
                 cwd=root, env=environment, capture_output=True, text=True, timeout=120,
             )
             if name == "positive.py":

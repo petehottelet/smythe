@@ -99,10 +99,11 @@ Process workers trade more memory for shorter completion time:
 
 ### Astra and Sol
 
-Execution and automatic scoring are complete for the 200-workflow Astra/Sol
-study. Human review of eight flagged answers remains pending, so the study
-is not yet claimable. Generated graphs took more time on average in this task
-set; every run and the unresolved cost range remain in the records.
+**200 matched Astra/Sol workflows, with completed human review.** The frozen
+automatic rule accepts 191/200; human review accepts all eight flagged answers
+at 4/4. The study is claimable within its documented scope. Generated graphs
+took more time on average on these tasks; every run and the unresolved cost
+range remain in the records.
 
 [Study report and review status](benchmarks/results/astra_20260913_main/README.md) ·
 [Cost and timing distributions](assets/benchmarks/astra_workflows.svg) ·
@@ -313,11 +314,10 @@ packages, installed typing checks and a separately verified Repo Doctor ZIP.
 - **Astra follow-ups:** compare concurrency one and eight on identical graphs,
   match modern framework adapters, and measure durable tool workflows. These
   [separate studies](benchmarks/astra_benchmark_plan.md#separate-follow-up-studies)
-  extend the 200-workflow text comparison. Its eight disputed answers still need human review.
+  extend the completed, human-reviewed 200-workflow text comparison.
 
 [Outstanding benchmark checklist](docs/benchmark-delivery-audit-2026-09-13.md) ·
-[Specifications and priorities](ROADMAP.md#coming-soon) ·
-[Repository review](docs/project-review-2026-09-06.md).
+[Specifications and priorities](ROADMAP.md#coming-soon).
 
 Smythe is pre-1.0; minor releases may change APIs.
 [Release verification](docs/release-0.7.0.md) ·

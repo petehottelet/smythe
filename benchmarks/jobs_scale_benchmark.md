@@ -107,7 +107,6 @@ logs, event timestamps, and retained receipt-subset hashes. The archive does
 not contain historical database snapshots. Review code is retained separately
 from producer code so their revisions remain explicit.
 
-[Publication plan](../plans/jobs-scale-publication.md) ·
 [Archive regression checks](../tests/test_jobs_scale_archive.py).
 
 ## Graph-depth coverage

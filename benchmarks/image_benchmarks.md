@@ -44,7 +44,7 @@ ceiling conservatively. Verify current provider pricing before rerunning.
 - Cross-provider context: a prior recorded GPT-Image run
   (`gpt-image-2`, 1536×1024 medium, k=3) showed the same executor
   efficiency (0.90) at ~6× the per-image latency (~39s vs ~6s) and
-  near-identical price — see `plans/05-gpt-image-benchmark.md`.
+  near-identical price. This earlier observation is separate from the Gemini sweep above.
 
 ## Objective quality checks
 
