@@ -43,6 +43,6 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Local working notes (TODOs, project instructions, scratch)
+# Private plans, proposals, reviews, scorecards, and working notes; never publish.
 00_project_files/
 .claude/

@@ -39,6 +39,18 @@ behavior belongs in the linked guide for that subsystem.
 - Use the visual rules in `docs/style.md` for diagrams and landing-page assets.
 - Validate local Markdown links after broad documentation edits.
 
+## Private planning materials
+
+- Always keep internal implementation plans, proposals, project reviews,
+  scorecards, and their working measurement notes under `00_project_files/`.
+- Keep `00_project_files/` gitignored. Never stage its contents, force-add them,
+  include them in distribution or release archives, or publish copies elsewhere
+  in the repository.
+- Do not link private planning materials from public documentation. A request
+  to push repository updates does not authorize publishing these materials.
+- Public documentation is for user guides, product roadmaps, and benchmark
+  protocols and results. Internal implementation assessments stay private.
+
 ## Code quality
 
 - Read a file in full before making a wide-ranging edit to it.
