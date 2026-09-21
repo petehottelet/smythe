@@ -53,8 +53,23 @@ python -m mypy
 pytest tests/ -q
 ```
 
-CI runs the same commands across the supported Python matrix. PRs must be
-green on both before merge.
+CI runs these checks across the supported Python matrix. All required checks
+must pass before merge. Python test processes block external socket connections
+and DNS lookups, including when provider keys are present. Loopback SDK wire
+fixtures and local MCP IPC remain available. Subprocess examples use their own
+offline fixtures; the socket guard is not an operating-system sandbox.
+
+Paid connectivity probes live outside `tests/`. To explicitly authorize one
+short request after installing the chosen SDK, run:
+
+```bash
+python -m tools.provider_probe --provider openai --model YOUR_TEXT_MODEL --allow-paid
+```
+
+The probe supports `openai`, `anthropic`, and `gemini`. It uses a fixed prompt,
+128 output tokens, no retries and a 30-second deadline. These bound the request,
+not its exact dollar cost. It is never invoked by pytest or CI. Gemini uses the
+[SDK retry and timeout controls](https://googleapis.github.io/python-genai/).
 
 ### Working with a slim checkout
 

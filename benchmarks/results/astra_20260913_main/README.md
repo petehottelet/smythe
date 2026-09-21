@@ -203,6 +203,29 @@ completes the disputed-answer gate.
 
 ## Evidence and reproduction
 
+### Publication reproduction
+
+The [findings article](../../astra_findings.md) summarizes the completed study.
+An additive [21 September offline receipt](offline-reproduction-20260921.json)
+rechecks all 1,232 archive members, the 200 outcomes, 654 dispatched request
+policies, all eight human-output bindings and both charts. It exactly
+reproduces the committed analysis and retains the 191/200 automatic count and
+$0.169645 unknown reservation. This is a fresh evidence check with zero
+provider calls, not a new measurement campaign or a billing reconciliation.
+
+To reproduce that check from a full checkout:
+
+```bash
+python -m benchmarks.verify_astra_publication --out NEW_DIRECTORY
+```
+
+Use a new private or temporary output directory. The verifier hashes the
+sealed archive, extracts copies of its ledgers, validates the separate human
+supplement, and writes a receipt with input/source hashes. The original
+qualification and platform records above retain their historical scope.
+
+### Retained records
+
 - [All 200 trial metrics, comparisons and phase charges](analysis.json)
 - [Native evidence review](review.json) and [all campaign spending](campaign-spending.json)
 - [Completed human ratings](human-main-response.json), [bound samples](human-main-manifest.json) and [prior publication status](pre-human-review.json)

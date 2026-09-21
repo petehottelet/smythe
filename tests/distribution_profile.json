@@ -1,9 +1,13 @@
 {
   "version": 1,
   "required_repository_files": [
-    "benchmarks/README.md", "screensaver/svg-preview/index.html",
-    "skills/repo-doctor/SKILL.md", "examples/12_jobs_manifest.yaml",
-    "docs/index.md", "assets/wordmark.svg", ".github/workflows/ci.yml"
+    "benchmarks/README.md",
+    "screensaver/svg-preview/index.html",
+    "skills/repo-doctor/SKILL.md",
+    "examples/12_jobs_manifest.yaml",
+    "docs/index.md",
+    "assets/wordmark.svg",
+    ".github/workflows/ci.yml"
   ],
   "excluded_modules": {
     "test_acquisition_demo.py": "Acquisition example and input documents",
@@ -17,6 +21,7 @@
     "test_astra_evidence.py": "Astra evidence archive tooling",
     "test_astra_judge_study.py": "Astra judge study",
     "test_astra_main_evidence.py": "Astra main evidence archive",
+    "test_astra_publication.py": "Astra publication evidence verifier",
     "test_astra_runtime.py": "Astra campaign runtime and saved receipts",
     "test_astra_study.py": "Astra study runner",
     "test_banner_optimizer.py": "Banner benchmark harness",

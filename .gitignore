@@ -48,6 +48,7 @@ Thumbs.db
 # Retired private-document locations: use 00_project_files instead.
 /plans/
 /docs/project-review-*.md
+/docs/benchmark-delivery-audit-*.md
 /docs/distribution-plan-review-*.md
 /docs/data/distribution-review-*.json
 /docs/glyph-rain-plan.md

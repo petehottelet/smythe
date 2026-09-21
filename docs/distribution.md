@@ -1,7 +1,8 @@
 # Packages, source checkouts and typing
 
 These distribution improvements are implemented after 0.7.0 and are
-**unreleased**. The published 0.7.0 artifacts remain unchanged.
+**unreleased**, in the [0.8.0rc1 candidate](release-0.8.0rc1.md). The published
+0.7.0 artifacts remain unchanged.
 
 ## Choose a distribution
 
