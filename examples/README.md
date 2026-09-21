@@ -9,8 +9,13 @@ and use files from the repository. Run them from its root:
 
 ```bash
 pip install -e .            # from the repo root
-python examples/01_quickstart_yaml.py
+python examples/14_durable_text_workflow.py
 ```
+
+Example 14 explicitly selects fixture responses even when API keys are set.
+It demonstrates planning, execution and recovery with zero provider calls.
+The [0.8.0rc1 candidate](../docs/release-0.8.0rc1.md) adds the changes marked
+unreleased below; 0.7.0 remains the published installation target.
 
 The durable artifact-job example uses the installed CLI. Install its optional
 dependencies with `pip install -e ".[jobs]"` from this checkout, or
@@ -75,6 +80,7 @@ Use a new output filename for each export.
 | [Native Astra/Sol Responses](../docs/openai-responses.md) | Smythe 0.7.0 counts and quotes an exact request before generation, records native token prices, and retains function-tool continuation and failed-response receipts. |
 | [Astra campaign preparation](../benchmarks/astra_benchmark_plan.md#prepared-experiment) | Validate 13 original task/source packs and reproduce the 12-pilot/200-main schedule locally, with no API calls. Factual checks remain separate from quality scoring. |
 | [Glyph contour study](../screensaver/glyph-design-v2/README.md) | Inspect all 192 v2 glyphs, their small-size sheets, and individual SVGs. Current previews and native source exports use v2. [Matched 192/256 workflow measurements](../benchmarks/svg_v2_results.md) cover compilation, validation and export; the live catalog remains 192. |
+| [Astra findings and reproduction](../benchmarks/astra_findings.md) | Read the completed comparison and independently check archived members, native accounting, human-output bindings and both charts without provider calls. |
 | [Astra campaign runners and results](../benchmarks/results/astra_20260913_main/README.md) | Inspect all 200 matched outcomes (191 automatically accepted), both native ledgers, blind judgments and the full retained cost reserve. Human review accepts all eight flagged answers at 4/4; the original automatic scores remain unchanged. Reproduce the analysis without paid calls; [runner guide](../benchmarks/astra_runtime.md). |
 | [Planner-only instructions](../docs/workflow-accounting.md#freeze-graph-limits) | Unreleased: bind graph policy through `LLMArchitect.planning_instructions`, with answer requirements kept in `Task.constraints`. |
 | [Fable 5.1 study](../benchmarks/fable_51_benchmark_plan.md) | [Native and Code pilots](../benchmarks/results/fable_20260914_pilot/README.md) and the [ten-task Code Workflow study](../benchmarks/results/fable_code_20260914/README.md) have complete evidence. Human pilot ratings gate the 100 native main workflows and matched comparison. |

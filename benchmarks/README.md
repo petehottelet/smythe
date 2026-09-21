@@ -399,13 +399,16 @@ published anyway: [control_ablation.md](control_ablation.md).
 
 ## Coming soon
 
-The [delivery audit](../docs/benchmark-delivery-audit-2026-09-13.md) consolidates
-the remaining promises, their existing evidence and the work needed to close them.
+The [roadmap](../ROADMAP.md#coming-soon) defines the next runtime and measurement
+priorities. Completed campaigns remain linked above, including outcomes that
+missed their targets. New paid cohorts require frozen protocols and spending caps.
 
 - [Astra follow-up studies](astra_benchmark_plan.md#separate-follow-up-studies):
   scheduler concurrency on identical graphs, matched modern framework adapters,
   and durable tool workflows. The [200-workflow primary comparison](results/astra_20260913_main/README.md)
-  has complete execution and scoring; human review and one failed call's native usage remain unresolved.
+  has complete execution, scoring and human review. One failed call's native usage
+  remains unresolved; only affected exact cost claims are withheld. Read the
+  [findings and offline reproduction](astra_findings.md).
 - Full-workflow task-shape cost campaign using the corrected provider-call
   recorder, with planning usage included and input/output pricing separated
 - Repeated, randomized campaign order and a larger external task set for

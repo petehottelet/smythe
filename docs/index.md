@@ -10,6 +10,7 @@ verification, trace, artifact, and recovery controls.
 - [Architecture](architecture.md) — the two core abstractions and component boundaries
 - [Examples](../examples/README.md) — offline-first feature tours plus explicitly gated live integrations
 - [Benchmarks](../benchmarks/README.md) — evidence status, protocols, and raw records
+- [0.8.0rc1 candidate](release-0.8.0rc1.md) — scope, compatibility changes and release verification
 - [Smythe 0.7.0 verification](release-0.7.0.md) — published package checks, historical native checksums, and retained evidence
 
 ## Plan and execute graphs
@@ -35,6 +36,7 @@ verification, trace, artifact, and recovery controls.
 - [GPT-6 Astra quickstart](../README.md#quickstart) — native text planning and execution within one saved $5 allowance
 - [Native OpenAI Responses](openai-responses.md) — Astra/Sol function tools, exact token prices, request quotes, and retained failure receipts
 - [Original Astra pilot results](../benchmarks/results/astra_20260913/README.md) — historical 24-workflow calibration snapshot with complete native receipts
+- [What the Astra study found](../benchmarks/astra_findings.md) — scoped findings and an offline reproduction supplement
 - [Astra/Sol main results](../benchmarks/results/astra_20260913_main/README.md) — 200 outcomes, completed human review, automatic scores, timing and reserved-cost bounds; claimable within the recorded scope
 - [Astra benchmark plan](../benchmarks/astra_benchmark_plan.md) — completed execution and human review, fixed acceptance gates and separate follow-up experiments
 - [Fable 5.1 extension](../benchmarks/fable_51_benchmark_plan.md) — native Messages runner, 12-pilot/100-main design, human review gates and a separate Ultracode comparison
@@ -67,7 +69,6 @@ verification, trace, artifact, and recovery controls.
 ## Project guides
 
 - [Coming soon](../ROADMAP.md#coming-soon) — acceptance criteria for runtime and measurement improvements
-- [Benchmark delivery audit](benchmark-delivery-audit-2026-09-13.md) — completed studies and the remaining promised measurements
 - [Contributing](../CONTRIBUTING.md)
 - [Packages and typing](distribution.md) — unreleased slim source archives, explicit library tests, installed type checks and versioned Repo Doctor ZIPs
 - [Roadmap](../ROADMAP.md)

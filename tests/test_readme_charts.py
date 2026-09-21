@@ -129,34 +129,19 @@ def test_glyph_scaling_chart_uses_all_four_isolated_records():
     assert "Scaling across 64, 128, 192 and 256 nodes" in svg
 
 
-def test_readme_connects_glyph_rain_to_benchmark_evidence():
+def test_readme_links_benchmark_evidence_and_the_glyph_showcase():
     readme = ROOT.joinpath("README.md").read_text(encoding="utf-8")
-    ordered_markers = (
-        "## Benchmark\n",
-        "screensaver/svg-preview/preview.gif",
-        "**Build from source:** [Windows]",
-        "## Process\n",
-        "### SVG catalog workflow",
-        "assets/benchmarks/svg_v2_workflow.svg",
-        "assets/benchmarks/svg_v2_memory.svg",
-        "### Astra and Sol",
-        "assets/benchmarks/astra_workflows.svg",
-        "### Glyph generation and scaling",
-        "assets/benchmarks/glyph_scaling.svg",
-        "### Jobs at 5,000 operations",
-        "assets/benchmarks/jobs_scale.svg",
-        "### Recovery after interruption",
-        "assets/benchmarks/recovery.svg",
-        "### Framework efficiency",
-        "assets/benchmarks/framework_callouts.svg",
-        "assets/benchmarks/framework_comparison.svg",
-        "### Generated execution topology",
-        "assets/benchmarks/shape_efficiency.svg",
-    )
-    positions = [readme.index(marker) for marker in ordered_markers]
-    assert positions == sorted(positions)
-    for anchor in ("benchmark", "process"):
-        assert f'href="#{anchor}"' in readme
+    # Claims must remain traceable when the product page's layout changes.
+    destinations = set(re.findall(r"\[[^\]]+\]\(([^)]+)\)", readme))
+    for target in (
+        "benchmarks/README.md",
+        "benchmarks/astra_findings.md",
+        "benchmarks/durability_benchmark.md",
+        "benchmarks/svg_v2_results.md",
+        "screensaver/README.md",
+    ):
+        assert target in destinations
+        assert ROOT.joinpath(target).is_file()
 
     guide = ROOT.joinpath("screensaver/README.md").read_text(encoding="utf-8")
     for name in ("glyph_pipeline.svg", "glyph_specimens.svg"):

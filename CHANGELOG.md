@@ -21,6 +21,8 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
+Candidate version: **0.8.0rc1**. Stable publication awaits release review.
+
 ### Added
 
 - **Fable benchmark evidence**: 12 native pilot workflows, a separate Code
@@ -48,8 +50,9 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 - **Fable 5.1 experiment preparation**: bind a 12-workflow medium/high pilot and
   100-workflow medium-effort main design to the existing task contracts, native
-  Claude accounting requirements, and a shared spending envelope. Preparation
-  only; no paid runner or Fable results. [Plan](benchmarks/fable_51_benchmark_plan.md).
+  Claude accounting requirements, and a shared spending envelope. The pilots
+  and Code study are complete; human pilot ratings gate the native main study.
+  [Protocol and status](benchmarks/fable_51_benchmark_plan.md).
 
 - **Planner-only instructions**: `LLMArchitect(planning_instructions="...")`
   records graph requirements in the workflow recipe without placing them in
@@ -87,6 +90,13 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ### Documentation
 
+- Center the README on generated graphs, durable execution and a runnable
+  quickstart. Reconcile Astra/Fable status and the supported 0.7.x line.
+  Keep the internal benchmark delivery inventory in private storage.
+- Publish the [Astra findings](benchmarks/astra_findings.md) and an additive
+  offline reproduction of archive members, native analysis, human bindings and
+  charts. Preserve the 191/200 primary count and unresolved cost bounds.
+
 - Keep implementation plans and internal investigations in ignored private
   storage, including the legacy glyph plans. Public screensaver guides link
   directly to measured data, current controls and artifact acceptance records.
@@ -117,7 +127,7 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   workflows. Retain compilation, four-size validation, all-pairs comparison,
   export, sampled memory and every trial. Add 64 benchmark designs without
   changing the live 192-glyph catalog, publish monochrome timing/memory figures,
-  and consolidate the outstanding benchmark promises into a delivery audit.
+  and link outstanding measurements from the benchmark index and roadmap.
 
 - Replace the original screensaver artwork with a complete 192-glyph v2
   catalog: broad cut strokes, deliberate openings, and the approved detached
@@ -138,11 +148,18 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   Pause native binary distribution and ignore local build products.
 - **Windows Defender notice**: record the unresolved 7 September 2026
   `Trojan:Win32/Wacatac.H!ml` detection of the v0.7.0 Windows screensaver
-  and quarantine of downloaded and distribution copies in a separate
-  [investigation record](docs/windows-defender-2026-09-07.md).
+  and quarantine of downloaded and distribution copies. Precompiled
+  distribution remains paused; [source-build policy](screensaver/README.md).
 - Update the verified PyPI badge and align the release and renderer status guides.
 
 ### Fixed
+
+- Remove three credential-triggered paid provider tests. Block external socket
+  traffic in Python test processes while retaining loopback wire fixtures.
+  Manual provider probes require explicit authorization, cap output and time,
+  and disable SDK retries.
+- Reject PyPI publication without a matching version tag and successful
+  main-branch CI at the exact release commit.
 
 - Separate Astra benchmark planning controls from executor answer constraints.
   State checked numeric/string types and both arithmetic decision labels

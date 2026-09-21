@@ -89,6 +89,7 @@
     "tests/test_astra_evidence.py",
     "tests/test_astra_judge_study.py",
     "tests/test_astra_main_evidence.py",
+    "tests/test_astra_publication.py",
     "tests/test_astra_runtime.py",
     "tests/test_astra_study.py",
     "tests/test_async_executor.py",
@@ -153,6 +154,7 @@
     "tests/test_native_messages.py",
     "tests/test_native_pricing.py",
     "tests/test_native_response_accounting.py",
+    "tests/test_offline_policy.py",
     "tests/test_offline_provider.py",
     "tests/test_openclaw_adapter.py",
     "tests/test_optimize_cli.py",
@@ -168,6 +170,7 @@
     "tests/test_planner.py",
     "tests/test_planner_inventory.py",
     "tests/test_provider.py",
+    "tests/test_provider_probe.py",
     "tests/test_provider_responses.py",
     "tests/test_provider_usage_validation.py",
     "tests/test_publish_svg_catalog.py",
@@ -176,6 +179,7 @@
     "tests/test_recovery_chart.py",
     "tests/test_reference_glyph_import.py",
     "tests/test_registry.py",
+    "tests/test_release_gate.py",
     "tests/test_renderer_performance_review.py",
     "tests/test_repo_doctor.py",
     "tests/test_router.py",
@@ -222,6 +226,8 @@
     "tools/distribution.py",
     "tools/large_files.py",
     "tools/package_smoke.py",
+    "tools/provider_probe.py",
+    "tools/release_gate.py",
     "tools/skill_archive.py"
   ]
 }

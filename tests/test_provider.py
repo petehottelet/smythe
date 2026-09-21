@@ -1,7 +1,6 @@
 """Tests for the Provider abstraction and auto-detection."""
 
 import asyncio
-import os
 
 import pytest
 
@@ -138,30 +137,6 @@ def test_openai_guard_empty_choices():
     assert result.prompt_tokens == 10
 
 
-@pytest.mark.skipif(
-    not os.environ.get("ANTHROPIC_API_KEY"),
-    reason="ANTHROPIC_API_KEY not set",
-)
-def test_anthropic_integration():
-    p = AnthropicProvider()
-    result = asyncio.run(p.complete("You are a test.", "Say hello.", "claude-sonnet-4-20250514"))
-    assert isinstance(result, CompletionResult)
-    assert len(result.text) > 0
-    assert result.prompt_tokens > 0
-
-
-@pytest.mark.skipif(
-    not os.environ.get("OPENAI_API_KEY"),
-    reason="OPENAI_API_KEY not set",
-)
-def test_openai_integration():
-    p = OpenAIProvider()
-    result = asyncio.run(p.complete("You are a test.", "Say hello.", "gpt-4o-mini"))
-    assert isinstance(result, CompletionResult)
-    assert len(result.text) > 0
-    assert result.prompt_tokens > 0
-
-
 def test_gemini_provider_constructable():
     p = GeminiProvider(api_key="test-key")
     assert isinstance(p, Provider)
@@ -262,18 +237,6 @@ def test_gemini_provider_empty_text():
     result = asyncio.run(p.complete("sys", "prompt", "gemini-3-pro"))
     assert result.text == ""
     assert result.prompt_tokens == 5
-
-
-@pytest.mark.skipif(
-    not os.environ.get("GOOGLE_API_KEY"),
-    reason="GOOGLE_API_KEY not set",
-)
-def test_gemini_integration():
-    p = GeminiProvider()
-    result = asyncio.run(p.complete("You are a test.", "Say hello.", "gemini-2.5-flash"))
-    assert isinstance(result, CompletionResult)
-    assert len(result.text) > 0
-    assert result.prompt_tokens > 0
 
 
 # ---------------------------------------------------------------------------

@@ -130,6 +130,12 @@ keep graph limits out of executor answer requirements. The
 [Astra method amendment](../benchmarks/astra_method_amendment_20260913.md)
 uses this separation after human calibration and a complete final pilot.
 
+The completed [Astra/Sol findings](../benchmarks/astra_findings.md) report
+generated-graph overhead on ten reused synthetic tasks. The additive
+[publication reproduction](../benchmarks/results/astra_20260913_main/README.md#publication-reproduction)
+verifies the sealed evidence and completed human ratings without paid calls.
+Scheduler, framework and tool studies remain separate experiments.
+
 [Cost guardrails](budgets.md) · [Task handoffs](tasks.md) ·
 [Astra campaign plan](../benchmarks/astra_benchmark_plan.md) ·
 [Astra/Sol 200-workflow results](../benchmarks/results/astra_20260913_main/README.md) ·
