@@ -8,8 +8,11 @@ section will be updated with a longer support window.
 
 | Version  | Supported          |
 | -------- | ------------------ |
-| 0.6.x    | Yes                |
-| < 0.6    | No                 |
+| 0.7.x    | Yes                |
+| < 0.7    | No                 |
+
+The 0.8.0rc1 checkout is a prerelease candidate; 0.7.x remains the supported
+published line until the next release.
 
 ## Reporting a vulnerability
 

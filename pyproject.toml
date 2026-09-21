@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "smythe"
-version = "0.7.0"
+version = "0.8.0rc1"
 description = "Generated agent execution graphs with durable, budgeted orchestration"
 dynamic = ["readme"]
 license = "MIT"

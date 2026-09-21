@@ -172,6 +172,15 @@ It adds the following runtime guarantees and measured evidence:
 
 ## Implemented after 0.7.0 (Unreleased)
 
+These changes form the [0.8.0rc1 candidate](docs/release-0.8.0rc1.md).
+Low-level Autotune ownership arguments require a minor release; public
+installation instructions remain pinned to 0.7.0 until publication.
+
+- **Offline test enforcement** — external Python socket dispatch is blocked;
+  paid provider probes require an explicit command outside the test suite.
+- **Release qualification** — PyPI publishing requires a matching version tag
+  and successful main CI at that exact commit.
+
 - **Distribution and typing** — explicit source-package contents and library
   test profile, clean source rebuilds, installed consumer type checks, and a
   versioned Repo Doctor ZIP with runtime pin and checksums.
@@ -195,7 +204,7 @@ It adds the following runtime guarantees and measured evidence:
   Existing evidence and identities remain intact.
   [Concurrent initialization regression checks](tests/test_jobs_workflow_initialization.py).
 
-## Coming soon
+## Completed benchmark evidence
 
 Every benchmark publication includes the [materials completion check](docs/current-materials.md#completion-check-for-every-benchmark-update): current glyph sheets, previews, exports, charts, links, and consistent documentation.
 
@@ -206,8 +215,8 @@ web previews, and native source exports are now updated. The
 [192/256-glyph v2 benchmark](benchmarks/svg_v2_results.md) completes 36 matched
 compilation, validation and export workflows, with timing and memory evidence.
 Newly compiled native builds still need platform qualification. The
-[benchmark delivery audit](docs/benchmark-delivery-audit-2026-09-13.md) lists
-every remaining measurement commitment.
+[benchmark index](benchmarks/README.md#coming-soon) lists separate outstanding
+measurements and their evidence scope.
 
 **Astra status — 13 September 2026:** human calibration passed, and the
 final pilot passed all 12 output contracts. Four pilot stages total 48
@@ -228,6 +237,12 @@ Human review is complete: all eight flagged main answers were accepted at 4/4.
 The records are claimable within their documented descriptive scope; the
 191/200 automatic classifications and affected cost bounds are retained.
 
+The [Astra findings](benchmarks/astra_findings.md) and
+[offline reproduction](benchmarks/results/astra_20260913_main/README.md#publication-reproduction)
+close the primary publication without changing its sealed evidence.
+
+## Coming soon
+
 The [Fable 5.1 extension](benchmarks/fable_51_benchmark_plan.md) has a native
 Messages runner for its 12-workflow pilot and 100-workflow main schedule.
 Usage accounting and saved-response recovery are integrated into the durable
@@ -241,7 +256,8 @@ The remaining runtime and evidence priorities are:
 
 | Priority | Change | Acceptance criteria |
 |---|---|---|
-| P1 | Complete-workflow cost evidence | Publish fresh cost comparisons from the durable text ledger, with native usage, declared prices, failed attempts, and all optimization trials retained. |
+| P1 | Complete-deliverable contracts and graph selection | Require every requested output part, reject incomplete assembly, and compare fixed/generated selection on newly frozen held-out tasks. Retain failures and charge planning. |
+| P1 | Broader complete-workflow cost evidence | Extend the completed Astra evidence to harder external tasks using the native ledger, declared prices, failed attempts and all optimization trials. |
 | P2 | Web renderer parity and presentation | Follow the [completed headless study](benchmarks/renderer_performance_20260907_results.md) with measured visible-display cadence, GPU timing, and quantified reference tolerances. All six primary sessions missed their frozen pacing target; the separate blank-page control showed similar callback cadence. Archived Canvas v1 timings remain superseded diagnostics. |
 
 ### Product and scale
