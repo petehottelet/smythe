@@ -1,13 +1,47 @@
 """Explicit source-package profile; full-checkout coverage remains the default."""
 
+import ipaddress
 import json
 from pathlib import Path
+import socket
+import sys
 
 import pytest
 
 TESTS = Path(__file__).resolve().parent
 ROOT = TESTS.parent
 PROFILE = json.loads((TESTS / "distribution_profile.json").read_text(encoding="utf-8"))
+
+
+def _offline_network(event, args):
+    """Reject external Python socket traffic, including during test collection.
+
+    Local SDK wire fixtures and MCP IPC remain available. This is a test
+    guardrail, not an OS sandbox: separately launched processes need their own
+    offline fixtures. No credential-dependent live tests belong in this suite.
+    """
+    if event == "socket.getaddrinfo":
+        host = args[0]
+    elif event in {"socket.connect", "socket.sendto"}:
+        sock, address = args
+        if sock.family not in {socket.AF_INET, socket.AF_INET6}:
+            return
+        host = address[0]
+    else:
+        return
+    if isinstance(host, bytes):
+        host = host.decode("ascii")
+    if host in {None, "localhost"}:
+        return
+    try:
+        if ipaddress.ip_address(host).is_loopback:
+            return
+    except ValueError:
+        pass
+    raise RuntimeError("Offline test suite blocked external network dispatch")
+
+
+sys.addaudithook(_offline_network)
 
 
 def pytest_addoption(parser):
