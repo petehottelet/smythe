@@ -27,7 +27,7 @@ ambiguous after a connection failure.
 | `smythe.optimize.statistics` | Direction-normalized paired comparisons, seeded bootstrap intervals, and promotion policy |
 | `smythe.optimize.ledger` | Durable campaign, candidate, trial-event, cost-exposure, and decision history |
 | `smythe.optimize.engine` | Bounded development, confirmation, and holdout orchestration with conservative recovery |
-| `smythe.optimize.inspection` and `smythe.optimize.report` | Read-only evidence collection and standalone HTML reports (unreleased) |
+| `smythe.optimize.inspection` and `smythe.optimize.report` | Read-only evidence collection and standalone HTML reports |
 
 These modules are deliberately separable from proposal generation. A human,
 an agent, or a deterministic grid can propose candidates, but every candidate
@@ -38,7 +38,7 @@ The package is pre-1.0 and its API may change. The programmatic runner is
 
 The [0.7.0 release](https://github.com/petehottelet/smythe/blob/v0.7.0/docs/optimize.md)
 uses ledger schema v3. Campaign ownership, schema v4, and HTML reports below
-are **unreleased** changes available from the repository checkout.
+ship in **0.8.0**. Install `pip install "smythe==0.8.0"`.
 
 ## Experiment contracts and budgets
 
@@ -237,7 +237,9 @@ and again at close. This detects practical races, but it is not a filesystem
 lock: an external writer that bypasses Smythe and starts and checkpoints wholly
 between checks is outside the guarantee.
 
-### Export a campaign report (Unreleased)
+<a id="export-a-campaign-report-unreleased"></a>
+
+### Export a campaign report
 
 Add `--out` to inspect a closed campaign as a standalone HTML document:
 
@@ -313,7 +315,9 @@ micro-USD cost, and optional SHA-256 artifact hashes.
 confirmation and holdout assessments, decision and trial keys, and ledger
 snapshot.
 
-### Campaign ownership (Unreleased)
+<a id="campaign-ownership-unreleased"></a>
+
+### Campaign ownership
 
 One live lease owns each campaign. `OptimizationRunner.run()` acquires a
 unique owner identity and increasing epoch, renews it in a background thread,
@@ -348,8 +352,7 @@ The low-level ledger API now requires an explicit `lease=` token for
 `heartbeat_campaign_lease`, and release through `release_campaign_lease`.
 `CampaignLease`, `CampaignLeaseError`, and `CampaignLeaseConflict` are public
 exports. Use `OptimizationRunner` to manage this lifecycle automatically.
-This required-token API change belongs to the next minor release; it is not
-part of the published 0.7.0 API.
+This required-token API change ships in 0.8.0; it is not part of the 0.7.0 API.
 
 Leases fence Smythe's public mutation API on a local SQLite ledger. They do not
 isolate untrusted code inside the runner process, protect against direct
@@ -423,7 +426,7 @@ Append-only describes transitions made through the public Python API; it is
 not protection against an operator directly modifying the SQLite database.
 Protect and back up the database as experiment evidence.
 
-The unreleased ledger schema is version 4. It adds campaign leases, monotonic
+The ledger schema in 0.8.0 is version 4. It adds campaign leases, monotonic
 owner epochs, and immutable dispatch ownership to v3's atomic plan sealing and
 single terminal-decision constraint. Writable opening upgrades a v3 database
 transactionally, preserving campaign and candidate payloads, trial events,
