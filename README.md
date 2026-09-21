@@ -3,7 +3,7 @@
   <p><em>Turn a goal into an inspectable agent workflow. Run it with budgets and recovery.</em></p>
   <p>
     <a href="https://pypi.org/project/smythe/"><img src="assets/badges/pypi.svg" alt="PyPI release"></a>
-    <a href="https://github.com/petehottelet/smythe/actions/workflows/ci.yml"><img src="assets/badges/ci.svg" alt="CI checks"></a>
+    <a href="https://github.com/petehottelet/smythe/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush"><img src="https://github.com/petehottelet/smythe/actions/workflows/ci.yml/badge.svg?branch=main&amp;event=push" alt="CI status on main"></a>
     <img src="assets/badges/python.svg" alt="Python 3.11, 3.12, and 3.13">
     <a href="LICENSE"><img src="assets/badges/license.svg" alt="License: MIT"></a>
   </p>

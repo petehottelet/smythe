@@ -1,11 +1,12 @@
 # House style
 
-Smythe's visual system is editorial, inscriptional, and strictly monochrome.
+Smythe's visual system is editorial, inscriptional, and monochrome apart from
+the product imagery and live CI status described below.
 Landing-page assets should feel like a well-set title page: decisive hierarchy,
 precise rules, generous white space, and no decorative interface chrome.
 
 The Glyph Rain screenshot, atlas, animation, and explorer controls are the
-intentional color exception. They show the green product artifact itself. Every graph, chart,
+intentional product color exception. They show the green product artifact itself. Every graph, chart,
 diagram, landing-page wordmark, and callout uses black and white only.
 
 ## Palette
@@ -78,10 +79,16 @@ Every public diagram carries the same pure black-and-white init header, kept as
 
 ## Badges
 
-Use the repository-native SVG badges in `assets/badges/`. Each uses the
+Use the repository-native SVG badges in `assets/badges/` for release, Python,
+and license information. Each uses the
 conventional two-tone split—a black label field with white type and a white
 value field with black type—inside a complete one-pixel black rectangular
-border. Keep their values synchronized with the release and CI state.
+border. Keep their values synchronized with the release.
+
+The CI badge uses GitHub's live workflow badge, scoped to push runs on `main`.
+Its status color is an intentional exception: green means the latest applicable
+run passed, and failures change the badge automatically. Do not replace it with
+a static passing badge.
 
 ## Explorer controls
 

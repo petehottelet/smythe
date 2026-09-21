@@ -93,14 +93,17 @@ def test_committed_benchmark_charts_match_the_current_evidence_renderer():
         )
 
 
-def test_readme_badges_use_bordered_black_and_white_assets():
+def test_readme_badges_use_live_ci_and_bordered_black_and_white_metadata():
     readme = ROOT.joinpath("README.md").read_text(encoding="utf-8")
     badge_paths = re.findall(r'src="(assets/badges/[^"]+\.svg)"', readme)
-    assert len(badge_paths) == 4
+    assert len(badge_paths) == 3
     for relative in badge_paths:
         svg = ROOT.joinpath(relative).read_text(encoding="utf-8")
         assert set(HEX_COLOR.findall(svg)) == MONOCHROME
         assert 'fill="#ffffff" stroke="#000000"' in svg
+    assert ('src="https://github.com/petehottelet/smythe/actions/workflows/'
+            'ci.yml/badge.svg?branch=main&amp;event=push"') in readme
+    assert 'src="assets/badges/ci.svg"' not in readme
 
 
 def test_glyph_diagrams_use_the_committed_vector_catalog():
