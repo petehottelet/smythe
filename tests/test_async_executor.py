@@ -1,7 +1,6 @@
 """Tests for the AsyncExecutor — concurrency, ordering, and deadlock detection."""
 
 import asyncio
-import time
 
 import pytest
 
@@ -45,8 +44,7 @@ def _make_executor(
 
 @pytest.mark.asyncio
 async def test_parallel_nodes_run_concurrently():
-    delay = 0.15
-    provider = SlowMockProvider(delay=delay)
+    provider = ConcurrencyTrackingProvider()
     executor, _ = _make_executor(provider)
 
     a = Node(label="A", id="a")
@@ -54,12 +52,10 @@ async def test_parallel_nodes_run_concurrently():
     c = Node(label="C", id="c")
     graph = ExecutionGraph(topology=[Topology.FORK_JOIN], nodes=[a, b, c])
 
-    start = time.monotonic()
     await executor.run(graph)
-    elapsed = time.monotonic() - start
 
     assert all(n.status == NodeStatus.COMPLETED for n in graph.nodes)
-    assert elapsed < delay * 2.5, f"Expected ~{delay}s but took {elapsed:.2f}s"
+    assert provider.peak == 3
 
 
 @pytest.mark.asyncio
