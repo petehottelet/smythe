@@ -21,7 +21,14 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
-Candidate version: **0.8.0rc1**. Stable publication awaits release review.
+No unreleased changes.
+
+## [0.8.0] - 2026-09-21
+
+This release adds native Claude Messages, owned Autotune campaigns and reports,
+compact distributions, and the completed Astra publication. See the
+[upgrade guide](docs/release-0.8.0.md) for the required low-level Autotune
+`lease=` arguments and schema-v4 migration.
 
 ### Added
 
@@ -86,12 +93,12 @@ Candidate version: **0.8.0rc1**. Stable publication awaits release review.
 - Autotune schema v4 transactionally upgrades v3 evidence and blocks writes
   from already-open v3 connections. Closed read-only v3 inspection remains
   supported. Low-level trial and decision methods now require an explicit
-  `lease=` token; this breaking API change is for the next minor release.
+  `lease=` token; this breaking API change ships in 0.8.0.
 
 ### Documentation
 
 - Center the README on generated graphs, durable execution and a runnable
-  quickstart. Reconcile Astra/Fable status and the supported 0.7.x line.
+  quickstart. Reconcile Astra/Fable status and the supported 0.8.x line.
   Keep the internal benchmark delivery inventory in private storage.
 - Publish the [Astra findings](benchmarks/astra_findings.md) and an additive
   offline reproduction of archive members, native analysis, human bindings and
@@ -953,6 +960,7 @@ Initial public release.
   60ms sleep, which is too tight for `time.sleep()` precision on Windows.
   Passes consistently in isolation. Tracked for fix in 0.1.1.
 
-[Unreleased]: https://github.com/petehottelet/smythe/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/petehottelet/smythe/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/petehottelet/smythe/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/petehottelet/smythe/compare/v0.6.0...v0.7.0
 [0.1.0]: https://github.com/petehottelet/smythe/releases/tag/v0.1.0

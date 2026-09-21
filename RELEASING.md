@@ -24,8 +24,8 @@ Candidate branches can run the same platform matrix with
 `gh workflow run ci.yml --ref BRANCH`. That manual qualification does not
 replace the required successful push checks on `main` before publication.
 
-The current [0.8.0rc1 candidate](docs/release-0.8.0rc1.md) is prepared for
-review; stable publication and its release notes follow that review.
+The [0.8.0 release guide](docs/release-0.8.0.md) records its scope,
+compatibility changes and verification commands.
 
 ## Per-release flow
 

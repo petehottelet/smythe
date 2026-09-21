@@ -5,7 +5,7 @@
 dated, model-specific token price. Smythe 0.7.0 includes this explicit adapter:
 
 ```bash
-pip install "smythe[openai]==0.7.0"
+pip install "smythe[openai]==0.8.0"
 ```
 
 Set `OPENAI_API_KEY`. Select the provider explicitly; automatic provider
@@ -125,7 +125,7 @@ Its request quote replaces the legacy per-call estimate for admission.
 Existing Chat Completions calls continue to use the blended estimate when
 their provider supplies no explicit cost.
 
-**Unreleased:** [planner-only instructions](workflow-accounting.md#freeze-graph-limits)
+**Added in 0.8.0:** [planner-only instructions](workflow-accounting.md#freeze-graph-limits)
 keep graph limits out of executor answer requirements. The
 [Astra method amendment](../benchmarks/astra_method_amendment_20260913.md)
 uses this separation after human calibration and a complete final pilot.

@@ -15,17 +15,17 @@ wide artifact production.
 
 ## Install
 
-Install Smythe 0.7.0 with the Jobs dependencies:
+Install Smythe 0.8.0 with the Jobs dependencies:
 
 ```bash
-pip install "smythe[jobs]==0.7.0"
+pip install "smythe[jobs]==0.8.0"
 ```
 
 Add the provider extra needed by a live manifest, for example:
 
 ```bash
-pip install "smythe[jobs,openai]==0.7.0"
-pip install "smythe[jobs,gemini]==0.7.0"
+pip install "smythe[jobs,openai]==0.8.0"
+pip install "smythe[jobs,gemini]==0.8.0"
 ```
 
 The installed command is `smythe`. Job state defaults to
@@ -377,7 +377,7 @@ risk explicitly during a selective reroll.
 
 ## Jobs database upgrades
 
-**Unreleased after 0.7.0:** concurrent openers use bounded retries for WAL
+**Added in 0.8.0:** concurrent openers use bounded retries for WAL
 setup, then revalidate and create or migrate the schema in one transaction.
 Failed initialization rolls back. This repair preserves schema version 4 and
 existing records; read-only inspection performs no migration or WAL setup.
