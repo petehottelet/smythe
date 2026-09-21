@@ -170,11 +170,16 @@ It adds the following runtime guarantees and measured evidence:
     call identities, and zero-cost balances pass independent reconciliation.
     [Scope and retained evidence](benchmarks/jobs_scale_5000_20260907_results.md).
 
-## Implemented after 0.7.0 (Unreleased)
+## Shipped (v0.8.0): owned campaigns and reproducible evidence
 
-These changes form the [0.8.0rc1 candidate](docs/release-0.8.0rc1.md).
-Low-level Autotune ownership arguments require a minor release; public
-installation instructions remain pinned to 0.7.0 until publication.
+The [0.8.0 release](docs/release-0.8.0.md) adds these capabilities.
+Low-level Autotune callers must supply explicit lease tokens; the CLI manages
+ownership automatically. Read the migration guide before upgrading a ledger.
+
+- **Native Claude Messages** — exact Fable cache billing, conservative request
+  quotes and saved-response recovery. [Provider guide](docs/anthropic-messages.md).
+- **Planner-only instructions** — graph requirements stay separate from answer
+  constraints. [Workflow policy](docs/workflow-accounting.md#freeze-graph-limits).
 
 - **Offline test enforcement** — external Python socket dispatch is blocked;
   paid provider probes require an explicit command outside the test suite.
@@ -189,7 +194,7 @@ installation instructions remain pinned to 0.7.0 until publication.
 - **Autotune inspection reports** — export saved decisions, paired comparison
   intervals, policies, trial details, and exact costs as a standalone monochrome
   page. Read-only validation and exclusive publication preserve the ledger and
-  existing files. [Report command and evidence scope](docs/optimize.md#export-a-campaign-report-unreleased).
+  existing files. [Report command and evidence scope](docs/optimize.md#export-a-campaign-report).
 - **Planner history validation** — skip malformed recalled fields without
   rewriting history or changing valid ranking. Prompts identify summed node
   time explicitly. [Learning loop](docs/architecture.md#learning-loop).
@@ -198,7 +203,7 @@ installation instructions remain pinned to 0.7.0 until publication.
   cancellation drains evaluators before release. Transactional v3-to-v4
   migration preserves evidence and blocks already-open legacy writers.
   Explicit `lease=` tokens are a new low-level API requirement.
-  [Ownership and migration scope](docs/optimize.md#campaign-ownership-unreleased).
+  [Ownership and migration scope](docs/optimize.md#campaign-ownership).
 - **Concurrent journal initialization** — bounded WAL retries and atomic
   schema creation prevent competing openers from seeing partial stores.
   Existing evidence and identities remain intact.

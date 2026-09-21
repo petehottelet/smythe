@@ -5,7 +5,7 @@ source context, and acceptance criteria. Smythe snapshots them before routing
 or planning and attaches the snapshot to `ExecutionGraph.task`.
 
 Smythe 0.7.0 carries the complete task through planning, execution, and recovery.
-Install `pip install "smythe==0.7.0"` to run this example.
+Install `pip install "smythe==0.8.0"` to run this example.
 
 ```python
 from smythe import OfflineProvider, SimpleArchitect, Swarm, Task

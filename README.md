@@ -2,7 +2,7 @@
   <img src="assets/wordmark.svg" alt="SMYTHE" width="340">
   <p><em>Turn a goal into an inspectable agent workflow. Run it with budgets and recovery.</em></p>
   <p>
-    <a href="https://pypi.org/project/smythe/"><img src="assets/badges/pypi.svg" alt="PyPI v0.7.0"></a>
+    <a href="https://pypi.org/project/smythe/"><img src="assets/badges/pypi.svg" alt="PyPI release"></a>
     <a href="https://github.com/petehottelet/smythe/actions/workflows/ci.yml"><img src="assets/badges/ci.svg" alt="CI checks"></a>
     <img src="assets/badges/python.svg" alt="Python 3.11, 3.12, and 3.13">
     <a href="LICENSE"><img src="assets/badges/license.svg" alt="License: MIT"></a>
@@ -28,7 +28,7 @@ where you need to see what will run and account for what happened.
 Python 3.11+. Install the released library with OpenAI support:
 
 ```bash
-pip install "smythe[openai]==0.7.0"
+pip install "smythe[openai]==0.8.0"
 ```
 
 Set `OPENAI_API_KEY`, then plan and execute with
@@ -127,8 +127,9 @@ receipt limits affected exact cost comparisons. All outcomes remain published.
 
 ## Project status
 
-Smythe 0.7.0 is available on PyPI. This checkout prepares **0.8.0rc1**; it is
-not a published release. The API is pre-1.0; minor releases may change it. Source changes after that release are marked in the
+**Smythe 0.8.0** is the current library release. See the
+[release notes and upgrade guide](docs/release-0.8.0.md). The API is pre-1.0;
+minor releases may change it. Later source changes appear in the
 [changelog](CHANGELOG.md#unreleased).
 
 Next priorities are complete-deliverable checks, broader external-task

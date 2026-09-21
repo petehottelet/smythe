@@ -10,7 +10,7 @@ verification, trace, artifact, and recovery controls.
 - [Architecture](architecture.md) — the two core abstractions and component boundaries
 - [Examples](../examples/README.md) — offline-first feature tours plus explicitly gated live integrations
 - [Benchmarks](../benchmarks/README.md) — evidence status, protocols, and raw records
-- [0.8.0rc1 candidate](release-0.8.0rc1.md) — scope, compatibility changes and release verification
+- [Smythe 0.8.0](release-0.8.0.md) — scope, compatibility changes and release verification
 - [Smythe 0.7.0 verification](release-0.7.0.md) — published package checks, historical native checksums, and retained evidence
 
 ## Plan and execute graphs
@@ -28,8 +28,8 @@ verification, trace, artifact, and recovery controls.
 - [Checkpoint format](checkpoint-format.md) — flushed atomic publication, saved state, and resume semantics
 - [Cost guardrails](budgets.md) — strict usage validation, reservations, and failed-accounting recovery
 - [Jobs](jobs.md) — preflight, approval, detached workers and host limits, durable pause/resume, fenced ownership, artifact namespaces, database upgrades, inspection, rerolls, and exports
-- [Optimization](optimize.md) — bounded concurrency experiments, evidence ledgers, and unreleased campaign ownership, schema-v3 migration, and read-only HTML comparison reports
-- [Concurrent journal initialization checks](../tests/test_jobs_workflow_initialization.py) — unreleased WAL contention and atomic schema fixes, with regression evidence
+- [Optimization](optimize.md) — bounded concurrency experiments, evidence ledgers, and campaign ownership, schema-v4 migration, and read-only HTML comparison reports
+- [Concurrent journal initialization checks](../tests/test_jobs_workflow_initialization.py) — WAL contention and atomic schema fixes, with regression evidence
 
 ## Connect models and tools
 
@@ -42,7 +42,7 @@ verification, trace, artifact, and recovery controls.
 - [Fable 5.1 extension](../benchmarks/fable_51_benchmark_plan.md) — native Messages runner, 12-pilot/100-main design, human review gates and a separate Ultracode comparison
 - [Fable pilot results](../benchmarks/results/fable_20260914_pilot/README.md) — 12 native workflows and one Code Workflow pilot; raw receipts, exact native costs, blind judging, and pending human review
 - [Fable Code Workflow results](../benchmarks/results/fable_code_20260914/README.md) — ten completed tasks, five retained diagnostics, native billing and blind-judge reasoning; native comparison awaits pilot ratings
-- [Native Claude Messages](anthropic-messages.md) — exact Fable cache billing, conservative request quotes, and saved-response recovery (unreleased)
+- [Native Claude Messages](anthropic-messages.md) — exact Fable cache billing, conservative request quotes, and saved-response recovery
 - [Astra method amendment](../benchmarks/astra_method_amendment_20260913.md) — planner-only instructions, explicit field types, 48 pilot workflows and preserved diagnostic charges
 - [Astra campaign runners](../benchmarks/astra_runtime.md) — pilot, main, approved reserved-cost continuation, blind judging and offline evidence analysis
 - [MCP](mcp.md) — tool discovery, allowlists, secrets, budgets, and timeouts
@@ -70,7 +70,7 @@ verification, trace, artifact, and recovery controls.
 
 - [Coming soon](../ROADMAP.md#coming-soon) — acceptance criteria for runtime and measurement improvements
 - [Contributing](../CONTRIBUTING.md)
-- [Packages and typing](distribution.md) — unreleased slim source archives, explicit library tests, installed type checks and versioned Repo Doctor ZIPs
+- [Packages and typing](distribution.md) — slim source archives, explicit library tests, installed type checks and versioned Repo Doctor ZIPs
 - [Roadmap](../ROADMAP.md)
 - [Changelog](../CHANGELOG.md)
 - [Releasing](../RELEASING.md) — package builds, release assets, and PyPI publication
