@@ -73,7 +73,7 @@ contribute a distinct work product. That right-sizing policy is what lets the
 same system use one node for a transformation and a wide graph for parallel
 artifact generation.
 
-**Unreleased:** `LLMArchitect(planning_instructions="...")` keeps graph-policy
+**Added in 0.8.0:** `LLMArchitect(planning_instructions="...")` keeps graph-policy
 instructions in the planning request and saved recipe. Answer requirements
 remain in `Task.constraints`, which reaches every executor.
 [Bounded planning example](workflow-accounting.md#freeze-graph-limits).
@@ -139,7 +139,7 @@ of each completed run and recalls relevant outcomes into later planning prompts.
 Its `total_duration_ms` field sums recorded spans; overlapping nodes contribute
 their individual durations, so this value is not elapsed wall time.
 
-**Unreleased after 0.7.0:** recalled topology, success, cost, and duration fields
+**Added in 0.8.0:** recalled topology, success, cost, and duration fields
 are validated before ranking. Malformed records are skipped without rewriting
 the history file; valid values, legacy keys, and relevance ordering remain
 unchanged. Planner prompts label the recorded duration as “Summed node time.”

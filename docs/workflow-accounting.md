@@ -6,12 +6,12 @@ Separate `plan()` and `execute()` calls retain the same run identity and plannin
 charges. `resume(execution_id)` continues that run under its original policy.
 Smythe 0.7.0 includes this managed text-workflow API.
 
-**Unreleased:** [native Fable Messages](anthropic-messages.md) uses the same
+**Added in 0.8.0:** [native Fable Messages](anthropic-messages.md) uses the same
 journal with Anthropic-specific cache categories, quotes, and response decoding.
 
 ## Start a bounded Astra workflow
 
-Install `pip install "smythe[openai]==0.7.0"` and set
+Install `pip install "smythe[openai]==0.8.0"` and set
 `OPENAI_API_KEY`.
 This example makes paid generation calls under a $5 run allowance:
 
@@ -75,7 +75,7 @@ requires a durable `run_store`; omitting it preserves existing recipe identities
 architect to declare `max_retries: 0` on every node, including `HALT` nodes.
 Include the graph limits in the planning instructions for a bounded experiment.
 
-**Unreleased:** pass graph-only requirements through
+**Added in 0.8.0:** pass graph-only requirements through
 `LLMArchitect(planning_instructions="...")`. This text is recorded in the
 workflow recipe and sent only to the planner. Keep answer requirements in
 `Task.constraints`, which every executor receives. For example:
@@ -140,7 +140,7 @@ revisions. Heartbeats renew ownership during calls. A former owner can append
 immutable late evidence for its exact dispatch, but cannot advance the run.
 Recovery settles available late evidence before admitting new work.
 
-**Unreleased after 0.7.0:** concurrent journal openers use bounded WAL retries
+**Added in 0.8.0:** concurrent journal openers use bounded WAL retries
 and create all tables and the persistent store identity in one transaction.
 Competing openers reuse that identity. Failed initialization rolls back;
 existing evidence and read-only inspection retain their behavior.
