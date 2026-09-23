@@ -422,6 +422,20 @@ def test_parse_pathological_json_is_no_change():
     assert _parse('{"change": true, "drop": [' + "1" * 5000 + "]}") is None
 
 
+@pytest.mark.parametrize("node_id", ["fix\nup", "x" * 65, "has space", "café", "a/b"])
+def test_parse_refuses_added_ids_outside_the_plan_id_pattern(node_id):
+    """A durable journal rejects such ids on the node's first call, and every
+    resume replays the same checkpoint, so the run could never finish."""
+    add = [{"id": node_id, "label": "Fix it", "depends_on": ["n0"]}]
+    assert _parse(json.dumps({"change": True, "reason": "gap", "add": add})) is None
+
+
+def test_parse_accepts_added_ids_in_the_plan_id_pattern():
+    add = [{"id": "fix-up_2", "label": "Fix it", "depends_on": ["n0"]}]
+    revision = _parse(json.dumps({"change": True, "reason": "gap", "add": add}))
+    assert [node.id for node in revision.add_nodes] == ["fix-up_2"]
+
+
 def _additions(count):
     return json.dumps({"change": True, "reason": "gaps", "add": [
         {"id": f"extra{i}", "label": f"Extra {i}", "depends_on": ["n0"]} for i in range(count)

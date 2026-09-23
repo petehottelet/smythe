@@ -71,11 +71,12 @@ class NodeFinalizationError(RuntimeError):
 def _safe_filename_component(raw: str) -> str:
     """Make an arbitrary node id safe as a filename component.
 
-    Node ids come from YAML and LLM plan JSON with no character
-    validation, so they can carry path separators (traversal out of the
-    artifact dir) or Windows-illegal characters (OSError after an
-    already-billed provider call).  When sanitization changes anything,
-    a short hash of the original keeps distinct ids distinct.
+    Node ids from YAML and graphs built in code have no character
+    validation (only model-generated ids are restricted), so they can
+    carry path separators (traversal out of the artifact dir) or
+    Windows-illegal characters (OSError after an already-billed provider
+    call).  When sanitization changes anything, a short hash of the
+    original keeps distinct ids distinct.
     """
     safe = re.sub(r"[^A-Za-z0-9._-]", "_", raw).strip("._") or "node"
     if safe != raw:

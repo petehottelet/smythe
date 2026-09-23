@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING
 
 from smythe.budget import validate_completion_usage
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Revision
+from smythe.loader import MODEL_NODE_ID
 from smythe.provider import TRUNCATED_STOP_REASONS
 from smythe.task import render_task
 from smythe.verifier import node_generation
@@ -269,7 +270,8 @@ class LLMSupervisor(Supervisor):
         A supervisor that cannot produce valid JSON must not be able to
         halt a run that is otherwise going fine.  ``change`` must be JSON
         ``true`` (the string ``"false"`` is not).  Any field of the wrong
-        JSON type, or an addition without a label, makes the whole
+        JSON type, an addition without a label, or an added id that is
+        not 1-64 letters, digits, ``-`` or ``_`` makes the whole
         proposal no change: applying the part that happened to parse
         could do something the reviewer never proposed.  So does a
         proposal with more than ``max_added_nodes`` additions; it is
@@ -312,6 +314,7 @@ class LLMSupervisor(Supervisor):
             depends_on = [] if depends_on is None else depends_on
             if (not isinstance(label, str) or not label.strip()
                     or not isinstance(node_id, (str, type(None)))
+                    or (node_id and not MODEL_NODE_ID.fullmatch(node_id))
                     or not _is_str_list(depends_on)):
                 return None
             add_nodes.append(

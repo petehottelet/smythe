@@ -31,7 +31,9 @@ MODEL_PLAN_MAX_DEPTH = 5
 MODEL_PLAN_MAX_RETRIES = 3
 MODEL_PLAN_MAX_REGENERATIONS = 2
 
-_MODEL_NODE_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
+# Ids a model may choose, for plans and supervisor additions alike: a durable
+# journal rejects control characters and very long scope ids.
+MODEL_NODE_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
 _MODEL_PLAN_KEYS = frozenset({"topology", "nodes"})
 _MODEL_NODE_KEYS = frozenset({
     "id", "label", "depends_on", "agent", "required_capabilities",
@@ -62,8 +64,10 @@ def load_graph_from_string(yaml_str: str) -> tuple[ExecutionGraph, Registry]:
 def build_graph_from_dict(data: dict) -> tuple[ExecutionGraph, Registry]:
     """Build an ExecutionGraph and Registry from a parsed dict.
 
-    Shared by the YAML loader and the LLM planner.  The dict must have
-    a ``topology`` key (string or list of strings) and a ``nodes`` list.
+    For developer-written graphs only: it accepts every field, including
+    MCP server declarations.  Model output must go through
+    :func:`build_graph_from_model_output`.  The dict must have a
+    ``topology`` key (string or list of strings) and a ``nodes`` list.
     Each node entry may include an ``agent`` sub-dict with name, persona,
     and capabilities.
     """
@@ -312,7 +316,7 @@ def _check_model_node(index: int, entry: object) -> None:
             f"Node at index {index} must be an object, got {type(entry).__name__}"
         )
     node_id = entry.get("id")
-    if not isinstance(node_id, str) or not _MODEL_NODE_ID.fullmatch(node_id):
+    if not isinstance(node_id, str) or not MODEL_NODE_ID.fullmatch(node_id):
         raise ValueError(
             f"Node at index {index} needs an 'id' of 1-64 letters, digits, "
             f"'-' or '_', got {node_id!r}"
