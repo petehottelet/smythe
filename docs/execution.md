@@ -42,6 +42,16 @@ pending graph. Invalid-accounting markers require reconciliation first.
 Unfinished [verification transitions](verifier.md#recovery-and-concurrent-work)
 are recovered before new work or cached-output return.
 
+## Provider connections
+
+Serial execution runs each node under its own `asyncio.run()`, as do
+`Swarm.plan()`, `execute()`, and `resume()`. `AnthropicProvider`,
+`OpenAIProvider`, `OpenAIImageProvider`, and `GeminiProvider` therefore keep
+one SDK client per event loop. Calls on the same loop share its connection
+pool, so a parallel run reuses connections across its fan-out. A client is
+never used on another loop, and it closes on its own loop when that loop shuts
+down (`asyncio.run()` does this before closing it).
+
 ## Deep graphs
 
 Validation, cycle detection, dependency ordering, and depth calculation use
