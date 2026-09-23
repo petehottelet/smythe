@@ -483,8 +483,20 @@ def _degrees_of_freedom(value: object) -> int:
 def student_t_quantile(probability: float, degrees_of_freedom: int) -> float:
     """Return the Student-t quantile ``t`` with ``P(T <= t) == probability``.
 
-    Pure Python and accurate to roughly 1e-13 relative error for every
-    integer ``degrees_of_freedom >= 1`` and ``0 < probability < 1``.
+    Pure Python, for every integer ``degrees_of_freedom >= 1`` and
+    ``0 < probability < 1``.  Relative error, measured against exact
+    high-precision tails, depends on the regime:
+
+    - Below 10,000 degrees of freedom the exact incomplete-beta tail is
+      inverted numerically: under 1e-13 at every probability tested, down
+      to 1e-300.
+    - From 10,000 degrees of freedom a four-term Cornish-Fisher expansion is
+      used.  It is accurate to about 1e-15 while
+      ``min(probability, 1 - probability) >= 2**-54``, which includes every
+      tail a contract confidence below one can request.  Further into the
+      lower tail the error grows: at 10,000 degrees of freedom it is about
+      1.4e-11 at ``probability=1e-100`` and 3.5e-9 at ``1e-300``, and it
+      shrinks as the degrees of freedom increase.
     """
 
     value = _finite_number(probability, name="probability")
