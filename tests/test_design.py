@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
+import struct
+import zlib
 from pathlib import Path
 
 import pytest
 
+from smythe import design
 from smythe.design import (
     DEFAULT_ANTI_PATTERNS,
     DesignSystem,
     Finding,
+    check_blank,
     check_dimensions,
     check_flat_regions,
     check_near_duplicates,
@@ -18,7 +23,7 @@ from smythe.design import (
     dhash,
     inspect_asset,
 )
-from smythe.graph import Node
+from smythe.graph import ExecutionGraph, Node, Topology
 
 PIL = pytest.importorskip("PIL")
 
@@ -154,6 +159,101 @@ def test_inspect_asset_runs_applicable_detectors(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Blank frames
+# ---------------------------------------------------------------------------
+
+
+def _speckled(path: Path, specks: int = 12) -> Path:
+    """A black frame with a few white noise pixels in distinct places."""
+    from PIL import Image
+
+    img = Image.new("RGB", (256, 256), (0, 0, 0))
+    for i in range(specks):
+        img.putpixel(((37 * i + 11) % 256, (91 * i + 5) % 256), (255, 255, 255))
+    img.save(path, "PNG")
+    return path
+
+
+def _transparent(path: Path) -> Path:
+    from PIL import Image
+
+    Image.new("RGBA", (256, 256), (0, 0, 0, 0)).save(path, "PNG")
+    return path
+
+
+def _blank_jpeg(path: Path) -> Path:
+    from PIL import Image
+
+    Image.new("RGB", (256, 256), (230, 220, 200)).save(path, "JPEG", quality=20)
+    return path
+
+
+def _faint_mark(path: Path) -> Path:
+    """A deliberately faint tone-on-tone square, 13 levels off white."""
+    from PIL import Image
+
+    canvas = Image.new("RGB", (256, 256), (255, 255, 255))
+    canvas.paste((242, 242, 242), (64, 64, 192, 192))
+    canvas.save(path, "PNG")
+    return path
+
+
+def _product_on_plain_background(path: Path) -> Path:
+    """A shaded product with a soft shadow on a light studio backdrop."""
+    from PIL import Image, ImageDraw, ImageFilter
+
+    canvas = Image.new("RGB", (512, 512), (238, 238, 236))
+    shadow = Image.new("L", canvas.size, 0)
+    ImageDraw.Draw(shadow).ellipse((165, 410, 350, 440), fill=90)
+    canvas.paste((150, 150, 150), (0, 0), shadow.filter(ImageFilter.GaussianBlur(9)))
+    shade = Image.linear_gradient("L").rotate(90).resize((130, 260))
+    blue = Image.new("L", shade.size, 160)
+    canvas.paste(Image.merge("RGB", (shade, shade, blue)), (191, 150))
+    canvas.save(path, "PNG")
+    return path
+
+
+def _black_logo_on_transparency(path: Path) -> Path:
+    """Transparent pixels store black too, so only alpha shows the mark."""
+    from PIL import Image, ImageDraw
+
+    logo = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+    ImageDraw.Draw(logo).ellipse((64, 64, 192, 192), fill=(0, 0, 0, 255))
+    logo.save(path, "PNG")
+    return path
+
+
+def test_blank_detector_names_the_colour_and_rounds_down(tmp_path):
+    [black] = check_blank(_image(tmp_path / "black.png", size=(256, 256), color=(0, 0, 0)))
+    assert (black.detector, black.hard) == ("blank-image", True)
+    assert black.message.startswith("100% of the image is one flat colour (#000000)")
+
+    # One speck leaves 4095 of 4096 cells uniform: 99.9%, not rounded up to 100%.
+    [speckled] = check_blank(_speckled(tmp_path / "speckled.png", specks=1))
+    assert speckled.message.startswith("99.9% of the image is one flat colour (#000000)")
+
+    [clear] = check_blank(_transparent(tmp_path / "clear.png"))
+    assert "(fully transparent)" in clear.message
+
+
+def test_blank_detector_ignores_compression_noise_but_not_faint_content(tmp_path):
+    assert [f.detector for f in check_blank(_blank_jpeg(tmp_path / "blank.jpg"))] == [
+        "blank-image"
+    ]
+    faint = _faint_mark(tmp_path / "faint.png")
+    assert check_blank(faint) == []
+    assert check_blank(faint, tolerance=16) != []
+
+
+def test_blank_detector_thresholds_are_tunable(tmp_path):
+    speckled = _speckled(tmp_path / "speckled.png")
+    assert check_blank(speckled, min_uniform=0.999) == []
+    logo = _black_logo_on_transparency(tmp_path / "logo.png")
+    assert check_blank(logo) == []
+    assert check_blank(logo, min_uniform=0.5) != []
+
+
+# ---------------------------------------------------------------------------
 # design_verifier — detectors as a gate
 # ---------------------------------------------------------------------------
 
@@ -202,6 +302,41 @@ def test_verifier_passes_a_logo_on_a_white_background(tmp_path):
     strict_verdict = strict.verdict(Node(id="v", label="v"), _target_with([logo]))
     assert strict_verdict.passed is False
     assert "[advisory] flat-region" in strict_verdict.reason
+
+
+BLANK_FRAMES = {
+    "black.png": lambda path: _image(path, size=(256, 256), color=(0, 0, 0)),
+    "white.png": lambda path: _image(path, size=(256, 256), color=(255, 255, 255)),
+    "near-blank.png": _speckled,
+    "blank.jpg": _blank_jpeg,
+    "transparent.png": _transparent,
+}
+
+
+@pytest.mark.parametrize("name", sorted(BLANK_FRAMES))
+def test_verifier_fails_a_blank_frame(tmp_path, name):
+    """Regression: a correctly sized blank frame, what a provider can return
+    when a safety filter trips, passed once flat regions became advisory."""
+    path = BLANK_FRAMES[name](tmp_path / name)
+    verifier = design_verifier(width=256, height=256)
+    verdict = verifier.verdict(Node(id="v", label="v"), _target_with([path]))
+    assert verdict.passed is False
+    assert verdict.reason.startswith("[hard] blank-image: ")
+
+
+CONTENT_ON_PLAIN_BACKGROUNDS = {
+    "logo-on-white.png": _logo_on_white,
+    "product.png": _product_on_plain_background,
+    "logo-on-transparency.png": _black_logo_on_transparency,
+}
+
+
+@pytest.mark.parametrize("name", sorted(CONTENT_ON_PLAIN_BACKGROUNDS))
+def test_verifier_passes_content_on_a_plain_background(tmp_path, name):
+    path = CONTENT_ON_PLAIN_BACKGROUNDS[name](tmp_path / name)
+    assert check_blank(path) == []
+    verdict = design_verifier().verdict(Node(id="v", label="v"), _target_with([path]))
+    assert verdict.passed is True
 
 
 def test_verifier_ignores_advisory_findings_by_default(tmp_path):
@@ -295,6 +430,132 @@ def test_verifier_reports_a_decompression_bomb_as_a_failure(tmp_path):
     assert verdict.passed is False
     assert "unreadable-artifact: bomb.png" in verdict.reason
     assert "pixel limit" in verdict.reason
+
+
+def _png_chunk(kind: bytes, body: bytes) -> bytes:
+    return struct.pack(">I", len(body)) + kind + body + struct.pack(
+        ">I", zlib.crc32(kind + body)
+    )
+
+
+def _png(*chunks: bytes) -> bytes:
+    return b"\x89PNG\r\n\x1a\n" + b"".join(chunks)
+
+
+def _ihdr(colour_type: int = 2) -> bytes:
+    return _png_chunk(b"IHDR", struct.pack(">IIBBBBB", 8, 8, 8, colour_type, 0, 0, 0))
+
+
+def _idat(channels: int = 3) -> bytes:
+    rows = b"".join(b"\x00" + bytes(range(8 * channels)) for _ in range(8))
+    return _png_chunk(b"IDAT", zlib.compress(rows))
+
+
+def _text_bomb() -> bytes:
+    """A 1 KB zTXt chunk that inflates just past Pillow's text limit."""
+    from PIL import PngImagePlugin
+
+    inflated = b"A" * (PngImagePlugin.MAX_TEXT_CHUNK + 1)
+    return _png_chunk(b"zTXt", b"Comment\x00\x00" + zlib.compress(inflated))
+
+
+_IEND = _png_chunk(b"IEND", b"")
+# CRC-valid PNGs that Pillow rejects with something other than OSError.
+MALFORMED_PNGS = {
+    # ValueError while opening.
+    "truncated-ihdr": lambda: _png(
+        _png_chunk(b"IHDR", struct.pack(">IIBBBB", 8, 8, 8, 2, 0, 0)), _IEND
+    ),
+    "text-bomb-before-data": lambda: _png(_ihdr(), _text_bomb(), _idat(), _IEND),
+    # ValueError while loading: the chunk follows the image data.
+    "text-bomb-after-data": lambda: _png(_ihdr(), _idat(), _text_bomb(), _IEND),
+    # struct.error while loading.
+    "short-chrm-after-data": lambda: _png(
+        _ihdr(), _idat(), _png_chunk(b"cHRM", b"\x00" * 7), _IEND
+    ),
+    # AssertionError converting (AttributeError under python -O).
+    "palette-without-plte": lambda: _png(
+        _ihdr(colour_type=3), _png_chunk(b"tRNS", b"\x00"), _idat(channels=1), _IEND
+    ),
+}
+
+
+@pytest.mark.parametrize("name", sorted(MALFORMED_PNGS))
+def test_verifier_reports_malformed_images_as_unreadable(tmp_path, name):
+    """Regression: only OSError, SyntaxError and DecompressionBombError were
+    caught, so these escaped and aborted the run after both paid calls."""
+    path = tmp_path / f"{name}.png"
+    path.write_bytes(MALFORMED_PNGS[name]())
+    verdict = design_verifier().verdict(Node(id="v", label="v"), _target_with([path]))
+    assert verdict.passed is False
+    assert verdict.reason.startswith(f"[hard] unreadable-artifact: {name}.png: ")
+
+
+def test_a_malformed_image_is_regenerated_instead_of_aborting_the_run(tmp_path):
+    """Regression: the verdict raised ValueError and the run aborted."""
+    from smythe.async_executor import AsyncExecutor
+    from smythe.provider import Artifact, CompletionResult, Provider
+    from smythe.registry import Registry
+    from smythe.tracer import Tracer
+
+    malformed = MALFORMED_PNGS["truncated-ihdr"]()
+
+    class ImageProvider(Provider):
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        async def complete(self, system, prompt, model):
+            label = prompt.splitlines()[0].strip()
+            self.calls.append(label)
+            artifacts = [Artifact(data=malformed, mime_type="image/png")] if label == "draw" else []
+            return CompletionResult(
+                text="done", artifacts=artifacts, prompt_tokens=1, completion_tokens=1
+            )
+
+    draw = Node(id="draw", label="draw")
+    judge = Node(
+        id="judge", label="judge", depends_on=["draw"], verifies="draw", max_regenerations=1
+    )
+    for node in (draw, judge):
+        node.metadata["model"] = "test-model"
+    provider, tracer = ImageProvider(), Tracer()
+    executor = AsyncExecutor(
+        provider=provider, registry=Registry(), tracer=tracer,
+        artifact_dir=tmp_path / "artifacts", verifier=design_verifier(),
+    )
+
+    asyncio.run(executor.run(ExecutionGraph(topology=[Topology.SERIAL], nodes=[draw, judge])))
+
+    assert provider.calls == ["draw", "judge", "draw", "judge"]
+    [regeneration] = [s for s in tracer.summary() if s["status"] == "regeneration"]
+    assert regeneration["label"].startswith("[hard] unreadable-artifact: draw_00.png: ")
+
+
+def test_verifier_does_not_disguise_its_own_errors_as_unreadable_files(tmp_path, monkeypatch):
+    good = _image(tmp_path / "good.png", noise=3)
+    target = _target_with([good])
+    # A misconfigured palette is the caller's error, not the artifact's.
+    with pytest.raises(ValueError, match="6-digit hex"):
+        design_verifier(DesignSystem(palette=["#fff"])).verdict(Node(id="v", label="v"), target)
+
+    def broken_detector(*args, **kwargs):
+        raise TypeError("detector bug")
+
+    monkeypatch.setattr(design, "_flat_region_findings", broken_detector)
+    with pytest.raises(TypeError, match="detector bug"):
+        design_verifier().verdict(Node(id="v", label="v"), target)
+
+
+@pytest.mark.parametrize("error", [ImportError, MemoryError])
+def test_verifier_propagates_environment_failures(tmp_path, monkeypatch, error):
+    good = _image(tmp_path / "good.png", noise=3)
+
+    def unavailable(*args, **kwargs):
+        raise error("environment failure")
+
+    monkeypatch.setattr(design, "open_image", unavailable)
+    with pytest.raises(error):
+        design_verifier().verdict(Node(id="v", label="v"), _target_with([good]))
 
 
 def test_finding_str_marks_severity():
