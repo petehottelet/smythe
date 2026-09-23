@@ -720,6 +720,8 @@ class ExecutorBase:
         messages = [ChatMessage(role="user", content=prompt, attachments=attachments)]
 
         if self._tool_runtime is None:
+            # A retry after truncated output follows a billed call.
+            self._readmit_node_budget(node, model)
             result = await self._provider_chat(node, system, messages, model)
             self._record_cost(node, result)
             # Only after the charge is recorded: truncated output is billed.
@@ -731,11 +733,7 @@ class ExecutorBase:
             tools = list(session.tools) or None
             limit = node.max_tool_iterations or self._max_tool_iterations
             for turn in range(limit):
-                if self._budget and not self._workflow_managed and node.id not in self._reserved_node_ids:
-                    if self._provider.requires_explicit_budget_estimate(model):
-                        self.reserve_node_budget(node)
-                    else:
-                        self._budget.check(node.id)
+                self._readmit_node_budget(node, model)
                 result = await self._provider_chat(node, system, messages, model, tools=tools, turn=turn)
                 self._record_cost(node, result)
                 # A truncated turn may carry half-written tool arguments, so
@@ -799,6 +797,19 @@ class ExecutorBase:
         raise ToolLoopLimitError(
             f"Node {node.id!r} hit max_tool_iterations={limit} without completing"
         )
+
+    def _readmit_node_budget(self, node: Node, model: str) -> None:
+        """Admit another call for a node whose reservation a billed call used.
+
+        Reconciling a charge consumes the node's reservation, so a later call
+        for the same node (a tool turn, or a retry after truncated output)
+        passes budget admission again before dispatch.
+        """
+        if self._budget and not self._workflow_managed and node.id not in self._reserved_node_ids:
+            if self._provider.requires_explicit_budget_estimate(model):
+                self.reserve_node_budget(node)
+            else:
+                self._budget.check(node.id)
 
     async def _provider_chat(self, node, system, messages, model, tools=None, *, turn=0):
         self._raise_unresolved_response(node)

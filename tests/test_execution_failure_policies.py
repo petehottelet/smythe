@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from smythe.async_executor import AsyncExecutor
-from smythe.budget import Sentinel
+from smythe.budget import Sentinel, SentinelAlert
 from smythe.checkpoint import FileCheckpointStore
 from smythe.executor import Executor
 from smythe.executor_base import SKIPPED_DEPENDENCY_RESULT, TERMINAL_DELIVERABLE_NOTE
@@ -239,6 +239,38 @@ def test_truncated_output_is_a_billed_failure_under_the_node_policy(
     expected = truncated * 0.0625 + (0.125 if outcome is NodeStatus.COMPLETED else 0)
     assert budget.breakdown()["problem"] == expected
     assert problem.metadata["cost_usd"] == expected
+    assert budget._reservations == {}
+
+
+@pytest.mark.parametrize("hard_ceiling", [False, True])
+def test_retry_after_truncation_passes_budget_admission_again(mode, hard_ceiling):
+    """The truncated call consumed the node's reservation; the retry needs one."""
+
+    class AlwaysTruncates(ScriptedProvider):
+        async def complete(self, system, prompt, model):
+            self.calls.append(prompt.splitlines()[0])
+            return CompletionResult("half an answ", cost_usd=0.05, cost_usd_is_estimate=hard_ceiling,
+                                    stop_reason="max_tokens")
+
+        def budget_estimate_usd(self, model):
+            return 0.05 if hard_ceiling else None
+
+        def requires_explicit_budget_estimate(self, model):
+            return hard_ceiling
+
+    provider = AlwaysTruncates()
+    graph = ExecutionGraph([Topology.SERIAL], [
+        Node("problem", id="problem", failure_policy=FailurePolicy.RETRY, max_retries=2),
+    ])
+    budget = Sentinel(0.08 if hard_ceiling else 0.05)
+
+    with pytest.raises(SentinelAlert):
+        run(mode, provider, graph, budget)
+
+    # One billed call, and no second dispatch past the budget.
+    assert provider.calls == ["problem"]
+    assert budget.breakdown() == {"problem": 0.05}
+    assert graph.nodes[0].status is NodeStatus.FAILED
     assert budget._reservations == {}
 
 

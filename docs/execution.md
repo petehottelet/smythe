@@ -19,7 +19,8 @@ Truncated output is a provider error. When a response stops at its output
 limit (Anthropic `stop_reason` `max_tokens` or `model_context_window_exceeded`,
 OpenAI `finish_reason` `length`, Gemini `finish_reason` `MAX_TOKENS`), the
 executor records the call's charge and then raises `OutputTruncatedError`. The
-node's failure policy applies, and no tool call from the truncated turn runs.
+node's failure policy applies, a retry passes budget admission again before it
+is sent, and no tool call from the truncated turn runs.
 An `LLM_MERGE` synthesis raises the same error after recording its charge.
 Raising the provider's `max_tokens` is the usual fix.
 
