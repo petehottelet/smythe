@@ -56,16 +56,31 @@ in the [recovery guide](checkpoint-format.md#version-compatibility).
 
 ## Reading a verdict
 
-`TokenVerifier` (the default) accepts either strict JSON or prose:
+`TokenVerifier` (the default) accepts either JSON or prose:
 
 ```text
 {"passed": false, "reason": "two claims lack sources"}
 FAIL - two claims lack sources
 ```
 
-An output that says neither is treated as a **pass**. This matters: a
-confused judge must not be able to burn a run's regeneration budget in a
-loop, and silence is not evidence of failure.
+- **JSON** may be bare or in a code fence. `passed` must be a JSON
+  boolean; `"false"`, `1`, or `null` is not a verdict.
+- **Prose** must state the verdict as the uppercase word `PASS` or
+  `FAIL` (`PASSED` and `FAILED` also count). Lowercase words are read as
+  prose, so "does not fail any criterion. PASS" passes. A reply that is
+  only the verdict word, such as `Pass.`, may use any case.
+
+Verdicts **fail closed**. Empty output, a non-boolean `passed`, prose with
+neither word, and prose with both are all read as FAIL, and the
+regeneration span records why. A gate must not approve work because its
+judge was unreadable.
+
+The cost of failing closed is bounded by the gate itself. A failed verdict
+triggers at most `max_regenerations` send-backs; after that, the run
+finishes with the last output rather than stopping. A gate with
+`max_regenerations=0` is advisory and its verdict is never read. Ask the
+judge for JSON, or for a single PASS or FAIL, so that a readable verdict
+is the norm.
 
 ## Gating without a model
 
@@ -118,7 +133,9 @@ task = Task(
 `done_when` reaches the planner (which shapes the plan around it and
 may add a verifier node) and every executing node (so the work knows
 the bar it is held to). The Architect is instructed to add at most one
-gate, on the node that produces the deliverable.
+gate, on the node that produces the deliverable. A generated plan may
+set `max_regenerations` to at most 2; a larger value is rejected and the
+planner asks the model for a corrected plan.
 
 The verifier's verdict is never the deliverable: `DELIVERABLE`
 synthesis excludes verifier nodes, so a gated run returns the artefact

@@ -31,8 +31,13 @@ from dataclasses import dataclass
 
 from smythe.graph import ExecutionGraph, Node, NodeStatus
 
-_FAIL_PATTERN = re.compile(r"\b(fail|failed|reject|rejected)\b", re.IGNORECASE)
-_PASS_PATTERN = re.compile(r"\b(pass|passed|approve|approved|ok)\b", re.IGNORECASE)
+# Prose verdicts are the uppercase words the verifier prompts ask for.
+# Case matters: "does not fail any criterion. PASS" is a pass, because
+# the lowercase "fail" is prose, not a verdict.
+_VERDICT_WORD = re.compile(r"\b(PASS(?:ED)?|FAIL(?:ED)?)\b")
+_BARE_VERDICT = re.compile(r"(pass(?:ed)?|fail(?:ed)?)", re.IGNORECASE)
+_FENCED = re.compile(r"```(?:json)?\s*\n?(.*?)\n?\s*```", re.DOTALL)
+_DECORATION = " \t\r\n.!*_`'\"#>:"
 
 
 class VerificationRecoveryError(RuntimeError):
@@ -133,48 +138,63 @@ class Verifier(ABC):
 
 
 class TokenVerifier(Verifier):
-    """Reads a verdict from the verifier node's text.
+    """Reads a verdict from the verifier node's text, failing closed.
 
-    Accepts either strict JSON (``{"passed": false, "reason": "..."}``)
-    or plain prose containing a PASS/FAIL keyword.  When the output says
-    neither, the result is treated as a **pass**: an unreadable verdict
-    must not be able to burn a run's regeneration budget in a loop.
+    Accepts either JSON (``{"passed": false, "reason": "..."}``, bare or
+    in a code fence) or prose that states the verdict as the uppercase
+    word PASS or FAIL (PASSED and FAILED also count).  A reply that is
+    only the verdict word may use any case.
+
+    Anything else is a **fail**: empty output, a ``passed`` value that is
+    not a JSON boolean (``"false"`` is not ``false``), prose with no
+    verdict word, and prose that says both PASS and FAIL.  A gate must
+    not wave work through because its judge was unreadable.  The cost of
+    failing closed is bounded: the executor regenerates at most
+    ``max_regenerations`` times, then lets the run finish with the last
+    output, and a gate with ``max_regenerations=0`` is never read.
     """
 
     def verdict(self, verifier_node: Node, verified_node: Node) -> Verdict:
         text = str(verifier_node.result or "").strip()
         if not text:
-            return Verdict(passed=True, reason="verifier produced no output")
+            return Verdict(passed=False, reason="verifier produced no output")
 
         parsed = self._parse_json(text)
         if parsed is not None:
             return parsed
 
-        head = text[:600]
-        fail = _FAIL_PATTERN.search(head)
-        passed = _PASS_PATTERN.search(head)
-        if fail and (not passed or fail.start() < passed.start()):
-            return Verdict(passed=False, reason=head.splitlines()[0][:200])
-        return Verdict(passed=True, reason="")
+        bare = text.strip(_DECORATION)
+        if _BARE_VERDICT.fullmatch(bare):
+            words = {bare.upper().removesuffix("ED")}
+        else:
+            words = {match.group(1).removesuffix("ED") for match in _VERDICT_WORD.finditer(text)}
+        first_line = text.splitlines()[0]
+        if words == {"PASS"}:
+            return Verdict(passed=True, reason="")
+        if words == {"FAIL"}:
+            return Verdict(passed=False, reason=first_line[:200])
+        if words:
+            return Verdict(passed=False, reason=f"ambiguous verdict (both PASS and FAIL): {first_line[:150]}")
+        return Verdict(passed=False, reason=f"no PASS or FAIL verdict: {first_line[:160]}")
 
     @staticmethod
     def _parse_json(text: str) -> Verdict | None:
-        cleaned = text
-        if cleaned.startswith("```"):
-            parts = cleaned.split("```")
-            if len(parts) < 2:
-                return None
-            cleaned = parts[1].removeprefix("json").strip()
+        fence_match = _FENCED.search(text)
+        cleaned = fence_match.group(1).strip() if fence_match else text
         try:
             data = json.loads(cleaned)
-        except json.JSONDecodeError:
+        except (ValueError, RecursionError):
             return None
         if not isinstance(data, dict) or "passed" not in data:
             return None
-        return Verdict(
-            passed=bool(data["passed"]),
-            reason=str(data.get("reason", ""))[:200],
-        )
+        passed = data["passed"]
+        reason = str(data.get("reason", ""))[:200]
+        if passed is True:
+            return Verdict(passed=True, reason=reason)
+        if passed is False:
+            return Verdict(passed=False, reason=reason)
+        shown = repr(passed)[:60] if isinstance(passed, (str, int, float, type(None))) else type(passed).__name__
+        return Verdict(passed=False, reason=f"'passed' must be a JSON boolean, got {shown}")
 
 
 class CallableVerifier(Verifier):
