@@ -640,19 +640,26 @@ def rate_limit_body(**error):
                       "param": None, "code": "rate_limit_exceeded", **error}}
 
 
-def rejected_http(store, lease, call, status=429, body=None):
+def rejected_http(store, lease, call, status=429, body=None, transport_error="RateLimitError"):
     permit = dispatch(store, lease, call)
     raw = envelope(call, rate_limit_body() if body is None else body, status_code=status,
-                   transport_error="RateLimitError")
+                   transport_error=transport_error)
     evidence_id = store.append_response(permit, raw)
     return store.settle_call(lease, call["call_id"], evidence_id)
 
 
-@pytest.mark.parametrize("status", [400, 401, 403, 404, 409, 413, 422, 429])
-def test_http_4xx_error_body_settles_at_zero_cost_and_keeps_admission_open(journal, status):
+# Each status that a provider returns before model work, with the SDK error
+# that carries it. APIStatusError is the SDKs' class for a status without one.
+@pytest.mark.parametrize("status,transport_error", [
+    (401, "AuthenticationError"), (403, "PermissionDeniedError"), (404, "NotFoundError"),
+    (413, "RequestTooLargeError"), (413, "APIStatusError"), (429, "RateLimitError"), (429, None),
+])
+def test_pre_generation_rejection_settles_at_zero_cost_and_keeps_admission_open(
+    journal, status, transport_error,
+):
     store, lease, _ = journal
     call = prepare(store, lease)
-    record = rejected_http(store, lease, call, status)
+    record = rejected_http(store, lease, call, status, transport_error=transport_error)
     assert record["state"] == "settled" and record["billing_state"] == "known"
     assert record["cost_nanousd"] == 0 and record["result_state"] == "rejected"
     assert record["receipt"]["http_status"] == status and record["receipt"]["cost_is_complete"]
@@ -684,6 +691,22 @@ def test_http_4xx_error_body_settles_at_zero_cost_and_keeps_admission_open(journ
     (429, {**rate_limit_body(), "usage": {"input_tokens": 1}}, "RateLimitError"),
     (400, {"id": "resp_failed", "object": "response", "status": "failed", **rate_limit_body()}, "BadRequestError"),
     (429, {"type": "message", **rate_limit_body()}, "RateLimitError"),
+    # Only 401, 403, 404, 413 and 429 show that no model work happened.
+    (400, rate_limit_body(type="invalid_request_error", code="context_length_exceeded"), "BadRequestError"),
+    (400, {"type": "error", "error": {"type": "invalid_request_error",
+                                      "message": "Output blocked by content filtering policy"},
+           "request_id": "req_filtered"}, "BadRequestError"),
+    (402, rate_limit_body(type="insufficient_quota"), "APIStatusError"),
+    (409, rate_limit_body(type="conflict"), "ConflictError"),
+    (422, rate_limit_body(type="invalid_request_error"), "UnprocessableEntityError"),
+    # A qualifying status needs the plain error object and nothing else.
+    (429, rate_limit_body(usage={"input_tokens": 90_000, "output_tokens": 30_000}), "RateLimitError"),
+    (429, rate_limit_body(message={"text": "Rate limit reached"}), "RateLimitError"),
+    (429, {**rate_limit_body(), "request_id": {"nested": [1, 2]}}, "RateLimitError"),
+    # It also needs that status's SDK error, not a transport failure.
+    (429, rate_limit_body(), "APITimeoutError"),
+    (429, rate_limit_body(), "APIConnectionError"),
+    (401, rate_limit_body(), "RateLimitError"),
 ])
 def test_uncertain_http_outcomes_keep_unknown_exposure(journal, status, body, transport_error):
     store, lease, _ = journal
@@ -745,3 +768,48 @@ def test_reclassified_http_rejection_clears_latch_when_nothing_else_blocks(journ
     assert prepare(store, lease, "admitted")["state"] == "prepared"
     audit = store.audit("run")
     assert (audit["confirmed_nanousd"], audit["unknown_nanousd"], audit["unknown_calls"]) == (0, 0, 0)
+
+
+@pytest.mark.parametrize("status,body,transport_error", [
+    (400, rate_limit_body(type="invalid_request_error", code="context_length_exceeded"), "BadRequestError"),
+    (429, rate_limit_body(usage={"input_tokens": 1}), "RateLimitError"),
+    (429, rate_limit_body(), "APITimeoutError"),
+])
+def test_saved_unknown_response_from_older_release_is_reclassified_only_if_it_qualifies(
+    journal, monkeypatch, status, body, transport_error,
+):
+    import smythe.workflow_store as workflow_store
+
+    store, lease, _ = journal
+    call = prepare(store, lease)
+    original = workflow_store._http_rejection_receipt
+    monkeypatch.setattr(workflow_store, "_http_rejection_receipt", lambda *args: None)
+    old = rejected_http(store, lease, call, status, body, transport_error=transport_error)
+    monkeypatch.setattr(workflow_store, "_http_rejection_receipt", original)
+    record = store.settle_call(lease, call["call_id"], old["evidence_id"])
+    assert record["billing_state"] == "unknown" and record["cost_nanousd"] is None
+    assert record["result_state"] == "pending" and record["blocked_reason"] == "unknown_exposure"
+    audit = store.inspect_run("run")
+    assert audit["unknown_nanousd"] == 6_250_000 and audit["unknown_calls"] == 1
+    assert "unknown_exposure_resolved" not in [event["type"] for event in audit["events"]]
+
+
+def test_later_call_lookup_covers_later_attempts_and_turns_of_one_invocation(journal):
+    store, lease, _ = journal
+    call = prepare(store, lease)
+    base = CallKey("execution", "worker")
+    for key in (replace(base, attempt=1), replace(base, attempt=1, turn=2),
+                replace(base, invocation=1, attempt=3), replace(base, generation=1, attempt=5)):
+        store.prepare_call(lease, key, request_json=call["request_json"], provider=call["provider"],
+                           price_version=PRICE_VERSION)
+    assert store.has_later_call("run", base)
+    assert store.has_later_call("run", replace(base, turn=7))
+    assert store.has_later_call("run", replace(base, attempt=1))
+    assert not store.has_later_call("run", replace(base, attempt=1, turn=2))
+    assert store.has_later_call("run", replace(base, invocation=1))
+    assert not store.has_later_call("run", replace(base, invocation=1, attempt=3))
+    assert not store.has_later_call("run", replace(base, generation=1, attempt=5))
+    assert not store.has_later_call("run", CallKey("execution", "other"))
+    assert not store.has_later_call("run", CallKey("verification", "worker"))
+    with pytest.raises(WorkflowValidationError):
+        store.has_later_call("run", {"phase": "execution", "scope_id": "worker"})

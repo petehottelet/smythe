@@ -34,11 +34,19 @@ one-hour writes, and output are separate categories. Claude's ordinary input
 count excludes cache tokens; thinking is included in billed output once.
 Missing usage, inconsistent cache totals, unknown models or service tiers,
 and interrupted dispatches keep their reserved exposure and close admission.
-Refusals and truncated output retain their known charge. A 4xx error response,
-such as a 429 `rate_limit_error`, settles at zero cost and follows the node's
-failure policy. 5xx responses, including 529 `overloaded_error`, keep their
-reserved exposure because the journal cannot show they were not billed. See
-[workflow accounting](workflow-accounting.md#admission-and-cost).
+Refusals and truncated output retain their known charge. A 401, 403, 404, 413
+or 429 response, such as a 429 `rate_limit_error`, settles at zero cost and
+follows the node's failure policy when two conditions hold. Its body must be
+Anthropic's plain error object, `{"type": "error", "error": {"type": "...",
+"message": "..."}, "request_id": "..."}`, with no usage or other field. The
+SDK must have reported it as that status's error, such as `RateLimitError`,
+not as a transport failure. Every other 4xx response keeps its reserved
+exposure. That includes a 400 such as "Output blocked by content filtering
+policy", which can follow billed generation. 5xx responses, including 529
+`overloaded_error`, also keep their reserved exposure, because the journal
+cannot show they were not billed. See
+[workflow accounting](workflow-accounting.md#admission-and-cost) for the exact
+conditions.
 
 Input counts are estimates. The quote reserves the entire output cap and
 input headroom at the highest supported input rate. A measured overrun remains

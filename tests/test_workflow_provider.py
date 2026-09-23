@@ -53,6 +53,14 @@ class HTTPStatusFailure(Exception):
                                         headers={"x-request-id": f"req_status_{status}"})
 
 
+class RateLimitError(HTTPStatusFailure):
+    """The SDK's class for a 429 response; the journal records the class name."""
+
+
+class BadRequestError(HTTPStatusFailure):
+    """The SDK's class for a 400 response."""
+
+
 @pytest.fixture
 def journal(tmp_path):
     store = SQLiteWorkflowStore(tmp_path / "workflow.db")
@@ -257,13 +265,13 @@ def test_known_bad_output_is_paid_terminal_and_replayed_locally(journal, transpo
 
 def test_rate_limit_is_zero_cost_rejection_and_next_attempt_is_admitted(journal, transport):
     store, lease = journal
-    transport.generation.side_effect = [HTTPStatusFailure(429), wire(response())]
+    transport.generation.side_effect = [RateLimitError(429), wire(response())]
     with pytest.raises(ProviderRequestRejectedError) as caught:
         asyncio.run(invoke(journal))
     error = caught.value
     assert not isinstance(error, (ProviderResponseError, WorkflowError))
     assert error.status_code == 429 and "HTTP 429 (rate_limit_exceeded)" in str(error)
-    assert error.envelope.status_code == 429 and error.envelope.transport_error == "HTTPStatusFailure"
+    assert error.envelope.status_code == 429 and error.envelope.transport_error == "RateLimitError"
     assert error.receipt["cost_nanousd"] == 0 and error.receipt["workflow_charge_recorded"] is True
     record = store.lookup_call(lease.run_id, KEY)
     assert (record["billing_state"], record["result_state"], record["cost_nanousd"]) == ("known", "rejected", 0)
@@ -283,8 +291,10 @@ def test_rate_limit_is_zero_cost_rejection_and_next_attempt_is_admitted(journal,
 @pytest.mark.parametrize("failure", [
     ConnectionError("connection reset"), HTTPStatusFailure(500, "server_error", None),
     HTTPStatusFailure(503, "service_unavailable", None),
+    # A 400 can follow model work, so it is not a zero-cost rejection.
+    BadRequestError(400, "invalid_request_error", "context_length_exceeded"),
 ])
-def test_transport_and_server_errors_remain_unknown_exposure(journal, transport, failure):
+def test_transport_server_and_other_4xx_errors_remain_unknown_exposure(journal, transport, failure):
     store, lease = journal
     transport.generation.side_effect = failure
     with pytest.raises(ProviderAccountingError):

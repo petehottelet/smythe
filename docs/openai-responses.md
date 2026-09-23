@@ -106,9 +106,11 @@ records known charges once, stops further dispatch, and preserves unresolved
 in-memory reservations. These failures cannot trigger an automatic node retry or be
 converted into tool feedback that causes another paid turn. Saved error
 markers block ordinary resume until the response or accounting is reconciled.
-In a [durable workflow](workflow-accounting.md#admission-and-cost), a 4xx
-error response such as a 429 rate limit instead settles at zero cost and
-follows the node's failure policy.
+In a [durable workflow](workflow-accounting.md#admission-and-cost), a 401,
+403, 404, 413 or 429 response with OpenAI's plain error object, such as a 429
+rate limit, instead settles at zero cost and follows the node's failure policy.
+Other 4xx responses, such as a 400 `context_length_exceeded`, keep unknown
+exposure.
 
 ## Swarm budget scope
 

@@ -213,10 +213,14 @@ class WorkflowRuntime:
         key = CallKey(scope.phase, scope.component_id, scope.generation,
                       invocation, scope.attempt, scope.turn)
         keys = [key]
-        # A provider 4xx rejection is final for its call but cost nothing.
-        # Re-entering the same attempt (for example on resume) moves to a new,
-        # durably allocated invocation instead of replaying the rejection.
-        while _is_http_rejection(self.store.lookup_call(self.run_id, key)):
+        # A zero-cost provider rejection is final for its call. Re-entering
+        # the last call of an invocation (for example on resume after HALT)
+        # moves to a new, durably allocated invocation instead of replaying
+        # the rejection. A rejection that a later attempt or turn already
+        # followed replays, so a retry reaches that recorded call instead of
+        # buying its step again.
+        while (_is_http_rejection(self.store.lookup_call(self.run_id, key))
+               and not self.store.has_later_call(self.run_id, key)):
             invocation = self.store.allocate_invocation(
                 self.context.lease, scope.phase, scope.component_id, scope.generation,
                 f"{operation_key}/after-http-rejection/{len(keys)}",
@@ -375,15 +379,20 @@ class WorkflowRuntime:
         self._pending_operations.clear()
 
     def _node_update(self, node):
-        if (node.status is NodeStatus.COMPLETED and "response_error" in node.metadata
-                and "workflow_accounting_invalid" not in node.metadata):
-            self._clear_resolved_native_error(node)
+        self._clear_resolved_native_error(node)
         self._updates += 1
         if self._updates >= self.checkpoint_every_n_nodes:
             self._updates = 0
             self._save()
 
     def _clear_resolved_native_error(self, node):
+        # A completed node, or one skipped after zero-cost rejections, keeps
+        # no error marker once every journal call it made is resolved. A
+        # completed run requires every node to be free of these markers.
+        if (node.status not in (NodeStatus.COMPLETED, NodeStatus.SKIPPED)
+                or "response_error" not in node.metadata
+                or "workflow_accounting_invalid" in node.metadata):
+            return
         records = {call["call_id"]: call for call in self.store.inspect_run(self.run_id)["calls"]}
         ids = set()
         for entry in node.metadata.get("native_receipts", []):
@@ -521,9 +530,7 @@ class WorkflowRuntime:
         # A verdict's forced checkpoint can precede its ordinary node callback.
         # Resolve proven native replay markers before consuming that control.
         for node in self.graph.nodes:
-            if (node.status is NodeStatus.COMPLETED and "response_error" in node.metadata
-                    and "workflow_accounting_invalid" not in node.metadata):
-                self._clear_resolved_native_error(node)
+            self._clear_resolved_native_error(node)
         if state and state["status"] == "completed":
             validate_verification_checkpoint(self.graph, version=3, completed=True)
             if verification_pending(self.graph) or any(

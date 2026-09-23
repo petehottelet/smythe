@@ -42,6 +42,9 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
 The [offline example](../examples/14_durable_text_workflow.py) exercises the same
 handoff and cached recovery with zero provider API charges.
 
+With `parallel=True`, a failing node cancels calls still in flight, which can
+block the run. See [admission and cost](#admission-and-cost).
+
 ## Freeze graph limits
 
 Use `WorkflowGraphPolicy` to keep an experiment or production task within a
@@ -111,25 +114,60 @@ admitted quote or run budget is retained and stops further admission. Missing
 billing evidence remains unknown and holds exposure. The allowance governs
 admission; it cannot undo an already incurred provider charge.
 
-**Changed in 0.8.1:** a 4xx HTTP response that carries the provider's JSON
-error object, such as a 429 rate limit, is a rejected request. It settles at
-zero cost with a rejected result, and the run stays open. The node's failure
-policy decides what happens next: `RETRY` makes a new journaled call after
-`retry_backoff_s`, `SKIP` skips the node, and `HALT` fails it. Resuming a
-halted run gives the rejected step a new call. The error is
-`ProviderRequestRejectedError`, with the status code and raw evidence attached.
-A rejected supervisor review counts as no change, like other supervisor errors.
-The following responses still hold unknown exposure, because the provider may
-have processed and billed the request:
+**Changed in 0.8.1:** a request that the provider refuses before any model
+work settles at zero cost with a rejected result, and the run stays open. A
+generation response qualifies only when all of these hold:
+
+- Its status is 401, 403, 404, 413 or 429: authentication, permission, an
+  unknown model or endpoint, an oversized request, or a rate or quota limit.
+- Its body is the provider's plain error object and nothing else: OpenAI's
+  `{"error": {...}}` or Anthropic's `{"type": "error", "error": {...},
+  "request_id": "..."}`. The error object may contain only `message`, `type`,
+  `param` and `code`, each a string or null. A body with usage or any other
+  field does not qualify.
+- The exception recorded with the response, if any, is that status's SDK
+  error, such as `RateLimitError` for a 429, or the SDK's general
+  `APIStatusError`. A transport error, such as a timeout, does not qualify.
+
+The node raises `ProviderRequestRejectedError`, with the status code and raw
+evidence attached, and its failure policy decides what happens next: `RETRY`
+makes a new journaled call, `SKIP` skips the node, and `HALT` fails it. A
+rejected supervisor review counts as no change, like other supervisor errors.
+Every other unsuccessful response holds unknown exposure, because the provider
+may have processed and billed the request:
 
 - transport failures with no response
-- 408 and 499 timeouts
-- 4xx responses whose body is anything other than the provider's plain error
-  object
+- every other 4xx status, including 400 (Anthropic reports output blocked by
+  its content filter as a 400), 408, 409, 422 and 499
+- a qualifying status with any other body or error
 - 5xx responses, including Anthropic's 529 overloaded status
 
-A rejected input-token count still stops the node, but it leaves no exposure.
-Resuming the run repeats the count.
+Before retry `n`, `RETRY` waits a random time between 0 and
+`retry_backoff_s * 2**(n - 1)` seconds. The default, `retry_backoff_s=0`,
+retries immediately. Each new call starts with an input-token count. If the
+provider rejects the count, for example with another 429, the node stops
+whatever its failure policy. The count leaves no exposure, and resuming the
+run repeats it. `retry_backoff_s` is part of the saved recipe, so resuming
+with a different value raises `WorkflowConflictError`. A run created with the
+default of 0, including a 0.8.0 run created that way, cannot gain a backoff
+when it resumes.
+
+Resuming a run starts each unfinished node at its first attempt again. A
+saved accepted response replays without a new request, and so does a
+rejection that a later attempt already followed. Replayed retries still wait
+their backoff. A rejected call that nothing followed is sent again as a new
+call. Resuming a halted run therefore gives the rejected step one new call,
+and a `RETRY` node whose attempts were all rejected gets one new call, for its
+final attempt.
+
+In a parallel run, a node that fails cancels the other nodes that are still
+running. A zero-cost rejection fails its node under `HALT`, the default, and
+under `RETRY` once the final attempt is rejected. A node that `SKIP` skips
+cancels nothing. A cancelled node whose generation request was already sent
+holds unknown exposure at its quoted ceiling, so the run is blocked with
+`unknown_exposure` and resuming it fails. Runs that execute one node at a time
+(`parallel=False`, the default, or `max_concurrency=1`) have no other call in
+flight.
 
 `result.total_cost_usd` is a compatibility projection of confirmed charges.
 `workflow_accounting` reports exact `confirmed_nanousd`, `reserved_nanousd`,
@@ -160,11 +198,14 @@ revisions. Heartbeats renew ownership during calls. A former owner can append
 immutable late evidence for its exact dispatch, but cannot advance the run.
 Recovery settles available late evidence before admitting new work.
 
-A 0.8.0 journal can hold a saved 4xx error response as unknown exposure. On
-resume, 0.8.1 settles that call again at zero cost with a rejected result and
+A 0.8.0 journal holds every saved 4xx error response as unknown exposure. On
+resume, 0.8.1 settles a saved response that meets the zero-cost conditions
+above, such as a plain 429, again at zero cost with a rejected result and
 records an `unknown_exposure_resolved` event. If no other unknown call or
-overrun blocks the run, admission reopens. Repeating the settlement changes
-nothing.
+overrun blocks the run, admission reopens. Once the node completes or is
+skipped, its saved `response_error`, `accounting_invalid`, `accounting_error`
+and `cost_usd_unknown` markers are removed. Any other saved response, such as a
+400, keeps its unknown exposure. Repeating the settlement changes nothing.
 
 **Added in 0.8.0:** concurrent journal openers use bounded WAL retries
 and create all tables and the persistent store identity in one transaction.
@@ -172,10 +213,10 @@ Competing openers reuse that identity. Failed initialization rolls back;
 existing evidence and read-only inspection retain their behavior.
 
 Resume requires the same component descriptions, model configuration, budget,
-and concurrency policy. It does not refill allowances. An inspected pending
-plan can be edited before execution; a stale graph from an already progressing
-run must use `resume()`. A graph carrying durable provenance cannot enter the
-ordinary unjournaled execution path.
+retry backoff, and concurrency policy. It does not refill allowances. An
+inspected pending plan can be edited before execution; a stale graph from an
+already progressing run must use `resume()`. A graph carrying durable
+provenance cannot enter the ordinary unjournaled execution path.
 
 ## Supported scope
 

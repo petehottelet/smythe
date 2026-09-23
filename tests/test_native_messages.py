@@ -38,12 +38,25 @@ def wire(raw):
 class StatusError(Exception):
     """Mimics an SDK status error, which carries the raw HTTP response."""
 
-    def __init__(self, status, error_type):
+    def __init__(self, status, error_type, message="Provider error"):
         super().__init__(f"Error code: {status}")
-        body = {"type": "error", "error": {"type": error_type, "message": "Provider error"},
+        body = {"type": "error", "error": {"type": error_type, "message": message},
                 "request_id": "req_status"}
         self.response = SimpleNamespace(content=json.dumps(body).encode(), status_code=status,
                                         headers={"request-id": "req_status"})
+
+
+# The journal records the SDK class name, and the SDK names one per status.
+class RateLimitError(StatusError):
+    """The SDK's class for a 429 response."""
+
+
+class RequestTooLargeError(StatusError):
+    """The SDK's class for a 413 response."""
+
+
+class BadRequestError(StatusError):
+    """The SDK's class for a 400 response."""
 
 
 @pytest.fixture
@@ -173,7 +186,7 @@ def test_unknown_dispatch_keeps_reserve_and_blocks_next_call(journal, transport,
 
 def test_rate_limit_is_zero_cost_rejection_and_next_attempt_is_admitted(journal, transport):
     store, lease = journal
-    transport.generation.side_effect = [StatusError(429, "rate_limit_error"), wire(response())]
+    transport.generation.side_effect = [RateLimitError(429, "rate_limit_error"), wire(response())]
     with pytest.raises(ProviderRequestRejectedError) as caught:
         asyncio.run(invoke(journal))
     assert not isinstance(caught.value, (ProviderResponseError, WorkflowError))
@@ -194,7 +207,7 @@ def test_durable_swarm_retries_rate_limited_node_with_exact_totals(tmp_path, tra
     from smythe import Swarm
     from smythe.graph import ExecutionGraph, FailurePolicy, Node, Topology
 
-    transport.generation.side_effect = [StatusError(429, "rate_limit_error"), wire(response())]
+    transport.generation.side_effect = [RateLimitError(429, "rate_limit_error"), wire(response())]
     graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
         Node(id="draft", label="Draft", failure_policy=FailurePolicy.RETRY, max_retries=1)])
     with SQLiteWorkflowStore(tmp_path / "fable-retry.sqlite3") as store:
@@ -221,6 +234,28 @@ def test_server_errors_including_overloaded_keep_unknown_exposure(journal, trans
     with pytest.raises(WorkflowError):
         asyncio.run(invoke(journal, key=CallKey("execution", "node", attempt=1)))
     assert transport.generation.await_count == 1
+
+
+def test_request_too_large_is_a_zero_cost_rejection(journal, transport):
+    store, lease = journal
+    transport.generation.side_effect = RequestTooLargeError(413, "request_too_large")
+    with pytest.raises(ProviderRequestRejectedError) as caught:
+        asyncio.run(invoke(journal))
+    assert caught.value.status_code == 413
+    record = store.lookup_call(lease.run_id, CallKey("execution", "node"))
+    assert (record["billing_state"], record["result_state"], record["cost_nanousd"]) == ("known", "rejected", 0)
+    assert store.load_run(lease.run_id)["blocked_reason"] is None
+
+
+def test_output_blocked_by_content_filter_keeps_unknown_exposure(journal, transport):
+    # Anthropic can return this 400 after generating, and billing, the output.
+    transport.generation.side_effect = BadRequestError(
+        400, "invalid_request_error", "Output blocked by content filtering policy")
+    with pytest.raises(ProviderAccountingError):
+        asyncio.run(invoke(journal))
+    audit = journal[0].inspect_run(journal[1].run_id)
+    assert audit["unknown_calls"] == 1 and audit["unknown_nanousd"] > 0
+    assert audit["confirmed_nanousd"] == 0 and audit["blocked_reason"] == "unknown_exposure"
 
 
 def test_concurrent_duplicate_call_has_one_dispatch(journal, transport):

@@ -2,13 +2,17 @@
 
 import asyncio
 from collections import Counter
+from contextlib import closing
 import json
+import sqlite3
+import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 
 from smythe import Swarm, Task
+from smythe.graph import NodeStatus
 from smythe.planner import LLMArchitect
 from smythe.prompts import PLANNING_SYSTEM_PROMPT
 from smythe.provider import ProviderAccountingError
@@ -365,3 +369,106 @@ def test_rate_limit_held_as_unknown_by_080_journal_is_reclassified_on_resume(
         assert_exact_ledger(store, run_id)
         assert swarm(store).resume(run_id).output == "Final accepted output."
         assert len(native_transport.requests) == 5
+
+
+class Crash(BaseException):
+    """Stops a run where a killed process would, skipping its cleanup handlers."""
+
+
+def test_crash_after_a_successful_retry_replays_it_without_buying_the_step_again(
+    tmp_path, native_transport, monkeypatch,
+):
+    plan = json.loads(json.dumps(PLAN))
+    plan["nodes"][0].update(failure_policy="retry", max_retries=1)
+    native_transport.planning_outputs = [json.dumps(plan)]
+    native_transport.rate_limited["execution"] = 1
+    image = tmp_path / "crashed.db"
+    with SQLiteWorkflowStore(tmp_path / "live.db") as store:
+        save_checkpoint = store.save_checkpoint
+
+        def crash_before_draft_checkpoint(lease, revision, checkpoint, **kwargs):
+            draft = next(node for node in checkpoint["graph"]["nodes"] if node["id"] == "draft")
+            if draft["status"] == "completed" and not image.exists():
+                # Attempt 1 is accepted but its node checkpoint is not saved.
+                # Copy the journal exactly as a killed process leaves it.
+                with closing(sqlite3.connect(image)) as target:
+                    store._db.backup(target)
+                raise Crash
+            return save_checkpoint(lease, revision, checkpoint, **kwargs)
+
+        monkeypatch.setattr(store, "save_checkpoint", crash_before_draft_checkpoint)
+        with pytest.raises(Crash):
+            swarm(store).execute(Task("Write and check"))
+    assert len(native_transport.requests) == 3  # Planning, rejected attempt 0, accepted attempt 1.
+    # A new process resumes once the killed owner's 60-second lease has expired.
+    with SQLiteWorkflowStore(image, clock_ns=lambda: time.time_ns() + 120 * 10**9) as store:
+        run_id = store.list_runs()[0]["run_id"]
+        result = swarm(store).resume(run_id)
+        assert result.output == "Final accepted output." and result.total_cost_usd == .006
+        assert len(native_transport.requests) == 5  # Only the judge and synthesis.
+        assert draft_calls(store, run_id) == [(0, 0, 0, "rejected"), (0, 1, 1_500_000, "applied")]
+        assert_exact_ledger(store, run_id)
+        assert swarm(store).resume(run_id).output == "Final accepted output."
+    assert len(native_transport.requests) == 5
+
+
+def test_resume_after_every_retry_was_rejected_sends_only_the_final_attempt_again(
+    tmp_path, native_transport,
+):
+    plan = json.loads(json.dumps(PLAN))
+    plan["nodes"][0].update(failure_policy="retry", max_retries=1)
+    native_transport.planning_outputs = [json.dumps(plan)]
+    native_transport.rate_limited["execution"] = 3
+    with SQLiteWorkflowStore(tmp_path / "retries-rejected.db") as store:
+        instance = swarm(store)
+        graph = instance.plan(Task("Write and check"))
+        run_id = graph.run_ref["run_id"]
+        with pytest.raises(ProviderRequestRejectedError):
+            instance.execute(graph)
+        assert draft_calls(store, run_id) == [(0, 0, 0, "rejected"), (0, 1, 0, "rejected")]
+        # Attempt 0 replays its rejection locally; each resume sends one new call.
+        with pytest.raises(ProviderRequestRejectedError):
+            instance.resume(run_id)
+        assert len(native_transport.requests) == 4
+        assert draft_calls(store, run_id)[-1] == (1, 1, 0, "rejected")
+        result = instance.resume(run_id)
+        assert result.output == "Final accepted output." and result.total_cost_usd == .006
+        assert len(native_transport.requests) == 7
+        assert draft_calls(store, run_id) == [
+            (0, 0, 0, "rejected"), (0, 1, 0, "rejected"), (1, 1, 0, "rejected"), (2, 1, 1_500_000, "applied"),
+        ]
+        assert_exact_ledger(store, run_id)
+
+
+def test_skipped_node_from_080_journal_drops_resolved_markers_and_resumes_cleanly(
+    tmp_path, native_transport, monkeypatch,
+):
+    import smythe.workflow_store as workflow_store
+
+    plan = json.loads(json.dumps(PLAN))
+    plan["nodes"][0].update(failure_policy="skip")
+    native_transport.planning_outputs = [json.dumps(plan)]
+    native_transport.rate_limited["execution"] = 2  # 0.8.0's call, then the call after migration.
+    original = workflow_store._http_rejection_receipt
+    monkeypatch.setattr(workflow_store, "_http_rejection_receipt", lambda *args: None)
+    path = tmp_path / "old-skip-429.db"
+    with SQLiteWorkflowStore(path) as store:
+        instance = swarm(store)
+        graph = instance.plan(Task("Write and check"))
+        run_id = graph.run_ref["run_id"]
+        with pytest.raises(ProviderAccountingError):
+            instance.execute(graph)
+    monkeypatch.setattr(workflow_store, "_http_rejection_receipt", original)
+    markers = {"accounting_invalid", "accounting_error", "response_error", "cost_usd_unknown"}
+    with SQLiteWorkflowStore(path) as store:
+        result = swarm(store).resume(run_id)
+        draft = next(node for node in result.graph.nodes if node.id == "draft")
+        assert draft.status is NodeStatus.SKIPPED and not markers & draft.metadata.keys()
+        saved = store.get_checkpoint(run_id)["checkpoint"]
+        assert saved["status"] == "completed"
+        assert not markers & next(node for node in saved["graph"]["nodes"] if node["id"] == "draft")["metadata"].keys()
+        assert result.total_cost_usd == .0045 and result.cost_is_complete
+        assert draft_calls(store, run_id) == [(0, 0, 0, "rejected"), (1, 0, 0, "rejected")]
+        assert_exact_ledger(store, run_id)
+        assert swarm(store).resume(run_id).output == result.output
+    assert len(native_transport.requests) == 5
