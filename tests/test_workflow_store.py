@@ -792,3 +792,24 @@ def test_saved_unknown_response_from_older_release_is_reclassified_only_if_it_qu
     audit = store.inspect_run("run")
     assert audit["unknown_nanousd"] == 6_250_000 and audit["unknown_calls"] == 1
     assert "unknown_exposure_resolved" not in [event["type"] for event in audit["events"]]
+
+
+def test_later_call_lookup_covers_later_attempts_and_turns_of_one_invocation(journal):
+    store, lease, _ = journal
+    call = prepare(store, lease)
+    base = CallKey("execution", "worker")
+    for key in (replace(base, attempt=1), replace(base, attempt=1, turn=2),
+                replace(base, invocation=1, attempt=3), replace(base, generation=1, attempt=5)):
+        store.prepare_call(lease, key, request_json=call["request_json"], provider=call["provider"],
+                           price_version=PRICE_VERSION)
+    assert store.has_later_call("run", base)
+    assert store.has_later_call("run", replace(base, turn=7))
+    assert store.has_later_call("run", replace(base, attempt=1))
+    assert not store.has_later_call("run", replace(base, attempt=1, turn=2))
+    assert store.has_later_call("run", replace(base, invocation=1))
+    assert not store.has_later_call("run", replace(base, invocation=1, attempt=3))
+    assert not store.has_later_call("run", replace(base, generation=1, attempt=5))
+    assert not store.has_later_call("run", CallKey("execution", "other"))
+    assert not store.has_later_call("run", CallKey("verification", "worker"))
+    with pytest.raises(WorkflowValidationError):
+        store.has_later_call("run", {"phase": "execution", "scope_id": "worker"})

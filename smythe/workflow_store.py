@@ -641,6 +641,23 @@ class SQLiteWorkflowStore:
             row = db.execute("SELECT * FROM workflow_calls WHERE run_id=? AND key_json=?", (run_id, _canonical(asdict(key)))).fetchone()
             return self._call_record(row) if row else None
 
+    def has_later_call(self, run_id, key):
+        """Whether the journal holds a later attempt, or later turn, of key's invocation."""
+        if not isinstance(key, CallKey):
+            raise WorkflowValidationError("Expected CallKey")
+        with self._transaction(write=False) as db:
+            self._run(db, run_id)
+            for row in db.execute("SELECT key_json FROM workflow_calls WHERE run_id=?", (run_id,)):
+                try:
+                    other = CallKey(**_loads(row["key_json"], stored=True))
+                except (WorkflowValidationError, TypeError) as exc:
+                    raise WorkflowCorruptionError("Call key is invalid") from exc
+                if ((other.phase, other.scope_id, other.generation, other.invocation)
+                        == (key.phase, key.scope_id, key.generation, key.invocation)
+                        and (other.attempt, other.turn) > (key.attempt, key.turn)):
+                    return True
+            return False
+
     @staticmethod
     def _call_record(row):
         request = _loads(row["request_json"], stored=True)

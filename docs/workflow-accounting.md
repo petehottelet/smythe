@@ -128,11 +128,10 @@ generation response qualifies only when all of these hold:
 
 The node raises `ProviderRequestRejectedError`, with the status code and raw
 evidence attached, and its failure policy decides what happens next: `RETRY`
-makes a new journaled call, `SKIP` skips the node, and `HALT` fails it.
-Resuming a halted run gives the rejected step a new call. A rejected
-supervisor review counts as no change, like other supervisor errors. Every
-other unsuccessful response holds unknown exposure, because the provider may
-have processed and billed the request:
+makes a new journaled call, `SKIP` skips the node, and `HALT` fails it. A
+rejected supervisor review counts as no change, like other supervisor errors.
+Every other unsuccessful response holds unknown exposure, because the provider
+may have processed and billed the request:
 
 - transport failures with no response
 - every other 4xx status, including 400 (Anthropic reports output blocked by
@@ -142,6 +141,14 @@ have processed and billed the request:
 
 A rejected input-token count still stops the node, but it leaves no exposure.
 Resuming the run repeats the count.
+
+Resuming a run starts each unfinished node at its first attempt again. A
+saved accepted response replays without a new request, and so does a
+rejection that a later attempt already followed. Replayed retries still wait
+their backoff. A rejected call that nothing followed is sent again as a new
+call. Resuming a halted run therefore gives the rejected step one new call,
+and a `RETRY` node whose attempts were all rejected gets one new call, for its
+final attempt.
 
 `result.total_cost_usd` is a compatibility projection of confirmed charges.
 `workflow_accounting` reports exact `confirmed_nanousd`, `reserved_nanousd`,

@@ -213,10 +213,14 @@ class WorkflowRuntime:
         key = CallKey(scope.phase, scope.component_id, scope.generation,
                       invocation, scope.attempt, scope.turn)
         keys = [key]
-        # A provider 4xx rejection is final for its call but cost nothing.
-        # Re-entering the same attempt (for example on resume) moves to a new,
-        # durably allocated invocation instead of replaying the rejection.
-        while _is_http_rejection(self.store.lookup_call(self.run_id, key)):
+        # A zero-cost provider rejection is final for its call. Re-entering
+        # the last call of an invocation (for example on resume after HALT)
+        # moves to a new, durably allocated invocation instead of replaying
+        # the rejection. A rejection that a later attempt or turn already
+        # followed replays, so a retry reaches that recorded call instead of
+        # buying its step again.
+        while (_is_http_rejection(self.store.lookup_call(self.run_id, key))
+               and not self.store.has_later_call(self.run_id, key)):
             invocation = self.store.allocate_invocation(
                 self.context.lease, scope.phase, scope.component_id, scope.generation,
                 f"{operation_key}/after-http-rejection/{len(keys)}",
