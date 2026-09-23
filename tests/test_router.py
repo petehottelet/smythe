@@ -121,6 +121,73 @@ async def test_classifier_case_insensitive():
     assert result is constrained
 
 
+@pytest.mark.parametrize("reply", [
+    "deterministic:MyShape", "deterministic:myshape", "DETERMINISTIC:MYSHAPE",
+    "Deterministic: MyShape", "`deterministic:MyShape`", "deterministic:MyShape.",
+    '"deterministic:MyShape"', "**deterministic:`MyShape`**",
+])
+def test_deterministic_keys_match_regardless_of_case_and_decoration(reply):
+    """The reply used to be lowercased before a case-sensitive key lookup."""
+    shape = FixedArchitect("shape")
+    router = WhiteRabbit(
+        deterministic={"MyShape": shape},
+        autonomous=FixedArchitect("fallback"),
+        classifier_provider=ClassifierMockProvider(reply),
+        classifier_model="test",
+    )
+    assert router.route(Task(goal="Shape it")) is shape
+
+
+@pytest.mark.parametrize("reply", [
+    "constrained.", "`constrained`", '"constrained"', "**Constrained**", "constrained!\n",
+])
+def test_decorated_tier_names_are_matched(reply):
+    constrained = FixedArchitect("constrained")
+    router = WhiteRabbit(
+        constrained=constrained,
+        autonomous=FixedArchitect("fallback"),
+        classifier_provider=ClassifierMockProvider(reply),
+        classifier_model="test",
+    )
+    assert router.route(Task(goal="Constrain it")) is constrained
+
+
+def test_keys_differing_only_by_case_are_rejected():
+    with pytest.raises(ValueError, match="differ by more than case"):
+        WhiteRabbit(
+            deterministic={"MyShape": FixedArchitect("a"), "myshape": FixedArchitect("b")},
+            autonomous=FixedArchitect("fallback"),
+        )
+
+
+@pytest.mark.parametrize("reply", [
+    "I think this is a constrained task", "deterministic:missing", "constrained",
+])
+def test_unmatched_reply_falls_back_with_a_warning(reply, caplog):
+    fallback = FixedArchitect("fallback")
+    router = WhiteRabbit(
+        deterministic={"real": FixedArchitect("real")},
+        autonomous=fallback,
+        classifier_provider=ClassifierMockProvider(reply),
+        classifier_model="test",
+    )
+    with caplog.at_level("WARNING", logger="smythe.router"):
+        assert router.route(Task(goal="Unclear")) is fallback
+    assert "falling back to the autonomous architect" in caplog.text
+
+
+def test_choosing_autonomous_does_not_warn(caplog):
+    fallback = FixedArchitect("fallback")
+    router = WhiteRabbit(
+        autonomous=fallback,
+        classifier_provider=ClassifierMockProvider("Autonomous."),
+        classifier_model="test",
+    )
+    with caplog.at_level("WARNING", logger="smythe.router"):
+        assert router.route(Task(goal="Open-ended")) is fallback
+    assert caplog.text == ""
+
+
 def test_sync_route_delegates_to_aroute():
     """Sync route() should produce the same result as aroute()."""
     det = FixedArchitect("det")

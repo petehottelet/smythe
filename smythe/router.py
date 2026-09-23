@@ -6,6 +6,7 @@ Follow the white rabbit.  It knows the way.
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from smythe.budget import validate_completion_usage
 from smythe.planner import Architect, ArchitectError, DeterministicArchitect
@@ -14,6 +15,11 @@ from smythe.task import Task, render_task_json
 from smythe.workflow_binding import (
     ComponentBinding, bind_component, describe_component, provider_description, require_exact,
 )
+
+logger = logging.getLogger("smythe.router")
+
+# Wrapping a classifier may put around its one-token answer.
+_REPLY_DECORATION = " \t\r\n`'\".,;:!?*()[]{}<>"
 
 
 CLASSIFIER_SYSTEM_PROMPT = """\
@@ -35,6 +41,10 @@ class WhiteRabbit:
       and selects the appropriate architect from the registered tiers.
 
     When no classifier provider is set, falls back to the autonomous architect.
+    Classifier replies match tier names and deterministic keys without
+    regard to case or surrounding quotes, backticks, or punctuation, so
+    deterministic keys must differ by more than case.  An unmatched reply
+    falls back to the autonomous architect and logs a warning.
     """
 
     def __init__(
@@ -47,6 +57,15 @@ class WhiteRabbit:
         classifier_model: str = "claude-opus-5-5",
         run_binding: ComponentBinding | None = None,
     ) -> None:
+        self._deterministic_by_key: dict[str, DeterministicArchitect] = {}
+        for key, tier in (deterministic or {}).items():
+            folded = key.casefold() if isinstance(key, str) else key
+            if folded in self._deterministic_by_key:
+                raise ValueError(
+                    f"Deterministic router keys must differ by more than case: {key!r} "
+                    "collides with another key"
+                )
+            self._deterministic_by_key[folded] = tier
         self._deterministic = deterministic or {}
         self._constrained = constrained
         self._autonomous = autonomous
@@ -125,16 +144,21 @@ class WhiteRabbit:
 
     def _parse_classification(self, text: str) -> Architect:
         """Map classifier output to an architect instance."""
-        cleaned = text.strip().lower()
+        cleaned = text.strip(_REPLY_DECORATION).casefold()
 
         if cleaned.startswith("deterministic:"):
-            key = cleaned.split(":", 1)[1].strip()
-            if key in self._deterministic:
-                return self._deterministic[key]
-
-        if cleaned == "constrained" and self._constrained is not None:
+            key = cleaned.split(":", 1)[1].strip(_REPLY_DECORATION)
+            if key in self._deterministic_by_key:
+                return self._deterministic_by_key[key]
+        elif cleaned == "constrained" and self._constrained is not None:
             return self._constrained
+        elif cleaned == "autonomous":
+            return self._fallback()
 
+        logger.warning(
+            "Classifier reply %r matched no configured tier; falling back to the "
+            "autonomous architect", text[:200],
+        )
         return self._fallback()
 
     def _fallback(self) -> Architect:
