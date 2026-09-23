@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import re
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -16,7 +15,7 @@ from smythe.constrained_prompts import (
     build_constrained_user_prompt,
 )
 from smythe.graph import ExecutionGraph, Node, Topology
-from smythe.planner import Architect, ArchitectError
+from smythe.planner import Architect, ArchitectError, _strip_code_fence
 from smythe.provider import TRUNCATED_STOP_REASONS, Provider
 from smythe.registry import Registry
 from smythe.task import Task
@@ -159,12 +158,7 @@ class ConstrainedArchitect(Architect):
 
     def _extract_selections(self, text: str) -> list[dict[str, Any]]:
         """Parse the JSON array of selections, raising ValueError on any schema error."""
-        stripped = text.strip()
-        fence_match = re.search(
-            r"```(?:json)?\s*\n?(.*?)\n?\s*```", stripped, re.DOTALL
-        )
-        if fence_match:
-            stripped = fence_match.group(1).strip()
+        stripped = _strip_code_fence(text.strip())
 
         try:
             data = json.loads(stripped)

@@ -1,6 +1,7 @@
 """Tests for the LLM-driven architect."""
 
 import json
+import time
 from dataclasses import asdict
 from pathlib import Path
 
@@ -419,6 +420,15 @@ def test_deeply_nested_json_is_retried_not_raised():
     planner = LLMArchitect(provider=provider, planning_model="test-model", max_retries=1)
     graph, _ = planner.plan(Task(goal="Survive pathological JSON"))
     assert len(graph.nodes) == 2
+
+
+def test_unclosed_fence_before_long_whitespace_is_read_in_linear_time():
+    """The old fence regex backtracked cubically on this reply shape (about
+    14 s at 2,000 newlines), blocking the event loop."""
+    started = time.perf_counter()
+    with pytest.raises(ValueError):
+        LLMArchitect._extract_json("```json\n" + "\n" * 2_000 + "x")
+    assert time.perf_counter() - started < 1.0
 
 
 def _wide_plan(count: int) -> str:

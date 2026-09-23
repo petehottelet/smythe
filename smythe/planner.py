@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import re
 from abc import ABC, abstractmethod
 
 from smythe.budget import Sentinel, validate_completion_usage, validate_token_count
@@ -30,6 +29,21 @@ from smythe.workflow_binding import (
 
 class ArchitectError(Exception):
     """Raised when the Architect cannot produce a valid execution graph."""
+
+
+def _strip_code_fence(text: str) -> str:
+    """Return the body of the first ``` fence (minus a ``json`` tag), else ``text``.
+
+    Uses plain searches: a regex with whitespace quantifiers around a lazy
+    body backtracks cubically on a reply with an unclosed fence followed by
+    a long run of whitespace, stalling the event loop for minutes.
+    """
+    start = text.find("```")
+    end = text.find("```", start + 3) if start >= 0 else -1
+    if end < 0:
+        return text
+    body = text[start + 3:end]
+    return body.removeprefix("json").strip()
 
 
 class Architect(ABC):
@@ -265,12 +279,7 @@ class LLMArchitect(Architect):
     @staticmethod
     def _extract_json(text: str) -> dict:
         """Parse JSON from an LLM response, stripping code fences if present."""
-        stripped = text.strip()
-        fence_match = re.search(
-            r"```(?:json)?\s*\n?(.*?)\n?\s*```", stripped, re.DOTALL
-        )
-        if fence_match:
-            stripped = fence_match.group(1).strip()
+        stripped = _strip_code_fence(text.strip())
 
         try:
             data = json.loads(stripped)

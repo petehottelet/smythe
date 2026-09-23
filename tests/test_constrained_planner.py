@@ -1,6 +1,7 @@
 """Tests for the ConstrainedArchitect."""
 
 import json
+import time
 
 import pytest
 
@@ -254,6 +255,16 @@ def test_malformed_selections_are_retried_as_value_errors(bad_response, message)
 
     assert [n.id for n in graph.nodes] == ["draft-0-write"]
     assert message in provider.prompts_received[1]
+
+
+def test_unclosed_fence_before_long_whitespace_is_read_in_linear_time():
+    """The old fence regex backtracked cubically on this reply shape (about
+    14 s at 2,000 newlines), blocking the event loop."""
+    planner = ConstrainedArchitect(provider=MockConstrainedProvider([]), templates=TEMPLATES)
+    started = time.perf_counter()
+    with pytest.raises(ValueError):
+        planner._extract_selections("```json\n" + "\n" * 2_000 + "x")
+    assert time.perf_counter() - started < 1.0
 
 
 def test_null_params_are_treated_as_no_params():
