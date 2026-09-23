@@ -108,7 +108,8 @@ def test_flat_region_detector_catches_placeholder_boxes(tmp_path):
     flat = _image(tmp_path / "flat.png")
     findings = check_flat_regions(flat)
     assert findings and findings[0].detector == "flat-region"
-    assert findings[0].hard is True
+    # A plain background is legitimate for logos, so this cannot block alone.
+    assert findings[0].hard is False
 
     textured = _image(tmp_path / "textured.png", noise=3)
     assert check_flat_regions(textured) == []
@@ -172,10 +173,35 @@ def test_verifier_passes_clean_assets(tmp_path):
 
 
 def test_verifier_fails_on_a_hard_finding(tmp_path):
-    flat = _image(tmp_path / "flat.png")
-    verdict = design_verifier().verdict(Node(id="v", label="v"), _target_with([flat]))
+    wrong_size = _image(tmp_path / "wrong.png", noise=3)
+    verifier = design_verifier(width=128, height=128)
+    verdict = verifier.verdict(Node(id="v", label="v"), _target_with([wrong_size]))
     assert verdict.passed is False
-    assert "flat-region" in verdict.reason
+    assert "dimensions" in verdict.reason
+
+
+def _logo_on_white(path: Path) -> Path:
+    from PIL import Image
+
+    canvas = Image.new("RGB", (256, 256), (255, 255, 255))
+    with Image.open(_image(path.with_name("mark.png"), size=(96, 96), noise=5)) as mark:
+        canvas.paste(mark, (80, 80))
+    canvas.save(path, "PNG")
+    return path
+
+
+def test_verifier_passes_a_logo_on_a_white_background(tmp_path):
+    """Regression: a plain background used to force a paid regeneration."""
+    logo = _logo_on_white(tmp_path / "logo.png")
+    assert [f.detector for f in inspect_asset(logo)] == ["flat-region"]
+
+    verdict = design_verifier().verdict(Node(id="v", label="v"), _target_with([logo]))
+    assert verdict.passed is True
+
+    strict = design_verifier(include_advisory=True)
+    strict_verdict = strict.verdict(Node(id="v", label="v"), _target_with([logo]))
+    assert strict_verdict.passed is False
+    assert "[advisory] flat-region" in strict_verdict.reason
 
 
 def test_verifier_ignores_advisory_findings_by_default(tmp_path):
@@ -200,9 +226,75 @@ def test_verifier_passes_when_there_is_nothing_to_inspect():
     assert verdict.passed is True
 
 
-def test_verifier_tolerates_missing_files(tmp_path):
+def test_verifier_fails_when_the_only_artifact_is_missing(tmp_path):
+    """Regression: a missing file was skipped and the verdict passed."""
     target = _target_with([tmp_path / "gone.png"])
-    assert design_verifier().verdict(Node(id="v", label="v"), target).passed is True
+    verdict = design_verifier().verdict(Node(id="v", label="v"), target)
+    assert verdict.passed is False
+    assert "[hard] missing-artifact: gone.png" in verdict.reason
+
+
+def test_verifier_reports_one_missing_artifact_among_several(tmp_path):
+    """Regression: near-duplicate hashing raised FileNotFoundError."""
+    a = _image(tmp_path / "a.png", noise=3)
+    b = _image(tmp_path / "b.png", color=(10, 200, 10), noise=17)
+    target = _target_with([a, tmp_path / "gone.png", b])
+    verdict = design_verifier().verdict(Node(id="v", label="v"), target)
+    assert verdict.passed is False
+    assert verdict.reason == "[hard] missing-artifact: gone.png does not exist"
+
+
+def _spy_on_plugin_open(monkeypatch, plugin_class):
+    calls = []
+    original = plugin_class._open
+
+    def spy(self):
+        calls.append(plugin_class.__name__)
+        return original(self)
+
+    monkeypatch.setattr(plugin_class, "_open", spy)
+    return calls
+
+
+def test_detectors_refuse_formats_outside_png_jpeg_gif_webp(tmp_path, monkeypatch):
+    from PIL import EpsImagePlugin, Image, TiffImagePlugin, UnidentifiedImageError
+
+    calls = _spy_on_plugin_open(monkeypatch, EpsImagePlugin.EpsImageFile)
+    calls += _spy_on_plugin_open(monkeypatch, TiffImagePlugin.TiffImageFile)
+    tiff = tmp_path / "tiff.png"
+    Image.new("RGB", (64, 64), (1, 2, 3)).save(tiff, format="TIFF")
+    eps = tmp_path / "eps.png"
+    eps.write_bytes(b"%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 64 64\nshowpage\n")
+
+    for path in (tiff, eps):
+        with pytest.raises(UnidentifiedImageError, match="PNG, JPEG, GIF, or WebP"):
+            check_dimensions(path, 64, 64)
+        with pytest.raises(UnidentifiedImageError):
+            dhash(path)
+        verdict = design_verifier().verdict(Node(id="v", label="v"), _target_with([path]))
+        assert verdict.passed is False
+        assert f"[hard] unreadable-artifact: {path.name}" in verdict.reason
+    assert calls == []
+
+
+def test_verifier_reports_a_decompression_bomb_as_a_failure(tmp_path):
+    import struct
+    import zlib
+
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        return struct.pack(">I", len(body)) + kind + body + struct.pack(
+            ">I", zlib.crc32(kind + body)
+        )
+
+    header = struct.pack(">IIBBBBB", 10_000, 10_000, 8, 2, 0, 0, 0)
+    bomb = tmp_path / "bomb.png"
+    bomb.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IEND", b""))
+
+    with pytest.warns(Warning):  # Pillow warns first; Smythe then refuses.
+        verdict = design_verifier().verdict(Node(id="v", label="v"), _target_with([bomb]))
+    assert verdict.passed is False
+    assert "unreadable-artifact: bomb.png" in verdict.reason
+    assert "pixel limit" in verdict.reason
 
 
 def test_finding_str_marks_severity():
