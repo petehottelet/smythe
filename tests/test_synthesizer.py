@@ -232,6 +232,28 @@ def test_llm_merge_provider_error_sets_failed_status():
     assert len(error_spans) == 1
 
 
+@pytest.mark.parametrize("stop_reason", ["max_tokens", "model_context_window_exceeded"])
+def test_llm_merge_truncated_output_raises_after_recording_cost(stop_reason):
+    """A merge cut off at max_tokens is not a deliverable, but it was billed."""
+    from smythe.provider import OutputTruncatedError
+
+    class _TruncatingProvider(Provider):
+        async def complete(self, system, prompt, model):
+            return CompletionResult(text="Half of the mer", prompt_tokens=30,
+                                    completion_tokens=40, stop_reason=stop_reason)
+
+    budget, tracer = Sentinel(max_budget_usd=1.0), Tracer()
+    synth = Synthesizer(strategy=SynthesisStrategy.LLM_MERGE, provider=_TruncatingProvider(),
+                        budget=budget, tracer=tracer)
+
+    with pytest.raises(OutputTruncatedError, match=stop_reason):
+        synth.synthesize(_make_graph("A", "B"))
+
+    assert budget.breakdown()["__synthesis__"] == pytest.approx(70 * budget.cost_per_token)
+    assert budget._reservations == {}
+    assert [s["node_id"] for s in tracer.summary() if s.get("error")] == ["__synthesis__"]
+
+
 # ---------------------------------------------------------------------------
 # DELIVERABLE strategy (the default)
 # ---------------------------------------------------------------------------

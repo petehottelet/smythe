@@ -105,6 +105,36 @@ class CompletionResult:
         return self.prompt_tokens + self.completion_tokens
 
 
+# Stop reasons meaning generation ended before the response was complete.
+# Built-in providers normalize their native signals to these values
+# (OpenAI finish_reason "length" and Gemini MAX_TOKENS become "max_tokens").
+TRUNCATED_STOP_REASONS = frozenset({"max_tokens", "model_context_window_exceeded"})
+
+
+class OutputTruncatedError(RuntimeError):
+    """The model stopped before completing its response.
+
+    Callers raise this only after the call's usage has been recorded, so
+    the billed charge is kept. It is an ordinary provider failure: a node's
+    failure policy applies (RETRY retries, SKIP skips, HALT stops the run).
+    Raising the provider's ``max_tokens`` is the usual remedy.
+    """
+
+    def __init__(self, stop_reason: str, *, where: str | None = None) -> None:
+        self.stop_reason = stop_reason
+        prefix = f"{where}: " if where else ""
+        super().__init__(
+            f"{prefix}provider output was truncated (stop_reason={stop_reason!r}); "
+            "the response is incomplete"
+        )
+
+
+def _raise_if_truncated(result: CompletionResult, *, where: str | None = None) -> None:
+    """Reject incomplete output. Call only after the result's cost is recorded."""
+    if result.stop_reason in TRUNCATED_STOP_REASONS:
+        raise OutputTruncatedError(result.stop_reason, where=where)
+
+
 class ProviderResponseError(RuntimeError):
     """A dispatched response is unusable; its evidence and bill remain available.
 
@@ -1050,6 +1080,11 @@ class GeminiProvider(Provider):
                 cost_usd_is_estimate = False
                 cost_usd_unknown = True
 
+        if self._finish_reason(response) == "MAX_TOKENS":
+            stop = "max_tokens"
+        else:
+            stop = "tool_use" if tool_calls else "end_turn"
+
         usage = response.usage_metadata
         # The SDK can set token-count attributes to None (observed on
         # image-only responses), so coerce before arithmetic downstream.
@@ -1058,12 +1093,23 @@ class GeminiProvider(Provider):
             prompt_tokens=_usage_tokens(usage, "prompt_token_count"),
             completion_tokens=_usage_tokens(usage, "candidates_token_count"),
             tool_calls=tool_calls,
-            stop_reason="tool_use" if tool_calls else "end_turn",
+            stop_reason=stop,
             artifacts=artifacts,
             cost_usd=cost_usd,
             cost_usd_is_estimate=cost_usd_is_estimate,
             cost_usd_unknown=cost_usd_unknown,
         )
+
+    @staticmethod
+    def _finish_reason(response) -> str | None:
+        """The first candidate's finish reason as an upper-case name, if any."""
+        candidates = getattr(response, "candidates", None)
+        if not isinstance(candidates, (list, tuple)) or not candidates:
+            return None
+        reason = getattr(candidates[0], "finish_reason", None)
+        # The SDK returns a string enum; its value is the wire name.
+        reason = getattr(reason, "value", reason)
+        return reason.upper() if isinstance(reason, str) else None
 
     @staticmethod
     def _extract_artifacts(response) -> list[Artifact]:

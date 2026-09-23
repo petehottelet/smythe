@@ -15,6 +15,14 @@ place of its result. The error text stays in the node's `result`, the trace,
 and checkpoints for diagnosis, but it never enters a dependent's prompt or the
 synthesized output. Resumed runs apply the same rule to saved skipped nodes.
 
+Truncated output is a provider error. When a response stops at its output
+limit (Anthropic `stop_reason` `max_tokens` or `model_context_window_exceeded`,
+OpenAI `finish_reason` `length`, Gemini `finish_reason` `MAX_TOKENS`), the
+executor records the call's charge and then raises `OutputTruncatedError`. The
+node's failure policy applies, and no tool call from the truncated turn runs.
+An `LLM_MERGE` synthesis raises the same error after recording its charge.
+Raising the provider's `max_tokens` is the usual fix.
+
 A node timeout follows its failure policy. Invalid accounting, budget
 admission or reconciliation failures, and failures persisting a billed result
 are terminal regardless of that policy. See [Cost guardrails](budgets.md).
