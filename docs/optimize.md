@@ -24,7 +24,7 @@ ambiguous after a connection failure.
 |---|---|
 | `smythe.optimize.contracts` | Versioned contracts, objectives, allowlisted candidate patches, canonical JSON, and content-derived identities |
 | `smythe.optimize.concurrency` | Deterministic offline concurrency simulator and evaluator fingerprint |
-| `smythe.optimize.statistics` | Direction-normalized paired comparisons, seeded bootstrap intervals, and promotion policy |
+| `smythe.optimize.statistics` | Direction-normalized paired comparisons, paired Student-t promotion bounds, descriptive bootstrap intervals, and promotion policy |
 | `smythe.optimize.ledger` | Durable campaign, candidate, trial-event, cost-exposure, and decision history |
 | `smythe.optimize.engine` | Bounded development, confirmation, and holdout orchestration with conservative recovery |
 | `smythe.optimize.inspection` and `smythe.optimize.report` | Read-only evidence collection and standalone HTML reports |
@@ -87,11 +87,11 @@ challenger, limiting both cost and repeated testing.
 
 Independent implementation ceilings bound otherwise-valid contracts to 1,024
 candidates, 256 parallel candidate series, 10,000 repetitions per split, and
-100,000 trials. Bootstrap work is capped at 1,000,000 resamples and checks the
-same monotonic deadline cooperatively. The installed concurrency command uses
-tighter limits: 64 challengers, 64 parallel series, 100 repetitions per split,
-100,000 bootstrap resamples, one million work items or concurrency units, and
-ten million simulated item-trials per campaign.
+100,000 trials. Descriptive bootstrap work is capped at 1,000,000 resamples
+and checks the same monotonic deadline cooperatively. The installed
+concurrency command uses tighter limits: 64 challengers, 64 parallel series,
+100 repetitions per split, 100,000 bootstrap resamples, one million work items
+or concurrency units, and ten million simulated item-trials per campaign.
 
 On resume, previously completed evaluator durations count against the new
 deadline so restarting cannot reset the time cap. The runner sums those
@@ -119,11 +119,31 @@ metric, and baseline minus candidate for a minimized metric.
 - every deterministic gate passes;
 - every candidate aggregate satisfies its hard metric bounds;
 - every secondary metric stays within its declared regression allowance; and
-- the primary metric's seeded bootstrap lower confidence bound is strictly
+- the primary metric's one-sided paired Student-t lower bound is strictly
   greater than `min_improvement`.
 
-The bootstrap implementation uses Python's standard-library PRNG with an
-explicit seed, so identical inputs produce identical evidence. Each campaign
+The lower bound is `mean - t * sd / sqrt(n)` over the `n` paired
+improvements, where `t` is the Student-t quantile with `n - 1` degrees of
+freedom at upper-tail probability `(1 - confidence) / 2`. At the default
+confidence of 0.95 each confirmation or holdout test therefore admits a truly
+null candidate about 2.5% of the time when paired improvements are roughly
+normal; with five pairs, `t` is 2.776. The quantile is computed in pure Python
+for every degree of freedom and every contract confidence. Identical paired
+improvements have zero spread, so the bound equals their mean; one pair cannot
+form a bound. Each recorded comparison saves its method (`paired_student_t`),
+degrees of freedom, standard error, and critical value. The reported
+`confidence_interval` is the matching two-sided t interval, so its lower
+endpoint is the promotion bound.
+
+Comparisons also save a seeded percentile bootstrap interval as
+`descriptive_bootstrap_interval`. It is description only and never decides
+promotion: with the small samples Autotune uses, that bootstrap bound admitted
+about 8% of null candidates with five pairs and 12–14% with three, against a
+nominal 2.5%. Decisions
+recorded by 0.8.0 and earlier used that bootstrap bound; they still load,
+inspect, and report, labeled with their original rule.
+
+Each campaign
 stores a random 32-byte holdout secret and publicly records only a
 domain-separated SHA-256 commitment. Holdout seeds are HMAC-derived after the
 complete candidate plan has been bound. The campaign row, plan hash, ordered
@@ -201,7 +221,8 @@ Useful controls include `--candidate-concurrency`, `--work-items`,
 `--provider-capacity`, `--base-latency-ms`, `--max-p95-latency-ms`,
 `--max-error-rate`, the three `--*-repetitions` options,
 `--max-parallel-candidates`, `--max-wall-seconds`, `--confidence`,
-`--min-improvement`, and `--bootstrap-resamples`. Use `--ledger PATH` to
+`--min-improvement`, and `--bootstrap-resamples` (descriptive interval only).
+Use `--ledger PATH` to
 override the default `~/.smythe/optimize.sqlite3`. The CLI defaults to
 `--ledger-durability normal`; choose `full` when the evidence must also survive
 host power loss rather than only a process crash.
@@ -214,14 +235,18 @@ appears only when confirmation and holdout both promote the candidate.
 Rejection never emits a patch to apply.
 
 The optimization plan hash binds the contract, incumbent, ordered challenger
-set, policy hashes, evaluator hash, runner version, bootstrap configuration,
-and required trial count. When `--campaign-id` is omitted, the durable campaign
-identity is derived from that full plan. Repeating the same command reuses
-completed trials; changing a candidate or bootstrap configuration creates a
-different automatic campaign. The holdout commitment is created when a new
+set, policy hashes, evaluator hash, runner version, promotion method,
+descriptive bootstrap configuration, and required trial count. When
+`--campaign-id` is omitted, the durable campaign identity is derived from that
+full plan. Repeating the same command reuses completed trials; changing a
+candidate or bootstrap configuration creates a different automatic campaign.
+The holdout commitment is created when a new
 fully bound campaign is atomically created and is checked on every resume and
 decision. Supplying `--campaign-id` does not weaken the binding: reopening it
 requires an exact plan and candidate-inventory match.
+
+The promotion method is part of the plan, so a campaign created by 0.8.0 is
+not resumed under the paired t rule: the same command derives a new campaign.
 
 Inspect a campaign without mutating the ledger:
 
@@ -255,9 +280,14 @@ outcomes remain visible even when their reserved cost is zero.
 Saved development scores, confirmation and holdout comparisons, candidate
 policies, and trial observations follow. Black-and-white interval plots show
 the recorded improvement and confidence interval, sample count, and objective
-direction. Positive improvement means better. Raw metric bounds and secondary
-mean-regression rules remain distinct from the primary confidence threshold.
-Metric names are preserved; the contract does not declare physical units.
+direction. Each comparison names the rule that produced its promotion bound:
+the paired Student-t bound, with its degrees of freedom, standard error, and
+critical value, or the percentile bootstrap bound for decisions recorded by
+0.8.0 and earlier. A saved descriptive bootstrap interval is labeled as not
+used for promotion. Positive improvement means better. Raw metric bounds and
+secondary mean-regression rules remain distinct from the primary confidence
+threshold. Metric names are preserved; the contract does not declare physical
+units.
 
 Export does not rerun an evaluator, recompute statistics, rank candidates, or
 change a decision. Campaigns that advanced beyond development retain only the
@@ -302,7 +332,7 @@ runner = OptimizationRunner(
     ledger,
     evaluate,
     evaluator_hash="sha256:<64 lowercase hex>",
-    bootstrap_resamples=2_000,
+    bootstrap_resamples=2_000,  # descriptive interval only
 )
 result = await runner.run(incumbent, challengers)
 ```

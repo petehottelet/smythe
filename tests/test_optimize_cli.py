@@ -339,6 +339,53 @@ def test_auto_identity_includes_candidates_and_bootstrap_configuration(tmp_path,
     ) == 3
 
 
+_SMALL_CAMPAIGN = (
+    "--candidate-concurrency",
+    "8",
+    "--bootstrap-resamples",
+    "10",
+    "--development-repetitions",
+    "1",
+    "--confirmation-repetitions",
+    "3",
+    "--holdout-repetitions",
+    "3",
+)
+
+
+def test_new_decisions_record_and_report_the_paired_t_rule(tmp_path, capsys):
+    ledger_path = tmp_path / "method.sqlite3"
+    campaign = _run(ledger_path, capsys, *_SMALL_CAMPAIGN)
+    assert campaign["promoted"] is True
+    for stage in ("confirmation_assessment", "holdout_assessment"):
+        primary = campaign["evidence"][stage]["primary"]
+        assert primary["method"] == "paired_student_t"
+        assert primary["degrees_of_freedom"] == 2
+        assert primary["critical_value"] == pytest.approx(4.302652729749462)
+        assert primary["lower_confidence_bound"] == primary["confidence_interval"][0]
+        assert len(primary["descriptive_bootstrap_interval"]) == 2
+    decision = campaign["ledger_snapshot"]["decisions"][0]
+    assert decision["assessment"]["promotion_method"] == "paired_student_t"
+
+    out = tmp_path / "report.html"
+    assert main(
+        [
+            "optimize",
+            "inspect",
+            campaign["campaign_id"],
+            "--ledger",
+            str(ledger_path),
+            "--out",
+            str(out),
+            "--json",
+        ]
+    ) == EXIT_OK
+    capsys.readouterr()
+    html = out.read_text(encoding="utf-8")
+    assert html.count("Paired Student-t lower bound") == 6
+    assert "Descriptive bootstrap interval (not used for promotion)" in html
+
+
 def test_inspect_is_read_only_and_missing_campaign_has_stable_exit(tmp_path, capsys):
     ledger_path = tmp_path / "inspect.sqlite3"
     campaign = _run(

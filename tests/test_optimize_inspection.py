@@ -214,3 +214,74 @@ def test_nonfinite_arbitrary_assessment_is_refused_without_rewriting(tmp_path, m
         with pytest.raises(ExperimentLedgerError) as caught:
             collect_optimization_report(ledger, CAMPAIGN)
         assert isinstance(caught.value.__cause__, ValueError)
+
+
+def _legacy_comparison(seeds):
+    # Exact comparison shape written before the paired t promotion rule: the
+    # percentile bootstrap interval was the promotion interval.
+    return {"objective_name": "quality", "direction": "maximize", "sample_count": len(seeds),
+            "sample_seeds": list(seeds), "baseline_mean": 9.25, "candidate_mean": 10.25,
+            "mean_improvement": 1.0, "confidence_level": 0.95, "bootstrap_resamples": 2000,
+            "bootstrap_seed": 42, "confidence_interval": [1.0, 1.0], "lower_confidence_bound": 1.0,
+            "hard_bounds_passed": True, "non_regression_passed": True}
+
+
+def _legacy_assessment(seeds):
+    return {"promote": True, "primary": _legacy_comparison(seeds), "secondary": [],
+            "gates": {"candidate.shape": True, "incumbent.shape": True}, "all_gates_passed": True,
+            "hard_bounds_passed": True, "secondary_non_regression_passed": True,
+            "min_improvement": 0.25, "reasons": []}
+
+
+def test_decisions_recorded_under_the_bootstrap_rule_still_validate_inspect_and_report(tmp_path):
+    from smythe.optimize.report import render_optimization_report
+
+    path = tmp_path / "legacy.db"
+    contract = ExperimentContract(
+        name="legacy_fixture", objectives=(MetricObjective("quality", ObjectiveDirection.MAXIMIZE, primary=True),),
+        mutable_fields=("label",), development_repetitions=1,
+        confirmation_repetitions=3, holdout_repetitions=3, max_candidates=2,
+        max_parallel_candidates=2, max_trials=14, max_wall_seconds=600,
+        max_budget_microusd=14_000, per_trial_reservation_microusd=1000,
+        confidence=.95, min_improvement=.25, base_seed=100,
+    )
+    incumbent = Candidate(contract=contract, policy={"label": "current"}, hypothesis="current")
+    challenger = Candidate(contract=contract, policy={"label": "new"}, hypothesis="new", parent=incumbent)
+    plan = {"development": (100,), "confirmation": (201, 202, 203), "holdout": (301, 302, 303)}
+    keys = []
+    with ExperimentLedger(path, durability="normal") as ledger:
+        ledger.create_campaign(contract, incumbent.candidate_id, (incumbent, challenger),
+                               plan_hash=PLAN, campaign_id=CAMPAIGN)
+        lease = ledger.acquire_campaign_lease(CAMPAIGN, "legacy-writer", ttl_s=3600)
+        for split, seeds in plan.items():
+            for candidate, role in ((incumbent, "incumbent"), (challenger, "challenger")):
+                for seed in seeds:
+                    key = ledger.prepare_trial(CAMPAIGN, candidate.candidate_id, split,
+                                               role + ".plan_" + "a" * 64, seed, lease=lease,
+                                               evaluator_hash=EVALUATOR, ceiling_microusd=1000)
+                    ledger.claim_trial_dispatch(key, lease=lease)
+                    ledger.complete_trial(key, lease=lease, metrics={"quality": 9.25 + (role == "challenger")},
+                                          gates={"shape": True}, actual_cost_microusd=0, duration_ms=1)
+                    keys.append(key)
+        ledger.append_decision(PromotionDecision(
+            campaign_id=CAMPAIGN, candidate_id=challenger.candidate_id, promoted=True,
+            reason="confirmation and untouched holdout both passed promotion policy",
+            trial_keys=tuple(keys), assessment={
+                "optimization_plan_hash": PLAN, "runner_version": 3, "ledger_durability": "normal",
+                "holdout_seed_commitment": ledger.get_holdout_seed_commitment(CAMPAIGN),
+                "development": {"candidate_id": challenger.candidate_id, "viable": True},
+                "confirmation": _legacy_assessment(plan["confirmation"]),
+                "holdout": _legacy_assessment(plan["holdout"]),
+            },
+        ), lease=lease)
+        ledger.release_campaign_lease(lease)
+
+    with ExperimentLedger(path, read_only=True) as ledger:
+        assert len(ledger.validate_decision_inventory(CAMPAIGN)) == 1
+        report = collect_optimization_report(ledger, CAMPAIGN)
+    decision = report["ledger_snapshot"]["decisions"][0]
+    assert decision["promoted"] is True
+    assert "method" not in decision["assessment"]["holdout"]["primary"]
+    html = render_optimization_report(report)
+    assert html.count("Percentile bootstrap lower bound (earlier rule") == 2
+    assert "Paired Student-t" not in html

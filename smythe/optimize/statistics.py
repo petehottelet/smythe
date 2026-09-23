@@ -1,4 +1,9 @@
-"""Deterministic paired statistics and promotion policy for optimization runs."""
+"""Deterministic paired statistics and promotion policy for optimization runs.
+
+Promotion uses a one-sided paired Student-t lower bound on the mean paired
+improvement.  A seeded percentile bootstrap interval is still recorded, but
+only as descriptive evidence; it never decides promotion.
+"""
 
 from __future__ import annotations
 
@@ -7,21 +12,38 @@ import random
 import time
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from statistics import fmean
+from functools import lru_cache
+from statistics import NormalDist, fmean
 
 from smythe.optimize.contracts import MetricObjective, ObjectiveDirection
 
 
 MIN_PAIRED_SAMPLES = 3
 MAX_BOOTSTRAP_RESAMPLES = 1_000_000
+PROMOTION_METHOD = "paired_student_t"
 _MAX_SEED = (1 << 63) - 1
 _DEADLINE_CHECK_INTERVAL = 1_024
 _DEADLINE_DRAW_CHECK_INTERVAL = 4_096
+# The four-term Cornish-Fisher expansion is accurate to about 1e-15 relative
+# error from 10,000 degrees of freedom, even for the most extreme tail a
+# contract confidence below 1.0 can request.  Below it, the exact incomplete
+# beta tail is inverted numerically.
+_CORNISH_FISHER_MIN_DF = 10_000
+_T_QUANTILE_EPSILON = 1e-16
+_T_QUANTILE_MAX_ITERATIONS = 200
+_CONTINUED_FRACTION_FLOOR = 1e-300
 
 
 @dataclass(frozen=True, slots=True)
 class ComparisonResult:
-    """One direction-normalized, paired metric comparison."""
+    """One direction-normalized, paired metric comparison.
+
+    ``confidence_interval`` is the two-sided paired Student-t interval at
+    ``confidence_level``; its lower endpoint, ``lower_confidence_bound``, is the
+    one-sided lower bound at error rate ``(1 - confidence_level) / 2`` that
+    decides promotion.  ``descriptive_bootstrap_interval`` is a seeded
+    percentile bootstrap interval kept for description only.
+    """
 
     objective_name: str
     direction: ObjectiveDirection
@@ -37,6 +59,11 @@ class ComparisonResult:
     lower_confidence_bound: float
     hard_bounds_passed: bool
     non_regression_passed: bool
+    method: str | None = None
+    degrees_of_freedom: int | None = None
+    standard_error: float | None = None
+    critical_value: float | None = None
+    descriptive_bootstrap_interval: tuple[float, float] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -234,7 +261,12 @@ def bootstrap_confidence_interval(
     seed: int,
     deadline: float | None = None,
 ) -> tuple[float, float]:
-    """Return a deterministic percentile interval for the paired mean."""
+    """Return a deterministic percentile interval for the paired mean.
+
+    This interval is descriptive.  With the small paired samples Autotune uses
+    it is too narrow to control false promotion, so promotion uses
+    :func:`paired_t_lower_bound` instead.
+    """
 
     deadline_value = _normalized_deadline(deadline)
     _check_deadline(deadline_value)
@@ -286,13 +318,281 @@ def bootstrap_lower_bound(
     seed: int,
     deadline: float | None = None,
 ) -> float:
-    """Return the lower endpoint of the deterministic paired bootstrap interval."""
+    """Return the lower endpoint of the descriptive paired bootstrap interval.
+
+    Not used for promotion; see :func:`paired_t_lower_bound`.
+    """
 
     return bootstrap_confidence_interval(
         paired_deltas,
         confidence=confidence,
         resamples=resamples,
         seed=seed,
+        deadline=deadline,
+    )[0]
+
+
+def _continued_fraction(a: float, b: float, x: float) -> float:
+    """Evaluate the incomplete-beta continued fraction by modified Lentz."""
+
+    total = a + b
+    above = a + 1.0
+    below = a - 1.0
+    c = 1.0
+    d = 1.0 - total * x / above
+    if abs(d) < _CONTINUED_FRACTION_FLOOR:
+        d = _CONTINUED_FRACTION_FLOOR
+    d = 1.0 / d
+    result = d
+    # Convergence takes O(sqrt(a + b)) terms; the bound is generous.
+    for m in range(1, 1_000 + int(50 * math.sqrt(total)) + 1):
+        twice = 2 * m
+        for numerator in (
+            m * (b - m) * x / ((below + twice) * (a + twice)),
+            -(a + m) * (total + m) * x / ((a + twice) * (above + twice)),
+        ):
+            d = 1.0 + numerator * d
+            if abs(d) < _CONTINUED_FRACTION_FLOOR:
+                d = _CONTINUED_FRACTION_FLOOR
+            c = 1.0 + numerator / c
+            if abs(c) < _CONTINUED_FRACTION_FLOOR:
+                c = _CONTINUED_FRACTION_FLOOR
+            d = 1.0 / d
+            step = d * c
+            result *= step
+        if abs(step - 1.0) <= _T_QUANTILE_EPSILON:
+            return result
+    raise ArithmeticError("incomplete beta continued fraction did not converge")
+
+
+def _log_gamma_half_ratio(a: float) -> float:
+    """Return log(Gamma(a + 1/2) / Gamma(a)) without large-argument cancellation."""
+
+    if a < 50:
+        return math.lgamma(a + 0.5) - math.lgamma(a)
+    inverse = 1.0 / a
+    square = inverse * inverse
+    # Asymptotic series from the Bernoulli-polynomial expansion of lgamma.
+    series = inverse * (
+        -1 / 8
+        + square
+        * (1 / 192 + square * (-1 / 640 + square * (17 / 14336 - square * 31 / 18432)))
+    )
+    return 0.5 * math.log(a) + series
+
+
+def _student_t_upper_tail(t: float, degrees_of_freedom: int) -> float:
+    """Return P(T > t) for t > 0 through the regularized incomplete beta."""
+
+    a = degrees_of_freedom / 2.0
+    ratio = t * t / degrees_of_freedom
+    x = 1.0 / (1.0 + ratio)
+    complement = ratio / (1.0 + ratio)
+    log_front = (
+        _log_gamma_half_ratio(a)
+        - 0.5 * math.log(math.pi)
+        - a * math.log1p(ratio)
+        + 0.5 * math.log(complement)
+    )
+    if x < (a + 1.0) / (a + 2.5):
+        return 0.5 * math.exp(log_front) * _continued_fraction(a, 0.5, x) / a
+    return 0.5 - math.exp(log_front) * _continued_fraction(0.5, a, complement)
+
+
+def _student_t_log_density(t: float, degrees_of_freedom: int) -> float:
+    return (
+        math.lgamma((degrees_of_freedom + 1) / 2.0)
+        - math.lgamma(degrees_of_freedom / 2.0)
+        - 0.5 * math.log(degrees_of_freedom * math.pi)
+        - (degrees_of_freedom + 1) / 2.0 * math.log1p(t * t / degrees_of_freedom)
+    )
+
+
+def _cornish_fisher_t(tail: float, degrees_of_freedom: int) -> float:
+    z = -NormalDist().inv_cdf(tail)
+    z2 = z * z
+    g1 = (z2 + 1) * z / 4
+    g2 = ((5 * z2 + 16) * z2 + 3) * z / 96
+    g3 = (((3 * z2 + 19) * z2 + 17) * z2 - 15) * z / 384
+    g4 = ((((79 * z2 + 776) * z2 + 1482) * z2 - 1920) * z2 - 945) * z / 92160
+    df = float(degrees_of_freedom)
+    return z + (g1 + (g2 + (g3 + g4 / df) / df) / df) / df
+
+
+@lru_cache(maxsize=256)
+def _student_t_upper_quantile(tail: float, degrees_of_freedom: int) -> float:
+    """Return t with P(T > t) == tail, for 0 < tail <= 0.5.
+
+    Working from the upper-tail probability keeps full precision when the
+    confidence level is within a few ulps of one.
+    """
+
+    if tail == 0.5:
+        return 0.0
+    if degrees_of_freedom == 1:
+        return 1.0 / math.tan(math.pi * tail)
+    if degrees_of_freedom == 2:
+        return (1.0 - 2.0 * tail) / math.sqrt(2.0 * tail * (1.0 - tail))
+    guess = _cornish_fisher_t(tail, degrees_of_freedom)
+    if degrees_of_freedom >= _CORNISH_FISHER_MIN_DF:
+        return guess
+    # Safeguarded Newton iteration on log P(T > t), bracketed by bisection.
+    log_tail = math.log(tail)
+    low = 0.0
+    high = max(guess, 1.0)
+    while _student_t_upper_tail(high, degrees_of_freedom) >= tail:
+        low = high
+        high *= 2.0
+    t = guess if low < guess < high else 0.5 * (low + high)
+    for _ in range(_T_QUANTILE_MAX_ITERATIONS):
+        observed = _student_t_upper_tail(t, degrees_of_freedom)
+        if observed > tail:
+            low = t
+        elif observed < tail:
+            high = t
+        else:
+            return t
+        following = 0.5 * (low + high)
+        if observed > 0:
+            log_observed = math.log(observed)
+            # Newton step for log P(T > t) - log(tail); tail/density is
+            # formed in log space so extreme tails cannot underflow.
+            ratio = math.exp(
+                log_observed - _student_t_log_density(t, degrees_of_freedom)
+            )
+            newton = t + (log_observed - log_tail) * ratio
+            if low < newton < high:
+                following = newton
+        if (
+            abs(following - t) <= 4 * _T_QUANTILE_EPSILON * following
+            or high - low <= 4 * _T_QUANTILE_EPSILON * high
+        ):
+            return following
+        t = following
+    raise ArithmeticError("Student-t quantile did not converge")
+
+
+def _degrees_of_freedom(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError("degrees_of_freedom must be an integer")
+    if value < 1:
+        raise ValueError("degrees_of_freedom must be at least 1")
+    return value
+
+
+def student_t_quantile(probability: float, degrees_of_freedom: int) -> float:
+    """Return the Student-t quantile ``t`` with ``P(T <= t) == probability``.
+
+    Pure Python and accurate to roughly 1e-13 relative error for every
+    integer ``degrees_of_freedom >= 1`` and ``0 < probability < 1``.
+    """
+
+    value = _finite_number(probability, name="probability")
+    if not 0 < value < 1:
+        raise ValueError("probability must be strictly between zero and one")
+    df = _degrees_of_freedom(degrees_of_freedom)
+    if value > 0.5:
+        # Exact for probabilities in [0.5, 1] (Sterbenz lemma).
+        result = _student_t_upper_quantile(1.0 - value, df)
+    elif value < 0.5:
+        result = -_student_t_upper_quantile(value, df)
+    else:
+        result = 0.0
+    if not math.isfinite(result):
+        raise ValueError("Student-t quantile is outside the finite float range")
+    return result
+
+
+@dataclass(frozen=True, slots=True)
+class _PairedT:
+    mean: float
+    standard_error: float
+    critical_value: float
+    degrees_of_freedom: int
+    interval: tuple[float, float]
+
+
+def _paired_t(
+    samples: tuple[float, ...],
+    *,
+    confidence: float,
+    deadline: float | None,
+) -> _PairedT:
+    count = len(samples)
+    if count < 2:
+        # One observation carries no variance estimate; refuse rather than
+        # manufacture certainty.
+        raise ValueError("a paired t bound requires at least 2 paired samples")
+    confidence_value = _finite_number(confidence, name="confidence")
+    if not 0 < confidence_value < 1:
+        raise ValueError("confidence must be strictly between zero and one")
+    _check_deadline(deadline)
+    mean = _finite_mean(samples, name="paired improvement mean")
+    degrees_of_freedom = count - 1
+    # (1 - c) is exact for c in [0.5, 1); halving is exact.  The quantile is
+    # computed from this one-sided tail, not from a rounded (1 + c) / 2.
+    tail = (1.0 - confidence_value) / 2.0
+    critical_value = _student_t_upper_quantile(tail, degrees_of_freedom)
+    if min(samples) == max(samples):
+        # Identical paired deltas: the sample standard deviation is exactly
+        # zero and the interval degenerates to the mean.
+        _check_deadline(deadline)
+        return _PairedT(mean, 0.0, critical_value, degrees_of_freedom, (mean, mean))
+    # Scale by an exact power of two (|scaled| < 2) so squared deviations
+    # cannot overflow.
+    _, exponent = math.frexp(max(abs(value) for value in samples))
+    scale = math.ldexp(1.0, exponent - 1)
+    scaled = [value / scale for value in samples]
+    scaled_mean = math.fsum(scaled) / count
+    variance = math.fsum((value - scaled_mean) ** 2 for value in scaled) / degrees_of_freedom
+    standard_error = scale * math.sqrt(variance / count)
+    margin = critical_value * standard_error
+    interval = (mean - margin, mean + margin)
+    if not all(math.isfinite(value) for value in (standard_error, *interval)):
+        raise ValueError("paired t interval must be finite")
+    _check_deadline(deadline)
+    return _PairedT(mean, standard_error, critical_value, degrees_of_freedom, interval)
+
+
+def paired_t_confidence_interval(
+    paired_deltas: Sequence[float],
+    *,
+    confidence: float,
+    deadline: float | None = None,
+) -> tuple[float, float]:
+    """Return the two-sided paired Student-t interval for the mean delta.
+
+    Its lower endpoint is the one-sided lower bound with error rate
+    ``(1 - confidence) / 2``.  Fewer than two samples raise ``ValueError``;
+    identical samples give the degenerate interval ``(mean, mean)``.
+    """
+
+    deadline_value = _normalized_deadline(deadline)
+    _check_deadline(deadline_value)
+    samples = _finite_samples(
+        paired_deltas,
+        name="paired_deltas",
+        deadline=deadline_value,
+    )
+    return _paired_t(samples, confidence=confidence, deadline=deadline_value).interval
+
+
+def paired_t_lower_bound(
+    paired_deltas: Sequence[float],
+    *,
+    confidence: float,
+    deadline: float | None = None,
+) -> float:
+    """Return the one-sided paired Student-t lower bound used for promotion.
+
+    The bound is ``mean - t * sd / sqrt(n)`` with ``t`` the Student-t quantile
+    at upper-tail probability ``(1 - confidence) / 2`` and ``n - 1`` degrees
+    of freedom.
+    """
+
+    return paired_t_confidence_interval(
+        paired_deltas,
+        confidence=confidence,
         deadline=deadline,
     )[0]
 
@@ -334,7 +634,10 @@ def compare_metric(
     bootstrap_seed: int,
     deadline: float | None = None,
 ) -> ComparisonResult:
-    """Compare one metric using paired observations and seeded bootstrapping."""
+    """Compare one metric with a paired Student-t bound.
+
+    The seeded bootstrap arguments produce a descriptive interval only.
+    """
 
     deadline_value = _normalized_deadline(deadline)
     _check_deadline(deadline_value)
@@ -370,13 +673,15 @@ def compare_metric(
         candidate_seeds=paired_seed_values,
     )
     confidence_value = _finite_number(confidence, name="confidence")
-    interval = bootstrap_confidence_interval(
+    paired_t = _paired_t(deltas, confidence=confidence_value, deadline=deadline_value)
+    descriptive_interval = bootstrap_confidence_interval(
         deltas,
         confidence=confidence_value,
         resamples=bootstrap_resamples,
         seed=bootstrap_seed,
         deadline=deadline_value,
     )
+    interval = paired_t.interval
     candidate_mean = aggregate_mean(candidate_values)
     mean_improvement = aggregate_mean(deltas)
     return ComparisonResult(
@@ -396,6 +701,11 @@ def compare_metric(
         non_regression_passed=secondary_non_regression_passes(
             mean_improvement, objective
         ),
+        method=PROMOTION_METHOD,
+        degrees_of_freedom=paired_t.degrees_of_freedom,
+        standard_error=paired_t.standard_error,
+        critical_value=paired_t.critical_value,
+        descriptive_bootstrap_interval=descriptive_interval,
     )
 
 
@@ -515,6 +825,7 @@ def assess_promotion(
 __all__ = [
     "MAX_BOOTSTRAP_RESAMPLES",
     "MIN_PAIRED_SAMPLES",
+    "PROMOTION_METHOD",
     "ComparisonResult",
     "PromotionAssessment",
     "aggregate_mean",
@@ -524,5 +835,8 @@ __all__ = [
     "compare_metric",
     "hard_thresholds_pass",
     "paired_improvements",
+    "paired_t_confidence_interval",
+    "paired_t_lower_bound",
     "secondary_non_regression_passes",
+    "student_t_quantile",
 ]

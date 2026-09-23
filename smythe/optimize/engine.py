@@ -40,6 +40,7 @@ from smythe.optimize.ledger import (
 )
 from smythe.optimize.statistics import (
     MAX_BOOTSTRAP_RESAMPLES,
+    PROMOTION_METHOD,
     ComparisonResult,
     PromotionAssessment,
     aggregate_mean,
@@ -400,6 +401,7 @@ class OptimizationRunner:
                 assessment={
                     "optimization_plan_hash": plan["plan_hash"],
                     "runner_version": RUNNER_VERSION,
+                    "promotion_method": PROMOTION_METHOD,
                     "ledger_durability": self.ledger.durability,
                     "holdout_seed_commitment": holdout_seed_commitment,
                     "stage": "development",
@@ -497,6 +499,7 @@ class OptimizationRunner:
             assessment={
                 "optimization_plan_hash": plan["plan_hash"],
                 "runner_version": RUNNER_VERSION,
+                "promotion_method": PROMOTION_METHOD,
                 "ledger_durability": self.ledger.durability,
                 "holdout_seed_commitment": holdout_seed_commitment,
                 "development": selected_score,
@@ -575,8 +578,8 @@ class OptimizationRunner:
         plan_payload = {
             "runner_version": RUNNER_VERSION,
             "statistics": {
-                "method": "deterministic_paired_bootstrap",
-                "bootstrap_resamples": self.bootstrap_resamples,
+                "method": PROMOTION_METHOD,
+                "descriptive_bootstrap_resamples": self.bootstrap_resamples,
             },
             "contract_hash": self.contract.contract_hash,
             "incumbent_candidate_id": incumbent.candidate_id,
@@ -1462,6 +1465,15 @@ def _comparison_dict(result: ComparisonResult) -> dict[str, Any]:
         "lower_confidence_bound": result.lower_confidence_bound,
         "hard_bounds_passed": result.hard_bounds_passed,
         "non_regression_passed": result.non_regression_passed,
+        "method": result.method,
+        "degrees_of_freedom": result.degrees_of_freedom,
+        "standard_error": result.standard_error,
+        "critical_value": result.critical_value,
+        "descriptive_bootstrap_interval": (
+            None
+            if result.descriptive_bootstrap_interval is None
+            else list(result.descriptive_bootstrap_interval)
+        ),
     }
 
 

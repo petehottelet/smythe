@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+import math
+import random
 import time
 
 import pytest
@@ -10,12 +12,16 @@ import pytest
 from smythe.optimize.contracts import MetricObjective, ObjectiveDirection
 from smythe.optimize.statistics import (
     MAX_BOOTSTRAP_RESAMPLES,
+    PROMOTION_METHOD,
     aggregate_mean,
     assess_promotion,
     bootstrap_confidence_interval,
     bootstrap_lower_bound,
     compare_metric,
     paired_improvements,
+    paired_t_confidence_interval,
+    paired_t_lower_bound,
+    student_t_quantile,
 )
 
 
@@ -317,3 +323,175 @@ def test_results_are_frozen():
     )
     with pytest.raises(FrozenInstanceError):
         comparison.mean_improvement = 0  # type: ignore[misc]
+
+
+# Reference quantiles computed independently at 50 digits (mpmath inverse of
+# the regularized incomplete beta), rounded to 16 significant digits.
+@pytest.mark.parametrize(
+    ("probability", "df", "expected"),
+    [
+        (0.975, 1, 12.70620473617469),
+        (0.975, 2, 4.302652729749462),
+        (0.975, 4, 2.776445105197793),
+        (0.95, 30, 1.697260886593957),
+        (0.995, 10, 3.169272672616951),
+        (0.9995, 3, 12.92397863668796),
+        (0.75, 1, 1.0),
+        (0.9, 7, 1.414923927650509),
+        (0.975, 1_000, 1.962339080826408),
+        (0.975, 9_999, 1.960201263621357),
+        (0.975, 10_000, 1.960201239890626),
+        (0.975, 1_000_000, 1.959966356814107),
+    ],
+)
+def test_student_t_quantile_matches_reference_values(probability, df, expected):
+    assert student_t_quantile(probability, df) == pytest.approx(expected, rel=1e-12)
+    assert student_t_quantile(1 - probability, df) == pytest.approx(-expected, rel=1e-12)
+
+
+def test_student_t_quantile_known_table_values_and_symmetry():
+    assert round(student_t_quantile(0.975, 4), 6) == 2.776445
+    assert round(student_t_quantile(0.975, 1), 4) == 12.7062
+    assert round(student_t_quantile(0.95, 30), 6) == 1.697261
+    assert student_t_quantile(0.5, 3) == 0.0
+    values = [student_t_quantile(p, 5) for p in (0.6, 0.8, 0.95, 0.999)]
+    assert values == sorted(values)
+    by_df = [student_t_quantile(0.975, df) for df in (1, 2, 5, 30, 10_000)]
+    assert by_df == sorted(by_df, reverse=True)
+
+
+@pytest.mark.parametrize(
+    ("df", "expected"),
+    [
+        (1, 5734161139222659.0),
+        (2, 94906265.62425154),
+        (3, 270823.8069996586),
+        (4, 15247.02990221789),
+        (30, 16.62211287939564),
+        (4_000, 8.328651407063098),
+    ],
+)
+def test_paired_t_uses_exact_tail_for_most_extreme_contract_confidence(df, expected):
+    # The largest float below one is a valid contract confidence.  Its
+    # one-sided tail (1 - c) / 2 is ~5.6e-17 and must not round to zero.
+    confidence = math.nextafter(1.0, 0.0)
+    deltas = [0.0] * df + [1.0]
+    count = df + 1
+    mean = 1.0 / count
+    standard_error = math.sqrt((count - 1) / count / (count - 1) / count)
+    lower, upper = paired_t_confidence_interval(deltas, confidence=confidence)
+    assert (mean - lower) / standard_error == pytest.approx(expected, rel=1e-9)
+    assert (upper - mean) / standard_error == pytest.approx(expected, rel=1e-9)
+
+
+@pytest.mark.parametrize(
+    ("probability", "df", "error"),
+    [
+        (0.0, 4, ValueError),
+        (1.0, 4, ValueError),
+        (float("nan"), 4, ValueError),
+        (True, 4, TypeError),
+        (0.9, 0, ValueError),
+        (0.9, True, TypeError),
+        (0.9, 2.0, TypeError),
+    ],
+)
+def test_student_t_quantile_rejects_invalid_arguments(probability, df, error):
+    with pytest.raises(error):
+        student_t_quantile(probability, df)
+
+
+def test_paired_t_bound_is_mean_minus_t_times_standard_error():
+    deltas = (0.25, 0.5, 0.75, 1.0, 1.25)
+    standard_error = math.sqrt(0.625 / 4) / math.sqrt(5)
+    expected = 0.75 - 2.776445105197793 * standard_error
+
+    assert paired_t_lower_bound(deltas, confidence=0.95) == pytest.approx(expected, rel=1e-12)
+    comparison = compare_metric(
+        _primary(),
+        (1.0,) * 5,
+        tuple(1.0 + delta for delta in deltas),
+        baseline_seeds=SEEDS,
+        candidate_seeds=SEEDS,
+        confidence=0.95,
+        bootstrap_resamples=200,
+        bootstrap_seed=5,
+    )
+    assert comparison.method == PROMOTION_METHOD == "paired_student_t"
+    assert comparison.degrees_of_freedom == 4
+    assert comparison.critical_value == pytest.approx(2.776445105197793, rel=1e-12)
+    assert comparison.standard_error == pytest.approx(standard_error, rel=1e-12)
+    assert comparison.lower_confidence_bound == comparison.confidence_interval[0]
+    assert comparison.lower_confidence_bound == pytest.approx(expected, rel=1e-12)
+    low, high = comparison.confidence_interval
+    assert (low + high) / 2 == pytest.approx(comparison.mean_improvement)
+    # The deltas are exact binary fractions, so the descriptive bootstrap
+    # sees exactly these values.
+    assert comparison.descriptive_bootstrap_interval == bootstrap_confidence_interval(
+        deltas, confidence=0.95, resamples=200, seed=5
+    )
+
+
+def test_paired_t_refuses_single_samples_and_degenerates_only_for_identical_deltas():
+    for too_few in ((), (1.0,)):
+        with pytest.raises(ValueError, match="at least 2"):
+            paired_t_lower_bound(too_few, confidence=0.95)
+    with pytest.raises(ValueError, match="between zero and one"):
+        paired_t_lower_bound((1.0, 2.0), confidence=1.0)
+    assert paired_t_confidence_interval((0.5, 0.5, 0.5), confidence=0.95) == (0.5, 0.5)
+    # A tiny spread is not treated as zero variance.
+    assert paired_t_lower_bound((0.5, 0.5, 0.5 + 1e-9), confidence=0.95) < 0.5
+    # Scaling keeps large but finite deltas from overflowing the variance.
+    large = paired_t_lower_bound((1e200, 2e200, 3e200), confidence=0.95)
+    assert large == pytest.approx(2e200 - 4.302652729749462 * 1e200 / math.sqrt(3))
+    with pytest.raises(ValueError, match="finite"):
+        paired_t_lower_bound((1.7e308, -1.7e308, 1.7e308), confidence=0.95)
+
+
+def test_bootstrap_interval_is_descriptive_and_never_decides_promotion():
+    # A small, skewed sample whose percentile bootstrap lower bound is
+    # positive, while the paired t bound is not.
+    baseline = (0.0, 0.0, 0.0)
+    candidate = (0.1, 1.0, 2.0)
+    assessment = assess_promotion(
+        (_primary(),),
+        {"quality": baseline},
+        {"quality": candidate},
+        baseline_seeds=(1, 2, 3),
+        candidate_seeds=(1, 2, 3),
+        gates={},
+        min_improvement=0.0,
+        confidence=0.95,
+        bootstrap_resamples=2_000,
+        bootstrap_seed=11,
+    )
+    assert assessment.primary.descriptive_bootstrap_interval[0] > 0
+    assert assessment.primary.lower_confidence_bound < 0
+    assert assessment.promote is False
+
+
+@pytest.mark.parametrize("sample_count", [3, 5])
+def test_null_false_promotion_rate_is_near_nominal(sample_count):
+    # Regression: the percentile bootstrap bound promoted 7.5-9.2% of null
+    # candidates at n=5 and 12-14% at n=3 against a nominal 2.5%.
+    simulations = 2_000
+    rng = random.Random(8_675_309 + sample_count)
+    seeds = tuple(range(1, sample_count + 1))
+    promoted = 0
+    for _ in range(simulations):
+        deltas = tuple(rng.gauss(0.0, 1.0) for _ in range(sample_count))
+        assessment = assess_promotion(
+            (_primary(),),
+            {"quality": (0.0,) * sample_count},
+            {"quality": deltas},
+            baseline_seeds=seeds,
+            candidate_seeds=seeds,
+            gates={},
+            min_improvement=0.0,
+            confidence=0.95,
+            bootstrap_resamples=1,
+            bootstrap_seed=1,
+        )
+        promoted += assessment.promote
+    rate = promoted / simulations
+    assert 0.015 <= rate <= 0.035, rate
