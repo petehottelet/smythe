@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import stat
 from contextlib import ExitStack
 from threading import Event, Thread
 
@@ -73,6 +75,51 @@ def test_store_rejects_unsafe_custom_run_id(tmp_path, store_factory, run_id):
 
     with pytest.raises(ValueError, match="run_id"):
         store.create_run(plan, approval, manifest_root=tmp_path, run_id=run_id)
+
+
+@pytest.fixture
+def default_umask():
+    previous = os.umask(0o022)
+    try:
+        yield
+    finally:
+        os.umask(previous)
+
+
+def _mode(path) -> int:
+    return stat.S_IMODE(path.stat().st_mode)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+def test_new_database_and_its_wal_files_are_owner_only(tmp_path, store_factory, default_umask):
+    """Regression: a new jobs.sqlite3 was created world-readable (0644)."""
+    database = tmp_path / ".smythe" / "jobs.sqlite3"
+    plan, approval = _plan(tmp_path, provider="offline")
+    store = store_factory(database)
+    store.create_run(plan, approval, manifest_root=tmp_path)
+
+    wal = database.with_name(database.name + "-wal")
+    shm = database.with_name(database.name + "-shm")
+    assert wal.exists() and shm.exists()
+    assert {_mode(path) for path in (database, wal, shm)} == {0o600}
+    assert _mode(database.parent) == 0o700
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+def test_existing_database_keeps_its_permissions(tmp_path, default_umask):
+    directory = tmp_path / "shared"
+    directory.mkdir(mode=0o755)
+    database = directory / "jobs.sqlite3"
+    SQLiteRunStore(database).close()
+    database.chmod(0o640)
+
+    with SQLiteRunStore(database) as store:
+        plan, approval = _plan(tmp_path, provider="offline")
+        store.create_run(plan, approval, manifest_root=tmp_path)
+        wal = database.with_name(database.name + "-wal")
+        assert _mode(database) == 0o640
+        assert _mode(wal) == 0o640
+    assert _mode(directory) == 0o755
 
 
 def test_complete_call_persists_artifact_and_cost(tmp_path, store_factory):

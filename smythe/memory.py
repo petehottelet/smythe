@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import re
 import threading
 from dataclasses import asdict, dataclass, field
@@ -102,10 +103,24 @@ class PlannerMemory:
             task_done_when=list(getattr(saved_task, "done_when", [])),
         )
 
+        line = (json.dumps(asdict(outcome)) + "\n").encode("utf-8")
         with self._lock:
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self._path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(asdict(outcome)) + "\n")
+            # History holds task context, so a directory or file created here
+            # is owner-only. Existing ones keep whatever mode they have.
+            self._path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            descriptor = os.open(
+                self._path,
+                os.O_RDWR | os.O_APPEND | os.O_CREAT | getattr(os, "O_BINARY", 0),
+                0o600,
+            )
+            with open(descriptor, "a+b") as f:
+                end = f.seek(0, os.SEEK_END)
+                if end:
+                    # A crash can leave a partial last line; never append to it.
+                    f.seek(end - 1)
+                    if f.read(1) != b"\n":
+                        line = b"\n" + line
+                f.write(line)
 
     def recall(self, task: Any, k: int = 3) -> list[ExecutionOutcome]:
         """Find the k most relevant past outcomes by keyword overlap."""

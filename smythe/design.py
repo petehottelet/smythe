@@ -38,6 +38,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from smythe._images import open_image
 from smythe.verifier import CallableVerifier, Verdict
 
 # Anti-patterns worth avoiding by default. These are the shapes models
@@ -140,9 +141,7 @@ def _hex_to_rgb(value: str) -> tuple[int, int, int]:
 
 def check_dimensions(path: Path, width: int, height: int) -> list[Finding]:
     """Exact-size compliance. No model can measure this better."""
-    from PIL import Image
-
-    with Image.open(path) as img:
+    with open_image(path) as img:
         size = img.size
     if size != (width, height):
         return [Finding(
@@ -164,12 +163,10 @@ def check_palette(
     Sampled on a thumbnail: exact pixel accounting is neither necessary
     nor meaningful for photographic output.
     """
-    from PIL import Image
-
     if not palette:
         return []
     targets = [_hex_to_rgb(c) for c in palette]
-    with Image.open(path) as img:
+    with open_image(path) as img:
         thumb = img.convert("RGB").resize((64, 64))
         raw = thumb.tobytes()
     pixels = [tuple(raw[i:i + 3]) for i in range(0, len(raw), 3)]
@@ -195,13 +192,14 @@ def check_flat_regions(
 ) -> list[Finding]:
     """Find large, perfectly uniform rectangles.
 
-    These are usually an unfilled placeholder — the empty box a model
+    These are often an unfilled placeholder — the empty box a model
     leaves when told to reserve space for typography it was asked not
-    to render. Photographic content is never this uniform.
+    to render. Photographic content is never this uniform, but a logo,
+    icon, or product shot on a plain background legitimately is, so the
+    finding is advisory: ``design_verifier`` blocks on it only with
+    ``include_advisory=True``.
     """
-    from PIL import Image
-
-    with Image.open(path) as img:
+    with open_image(path) as img:
         thumb = img.convert("RGB").resize((grid * 8, grid * 8))
     flat_cells = 0
     for row in range(grid):
@@ -217,15 +215,14 @@ def check_flat_regions(
             "flat-region",
             f"{fraction:.0%} of the image is perfectly uniform — likely an "
             "unfilled placeholder rather than composition",
+            hard=False,
         )]
     return []
 
 
 def dhash(path: Path) -> int:
     """64-bit difference hash, for near-duplicate detection."""
-    from PIL import Image
-
-    with Image.open(path) as img:
+    with open_image(path) as img:
         # Grayscale tobytes() is one byte per pixel, so it indexes directly.
         px = img.convert("L").resize((9, 8)).tobytes()
     bits = 0
@@ -286,9 +283,11 @@ def design_verifier(
     """A verifier that gates on deterministic findings alone.
 
     Cheap, instant, and free of judge variance — run this before
-    spending a model call on aesthetic judgment. Advisory findings are
-    reported but do not fail by default, because a soft palette miss is
-    not worth paying to regenerate.
+    spending a model call on aesthetic judgment. Advisory findings
+    (palette, flat-region) are reported but do not fail by default,
+    because a soft palette miss or a plain background is not worth
+    paying to regenerate. A listed artifact that is missing, or cannot
+    be decoded as a PNG, JPEG, GIF, or WebP image, is a hard finding.
     """
 
     def verdict(verifier_node, target) -> Verdict:
@@ -297,15 +296,24 @@ def design_verifier(
         if not paths:
             return Verdict(passed=True, reason="no artifacts to inspect")
 
+        from PIL import Image
+
         findings: list[Finding] = []
+        inspected: list[Path] = []
         for path in paths:
             if not path.exists():
+                findings.append(Finding("missing-artifact", f"{path.name} does not exist"))
                 continue
-            findings.extend(
-                inspect_asset(path, system=system, width=width, height=height)
-            )
-        if len(paths) > 1:
-            findings.extend(check_near_duplicates(paths))
+            try:
+                findings.extend(
+                    inspect_asset(path, system=system, width=width, height=height)
+                )
+            except (OSError, SyntaxError, Image.DecompressionBombError) as exc:
+                findings.append(Finding("unreadable-artifact", f"{path.name}: {exc}"))
+                continue
+            inspected.append(path)
+        if len(inspected) > 1:
+            findings.extend(check_near_duplicates(inspected))
 
         blocking = [f for f in findings if f.hard or include_advisory]
         if not blocking:

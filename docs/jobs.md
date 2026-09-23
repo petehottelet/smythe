@@ -30,6 +30,10 @@ pip install "smythe[jobs,gemini]==0.8.0"
 
 The installed command is `smythe`. Job state defaults to
 `~/.smythe/jobs.sqlite3`; use `--store PATH` to choose another SQLite file.
+The journal stores prompts and responses, so a new database file is created
+readable only by its owner (mode 0600, which SQLite also applies to its `-wal`
+and `-shm` files), and a missing parent directory is created as 0700. Existing
+files and directories keep their permissions.
 
 ## Manifest v1
 
@@ -181,7 +185,10 @@ The distinction between `prepared` and `dispatched` controls recovery:
   Smythe does not issue an automatic duplicate.
 - A completed response is inspected, published without replacing an existing
   file beneath `<artifact_root>/artifacts/<operation-directory>/attempt-NNNN/`, and committed with its SHA-256,
-  MIME type, byte size, and observed dimensions.
+  MIME type, byte size, and observed dimensions. Image bytes are decoded only
+  as PNG, JPEG, GIF, or WebP, whatever MIME type the provider declares; other
+  formats are refused before any other Pillow decoder runs. Like undecodable
+  data, they become `unknown_outcome` with the reason in the attempt error.
 
 Each new run receives a persistent artifact namespace. Its files live beneath
 `<output_directory>/run-<namespace>`; snapshots expose that final component as

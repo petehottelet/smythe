@@ -2,6 +2,7 @@
 
 import json
 import os
+import stat
 import tempfile
 from copy import deepcopy
 from dataclasses import asdict
@@ -395,3 +396,65 @@ def test_prompt_without_history_keeps_existing_text():
     assert build_user_prompt(Task("Research signal")) == (
         "## Task\n\nResearch signal\n\nRespond with only the JSON object."
     )
+
+
+def _record_goal(memory: PlannerMemory, goal: str, context: dict | None = None) -> None:
+    graph = ExecutionGraph(
+        topology=[Topology.SERIAL],
+        nodes=[Node(label="Do it", id="n1", status=NodeStatus.COMPLETED)],
+    )
+    task = Task(goal=goal, context=context or {})
+    memory.record(task, graph, SwarmResult(output="done", graph=graph, trace=[]))
+
+
+@pytest.fixture
+def default_umask():
+    previous = os.umask(0o022)
+    try:
+        yield
+    finally:
+        os.umask(previous)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+def test_record_creates_owner_only_history_and_directory(tmp_path, default_umask):
+    """Regression: history holding task.context was created 0644."""
+    directory = tmp_path / ".smythe"
+    memory = PlannerMemory(directory / "history.jsonl")
+
+    _record_goal(memory, "Research alpha", {"customer": "secret"})
+
+    assert stat.S_IMODE(directory.stat().st_mode) == 0o700
+    assert stat.S_IMODE(memory.path.stat().st_mode) == 0o600
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+def test_record_keeps_existing_history_permissions(tmp_path, default_umask):
+    directory = tmp_path / "shared"
+    directory.mkdir(mode=0o755)
+    path = directory / "history.jsonl"
+    _write_outcome(path, _make_outcome("Research alpha"))
+    path.chmod(0o640)
+
+    _record_goal(PlannerMemory(path), "Research beta")
+
+    assert stat.S_IMODE(directory.stat().st_mode) == 0o755
+    assert stat.S_IMODE(path.stat().st_mode) == 0o640
+
+
+def test_record_after_a_torn_last_line_keeps_the_next_record(tmp_path):
+    """Regression: a crash-truncated last line swallowed record "gamma"."""
+    path = tmp_path / "history.jsonl"
+    memory = PlannerMemory(path)
+    _record_goal(memory, "Research alpha")
+    with open(path, "ab") as stream:
+        stream.write(b'{"task_goal": "Research beta", "task_constr')
+
+    _record_goal(memory, "Research gamma")
+    _record_goal(memory, "Research delta")
+
+    goals = {outcome.task_goal for outcome in memory.recall(Task("Research"), k=10)}
+    assert goals == {"Research alpha", "Research gamma", "Research delta"}
+    lines = path.read_bytes().split(b"\n")
+    assert lines[1] == b'{"task_goal": "Research beta", "task_constr'
+    assert len(lines) == 5 and lines[-1] == b""

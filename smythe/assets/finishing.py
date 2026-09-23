@@ -10,6 +10,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from smythe._images import open_image
 from smythe.assets.models import (
     AssetSpec,
     BrandMarkPolicy,
@@ -121,7 +122,7 @@ def _position(
 def _composite_logo(image, logo_path: Path, overlay: LogoOverlaySpec):
     Image, _, _, _, _ = _pillow()
     logo_bytes = logo_path.read_bytes()
-    with Image.open(io.BytesIO(logo_bytes)) as logo_source:
+    with open_image(logo_bytes) as logo_source:
         logo = logo_source.convert("RGBA")
     target_width = max(1, round(image.width * overlay.width_ratio))
     target_height = max(1, round(logo.height * target_width / logo.width))
@@ -273,7 +274,9 @@ def finish_image(
 
     The prior destination remains intact if decoding, compositing, encoding, or
     replacement fails. A production call re-checks master/font requirements so
-    callers cannot bypass preflight accidentally.
+    callers cannot bypass preflight accidentally. The source and logo master
+    are decoded only as PNG, JPEG, GIF, or WebP; any other format raises
+    ``PIL.UnidentifiedImageError`` before another Pillow plugin parses it.
     """
 
     if not isinstance(spec, AssetSpec):
@@ -291,7 +294,7 @@ def finish_image(
     source_bytes = source_path.read_bytes()
     source_hash = hashlib.sha256(source_bytes).hexdigest()
 
-    with Image.open(io.BytesIO(source_bytes)) as loaded:
+    with open_image(source_bytes) as loaded:
         source_size = loaded.size
         has_alpha = "A" in loaded.getbands() or "transparency" in loaded.info
         working = loaded.convert("RGBA" if has_alpha or spec.alpha_required else "RGB")
@@ -344,7 +347,8 @@ def finish_image(
     _atomic_save(working, destination_path, spec.format, **save_kwargs)
 
     observed_dpi: tuple[float, float] | None = None
-    with Image.open(destination_path) as finished:
+    # Only the header of the file just encoded is read, with its own plugin.
+    with Image.open(destination_path, formats=[spec.format.value]) as finished:
         recorded = finished.info.get("dpi")
         if isinstance(recorded, (tuple, list)) and len(recorded) >= 2:
             observed_dpi = float(recorded[0]), float(recorded[1])

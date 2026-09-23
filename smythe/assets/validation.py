@@ -8,6 +8,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Iterable
 
+from smythe._images import DEFAULT_MAX_IMAGE_PIXELS, NOT_ALLOWED_MESSAGE, open_image
 from smythe.assets.finishing import FinishReceipt, OverlayReceipt, sha256_file
 from smythe.assets.models import (
     AssetSpec,
@@ -304,6 +305,9 @@ def validate_image(
 ) -> ValidationReport:
     """Validate content bytes against an asset specification.
 
+    Only PNG, JPEG, GIF, and WebP bytes are decoded; any other format, or an
+    image larger than the decoding pixel limit, is a ``decode_failed`` finding.
+
     ``advisory_findings`` is intentionally a separate input and rejects hard
     findings. This keeps vision/OCR/judge observations visible without letting
     them silently redefine deterministic acceptance.
@@ -368,18 +372,32 @@ def validate_image(
             "Image validation requires Pillow; install the asset dependencies"
         ) from exc
 
+    # A spec larger than the default limit may legitimately decode that size.
+    max_pixels = max(DEFAULT_MAX_IMAGE_PIXELS, spec.width * spec.height)
     try:
-        with Image.open(image_path) as image:
+        with open_image(image_path, max_pixels=max_pixels) as image:
             image.load()
             observed_format = (image.format or "").upper()
             observed_size = image.size
             observed_dpi = image.info.get("dpi")
             has_alpha = "A" in image.getbands() or "transparency" in image.info
-    except (UnidentifiedImageError, OSError, ValueError) as exc:
+    except (
+        UnidentifiedImageError,
+        OSError,
+        SyntaxError,
+        ValueError,
+        Image.DecompressionBombError,
+    ) as exc:
+        if isinstance(exc, UnidentifiedImageError):
+            message = f"artifact bytes are {NOT_ALLOWED_MESSAGE}"
+        elif isinstance(exc, Image.DecompressionBombError):
+            message = "artifact exceeds the image decoding pixel limit"
+        else:
+            message = "artifact bytes are not a decodable image"
         findings.append(
             hard_finding(
                 "decode_failed",
-                "artifact bytes are not a decodable image",
+                message,
                 observed=type(exc).__name__,
             )
         )

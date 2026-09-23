@@ -434,6 +434,89 @@ def test_validation_reports_dimensions_dpi_alpha_and_decode_failures(tmp_path):
     assert "decode_failed" in {finding.code for finding in corrupt_report.hard_findings}
 
 
+def _spy_on_plugin_open(monkeypatch, plugin_class):
+    calls = []
+    original = plugin_class._open
+
+    def spy(self):
+        calls.append(plugin_class.__name__)
+        return original(self)
+
+    monkeypatch.setattr(plugin_class, "_open", spy)
+    return calls
+
+
+def _eps_and_tiff(tmp_path: Path) -> tuple[Path, Path]:
+    eps = tmp_path / "eps.png"
+    eps.write_bytes(b"%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 100 100\nshowpage\n")
+    tiff = _image(tmp_path / "tiff.png", size=(100, 100), image_format="TIFF")
+    return eps, tiff
+
+
+def test_validation_reports_other_formats_without_decoding_them(tmp_path, monkeypatch):
+    """Regression: TIFF/EPS files were handed to their Pillow plugins."""
+    from PIL import EpsImagePlugin, TiffImagePlugin
+
+    calls = _spy_on_plugin_open(monkeypatch, EpsImagePlugin.EpsImageFile)
+    calls += _spy_on_plugin_open(monkeypatch, TiffImagePlugin.TiffImageFile)
+    spec = AssetSpec(id="hero", prompt="x", width=100, height=100, format="PNG")
+
+    for path in _eps_and_tiff(tmp_path):
+        report = validate_image(path, spec)
+        assert [finding.code for finding in report.hard_findings] == ["decode_failed"]
+        assert "PNG, JPEG, GIF, or WebP" in report.hard_findings[0].message
+    assert calls == []
+
+
+def test_validation_reports_an_oversized_image_instead_of_raising(tmp_path):
+    import struct
+    import zlib
+
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        return struct.pack(">I", len(body)) + kind + body + struct.pack(
+            ">I", zlib.crc32(kind + body)
+        )
+
+    header = struct.pack(">IIBBBBB", 20_000, 20_000, 8, 2, 0, 0, 0)
+    bomb = tmp_path / "bomb.png"
+    bomb.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IEND", b""))
+    spec = AssetSpec(id="hero", prompt="x", width=100, height=100)
+
+    report = validate_image(bomb, spec)
+
+    assert [finding.code for finding in report.hard_findings] == ["decode_failed"]
+    assert report.hard_findings[0].observed == "DecompressionBombError"
+
+
+def test_finishing_refuses_other_source_and_logo_formats(tmp_path, monkeypatch):
+    from PIL import EpsImagePlugin, TiffImagePlugin, UnidentifiedImageError
+
+    calls = _spy_on_plugin_open(monkeypatch, EpsImagePlugin.EpsImageFile)
+    calls += _spy_on_plugin_open(monkeypatch, TiffImagePlugin.TiffImageFile)
+    eps, tiff = _eps_and_tiff(tmp_path)
+    destination = tmp_path / "final.png"
+    spec = AssetSpec(id="hero", prompt="x", width=100, height=100)
+    for source in (eps, tiff):
+        with pytest.raises(UnidentifiedImageError, match="PNG, JPEG, GIF, or WebP"):
+            finish_image(source, destination, spec)
+
+    source = _image(tmp_path / "source.png", size=(100, 100))
+    logo_spec = AssetSpec(
+        id="hero",
+        prompt="x",
+        width=100,
+        height=100,
+        mark_policy=BrandMarkPolicy.COMPOSITE_EXACT,
+        logo_overlay=LogoOverlaySpec(),
+    )
+    for logo in (eps, tiff):
+        brand = BrandSpec(name="Acme", brief="x", logo_path=logo)
+        with pytest.raises(UnidentifiedImageError, match="PNG, JPEG, GIF, or WebP"):
+            finish_image(source, destination, logo_spec, brand=brand)
+    assert calls == []
+    assert not destination.exists()
+
+
 def test_receipt_detects_valid_image_replacement(tmp_path):
     source = _image(tmp_path / "source.png")
     destination = tmp_path / "final.png"
