@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import io
 import os
 import stat
 import struct
@@ -12,6 +11,8 @@ import warnings
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
+
+from smythe._images import NOT_ALLOWED_MESSAGE, open_image
 
 
 _SUPPORTED_IMAGE_MIME_BY_FORMAT = {
@@ -51,7 +52,8 @@ def inspect_artifact(data: bytes, declared_mime_type: str) -> ArtifactInspection
     PNG, JPEG, GIF, and WebP candidates are verified and fully decoded with
     Pillow before their MIME type or dimensions are accepted. Unknown
     non-image binary types retain their declared MIME type and omit dimensions.
-    Declared image data fails closed when it cannot be decoded.
+    Declared image data fails closed when it cannot be decoded. No other
+    Pillow format plugin is consulted, whatever the declared MIME type.
     """
     if not isinstance(data, bytes):
         raise ArtifactInspectionError("artifact data must be bytes")
@@ -95,13 +97,15 @@ def _decode_image(data: bytes) -> tuple[str, int, int]:
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
-            with Image.open(io.BytesIO(data)) as candidate:
+            # Only the PNG, JPEG, GIF, and WebP plugins may parse provider
+            # bytes; any other format is refused before its plugin runs.
+            with open_image(data, max_pixels=MAX_IMAGE_PIXELS) as candidate:
                 _validate_image_shape(
                     *candidate.size,
                     frames=getattr(candidate, "n_frames", 1),
                 )
                 candidate.verify()
-            with Image.open(io.BytesIO(data)) as decoded:
+            with open_image(data, max_pixels=MAX_IMAGE_PIXELS) as decoded:
                 format_name = (decoded.format or "").upper()
                 size = decoded.size
                 frame_count = getattr(decoded, "n_frames", 1)
@@ -119,6 +123,14 @@ def _decode_image(data: bytes) -> tuple[str, int, int]:
     ) as exc:
         if isinstance(exc, ArtifactInspectionError):
             raise
+        if isinstance(exc, UnidentifiedImageError):
+            raise ArtifactInspectionError(
+                f"image artifact could not be fully decoded: bytes are {NOT_ALLOWED_MESSAGE}"
+            ) from exc
+        if isinstance(exc, Image.DecompressionBombError):
+            raise ArtifactInspectionError(
+                f"image artifact could not be fully decoded: {exc}"
+            ) from exc
         raise ArtifactInspectionError(
             f"image artifact could not be fully decoded: {type(exc).__name__}"
         ) from exc

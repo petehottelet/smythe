@@ -181,7 +181,10 @@ The distinction between `prepared` and `dispatched` controls recovery:
   Smythe does not issue an automatic duplicate.
 - A completed response is inspected, published without replacing an existing
   file beneath `<artifact_root>/artifacts/<operation-directory>/attempt-NNNN/`, and committed with its SHA-256,
-  MIME type, byte size, and observed dimensions.
+  MIME type, byte size, and observed dimensions. Image bytes are decoded only
+  as PNG, JPEG, GIF, or WebP, whatever MIME type the provider declares; other
+  formats are refused before any other Pillow decoder runs. Like undecodable
+  data, they become `unknown_outcome` with the reason in the attempt error.
 
 Each new run receives a persistent artifact namespace. Its files live beneath
 `<output_directory>/run-<namespace>`; snapshots expose that final component as
