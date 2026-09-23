@@ -31,12 +31,13 @@ if TYPE_CHECKING:
 
 
 class ProviderRequestRejectedError(RuntimeError):
-    """The provider rejected a journaled request with an HTTP 4xx error.
+    """The provider refused a journaled request before any model work.
 
-    The journal settled the call at zero cost with a rejected result, and the
-    run stays open. Unlike ``ProviderResponseError`` this is an ordinary node
-    failure: its failure policy decides, and a retry is a new journaled call.
-    Raw evidence remains on ``envelope`` and in the journal.
+    Only a 401, 403, 404, 413 or 429 response with the provider's plain error
+    body qualifies. The journal settled the call at zero cost with a rejected
+    result, and the run stays open. Unlike ``ProviderResponseError`` this is an
+    ordinary node failure: its failure policy decides, and a retry is a new
+    journaled call. Raw evidence remains on ``envelope`` and in the journal.
     """
 
     def __init__(self, message: str, *, status_code: int, envelope=None, receipt=None) -> None:

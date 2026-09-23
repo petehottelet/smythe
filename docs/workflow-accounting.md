@@ -111,21 +111,33 @@ admitted quote or run budget is retained and stops further admission. Missing
 billing evidence remains unknown and holds exposure. The allowance governs
 admission; it cannot undo an already incurred provider charge.
 
-**Changed in 0.8.1:** a 4xx HTTP response that carries the provider's JSON
-error object, such as a 429 rate limit, is a rejected request. It settles at
-zero cost with a rejected result, and the run stays open. The node's failure
-policy decides what happens next: `RETRY` makes a new journaled call after
-`retry_backoff_s`, `SKIP` skips the node, and `HALT` fails it. Resuming a
-halted run gives the rejected step a new call. The error is
-`ProviderRequestRejectedError`, with the status code and raw evidence attached.
-A rejected supervisor review counts as no change, like other supervisor errors.
-The following responses still hold unknown exposure, because the provider may
+**Changed in 0.8.1:** a request that the provider refuses before any model
+work settles at zero cost with a rejected result, and the run stays open. A
+generation response qualifies only when all of these hold:
+
+- Its status is 401, 403, 404, 413 or 429: authentication, permission, an
+  unknown model or endpoint, an oversized request, or a rate or quota limit.
+- Its body is the provider's plain error object and nothing else: OpenAI's
+  `{"error": {...}}` or Anthropic's `{"type": "error", "error": {...},
+  "request_id": "..."}`. The error object may contain only `message`, `type`,
+  `param` and `code`, each a string or null. A body with usage or any other
+  field does not qualify.
+- The exception recorded with the response, if any, is that status's SDK
+  error, such as `RateLimitError` for a 429, or the SDK's general
+  `APIStatusError`. A transport error, such as a timeout, does not qualify.
+
+The node raises `ProviderRequestRejectedError`, with the status code and raw
+evidence attached, and its failure policy decides what happens next: `RETRY`
+makes a new journaled call, `SKIP` skips the node, and `HALT` fails it.
+Resuming a halted run gives the rejected step a new call. A rejected
+supervisor review counts as no change, like other supervisor errors. Every
+other unsuccessful response holds unknown exposure, because the provider may
 have processed and billed the request:
 
 - transport failures with no response
-- 408 and 499 timeouts
-- 4xx responses whose body is anything other than the provider's plain error
-  object
+- every other 4xx status, including 400 (Anthropic reports output blocked by
+  its content filter as a 400), 408, 409, 422 and 499
+- a qualifying status with any other body or error
 - 5xx responses, including Anthropic's 529 overloaded status
 
 A rejected input-token count still stops the node, but it leaves no exposure.
@@ -160,11 +172,12 @@ revisions. Heartbeats renew ownership during calls. A former owner can append
 immutable late evidence for its exact dispatch, but cannot advance the run.
 Recovery settles available late evidence before admitting new work.
 
-A 0.8.0 journal can hold a saved 4xx error response as unknown exposure. On
-resume, 0.8.1 settles that call again at zero cost with a rejected result and
+A 0.8.0 journal holds every saved 4xx error response as unknown exposure. On
+resume, 0.8.1 settles a saved response that meets the zero-cost conditions
+above, such as a plain 429, again at zero cost with a rejected result and
 records an `unknown_exposure_resolved` event. If no other unknown call or
-overrun blocks the run, admission reopens. Repeating the settlement changes
-nothing.
+overrun blocks the run, admission reopens. Any other saved response, such as
+a 400, keeps its unknown exposure. Repeating the settlement changes nothing.
 
 **Added in 0.8.0:** concurrent journal openers use bounded WAL retries
 and create all tables and the persistent store identity in one transaction.
