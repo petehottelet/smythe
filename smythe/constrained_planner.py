@@ -17,7 +17,7 @@ from smythe.constrained_prompts import (
 )
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.planner import Architect, ArchitectError
-from smythe.provider import Provider
+from smythe.provider import TRUNCATED_STOP_REASONS, Provider
 from smythe.registry import Registry
 from smythe.task import Task
 from smythe.workflow_binding import (
@@ -139,6 +139,11 @@ class ConstrainedArchitect(Architect):
             validate_completion_usage(result)
 
             try:
+                if result.stop_reason in TRUNCATED_STOP_REASONS:
+                    raise ValueError(
+                        "the response was cut off at the output token limit; "
+                        "return fewer selections"
+                    )
                 selections = self._extract_selections(result.text)
                 return self._compose(selections, task)
             except WorkflowBindingError:

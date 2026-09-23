@@ -20,7 +20,7 @@ from smythe.prompts import (
     build_agent_inventory,
     build_user_prompt,
 )
-from smythe.provider import Provider
+from smythe.provider import TRUNCATED_STOP_REASONS, Provider
 from smythe.registry import Registry
 from smythe.task import Task
 from smythe.workflow_binding import (
@@ -217,6 +217,12 @@ class LLMArchitect(Architect):
             )
             validate_completion_usage(result)
             try:
+                if result.stop_reason in TRUNCATED_STOP_REASONS:
+                    # A cut-off plan can parse yet silently miss nodes.
+                    raise ValueError(
+                        "the response was cut off at the output token limit; "
+                        "return a smaller plan"
+                    )
                 data = self._extract_json(result.text)
                 graph, registry = build_graph_from_model_output(
                     data, max_nodes=self._max_nodes, max_depth=self._max_depth,

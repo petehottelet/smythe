@@ -590,3 +590,22 @@ def test_revised_graph_survives_checkpoint_roundtrip():
     assert restored.nodes[1].depends_on == ["n0"]
     assert restored.nodes[1].metadata["model"] == "test-model"
     assert all(n.status is NodeStatus.COMPLETED for n in restored.nodes)
+
+
+def test_truncated_supervisor_review_applies_no_revision(caplog):
+    class TruncatedProposal(ProposingProvider):
+        async def complete(self, system, prompt, model):
+            result = await super().complete(system, prompt, model)
+            from smythe.supervisor import SUPERVISOR_SYSTEM_PROMPT
+
+            if system == SUPERVISOR_SYSTEM_PROMPT:
+                result.stop_reason = "max_tokens"
+            return result
+
+    graph = _graph("first")
+    supervisor = LLMSupervisor(TruncatedProposal(_additions(1)), only_terminal=False)
+    with caplog.at_level("WARNING", logger="smythe.supervisor"):
+        asyncio.run(_executor(supervisor, max_revisions=1).run(graph))
+
+    assert [n.id for n in graph.nodes] == ["n0"]
+    assert "cut off at the output token limit" in caplog.text

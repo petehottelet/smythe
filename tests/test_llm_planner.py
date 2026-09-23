@@ -486,3 +486,39 @@ class _NullBinding:
 
     def child(self, name):
         return self
+
+
+class _TruncatingPlanningProvider(MockPlanningProvider):
+    """First reply stops at the token limit even though its text parses."""
+
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        result = await super().complete(system, prompt, model)
+        if self._call_index == 1:
+            result.stop_reason = "max_tokens"
+        return result
+
+
+def test_truncated_plan_is_retried_with_a_smaller_plan_request():
+    provider = _TruncatingPlanningProvider([SERIAL_RESPONSE, SERIAL_RESPONSE])
+    planner = LLMArchitect(provider=provider, planning_model="test-model", max_retries=1)
+
+    graph, _ = planner.plan(Task(goal="Write something"))
+
+    assert len(graph.nodes) == 2
+    assert len(provider.prompts_received) == 2
+    assert "cut off at the output token limit" in provider.prompts_received[1]
+    assert "return a smaller plan" in provider.prompts_received[1]
+
+
+def test_plan_that_is_always_truncated_fails_with_a_clear_error():
+    class AlwaysTruncated(MockPlanningProvider):
+        async def complete(self, system, prompt, model):
+            result = await super().complete(system, prompt, model)
+            result.stop_reason = "max_tokens"
+            return result
+
+    planner = LLMArchitect(
+        provider=AlwaysTruncated([SERIAL_RESPONSE]), planning_model="test-model", max_retries=1,
+    )
+    with pytest.raises(ArchitectError, match="cut off at the output token limit"):
+        planner.plan(Task(goal="Write something"))

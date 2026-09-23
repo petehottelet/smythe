@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING
 
 from smythe.budget import validate_completion_usage
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Revision
+from smythe.provider import TRUNCATED_STOP_REASONS
 from smythe.task import render_task
 from smythe.verifier import node_generation
 from smythe.workflow_binding import (
@@ -222,6 +223,13 @@ class LLMSupervisor(Supervisor):
             model,
         )
         validate_completion_usage(result)
+        if result.stop_reason in TRUNCATED_STOP_REASONS:
+            # A cut-off review is not a decision; treat it as no change.
+            logger.warning(
+                "Supervisor review of node %r was cut off at the output token limit; "
+                "no revision applied", node.id,
+            )
+            return None
         return self._parse(result.text, max_added_nodes=self._max_added_nodes)
 
     @staticmethod

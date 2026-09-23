@@ -258,3 +258,22 @@ def test_null_params_are_treated_as_no_params():
     provider = MockConstrainedProvider([json.dumps([{"template": "parallel-work", "params": None}])])
     graph, _ = ConstrainedArchitect(provider=provider, templates=TEMPLATES).plan(Task(goal="x"))
     assert len([n for n in graph.nodes if "w-" in n.id]) == 2
+
+
+def test_truncated_selection_is_retried_even_when_it_parses():
+    class Truncating(MockConstrainedProvider):
+        async def complete(self, system, prompt, model):
+            result = await super().complete(system, prompt, model)
+            if self._call_index == 1:
+                result.stop_reason = "max_tokens"
+            return result
+
+    response = json.dumps([{"template": "draft"}])
+    provider = Truncating([response, response])
+    planner = ConstrainedArchitect(provider=provider, templates=TEMPLATES, max_retries=1)
+
+    graph, _ = planner.plan(Task(goal="Retry test"))
+
+    assert len(graph.nodes) == 1
+    assert len(provider.prompts_received) == 2
+    assert "cut off at the output token limit" in provider.prompts_received[1]
