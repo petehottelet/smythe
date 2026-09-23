@@ -9,13 +9,15 @@ from types import SimpleNamespace
 import pytest
 
 from smythe.async_executor import AsyncExecutor
-from smythe.budget import Sentinel
+from smythe.budget import Sentinel, SentinelAlert
 from smythe.checkpoint import FileCheckpointStore
 from smythe.executor import Executor
+from smythe.executor_base import SKIPPED_DEPENDENCY_RESULT, TERMINAL_DELIVERABLE_NOTE
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
-from smythe.provider import CompletionResult, Provider
+from smythe.provider import CompletionResult, OutputTruncatedError, Provider
 from smythe.registry import Registry
 from smythe.swarm import Swarm
+from smythe.tools import ToolCall, ToolResult, ToolSpec
 from smythe.tracer import Tracer
 
 
@@ -187,6 +189,122 @@ def test_failure_retains_cost_of_completed_provider_turns(mode, policy, attempts
     assert budget._reservations == {}
 
 
+class TruncatingProvider(ScriptedProvider):
+    """The "problem" step hits max_tokens on its first `truncations` calls."""
+
+    def __init__(self, truncations):
+        super().__init__()
+        self.truncations = truncations
+
+    async def complete(self, system, prompt, model):
+        if prompt.splitlines()[0] == "problem" and self.truncations:
+            self.truncations -= 1
+            self.calls.append("problem")
+            return CompletionResult("half an answ", cost_usd=0.0625, stop_reason="max_tokens")
+        return await super().complete(system, prompt, model)
+
+
+@pytest.mark.parametrize("policy,truncations,outcome", [
+    (FailurePolicy.HALT, 1, NodeStatus.FAILED),
+    (FailurePolicy.RETRY, 1, NodeStatus.COMPLETED),
+    (FailurePolicy.RETRY, 3, NodeStatus.FAILED),
+    (FailurePolicy.SKIP, 1, NodeStatus.SKIPPED),
+])
+def test_truncated_output_is_a_billed_failure_under_the_node_policy(
+    mode, policy, truncations, outcome,
+):
+    provider = TruncatingProvider(truncations)
+    graph, budget = make_graph(policy), Sentinel(10)
+
+    if outcome is NodeStatus.FAILED:
+        with pytest.raises(OutputTruncatedError) as caught:
+            run(mode, provider, graph, budget)
+        assert caught.value.stop_reason == "max_tokens"
+        assert_halted(graph)
+    else:
+        run(mode, provider, graph, budget)
+
+    problem = graph.nodes[1]
+    assert problem.status is outcome
+    attempts = 3 if policy is FailurePolicy.RETRY else 1
+    truncated = min(truncations, attempts)
+    assert provider.calls.count("problem") == min(truncations + 1, attempts)
+    if outcome is NodeStatus.COMPLETED:
+        assert problem.result == "done: problem"
+    else:
+        # The partial text is never presented as the node's output.
+        assert "half an answ" not in problem.result
+        assert "truncated" in problem.result
+    # Every truncated call was billed, and each charge survives.
+    expected = truncated * 0.0625 + (0.125 if outcome is NodeStatus.COMPLETED else 0)
+    assert budget.breakdown()["problem"] == expected
+    assert problem.metadata["cost_usd"] == expected
+    assert budget._reservations == {}
+
+
+@pytest.mark.parametrize("hard_ceiling", [False, True])
+def test_retry_after_truncation_passes_budget_admission_again(mode, hard_ceiling):
+    """The truncated call consumed the node's reservation; the retry needs one."""
+
+    class AlwaysTruncates(ScriptedProvider):
+        async def complete(self, system, prompt, model):
+            self.calls.append(prompt.splitlines()[0])
+            return CompletionResult("half an answ", cost_usd=0.05, cost_usd_is_estimate=hard_ceiling,
+                                    stop_reason="max_tokens")
+
+        def budget_estimate_usd(self, model):
+            return 0.05 if hard_ceiling else None
+
+        def requires_explicit_budget_estimate(self, model):
+            return hard_ceiling
+
+    provider = AlwaysTruncates()
+    graph = ExecutionGraph([Topology.SERIAL], [
+        Node("problem", id="problem", failure_policy=FailurePolicy.RETRY, max_retries=2),
+    ])
+    budget = Sentinel(0.08 if hard_ceiling else 0.05)
+
+    with pytest.raises(SentinelAlert):
+        run(mode, provider, graph, budget)
+
+    # One billed call, and no second dispatch past the budget.
+    assert provider.calls == ["problem"]
+    assert budget.breakdown() == {"problem": 0.05}
+    assert graph.nodes[0].status is NodeStatus.FAILED
+    assert budget._reservations == {}
+
+
+def test_truncated_tool_turn_runs_no_tools_and_keeps_its_charge(mode):
+    ran = []
+
+    class Tools:
+        @asynccontextmanager
+        async def open(self, agent):
+            async def call(tool_call):
+                ran.append(tool_call.arguments)
+                return ToolResult(tool_call_id=tool_call.id, content="ran")
+            yield SimpleNamespace(tools=[ToolSpec("x.write", "Write", {"type": "object"})],
+                                  call=call)
+
+    class TruncatedToolCall(ScriptedProvider):
+        async def chat(self, system, messages, model, tools=None):
+            self.calls.append(messages[0].content.splitlines()[0])
+            return CompletionResult(
+                "", tool_calls=[ToolCall("t1", "x.write", {"path": "/tm"})],
+                stop_reason="max_tokens", cost_usd=0.0625,
+            )
+
+    provider = TruncatedToolCall()
+    graph = ExecutionGraph([Topology.SERIAL], [Node("problem", id="problem")])
+    budget = Sentinel(10)
+    with pytest.raises(OutputTruncatedError):
+        run(mode, provider, graph, budget, tool_runtime=Tools())
+
+    assert ran == []
+    assert provider.calls == ["problem"]
+    assert budget.breakdown() == {"problem": 0.0625}
+
+
 @pytest.mark.parametrize("policy,attempts", [(FailurePolicy.HALT, 1), (FailurePolicy.RETRY, 3)])
 def test_halted_checkpoint_resumes_failed_and_pending_work_only(mode, policy, attempts, tmp_path):
     errors = [RuntimeError(f"attempt {i}") for i in range(attempts)]
@@ -226,3 +344,84 @@ def test_halted_checkpoint_resumes_failed_and_pending_work_only(mode, policy, at
     )
     assert resumed.resume(execution_id).output == result.output
     assert resumed_provider.calls == ["problem", "queued", "skip-child", "grandchild"]
+
+
+SKIP_ERROR = "HTTP 500 from upstream: stack trace /srv/secret/path.py line 42"
+
+
+class PromptRecordingProvider(Provider):
+    """Fails the "Fetch" step and records every other prompt by label."""
+
+    def __init__(self, *, crash_summary=False):
+        self.prompts = {}
+        self.crash_summary = crash_summary
+
+    async def complete(self, system, prompt, model):
+        label = prompt.splitlines()[0]
+        if label == "Fetch":
+            raise RuntimeError(SKIP_ERROR)
+        self.prompts[label] = prompt
+        if label == "Summarize" and self.crash_summary:
+            raise RuntimeError("process died")
+        return CompletionResult(f"done: {label}", cost_usd=0.125)
+
+
+def make_skip_graph():
+    return ExecutionGraph([Topology.SERIAL], [
+        Node("Fetch", id="fetch", failure_policy=FailurePolicy.SKIP),
+        Node("Other", id="other"),
+        Node("Summarize", id="summ", depends_on=["fetch", "other"]),
+    ])
+
+
+def assert_marker_not_error(prompt):
+    assert f"[fetch]: {SKIPPED_DEPENDENCY_RESULT}" in prompt
+    assert "[other]: done: Other" in prompt
+    assert "secret" not in prompt and "HTTP 500" not in prompt
+    # The terminal note still asks for carried-forward context; only the
+    # marker, never the error, is there to carry.
+    assert TERMINAL_DELIVERABLE_NOTE in prompt
+
+
+def test_skipped_dependency_passes_marker_not_error_text(mode):
+    provider = PromptRecordingProvider()
+    graph, tracer = make_skip_graph(), Tracer()
+    options = dict(provider=provider, registry=Registry(), tracer=tracer, artifact_dir=None)
+    if mode == "serial":
+        Executor(**options).run(graph)
+    else:
+        asyncio.run(AsyncExecutor(**options, max_concurrency=1).run(graph))
+
+    fetch = graph.nodes[0]
+    assert fetch.status is NodeStatus.SKIPPED
+    # The error stays on the node and in the trace for diagnosis.
+    assert fetch.result == SKIP_ERROR
+    assert any(span["node_id"] == "fetch" and span["error"] == SKIP_ERROR
+               for span in tracer.summary())
+    assert_marker_not_error(provider.prompts["Summarize"])
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_resumed_dependent_sees_skip_marker_and_checkpoint_keeps_error(parallel, tmp_path):
+    store = FileCheckpointStore(tmp_path)
+    first = PromptRecordingProvider(crash_summary=True)
+    swarm = Swarm(provider=first, model="test-model", parallel=parallel,
+                  checkpoint_store=store, artifact_dir=None)
+    with pytest.raises(RuntimeError, match="process died"):
+        swarm.execute(make_skip_graph())
+    assert_marker_not_error(first.prompts["Summarize"])
+    [execution_id] = store.list_ids()
+    saved = {node["id"]: node for node in store.load(execution_id)["graph"]["nodes"]}
+    assert saved["fetch"]["status"] == "skipped"
+    assert saved["fetch"]["result"] == SKIP_ERROR
+
+    resumed_provider = PromptRecordingProvider()
+    resumed = Swarm(provider=resumed_provider, model="test-model", parallel=parallel,
+                    checkpoint_store=store, artifact_dir=None).resume(execution_id)
+
+    assert list(resumed_provider.prompts) == ["Summarize"]
+    assert_marker_not_error(resumed_provider.prompts["Summarize"])
+    assert "secret" not in resumed.output
+    final = {node["id"]: node for node in store.load(execution_id)["graph"]["nodes"]}
+    assert final["fetch"]["status"] == "skipped"
+    assert final["fetch"]["result"] == SKIP_ERROR

@@ -22,8 +22,8 @@ from smythe.budget import (
 )
 from smythe.graph import ExecutionGraph, Node, NodeStatus, RevisionError
 from smythe.provider import (
-    CompletionResult, Provider, ProviderResponseError, _native_receipt, _settle_response_error,
-    _native_response_errors, _settle_response_group,
+    CompletionResult, Provider, ProviderResponseError, _native_receipt, _raise_if_truncated,
+    _settle_response_error, _native_response_errors, _settle_response_group,
 )
 from smythe.registry import Registry
 from smythe.task import render_task, snapshot_task
@@ -111,6 +111,13 @@ TERMINAL_DELIVERABLE_NOTE = (
     "argument and then a critique of it, return both, not just your "
     "own increment."
 )
+
+# What a dependent sees in place of a SKIPPED dependency's result. A node
+# skipped after a failure keeps its error text in ``node.result`` for traces
+# and checkpoints, but that text is not step output: passed on as context,
+# the terminal note above would ask the model to carry it into the
+# deliverable.
+SKIPPED_DEPENDENCY_RESULT = "[skipped: this step did not complete]"
 
 
 class ExecutorBase:
@@ -713,8 +720,12 @@ class ExecutorBase:
         messages = [ChatMessage(role="user", content=prompt, attachments=attachments)]
 
         if self._tool_runtime is None:
+            # A retry after truncated output follows a billed call.
+            self._readmit_node_budget(node, model)
             result = await self._provider_chat(node, system, messages, model)
             self._record_cost(node, result)
+            # Only after the charge is recorded: truncated output is billed.
+            _raise_if_truncated(result, where=f"Node {node.id!r}")
             return result
 
         collected_artifacts: list = []
@@ -722,13 +733,12 @@ class ExecutorBase:
             tools = list(session.tools) or None
             limit = node.max_tool_iterations or self._max_tool_iterations
             for turn in range(limit):
-                if self._budget and not self._workflow_managed and node.id not in self._reserved_node_ids:
-                    if self._provider.requires_explicit_budget_estimate(model):
-                        self.reserve_node_budget(node)
-                    else:
-                        self._budget.check(node.id)
+                self._readmit_node_budget(node, model)
                 result = await self._provider_chat(node, system, messages, model, tools=tools, turn=turn)
                 self._record_cost(node, result)
+                # A truncated turn may carry half-written tool arguments, so
+                # it is rejected (after billing) before any tool runs.
+                _raise_if_truncated(result, where=f"Node {node.id!r}")
                 # Artifacts on intermediate turns are already billed —
                 # carry them to the final result so they get persisted.
                 if result.artifacts:
@@ -787,6 +797,19 @@ class ExecutorBase:
         raise ToolLoopLimitError(
             f"Node {node.id!r} hit max_tool_iterations={limit} without completing"
         )
+
+    def _readmit_node_budget(self, node: Node, model: str) -> None:
+        """Admit another call for a node whose reservation a billed call used.
+
+        Reconciling a charge consumes the node's reservation, so a later call
+        for the same node (a tool turn, or a retry after truncated output)
+        passes budget admission again before dispatch.
+        """
+        if self._budget and not self._workflow_managed and node.id not in self._reserved_node_ids:
+            if self._provider.requires_explicit_budget_estimate(model):
+                self.reserve_node_budget(node)
+            else:
+                self._budget.check(node.id)
 
     async def _provider_chat(self, node, system, messages, model, tools=None, *, turn=0):
         self._raise_unresolved_response(node)
@@ -1008,12 +1031,17 @@ class ExecutorBase:
 
         Artifact paths live in dep metadata (not in the result text, so
         JSON results stay parseable); they are appended here so
-        downstream nodes can reference the files.
+        downstream nodes can reference the files.  A SKIPPED dependency
+        contributes only ``SKIPPED_DEPENDENCY_RESULT``: its recorded
+        result is an error message, not output.
         """
         dep_results: dict[str, Any] = {}
         for dep_id in node.depends_on:
             dep_node = self._cached_node_by_id(dep_id, graph)
             if dep_node is None:
+                continue
+            if dep_node.status is NodeStatus.SKIPPED:
+                dep_results[dep_id] = SKIPPED_DEPENDENCY_RESULT
                 continue
             value = dep_node.result
             records = dep_node.metadata.get("artifacts") or []

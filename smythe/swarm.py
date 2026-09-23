@@ -249,20 +249,32 @@ class Swarm:
         task_or_graph = self._resolve_input(task_or_graph)
         if self._run_store is not None:
             return asyncio.run(self._workflow_runtime().execute(
-                task_or_graph, max_concurrency=self.max_concurrency if self.parallel else 1,
+                task_or_graph, max_concurrency=self._execution_concurrency(),
             ))
         if self.parallel:
             return asyncio.run(self.execute_async(task_or_graph))
         return self._execute_sync(task_or_graph)
 
+    def _execution_concurrency(self) -> int | None:
+        """The node concurrency for every execute and resume path.
+
+        ``parallel=False`` means one node at a time wherever the graph runs,
+        including the async executor behind ``execute_async()`` and resume.
+        """
+        return self.max_concurrency if self.parallel else 1
+
     async def execute_async(
         self, task_or_graph: Task | ExecutionGraph | None = None,
     ) -> SwarmResult:
-        """Async execution using the parallel AsyncExecutor."""
+        """Async execution on the AsyncExecutor, safe inside a running loop.
+
+        Admits up to ``max_concurrency`` ready nodes at once when
+        ``parallel=True``, and one node at a time otherwise.
+        """
         task_or_graph = self._resolve_input(task_or_graph)
         if self._run_store is not None:
             return await self._workflow_runtime().execute(
-                task_or_graph, max_concurrency=self.max_concurrency,
+                task_or_graph, max_concurrency=self._execution_concurrency(),
             )
         from smythe.async_executor import AsyncExecutor
 
@@ -284,7 +296,7 @@ class Swarm:
 
         executor = AsyncExecutor(
             provider=self._provider, registry=self._registry, tracer=tracer,
-            budget=budget, max_concurrency=self.max_concurrency,
+            budget=budget, max_concurrency=self._execution_concurrency(),
             tool_runtime=self._tool_runtime,
             max_tool_iterations=self.max_tool_iterations,
             artifact_dir=self._run_artifact_dir(execution_id),
@@ -506,11 +518,13 @@ class Swarm:
         and re-run. Cost accounting continues against the budget policy
         recorded in the checkpoint.  If the checkpointed execution
         already finished, its stored result is returned without
-        re-executing anything.
+        re-executing anything.  Resumed work runs one node at a time
+        unless this Swarm has ``parallel=True``; a durable ``run_store``
+        run keeps the concurrency its first execution recorded.
         """
         if self._run_store is not None:
             return await self._workflow_runtime().resume(
-                execution_id, max_concurrency=self.max_concurrency,
+                execution_id, max_concurrency=self._execution_concurrency(),
             )
         if self._checkpoint_store is None:
             raise ValueError(
@@ -597,7 +611,7 @@ class Swarm:
 
         executor = AsyncExecutor(
             provider=self._provider, registry=self._registry, tracer=tracer,
-            budget=budget, max_concurrency=self.max_concurrency,
+            budget=budget, max_concurrency=self._execution_concurrency(),
             tool_runtime=self._tool_runtime,
             max_tool_iterations=self.max_tool_iterations,
             artifact_dir=self._run_artifact_dir(execution_id),

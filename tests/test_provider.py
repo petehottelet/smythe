@@ -1,6 +1,8 @@
 """Tests for the Provider abstraction and auto-detection."""
 
 import asyncio
+import base64
+import enum
 
 import pytest
 
@@ -894,3 +896,250 @@ def test_gemini_maps_attachments_to_inline_data_parts():
     assert parts[0]["inline_data"]["mime_type"] == "image/png"
     assert parts[0]["inline_data"]["data"] == b"\x89PNG-in"
     assert parts[1] == {"text": "pick the best"}
+
+
+# ---------------------------------------------------------------------------
+# Truncated output (max_tokens) is a billed failure, not a success
+# ---------------------------------------------------------------------------
+
+
+class _GeminiFinishReason(str, enum.Enum):
+    """Stands in for google.genai.types.FinishReason (a string enum)."""
+
+    STOP = "STOP"
+    MAX_TOKENS = "MAX_TOKENS"
+
+
+def _gemini_finish_response(finish_reason, *, function_calls=None):
+    from unittest.mock import MagicMock
+
+    candidate = MagicMock()
+    candidate.finish_reason = finish_reason
+    candidate.content.parts = []
+    response = MagicMock()
+    response.text = "partial answer"
+    response.candidates = [candidate]
+    response.function_calls = function_calls
+    response.usage_metadata = MagicMock(prompt_token_count=11, candidates_token_count=4096)
+    return response
+
+
+@pytest.mark.parametrize("finish_reason,expected", [
+    (_GeminiFinishReason.MAX_TOKENS, "max_tokens"),
+    ("MAX_TOKENS", "max_tokens"),
+    (_GeminiFinishReason.STOP, "end_turn"),
+    (None, "end_turn"),
+])
+def test_gemini_maps_finish_reason_max_tokens(finish_reason, expected):
+    p, _ = _gemini_with_mock(_gemini_finish_response(finish_reason))
+    result = asyncio.run(p.complete("sys", "prompt", "gemini-3-pro"))
+    assert result.stop_reason == expected
+    assert result.completion_tokens == 4096
+
+
+def test_gemini_truncated_tool_call_still_reports_max_tokens():
+    from unittest.mock import MagicMock
+
+    call = MagicMock()
+    call.name = "wx__get_weather"
+    call.args = {"city": "Par"}
+    p, _ = _gemini_with_mock(_gemini_finish_response("MAX_TOKENS", function_calls=[call]))
+    result = asyncio.run(
+        p.chat("sys", [ChatMessage(role="user", content="q")], "m", tools=[WEATHER_TOOL])
+    )
+    assert result.tool_calls
+    assert result.stop_reason == "max_tokens"
+
+
+def test_openai_length_finish_reason_reports_max_tokens():
+    rc = _openai_tool_call("call_1", "wx__get_weather", '{"city": "Pa')
+    for tool_calls in (None, [rc]):
+        p, _ = _openai_with_mock(
+            _make_openai_response(content="partial", tool_calls=tool_calls, finish_reason="length")
+        )
+        result = asyncio.run(p.complete("sys", "prompt", "gpt-x"))
+        assert result.stop_reason == "max_tokens"
+
+
+class _TextBlock:
+    def __init__(self, text):
+        self.text = text
+
+
+def _truncating_providers():
+    anthropic, _ = _anthropic_with_mock(_make_anthropic_response(
+        [_TextBlock("partial answer")], stop_reason="max_tokens",
+    ))
+    openai, _ = _openai_with_mock(
+        _make_openai_response(content="partial answer", finish_reason="length")
+    )
+    gemini, _ = _gemini_with_mock(_gemini_finish_response(_GeminiFinishReason.MAX_TOKENS))
+    return {"anthropic": anthropic, "openai": openai, "gemini": gemini}
+
+
+@pytest.mark.parametrize("name", ["anthropic", "openai", "gemini"])
+def test_truncated_provider_output_fails_node_after_recording_cost(name):
+    from smythe.budget import Sentinel
+    from smythe.executor import Executor
+    from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
+    from smythe.provider import OutputTruncatedError
+    from smythe.registry import Registry
+    from smythe.tracer import Tracer
+
+    provider = _truncating_providers()[name]
+    node = Node("Write the report", id="report", metadata={"model": "m"})
+    graph = ExecutionGraph([Topology.SERIAL], [node])
+    budget = Sentinel(max_budget_usd=10.0)
+
+    with pytest.raises(OutputTruncatedError, match="max_tokens") as caught:
+        Executor(provider=provider, registry=Registry(), tracer=Tracer(),
+                 budget=budget, artifact_dir=None).run(graph)
+
+    assert caught.value.stop_reason == "max_tokens"
+    assert node.status is NodeStatus.FAILED
+    assert "partial answer" not in str(node.result)
+    # The truncated call was billed; its charge must survive the failure.
+    assert budget.breakdown()["report"] > 0
+    assert node.metadata["cost_usd"] == budget.breakdown()["report"]
+
+
+# ---------------------------------------------------------------------------
+# SDK clients never cross event loops
+# ---------------------------------------------------------------------------
+
+
+class _LoopBoundClient:
+    """Fake SDK client whose pooled connections belong to one event loop.
+
+    Like an httpx-based SDK client, it fails with "Event loop is closed" when
+    reused from a later loop, which is what a serial Swarm (one asyncio.run
+    per node) did to a single cached client.
+    """
+
+    def __init__(self, created):
+        from types import SimpleNamespace
+
+        self.loop = None
+        self.closed_on = None
+        self.calls = 0
+        created.append(self)
+        png = base64.b64encode(b"\x89PNG").decode()
+        self.messages = SimpleNamespace(create=self._reply(SimpleNamespace(
+            content=[_TextBlock("ok")], stop_reason="end_turn",
+            usage=SimpleNamespace(input_tokens=1, output_tokens=1),
+        )))
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._reply(SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="ok", tool_calls=None),
+                                     finish_reason="stop")],
+            usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1),
+        ))))
+        self.images = SimpleNamespace(generate=self._reply(SimpleNamespace(
+            data=[SimpleNamespace(b64_json=png)], usage=None,
+        )))
+        self.aio = SimpleNamespace(
+            models=SimpleNamespace(generate_content=self._reply(SimpleNamespace(
+                text="ok", function_calls=None, candidates=None,
+                usage_metadata=SimpleNamespace(prompt_token_count=1, candidates_token_count=1),
+            ))),
+            aclose=self.close,
+        )
+
+    def _reply(self, response):
+        async def call(**kwargs):
+            loop = asyncio.get_running_loop()
+            self.loop = self.loop or loop
+            if self.loop is not loop or self.closed_on is not None:
+                raise RuntimeError("Event loop is closed")
+            self.calls += 1
+            await asyncio.sleep(0)
+            return response
+        return call
+
+    async def close(self):
+        self.closed_on = asyncio.get_running_loop()
+
+
+@pytest.fixture(params=["anthropic", "openai", "openai-image", "gemini"])
+def loop_bound_provider(request, monkeypatch):
+    """A built-in provider whose SDK is faked; CI installs no provider SDKs."""
+    import sys
+    from types import SimpleNamespace
+
+    created = []
+
+    def factory(**kwargs):
+        return _LoopBoundClient(created)
+
+    monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(AsyncAnthropic=factory))
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(AsyncOpenAI=factory))
+    genai = SimpleNamespace(Client=factory)
+    monkeypatch.setitem(sys.modules, "google", SimpleNamespace(genai=genai))
+    monkeypatch.setitem(sys.modules, "google.genai", genai)
+    provider, model = {
+        "anthropic": (lambda: AnthropicProvider(api_key="k"), "claude-x"),
+        "openai": (lambda: OpenAIProvider(api_key="k"), "gpt-x"),
+        "openai-image": (lambda: OpenAIImageProvider(api_key="k"), "gpt-image-2"),
+        "gemini": (lambda: GeminiProvider(api_key="k"), "gemini-x"),
+    }[request.param]
+    return provider(), model, created
+
+
+def test_provider_client_is_never_reused_on_a_later_event_loop(loop_bound_provider):
+    provider, model, created = loop_bound_provider
+
+    for _ in range(3):
+        asyncio.run(provider.complete("sys", "prompt", model))
+
+    assert len(created) == 3
+    assert all(client.calls == 1 for client in created)
+    # Each owned client was closed on the loop that created it, before that
+    # loop closed, and nothing stale remains cached.
+    assert all(client.closed_on is client.loop for client in created)
+    assert provider._loop_clients._clients == {}
+
+
+def test_provider_client_is_shared_within_one_event_loop(loop_bound_provider):
+    provider, model, created = loop_bound_provider
+
+    async def fan_out():
+        await provider.complete("sys", "first", model)
+        await asyncio.gather(*(provider.complete("sys", "p", model) for _ in range(4)))
+
+    asyncio.run(fan_out())
+
+    [client] = created
+    assert client.calls == 5
+    assert client.closed_on is client.loop
+
+
+def test_provider_discards_client_of_a_loop_closed_without_shutdown(loop_bound_provider):
+    provider, model, created = loop_bound_provider
+    loop = asyncio.new_event_loop()
+    loop.run_until_complete(provider.complete("sys", "prompt", model))
+    loop.close()  # no shutdown_asyncgens(): the client was never closed
+
+    asyncio.run(provider.complete("sys", "prompt", model))
+
+    stale, fresh = created
+    assert stale.calls == 1 and stale.closed_on is None
+    assert fresh.calls == 1 and fresh.closed_on is fresh.loop
+    assert provider._loop_clients._clients == {}
+
+
+def test_serial_swarm_runs_each_node_on_a_fresh_client(loop_bound_provider):
+    from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
+    from smythe.synthesizer import SynthesisStrategy, Synthesizer
+
+    provider, model, created = loop_bound_provider
+    graph = ExecutionGraph([Topology.SERIAL], [
+        Node("a", id="a"), Node("b", id="b", depends_on=["a"]), Node("c", id="c", depends_on=["b"]),
+    ])
+    swarm = Swarm(model=model, provider=provider, artifact_dir=None,
+                  synthesizer=Synthesizer(SynthesisStrategy.LLM_MERGE))
+
+    result = swarm.execute(graph)
+
+    assert all(node.status is NodeStatus.COMPLETED for node in result.graph.nodes)
+    # Three node loops plus the synthesis loop, each with its own client.
+    assert len(created) == 4
+    assert all(client.closed_on is client.loop for client in created)

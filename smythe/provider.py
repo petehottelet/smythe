@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import inspect
 import json
 import math
 import os
@@ -103,6 +104,36 @@ class CompletionResult:
     @property
     def total_tokens(self) -> int:
         return self.prompt_tokens + self.completion_tokens
+
+
+# Stop reasons meaning generation ended before the response was complete.
+# Built-in providers normalize their native signals to these values
+# (OpenAI finish_reason "length" and Gemini MAX_TOKENS become "max_tokens").
+TRUNCATED_STOP_REASONS = frozenset({"max_tokens", "model_context_window_exceeded"})
+
+
+class OutputTruncatedError(RuntimeError):
+    """The model stopped before completing its response.
+
+    Callers raise this only after the call's usage has been recorded, so
+    the billed charge is kept. It is an ordinary provider failure: a node's
+    failure policy applies (RETRY retries, SKIP skips, HALT stops the run).
+    Raising the provider's ``max_tokens`` is the usual remedy.
+    """
+
+    def __init__(self, stop_reason: str, *, where: str | None = None) -> None:
+        self.stop_reason = stop_reason
+        prefix = f"{where}: " if where else ""
+        super().__init__(
+            f"{prefix}provider output was truncated (stop_reason={stop_reason!r}); "
+            "the response is incomplete"
+        )
+
+
+def _raise_if_truncated(result: CompletionResult, *, where: str | None = None) -> None:
+    """Reject incomplete output. Call only after the result's cost is recorded."""
+    if result.stop_reason in TRUNCATED_STOP_REASONS:
+        raise OutputTruncatedError(result.stop_reason, where=where)
 
 
 class ProviderResponseError(RuntimeError):
@@ -406,24 +437,109 @@ _OFFLINE_PNG = base64.b64decode(
 )
 
 
+async def _close_sdk_client(client) -> None:
+    """Close an SDK client's async transport (and google-genai's sync one)."""
+    # google-genai keeps its async transport on ``client.aio``; its
+    # ``close()`` covers only the sync transport. Anthropic and OpenAI
+    # expose one async ``close()``.
+    for close in (getattr(getattr(client, "aio", None), "aclose", None),
+                  getattr(client, "close", None)):
+        if callable(close):
+            outcome = close()
+            if inspect.isawaitable(outcome):
+                await outcome
+
+
+async def _close_at_loop_shutdown(clients: dict, loop, client):
+    """Suspend until *loop* shuts down, then close *client* on that loop."""
+    try:
+        yield
+    finally:
+        if clients.get(loop, (None,))[0] is client:
+            del clients[loop]
+        try:
+            running = asyncio.get_running_loop()
+        except RuntimeError:
+            running = None
+        # Closing from any other loop would touch a dead loop's transports.
+        if running is loop:
+            try:
+                await _close_sdk_client(client)
+            except Exception:
+                pass  # Shutdown cleanup must not mask the run's own outcome.
+
+
+class _LoopClients:
+    """Provider-owned SDK clients, one per running event loop.
+
+    httpx-based SDK clients bind pooled connections to the loop that opened
+    them. The serial executor runs each node under its own ``asyncio.run()``,
+    as do ``Swarm.plan()``, ``execute()`` and ``resume()``, so one cached
+    client would carry a closed loop's connections into the next run
+    ("RuntimeError: Event loop is closed"). A client per loop keeps
+    connection reuse within a run, including a parallel fan-out, and never
+    crosses loops. (The journal-managed providers instead open and close a
+    client per call.)
+
+    Cleanup: a client is closed on its own loop when that loop shuts down
+    its asynchronous generators, which ``asyncio.run()`` does before closing
+    the loop. A client whose loop closed without that step is discarded,
+    not reused. Outside a running loop, ``get`` returns an uncached client.
+    """
+
+    def __init__(self) -> None:
+        self._clients: dict = {}
+
+    def get(self, factory):
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return factory()
+        for known in list(self._clients):
+            if known.is_closed():
+                self._clients.pop(known, None)
+        entry = self._clients.get(loop)
+        if entry is None:
+            client = factory()
+            shutdown = _close_at_loop_shutdown(self._clients, loop, client)
+            # Advance to the first ``yield``: that registers the generator
+            # with the running loop, whose shutdown_asyncgens() will aclose()
+            # it. The entry keeps it alive; the loop only holds a weak ref.
+            try:
+                shutdown.asend(None).send(None)
+            except StopIteration:
+                pass
+            entry = (client, shutdown)
+            self._clients[loop] = entry
+        return entry[0]
+
+
 class AnthropicProvider(Provider):
-    """Provider backed by the Anthropic Messages API."""
+    """Provider backed by the Anthropic Messages API.
+
+    SDK clients are cached per event loop (see ``_LoopClients``). A client
+    assigned to ``_client`` is caller-owned and used as-is.
+    """
 
     def __init__(self, *, api_key: str | None = None, max_tokens: int = 4096) -> None:
         self._api_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
         self._max_tokens = max_tokens
         self._client = None
+        self._loop_clients = _LoopClients()
+
+    def _new_client(self):
+        try:
+            import anthropic
+        except ImportError as exc:
+            raise ImportError(
+                "Install the anthropic extra: pip install smythe[anthropic]"
+            ) from exc
+        return anthropic.AsyncAnthropic(api_key=self._api_key)
 
     def _get_client(self):
-        if self._client is None:
-            try:
-                import anthropic
-            except ImportError as exc:
-                raise ImportError(
-                    "Install the anthropic extra: pip install smythe[anthropic]"
-                ) from exc
-            self._client = anthropic.AsyncAnthropic(api_key=self._api_key)
-        return self._client
+        if self._client is not None:
+            return self._client
+        return self._loop_clients.get(self._new_client)
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         return await self.chat(system, [ChatMessage(role="user", content=prompt)], model)
@@ -571,25 +687,31 @@ class OpenAIProvider(Provider):
             float(request_timeout_s) if request_timeout_s is not None else None
         )
         self._client_max_retries = max_retries
+        # A client assigned to ``_client`` is caller-owned and used as-is;
+        # owned clients are cached per event loop (see ``_LoopClients``).
         self._client = None
+        self._loop_clients = _LoopClients()
+
+    def _new_client(self):
+        try:
+            import openai
+        except ImportError as exc:
+            raise ImportError(
+                "Install the openai extra: pip install smythe[openai]"
+            ) from exc
+        kwargs = {"api_key": self._api_key}
+        if self._base_url:
+            kwargs["base_url"] = self._base_url
+        if self._request_timeout_s is not None:
+            kwargs["timeout"] = self._request_timeout_s
+        if self._client_max_retries is not None:
+            kwargs["max_retries"] = self._client_max_retries
+        return openai.AsyncOpenAI(**kwargs)
 
     def _get_client(self):
-        if self._client is None:
-            try:
-                import openai
-            except ImportError as exc:
-                raise ImportError(
-                    "Install the openai extra: pip install smythe[openai]"
-                ) from exc
-            kwargs = {"api_key": self._api_key}
-            if self._base_url:
-                kwargs["base_url"] = self._base_url
-            if self._request_timeout_s is not None:
-                kwargs["timeout"] = self._request_timeout_s
-            if self._client_max_retries is not None:
-                kwargs["max_retries"] = self._client_max_retries
-            self._client = openai.AsyncOpenAI(**kwargs)
-        return self._client
+        if self._client is not None:
+            return self._client
+        return self._loop_clients.get(self._new_client)
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         return await self.chat(system, [ChatMessage(role="user", content=prompt)], model)
@@ -933,7 +1055,11 @@ class GeminiProvider(Provider):
             )
         self._max_cost_per_call_usd = max_cost_per_call_usd
         self._image_config = dict(image_config) if image_config else None
+        # A client assigned to ``_client`` is caller-owned and used as-is;
+        # owned clients are cached per event loop (see ``_LoopClients``).
+        # One genai.Client per loop covers both its sync and ``aio`` surfaces.
         self._client = None
+        self._loop_clients = _LoopClients()
 
     @property
     def cost_estimate_per_call(self) -> float | None:
@@ -954,19 +1080,22 @@ class GeminiProvider(Provider):
             return any(str(item).upper() == "IMAGE" for item in self._response_modalities)
         return any(hint in model.lower() for hint in ("image", "banana"))
 
+    def _new_client(self):
+        try:
+            from google import genai
+        except ImportError as exc:
+            raise ImportError(
+                "Install the gemini extra: pip install smythe[gemini]"
+            ) from exc
+        kwargs = {}
+        if self._api_key:
+            kwargs["api_key"] = self._api_key
+        return genai.Client(**kwargs)
+
     def _get_client(self):
-        if self._client is None:
-            try:
-                from google import genai
-            except ImportError as exc:
-                raise ImportError(
-                    "Install the gemini extra: pip install smythe[gemini]"
-                ) from exc
-            kwargs = {}
-            if self._api_key:
-                kwargs["api_key"] = self._api_key
-            self._client = genai.Client(**kwargs)
-        return self._client
+        if self._client is not None:
+            return self._client
+        return self._loop_clients.get(self._new_client)
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         return await self.chat(system, [ChatMessage(role="user", content=prompt)], model)
@@ -1050,6 +1179,11 @@ class GeminiProvider(Provider):
                 cost_usd_is_estimate = False
                 cost_usd_unknown = True
 
+        if self._finish_reason(response) == "MAX_TOKENS":
+            stop = "max_tokens"
+        else:
+            stop = "tool_use" if tool_calls else "end_turn"
+
         usage = response.usage_metadata
         # The SDK can set token-count attributes to None (observed on
         # image-only responses), so coerce before arithmetic downstream.
@@ -1058,12 +1192,23 @@ class GeminiProvider(Provider):
             prompt_tokens=_usage_tokens(usage, "prompt_token_count"),
             completion_tokens=_usage_tokens(usage, "candidates_token_count"),
             tool_calls=tool_calls,
-            stop_reason="tool_use" if tool_calls else "end_turn",
+            stop_reason=stop,
             artifacts=artifacts,
             cost_usd=cost_usd,
             cost_usd_is_estimate=cost_usd_is_estimate,
             cost_usd_unknown=cost_usd_unknown,
         )
+
+    @staticmethod
+    def _finish_reason(response) -> str | None:
+        """The first candidate's finish reason as an upper-case name, if any."""
+        candidates = getattr(response, "candidates", None)
+        if not isinstance(candidates, (list, tuple)) or not candidates:
+            return None
+        reason = getattr(candidates[0], "finish_reason", None)
+        # The SDK returns a string enum; its value is the wire name.
+        reason = getattr(reason, "value", reason)
+        return reason.upper() if isinstance(reason, str) else None
 
     @staticmethod
     def _extract_artifacts(response) -> list[Artifact]:

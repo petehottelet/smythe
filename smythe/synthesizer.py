@@ -14,7 +14,7 @@ from smythe.budget import (
 from smythe.graph import ExecutionGraph, Node, NodeStatus
 from smythe.provider import (
     Provider, ProviderResponseError, _native_receipt, _native_response_errors,
-    _settle_response_error, _settle_response_group,
+    _raise_if_truncated, _settle_response_error, _settle_response_group,
 )
 from smythe.task import Task, render_task
 from smythe.tracer import Tracer
@@ -293,6 +293,8 @@ class Synthesizer:
             if resolved_budget:
                 cost = resolved_budget.add_cost("__synthesis__", result)
                 synth_node.metadata["cost_usd"] = cost
+            # Checked after billing so a truncated merge keeps its charge.
+            _raise_if_truncated(result, where="Synthesis")
 
             synth_node.status = NodeStatus.COMPLETED
             return result.text

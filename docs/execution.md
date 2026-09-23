@@ -10,9 +10,35 @@ retains completed results and recorded charges.
 | `RETRY` | Make up to `max_retries` additional attempts; stop if all fail |
 | `SKIP` | Mark the node skipped and continue eligible work |
 
+A skipped node's dependents receive `[skipped: this step did not complete]` in
+place of its result. The error text stays in the node's `result`, the trace,
+and checkpoints for diagnosis, but it never enters a dependent's prompt or the
+synthesized output. Resumed runs apply the same rule to saved skipped nodes.
+
+Truncated output is a provider error. When a response stops at its output
+limit (Anthropic `stop_reason` `max_tokens` or `model_context_window_exceeded`,
+OpenAI `finish_reason` `length`, Gemini `finish_reason` `MAX_TOKENS`), the
+executor records the call's charge and then raises `OutputTruncatedError`. The
+node's failure policy applies, a retry passes budget admission again before it
+is sent, and no tool call from the truncated turn runs.
+An `LLM_MERGE` synthesis raises the same error after recording its charge.
+Raising the provider's `max_tokens` is the usual fix.
+
 A node timeout follows its failure policy. Invalid accounting, budget
 admission or reconciliation failures, and failures persisting a billed result
 are terminal regardless of that policy. See [Cost guardrails](budgets.md).
+
+## Concurrency
+
+`Swarm(parallel=False)`, the default, runs one node at a time on every path.
+`execute()` uses the serial executor. `execute_async()`, `resume()`, and
+`aresume()` use the async executor with a concurrency of one.
+`Swarm(parallel=True)` admits up to `max_concurrency` ready nodes at once
+(default 8; `None` means unlimited) on the same paths. A durable run
+(`run_store`) records the concurrency of its first execution and keeps it when
+resumed.
+
+## Terminal failures
 
 In serial execution, every later node remains pending after a terminal
 failure, including independent siblings and descendants with `SKIP` policies.
@@ -28,6 +54,16 @@ nodes and their costs, resets failed or interrupted nodes, and continues the
 pending graph. Invalid-accounting markers require reconciliation first.
 Unfinished [verification transitions](verifier.md#recovery-and-concurrent-work)
 are recovered before new work or cached-output return.
+
+## Provider connections
+
+Serial execution runs each node under its own `asyncio.run()`, as do
+`Swarm.plan()`, `execute()`, and `resume()`. `AnthropicProvider`,
+`OpenAIProvider`, `OpenAIImageProvider`, and `GeminiProvider` therefore keep
+one SDK client per event loop. Calls on the same loop share its connection
+pool, so a parallel run reuses connections across its fan-out. A client is
+never used on another loop, and it closes on its own loop when that loop shuts
+down (`asyncio.run()` does this before closing it).
 
 ## Deep graphs
 
