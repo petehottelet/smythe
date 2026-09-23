@@ -43,8 +43,9 @@ class WhiteRabbit:
     When no classifier provider is set, falls back to the autonomous architect.
     Classifier replies match tier names and deterministic keys without
     regard to case or surrounding quotes, backticks, or punctuation, so
-    deterministic keys must differ by more than case.  An unmatched reply
-    falls back to the autonomous architect and logs a warning.
+    deterministic keys must differ by more than case and surrounding
+    punctuation.  An unmatched reply falls back to the autonomous architect
+    and logs a warning.
     """
 
     def __init__(
@@ -59,11 +60,13 @@ class WhiteRabbit:
     ) -> None:
         self._deterministic_by_key: dict[str, DeterministicArchitect] = {}
         for key, tier in (deterministic or {}).items():
-            folded = key.casefold() if isinstance(key, str) else key
+            # Normalize keys exactly as replies are read, so a key such as
+            # "faq?" stays reachable when the reply loses its punctuation.
+            folded = key.strip(_REPLY_DECORATION).casefold() if isinstance(key, str) else key
             if folded in self._deterministic_by_key:
                 raise ValueError(
-                    f"Deterministic router keys must differ by more than case: {key!r} "
-                    "collides with another key"
+                    "Deterministic router keys must differ by more than case and "
+                    f"surrounding punctuation: {key!r} collides with another key"
                 )
             self._deterministic_by_key[folded] = tier
         self._deterministic = deterministic or {}

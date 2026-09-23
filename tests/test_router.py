@@ -160,6 +160,27 @@ def test_keys_differing_only_by_case_are_rejected():
         )
 
 
+@pytest.mark.parametrize("key", ["faq?", "[legacy]", "summary:", "report (short)", "report."])
+def test_keys_with_surrounding_punctuation_stay_reachable(key):
+    """Replies lose their surrounding punctuation, so stored keys must too."""
+    tier = FixedArchitect("tier")
+    router = WhiteRabbit(
+        deterministic={key: tier},
+        autonomous=FixedArchitect("fallback"),
+        classifier_provider=ClassifierMockProvider(f"deterministic:{key}"),
+        classifier_model="test",
+    )
+    assert router.route(Task(goal="Route it")) is tier
+
+
+def test_keys_differing_only_by_surrounding_punctuation_are_rejected():
+    with pytest.raises(ValueError, match="surrounding punctuation"):
+        WhiteRabbit(
+            deterministic={"report": FixedArchitect("a"), "report.": FixedArchitect("b")},
+            autonomous=FixedArchitect("fallback"),
+        )
+
+
 @pytest.mark.parametrize("reply", [
     "I think this is a constrained task", "deterministic:missing", "constrained",
 ])
