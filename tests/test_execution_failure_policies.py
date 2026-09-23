@@ -12,6 +12,7 @@ from smythe.async_executor import AsyncExecutor
 from smythe.budget import Sentinel
 from smythe.checkpoint import FileCheckpointStore
 from smythe.executor import Executor
+from smythe.executor_base import SKIPPED_DEPENDENCY_RESULT, TERMINAL_DELIVERABLE_NOTE
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
@@ -226,3 +227,84 @@ def test_halted_checkpoint_resumes_failed_and_pending_work_only(mode, policy, at
     )
     assert resumed.resume(execution_id).output == result.output
     assert resumed_provider.calls == ["problem", "queued", "skip-child", "grandchild"]
+
+
+SKIP_ERROR = "HTTP 500 from upstream: stack trace /srv/secret/path.py line 42"
+
+
+class PromptRecordingProvider(Provider):
+    """Fails the "Fetch" step and records every other prompt by label."""
+
+    def __init__(self, *, crash_summary=False):
+        self.prompts = {}
+        self.crash_summary = crash_summary
+
+    async def complete(self, system, prompt, model):
+        label = prompt.splitlines()[0]
+        if label == "Fetch":
+            raise RuntimeError(SKIP_ERROR)
+        self.prompts[label] = prompt
+        if label == "Summarize" and self.crash_summary:
+            raise RuntimeError("process died")
+        return CompletionResult(f"done: {label}", cost_usd=0.125)
+
+
+def make_skip_graph():
+    return ExecutionGraph([Topology.SERIAL], [
+        Node("Fetch", id="fetch", failure_policy=FailurePolicy.SKIP),
+        Node("Other", id="other"),
+        Node("Summarize", id="summ", depends_on=["fetch", "other"]),
+    ])
+
+
+def assert_marker_not_error(prompt):
+    assert f"[fetch]: {SKIPPED_DEPENDENCY_RESULT}" in prompt
+    assert "[other]: done: Other" in prompt
+    assert "secret" not in prompt and "HTTP 500" not in prompt
+    # The terminal note still asks for carried-forward context; only the
+    # marker, never the error, is there to carry.
+    assert TERMINAL_DELIVERABLE_NOTE in prompt
+
+
+def test_skipped_dependency_passes_marker_not_error_text(mode):
+    provider = PromptRecordingProvider()
+    graph, tracer = make_skip_graph(), Tracer()
+    options = dict(provider=provider, registry=Registry(), tracer=tracer, artifact_dir=None)
+    if mode == "serial":
+        Executor(**options).run(graph)
+    else:
+        asyncio.run(AsyncExecutor(**options, max_concurrency=1).run(graph))
+
+    fetch = graph.nodes[0]
+    assert fetch.status is NodeStatus.SKIPPED
+    # The error stays on the node and in the trace for diagnosis.
+    assert fetch.result == SKIP_ERROR
+    assert any(span["node_id"] == "fetch" and span["error"] == SKIP_ERROR
+               for span in tracer.summary())
+    assert_marker_not_error(provider.prompts["Summarize"])
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_resumed_dependent_sees_skip_marker_and_checkpoint_keeps_error(parallel, tmp_path):
+    store = FileCheckpointStore(tmp_path)
+    first = PromptRecordingProvider(crash_summary=True)
+    swarm = Swarm(provider=first, model="test-model", parallel=parallel,
+                  checkpoint_store=store, artifact_dir=None)
+    with pytest.raises(RuntimeError, match="process died"):
+        swarm.execute(make_skip_graph())
+    assert_marker_not_error(first.prompts["Summarize"])
+    [execution_id] = store.list_ids()
+    saved = {node["id"]: node for node in store.load(execution_id)["graph"]["nodes"]}
+    assert saved["fetch"]["status"] == "skipped"
+    assert saved["fetch"]["result"] == SKIP_ERROR
+
+    resumed_provider = PromptRecordingProvider()
+    resumed = Swarm(provider=resumed_provider, model="test-model", parallel=parallel,
+                    checkpoint_store=store, artifact_dir=None).resume(execution_id)
+
+    assert list(resumed_provider.prompts) == ["Summarize"]
+    assert_marker_not_error(resumed_provider.prompts["Summarize"])
+    assert "secret" not in resumed.output
+    final = {node["id"]: node for node in store.load(execution_id)["graph"]["nodes"]}
+    assert final["fetch"]["status"] == "skipped"
+    assert final["fetch"]["result"] == SKIP_ERROR

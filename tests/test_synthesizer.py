@@ -331,3 +331,30 @@ def test_deliverable_falls_back_when_every_node_is_a_verifier():
     graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[only])
 
     assert "PASS" in Synthesizer(SynthesisStrategy.DELIVERABLE).synthesize(graph)
+
+
+@pytest.mark.parametrize("strategy", list(SynthesisStrategy))
+@pytest.mark.parametrize("skipped_is_terminal", [False, True])
+def test_skipped_node_error_text_never_reaches_output(strategy, skipped_is_terminal):
+    """A SKIPPED node keeps its error as ``result``; that is not output."""
+    error = "HTTP 500 from upstream: stack trace /srv/secret/path.py line 42"
+    fetch = Node(id="fetch", label="Fetch", status=NodeStatus.SKIPPED, result=error)
+    other = Node(id="other", label="Other", status=NodeStatus.COMPLETED, result="{\"a\": 1}")
+    nodes = [fetch, other]
+    if not skipped_is_terminal:
+        nodes.append(Node(id="final", label="Final", depends_on=["fetch", "other"],
+                          status=NodeStatus.COMPLETED, result="{\"b\": 2}"))
+    prompts = []
+
+    class Recording(Provider):
+        async def complete(self, system, prompt, model):
+            prompts.append(prompt)
+            return CompletionResult(text="merged", prompt_tokens=1, completion_tokens=1)
+
+    output = Synthesizer(strategy, provider=Recording()).synthesize(
+        ExecutionGraph(topology=[Topology.SERIAL], nodes=nodes),
+    )
+
+    assert output
+    assert "secret" not in output and "HTTP 500" not in output
+    assert all("secret" not in prompt for prompt in prompts)

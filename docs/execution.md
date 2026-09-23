@@ -10,6 +10,11 @@ retains completed results and recorded charges.
 | `RETRY` | Make up to `max_retries` additional attempts; stop if all fail |
 | `SKIP` | Mark the node skipped and continue eligible work |
 
+A skipped node's dependents receive `[skipped: this step did not complete]` in
+place of its result. The error text stays in the node's `result`, the trace,
+and checkpoints for diagnosis, but it never enters a dependent's prompt or the
+synthesized output. Resumed runs apply the same rule to saved skipped nodes.
+
 A node timeout follows its failure policy. Invalid accounting, budget
 admission or reconciliation failures, and failures persisting a billed result
 are terminal regardless of that policy. See [Cost guardrails](budgets.md).

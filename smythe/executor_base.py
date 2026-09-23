@@ -112,6 +112,13 @@ TERMINAL_DELIVERABLE_NOTE = (
     "own increment."
 )
 
+# What a dependent sees in place of a SKIPPED dependency's result. A node
+# skipped after a failure keeps its error text in ``node.result`` for traces
+# and checkpoints, but that text is not step output: passed on as context,
+# the terminal note above would ask the model to carry it into the
+# deliverable.
+SKIPPED_DEPENDENCY_RESULT = "[skipped: this step did not complete]"
+
 
 class ExecutorBase:
     """Shared infrastructure for all executor variants.
@@ -1008,12 +1015,17 @@ class ExecutorBase:
 
         Artifact paths live in dep metadata (not in the result text, so
         JSON results stay parseable); they are appended here so
-        downstream nodes can reference the files.
+        downstream nodes can reference the files.  A SKIPPED dependency
+        contributes only ``SKIPPED_DEPENDENCY_RESULT``: its recorded
+        result is an error message, not output.
         """
         dep_results: dict[str, Any] = {}
         for dep_id in node.depends_on:
             dep_node = self._cached_node_by_id(dep_id, graph)
             if dep_node is None:
+                continue
+            if dep_node.status is NodeStatus.SKIPPED:
+                dep_results[dep_id] = SKIPPED_DEPENDENCY_RESULT
                 continue
             value = dep_node.result
             records = dep_node.metadata.get("artifacts") or []
