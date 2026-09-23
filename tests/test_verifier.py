@@ -79,18 +79,97 @@ def test_token_verifier_strips_code_fences():
     assert TokenVerifier().verdict(node, Node(id="t", label="t")).passed is False
 
 
-def test_unreadable_verdict_is_treated_as_pass():
-    """An unparseable verdict must not burn the regeneration budget."""
+def _verdict(text):
     node = Node(id="j", label="j")
-    for text in ("", "The weather is nice today.", None):
-        node.result = text
-        assert TokenVerifier().verdict(node, Node(id="t", label="t")).passed is True
+    node.result = text
+    return TokenVerifier().verdict(node, Node(id="t", label="t"))
+
+
+@pytest.mark.parametrize("text", [
+    "", None, "   ", "The weather is nice today.", "Looks good to me, approved.", "ok",
+    '{"reason": "no verdict field"}',
+])
+def test_unreadable_verdict_fails_closed(text):
+    """A gate must not wave work through because its judge was unreadable."""
+    verdict = _verdict(text)
+    assert verdict.passed is False
+    assert verdict.reason
+
+
+@pytest.mark.parametrize("value", ['"false"', '"true"', "1", "0", "null", '"PASS"', "[]"])
+def test_json_passed_must_be_a_boolean(value):
+    verdict = _verdict('{"passed": %s, "reason": "r"}' % value)
+    assert verdict.passed is False
+    assert "JSON boolean" in verdict.reason
+
+
+def test_json_true_passes_with_its_reason():
+    verdict = _verdict('{"passed": true, "reason": "every claim is cited"}')
+    assert verdict.passed is True
+    assert verdict.reason == "every claim is cited"
+
+
+def test_fenced_json_after_prose_is_read():
+    assert _verdict('My verdict:\n```json\n{"passed": true}\n```').passed is True
+    assert _verdict('My verdict:\n```\n{"passed": false}\n```').passed is False
 
 
 def test_first_keyword_wins():
     node = Node(id="j", label="j")
     node.result = "FAILED: this does not pass muster"
     assert TokenVerifier().verdict(node, Node(id="t", label="t")).passed is False
+
+
+@pytest.mark.parametrize("text", [
+    "The draft does not fail any criterion. PASS",
+    "No criterion failed.\n\nVerdict: **PASS**",
+    "PASSED - all three criteria hold",
+    "pass",
+    "Pass.",
+    "**PASSED**",
+])
+def test_lowercase_prose_is_not_a_verdict(text):
+    assert _verdict(text).passed is True
+
+
+@pytest.mark.parametrize("text", ["fail", "Failed.", "Verdict: FAIL - two claims lack sources"])
+def test_explicit_failures_fail(text):
+    assert _verdict(text).passed is False
+
+
+@pytest.mark.parametrize("text", [
+    "Criterion 1: PASS\nCriterion 2: FAIL",
+    "PASS/FAIL",
+    "I would say PASS, but on reflection FAIL.",
+])
+def test_conflicting_verdict_words_fail_closed(text):
+    verdict = _verdict(text)
+    assert verdict.passed is False
+    assert "ambiguous" in verdict.reason
+
+
+def test_pathological_json_fails_closed_instead_of_raising():
+    assert _verdict("[" * 100_000 + "]" * 100_000).passed is False
+    assert _verdict('{"passed": ' + "1" * 5000 + "}").passed is False
+
+
+def test_unreadable_verdicts_regenerate_only_up_to_the_limit():
+    """Failing closed stays bounded: the run finishes with the last output."""
+    graph = _gated_graph(max_regenerations=2)
+    provider = ScriptedProvider({"draft": ["v1", "v2", "v3"], "judge": ["Looks fine to me."]})
+    _run(graph, provider)
+
+    assert provider.runs["draft"] == 3
+    assert graph.nodes[1].metadata["regenerations_used"] == 2
+    assert all(n.status is NodeStatus.COMPLETED for n in graph.nodes)
+    assert graph.nodes[0].result == "v3"
+
+
+def test_advisory_gate_never_reads_an_unreadable_verdict():
+    graph = _gated_graph(max_regenerations=0)
+    provider = ScriptedProvider({"draft": ["v1"], "judge": ["Looks fine to me."]})
+    _run(graph, provider)
+    assert provider.runs == {"draft": 1, "judge": 1}
 
 
 def test_callable_verifier_accepts_bool_or_verdict():

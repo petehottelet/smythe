@@ -33,8 +33,10 @@ class SubGraphTemplate:
     Attributes:
         name: Unique template identifier shown in the LLM menu.
         description: Human-readable description of what this template does.
-        builder: Callable that accepts a Task and optional params dict,
-                 returning a list of Nodes and a Registry of agents.
+        builder: Callable invoked as ``builder(task, **params)``, where
+                 ``params`` is the optional object the model supplied with
+                 its selection, returning a list of Nodes and a Registry of
+                 agents.  Params are model output: validate them.
     """
 
     name: str
@@ -151,7 +153,7 @@ class ConstrainedArchitect(Architect):
         )
 
     def _extract_selections(self, text: str) -> list[dict[str, Any]]:
-        """Parse JSON array from LLM response."""
+        """Parse the JSON array of selections, raising ValueError on any schema error."""
         stripped = text.strip()
         fence_match = re.search(
             r"```(?:json)?\s*\n?(.*?)\n?\s*```", stripped, re.DOTALL
@@ -159,9 +161,29 @@ class ConstrainedArchitect(Architect):
         if fence_match:
             stripped = fence_match.group(1).strip()
 
-        data = json.loads(stripped)
+        try:
+            data = json.loads(stripped)
+        except RecursionError:
+            raise ValueError("The selection JSON is nested too deeply") from None
         if not isinstance(data, list):
             raise ValueError("Expected a JSON array of template selections")
+        for index, selection in enumerate(data):
+            if not isinstance(selection, dict):
+                raise ValueError(
+                    f"Selection at index {index} must be an object with a "
+                    f"'template' key, got {type(selection).__name__}"
+                )
+            unknown = sorted(key for key in selection if key not in ("template", "params"))
+            if unknown:
+                raise ValueError(
+                    f"Selection at index {index} has unsupported field(s) {unknown}; "
+                    "allowed fields are ['params', 'template']"
+                )
+            if not isinstance(selection.get("template"), str):
+                raise ValueError(f"Selection at index {index} needs a string 'template'")
+            params = selection.get("params")
+            if params is not None and not isinstance(params, dict):
+                raise ValueError(f"'params' in selection at index {index} must be an object")
         return data
 
     def _compose(
@@ -192,7 +214,7 @@ class ConstrainedArchitect(Architect):
                 )
 
             template = self._templates[template_name]
-            params = sel.get("params", {})
+            params = sel.get("params") or {}
 
             nodes, registry = template.builder(task, **params)
             if self._run_binding is not None:

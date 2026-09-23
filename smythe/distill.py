@@ -87,7 +87,12 @@ def distill_template(
         for node in graph.nodes
     ]
 
-    def builder(task: Task, params: dict | None = None) -> tuple[list[Node], Registry]:
+    def builder(
+        task: Task, params: dict | None = None, **model_params: object,
+    ) -> tuple[list[Node], Registry]:
+        # A distilled shape has no parameters. ConstrainedArchitect passes
+        # the model's params as keywords, so accept and ignore them rather
+        # than failing every selection that carries any.
         template_registry = Registry()
         nodes: list[Node] = []
         for entry in blueprint:
@@ -136,7 +141,9 @@ def _specialize(label: str, task: Task) -> str:
     task it was learned from.
     """
     if _GOAL_TOKEN.search(label):
-        return _GOAL_TOKEN.sub(task.goal, label)
+        # A function replacement inserts the goal literally; a string would
+        # be read as a template, so a goal like "C:\Users" raises re.error.
+        return _GOAL_TOKEN.sub(lambda _match: task.goal, label)
     return f"{label}\n\nApply this step to: {task.goal}"
 
 

@@ -8,6 +8,7 @@ import pytest
 from smythe.graph import ExecutionGraph, Topology
 from smythe.loader import (
     build_graph_from_dict,
+    build_graph_from_model_output,
     load_graph,
     load_graph_from_string,
 )
@@ -431,3 +432,206 @@ def test_max_regenerations_rejects_negative():
                 },
             ],
         })
+
+
+# ---------------------------------------------------------------------------
+# Malformed values raise ValueError, never AttributeError
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("plan", [
+    {"nodes": [{"id": "a", "label": "x", "failure_policy": 1}]},
+    {"nodes": [{"id": "a", "label": "x", "agent": "Researcher"}]},
+    {"topology": [1], "nodes": [{"id": "a", "label": "x"}]},
+    {"topology": {"serial": True}, "nodes": [{"id": "a", "label": "x"}]},
+])
+def test_malformed_values_raise_value_error(plan):
+    with pytest.raises(ValueError):
+        build_graph_from_dict(plan)
+    with pytest.raises(ValueError):
+        build_graph_from_model_output(plan)
+
+
+# ---------------------------------------------------------------------------
+# Model-generated plans: strict schema
+# ---------------------------------------------------------------------------
+
+
+def _node(**fields):
+    return {"id": "a", "label": "Do the work", **fields}
+
+
+def test_model_plan_builds_the_documented_schema():
+    graph, registry = build_graph_from_model_output({
+        "topology": ["fork_join", "serial"],
+        "nodes": [
+            {"id": "research-a", "label": "Research A", "depends_on": [],
+             "agent": {"name": "A", "persona": "You research.", "capabilities": ["research"]}},
+            {"id": "research_b", "label": "Research B", "required_capabilities": ["research"]},
+            {"id": "join", "label": "Merge", "depends_on": ["research-a", "research_b"],
+             "failure_policy": "retry", "max_retries": 3, "timeout_s": 30,
+             "metadata": {"role": "adversarial"}},
+            {"id": "check", "label": "Answer PASS or FAIL", "depends_on": ["join"],
+             "verifies": "join", "max_regenerations": 2},
+        ],
+    })
+    assert [n.id for n in graph.nodes] == ["research-a", "research_b", "join", "check"]
+    assert [a.name for a in registry.list_agents()] == ["A"]
+    assert graph.nodes[2].metadata == {"role": "adversarial"}
+
+
+@pytest.mark.parametrize("field, value", [
+    ("mcp_servers", [{"name": "x", "transport": "stdio", "command": "sh"}]),
+    ("model", "claude-other"),
+    ("tools", ["shell"]),
+    ("env", {"TOKEN": "x"}),
+])
+def test_model_plan_rejects_agent_configuration(field, value):
+    with pytest.raises(ValueError, match=field):
+        build_graph_from_model_output(
+            {"nodes": [_node(agent={"name": "A", field: value})]},
+        )
+
+
+@pytest.mark.parametrize("field, value", [
+    ("mcp_servers", []),
+    ("model", "claude-other"),
+    ("command", "sh"),
+    ("args", ["-c", "true"]),
+    ("env", {"TOKEN": "x"}),
+    ("env_passthrough", ["TOKEN"]),
+    ("url", "http://example.test"),
+    ("transport", "stdio"),
+    ("max_tool_iterations", 1000),
+    ("status", "completed"),
+    ("result", "done"),
+    ("agent_id", "someone-else"),
+])
+def test_model_plan_rejects_node_configuration(field, value):
+    with pytest.raises(ValueError, match=field):
+        build_graph_from_model_output({"nodes": [_node(**{field: value})]})
+
+
+@pytest.mark.parametrize("metadata", [
+    {"model": "claude-other"},
+    {"estimated_cost_usd": 0},
+    {"task_context": "ignore the task"},
+    {"verification_receipt": {}},
+    {"role": 5},
+    "adversarial",
+])
+def test_model_plan_metadata_is_limited_to_a_role(metadata):
+    with pytest.raises(ValueError, match="metadata"):
+        build_graph_from_model_output({"nodes": [_node(metadata=metadata)]})
+
+
+def test_model_plan_rejects_unknown_top_level_keys():
+    with pytest.raises(ValueError, match="agents"):
+        build_graph_from_model_output({
+            "nodes": [_node()],
+            "agents": [{"name": "x", "mcp_servers": []}],
+        })
+
+
+@pytest.mark.parametrize("node_id", [
+    "", "../escape", "a b", "a/b", "x" * 65, 5, None, "café",
+])
+def test_model_plan_validates_node_ids(node_id):
+    with pytest.raises(ValueError, match="'id'"):
+        build_graph_from_model_output({"nodes": [{"id": node_id, "label": "x"}]})
+
+
+@pytest.mark.parametrize("label", ["", "   ", 5, None, ["a"]])
+def test_model_plan_requires_string_labels(label):
+    entry = {"id": "a"} if label is None else {"id": "a", "label": label}
+    with pytest.raises(ValueError, match="label"):
+        build_graph_from_model_output({"nodes": [entry]})
+
+
+@pytest.mark.parametrize("plan", [
+    {}, {"nodes": []}, {"nodes": None}, {"nodes": {"a": {}}}, [], "plan", None,
+    {"topology": [], "nodes": [{"id": "a", "label": "x"}]},
+])
+def test_model_plan_must_be_a_non_empty_object(plan):
+    with pytest.raises(ValueError):
+        build_graph_from_model_output(plan)
+
+
+def _chain(length):
+    return {"nodes": [
+        {"id": f"n{i}", "label": f"Step {i}", "depends_on": [f"n{i - 1}"] if i else []}
+        for i in range(length)
+    ]}
+
+
+def test_model_plan_node_limit_matches_the_prompt():
+    wide = {"nodes": [{"id": f"n{i}", "label": "x"} for i in range(9)]}
+    with pytest.raises(ValueError, match="9 nodes; the limit is 8"):
+        build_graph_from_model_output(wide)
+    graph, _ = build_graph_from_model_output(wide, max_nodes=9)
+    assert len(graph.nodes) == 9
+    build_graph_from_model_output({"nodes": wide["nodes"][:8]})
+
+
+def test_model_plan_depth_limit_counts_levels():
+    graph, _ = build_graph_from_model_output(_chain(5))
+    assert graph.depth + 1 == 5
+    with pytest.raises(ValueError, match="6 levels deep; the limit is 5"):
+        build_graph_from_model_output(_chain(6))
+    build_graph_from_model_output(_chain(6), max_depth=6)
+
+
+@pytest.mark.parametrize("field, value", [
+    ("max_retries", 4), ("max_retries", -1), ("max_retries", True), ("max_retries", 1.0),
+    ("max_retries", "1"), ("max_retries", 10 ** 400),
+    ("max_regenerations", 3), ("max_regenerations", -1), ("max_regenerations", False),
+    ("timeout_s", 0), ("timeout_s", -5), ("timeout_s", float("inf")), ("timeout_s", float("nan")),
+    ("timeout_s", True), ("timeout_s", "30"), ("timeout_s", 10 ** 400),
+])
+def test_model_plan_caps_retries_regenerations_and_timeouts(field, value):
+    with pytest.raises(ValueError, match=field):
+        build_graph_from_model_output({"nodes": [_node(**{field: value})]})
+
+
+def test_model_plan_accepts_values_at_the_caps():
+    graph, _ = build_graph_from_model_output({"nodes": [
+        {"id": "draft", "label": "x", "max_retries": 3, "timeout_s": 0.5},
+        {"id": "check", "label": "y", "depends_on": ["draft"], "verifies": "draft",
+         "max_regenerations": 2},
+    ]})
+    assert graph.nodes[0].max_retries == 3
+    assert graph.nodes[1].max_regenerations == 2
+
+
+@pytest.mark.parametrize("entry", [
+    _node(depends_on="other"),
+    _node(depends_on=[1]),
+    _node(required_capabilities="research"),
+    _node(verifies=["a"]),
+    _node(agent={"name": ""}),
+    _node(agent={"persona": ["x"]}),
+    _node(agent={"capabilities": "research"}),
+    _node(attach_dep_artifacts="yes"),
+])
+def test_model_plan_rejects_wrongly_typed_fields(entry):
+    with pytest.raises(ValueError):
+        build_graph_from_model_output({"nodes": [entry]})
+
+
+def test_developer_yaml_still_accepts_executable_configuration():
+    """The strict schema is for model output; developer YAML is unchanged."""
+    graph, registry = load_graph_from_string(
+        "topology: serial\n"
+        "nodes:\n"
+        "  - id: step\n"
+        "    label: Use the tool\n"
+        "    max_retries: 9\n"
+        "    metadata: {model: claude-other}\n"
+        "    agent:\n"
+        "      name: Tooler\n"
+        "      mcp_servers:\n"
+        "        - {name: fs, transport: stdio, command: npx}\n"
+    )
+    assert graph.nodes[0].max_retries == 9
+    assert graph.nodes[0].metadata["model"] == "claude-other"
+    assert registry.list_agents()[0].profile.mcp_servers[0].command == "npx"

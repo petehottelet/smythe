@@ -9,7 +9,11 @@ from abc import ABC, abstractmethod
 
 from smythe.budget import Sentinel, validate_completion_usage, validate_token_count
 from smythe.graph import ExecutionGraph, Node, Topology
-from smythe.loader import build_graph_from_dict
+from smythe.loader import (
+    MODEL_PLAN_MAX_DEPTH,
+    MODEL_PLAN_MAX_NODES,
+    build_graph_from_model_output,
+)
 from smythe.prompts import (
     PLANNING_SYSTEM_PROMPT,
     RETRY_PROMPT,
@@ -86,6 +90,16 @@ class LLMArchitect(Architect):
     The Architect sends the task to the LLM with a structured prompt
     describing available topologies and the expected JSON output schema.
     The response is parsed into an ExecutionGraph with agent personas.
+
+    The reply is model output, so it is parsed under a strict schema
+    (:func:`smythe.loader.build_graph_from_model_output`): a plan cannot
+    declare MCP servers or per-node models, and it must stay within
+    ``max_nodes`` nodes and ``max_depth`` levels.  A reply that breaks
+    the schema is retried like malformed JSON, up to ``max_retries``.
+
+    A durable run's ``WorkflowGraphPolicy`` is checked after planning and
+    its rejection is final, so keep ``max_nodes`` at or below the policy's
+    ``max_nodes``: an oversized plan is then repaired, not fatal.
     """
 
     def __init__(
@@ -99,6 +113,8 @@ class LLMArchitect(Architect):
         registry: Registry | None = None,
         *,
         planning_instructions: str = "",
+        max_nodes: int = MODEL_PLAN_MAX_NODES,
+        max_depth: int = MODEL_PLAN_MAX_DEPTH,
         run_binding: ComponentBinding | None = None,
     ) -> None:
         self._provider = provider
@@ -113,7 +129,21 @@ class LLMArchitect(Architect):
         if type(planning_instructions) is not str:
             raise ValueError("planning_instructions must be a string")
         self._planning_instructions = planning_instructions
+        for name, value in (("max_nodes", max_nodes), ("max_depth", max_depth)):
+            if type(value) is not int or value < 1:
+                raise ValueError(f"{name} must be a positive integer, got {value!r}")
+        self._max_nodes = max_nodes
+        self._max_depth = max_depth
         self._run_binding = run_binding
+
+    def _plan_limits(self) -> dict:
+        """Non-default plan limits; defaults are omitted so existing recipes keep their identity."""
+        limits = {}
+        if self._max_nodes != MODEL_PLAN_MAX_NODES:
+            limits["max_nodes"] = self._max_nodes
+        if self._max_depth != MODEL_PLAN_MAX_DEPTH:
+            limits["max_depth"] = self._max_depth
+        return limits
 
     def workflow_description(self, **defaults) -> dict:
         require_exact(self, LLMArchitect)
@@ -130,6 +160,7 @@ class LLMArchitect(Architect):
                 "avg_tokens_per_node": self._avg_tokens_per_node,
                 **({"planning_instructions": self._planning_instructions}
                    if self._planning_instructions else {}),
+                **self._plan_limits(),
                 "registry": describe_component(self._registry, role="registry")}
 
     def workflow_providers(self) -> tuple[Provider, ...]:
@@ -143,6 +174,7 @@ class LLMArchitect(Architect):
             avg_tokens_per_node=self._avg_tokens_per_node,
             registry=self._registry.bind_run(binding.child("registry")) if self._registry else None,
             planning_instructions=self._planning_instructions,
+            max_nodes=self._max_nodes, max_depth=self._max_depth,
             run_binding=binding,
         )
 
@@ -160,6 +192,12 @@ class LLMArchitect(Architect):
                             "These instructions govern the plan, not the task's answer. "
                             "Do not add them to the deliverable schema.\n"
                             + self._planning_instructions)
+        if self._plan_limits():
+            # The system prompt states the default limits; say which apply.
+            user_prompt += ("\n\n## Plan limits\n"
+                            f"Use at most {self._max_nodes} nodes and keep the graph at most "
+                            f"{self._max_depth} levels deep. These limits replace the "
+                            "defaults stated in the rules.")
 
         last_error: Exception | None = None
         for attempt in range(1 + self._max_retries):
@@ -180,7 +218,9 @@ class LLMArchitect(Architect):
             validate_completion_usage(result)
             try:
                 data = self._extract_json(result.text)
-                graph, registry = build_graph_from_dict(data)
+                graph, registry = build_graph_from_model_output(
+                    data, max_nodes=self._max_nodes, max_depth=self._max_depth,
+                )
                 graph.estimated_cost_usd = self._estimate_cost(graph)
                 return graph, registry
             except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
@@ -226,7 +266,10 @@ class LLMArchitect(Architect):
         if fence_match:
             stripped = fence_match.group(1).strip()
 
-        data = json.loads(stripped)
+        try:
+            data = json.loads(stripped)
+        except RecursionError:
+            raise ValueError("The plan JSON is nested too deeply") from None
         if not isinstance(data, dict):
             raise ValueError("Expected a JSON object at the top level")
         return data

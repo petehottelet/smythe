@@ -43,7 +43,7 @@ run has already banked or the money already spent on it.
 ## Safety
 
 Adaptive orchestration is an unbounded agent loop unless you bound it.
-Four guardrails do that:
+Five guardrails do that:
 
 1. **`max_revisions`** caps how many times a run may be revised.
    Supervision is off by default (`max_revisions=0`).
@@ -62,6 +62,17 @@ Four guardrails do that:
    supervision to the shared ledger, reserve request-bound quotes before review
    calls, and preserve their charges and unknown exposure across recovery.
    See [accounting scope](budgets.md#current-scope).
+5. **Strictly read proposals.** `LLMSupervisor` applies a reply only when
+   `change` is JSON `true` (not the string `"true"`) and every field has the
+   type shown in its prompt; anything else means no change. A proposal that
+   adds more than `max_added_nodes` nodes (default 3) is treated as no
+   change, not truncated, and logged as a warning on the `smythe.supervisor`
+   logger. The cap applies to model proposals; a `Supervisor` you write
+   yourself is your code and is not capped.
+
+```python
+LLMSupervisor(provider, max_added_nodes=1)   # at most one new step per revision
+```
 
 ## Triggering reviews
 

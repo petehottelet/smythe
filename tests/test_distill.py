@@ -161,3 +161,52 @@ def test_distilled_template_composes_with_the_constrained_architect():
 
     assert len(built.nodes) == 2
     assert any("A brand new task" in n.label for n in built.nodes)
+
+
+@pytest.mark.parametrize("goal", [
+    r"C:\Users\me\report.docx",
+    r"count every \d+ in the log",
+    r"\g<0> and \1 are literal",
+])
+def test_goal_is_substituted_literally(goal):
+    """A goal is not a regex replacement template."""
+    graph, registry = _completed_graph()
+    graph.nodes[0].label = "Research {goal} thoroughly"
+    template = distill_template(graph, name="t", registry=registry)
+    nodes, _ = template.builder(Task(goal=goal))
+    assert nodes[0].label == f"Research {goal} thoroughly"
+
+
+def test_distilled_builder_accepts_params_however_they_arrive():
+    graph, registry = _completed_graph()
+    template = distill_template(graph, name="t", registry=registry)
+    for nodes, _ in (
+        template.builder(Task(goal="x")),
+        template.builder(Task(goal="x"), {"depth": 2}),
+        template.builder(Task(goal="x"), params={"depth": 2}),
+        template.builder(Task(goal="x"), depth=2, audience="board"),
+    ):
+        assert [n.id for n in nodes] == ["research", "review"]
+
+
+def test_distilled_template_tolerates_model_supplied_params():
+    """ConstrainedArchitect calls builder(task, **params); that used to raise TypeError."""
+    from smythe.constrained_planner import ConstrainedArchitect
+    from smythe.provider import CompletionResult, Provider
+
+    class PickWithParams(Provider):
+        def __init__(self):
+            self.calls = 0
+
+        async def complete(self, system, prompt, model):
+            self.calls += 1
+            return CompletionResult(text='[{"template": "learned", "params": {"depth": 2}}]')
+
+    graph, registry = _completed_graph()
+    template = distill_template(graph, name="learned", registry=registry)
+    provider = PickWithParams()
+    architect = ConstrainedArchitect(provider=provider, templates=[template], max_retries=0)
+    built, _ = architect.plan(Task(goal="A brand new task"))
+
+    assert len(built.nodes) == 2
+    assert provider.calls == 1

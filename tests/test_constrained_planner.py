@@ -233,3 +233,28 @@ def test_constrained_planner_catches_bad_params_type():
     graph, _ = planner.plan(task)
     assert len(graph.nodes) == 1
     assert len(provider.prompts_received) == 2
+
+
+@pytest.mark.parametrize("bad_response, message", [
+    ('["research"]', "must be an object"),
+    ('[{"template": 1}]', "string 'template'"),
+    ('[{}]', "string 'template'"),
+    ('[{"template": "research", "params": ["x"]}]', "'params'"),
+    ('[{"template": "research", "agent": {"mcp_servers": []}}]', "unsupported field"),
+    ("[" * 100_000 + "]" * 100_000, "nested too deeply"),
+])
+def test_malformed_selections_are_retried_as_value_errors(bad_response, message):
+    """A reply like ["research"] used to escape the retry loop as AttributeError."""
+    provider = MockConstrainedProvider([bad_response, json.dumps([{"template": "draft"}])])
+    planner = ConstrainedArchitect(provider=provider, templates=TEMPLATES, max_retries=1)
+
+    graph, _ = planner.plan(Task(goal="Recover from a malformed selection"))
+
+    assert [n.id for n in graph.nodes] == ["draft-0-write"]
+    assert message in provider.prompts_received[1]
+
+
+def test_null_params_are_treated_as_no_params():
+    provider = MockConstrainedProvider([json.dumps([{"template": "parallel-work", "params": None}])])
+    graph, _ = ConstrainedArchitect(provider=provider, templates=TEMPLATES).plan(Task(goal="x"))
+    assert len([n for n in graph.nodes if "w-" in n.id]) == 2
