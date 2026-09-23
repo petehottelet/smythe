@@ -37,13 +37,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Any
 
 from smythe._images import open_image
 from smythe.verifier import CallableVerifier, Verdict
 
-if TYPE_CHECKING:
-    from PIL.Image import Image as PILImage
+# Pillow stays a runtime import inside functions, as in smythe._images: a
+# module-level import, even under TYPE_CHECKING, pulls Pillow and numpy stubs
+# into the package's mypy run.
+_PILImage = Any
 
 # Anti-patterns worth avoiding by default. These are the shapes models
 # fall into unprompted, not universal design sins — override freely.
@@ -190,7 +192,7 @@ def check_palette(
 
 
 def _palette_findings(
-    sample: PILImage,
+    sample: _PILImage,
     targets: list[tuple[int, int, int]],
     *,
     tolerance: int = 60,
@@ -247,7 +249,7 @@ def check_blank(
     return _blank_findings(sample, tolerance=tolerance, min_uniform=min_uniform)
 
 
-def _blank_sample(image: PILImage) -> PILImage:
+def _blank_sample(image: _PILImage) -> _PILImage:
     """Area-average *image* onto the blank-test grid, keeping transparency."""
     from PIL import Image
 
@@ -258,7 +260,7 @@ def _blank_sample(image: PILImage) -> PILImage:
 
 
 def _blank_findings(
-    sample: PILImage,
+    sample: _PILImage,
     *,
     tolerance: int = _BLANK_TOLERANCE,
     min_uniform: float = _BLANK_MIN_UNIFORM,
@@ -318,7 +320,7 @@ def check_flat_regions(
 
 
 def _flat_region_findings(
-    sample: PILImage, *, min_fraction: float = 0.06, grid: int = _FLAT_GRID,
+    sample: _PILImage, *, min_fraction: float = 0.06, grid: int = _FLAT_GRID,
 ) -> list[Finding]:
     flat_cells = 0
     for row in range(grid):
@@ -346,7 +348,7 @@ def dhash(path: Path) -> int:
     return _dhash_bits(sample)
 
 
-def _dhash_bits(sample: PILImage) -> int:
+def _dhash_bits(sample: _PILImage) -> int:
     # Grayscale tobytes() is one byte per pixel, so it indexes directly.
     px = sample.tobytes()
     bits = 0
@@ -389,10 +391,10 @@ class _Samples:
     """The small samples of one decoded image that the detectors read."""
 
     size: tuple[int, int]
-    palette: PILImage
-    flat: PILImage
-    blank: PILImage
-    gray: PILImage
+    palette: _PILImage
+    flat: _PILImage
+    blank: _PILImage
+    gray: _PILImage
 
 
 def _decode_samples(path: Path) -> _Samples:
