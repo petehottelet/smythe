@@ -6,7 +6,7 @@ CheckpointStore.  A crashed or interrupted execution can then be picked
 up with ``swarm.resume(execution_id)``, re-running only the nodes that
 never completed.
 
-The state is a plain JSON document (version 3) so users can inspect or
+The state is a plain JSON document (version 4) so users can inspect or
 repair checkpoints by hand.  See docs/checkpoint-format.md for the full
 schema.
 """
@@ -29,10 +29,14 @@ from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topolo
 from smythe.registry import Registry
 from smythe.task import Task, task_from_dict, task_snapshots_equal, task_to_dict
 
-CHECKPOINT_VERSION = 3
+CHECKPOINT_VERSION = 4
 # v3 adds mandatory verification dispositions. Older graphs without an
-# ambiguous unfinished gating decision remain readable.
-SUPPORTED_CHECKPOINT_VERSIONS = (1, 2, 3)
+# ambiguous unfinished gating decision remain readable. v4 changes no field:
+# it certifies that every agent MCP server it records came from developer
+# configuration, because builds that write v4 never take servers from model
+# output. Earlier versions may hold servers a model-generated plan declared.
+SUPPORTED_CHECKPOINT_VERSIONS = (1, 2, 3, 4)
+MCP_TRUSTED_CHECKPOINT_VERSION = 4
 
 _EXECUTION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
@@ -146,6 +150,22 @@ def agents_from_list(data: list[dict[str, Any]]) -> list[Agent]:
             ),
         ))
     return agents
+
+
+def drop_untrusted_mcp_servers(agents: list[Agent], *, version: int) -> list[str]:
+    """Remove MCP servers restored from a checkpoint older than version 4.
+
+    Before 0.8.1 a model-generated plan could declare MCP servers, and resume
+    would start them as local programs.  Version 4 checkpoints record only
+    developer-configured servers, so theirs are kept.  Returns the removed
+    servers as ``"<agent id>/<server name>"``.
+    """
+    if version >= MCP_TRUSTED_CHECKPOINT_VERSION:
+        return []
+    dropped = [f"{agent.id}/{spec.name}" for agent in agents for spec in agent.profile.mcp_servers]
+    for agent in agents:
+        agent.profile.mcp_servers = []
+    return dropped
 
 
 def reset_incomplete_nodes(graph: ExecutionGraph) -> list[str]:

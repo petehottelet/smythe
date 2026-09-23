@@ -1,4 +1,4 @@
-# Checkpoint format (version 3)
+# Checkpoint format (version 4)
 
 This guide describes the ordinary `checkpoint_store` path. Opt-in
 [`run_store` workflows](workflow-accounting.md) use a separate SQLite journal
@@ -44,7 +44,7 @@ and recovery controls.
 
 ```json
 {
-  "version": 3,
+  "version": 4,
   "execution_id": "9f2c4a…",
   "status": "running | completed | failed",
   "created_at": 1751600000.0,
@@ -150,9 +150,16 @@ resume. See [Cost guardrails](budgets.md).
 
 ## Version compatibility
 
-This build writes version `3` and reads versions `1`, `2`, and `3`.
+This build writes version `4` and reads versions `1` through `4`.
 Version 2 added `control` and `task.done_when`; version 1 loads their original
 defaults of zero revisions and no acceptance criteria.
+
+Version 4 adds no field. It records that every MCP server listed under
+`agents` came from developer configuration: from 0.8.1 on, a model-generated
+plan cannot declare MCP servers. Before 0.8.1 one could, and resume would start
+the server as a local program. Resuming a version 1–3 checkpoint therefore
+removes its agents' `mcp_servers` and logs a warning naming them; re-run the
+task to use those tools. Older readers reject version 4.
 
 The optional `graph.task` field is additive. Legacy graphs inherit the
 checkpoint's top-level task when available. If both populated task copies

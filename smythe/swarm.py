@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -16,6 +17,7 @@ from smythe.checkpoint import (
     CheckpointStore,
     agents_from_list,
     build_state,
+    drop_untrusted_mcp_servers,
     graph_from_dict,
     reset_incomplete_nodes,
     task_from_dict,
@@ -45,6 +47,8 @@ from smythe.verifier import Verifier, validate_verification_checkpoint, verifica
 from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_policy import WorkflowGraphPolicy, snapshot_graph_policy
 from smythe.workflow_store import SQLiteWorkflowStore
+
+logger = logging.getLogger("smythe.swarm")
 
 
 @dataclass
@@ -600,7 +604,15 @@ class Swarm:
 
         from smythe.async_executor import AsyncExecutor
 
-        for agent in agents_from_list(state.get("agents", [])):
+        restored = agents_from_list(state.get("agents", []))
+        dropped = drop_untrusted_mcp_servers(restored, version=version)
+        if dropped:
+            logger.warning(
+                "Checkpoint %r predates smythe 0.8.1, when a model-generated plan could "
+                "declare MCP servers; resuming without %s. Re-run the task to use them.",
+                execution_id, dropped,
+            )
+        for agent in restored:
             self._registry.register(agent)
         reset_incomplete_nodes(graph)
         graph.validate()

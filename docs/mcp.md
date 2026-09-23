@@ -31,7 +31,7 @@ MCPServerSpec(
 )
 ```
 
-The value is read from the process environment when the session opens; a missing variable fails immediately with its name. Checkpoints store only the name, so resumed executions re-resolve from the resuming process's environment — no secret ever touches disk.
+The value is read from the process environment when the session opens; a missing variable fails immediately with its name. Checkpoints store only the name, so resumed executions re-resolve from the resuming process's environment — no secret ever touches disk. Resuming a checkpoint written before 0.8.1 drops its agents' MCP servers with a warning, because a generated plan could declare servers then ([checkpoint versions](checkpoint-format.md#version-compatibility)).
 
 ## Allowlists
 

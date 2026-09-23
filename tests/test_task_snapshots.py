@@ -189,13 +189,13 @@ def test_graph_task_field_preserves_positional_construction_and_full_json_roundt
     assert graph_from_dict({"topology": ["serial"], "nodes": []}).task is None
 
 
-def test_checkpoint_v3_retains_complete_task_in_both_snapshots():
+def test_checkpoint_retains_complete_task_in_both_snapshots():
     task = snapshot_task(Task("Goal", constraints=["Constraint"], context={"source": [1]},
                               done_when=["Accepted"]))
     graph = ExecutionGraph([Topology.SERIAL], [Node("Step", id="step")], task=task)
     state = build_state(execution_id="run", status="running", model="test", graph=graph,
                         registry=Registry(), task=task, max_budget_usd=1, node_costs={})
-    assert state["version"] == 3
+    assert state["version"] == checkpoint.CHECKPOINT_VERSION
     assert state["task"] == state["graph"]["task"] == task_to_dict(task)
     task.context["source"].append(2)
     task.constraints.clear()

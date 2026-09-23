@@ -130,7 +130,7 @@ def test_control_saves_bypass_node_batching_and_snapshot_before_callbacks(tmp_pa
     assert reset["result"] is None
     assert "regeneration_intent" not in reset["metadata"]
     assert result.graph.nodes[1].metadata["regenerations_used"] == 1
-    assert all(s["version"] == 3 for s in store.states)
+    assert all(s["version"] == CHECKPOINT_VERSION for s in store.states)
 
 
 @pytest.mark.parametrize("sync", [False, True])
