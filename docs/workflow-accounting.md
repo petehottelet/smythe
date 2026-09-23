@@ -65,8 +65,13 @@ policy = WorkflowGraphPolicy(
 The policy is part of the saved workflow recipe. It applies to generated
 plans, caller-built and YAML graphs, edited handoffs, recovered checkpoints,
 and replayed planning decisions. A revision is checked on a detached candidate
-before it can change the live graph. Oversized or otherwise disallowed plans
-fail before node execution; any planning charges remain in the ledger.
+before it can change the live graph. A disallowed graph fails before node
+execution; any planning charges remain in the ledger. The planner's own limits
+apply first: `LLMArchitect` retries a plan over 8 nodes or 5 levels, so keep
+its `max_nodes` at or below the policy's, and pass
+`architect=LLMArchitect(max_nodes=...)` for a policy above 8 nodes. The policy
+is checked after planning, and resume replays the saved plan, so a plan the
+policy rejects needs a new run.
 
 `max_nodes` counts every node in the current graph, including verification,
 completed, and skipped nodes. Optional limits set to `None` add no restriction.

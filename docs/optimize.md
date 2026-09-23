@@ -286,11 +286,21 @@ atomically created and is checked on every resume and decision. Supplying `--cam
 requires an exact plan and candidate-inventory match.
 
 The promotion method is part of the plan, so a campaign created by 0.8.0 is
-not resumed under the paired t rule: the same command derives a new campaign.
+not resumed under the paired t rule: the same command without `--campaign-id`
+derives a new campaign. Re-running an explicit `--campaign-id` created by 0.8.0
+exits with code 8 (campaign binding drift); finish that campaign on 0.8.0 or
+choose a new ID.
 The method is not part of the holdout identity. If the earlier campaign
 reached its holdout, that challenger policy's holdout is already used and the
 new campaign is refused; inspect the earlier campaign's recorded decision
 instead.
+
+`smythe optimize` exits with code 8 for campaign state errors (an unknown
+campaign, a plan that conflicts with a saved campaign, a used holdout, work that
+needs attention) and for local SQLite or filesystem failures, and with code 9
+when a declared limit (wall time, trials, candidates or spend) stops or refuses
+it. With `--json`, `error.type`
+names the exact error, such as `HoldoutAlreadyUsedError`.
 
 Inspect a campaign without mutating the ledger:
 
