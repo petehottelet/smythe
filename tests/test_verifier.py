@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 import pytest
 
@@ -151,6 +152,197 @@ def test_conflicting_verdict_words_fail_closed(text):
 def test_pathological_json_fails_closed_instead_of_raising():
     assert _verdict("[" * 100_000 + "]" * 100_000).passed is False
     assert _verdict('{"passed": ' + "1" * 5000 + "}").passed is False
+
+
+_FORMAT_ECHO = (
+    'Expected format:\n```json\n{"passed": true, "reason": "..."}\n```\n'
+    'My verdict:\n```json\n{"passed": false, "reason": "uncited claims"}\n```'
+)
+
+# Every reply from the 0.8.1 verdict-parser review, plus clean replies whose
+# meaning must not change.  A false PASS lets a defective deliverable
+# through, so each ambiguous reply must FAIL.
+VERDICTS = [
+    # An uppercase PASS that is negated, conditional or quoted is not a verdict.
+    pytest.param("The memo failed criterion 2 (no sources), so it cannot PASS.", False,
+                 id="cannot-pass"),
+    pytest.param("Rejected: the draft does not PASS.", False, id="rejected-does-not-pass"),
+    pytest.param("REJECTED - the draft does not PASS.", False, id="REJECTED-does-not-pass"),
+    pytest.param("It FAILS to PASS criterion 2.", False, id="fails-to-pass"),
+    pytest.param("NOT PASS", False, id="not-pass"),
+    pytest.param("Does it PASS? No.", False, id="question"),
+    pytest.param("The memo would PASS if the citations were added.", False, id="would-pass-if"),
+    pytest.param('The draft claims "all tests PASS", which is false.', False, id="quoted-pass"),
+    pytest.param("Criterion 1: PASS\nCriterion 2: PASS\nCriterion 3: not met (no sources)\n"
+                 "Overall: not approved", False, id="criteria-without-final-verdict"),
+    pytest.param("The draft does not PASS.", False, id="does-not-pass"),
+    pytest.param("fail - does not PASS", False, id="lowercase-fail-does-not-pass"),
+    # JSON cannot be overridden by prose, and its strings are never prose.
+    pytest.param('{"passed": false, "reason": "criterion 2 is not a PASS"}.', False,
+                 id="json-false-then-period"),
+    pytest.param('Verdict: {"passed": false, "reason": "no PASS on criterion 2"}', False,
+                 id="labelled-json-false"),
+    pytest.param('{"passed": false, "reason": "no sources"}\nOverall it would PASS with citations.',
+                 False, id="json-false-then-prose"),
+    pytest.param('FAIL\n```json\n{"passed": true}\n```', False, id="prose-fail-json-true"),
+    pytest.param(_FORMAT_ECHO, False, id="echoed-format-example"),
+    pytest.param('```json\n{"passed": true}\n```\nOn reflection, criterion 3 is unmet: FAIL', False,
+                 id="json-true-then-prose-fail"),
+    pytest.param('PASS\n```json\n{"passed": false}\n```', False, id="prose-pass-json-false"),
+    pytest.param('{"passed": false, "passed": true}', False, id="repeated-passed-key"),
+    pytest.param('{"passed": false, "reason": "the format is {"passed": true}"}', False,
+                 id="malformed-json-around-a-verdict"),
+    pytest.param('Verdict: PASS\n{"passed": tru', False, id="truncated-json"),
+    pytest.param('{"passed": true, "criteria": [{"name": "sources", "passed": false}]}', False,
+                 id="nested-false"),
+    pytest.param('{"verdict": {"passed": true}}', False, id="nested-true-is-not-a-verdict"),
+    pytest.param('[{"passed": true}]', False, id="array-is-not-a-verdict"),
+    pytest.param('{"result": "PASS"}', False, id="json-string-is-not-prose"),
+    # A PASS must stand alone; other positions and contradictions fail.
+    pytest.param("PASS\n\nOn reflection, the memo does not PASS criterion 3.", False,
+                 id="pass-then-negated-pass"),
+    pytest.param("Verdict: PASS - provided the citations are added", False, id="conditional-pass"),
+    pytest.param("PASS, if the citations are added.", False, id="pass-comma-if"),
+    pytest.param("Criterion 1 - sources\nVerdict: PASS\nCriterion 2 - length\n"
+                 "Verdict: not met (950 words)", False, id="unreadable-verdict-line"),
+    pytest.param("The memo FAILED criterion 2.\n\nVerdict: PASS", False, id="fail-word-then-pass"),
+    pytest.param("```\nFAILED test_sources\n```\nPASS", False, id="fail-word-in-code-block"),
+    pytest.param("Result: PASS\nResult: not met", False, id="result-is-not-a-verdict-label"),
+    pytest.param("Everything checks out: PASS", False, id="arbitrary-label"),
+    pytest.param("- PASS\n- PASS\n- missing sources", False, id="bulleted-pass"),
+    pytest.param("1. PASS\n2. PASS\n3. missing sources", False, id="numbered-pass"),
+    pytest.param("Test log:\n```\nPASS\n```\nThe draft omits the failing case.", False,
+                 id="pass-in-code-block"),
+    pytest.param("> PASS\n\nThat status line in the draft is wrong.", False,
+                 id="pass-in-blockquote"),
+    pytest.param("PASS-THROUGH mode is undocumented, so criterion 2 is unmet.", False,
+                 id="hyphenated-word"),
+    pytest.param("See PASS.md; criterion 2 is unmet.", False, id="file-name"),
+    pytest.param("PASS?", False, id="pass-question"),
+    # Avoidable false FAILs from the review now pass.
+    pytest.param("PASS/FAIL: PASS", True, id="choice-label"),
+    pytest.param("Verdict (PASS or FAIL): PASS", True, id="choice-in-label"),
+    pytest.param("Verdict: PASSES", True, id="passes"),
+    pytest.param('```JSON\n{"passed": true}\n```', True, id="uppercase-fence-tag"),
+    pytest.param('{"passed": true}\nThe draft is fine.', True, id="json-then-prose"),
+    pytest.param('Here is my verdict: {"passed": true}', True, id="prose-then-json"),
+    pytest.param('The rubric says "answer PASS or FAIL". PASS.', True, id="rubric-echo"),
+    pytest.param("FAIL or PASS? PASS.", True, id="reversed-choice"),
+    pytest.param("PASS-FAIL grading applies.\nVerdict: PASS", True, id="hyphenated-choice"),
+    # Clean replies keep their meaning.
+    pytest.param("PASS", True, id="PASS"),
+    pytest.param("FAIL", False, id="FAIL"),
+    pytest.param("Pass.", True, id="bare-any-case"),
+    pytest.param("PASS. Everything checks out.", True, id="leading-pass"),
+    pytest.param("FAIL - the draft contradicts the source data.", False, id="leading-fail"),
+    pytest.param("PASS — all criteria met", True, id="em-dash"),
+    pytest.param("PASS (3/3 criteria met)", True, id="parenthetical"),
+    pytest.param("The draft does not fail any criterion. PASS", True, id="trailing-pass"),
+    pytest.param("Is the memo ready? PASS", True, id="after-question"),
+    pytest.param("Overall: PASS", True, id="overall"),
+    pytest.param("Final verdict - PASS", True, id="final-verdict"),
+    pytest.param("**Verdict:** PASS", True, id="bold-label"),
+    pytest.param("## Verdict: FAIL", False, id="heading-fail"),
+    pytest.param("Verdict:\nPASS", True, id="label-on-own-line"),
+    pytest.param("My final verdict is PASS", True, id="verdict-is"),
+    pytest.param("| Verdict | PASS |", True, id="table-row"),
+    pytest.param("Criterion 1: PASS\nCriterion 2: PASS\n\nOverall: PASS", True,
+                 id="criteria-with-final-verdict"),
+    pytest.param("Criterion 1: PASS\nCriterion 2: FAIL\n\nOverall: PASS", False,
+                 id="criteria-contradict-final-verdict"),
+    pytest.param('{"passed": true, "reason": "every claim is cited"}', True, id="json-true"),
+    pytest.param('{"passed": false}', False, id="json-false"),
+    pytest.param('My verdict:\n```json\n{"passed": true}\n```', True, id="fenced-json"),
+    pytest.param('Verdict: PASS\n{"passed": true, "reason": "fine"}', True,
+                 id="json-agrees-with-prose"),
+]
+
+
+@pytest.mark.parametrize(("text", "passed"), VERDICTS)
+def test_verdict_table(text, passed):
+    assert _verdict(text).passed is passed
+
+
+@pytest.mark.parametrize(("text", "reason"), [
+    ('```JSON\n{"passed": false, "reason": "typo"}\n```', "typo"),
+    ('Verdict: {"passed": false, "reason": "no PASS on criterion 2"}', "no PASS on criterion 2"),
+    ('{"passed": false, "reason": "no sources"}\nOverall it would PASS with citations.',
+     "no sources"),
+    ('Here is my verdict: {"passed": true, "reason": "cited"}', "cited"),
+])
+def test_json_verdict_is_read_through_surrounding_text(text, reason):
+    assert _verdict(text).reason == reason
+
+
+@pytest.mark.parametrize(("text", "expected"), [
+    ('FAIL\n```json\n{"passed": true}\n```', "ambiguous verdict"),
+    (_FORMAT_ECHO, "ambiguous verdict"),
+    ('{"passed": false, "passed": true}', "repeats 'passed'"),
+    ('Verdict: PASS\n{"passed": tru', "not part of valid JSON"),
+    ("It can't PASS.", "negated or conditional PASS"),
+    ("Verdict: not a pass", "unreadable verdict"),
+])
+def test_rejected_verdicts_say_why(text, expected):
+    verdict = _verdict(text)
+    assert verdict.passed is False
+    assert expected in verdict.reason
+
+
+def test_unexamined_json_verdict_fails_closed():
+    """At most 64 JSON candidates are decoded; a verdict beyond them fails the reply."""
+    verdict = _verdict('{"note": 1} ' * 64 + '{"passed": true}')
+    assert verdict.passed is False
+    assert "not part of valid JSON" in verdict.reason
+    assert _verdict('{"note": 1} ' * 63 + '{"passed": true}').passed is True
+
+
+def test_negated_pass_sends_the_draft_back():
+    graph = _gated_graph(max_regenerations=1)
+    provider = ScriptedProvider({
+        "draft": ["v1", "v2"], "judge": ["Rejected: the draft does not PASS.", "PASS"],
+    })
+    _run(graph, provider)
+    assert provider.runs["draft"] == 2
+    assert graph.nodes[0].result == "v2"
+
+
+def _timed_verdict(text):
+    start = time.perf_counter()
+    verdict = _verdict(text)
+    return verdict, time.perf_counter() - start
+
+
+@pytest.mark.parametrize(("text", "passed"), [
+    pytest.param("```" + " " * 2000 + "x", False, id="open-fence-then-spaces"),
+    pytest.param("PASS\n```\n" + "\n" * 2000 + "end", True, id="open-fence-then-newlines"),
+])
+def test_unclosed_code_fence_is_read_quickly(text, passed):
+    """A cubic fence regex took 4 to 16 seconds on these 2 KB replies."""
+    verdict, seconds = _timed_verdict(text)
+    assert verdict.passed is passed
+    assert seconds < 0.5
+
+
+@pytest.mark.parametrize("text", [
+    pytest.param("```" + " " * 190_000 + "x", id="open-fence-then-spaces"),
+    pytest.param("PASS\n```\n" + "\n" * 190_000 + "end", id="open-fence-then-newlines"),
+    pytest.param("{" * 190_000, id="open-braces"),
+    pytest.param('{"a":' * 38_000, id="nested-objects"),
+    pytest.param('[{"a": 1}, ' * 17_000, id="nested-arrays"),
+    pytest.param('"passed": ' * 19_000, id="stray-keys"),
+    pytest.param("PASS " * 10_000, id="verdict-words"),
+    pytest.param("Verdict: x\n" * 5_000, id="verdict-labels"),
+])
+def test_large_adversarial_reply_is_read_in_linear_time(text):
+    verdict, seconds = _timed_verdict(text)
+    assert isinstance(verdict.passed, bool)
+    assert seconds < 0.5
+
+
+def test_overlong_reply_fails_closed():
+    verdict = _verdict("PASS\n" + "x" * 200_001)
+    assert verdict.passed is False
+    assert "too long" in verdict.reason
 
 
 def test_unreadable_verdicts_regenerate_only_up_to_the_limit():
