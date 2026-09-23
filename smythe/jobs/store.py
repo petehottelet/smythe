@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import re
 import sqlite3
 import threading
@@ -255,6 +256,20 @@ def _validate_read_row(row, table: str) -> None:
             raise RunStoreError("Invalid stored text in " + table + "." + field)
 
 
+def _create_private_database_file(path: Path) -> None:
+    """Create a missing database file (and its directory) owner-only.
+
+    SQLite gives the -wal and -shm files the main file's permissions, so the
+    whole journal stays private. Existing files and directories are untouched.
+    """
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except OSError:
+        return  # Already exists, or SQLite reports the failure as it always has.
+    os.close(descriptor)
+
+
 def _artifact_identity(run: dict[str, Any], schema_version: int) -> dict[str, Any]:
     namespace = run["artifact_namespace"] if schema_version >= 4 else None
     owner = run["artifact_owner_id"] if schema_version >= 4 else None
@@ -285,7 +300,7 @@ class SQLiteRunStore:
         self._clock_ns = time.time_ns if clock_ns is None else clock_ns
         self._lock = threading.RLock()
         if not read_only:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
+            _create_private_database_file(self.path)
         try:
             self._connection = sqlite3.connect(
                 self.path.as_uri() + "?mode=ro" if read_only else self.path,

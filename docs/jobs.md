@@ -30,6 +30,10 @@ pip install "smythe[jobs,gemini]==0.8.0"
 
 The installed command is `smythe`. Job state defaults to
 `~/.smythe/jobs.sqlite3`; use `--store PATH` to choose another SQLite file.
+The journal stores prompts and responses, so a new database file is created
+readable only by its owner (mode 0600, which SQLite also applies to its `-wal`
+and `-shm` files), and a missing parent directory is created as 0700. Existing
+files and directories keep their permissions.
 
 ## Manifest v1
 
