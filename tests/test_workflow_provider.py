@@ -15,7 +15,8 @@ from smythe.provider import (
 from smythe.provider_responses import OpenAIResponsesProvider, RawResponseEnvelope, ResponseQuoteError
 from smythe.tools import ChatMessage, ToolSpec
 from smythe.workflow_provider import (
-    WorkflowProviderContext, describe_provider, snapshot_provider, validate_workflow_model,
+    ProviderRequestRejectedError, WorkflowProviderContext, describe_provider, snapshot_provider,
+    validate_workflow_model,
 )
 from smythe.workflow_store import (
     CallKey, SQLiteWorkflowStore, WorkflowBudgetError, WorkflowConflictError, WorkflowError,
@@ -40,6 +41,16 @@ def response(**changes):
 def wire(body):
     return SimpleNamespace(content=body if isinstance(body, bytes) else json.dumps(body).encode(),
                            status_code=200, headers={"x-request-id": "req_workflow"})
+
+
+class HTTPStatusFailure(Exception):
+    """Mimics an SDK status error, which carries the raw HTTP response."""
+
+    def __init__(self, status, error_type="requests", code="rate_limit_exceeded"):
+        super().__init__(f"Error code: {status}")
+        body = {"error": {"message": "Provider error", "type": error_type, "param": None, "code": code}}
+        self.response = SimpleNamespace(content=json.dumps(body).encode(), status_code=status,
+                                        headers={"x-request-id": f"req_status_{status}"})
 
 
 @pytest.fixture
@@ -241,6 +252,48 @@ def test_known_bad_output_is_paid_terminal_and_replayed_locally(journal, transpo
     record = journal[0].lookup_call(journal[1].run_id, KEY)
     assert record["billing_state"] == "known" and record["result_state"] == "rejected"
     assert record["cost_nanousd"] == 1_500_000
+    assert transport.generation.await_count == 1
+
+
+def test_rate_limit_is_zero_cost_rejection_and_next_attempt_is_admitted(journal, transport):
+    store, lease = journal
+    transport.generation.side_effect = [HTTPStatusFailure(429), wire(response())]
+    with pytest.raises(ProviderRequestRejectedError) as caught:
+        asyncio.run(invoke(journal))
+    error = caught.value
+    assert not isinstance(error, (ProviderResponseError, WorkflowError))
+    assert error.status_code == 429 and "HTTP 429 (rate_limit_exceeded)" in str(error)
+    assert error.envelope.status_code == 429 and error.envelope.transport_error == "HTTPStatusFailure"
+    assert error.receipt["cost_nanousd"] == 0 and error.receipt["workflow_charge_recorded"] is True
+    record = store.lookup_call(lease.run_id, KEY)
+    assert (record["billing_state"], record["result_state"], record["cost_nanousd"]) == ("known", "rejected", 0)
+    assert store.load_run(lease.run_id)["blocked_reason"] is None
+    # The rejected logical call replays locally and is never resent.
+    with pytest.raises(ProviderRequestRejectedError):
+        asyncio.run(invoke(journal))
+    assert transport.generation.await_count == 1
+    retried = asyncio.run(invoke(journal, key=replace(KEY, attempt=1)))
+    assert retried.text == "Accepted output." and retried.cost_usd == .0015
+    audit = store.inspect_run(lease.run_id)
+    assert audit["confirmed_nanousd"] == sum(call["cost_nanousd"] for call in audit["calls"]) == 1_500_000
+    assert audit["reserved_nanousd"] == audit["unknown_nanousd"] == audit["unknown_calls"] == 0
+    assert transport.generation.await_count == transport.count.await_count == 2
+
+
+@pytest.mark.parametrize("failure", [
+    ConnectionError("connection reset"), HTTPStatusFailure(500, "server_error", None),
+    HTTPStatusFailure(503, "service_unavailable", None),
+])
+def test_transport_and_server_errors_remain_unknown_exposure(journal, transport, failure):
+    store, lease = journal
+    transport.generation.side_effect = failure
+    with pytest.raises(ProviderAccountingError):
+        asyncio.run(invoke(journal))
+    record = store.lookup_call(lease.run_id, KEY)
+    assert record["billing_state"] == "unknown" and record["unknown_nanousd"] > 0
+    assert store.load_run(lease.run_id)["blocked_reason"] == "unknown_exposure"
+    with pytest.raises(WorkflowError):
+        asyncio.run(invoke(journal, key=replace(KEY, attempt=1)))
     assert transport.generation.await_count == 1
 
 

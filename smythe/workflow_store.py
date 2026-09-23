@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import secrets
@@ -158,6 +159,57 @@ def _credential_free(value):
             _credential_free(item)
 
 
+_HTTP_REJECTION_SCOPE = "rejected_http_request"
+# Timeout and closed-connection statuses: the provider may already have run
+# and billed the request, so they keep unknown exposure like transport errors.
+_UNCERTAIN_4XX = frozenset({408, 499})
+_ERROR_IDENTIFIER = re.compile(r"[A-Za-z0-9_.-]{1,128}")
+
+
+def _http_rejection_receipt(evidence, raw, price_version):
+    """Return a zero-cost receipt for a provider's own 4xx error response.
+
+    OpenAI (``{"error": {...}}``) and Anthropic (``{"type": "error", "error":
+    {...}, "request_id": ...}``) answer a request they reject before generation
+    (rate limits, invalid requests, authentication) with a 4xx status and a
+    plain error envelope, and do not bill it. Transport failures, 5xx
+    responses, timeouts and any other body return None: unknown exposure.
+    """
+    status = evidence["status_code"]
+    if (type(status) is not int or not 400 <= status <= 499 or status in _UNCERTAIN_4XX
+            or type(raw) is not dict or type(raw.get("error")) is not dict
+            or not raw.keys() <= {"error", "type", "request_id"} or raw.get("type", "error") != "error"):
+        return None
+
+    def identifier(value):
+        return value if type(value) is str and _ERROR_IDENTIFIER.fullmatch(value) else None
+
+    return {"version": 1, "price_version": price_version, "pricing_scope": _HTTP_REJECTION_SCOPE,
+            "http_status": status, "error_type": identifier(raw["error"].get("type")),
+            "error_code": identifier(raw["error"].get("code")),
+            "cost_nanousd": 0, "cost_usd": "0", "cost_is_complete": True, "accounting_error": None}
+
+
+def _is_http_rejection(record):
+    """Whether a call record is a provider 4xx rejection settled at zero cost."""
+    receipt = record.get("receipt") if record else None
+    return (record is not None and record["billing_state"] == "known"
+            and record["result_state"] == "rejected" and record["cost_nanousd"] == 0
+            and type(receipt) is dict and receipt.get("pricing_scope") == _HTTP_REJECTION_SCOPE)
+
+
+def _create_private_file(path):
+    """Create a new journal readable by its owner only; keep existing modes.
+
+    SQLite gives its -wal and -shm files the database file's permissions.
+    """
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except OSError:
+        return  # Existing file, or an unusable path that SQLite reports itself.
+    os.close(descriptor)
+
+
 @dataclass(frozen=True, slots=True)
 class CallKey:
     phase: str
@@ -216,6 +268,8 @@ class SQLiteWorkflowStore:
         self._lock = threading.RLock()
         if not read_only:
             self.path.parent.mkdir(parents=True, exist_ok=True)
+            # The journal holds raw prompts and responses.
+            _create_private_file(self.path)
         target = self.path.as_uri() + "?mode=ro" if read_only else str(self.path)
         self._db = sqlite3.connect(target, uri=read_only, isolation_level=None, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
@@ -847,6 +901,7 @@ class SQLiteWorkflowStore:
                 raw = _loads(evidence["body"])
             except WorkflowValidationError:
                 raw = None
+            rejection = None
             if provider["kind"] == "offline":
                 valid = (type(raw) is dict and raw.get("provider_kind") == "offline"
                          and type(raw.get("version")) is int and raw["version"] == 1 and type(raw.get("text")) is str
@@ -862,7 +917,12 @@ class SQLiteWorkflowStore:
                 else:
                     native = price_native_response(raw, requested_model=request["model"])
                 cost, receipt = native.cost_nanousd, native.safe_summary()
-                if evidence["transport_error"] or evidence["status_code"] not in (None, 200):
+                rejection = _http_rejection_receipt(evidence, raw, call["price_version"])
+                if rejection is not None:
+                    # Known zero cost with a rejected result: the node's failure
+                    # policy, not an admission latch, decides what happens next.
+                    cost, receipt = 0, rejection
+                elif evidence["transport_error"] or evidence["status_code"] not in (None, 200):
                     cost = None
                     receipt.update(cost_is_complete=False, cost_nanousd=None, cost_usd=None,
                                    accounting_error="Transport or HTTP response was not successful")
@@ -889,6 +949,17 @@ class SQLiteWorkflowStore:
                             _money(unknown - _amount(call["unknown"])), self._clock_ns(), lease.run_id))
                 db.execute("UPDATE workflow_calls SET state='settled',billing_state='known',cost=?,reserved='0',unknown='0',receipt_json=?,receipt_sha=?,error=NULL,updated=? WHERE call_id=?",
                            (_money(cost), receipt_json, _sha(receipt_json), self._clock_ns(), call_id))
+                if rejection is not None:
+                    # Unknown billing always has a pending result, so this is
+                    # the call's first and only semantic disposition.
+                    db.execute("UPDATE workflow_calls SET result_state='rejected',error=? WHERE call_id=?",
+                               (f"HTTP {rejection['http_status']} provider rejection", call_id))
+                if call["billing_state"] == "unknown":
+                    # Late or reclassified evidence, e.g. a 4xx that 0.8.0 held
+                    # as unknown exposure, releases that exposure exactly once.
+                    self._event(db, lease.run_id, "unknown_exposure_resolved", call_id=call_id, payload={
+                        "released_unknown_nanousd": str(_amount(call["unknown"])), "cost_nanousd": str(cost),
+                        "basis": "http_rejection" if rejection is not None else "priced_response"})
                 if cost > _amount(call["ceiling"]):
                     db.execute("UPDATE workflow_runs SET status='blocked',blocked_reason='budget_overrun' WHERE run_id=? AND blocked_reason IN ('unknown_exposure','budget_overrun')",
                                (lease.run_id,))

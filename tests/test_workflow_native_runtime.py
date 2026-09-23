@@ -16,6 +16,7 @@ from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.router import WhiteRabbit
 from smythe.supervisor import LLMSupervisor, SUPERVISOR_SYSTEM_PROMPT
 from smythe.synthesizer import MERGE_SYSTEM_PROMPT, Synthesizer, SynthesisStrategy
+from smythe.workflow_provider import ProviderRequestRejectedError
 from smythe.workflow_store import SQLiteWorkflowStore
 from smythe.workflow_store import WorkflowBudgetError, WorkflowConflictError, WorkflowError
 
@@ -32,10 +33,21 @@ def wire(body, identity):
                            headers={"x-request-id": identity})
 
 
+class RateLimitError(Exception):
+    """Mimics the SDK's 429 status error, which carries the raw HTTP response."""
+
+    def __init__(self):
+        super().__init__("Error code: 429")
+        self.response = SimpleNamespace(content=json.dumps({"error": {
+            "message": "Rate limit reached", "type": "requests", "param": None,
+            "code": "rate_limit_exceeded"}}).encode(), status_code=429,
+            headers={"x-request-id": "req_rate_limited"})
+
+
 @pytest.fixture
 def native_transport(monkeypatch):
     state = SimpleNamespace(requests=[], counts=[], clients=[], planning_outputs=[], overrides={},
-                            invalid_worker_counts=False)
+                            invalid_worker_counts=False, rate_limited=Counter())
 
     async def count(**payload):
         state.counts.append(payload)
@@ -60,6 +72,9 @@ def native_transport(monkeypatch):
             phase = "execution"
             prompt = payload["input"][-1]["content"]
             text = "PASS" if "Your step: Check" in prompt else "Draft accepted output."
+        if state.rate_limited[phase]:
+            state.rate_limited[phase] -= 1
+            raise RateLimitError()
         raw = {
             "id": f"resp_{len(state.requests)}", "model": payload["model"], "status": "completed",
             "service_tier": "default", "usage": {
@@ -262,3 +277,91 @@ def test_managed_quote_failure_does_not_advance_retry_attempt(tmp_path, native_t
         native_transport.invalid_worker_counts = False
         result = instance.resume(graph.run_ref["run_id"])
         assert result.total_cost_usd == .006 and len(native_transport.requests) == 4
+
+
+def draft_calls(store, run_id):
+    return sorted((call["key"]["invocation"], call["key"]["attempt"], call["cost_nanousd"], call["result_state"])
+                  for call in store.inspect_run(run_id)["calls"] if call["key"]["scope_id"] == "node/draft")
+
+
+def assert_exact_ledger(store, run_id):
+    accounting = store.inspect_run(run_id)
+    assert accounting["confirmed_nanousd"] == sum(call["cost_nanousd"] or 0 for call in accounting["calls"])
+    assert accounting["reserved_nanousd"] == accounting["unknown_nanousd"] == accounting["unknown_calls"] == 0
+    assert store.audit(run_id)["ok"]
+
+
+def test_rate_limited_worker_retries_under_retry_policy_with_exact_totals(tmp_path, native_transport):
+    plan = json.loads(json.dumps(PLAN))
+    plan["nodes"][0].update(failure_policy="retry", max_retries=1)
+    native_transport.planning_outputs = [json.dumps(plan)]
+    native_transport.rate_limited["execution"] = 1
+    with SQLiteWorkflowStore(tmp_path / "retry-429.db") as store:
+        result = swarm(store).execute(Task("Write and check"))
+        assert result.output == "Final accepted output."
+        assert result.total_cost_usd == .006 and result.cost_is_complete
+        assert result.workflow_accounting["call_count"] == len(native_transport.requests) == 5
+        assert draft_calls(store, result.execution_id) == [(0, 0, 0, "rejected"), (0, 1, 1_500_000, "applied")]
+        assert_exact_ledger(store, result.execution_id)
+        draft = next(node for node in result.graph.nodes if node.id == "draft")
+        assert not {"accounting_invalid", "response_error"} & draft.metadata.keys()
+
+
+def test_rate_limited_halt_fails_node_and_resume_makes_a_new_attempt(tmp_path, native_transport, monkeypatch):
+    native_transport.rate_limited["execution"] = 1
+    path = tmp_path / "halt-429.db"
+    with SQLiteWorkflowStore(path) as store:
+        instance = swarm(store)
+        graph = instance.plan(Task("Write and check"))
+        run_id = graph.run_ref["run_id"]
+        with pytest.raises(ProviderRequestRejectedError):
+            instance.execute(graph)
+        run = store.load_run(run_id)
+        assert run["status"] == "running" and run["blocked_reason"] is None
+        saved = store.get_checkpoint(run_id)["checkpoint"]
+        draft = next(node for node in saved["graph"]["nodes"] if node["id"] == "draft")
+        assert saved["status"] == "failed" and draft["status"] == "failed" and "HTTP 429" in draft["result"]
+        assert not {"accounting_invalid", "response_error"} & draft["metadata"].keys()
+        assert_exact_ledger(store, run_id)
+        result = instance.resume(run_id)
+        assert result.output == "Final accepted output." and result.total_cost_usd == .006
+        assert len(native_transport.requests) == 5
+        # The rejected attempt stays in the journal; resume used a new invocation.
+        assert draft_calls(store, run_id) == [(0, 0, 0, "rejected"), (1, 0, 1_500_000, "applied")]
+        assert_exact_ledger(store, run_id)
+    monkeypatch.setattr(OpenAIResponsesProvider, "_get_client", lambda _: pytest.fail("SDK on completed resume"))
+    with SQLiteWorkflowStore(path) as reopened:
+        assert swarm(reopened).resume(run_id).total_cost_usd == .006
+
+
+def test_rate_limit_held_as_unknown_by_080_journal_is_reclassified_on_resume(
+    tmp_path, native_transport, monkeypatch,
+):
+    import smythe.workflow_store as workflow_store
+
+    native_transport.rate_limited["execution"] = 1
+    original = workflow_store._http_rejection_receipt
+    # Reproduce a 0.8.0 journal, where the 429 became unknown exposure.
+    monkeypatch.setattr(workflow_store, "_http_rejection_receipt", lambda *args: None)
+    path = tmp_path / "old-429.db"
+    with SQLiteWorkflowStore(path) as store:
+        instance = swarm(store)
+        graph = instance.plan(Task("Write and check"))
+        run_id = graph.run_ref["run_id"]
+        with pytest.raises(ProviderAccountingError):
+            instance.execute(graph)
+        assert store.load_run(run_id)["blocked_reason"] == "unknown_exposure"
+    monkeypatch.setattr(workflow_store, "_http_rejection_receipt", original)
+    with SQLiteWorkflowStore(path) as store:
+        result = swarm(store).resume(run_id)
+        assert result.output == "Final accepted output." and result.total_cost_usd == .006
+        assert result.cost_is_complete and len(native_transport.requests) == 5
+        assert draft_calls(store, run_id) == [(0, 0, 0, "rejected"), (1, 0, 1_500_000, "applied")]
+        events = [event["type"] for event in store.inspect_run(run_id)["events"]]
+        assert events.count("unknown_exposure_resolved") == 1
+        draft = next(node for node in result.graph.nodes if node.id == "draft")
+        assert not {"accounting_invalid", "accounting_error", "response_error",
+                    "cost_usd_unknown"} & draft.metadata.keys()
+        assert_exact_ledger(store, run_id)
+        assert swarm(store).resume(run_id).output == "Final accepted output."
+        assert len(native_transport.requests) == 5

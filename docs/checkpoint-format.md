@@ -23,7 +23,10 @@ With the default `FileCheckpointStore`, checkpoints live at
 temporary file in that directory, flushes its bytes, and atomically replaces
 the checkpoint. Independent store instances cannot overwrite each other's
 temporary files. Failed writes before replacement preserve the previous
-checkpoint and clean up only the current save's temporary file.
+checkpoint and clean up only the current save's temporary file. Checkpoints
+contain prompts and results, so each temporary file, and the checkpoint that
+replaces the previous one, is readable and writable by its owner only (mode
+0600 on POSIX).
 
 POSIX systems also flush the directory entry after replacement. Windows flushes
 the file; Python's standard library cannot separately flush its directory

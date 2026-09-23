@@ -106,6 +106,9 @@ records known charges once, stops further dispatch, and preserves unresolved
 in-memory reservations. These failures cannot trigger an automatic node retry or be
 converted into tool feedback that causes another paid turn. Saved error
 markers block ordinary resume until the response or accounting is reconciled.
+In a [durable workflow](workflow-accounting.md#admission-and-cost), a 4xx
+error response such as a 429 rate limit instead settles at zero cost and
+follows the node's failure policy.
 
 ## Swarm budget scope
 
