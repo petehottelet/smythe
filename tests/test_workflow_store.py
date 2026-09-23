@@ -5,7 +5,9 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 import hashlib
 import json
+import os
 import sqlite3
+import stat
 import threading
 
 import pytest
@@ -585,6 +587,40 @@ def test_read_only_run_discovery_contains_resume_ids_and_exact_balances_only(jou
     assert "task" not in runs["run"] and "config" not in runs["run"]
     with closing(sqlite3.connect(store.path)) as db, db:
         assert list(db.iterdump()) == before
+
+
+def mode(path):
+    return stat.S_IMODE(os.stat(path).st_mode)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+def test_new_journal_and_sqlite_sidecars_are_owner_only(tmp_path):
+    previous = os.umask(0o022)
+    try:
+        with SQLiteWorkflowStore(tmp_path / "new" / "private.db") as store:
+            store.create_run({"goal": "private prompt"}, {}, None, run_id="run")
+            modes = {suffix: mode(f"{store.path}{suffix}") for suffix in ("", "-wal", "-shm")}
+    finally:
+        os.umask(previous)
+    assert modes == {"": 0o600, "-wal": 0o600, "-shm": 0o600}
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+@pytest.mark.parametrize("existing", ["journal", "empty_file"])
+@pytest.mark.parametrize("chosen", [0o644, 0o640, 0o600])
+def test_existing_journal_file_permissions_are_left_unchanged(tmp_path, existing, chosen):
+    path = tmp_path / "shared.db"
+    if existing == "journal":
+        SQLiteWorkflowStore(path).close()
+    else:
+        path.touch()
+    path.chmod(chosen)
+    with SQLiteWorkflowStore(path) as store:
+        store.create_run(None, {}, None, run_id="run")
+        assert mode(path) == chosen
+    with SQLiteWorkflowStore(path, read_only=True) as reader:
+        assert reader.load_run("run")["status"] == "running"
+    assert mode(path) == chosen
 
 
 def test_offline_failed_status_cannot_imply_known_success(journal):

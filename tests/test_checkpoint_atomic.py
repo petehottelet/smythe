@@ -219,3 +219,25 @@ def test_cleanup_failure_does_not_replace_the_original_publication_error(tmp_pat
         # The injected cleanup failure intentionally left this save's temp.
         for path in attempted:
             original_unlink(path, missing_ok=True)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+def test_checkpoints_holding_prompts_are_owner_only_from_first_byte(tmp_path, monkeypatch):
+    store = FileCheckpointStore(tmp_path)
+    original = os.replace
+    temporary_modes = []
+
+    def publish(source, destination):
+        temporary_modes.append(stat.S_IMODE(os.stat(source).st_mode))
+        original(source, destination)
+
+    monkeypatch.setattr(checkpoint.os, "replace", publish)
+    previous = os.umask(0o022)
+    try:
+        store.save("run", {"prompt": "private"})
+        created = stat.S_IMODE((tmp_path / "run.json").stat().st_mode)
+        store.save("run", {"prompt": "private, updated"})
+    finally:
+        os.umask(previous)
+    assert temporary_modes == [0o600, 0o600]
+    assert created == stat.S_IMODE((tmp_path / "run.json").stat().st_mode) == 0o600

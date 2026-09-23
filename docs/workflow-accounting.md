@@ -207,7 +207,10 @@ hashes, and events. `store.audit(execution_id)` verifies accounting and evidence
 bindings. Open `SQLiteWorkflowStore(path, read_only=True)` for inspection without
 schema changes or provider construction. Explicit `load_replay()` and
 `load_evidence()` calls expose sensitive saved text and raw provider responses;
-protect the database and its SQLite sidecar files accordingly. API keys are
+protect the database and its SQLite sidecar files accordingly. Since 0.8.1, a
+new database file is created readable and writable by its owner only (mode
+0600 on POSIX), and SQLite gives its `-wal` and `-shm` files the same mode.
+Opening an existing file never changes its permissions. API keys are
 excluded from stored provider descriptions. Ordinary summaries and traces do
 not include raw responses or encrypted reasoning.
 

@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import secrets
@@ -197,6 +198,18 @@ def _is_http_rejection(record):
             and type(receipt) is dict and receipt.get("pricing_scope") == _HTTP_REJECTION_SCOPE)
 
 
+def _create_private_file(path):
+    """Create a new journal readable by its owner only; keep existing modes.
+
+    SQLite gives its -wal and -shm files the database file's permissions.
+    """
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except OSError:
+        return  # Existing file, or an unusable path that SQLite reports itself.
+    os.close(descriptor)
+
+
 @dataclass(frozen=True, slots=True)
 class CallKey:
     phase: str
@@ -255,6 +268,8 @@ class SQLiteWorkflowStore:
         self._lock = threading.RLock()
         if not read_only:
             self.path.parent.mkdir(parents=True, exist_ok=True)
+            # The journal holds raw prompts and responses.
+            _create_private_file(self.path)
         target = self.path.as_uri() + "?mode=ro" if read_only else str(self.path)
         self._db = sqlite3.connect(target, uri=read_only, isolation_level=None, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
