@@ -15,14 +15,18 @@ place of its result. The error text stays in the node's `result`, the trace,
 and checkpoints for diagnosis, but it never enters a dependent's prompt or the
 synthesized output. Resumed runs apply the same rule to saved skipped nodes.
 
-Truncated output is a provider error. When a response stops at its output
+Truncated output is a provider error for the SDK providers (`AnthropicProvider`,
+`OpenAIProvider` and `GeminiProvider`). When a response stops at its output
 limit (Anthropic `stop_reason` `max_tokens` or `model_context_window_exceeded`,
 OpenAI `finish_reason` `length`, Gemini `finish_reason` `MAX_TOKENS`), the
 executor records the call's charge and then raises `OutputTruncatedError`. The
-node's failure policy applies, a retry passes budget admission again before it
-is sent, and no tool call from the truncated turn runs.
-An `LLM_MERGE` synthesis raises the same error after recording its charge.
-Raising the provider's `max_tokens` is the usual fix.
+node's failure policy applies, a retry reserves the node's estimated cost again
+before it is sent, and no tool call from the truncated turn runs.
+An `LLM_MERGE` synthesis raises the same error after recording its charge;
+synthesis has no failure policy, so the run fails. Raising the provider's
+`max_tokens` is the usual fix. The native `AnthropicMessagesProvider` and
+`OpenAIResponsesProvider` treat a truncated response as a terminal response
+error instead.
 
 A node timeout follows its failure policy. Invalid accounting, budget
 admission or reconciliation failures, and failures persisting a billed result

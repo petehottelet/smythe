@@ -39,8 +39,9 @@ flowchart LR
 
 `Task` captures the goal, constraints, context, and acceptance criteria. An
 Architect converts it into an `ExecutionGraph`: a validated DAG whose nodes
-name concrete work products, dependencies, capabilities, models, failure
-policies, timeouts, and optional verification relationships.
+name concrete work products, dependencies, capabilities, failure policies,
+timeouts, and optional verification relationships. Graphs you write in Python
+or YAML can also set per-node models and agent tools; generated plans cannot.
 
 Applications can inspect, reject, edit, export, or execute the graph. Planning
 never implies execution.
@@ -57,9 +58,19 @@ memory, and resume. [Task handoff semantics](tasks.md).
 | Constrained | `ConstrainedArchitect` | A model selects from approved `SubGraphTemplate` values |
 | Autonomous | `LLMArchitect` | A model generates a task-specific graph |
 
-`WhiteRabbit` can route tasks between those tiers. The registry then assigns
-nodes to agents by required capabilities, including capabilities hydrated from
-external skill inventories.
+`WhiteRabbit` can route tasks between those tiers, matching the classifier's
+reply without regard to case or surrounding punctuation. The registry then
+assigns nodes to agents by required capabilities, including capabilities
+hydrated from external skill inventories.
+
+**Changed in 0.8.1:** model output is data. `LLMArchitect` reads a generated
+plan under a strict schema (`smythe.loader.build_graph_from_model_output`): a
+plan cannot declare MCP servers, commands, URLs, environment variables, or
+per-node models, and unknown fields are rejected. Node ids are 1–64 letters,
+digits, `-` or `_`; plans are limited to 8 nodes and 5 levels by default
+(`LLMArchitect(max_nodes=..., max_depth=...)`), and a node may ask for at most 3
+retries and 2 regenerations. A reply that breaks the schema, or that stops at
+the output token limit, is retried with the problem named, up to `max_retries`.
 
 ### Topology vocabulary
 
@@ -126,7 +137,9 @@ and portable exports. See [Jobs](jobs.md).
 Agents can carry MCP server specifications. The runtime discovers an allowed
 tool set, runs a bounded tool loop, traces every call, and resolves secret
 environment variables at execution time without serializing their values.
-See [MCP](mcp.md).
+Servers come only from developer configuration: Python, YAML, or the templates
+you write. A generated plan cannot declare one, and resuming a checkpoint
+written before 0.8.1 drops its servers. See [MCP](mcp.md).
 
 Capability hydration influences assignment; MCP tools enable execution. The
 Architect receives the effective agent/tool inventory so it can design the
@@ -163,7 +176,8 @@ prompt mutation.
   durable ledger across routing, planning, execution, verification, supervision,
   and synthesis. Request-bound quotes, fenced dispatch, and retained response
   evidence govern admission and recovery. See [managed scope](workflow-accounting.md#supported-scope).
-- A supervisor may change only pending work.
+- A supervisor may change only pending work, and one revision may add at most
+  `max_added_nodes` nodes (default 3).
 - A verifier may reset only its target and downstream dependents.
 - A resumed run keeps completed results, recorded spend, and consumed control allowances.
 
