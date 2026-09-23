@@ -133,7 +133,7 @@ checkpoint already handed to a custom store.
 2. Restores the complete task, validates saved budget policy, charges, and verification state. Conflicting task copies, unresolved accounting markers, or ambiguous verification decisions stop recovery. A completed snapshot with output and no pending verification work returns its validated stored result and task.
 3. Otherwise restores the graph, re-registers the recorded agents, and resets `running` / `failed` nodes to `pending`. It finishes saved regeneration intents and consumes pending verdicts before dispatch. A rejected generation invalidates affected `completed` and `skipped` results too; other finished nodes keep their recorded results.
 4. Restores per-node costs into the budget so the resumed run keeps counting against the original cap.
-5. Executes the remaining nodes (always on the parallel executor), synthesizes over the full graph, and writes the final checkpoint.
+5. Executes the remaining nodes on the async executor, one at a time unless the resuming Swarm has `parallel=True` (then up to `max_concurrency`), synthesizes over the full graph, and writes the final checkpoint.
 
 The trace on a resumed `SwarmResult` covers only the resumed portion; spans from before the crash are not reconstructed.
 

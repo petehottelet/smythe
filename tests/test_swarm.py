@@ -1,5 +1,6 @@
 """Tests for the Swarm top-level orchestrator."""
 
+import asyncio
 import os
 import tempfile
 
@@ -410,3 +411,89 @@ def test_done_when_reaches_every_node_prompt():
     context = graph.nodes[0].metadata["task_context"]
     assert "cites at least three sources" in context
     assert "under 500 words" in context
+
+
+# ---------------------------------------------------------------------------
+# parallel=False means one node at a time on every path, including resume
+# ---------------------------------------------------------------------------
+
+
+class _ConcurrencyProbe(Provider):
+    """Records the peak number of provider calls in flight."""
+
+    def __init__(self, crash_on: str | None = None) -> None:
+        self.active = 0
+        self.peak = 0
+        self.crash_on = crash_on
+
+    async def complete(self, system, prompt, model):
+        label = prompt.splitlines()[0]
+        if label == self.crash_on:
+            raise RuntimeError("process died")
+        self.active += 1
+        self.peak = max(self.peak, self.active)
+        try:
+            await asyncio.sleep(0.01)
+        finally:
+            self.active -= 1
+        return CompletionResult(text=f"done: {label}", prompt_tokens=1, completion_tokens=1)
+
+
+def _independent_graph():
+    return ExecutionGraph(
+        topology=[Topology.BROADCAST_REDUCE],
+        nodes=[Node(id="gate", label="gate")]
+        + [Node(id=f"w{i}", label=f"w{i}") for i in range(4)],
+    )
+
+
+@pytest.mark.parametrize("parallel,peak", [(False, 1), (True, 5)])
+def test_resume_honors_parallel_setting(tmp_path, parallel, peak):
+    from smythe.checkpoint import FileCheckpointStore
+
+    store = FileCheckpointStore(tmp_path)
+    crashed = Swarm(model="m", provider=_ConcurrencyProbe(crash_on="gate"),
+                    checkpoint_store=store, artifact_dir=None)
+    with pytest.raises(RuntimeError, match="process died"):
+        crashed.execute(_independent_graph())
+    [execution_id] = store.list_ids()
+
+    probe = _ConcurrencyProbe()
+    result = Swarm(model="m", provider=probe, parallel=parallel, max_concurrency=8,
+                   checkpoint_store=store, artifact_dir=None).resume(execution_id)
+
+    assert all(node.status.value == "completed" for node in result.graph.nodes)
+    assert probe.peak == peak
+
+
+@pytest.mark.parametrize("parallel,peak", [(False, 1), (True, 5)])
+def test_execute_async_honors_parallel_setting(parallel, peak):
+    probe = _ConcurrencyProbe()
+    swarm = Swarm(model="m", provider=probe, parallel=parallel, max_concurrency=8,
+                  artifact_dir=None)
+
+    asyncio.run(swarm.execute_async(_independent_graph()))
+
+    assert probe.peak == peak
+
+
+@pytest.mark.parametrize("parallel,expected", [(False, 1), (True, 3)])
+def test_durable_paths_record_the_parallel_concurrency(tmp_path, parallel, expected):
+    from smythe import OfflineProvider, SQLiteWorkflowStore
+
+    with SQLiteWorkflowStore(tmp_path / "runs.db") as store:
+        def swarm():
+            return Swarm(model="offline", provider=OfflineProvider(),
+                         architect=SimpleArchitect(), run_store=store, max_budget_usd=1,
+                         parallel=parallel, max_concurrency=3)
+
+        def saved(run_id):
+            return store.get_checkpoint(run_id)["checkpoint"]["max_concurrency"]
+
+        executed = swarm().execute(_independent_graph())
+        awaited = asyncio.run(swarm().execute_async(_independent_graph()))
+        planned = swarm().plan(Task(goal="Report"))
+        resumed = swarm().resume(planned.run_ref["run_id"])
+
+        for result in (executed, awaited, resumed):
+            assert saved(result.execution_id) == expected

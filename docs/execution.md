@@ -27,6 +27,18 @@ A node timeout follows its failure policy. Invalid accounting, budget
 admission or reconciliation failures, and failures persisting a billed result
 are terminal regardless of that policy. See [Cost guardrails](budgets.md).
 
+## Concurrency
+
+`Swarm(parallel=False)`, the default, runs one node at a time on every path.
+`execute()` uses the serial executor. `execute_async()`, `resume()`, and
+`aresume()` use the async executor with a concurrency of one.
+`Swarm(parallel=True)` admits up to `max_concurrency` ready nodes at once
+(default 8; `None` means unlimited) on the same paths. A durable run
+(`run_store`) records the concurrency of its first execution and keeps it when
+resumed.
+
+## Terminal failures
+
 In serial execution, every later node remains pending after a terminal
 failure, including independent siblings and descendants with `SKIP` policies.
 A queued node's policy does not override an earlier node's halt.
