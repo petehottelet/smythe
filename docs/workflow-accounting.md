@@ -42,6 +42,9 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
 The [offline example](../examples/14_durable_text_workflow.py) exercises the same
 handoff and cached recovery with zero provider API charges.
 
+With `parallel=True`, a failing node cancels calls still in flight, which can
+block the run. See [admission and cost](#admission-and-cost).
+
 ## Freeze graph limits
 
 Use `WorkflowGraphPolicy` to keep an experiment or production task within a
@@ -139,8 +142,15 @@ may have processed and billed the request:
 - a qualifying status with any other body or error
 - 5xx responses, including Anthropic's 529 overloaded status
 
-A rejected input-token count still stops the node, but it leaves no exposure.
-Resuming the run repeats the count.
+Before retry `n`, `RETRY` waits a random time between 0 and
+`retry_backoff_s * 2**(n - 1)` seconds. The default, `retry_backoff_s=0`,
+retries immediately. Each new call starts with an input-token count. If the
+provider rejects the count, for example with another 429, the node stops
+whatever its failure policy. The count leaves no exposure, and resuming the
+run repeats it. `retry_backoff_s` is part of the saved recipe, so resuming
+with a different value raises `WorkflowConflictError`. A run created with the
+default of 0, including a 0.8.0 run created that way, cannot gain a backoff
+when it resumes.
 
 Resuming a run starts each unfinished node at its first attempt again. A
 saved accepted response replays without a new request, and so does a
@@ -149,6 +159,15 @@ their backoff. A rejected call that nothing followed is sent again as a new
 call. Resuming a halted run therefore gives the rejected step one new call,
 and a `RETRY` node whose attempts were all rejected gets one new call, for its
 final attempt.
+
+In a parallel run, a node that fails cancels the other nodes that are still
+running. A zero-cost rejection fails its node under `HALT`, the default, and
+under `RETRY` once the final attempt is rejected. A node that `SKIP` skips
+cancels nothing. A cancelled node whose generation request was already sent
+holds unknown exposure at its quoted ceiling, so the run is blocked with
+`unknown_exposure` and resuming it fails. Runs that execute one node at a time
+(`parallel=False`, the default, or `max_concurrency=1`) have no other call in
+flight.
 
 `result.total_cost_usd` is a compatibility projection of confirmed charges.
 `workflow_accounting` reports exact `confirmed_nanousd`, `reserved_nanousd`,
@@ -194,10 +213,10 @@ Competing openers reuse that identity. Failed initialization rolls back;
 existing evidence and read-only inspection retain their behavior.
 
 Resume requires the same component descriptions, model configuration, budget,
-and concurrency policy. It does not refill allowances. An inspected pending
-plan can be edited before execution; a stale graph from an already progressing
-run must use `resume()`. A graph carrying durable provenance cannot enter the
-ordinary unjournaled execution path.
+retry backoff, and concurrency policy. It does not refill allowances. An
+inspected pending plan can be edited before execution; a stale graph from an
+already progressing run must use `resume()`. A graph carrying durable
+provenance cannot enter the ordinary unjournaled execution path.
 
 ## Supported scope
 
