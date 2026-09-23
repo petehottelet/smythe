@@ -183,8 +183,10 @@ A 0.8.0 journal holds every saved 4xx error response as unknown exposure. On
 resume, 0.8.1 settles a saved response that meets the zero-cost conditions
 above, such as a plain 429, again at zero cost with a rejected result and
 records an `unknown_exposure_resolved` event. If no other unknown call or
-overrun blocks the run, admission reopens. Any other saved response, such as
-a 400, keeps its unknown exposure. Repeating the settlement changes nothing.
+overrun blocks the run, admission reopens. Once the node completes or is
+skipped, its saved `response_error`, `accounting_invalid`, `accounting_error`
+and `cost_usd_unknown` markers are removed. Any other saved response, such as a
+400, keeps its unknown exposure. Repeating the settlement changes nothing.
 
 **Added in 0.8.0:** concurrent journal openers use bounded WAL retries
 and create all tables and the persistent store identity in one transaction.

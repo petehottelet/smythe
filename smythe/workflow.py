@@ -379,15 +379,20 @@ class WorkflowRuntime:
         self._pending_operations.clear()
 
     def _node_update(self, node):
-        if (node.status is NodeStatus.COMPLETED and "response_error" in node.metadata
-                and "workflow_accounting_invalid" not in node.metadata):
-            self._clear_resolved_native_error(node)
+        self._clear_resolved_native_error(node)
         self._updates += 1
         if self._updates >= self.checkpoint_every_n_nodes:
             self._updates = 0
             self._save()
 
     def _clear_resolved_native_error(self, node):
+        # A completed node, or one skipped after zero-cost rejections, keeps
+        # no error marker once every journal call it made is resolved. A
+        # completed run requires every node to be free of these markers.
+        if (node.status not in (NodeStatus.COMPLETED, NodeStatus.SKIPPED)
+                or "response_error" not in node.metadata
+                or "workflow_accounting_invalid" in node.metadata):
+            return
         records = {call["call_id"]: call for call in self.store.inspect_run(self.run_id)["calls"]}
         ids = set()
         for entry in node.metadata.get("native_receipts", []):
@@ -525,9 +530,7 @@ class WorkflowRuntime:
         # A verdict's forced checkpoint can precede its ordinary node callback.
         # Resolve proven native replay markers before consuming that control.
         for node in self.graph.nodes:
-            if (node.status is NodeStatus.COMPLETED and "response_error" in node.metadata
-                    and "workflow_accounting_invalid" not in node.metadata):
-                self._clear_resolved_native_error(node)
+            self._clear_resolved_native_error(node)
         if state and state["status"] == "completed":
             validate_verification_checkpoint(self.graph, version=3, completed=True)
             if verification_pending(self.graph) or any(

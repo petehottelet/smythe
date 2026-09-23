@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from smythe import Swarm, Task
+from smythe.graph import NodeStatus
 from smythe.planner import LLMArchitect
 from smythe.prompts import PLANNING_SYSTEM_PROMPT
 from smythe.provider import ProviderAccountingError
@@ -437,3 +438,37 @@ def test_resume_after_every_retry_was_rejected_sends_only_the_final_attempt_agai
             (0, 0, 0, "rejected"), (0, 1, 0, "rejected"), (1, 1, 0, "rejected"), (2, 1, 1_500_000, "applied"),
         ]
         assert_exact_ledger(store, run_id)
+
+
+def test_skipped_node_from_080_journal_drops_resolved_markers_and_resumes_cleanly(
+    tmp_path, native_transport, monkeypatch,
+):
+    import smythe.workflow_store as workflow_store
+
+    plan = json.loads(json.dumps(PLAN))
+    plan["nodes"][0].update(failure_policy="skip")
+    native_transport.planning_outputs = [json.dumps(plan)]
+    native_transport.rate_limited["execution"] = 2  # 0.8.0's call, then the call after migration.
+    original = workflow_store._http_rejection_receipt
+    monkeypatch.setattr(workflow_store, "_http_rejection_receipt", lambda *args: None)
+    path = tmp_path / "old-skip-429.db"
+    with SQLiteWorkflowStore(path) as store:
+        instance = swarm(store)
+        graph = instance.plan(Task("Write and check"))
+        run_id = graph.run_ref["run_id"]
+        with pytest.raises(ProviderAccountingError):
+            instance.execute(graph)
+    monkeypatch.setattr(workflow_store, "_http_rejection_receipt", original)
+    markers = {"accounting_invalid", "accounting_error", "response_error", "cost_usd_unknown"}
+    with SQLiteWorkflowStore(path) as store:
+        result = swarm(store).resume(run_id)
+        draft = next(node for node in result.graph.nodes if node.id == "draft")
+        assert draft.status is NodeStatus.SKIPPED and not markers & draft.metadata.keys()
+        saved = store.get_checkpoint(run_id)["checkpoint"]
+        assert saved["status"] == "completed"
+        assert not markers & next(node for node in saved["graph"]["nodes"] if node["id"] == "draft")["metadata"].keys()
+        assert result.total_cost_usd == .0045 and result.cost_is_complete
+        assert draft_calls(store, run_id) == [(0, 0, 0, "rejected"), (1, 0, 0, "rejected")]
+        assert_exact_ledger(store, run_id)
+        assert swarm(store).resume(run_id).output == result.output
+    assert len(native_transport.requests) == 5
