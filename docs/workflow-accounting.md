@@ -111,6 +111,26 @@ admitted quote or run budget is retained and stops further admission. Missing
 billing evidence remains unknown and holds exposure. The allowance governs
 admission; it cannot undo an already incurred provider charge.
 
+**Changed in 0.8.1:** a 4xx HTTP response that carries the provider's JSON
+error object, such as a 429 rate limit, is a rejected request. It settles at
+zero cost with a rejected result, and the run stays open. The node's failure
+policy decides what happens next: `RETRY` makes a new journaled call after
+`retry_backoff_s`, `SKIP` skips the node, and `HALT` fails it. Resuming a
+halted run gives the rejected step a new call. The error is
+`ProviderRequestRejectedError`, with the status code and raw evidence attached.
+A rejected supervisor review counts as no change, like other supervisor errors.
+The following responses still hold unknown exposure, because the provider may
+have processed and billed the request:
+
+- transport failures with no response
+- 408 and 499 timeouts
+- 4xx responses whose body is anything other than the provider's plain error
+  object
+- 5xx responses, including Anthropic's 529 overloaded status
+
+A rejected input-token count still stops the node, but it leaves no exposure.
+Resuming the run repeats the count.
+
 `result.total_cost_usd` is a compatibility projection of confirmed charges.
 `workflow_accounting` reports exact `confirmed_nanousd`, `reserved_nanousd`,
 `unknown_nanousd`, `unknown_calls`, and `call_count` separately.
@@ -139,6 +159,12 @@ The SQLite journal uses WAL, full synchronization, fenced leases, and checkpoint
 revisions. Heartbeats renew ownership during calls. A former owner can append
 immutable late evidence for its exact dispatch, but cannot advance the run.
 Recovery settles available late evidence before admitting new work.
+
+A 0.8.0 journal can hold a saved 4xx error response as unknown exposure. On
+resume, 0.8.1 settles that call again at zero cost with a rejected result and
+records an `unknown_exposure_resolved` event. If no other unknown call or
+overrun blocks the run, admission reopens. Repeating the settlement changes
+nothing.
 
 **Added in 0.8.0:** concurrent journal openers use bounded WAL retries
 and create all tables and the persistent store identity in one transaction.

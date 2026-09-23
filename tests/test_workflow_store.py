@@ -597,3 +597,115 @@ def test_offline_failed_status_cannot_imply_known_success(journal):
     assert record["cost_nanousd"] is None
     assert record["billing_state"] == "unknown"
     assert store.inspect_run("run")["unknown_calls"] == 1
+
+
+def rate_limit_body(**error):
+    return {"error": {"message": "Rate limit reached for requests", "type": "requests",
+                      "param": None, "code": "rate_limit_exceeded", **error}}
+
+
+def rejected_http(store, lease, call, status=429, body=None):
+    permit = dispatch(store, lease, call)
+    raw = envelope(call, rate_limit_body() if body is None else body, status_code=status,
+                   transport_error="RateLimitError")
+    evidence_id = store.append_response(permit, raw)
+    return store.settle_call(lease, call["call_id"], evidence_id)
+
+
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 409, 413, 422, 429])
+def test_http_4xx_error_body_settles_at_zero_cost_and_keeps_admission_open(journal, status):
+    store, lease, _ = journal
+    call = prepare(store, lease)
+    record = rejected_http(store, lease, call, status)
+    assert record["state"] == "settled" and record["billing_state"] == "known"
+    assert record["cost_nanousd"] == 0 and record["result_state"] == "rejected"
+    assert record["receipt"]["http_status"] == status and record["receipt"]["cost_is_complete"]
+    assert record["receipt"]["error_code"] == "rate_limit_exceeded"
+    assert record["run_status"] == "running" and not record["admission_closed"]
+    assert store.settle_call(lease, call["call_id"], record["evidence_id"]) == record
+    audit = store.audit("run")
+    assert (audit["confirmed_nanousd"], audit["reserved_nanousd"], audit["unknown_nanousd"]) == (0, 0, 0)
+    assert settled(store, lease, "worker-retry")["cost_nanousd"] == 1_060_000
+    assert store.audit("run")["confirmed_nanousd"] == 1_060_000
+    body = store.load_evidence(call["call_id"], record["evidence_id"])["body"]
+    assert body == canonical(rate_limit_body()).encode()
+    store.save_checkpoint(lease, 0, {"status": "failed"}, consumed_call_ids=[call["call_id"]])
+    assert store.load_replay(call["call_id"])["result_state"] == "rejected"
+    assert store.audit("run")["call_count"] == 2
+
+
+@pytest.mark.parametrize("status,body,transport_error", [
+    (None, b"", "APIConnectionError"),
+    (500, rate_limit_body(type="server_error"), "InternalServerError"),
+    (502, b"<html>Bad gateway</html>", "APIStatusError"),
+    (503, rate_limit_body(type="overloaded"), "APIStatusError"),
+    (529, {"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}}, "APIStatusError"),
+    (408, rate_limit_body(type="timeout"), "APITimeoutError"),
+    (499, rate_limit_body(type="client_closed"), "APIStatusError"),
+    (429, b"", "RateLimitError"),
+    (429, b"<html>Too Many Requests</html>", "RateLimitError"),
+    (429, {"message": "not a provider error object"}, "RateLimitError"),
+    (429, {**rate_limit_body(), "usage": {"input_tokens": 1}}, "RateLimitError"),
+    (400, {"id": "resp_failed", "object": "response", "status": "failed", **rate_limit_body()}, "BadRequestError"),
+    (429, {"type": "message", **rate_limit_body()}, "RateLimitError"),
+])
+def test_uncertain_http_outcomes_keep_unknown_exposure(journal, status, body, transport_error):
+    store, lease, _ = journal
+    call = prepare(store, lease)
+    permit = dispatch(store, lease, call)
+    evidence_id = store.append_response(permit, envelope(
+        call, body, status_code=status, transport_error=transport_error))
+    record = store.settle_call(lease, call["call_id"], evidence_id)
+    assert record["billing_state"] == "unknown" and record["cost_nanousd"] is None
+    assert record["unknown_nanousd"] == 6_250_000 and record["result_state"] == "pending"
+    assert record["blocked_reason"] == "unknown_exposure"
+    with pytest.raises(WorkflowStateError):
+        prepare(store, lease, "blocked")
+    assert store.audit("run")["unknown_nanousd"] == 6_250_000
+
+
+def test_saved_unknown_http_rejection_from_older_release_is_reclassified_once(journal, monkeypatch):
+    import smythe.workflow_store as workflow_store
+
+    store, lease, _ = journal
+    call, sibling = prepare(store, lease), prepare(store, lease, "sibling")
+    original = workflow_store._http_rejection_receipt
+    # Reproduce a 0.8.0 journal: every non-200 response was unknown exposure.
+    monkeypatch.setattr(workflow_store, "_http_rejection_receipt", lambda *args: None)
+    dispatch(store, lease, sibling)
+    old = rejected_http(store, lease, call)
+    store.mark_unknown(lease, sibling["call_id"], "lost transport")
+    assert old["billing_state"] == "unknown" and old["blocked_reason"] == "unknown_exposure"
+    assert store.recover(lease)["settle"] == [call["call_id"]]
+    monkeypatch.setattr(workflow_store, "_http_rejection_receipt", original)
+    with SQLiteWorkflowStore(store.path, clock_ns=store._clock_ns) as reopened:
+        first = reopened.settle_call(lease, call["call_id"], old["evidence_id"])
+        assert reopened.settle_call(lease, call["call_id"], old["evidence_id"]) == first
+        assert first["cost_nanousd"] == 0 and first["result_state"] == "rejected"
+        # The sibling's unresolved exposure still holds the latch.
+        assert first["blocked_reason"] == "unknown_exposure"
+        audit = reopened.inspect_run("run")
+        assert audit["unknown_nanousd"] == 6_250_000 and audit["unknown_calls"] == 1
+        resolved = [event for event in audit["events"] if event["type"] == "unknown_exposure_resolved"]
+        assert len(resolved) == 1 and resolved[0]["call_id"] == call["call_id"]
+        assert resolved[0]["data"] == {"basis": "http_rejection", "cost_nanousd": "0",
+                                       "released_unknown_nanousd": "6250000"}
+        assert reopened.recover(lease)["apply"] == [call["call_id"]]
+
+
+def test_reclassified_http_rejection_clears_latch_when_nothing_else_blocks(journal, monkeypatch):
+    import smythe.workflow_store as workflow_store
+
+    store, lease, _ = journal
+    call = prepare(store, lease)
+    original = workflow_store._http_rejection_receipt
+    monkeypatch.setattr(workflow_store, "_http_rejection_receipt", lambda *args: None)
+    old = rejected_http(store, lease, call)
+    monkeypatch.setattr(workflow_store, "_http_rejection_receipt", original)
+    with pytest.raises(WorkflowStateError):
+        prepare(store, lease, "blocked")
+    record = store.settle_call(lease, call["call_id"], old["evidence_id"])
+    assert record["blocked_reason"] is None and record["run_status"] == "running"
+    assert prepare(store, lease, "admitted")["state"] == "prepared"
+    audit = store.audit("run")
+    assert (audit["confirmed_nanousd"], audit["unknown_nanousd"], audit["unknown_calls"]) == (0, 0, 0)

@@ -24,10 +24,26 @@ from smythe.provider_responses import (
 )
 from smythe.tools import ChatMessage, ToolSpec
 from smythe.provider_messages import AnthropicMessagesProvider
-from smythe.workflow_store import WorkflowError
+from smythe.workflow_store import WorkflowError, _is_http_rejection
 
 if TYPE_CHECKING:
     from smythe.workflow_store import CallKey, LeaseToken, SQLiteWorkflowStore
+
+
+class ProviderRequestRejectedError(RuntimeError):
+    """The provider rejected a journaled request with an HTTP 4xx error.
+
+    The journal settled the call at zero cost with a rejected result, and the
+    run stays open. Unlike ``ProviderResponseError`` this is an ordinary node
+    failure: its failure policy decides, and a retry is a new journaled call.
+    Raw evidence remains on ``envelope`` and in the journal.
+    """
+
+    def __init__(self, message: str, *, status_code: int, envelope=None, receipt=None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.envelope = envelope
+        self.receipt = receipt
 
 
 class WorkflowQuoteError(ResponseQuoteError, WorkflowError):
@@ -299,7 +315,7 @@ class JournaledProvider(Provider):
             evidence_id = store.append_response(permit, envelope)
             record["evidence_id"] = evidence_id
             return self._finish(record, envelope, replayed=False)
-        except ProviderResponseError:
+        except (ProviderResponseError, ProviderRequestRejectedError):
             raise
         except BaseException as error:
             context._failed = True
@@ -316,6 +332,15 @@ class JournaledProvider(Provider):
                 "Workflow response has unresolved billing evidence", envelope=envelope,
                 receipt=record.get("receipt"),
             ), record, replayed=replayed)
+        if _is_http_rejection(record):
+            receipt = record["receipt"]
+            detail = receipt["error_code"] or receipt["error_type"]
+            raise ProviderRequestRejectedError(
+                f"Provider rejected the request with HTTP {receipt['http_status']}"
+                + (f" ({detail})" if detail else "") + "; the journal settled it at zero cost",
+                status_code=receipt["http_status"], envelope=envelope,
+                receipt=self._managed_receipt(receipt, record, replayed=replayed),
+            )
         source = context._providers[self.provider_id]
         if record.get("admission_closed"):
             # A billing latch is not a semantic rejection. Leave saved output

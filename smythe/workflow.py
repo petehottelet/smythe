@@ -34,7 +34,7 @@ from smythe.workflow_provider import (
 from smythe.workflow_policy import snapshot_graph_policy
 from smythe.workflow_store import (
     CallKey, SQLiteWorkflowStore, WorkflowConflictError, WorkflowError, WorkflowLeaseError,
-    WorkflowStateError,
+    WorkflowStateError, _is_http_rejection,
 )
 
 
@@ -212,9 +212,21 @@ class WorkflowRuntime:
         )
         key = CallKey(scope.phase, scope.component_id, scope.generation,
                       invocation, scope.attempt, scope.turn)
+        keys = [key]
+        # A provider 4xx rejection is final for its call but cost nothing.
+        # Re-entering the same attempt (for example on resume) moves to a new,
+        # durably allocated invocation instead of replaying the rejection.
+        while _is_http_rejection(self.store.lookup_call(self.run_id, key)):
+            invocation = self.store.allocate_invocation(
+                self.context.lease, scope.phase, scope.component_id, scope.generation,
+                f"{operation_key}/after-http-rejection/{len(keys)}",
+            )
+            key = CallKey(scope.phase, scope.component_id, scope.generation,
+                          invocation, scope.attempt, scope.turn)
+            keys.append(key)
         current = self._operation.get()
         if current is not None:
-            self._operation_keys.setdefault(current, set()).add(key)
+            self._operation_keys.setdefault(current, set()).update(keys)
         return self.context.for_call(self.provider_ids[id(source)], key)
 
     def _worker_call(self, node, phase, attempt, turn):
@@ -381,8 +393,17 @@ class WorkflowRuntime:
         ids.update(call["call_id"] for call in records.values()
                    if call["key"]["scope_id"] == f"node/{node.id}"
                    and call["key"]["generation"] == node_generation(node))
-        if ids and all(key in records and records[key]["billing_state"] == "known"
-                       and records[key]["result_state"] in {"accepted", "applied"} for key in ids):
+
+        def resolved(call_id):
+            call = records.get(call_id)
+            if call is None or call["billing_state"] != "known":
+                return False
+            # A zero-cost provider rejection needs no reconciliation.
+            return call["result_state"] in {"accepted", "applied"} or (
+                call["result_state"] == "rejected"
+                and _is_http_rejection(self.store.lookup_call(self.run_id, CallKey(**call["key"]))))
+
+        if ids and all(resolved(key) for key in ids):
             for key in ("response_error", "accounting_invalid", "accounting_error", "cost_usd_unknown"):
                 node.metadata.pop(key, None)
 

@@ -13,8 +13,10 @@ from smythe.provider import ProviderAccountingError, ProviderAccountingCancelled
 from smythe.provider_messages import AnthropicMessagesProvider
 from smythe.provider_responses import PreparedRequest, RawResponseEnvelope, _json_dump
 from smythe.tools import ChatMessage
-from smythe.workflow_provider import WorkflowProviderContext, describe_provider
-from smythe.workflow_store import CallKey, SQLiteWorkflowStore, WorkflowBudgetError, WorkflowConflictError
+from smythe.workflow_provider import ProviderRequestRejectedError, WorkflowProviderContext, describe_provider
+from smythe.workflow_store import (
+    CallKey, SQLiteWorkflowStore, WorkflowBudgetError, WorkflowConflictError, WorkflowError,
+)
 
 
 def response(**changes):
@@ -31,6 +33,17 @@ def wire(raw):
     return SimpleNamespace(http_response=SimpleNamespace(
         content=raw if isinstance(raw, bytes) else json.dumps(raw).encode()),
         status_code=200, headers={"request-id": "req_test"})
+
+
+class StatusError(Exception):
+    """Mimics an SDK status error, which carries the raw HTTP response."""
+
+    def __init__(self, status, error_type):
+        super().__init__(f"Error code: {status}")
+        body = {"type": "error", "error": {"type": error_type, "message": "Provider error"},
+                "request_id": "req_status"}
+        self.response = SimpleNamespace(content=json.dumps(body).encode(), status_code=status,
+                                        headers={"request-id": "req_status"})
 
 
 @pytest.fixture
@@ -155,6 +168,58 @@ def test_unknown_dispatch_keeps_reserve_and_blocks_next_call(journal, transport,
     assert audit["unknown_nanousd"] > 0 and audit["unknown_calls"]
     with pytest.raises(Exception):
         asyncio.run(invoke(journal, key=CallKey("execution", "next")))
+    assert transport.generation.await_count == 1
+
+
+def test_rate_limit_is_zero_cost_rejection_and_next_attempt_is_admitted(journal, transport):
+    store, lease = journal
+    transport.generation.side_effect = [StatusError(429, "rate_limit_error"), wire(response())]
+    with pytest.raises(ProviderRequestRejectedError) as caught:
+        asyncio.run(invoke(journal))
+    assert not isinstance(caught.value, (ProviderResponseError, WorkflowError))
+    assert caught.value.status_code == 429 and "rate_limit_error" in str(caught.value)
+    assert caught.value.envelope.request_id == "req_status"
+    record = store.lookup_call(lease.run_id, CallKey("execution", "node"))
+    assert (record["billing_state"], record["result_state"], record["cost_nanousd"]) == ("known", "rejected", 0)
+    assert store.load_run(lease.run_id)["blocked_reason"] is None
+    retried = asyncio.run(invoke(journal, key=CallKey("execution", "node", attempt=1)))
+    assert retried.text == "Accepted output."
+    audit = store.inspect_run(lease.run_id)
+    assert audit["confirmed_nanousd"] == sum(call["cost_nanousd"] for call in audit["calls"]) == 2_535_000
+    assert audit["unknown_calls"] == audit["reserved_nanousd"] == 0
+    assert transport.generation.await_count == 2
+
+
+def test_durable_swarm_retries_rate_limited_node_with_exact_totals(tmp_path, transport):
+    from smythe import Swarm
+    from smythe.graph import ExecutionGraph, FailurePolicy, Node, Topology
+
+    transport.generation.side_effect = [StatusError(429, "rate_limit_error"), wire(response())]
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="draft", label="Draft", failure_policy=FailurePolicy.RETRY, max_retries=1)])
+    with SQLiteWorkflowStore(tmp_path / "fable-retry.sqlite3") as store:
+        swarm = Swarm(model=MODEL, provider=AnthropicMessagesProvider(api_key="test-secret"),
+                      run_store=store, max_budget_usd=1)
+        result = swarm.execute(graph)
+        assert "Accepted output." in result.output
+        assert result.total_cost_usd == .002535 and result.cost_is_complete
+        accounting = store.inspect_run(result.execution_id)
+        assert sorted((call["key"]["attempt"], call["cost_nanousd"], call["result_state"])
+                      for call in accounting["calls"]) == [(0, 0, "rejected"), (1, 2_535_000, "applied")]
+        assert accounting["confirmed_nanousd"] == 2_535_000 and store.audit(result.execution_id)["ok"]
+    assert transport.generation.await_count == 2
+
+
+@pytest.mark.parametrize("status,error_type", [(529, "overloaded_error"), (500, "api_error")])
+def test_server_errors_including_overloaded_keep_unknown_exposure(journal, transport, status, error_type):
+    transport.generation.side_effect = StatusError(status, error_type)
+    with pytest.raises(ProviderAccountingError):
+        asyncio.run(invoke(journal))
+    audit = journal[0].inspect_run(journal[1].run_id)
+    assert audit["unknown_calls"] == 1 and audit["unknown_nanousd"] > 0
+    assert audit["blocked_reason"] == "unknown_exposure"
+    with pytest.raises(WorkflowError):
+        asyncio.run(invoke(journal, key=CallKey("execution", "node", attempt=1)))
     assert transport.generation.await_count == 1
 
 
