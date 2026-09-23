@@ -44,7 +44,7 @@ class WhiteRabbit:
         constrained: Architect | None = None,
         autonomous: Architect | None = None,
         classifier_provider: Provider | None = None,
-        classifier_model: str = "claude-opus-4-8",
+        classifier_model: str = "claude-opus-5-5",
         run_binding: ComponentBinding | None = None,
     ) -> None:
         self._deterministic = deterministic or {}

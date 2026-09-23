@@ -46,7 +46,7 @@ and recovery controls.
   "status": "running | completed | failed",
   "created_at": 1751600000.0,
   "updated_at": 1751600042.5,
-  "model": "claude-opus-4-8",
+  "model": "claude-opus-5-5",
   "task": {
     "goal": "…",
     "constraints": ["…"],
@@ -73,7 +73,7 @@ and recovery controls.
         "depends_on": [],
         "result": "…node output, null until executed…",
         "status": "completed",
-        "metadata": {"model": "claude-opus-4-8", "cost_usd": 0.0003},
+        "metadata": {"model": "claude-opus-5-5", "cost_usd": 0.0003},
         "failure_policy": "halt",
         "max_retries": 1,
         "required_capabilities": [],

@@ -91,7 +91,7 @@ class LLMArchitect(Architect):
     def __init__(
         self,
         provider: Provider,
-        planning_model: str = "claude-opus-4-8",
+        planning_model: str = "claude-opus-5-5",
         memory: object | None = None,
         max_retries: int = 2,
         cost_per_token: float = 0.000003,

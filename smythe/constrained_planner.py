@@ -63,7 +63,7 @@ class ConstrainedArchitect(Architect):
         self,
         provider: Provider,
         templates: list[SubGraphTemplate],
-        model: str = "claude-opus-4-8",
+        model: str = "claude-opus-5-5",
         max_retries: int = 2,
         *,
         run_binding: ComponentBinding | None = None,

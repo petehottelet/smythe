@@ -18,7 +18,7 @@ work so far against the goal and may revise the *unexecuted* remainder.
 from smythe import LLMSupervisor, Swarm
 
 swarm = Swarm(
-    model="claude-opus-4-8",
+    model="claude-opus-5-5",
     supervisor=LLMSupervisor(provider, review_after={"research"}),
     max_revisions=2,          # supervision is off unless this is > 0
 )

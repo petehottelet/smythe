@@ -421,7 +421,7 @@ def render_next_steps(snapshot: dict, overall: float) -> str:
 def _pick_real_provider() -> tuple[Provider, str] | None:
     """A real provider when an API key is set, mirroring examples/_providers.py."""
     if os.environ.get("ANTHROPIC_API_KEY"):
-        return AnthropicProvider(), "claude-opus-4-8"
+        return AnthropicProvider(), "claude-opus-5-5"
     if os.environ.get("OPENAI_API_KEY"):
         return OpenAIProvider(), "gpt-5.2"
     if os.environ.get("GOOGLE_API_KEY"):

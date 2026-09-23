@@ -104,7 +104,7 @@ class Swarm:
     def __init__(
         self,
         *,
-        model: str = "claude-opus-4-8",
+        model: str = "claude-opus-5-5",
         max_budget_usd: float | None = None,
         provider: Provider | None = None,
         architect: Architect | None = None,
@@ -673,7 +673,7 @@ class Swarm:
         cls,
         path: str,
         *,
-        model: str = "claude-opus-4-8",
+        model: str = "claude-opus-5-5",
         max_budget_usd: float | None = None,
         provider: Provider | None = None,
         parallel: bool = False,
