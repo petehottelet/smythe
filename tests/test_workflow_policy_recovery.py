@@ -11,6 +11,7 @@ from smythe import (
 )
 from smythe.checkpoint import graph_to_dict, node_to_dict
 from smythe.graph import Node, NodeStatus, Revision
+from smythe.planner import ArchitectError, LLMArchitect
 from smythe.provider_responses import OpenAIResponsesProvider
 from test_workflow_native_runtime import native_transport as native_transport
 from test_workflow_policy import make_graph, policy_swarm
@@ -148,7 +149,7 @@ def test_valid_saved_planning_operation_recovers_exact_graph_under_same_policy(s
     assert store.inspect_run(runs[0])["call_count"] == 1 and store.audit(runs[0])["ok"]
 
 
-@pytest.mark.parametrize("violation", ["model", "retries", "regenerations"])
+@pytest.mark.parametrize("violation", ["retries", "regenerations"])
 def test_generated_graph_controls_are_rejected_before_execution(store, monkeypatch, violation):
     plan = {"nodes": [{"id": "draft", "label": "Draft", "metadata": {}}]}
     violate_graph(plan, violation)
@@ -165,6 +166,24 @@ def test_generated_graph_controls_are_rejected_before_execution(store, monkeypat
     assert store.get_checkpoint(runs[0]) is None
 
 
+def test_generated_model_override_is_rejected_by_the_planner_schema(store, monkeypatch):
+    """A plan cannot choose its own node model, so the policy never sees one."""
+    plan = {"nodes": [{"id": "draft", "label": "Draft", "metadata": {"model": "other"}}]}
+    swarm = Swarm(model="offline", provider=OfflineProvider(plan=plan), run_store=store,
+                  graph_policy=WorkflowGraphPolicy(
+                      1, node_model="offline", max_retries=1, max_regenerations=0,
+                  ))
+    runs = capture_runs(store, monkeypatch)
+    with pytest.raises(ArchitectError, match="unsupported field"):
+        swarm.plan(Task("Report"))
+    accounting = store.inspect_run(runs[0])
+    # The initial attempt plus the default two schema repairs, all metered.
+    assert accounting["call_count"] == 3
+    assert {call["key"]["phase"] for call in accounting["calls"]} == {"planning"}
+    assert all(call["billing_state"] == "known" for call in accounting["calls"])
+    assert store.get_checkpoint(runs[0]) is None
+
+
 def test_rejected_native_planning_stays_metered_and_replays_without_rebuying(
     store, monkeypatch, native_transport,
 ):
@@ -172,9 +191,12 @@ def test_rejected_native_planning_stays_metered_and_replays_without_rebuying(
     native_transport.planning_outputs = [json.dumps({"nodes": [
         {"id": f"n{i}", "label": f"Step {i}", "max_retries": 0} for i in range(9)
     ]})]
+    provider = OpenAIResponsesProvider(api_key="dummy-no-network", max_output_tokens=100)
     swarm = Swarm(
-        model=model, provider=OpenAIResponsesProvider(api_key="dummy-no-network", max_output_tokens=100),
-        run_store=store, max_budget_usd=1,
+        model=model, provider=provider, run_store=store, max_budget_usd=1,
+        # The planner's own limit (default 8) would reject and repair this
+        # plan; raise it so the graph policy is what refuses the result.
+        architect=LLMArchitect(provider, planning_model=model, max_nodes=9),
         graph_policy=WorkflowGraphPolicy(8, node_model=model, max_retries=0, max_regenerations=0),
     )
     runs = capture_runs(store, monkeypatch)
@@ -195,6 +217,31 @@ def test_rejected_native_planning_stays_metered_and_replays_without_rebuying(
     assert len(native_transport.requests) == 1
     assert after["calls"] == before["calls"]
     assert store.get_checkpoint(run_id) is None and store.audit(run_id)["ok"]
+
+
+def test_default_planner_limit_repairs_an_oversized_plan_before_the_policy(
+    store, monkeypatch, native_transport,
+):
+    """With matching limits, an oversized plan is a paid repair, not a failed run."""
+    model = "gpt-6-astra"
+    native_transport.planning_outputs = [
+        json.dumps({"nodes": [
+            {"id": f"n{i}", "label": f"Step {i}", "max_retries": 0} for i in range(9)
+        ]}),
+        json.dumps({"nodes": [{"id": "n0", "label": "Step 0", "max_retries": 0}]}),
+    ]
+    swarm = Swarm(
+        model=model, provider=OpenAIResponsesProvider(api_key="dummy-no-network", max_output_tokens=100),
+        run_store=store, max_budget_usd=1,
+        graph_policy=WorkflowGraphPolicy(8, node_model=model, max_retries=0, max_regenerations=0),
+    )
+    runs = capture_runs(store, monkeypatch)
+    graph = swarm.plan(Task("Report"))
+    assert [node.id for node in graph.nodes] == ["n0"]
+    planning = store.inspect_run(runs[0])["calls"]
+    assert sorted(call["key"]["attempt"] for call in planning) == [0, 1]
+    assert all(call["billing_state"] == "known" for call in planning)
+    assert "9 nodes; the limit is 8" in native_transport.requests[1]["input"][-1]["content"]
 
 
 @pytest.mark.parametrize("violation", ["nodes", "model", "retries", "regenerations", "cycle"])

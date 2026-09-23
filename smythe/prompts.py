@@ -115,7 +115,8 @@ criterion; answer PASS or FAIL with reasons", "depends_on": ["memo"], \
 """
 
 RETRY_PROMPT = """\
-Your previous response was not valid JSON.  Please try again.
+Your previous response was not a valid plan.  Fix the problem described \
+above and try again.
 
 Return **only** the JSON object described in the system prompt — \
 no markdown fences, no commentary, no explanation.  Just the raw JSON.
