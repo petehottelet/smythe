@@ -21,7 +21,94 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
-No unreleased changes.
+Safety and correctness fixes planned for 0.8.1. Several fixes change behavior
+that 0.8.0 accepted; they are listed under **Changed**.
+
+### Security
+
+- **Model-generated plans can no longer start programs.** `LLMArchitect` parses
+  plans with a strict schema that rejects `mcp_servers`, commands, URLs,
+  environment variables, model overrides and unknown fields. Before this fix, a
+  plan could declare an MCP stdio server that `MCPToolRuntime()` would launch,
+  passing through any named environment variable. Developer-written YAML graphs
+  are unchanged.
+- **Images are decoded only as PNG, JPEG, GIF or WebP** in Jobs artifact
+  inspection, asset finishing, `validate_image` and the design checks. Other
+  formats, such as EPS (which could launch Ghostscript) or TIFF, are rejected
+  before any other decoder runs.
+- **New files holding prompts and responses are owner-only (0600):**
+  `SQLiteWorkflowStore` journals, Jobs and Autotune databases (with their
+  `-wal` and `-shm` files) and `PlannerMemory` history. Directories that
+  `PlannerMemory` and the Jobs store create are 0700. Existing files keep their
+  permissions.
+
+### Fixed
+
+- **Durable workflows survive rate limits.** A provider 4xx error response,
+  such as a 429, settles at zero cost with a rejected result instead of
+  blocking the run with `unknown_exposure`, and the node's failure policy
+  decides what happens next (`ProviderRequestRejectedError`). Resuming a run
+  that 0.8.0 blocked this way reclassifies the call and reopens the run.
+  Transport errors, 408/499 and 5xx responses (including Anthropic 529) still
+  hold unknown exposure.
+- Serial runs with the Anthropic, OpenAI, OpenAI image and Gemini providers no
+  longer fail with "Event loop is closed": each event loop gets its own client.
+- Output cut off at the token limit raises `OutputTruncatedError` after its
+  cost is recorded, and the node's failure policy applies (Anthropic, OpenAI,
+  Gemini and `LLM_MERGE` synthesis). Truncated plans are retried with a request
+  for a smaller plan, and a truncated supervisor review applies no revision.
+- A node that fails under `FailurePolicy.SKIP` passes
+  "[skipped: this step did not complete]" to later steps instead of its error
+  text.
+- `Swarm(parallel=False)` runs one node at a time in `resume()`, `aresume()`
+  and `execute_async()`, including runs with `run_store`.
+- `TokenVerifier` accepts only a JSON boolean for `passed` and treats empty,
+  missing or contradictory verdicts as FAIL, regenerating at most
+  `max_regenerations` times. It reads "does not fail … PASS" as a pass.
+- `LLMSupervisor` ignores `"change": "false"` and malformed fields, and refuses
+  revisions that add more than `max_added_nodes` (default 3) nodes.
+- Malformed planner and template-selection replies are retried instead of
+  escaping as `AttributeError`, and retry prompts name the actual problem.
+- `WhiteRabbit` matches deterministic keys regardless of case and surrounding
+  punctuation, and logs a warning when it falls back to the autonomous tier.
+- Distilled templates accept model-supplied params and goals containing
+  backslashes.
+- `design_verifier` fails when an artifact is missing or can't be decoded,
+  instead of passing or raising `FileNotFoundError`. The flat-region finding is
+  advisory, so a logo on a plain background no longer triggers a paid
+  regeneration.
+- `PlannerMemory` no longer loses the record appended after a crash-truncated
+  line.
+- **Autotune promotion matches its stated error rate.** Candidates are
+  promoted only when a one-sided paired Student-t lower bound clears
+  `min_improvement`. The percentile bootstrap used before promoted about 8% of
+  truly null candidates at five pairs, against a nominal 2.5%. Decisions record
+  their method; older decisions still load and are labeled in reports.
+- **Autotune holdouts stay sealed.** Re-testing a challenger whose holdout was
+  already used under the same contract in the same ledger is refused
+  (`HoldoutAlreadyUsedError`). Rewording the hypothesis or choosing a new
+  campaign ID no longer draws a fresh holdout.
+
+### Changed
+
+- The default model for `Swarm`, `Swarm.from_yaml`, `LLMArchitect`,
+  `ConstrainedArchitect` and the `WhiteRabbit` classifier is `claude-opus-5-5`
+  (was `claude-opus-4-8`).
+- Model plans are limited to 8 nodes and 5 levels by default
+  (`LLMArchitect(max_nodes=..., max_depth=...)`), with `max_retries` capped at
+  3 and `max_regenerations` at 2. Plans that set per-node models,
+  `max_tool_iterations` or metadata other than `role`, or that omit labels, are
+  rejected and retried.
+- `WhiteRabbit` raises `ValueError` when two deterministic keys differ only by
+  case.
+- `validate_image` reports disallowed formats and oversized images as
+  `decode_failed` findings.
+- Autotune campaigns started under 0.8.0 are not resumed under the new
+  promotion rule, because the method is part of the plan hash. Re-running a
+  campaign whose holdout was already used exits with code 8.
+- New public exports: `OutputTruncatedError`, `ProviderRequestRejectedError`
+  and `smythe.optimize.HoldoutAlreadyUsedError`.
+- The README shows the Glyph Rain animation again.
 
 ## [0.8.0] - 2026-09-21
 

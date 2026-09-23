@@ -23,6 +23,11 @@ an interruption.
 Use it for research pipelines, document production, and artifact generation
 where you need to see what will run and account for what happened.
 
+<p align="center">
+  <img src="assets/glyph_rain/glyph-rain-loop.gif" alt="Animated rain showing only the 192 revised Smythe glyphs" width="900">
+</p>
+<p align="center"><em><a href="screensaver/README.md">Glyph Rain</a>: its glyph catalog is compiled, validated, and exported by a Smythe workflow (<a href="benchmarks/svg_v2_results.md">benchmark</a>).</em></p>
+
 ## Quickstart
 
 Python 3.11+. Install the released library with OpenAI support:

@@ -24,6 +24,7 @@ from smythe.provider import (
     OfflineProvider,
     OpenAIImageProvider,
     OpenAIProvider,
+    OutputTruncatedError,
     Provider,
     ProviderResponseError,
     ProviderAccountingError,
@@ -33,6 +34,7 @@ from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.provider_messages import AnthropicMessagesProvider
 from smythe.pricing import NativeReceipt
 from smythe.workflow_binding import LocalOnly, WorkflowBindingError
+from smythe.workflow_provider import ProviderRequestRejectedError
 from smythe.workflow_policy import WorkflowGraphPolicy
 from smythe.workflow_store import SQLiteWorkflowStore, WorkflowError
 from smythe.router import WhiteRabbit
@@ -97,6 +99,7 @@ __all__ = [
     "OpenAIImageProvider",
     "OpenAIProvider",
     "OpenAIResponsesProvider",
+    "OutputTruncatedError",
     "NativeReceipt",
     "LocalOnly",
     "SQLiteWorkflowStore",
@@ -108,6 +111,7 @@ __all__ = [
     "ProviderResponseError",
     "ProviderAccountingError",
     "ProviderAccountingCancelledError",
+    "ProviderRequestRejectedError",
     "Revision",
     "RevisionError",
     "Sentinel",
