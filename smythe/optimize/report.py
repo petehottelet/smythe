@@ -227,6 +227,19 @@ def _reasons(value: object) -> str:
     return '<ul>' + ''.join(f'<li>{_text(v)}</li>' for v in value) + '</ul>' if value else ''
 
 
+_PAIRED_T = 'paired_student_t'
+
+
+def _interval(value: object, name: str) -> list:
+    if type(value) is not list or len(value) != 2:
+        raise ValueError(f'{name} needs two finite endpoints')
+    for endpoint in value:
+        _finite(endpoint, 'Interval endpoint')
+    if value[0] > value[1]:
+        raise ValueError(f'{name} endpoints are reversed')
+    return value
+
+
 def _comparison(value: object) -> dict | None:
     """Recognize saved engine statistics without making up missing fields."""
     if value is None:
@@ -248,19 +261,43 @@ def _comparison(value: object) -> dict | None:
         raise ValueError('Comparison objective name must be a string')
     if 'confidence_level' in item and not 0 < item['confidence_level'] < 1:
         raise ValueError('Comparison confidence must be between zero and one')
+    if item.get('method') is not None and type(item['method']) is not str:
+        raise ValueError('Comparison method must be a string')
+    if item.get('degrees_of_freedom') is not None:
+        _integer(item['degrees_of_freedom'], 'degrees_of_freedom', minimum=1)
+    for key in ('standard_error', 'critical_value'):
+        if item.get(key) is not None and _finite(item[key], key) < 0:
+            raise ValueError(f'{key} must be nonnegative')
+    if item.get('descriptive_bootstrap_interval') is not None:
+        _interval(item['descriptive_bootstrap_interval'], 'Descriptive bootstrap interval')
     if 'confidence_interval' in item:
-        interval = item['confidence_interval']
-        if type(interval) is not list or len(interval) != 2:
-            raise ValueError('Comparison interval needs two finite endpoints')
-        for endpoint in interval:
-            _finite(endpoint, 'Interval endpoint')
-        if interval[0] > interval[1]:
-            raise ValueError('Comparison interval endpoints are reversed')
+        interval = _interval(item['confidence_interval'], 'Comparison interval')
         if 'lower_confidence_bound' in item and item['lower_confidence_bound'] != interval[0]:
             raise ValueError('Saved lower bound disagrees with its interval')
     required = {'objective_name', 'direction', 'baseline_mean', 'candidate_mean',
                 'mean_improvement', 'confidence_level', 'confidence_interval', 'sample_count'}
     return item if required <= item.keys() else None
+
+
+def _interval_kind(item: dict) -> str:
+    """Name the saved promotion interval; decisions before 0.8.1 used a bootstrap."""
+    method = item.get('method')
+    if method == _PAIRED_T:
+        return 'paired t'
+    if method is None and 'bootstrap_resamples' in item:
+        return 'bootstrap'
+    return 'saved'
+
+
+def _method_label(item: dict) -> str:
+    kind = _interval_kind(item)
+    if kind == 'paired t':
+        return _text('Paired Student-t lower bound, one-sided error (1 − confidence) / 2')
+    if kind == 'bootstrap':
+        return _text('Percentile bootstrap lower bound (earlier rule; admits more false '
+                     'promotions than its confidence level at small samples)')
+    method = item.get('method')
+    return 'Not recorded' if method is None else _code(method)
 
 
 def _interval_plot(item: dict, threshold: int | float | None, identity: str) -> str:
@@ -289,9 +326,11 @@ def _interval_plot(item: dict, threshold: int | float | None, identity: str) -> 
              f'<circle cx="{x(mean)}" cy="42" r="4" fill="#000000"/>']
     if threshold is not None:
         parts.append(f'<path d="M{x(threshold)} 16V64" fill="none" stroke="#000000" stroke-dasharray="6 3"/>')
+    kind = _interval_kind(item)
+    label = 'Saved interval' if kind == 'saved' else f'Saved {kind} interval'
     parts.extend(['</svg><div class="plot-direction"><span>Less improvement</span>'
                   '<span>More improvement</span></div>',
-                  '<figcaption>Saved interval and mean (solid point); positive means improvement. '
+                  f'<figcaption>{label} and mean (solid point); positive means improvement. '
                   'Dotted line: zero. '])
     if threshold is not None:
         parts.append(f'Dashed line: primary minimum {_number(threshold)}; the saved lower bound must exceed it. ')
@@ -359,15 +398,28 @@ def _assessment(value: object, stage: str, objectives: dict[str, dict]) -> str:
         direction = 'Higher' if item['direction'] == 'maximize' else 'Lower'
         parts.append(f'<p class="note">{direction} raw values are better. Units: recorded metric units. '
                      f'Paired samples: {item["sample_count"]:,}.</p>')
-        parts.append(_table(f'{stage}: saved values', ['Measure', 'Recorded value'], [
+        rows = [
             ['Incumbent mean', _number(item['baseline_mean'])], ['Candidate mean', _number(item['candidate_mean'])],
             ['Mean improvement', _number(item['mean_improvement'])],
+            ['Promotion bound', _method_label(item)],
             ['Confidence level', _number(item['confidence_level'])],
             ['Improvement interval', _number(item['confidence_interval'][0]) + ' to ' + _number(item['confidence_interval'][1])],
+        ]
+        for key, label in [('degrees_of_freedom', 'Degrees of freedom'),
+                           ('standard_error', 'Standard error of mean improvement'),
+                           ('critical_value', 'Student-t critical value')]:
+            if item.get(key) is not None:
+                rows.append([label, _number(item[key])])
+        descriptive = item.get('descriptive_bootstrap_interval')
+        if descriptive is not None:
+            rows.append(['Descriptive bootstrap interval (not used for promotion)',
+                         _number(descriptive[0]) + ' to ' + _number(descriptive[1])])
+        rows.extend([
             ['Raw candidate hard minimum', _number(objective.get('hard_min'))],
             ['Raw candidate hard maximum', _number(objective.get('hard_max'))],
             ['Hard bounds passed', _flag(item.get('hard_bounds_passed'))],
-        ]))
+        ])
+        parts.append(_table(f'{stage}: saved values', ['Measure', 'Recorded value'], rows))
         if role == 'Secondary':
             parts.append(_definitions([('Allowed regression of mean improvement', _number(objective.get('max_regression'))),
                                        ('Mean non-regression passed', _flag(item.get('non_regression_passed')))]))

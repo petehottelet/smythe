@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import json
 import math
+import os
 import re
 import secrets
 import sqlite3
@@ -49,6 +50,14 @@ class ExperimentLedgerError(RuntimeError):
 
 class LedgerConflictError(ExperimentLedgerError):
     """Raised when an idempotency key is reused with different bytes."""
+
+
+class HoldoutAlreadyUsedError(LedgerConflictError):
+    """A challenger policy already consumed its sealed holdout under a contract.
+
+    Re-testing the same policy against the same contract in the same ledger
+    would draw a fresh holdout, so the ledger refuses it.
+    """
 
 
 class CampaignNotFoundError(ExperimentLedgerError, KeyError):
@@ -257,6 +266,74 @@ def _deep_freeze_json(value: Any) -> Any:
 def _holdout_commitment(nonce: bytes) -> str:
     digest = hashlib.sha256(_HOLDOUT_COMMITMENT_DOMAIN + nonce).hexdigest()
     return f"sha256:{digest}"
+
+
+def _create_private_file(path: Path) -> None:
+    """Create a missing ledger file readable only by its owner.
+
+    SQLite gives the -wal and -shm sidecars the database file's permission
+    bits, so they follow.  An existing file keeps its mode.
+    """
+
+    try:
+        descriptor = os.open(
+            path,
+            os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0),
+            0o600,
+        )
+    except OSError:
+        # Already present, or not creatable: SQLite opens it or reports the
+        # failure exactly as it did before.
+        return
+    os.close(descriptor)
+
+
+def _holdout_consumers(
+    cursor: sqlite3.Cursor,
+    contract_hash: str,
+    policy_hash: str | None = None,
+) -> dict[str, tuple[str, ...]]:
+    """Map challenger policy hashes to campaigns whose holdout evaluated them.
+
+    A holdout is consumed when a campaign prepares a holdout trial for a
+    non-incumbent candidate.  Campaigns are ordered by first holdout use.
+    """
+
+    query = """
+        SELECT k.policy_hash AS policy_hash, t.campaign_id AS campaign_id,
+               MIN(t.prepared_at_ns) AS first_used_ns
+        FROM trials AS t
+        JOIN campaigns AS c ON c.campaign_id = t.campaign_id
+        JOIN candidates AS k
+            ON k.campaign_id = t.campaign_id AND k.candidate_id = t.candidate_id
+        WHERE t.split = 'holdout'
+          AND t.candidate_id != c.incumbent_candidate_id
+          AND c.contract_hash = ?
+    """
+    values: list[object] = [contract_hash]
+    if policy_hash is not None:
+        query += " AND k.policy_hash = ?"
+        values.append(policy_hash)
+    query += """
+        GROUP BY k.policy_hash, t.campaign_id
+        ORDER BY first_used_ns, t.campaign_id
+    """
+    consumers: dict[str, list[str]] = {}
+    for row in cursor.execute(query, values).fetchall():
+        consumers.setdefault(row["policy_hash"], []).append(row["campaign_id"])
+    return {key: tuple(value) for key, value in consumers.items()}
+
+
+def _holdout_reuse_message(policy_hash: str, contract_hash: str, campaign_id: str) -> str:
+    """Explain why a second holdout for one policy and contract is refused."""
+
+    return (
+        f"challenger policy {policy_hash} already used the sealed holdout for "
+        f"contract {contract_hash} in campaign {campaign_id!r}; re-testing the "
+        "same policy against the same contract in this ledger would re-roll "
+        "the holdout, so it is refused. Inspect that campaign's recorded "
+        "decision instead."
+    )
 
 
 def _campaign_binding(
@@ -498,6 +575,8 @@ class ExperimentLedger:
             self._connection = connection
         else:
             self.path.parent.mkdir(parents=True, exist_ok=True)
+            # The database holds sealed holdout secrets: create it owner-only.
+            _create_private_file(self.path)
             self._connection = sqlite3.connect(
                 self.path,
                 isolation_level=None,
@@ -1207,6 +1286,22 @@ class ExperimentLedger:
             finally:
                 cursor.close()
 
+    def holdout_uses(self, contract_hash: str) -> dict[str, tuple[str, ...]]:
+        """Return challenger policy hashes whose sealed holdout a contract used.
+
+        Each policy maps to the campaigns that prepared holdout trials for it
+        as a challenger, in first-use order.  New campaigns may not re-test a
+        listed policy under the same contract.
+        """
+
+        normalized = _sha256(contract_hash, "contract_hash")
+        with self._lock:
+            cursor = self._connection.cursor()
+            try:
+                return _holdout_consumers(cursor, normalized)
+            finally:
+                cursor.close()
+
     @staticmethod
     def _validated_holdout_values(row: sqlite3.Row) -> tuple[bytes, str]:
         nonce = row["holdout_nonce"]
@@ -1368,7 +1463,7 @@ class ExperimentLedger:
         }
         prepared_json = _json_text(prepared_payload)
         with self._leased_transaction(lease, campaign_id=identifier) as cursor:
-            self._require_candidate(cursor, identifier, candidate)
+            candidate_row = self._require_candidate(cursor, identifier, candidate)
             existing = cursor.execute(
                 "SELECT * FROM trials WHERE trial_key = ?", (trial_key,)
             ).fetchone()
@@ -1394,6 +1489,27 @@ class ExperimentLedger:
                 raise LedgerConflictError(
                     f"campaign {identifier!r} already has a terminal decision"
                 )
+            if (
+                split_name == "holdout"
+                and candidate != campaign["incumbent_candidate_id"]
+            ):
+                # The first holdout row for a challenger is its durable
+                # holdout-use record, keyed by contract and policy content
+                # (never hypothesis prose or campaign identity).
+                policy_hash = candidate_row["policy_hash"]
+                prior = [
+                    item
+                    for item in _holdout_consumers(
+                        cursor, campaign["contract_hash"], policy_hash
+                    ).get(policy_hash, ())
+                    if item != identifier
+                ]
+                if prior:
+                    raise HoldoutAlreadyUsedError(
+                        _holdout_reuse_message(
+                            policy_hash, campaign["contract_hash"], prior[0]
+                        )
+                    )
             contract = json.loads(campaign["contract_json"])
             required_ceiling = contract["per_trial_reservation_microusd"]
             if ceiling != required_ceiling:
@@ -2067,6 +2183,7 @@ __all__ = [
     "CandidateNotFoundError",
     "ExperimentLedger",
     "ExperimentLedgerError",
+    "HoldoutAlreadyUsedError",
     "LedgerConflictError",
     "LedgerBudgetError",
     "PromotionDecision",

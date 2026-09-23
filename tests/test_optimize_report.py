@@ -341,6 +341,51 @@ def test_section_navigation_targets_unique_headings_and_remains_in_incomplete_re
     assert '<nav aria-label="Report sections">' in output
 
 
+def paired_t_comparison(name='quality', direction='maximize'):
+    saved = comparison(name, direction)
+    saved.update(method='paired_student_t', degrees_of_freedom=2, standard_error=0.1234375,
+                 critical_value=4.302652729749462, confidence_interval=[1.5955, 2.657586421975310],
+                 lower_confidence_bound=1.5955, descriptive_bootstrap_interval=[1.875, 2.375])
+    return saved
+
+
+def test_paired_t_decisions_name_the_promotion_rule_and_mark_bootstrap_descriptive():
+    data = payload()
+    for stage in ('confirmation', 'holdout'):
+        saved = data['ledger_snapshot']['decisions'][0]['assessment'][stage]
+        saved['primary'] = paired_t_comparison()
+        saved['secondary'] = [paired_t_comparison('latency', 'minimize')]
+    text = visible(render_optimization_report(bind(data)))
+    assert text.count('Paired Student-t lower bound') == 4
+    assert text.count('Descriptive bootstrap interval (not used for promotion)') == 4
+    assert text.count('Saved paired t interval and mean') == 4
+    assert '4.302652729749462' in text and '1.875 to 2.375' in text
+    assert 'Degrees of freedom' in text and 'Percentile bootstrap' not in text
+
+
+def test_legacy_bootstrap_decisions_still_render_with_their_recorded_rule():
+    # Decisions recorded before the paired t rule saved a bootstrap interval
+    # as the promotion interval and no method field.
+    text = visible(render_optimization_report(payload()))
+    assert text.count('Percentile bootstrap lower bound (earlier rule') == 4
+    assert text.count('Saved bootstrap interval and mean') == 4
+    assert 'Paired Student-t' not in text and 'not used for promotion' not in text
+
+
+@pytest.mark.parametrize('field,value', [
+    ('method', 7), ('degrees_of_freedom', 0), ('degrees_of_freedom', 1.5),
+    ('standard_error', -1), ('critical_value', float('inf')),
+    ('descriptive_bootstrap_interval', [2, 1]), ('descriptive_bootstrap_interval', [1]),
+])
+def test_malformed_paired_t_fields_are_refused(field, value):
+    data = payload()
+    saved = data['ledger_snapshot']['decisions'][0]['assessment']['confirmation']
+    saved['primary'] = paired_t_comparison()
+    saved['primary'][field] = value
+    with pytest.raises(ValueError):
+        render_optimization_report(bind(data))
+
+
 def test_direction_labels_are_html_text_outside_scaled_svg_for_each_saved_interval():
     output = render_optimization_report(payload())
     svgs = re.findall(r'<svg .*?</svg>', output)

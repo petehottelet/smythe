@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 import math
+import os
 import sqlite3
+import stat
 import uuid
 from threading import Barrier
 
@@ -19,6 +21,7 @@ from smythe.optimize.contracts import (
 from smythe.optimize.ledger import (
     ExperimentLedger,
     ExperimentLedgerError,
+    HoldoutAlreadyUsedError,
     LedgerBudgetError,
     LedgerConflictError,
     PromotionDecision,
@@ -231,6 +234,105 @@ def test_concurrent_idempotent_campaign_creation_commits_one_holdout_nonce(tmp_p
 
     assert len(materials[0]) == 71
     assert materials[0] == materials[1]
+
+
+def test_ledger_refuses_a_second_holdout_for_the_same_policy_and_contract(tmp_path):
+    path = tmp_path / "holdout-use.db"
+    contract = _contract()
+    incumbent = _candidate(contract, "incumbent")
+    challenger = _candidate(contract, "challenger")
+    reworded = Candidate(
+        contract=contract,
+        policy=dict(challenger.policy),
+        hypothesis="Identical policy, reworded hypothesis",
+    )
+    assert reworded.candidate_id != challenger.candidate_id
+    with ExperimentLedger(path) as ledger:
+        first = _seal(ledger, contract, incumbent, challenger, campaign_id="first")
+        second = _seal(ledger, contract, incumbent, reworded, campaign_id="second")
+        # Incumbent holdout rows and challenger development rows do not
+        # consume a challenger's holdout.
+        _prepared(ledger, first, incumbent, seed=1, split="holdout")
+        _prepared(ledger, first, challenger, seed=2, split="development")
+        assert ledger.holdout_uses(contract.contract_hash) == {}
+
+        _prepared(ledger, first, challenger, seed=1, split="holdout")
+        _prepared(ledger, first, challenger, seed=3, split="holdout")
+        assert ledger.holdout_uses(contract.contract_hash) == {
+            challenger.policy_hash: ("first",)
+        }
+        with pytest.raises(HoldoutAlreadyUsedError, match="campaign 'first'") as refused:
+            _prepared(ledger, second, reworded, seed=1, split="holdout")
+        assert isinstance(refused.value, LedgerConflictError)
+        assert challenger.policy_hash in str(refused.value)
+        assert contract.contract_hash in str(refused.value)
+        _prepared(ledger, second, incumbent, seed=1, split="holdout")
+        _prepared(ledger, second, reworded, seed=1, split="development")
+        assert not [
+            trial
+            for trial in ledger.list_trials(second, candidate_id=reworded.candidate_id)
+            if trial.split == "holdout"
+        ]
+
+        # The same policy content under a different contract is a new holdout.
+        other_contract = _contract(name="other_contract")
+        other_challenger = _candidate(other_contract, "challenger")
+        assert other_challenger.policy_hash == challenger.policy_hash
+        other = _seal(
+            ledger,
+            other_contract,
+            _candidate(other_contract, "incumbent"),
+            other_challenger,
+            campaign_id="other",
+        )
+        _prepared(ledger, other, other_challenger, seed=1, split="holdout")
+        assert ledger.holdout_uses(other_contract.contract_hash) == {
+            other_challenger.policy_hash: ("other",)
+        }
+
+    with ExperimentLedger(path, read_only=True) as reader:
+        assert reader.holdout_uses(contract.contract_hash) == {
+            challenger.policy_hash: ("first",)
+        }
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+def test_new_ledger_database_and_sidecars_are_owner_only(tmp_path):
+    previous = os.umask(0o022)
+    try:
+        path = tmp_path / "new-directory" / "autotune.db"
+        contract = _contract()
+        with ExperimentLedger(path) as ledger:
+            # Sealing a campaign writes its holdout secret through the WAL.
+            _seal(ledger, contract, _candidate(contract, "incumbent"))
+            modes = {
+                suffix: stat.S_IMODE(os.stat(f"{path}{suffix}").st_mode)
+                for suffix in ("", "-wal", "-shm")
+            }
+        assert modes == {"": 0o600, "-wal": 0o600, "-shm": 0o600}
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    finally:
+        os.umask(previous)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+def test_existing_ledger_file_permissions_are_not_changed(tmp_path):
+    previous = os.umask(0o022)
+    try:
+        path = tmp_path / "shared.db"
+        path.touch(mode=0o644)
+        contract = _contract()
+        with ExperimentLedger(path) as ledger:
+            _seal(ledger, contract, _candidate(contract, "incumbent"))
+            wal_mode = stat.S_IMODE(os.stat(f"{path}-wal").st_mode)
+        assert stat.S_IMODE(path.stat().st_mode) == 0o644
+        assert wal_mode == 0o644
+        os.chmod(path, 0o640)
+        with ExperimentLedger(path):
+            pass
+        assert stat.S_IMODE(path.stat().st_mode) == 0o640
+    finally:
+        os.umask(previous)
 
 
 def test_candidate_registration_is_idempotent_and_contract_bound(tmp_path):

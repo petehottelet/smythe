@@ -25,11 +25,13 @@ from smythe.optimize.contracts import (
 )
 from smythe.optimize.ledger import (
     _ENGINE_HOLDOUT_CAPABILITY,
+    _holdout_reuse_message,
     _lease_duration_ns,
     CampaignLease,
     CampaignLeaseError,
     ExperimentLedger,
     ExperimentLedgerError,
+    HoldoutAlreadyUsedError,
     LedgerBudgetError,
     LedgerConflictError,
     PromotionDecision,
@@ -40,6 +42,7 @@ from smythe.optimize.ledger import (
 )
 from smythe.optimize.statistics import (
     MAX_BOOTSTRAP_RESAMPLES,
+    PROMOTION_METHOD,
     ComparisonResult,
     PromotionAssessment,
     aggregate_mean,
@@ -267,6 +270,7 @@ class OptimizationRunner:
         self._validate_executable_contract()
         started = time.monotonic()
         plan = self._build_plan(incumbent, candidates)
+        self._require_unused_holdouts(plan)
         try:
             self.ledger.create_campaign(self.contract, incumbent.candidate_id,
                                         plan["all_candidates"], plan_hash=plan["plan_hash"],
@@ -400,6 +404,7 @@ class OptimizationRunner:
                 assessment={
                     "optimization_plan_hash": plan["plan_hash"],
                     "runner_version": RUNNER_VERSION,
+                    "promotion_method": PROMOTION_METHOD,
                     "ledger_durability": self.ledger.durability,
                     "holdout_seed_commitment": holdout_seed_commitment,
                     "stage": "development",
@@ -454,6 +459,17 @@ class OptimizationRunner:
         evidence.extend(record.trial_key for record in confirmation_candidate)
 
         if confirmation.promote:
+            # Durably claim this policy's one holdout for the contract before
+            # any holdout work is dispatched; a prior use is refused here.
+            self._require_time(deadline)
+            self._prepare_trial(
+                campaign_id,
+                selected,
+                "holdout",
+                _bound_phase("challenger", plan["plan_hash"]),
+                holdout_seeds[0],
+                lease=lease,
+            )
             holdout_baseline, holdout_candidate = await self._evaluate_pair(
                 campaign_id,
                 plan["plan_hash"],
@@ -497,6 +513,7 @@ class OptimizationRunner:
             assessment={
                 "optimization_plan_hash": plan["plan_hash"],
                 "runner_version": RUNNER_VERSION,
+                "promotion_method": PROMOTION_METHOD,
                 "ledger_durability": self.ledger.durability,
                 "holdout_seed_commitment": holdout_seed_commitment,
                 "development": selected_score,
@@ -575,8 +592,8 @@ class OptimizationRunner:
         plan_payload = {
             "runner_version": RUNNER_VERSION,
             "statistics": {
-                "method": "deterministic_paired_bootstrap",
-                "bootstrap_resamples": self.bootstrap_resamples,
+                "method": PROMOTION_METHOD,
+                "descriptive_bootstrap_resamples": self.bootstrap_resamples,
             },
             "contract_hash": self.contract.contract_hash,
             "incumbent_candidate_id": incumbent.candidate_id,
@@ -598,6 +615,27 @@ class OptimizationRunner:
             "plan_hash": plan_hash,
             "campaign_id": campaign_id,
         }
+
+    def _require_unused_holdouts(self, plan: Mapping[str, Any]) -> None:
+        """Refuse a plan that would re-test a policy whose holdout was used.
+
+        Holdout use is keyed by contract and policy content, so rewording a
+        hypothesis, changing the challenger set, or choosing a new campaign ID
+        cannot draw a second holdout for the same policy in this ledger.
+        """
+
+        campaign_id: str = plan["campaign_id"]
+        uses = self.ledger.holdout_uses(self.contract.contract_hash)
+        for candidate in plan["candidates"]:
+            consumers = uses.get(candidate.policy_hash, ())
+            if consumers and campaign_id not in consumers:
+                raise HoldoutAlreadyUsedError(
+                    _holdout_reuse_message(
+                        candidate.policy_hash,
+                        self.contract.contract_hash,
+                        consumers[0],
+                    )
+                )
 
     def _validate_executable_contract(self) -> None:
         if not self.contract.required_gates:
@@ -937,23 +975,9 @@ class OptimizationRunner:
         lease: CampaignLease,
     ) -> TrialRecord:
         self._require_time(deadline)
-        try:
-            trial_key = self.ledger.prepare_trial(
-                campaign_id,
-                candidate.candidate_id,
-                split,
-                phase,
-                seed,
-                evaluator_hash=self.evaluator_hash,
-                ceiling_microusd=self.contract.per_trial_reservation_microusd,
-                lease=lease,
-            )
-        except UnknownTrialError as exc:
-            raise OptimizationNeedsAttention(str(exc)) from exc
-        except LedgerBudgetError as exc:
-            raise OptimizationLimitError(str(exc)) from exc
-        except LedgerConflictError as exc:
-            raise OptimizationLimitError(str(exc)) from exc
+        trial_key = self._prepare_trial(
+            campaign_id, candidate, split, phase, seed, lease=lease
+        )
 
         record = self.ledger.get_trial(trial_key)
         if record.status is TrialStatus.COMPLETED:
@@ -1060,6 +1084,36 @@ class OptimizationRunner:
             ) from exc
         await self._enforce_limits(completed, duration_budget, lease=lease)
         return completed
+
+    def _prepare_trial(
+        self,
+        campaign_id: str,
+        candidate: Candidate,
+        split: str,
+        phase: str,
+        seed: int,
+        *,
+        lease: CampaignLease,
+    ) -> str:
+        try:
+            return self.ledger.prepare_trial(
+                campaign_id,
+                candidate.candidate_id,
+                split,
+                phase,
+                seed,
+                evaluator_hash=self.evaluator_hash,
+                ceiling_microusd=self.contract.per_trial_reservation_microusd,
+                lease=lease,
+            )
+        except UnknownTrialError as exc:
+            raise OptimizationNeedsAttention(str(exc)) from exc
+        except LedgerBudgetError as exc:
+            raise OptimizationLimitError(str(exc)) from exc
+        except HoldoutAlreadyUsedError:
+            raise
+        except LedgerConflictError as exc:
+            raise OptimizationLimitError(str(exc)) from exc
 
     def _validate_outcome(self, outcome: object) -> TrialOutcome:
         if not isinstance(outcome, TrialOutcome):
@@ -1462,6 +1516,15 @@ def _comparison_dict(result: ComparisonResult) -> dict[str, Any]:
         "lower_confidence_bound": result.lower_confidence_bound,
         "hard_bounds_passed": result.hard_bounds_passed,
         "non_regression_passed": result.non_regression_passed,
+        "method": result.method,
+        "degrees_of_freedom": result.degrees_of_freedom,
+        "standard_error": result.standard_error,
+        "critical_value": result.critical_value,
+        "descriptive_bootstrap_interval": (
+            None
+            if result.descriptive_bootstrap_interval is None
+            else list(result.descriptive_bootstrap_interval)
+        ),
     }
 
 

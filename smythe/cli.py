@@ -261,9 +261,22 @@ def build_parser() -> argparse.ArgumentParser:
     concurrency.add_argument("--holdout-repetitions", type=int, default=5)
     concurrency.add_argument("--max-parallel-candidates", type=int, default=2)
     concurrency.add_argument("--max-wall-seconds", type=int, default=300)
-    concurrency.add_argument("--confidence", type=float, default=0.95)
+    concurrency.add_argument(
+        "--confidence",
+        type=float,
+        default=0.95,
+        help=(
+            "two-sided paired t confidence; promotion requires the one-sided "
+            "lower bound at error (1 - confidence) / 2 to exceed --min-improvement"
+        ),
+    )
     concurrency.add_argument("--min-improvement", type=float, default=0.5)
-    concurrency.add_argument("--bootstrap-resamples", type=int, default=2_000)
+    concurrency.add_argument(
+        "--bootstrap-resamples",
+        type=int,
+        default=2_000,
+        help="resamples for the descriptive bootstrap interval (not used for promotion)",
+    )
     _add_optimize_output_options(concurrency, inherited=True)
 
     inspect = optimize_commands.add_parser(
