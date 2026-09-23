@@ -96,6 +96,10 @@ class LLMArchitect(Architect):
     declare MCP servers or per-node models, and it must stay within
     ``max_nodes`` nodes and ``max_depth`` levels.  A reply that breaks
     the schema is retried like malformed JSON, up to ``max_retries``.
+
+    A durable run's ``WorkflowGraphPolicy`` is checked after planning and
+    its rejection is final, so keep ``max_nodes`` at or below the policy's
+    ``max_nodes``: an oversized plan is then repaired, not fatal.
     """
 
     def __init__(

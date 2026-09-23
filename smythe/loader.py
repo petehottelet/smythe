@@ -246,8 +246,8 @@ def build_graph_from_model_output(
     YAML, this accepts only the fields the planning prompt defines.  A
     plan cannot declare MCP servers, commands, URLs, environment
     variables, or per-node or per-agent models, and unknown keys are
-    rejected rather than ignored.  The whole plan is checked before any
-    agent is created.
+    rejected rather than ignored.  The schema is checked before any
+    agent is created, and nothing is returned unless every check passes.
 
     ``max_depth`` counts levels: the number of nodes on the longest
     dependency chain, so a single node has depth 1.

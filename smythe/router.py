@@ -18,7 +18,7 @@ from smythe.workflow_binding import (
 
 logger = logging.getLogger("smythe.router")
 
-# Wrapping a classifier may put around its one-token answer.
+# Characters a classifier may wrap around its one-token answer.
 _REPLY_DECORATION = " \t\r\n`'\".,;:!?*()[]{}<>"
 
 
