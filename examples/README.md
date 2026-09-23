@@ -4,7 +4,7 @@ Examples 01–05, 08–14, and the acquisition-diligence example run offline
 out of the box. A built-in `DemoProvider` returns deterministic responses so
 you can inspect planning, fan-out, budgets, recovery, and synthesis without an
 API key. Examples 06 and 07 are live MCP integration tours. These examples
-target [Smythe 0.8.0](https://github.com/petehottelet/smythe/releases/tag/v0.8.0)
+target [Smythe 0.8.1](https://github.com/petehottelet/smythe/releases/tag/v0.8.1)
 and use files from the repository. Run them from its root:
 
 ```bash
@@ -14,12 +14,12 @@ python examples/14_durable_text_workflow.py
 
 Example 14 explicitly selects fixture responses even when API keys are set.
 It demonstrates planning, execution and recovery with zero provider calls.
-The [0.8.0 release guide](../docs/release-0.8.0.md) covers the current
-features and low-level Autotune migration requirements.
+The [0.8.1 release guide](../docs/release-0.8.1.md) covers upgrading from 0.8.0;
+the [0.8.0 guide](../docs/release-0.8.0.md) covers the low-level Autotune migration.
 
 The durable artifact-job example uses the installed CLI. Install its optional
 dependencies with `pip install -e ".[jobs]"` from this checkout, or
-`pip install "smythe[jobs]==0.8.0"` for the release package. The example is
+`pip install "smythe[jobs]==0.8.1"` for the release package. The example is
 completely offline and its approval token is bound to the exact manifest and
 budget:
 
@@ -55,8 +55,8 @@ cadence control, and the ten-minute travel/resize check.
 The repository's [Autotune concurrency command](../docs/optimize.md#run-the-offline-campaign)
 remains offline. Its [campaign ownership](../docs/optimize.md#campaign-ownership)
 update acquires and renews a lease automatically; the CLI needs no new flags.
-Low-level ledger callers must pass explicit lease tokens. These changes ship
-in the 0.8.0 package pinned above.
+Low-level ledger callers must pass explicit lease tokens. These changes shipped
+in 0.8.0 and are part of the package pinned above.
 
 Export a completed local campaign with the report command:
 
@@ -77,7 +77,7 @@ Use a new output filename for each export.
 | [Packages and typing](../docs/distribution.md) | Build and test a slim source package, verify typed sync/async consumers against an installed wheel, and install the standalone Repo Doctor skill. |
 | [Current materials](../docs/current-materials.md) | Revised 192/256 contact sheets, detail sheets, animation, still image, native source exports, and each benchmark's evidence status. |
 | [GPT-6 Astra quickstart](../README.md#quickstart) | Generate, inspect, and execute a text-only task graph through native Responses, with a $5 run allowance, concurrency eight, and planning included in the SQLite ledger. |
-| [Native Astra/Sol Responses](../docs/openai-responses.md) | Smythe 0.8.0 counts and quotes an exact request before generation, records native token prices, and retains function-tool continuation and failed-response receipts. |
+| [Native Astra/Sol Responses](../docs/openai-responses.md) | Smythe counts and quotes an exact request before generation, records native token prices, and retains function-tool continuation and failed-response receipts. |
 | [Astra campaign preparation](../benchmarks/astra_benchmark_plan.md#prepared-experiment) | Validate 13 original task/source packs and reproduce the 12-pilot/200-main schedule locally, with no API calls. Factual checks remain separate from quality scoring. |
 | [Glyph contour study](../screensaver/glyph-design-v2/README.md) | Inspect all 192 v2 glyphs, their small-size sheets, and individual SVGs. Current previews and native source exports use v2. [Matched 192/256 workflow measurements](../benchmarks/svg_v2_results.md) cover compilation, validation and export; the live catalog remains 192. |
 | [Astra findings and reproduction](../benchmarks/astra_findings.md) | Read the completed comparison and independently check archived members, native accounting, human-output bindings and both charts without provider calls. |
@@ -90,7 +90,7 @@ Use a new output filename for each export.
 | [02_dynamic_planning.py](02_dynamic_planning.py) | The `LLMArchitect` designs the execution graph from the task itself. Inspect it, then execute with the [complete task snapshot](../docs/tasks.md). |
 | [03_parallel_budget.py](03_parallel_budget.py) | Eight-node broadcast under a USD budget cap with `max_concurrency=3`, a per-node cost breakdown, and [strict cost guardrails](../docs/budgets.md). |
 | [04_resume_after_crash.py](04_resume_after_crash.py) | Resume preserves completed nodes and their costs. [File checkpoints](../docs/checkpoint-format.md) flush complete snapshots and use independent temporary files for atomic publication. [Verification recovery](../docs/verifier.md#recovery-and-concurrent-work) completes pending rejection and regeneration decisions before dispatch. |
-| [05_mcp_filesystem.py](05_mcp_filesystem.py) | MCP tool use, fully offline: an agent reads real files through a bundled MCP server ([mcp_file_server.py](mcp_file_server.py)) via the bounded tool loop. Needs `pip install "smythe[mcp]==0.8.0"`. |
+| [05_mcp_filesystem.py](05_mcp_filesystem.py) | MCP tool use, fully offline: an agent reads real files through a bundled MCP server ([mcp_file_server.py](mcp_file_server.py)) via the bounded tool loop. Needs `pip install "smythe[mcp]==0.8.1"`. |
 | [06_mcp_github.py](06_mcp_github.py) | The real GitHub MCP server with a mandatory tool allowlist and `env_passthrough` for the token. Env-gated: needs `GITHUB_PERSONAL_ACCESS_TOKEN`, an LLM key, and npx. |
 | [07_mcp_saas.py](07_mcp_saas.py) | Any SaaS MCP server over streamable HTTP (Linear, Notion, ...), configured entirely by environment variables. Env-gated. |
 | [08_learning_loop.py](08_learning_loop.py) | Record run 1 in `PlannerMemory` and recall it into run 2's planning prompt; the Architect returns a leaner plan (8 nodes → 3). The [history validation](../docs/architecture.md#learning-loop) skips malformed recalled fields and labels summed node time. |

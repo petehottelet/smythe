@@ -209,6 +209,26 @@ ownership automatically. Read the migration guide before upgrading a ledger.
   Existing evidence and identities remain intact.
   [Concurrent initialization regression checks](tests/test_jobs_workflow_initialization.py).
 
+## Shipped (v0.8.1): security and correctness fixes
+
+The [0.8.1 release](docs/release-0.8.1.md) stops a model-generated plan from
+starting local programs and tightens the execution envelope's checks. Some
+fixes change behavior that 0.8.0 accepted; read the upgrade notes first.
+
+- **Generated plans are data** — a strict plan schema with node and depth
+  limits; MCP servers come only from developer configuration, including on
+  checkpoint resume. [Planning tiers](docs/architecture.md#planning-tiers).
+- **Fail-closed judgment** — strict verifier verdicts, supervisor proposals and
+  router matching; truncated output fails its node.
+  [Execution policies](docs/execution.md).
+- **Budgets and durable runs** — retries reserve their estimate before
+  dispatch; durable runs settle pre-generation provider rejections at zero
+  cost. [Durable accounting](docs/workflow-accounting.md).
+- **Untrusted inputs** — image decoding limited to PNG, JPEG, GIF and WebP;
+  owner-only prompt and response files on POSIX.
+- **Autotune statistics** — paired Student-t promotion and sealed holdouts.
+  [Promotion rule](docs/optimize.md).
+
 ## Completed benchmark evidence
 
 Every benchmark publication includes the [materials completion check](docs/current-materials.md#completion-check-for-every-benchmark-update): current glyph sheets, previews, exports, charts, links, and consistent documentation.

@@ -21,73 +21,99 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
-Safety and correctness fixes planned for 0.8.1. Several fixes change behavior
-that 0.8.0 accepted; they are listed under **Changed**.
+No unreleased changes.
+
+## [0.8.1] - 2026-09-22
+
+This security release stops a model-generated plan from starting local
+programs and closes several places where model replies or provider responses
+could get past the execution envelope's checks. Some fixes change behavior that
+0.8.0 accepted; each is listed under **Changed**. The
+[upgrade guide](docs/release-0.8.1.md) lists what to check before upgrading.
 
 ### Security
 
-- **Model-generated plans can no longer start programs.** `LLMArchitect` parses
-  plans with a strict schema that rejects `mcp_servers`, commands, URLs,
-  environment variables, model overrides and unknown fields. Before this fix, a
-  plan could declare an MCP stdio server that `MCPToolRuntime()` would launch,
-  passing through any named environment variable. Developer-written YAML graphs
-  are unchanged.
-- **Images are decoded only as PNG, JPEG, GIF or WebP** in Jobs artifact
-  inspection, asset finishing, `validate_image` and the design checks. Other
-  formats, such as EPS (which could launch Ghostscript) or TIFF, are rejected
-  before any other decoder runs.
-- **New files holding prompts and responses are owner-only (0600):**
+- **Model-generated plans can no longer start programs.** In 0.8.0, a plan
+  from `LLMArchitect` (the default `Swarm` planner) could declare an MCP stdio
+  server for an agent. With `MCPToolRuntime()` configured, Smythe launched it
+  as a local program and passed it any environment variable named in
+  `env_passthrough`. Plans are now parsed with a strict schema that rejects
+  `mcp_servers`, commands, URLs, environment variables, model overrides and
+  unknown fields. Developer-written Python and YAML graphs are unchanged.
+- **Checkpoints written before 0.8.1 resume without their MCP servers,**
+  because a model-generated plan could have declared them. Resume logs a
+  warning naming each dropped server. New checkpoints are version 4.
+- **Untrusted images are decoded only as PNG, JPEG, GIF or WebP** in Jobs
+  artifact inspection, asset finishing, `validate_image` and the design
+  checks. Other formats, such as EPS (which could launch Ghostscript) or TIFF,
+  are rejected before any other decoder runs.
+- **New files holding prompts and responses are owner-only on POSIX (0600):**
   `SQLiteWorkflowStore` journals, Jobs and Autotune databases (with their
-  `-wal` and `-shm` files) and `PlannerMemory` history. Directories that
-  `PlannerMemory` and the Jobs store create are 0700. Existing files keep their
-  permissions.
+  `-wal` and `-shm` files) and `PlannerMemory` history. The directory that
+  `PlannerMemory` or the Jobs store creates for its file is 0700; parent
+  directories and existing files keep their permissions. On Windows these
+  files inherit their directory's access control.
+- Planner, template-selection and verifier replies are parsed in linear time.
+  A reply with an unclosed code fence followed by a long run of whitespace
+  could block the event loop for minutes.
 
 ### Fixed
 
-- **Durable workflows survive rate limits.** A provider 4xx error response,
-  such as a 429, settles at zero cost with a rejected result instead of
-  blocking the run with `unknown_exposure`, and the node's failure policy
+- **Durable workflows survive rate limits.** A provider rejection that happens
+  before any model work (HTTP 401, 403, 404, 413 or 429 with the provider's
+  plain error body and that status's SDK error) settles at zero cost instead
+  of blocking the run with `unknown_exposure`, and the node's failure policy
   decides what happens next (`ProviderRequestRejectedError`). Resuming a run
-  that 0.8.0 blocked this way reclassifies the call and reopens the run.
-  Transport errors, 408/499 and 5xx responses (including Anthropic 529) still
-  hold unknown exposure.
-- Serial runs with the Anthropic, OpenAI, OpenAI image and Gemini providers no
-  longer fail with "Event loop is closed": each event loop gets its own client.
-- Output cut off at the token limit raises `OutputTruncatedError` after its
-  cost is recorded, and the node's failure policy applies (Anthropic, OpenAI,
-  Gemini and `LLM_MERGE` synthesis). Truncated plans are retried with a request
-  for a smaller plan, and a truncated supervisor review applies no revision.
+  that 0.8.0 blocked this way reclassifies the call under the same rule and
+  reopens the run. Other 4xx responses, 408, 499, 5xx (including Anthropic 529)
+  and transport errors still hold unknown exposure. A run whose retry succeeded
+  just before a crash replays the accepted output on resume instead of buying
+  the step again. In a parallel run, a node that fails still cancels sibling
+  calls in flight, and those hold unknown exposure.
+- Serial runs with the Anthropic, OpenAI, OpenAI image and Gemini SDK
+  providers no longer fail with "Event loop is closed": each event loop gets
+  its own client.
 - A node that fails under `FailurePolicy.SKIP` passes
   "[skipped: this step did not complete]" to later steps instead of its error
   text.
-- `Swarm(parallel=False)` runs one node at a time in `resume()`, `aresume()`
-  and `execute_async()`, including runs with `run_store`.
-- `TokenVerifier` accepts only a JSON boolean for `passed` and treats empty,
-  missing or contradictory verdicts as FAIL, regenerating at most
-  `max_regenerations` times. It reads "does not fail … PASS" as a pass.
-- `LLMSupervisor` ignores `"change": "false"` and malformed fields, and refuses
-  revisions that add more than `max_added_nodes` (default 3) nodes.
+- A retry after truncated output, and each later tool turn, reserves the
+  node's estimated cost before it is sent. A bare budget check let parallel
+  runs, and nodes with an explicit estimate, spend past `max_budget_usd`.
+- `TokenVerifier` no longer passes negated, conditional or quoted verdicts
+  ("so it cannot PASS", "does not PASS"), and a JSON `"passed": false` can no
+  longer be overridden by prose or by an earlier example object. See
+  **Changed** for the verdict rules.
+- `LLMSupervisor` treats a malformed proposal as no change: `"change"` must be
+  JSON `true`, every added node needs a label and an id of 1-64 letters,
+  digits, `-` or `_`, and a revision may add at most `max_added_nodes`
+  (default 3) nodes. A truncated review applies no revision. An unchecked
+  added id could permanently block a durable run.
 - Malformed planner and template-selection replies are retried instead of
   escaping as `AttributeError`, and retry prompts name the actual problem.
 - `WhiteRabbit` matches deterministic keys regardless of case and surrounding
   punctuation, and logs a warning when it falls back to the autonomous tier.
 - Distilled templates accept model-supplied params and goals containing
   backslashes.
-- `design_verifier` fails when an artifact is missing or can't be decoded,
-  instead of passing or raising `FileNotFoundError`. The flat-region finding is
-  advisory, so a logo on a plain background no longer triggers a paid
-  regeneration.
+- `design_verifier` fails an artifact that is missing or cannot be decoded,
+  instead of passing or aborting the run. A blank image (one flat colour,
+  including fully transparent) is a hard `blank-image` finding, while the
+  flat-region finding is advisory, so a logo or product on a plain background
+  no longer triggers a paid regeneration.
 - `PlannerMemory` no longer loses the record appended after a crash-truncated
   line.
-- **Autotune promotion matches its stated error rate.** Candidates are
-  promoted only when a one-sided paired Student-t lower bound clears
-  `min_improvement`. The percentile bootstrap used before promoted about 8% of
-  truly null candidates at five pairs, against a nominal 2.5%. Decisions record
-  their method; older decisions still load and are labeled in reports.
-- **Autotune holdouts stay sealed.** Re-testing a challenger whose holdout was
-  already used under the same contract in the same ledger is refused
-  (`HoldoutAlreadyUsedError`). Rewording the hypothesis or choosing a new
-  campaign ID no longer draws a fresh holdout.
+- **Autotune promotion matches its stated error rate** for roughly normal
+  paired deltas. Candidates are promoted only when a one-sided paired
+  Student-t lower bound clears `min_improvement`. The percentile bootstrap used
+  before promoted about 8% of truly null candidates at five pairs, against a
+  nominal 2.5%. Strongly skewed deltas can still promote more often than
+  nominal. Decisions record their method; older decisions still load and are
+  labeled in reports.
+- **Autotune holdouts stay sealed.** A challenger policy gets one holdout per
+  holdout identity in a ledger: the evaluator, objectives and their bounds,
+  required gates, holdout repetitions, confidence and minimum improvement.
+  Re-testing it is refused with `HoldoutAlreadyUsedError` (CLI exit code 8),
+  whatever the campaign ID, hypothesis, challenger set, development or
+  confirmation repetitions, or operational limits.
 
 ### Changed
 
@@ -95,20 +121,97 @@ that 0.8.0 accepted; they are listed under **Changed**.
   `ConstrainedArchitect` and the `WhiteRabbit` classifier is `claude-opus-5-5`
   (was `claude-opus-4-8`).
 - Model plans are limited to 8 nodes and 5 levels by default
-  (`LLMArchitect(max_nodes=..., max_depth=...)`), with `max_retries` capped at
-  3 and `max_regenerations` at 2. Plans that set per-node models,
-  `max_tool_iterations` or metadata other than `role`, or that omit labels, are
-  rejected and retried.
+  (`LLMArchitect(max_nodes=..., max_depth=...)`). Node ids must be 1-64
+  letters, digits, `-` or `_`, `timeout_s` must be finite and positive, and a
+  node may set `max_retries` up to 3 and `max_regenerations` up to 2. Plans
+  that break these rules, set per-node models, `max_tool_iterations` or
+  metadata other than `role`, or omit labels are rejected and retried.
+  `ConstrainedArchitect` rejects selection fields other than `template` and
+  `params`. Malformed `failure_policy`, `agent` and `topology` values in
+  developer YAML raise `ValueError` instead of `AttributeError`.
+- With the Anthropic, OpenAI and Gemini SDK providers, output that stops at
+  the token limit fails the node with `OutputTruncatedError` after its cost is
+  recorded, and the node's failure policy applies. A truncated plan is retried
+  with a request for a smaller plan, a truncated supervisor review applies no
+  revision, and a truncated `LLM_MERGE` synthesis fails the run. A Gemini
+  image whose response reports `MAX_TOKENS` fails the node instead of being
+  kept. `AnthropicProvider` defaults to `max_tokens=4096`; raise it for long
+  deliverables. The native `AnthropicMessagesProvider` and
+  `OpenAIResponsesProvider` still treat a truncated response as a terminal
+  response error.
+- `Swarm(parallel=False)`, the default, now also runs one node at a time in
+  `execute_async()`, `resume()` and `aresume()`; 0.8.0 ran up to
+  `max_concurrency` nodes there. Pass `parallel=True` for concurrent
+  execution. A durable run keeps the concurrency its first execution
+  recorded, including runs first executed under 0.8.0.
+- `TokenVerifier` reads a verdict strictly. JSON verdict objects count
+  wherever they appear, need a JSON boolean `passed`, and must agree. A prose
+  verdict counts only when the uppercase word `PASS` or `FAIL` starts a line
+  or sentence or follows a final-verdict label (`Verdict:`, `Final answer:`,
+  `Overall:`, `PASS/FAIL:`); a reply that is only the verdict word may use any
+  case. A negated or conditional PASS, an uppercase FAIL anywhere, verdicts
+  that disagree, or no readable verdict fail the reply (regenerating at most
+  `max_regenerations` times). The approve, approved, ok and reject keywords are
+  gone, so replies such as "Approved.", "Result: PASS" or per-criterion lines
+  with no final verdict now fail the gate. End a judge's reply with a
+  standalone `PASS` or `FAIL` line or a `Verdict:` line.
+- `LLMSupervisor` refuses a whole proposal when any field is malformed; 0.8.0
+  applied the parts that parsed.
 - `WhiteRabbit` raises `ValueError` when two deterministic keys differ only by
-  case.
-- `validate_image` reports disallowed formats and oversized images as
-  `decode_failed` findings.
-- Autotune campaigns started under 0.8.0 are not resumed under the new
-  promotion rule, because the method is part of the plan hash. Re-running a
-  campaign whose holdout was already used exits with code 8.
-- New public exports: `OutputTruncatedError`, `ProviderRequestRejectedError`
-  and `smythe.optimize.HoldoutAlreadyUsedError`.
-- The README shows the Glyph Rain animation again.
+  case or surrounding punctuation.
+- `design_verifier` reports a blank image as a hard `blank-image` finding
+  (`smythe.design.check_blank`), and any non-image artifact listed on a
+  checked node fails it.
+- `finish_image` and the design checks refuse images over 89,478,485 pixels,
+  whatever `PIL.Image.MAX_IMAGE_PIXELS` allows. `validate_image` reports
+  disallowed formats and oversized images as `decode_failed` findings (TIFF
+  was `content_format_mismatch`).
+- Durable workflows raise `ProviderRequestRejectedError` (previously
+  `ProviderAccountingError`) for the zero-cost rejections above, and a step
+  rejected this way gets a new journaled call on resume. `RETRY` does not
+  read `Retry-After`: it waits a random delay of up to
+  `retry_backoff_s * 2 ** (attempt - 1)` (default 0, an immediate retry), and
+  `retry_backoff_s` is part of a durable run's recipe.
+- Autotune campaigns started under 0.8.0 are not resumed, because the
+  promotion method is part of the plan hash, and derived campaign IDs change.
+  Re-running an explicit `--campaign-id` campaign created by 0.8.0 exits 8
+  ("campaign binding drift"); finish it on 0.8.0 or start a new campaign.
+  `confidence_interval` and `lower_confidence_bound` now carry the paired
+  Student-t interval, with new `method`, `degrees_of_freedom`,
+  `standard_error`, `critical_value` and `descriptive_bootstrap_interval`
+  fields and `assessment.promotion_method`. The plan key `bootstrap_resamples`
+  is now `descriptive_bootstrap_resamples`, and `--bootstrap-resamples` no
+  longer affects promotion.
+- Rollback and in-flight runs: checkpoints are written as version 4, which
+  0.8.0 cannot read, and a durable journal in which 0.8.1 settled a provider
+  rejection cannot be resumed by 0.8.0. A durable run started under 0.8.0
+  cannot be resumed if its next call's prompt changed (a planner retry, or a
+  node that depends on a skipped node); finish it on 0.8.0 or start a new run.
+
+### Added
+
+- `OutputTruncatedError` and `ProviderRequestRejectedError` (exported from
+  `smythe`) and `smythe.optimize.HoldoutAlreadyUsedError`.
+- `LLMArchitect(max_nodes=..., max_depth=...)` and
+  `LLMSupervisor(max_added_nodes=...)`.
+- `smythe.loader.build_graph_from_model_output`, `MODEL_NODE_ID` and the
+  `MODEL_PLAN_MAX_*` limits; `smythe.provider.TRUNCATED_STOP_REASONS`.
+- `smythe.design.check_blank`.
+- `smythe.optimize.ledger.holdout_identity()`, whose result
+  `ExperimentLedger.holdout_uses()` takes. `smythe.optimize.statistics` gains
+  `paired_t_confidence_interval`, `paired_t_lower_bound`,
+  `student_t_quantile` and `PROMOTION_METHOD`.
+
+### Documentation
+
+- The README shows the Glyph Rain animation and its benchmark charts again,
+  returns to its original subheading, and opens with an offline quickstart that
+  runs after `pip install smythe`, with no API key. Its install commands no
+  longer pin a version.
+- The architecture guide describes the model-plan schema and where MCP servers
+  may come from; the execution guide states which providers raise
+  `OutputTruncatedError`; the [0.8.1 release guide](docs/release-0.8.1.md)
+  covers upgrading.
 
 ## [0.8.0] - 2026-09-21
 
@@ -1047,7 +1150,8 @@ Initial public release.
   60ms sleep, which is too tight for `time.sleep()` precision on Windows.
   Passes consistently in isolation. Tracked for fix in 0.1.1.
 
-[Unreleased]: https://github.com/petehottelet/smythe/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/petehottelet/smythe/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/petehottelet/smythe/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/petehottelet/smythe/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/petehottelet/smythe/compare/v0.6.0...v0.7.0
 [0.1.0]: https://github.com/petehottelet/smythe/releases/tag/v0.1.0
