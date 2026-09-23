@@ -386,6 +386,29 @@ def test_new_decisions_record_and_report_the_paired_t_rule(tmp_path, capsys):
     assert "Descriptive bootstrap interval (not used for promotion)" in html
 
 
+def test_changing_campaign_id_cannot_reroll_a_used_holdout(tmp_path, capsys):
+    ledger_path = tmp_path / "reroll.sqlite3"
+    first = _run(ledger_path, capsys, *_SMALL_CAMPAIGN)
+    assert first["evidence"]["holdout_assessment"] is not None
+    assert main(
+        [
+            "optimize",
+            "concurrency",
+            "--ledger",
+            str(ledger_path),
+            "--json",
+            "--campaign-id",
+            "second-attempt",
+            *_SMALL_CAMPAIGN,
+        ]
+    ) == EXIT_OPTIMIZE_STATE
+    error = _json_output(capsys)["error"]
+    assert error["type"] == "HoldoutAlreadyUsedError"
+    assert first["campaign_id"] in error["message"]
+    # The consuming campaign itself still replays.
+    assert _run(ledger_path, capsys, *_SMALL_CAMPAIGN)["campaign_id"] == first["campaign_id"]
+
+
 def test_inspect_is_read_only_and_missing_campaign_has_stable_exit(tmp_path, capsys):
     ledger_path = tmp_path / "inspect.sqlite3"
     campaign = _run(

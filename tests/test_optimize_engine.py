@@ -27,7 +27,12 @@ from smythe.optimize.engine import (
     _bound_phase,
     _split_seeds,
 )
-from smythe.optimize.ledger import CampaignLeaseConflict, ExperimentLedger, TrialStatus
+from smythe.optimize.ledger import (
+    CampaignLeaseConflict,
+    ExperimentLedger,
+    HoldoutAlreadyUsedError,
+    TrialStatus,
+)
 
 
 EVALUATOR_HASH = "sha256:" + "e" * 64
@@ -506,3 +511,101 @@ async def test_precreated_custom_campaign_cannot_reveal_then_expand_plan(tmp_pat
         snapshot = ledger.snapshot("sealed-custom-campaign")
         assert snapshot["candidate_count"] == 2
         assert snapshot["trial_count"] == 0
+
+
+def _rewording(contract: ExperimentContract, incumbent: Candidate, text: str) -> Candidate:
+    return Candidate(
+        contract=contract,
+        policy={"strength": 2},
+        hypothesis=text,
+        parent=incumbent.candidate_id,
+    )
+
+
+async def _challengers_win(context: TrialContext) -> TrialOutcome:
+    quality = 10.0 if context.candidate.policy["strength"] >= 2 else 0.0
+    return TrialOutcome(
+        metrics={"quality": quality, "risk": 1.0},
+        gates={"safe": True},
+        actual_cost_microusd=1,
+    )
+
+
+@pytest.mark.asyncio
+async def test_rewording_a_hypothesis_cannot_reroll_a_used_holdout(tmp_path):
+    contract = _contract(max_candidates=3, max_trials=15, max_budget_microusd=150)
+    incumbent, challenger = _candidates(contract)
+    calls: list[TrialContext] = []
+
+    async def evaluate(context: TrialContext) -> TrialOutcome:
+        calls.append(context)
+        return await _challengers_win(context)
+
+    with ExperimentLedger(tmp_path / "reroll.sqlite3", durability="normal") as ledger:
+        first = await _runner(contract, ledger, evaluate).run(incumbent, (challenger,))
+        assert first.holdout_assessment is not None
+        assert ledger.holdout_uses(contract.contract_hash) == {
+            challenger.policy_hash: (first.campaign_id,)
+        }
+        evaluated = len(calls)
+
+        reworded = _rewording(contract, incumbent, "Stronger settings help, reworded")
+        assert reworded.candidate_id != challenger.candidate_id
+        assert reworded.policy_hash == challenger.policy_hash
+        other = Candidate(
+            contract=contract,
+            policy={"strength": 3},
+            hypothesis="an unrelated policy",
+            parent=incumbent.candidate_id,
+        )
+        attempts = [
+            ((reworded,), None),
+            ((reworded,), "fresh-campaign-id"),
+            ((other, reworded), None),
+        ]
+        for challengers, campaign_id in attempts:
+            runner = _runner(contract, ledger, evaluate, campaign_id=campaign_id)
+            with pytest.raises(HoldoutAlreadyUsedError, match=first.campaign_id) as refused:
+                await runner.run(incumbent, challengers)
+            assert challenger.policy_hash in str(refused.value)
+            assert contract.contract_hash in str(refused.value)
+        assert len(calls) == evaluated
+        campaigns = ledger._connection.execute("SELECT COUNT(*) FROM campaigns").fetchone()[0]
+        assert campaigns == 1
+
+        # The consuming campaign still replays idempotently, and an unused
+        # policy under the same contract can still be tested.
+        replay = await _runner(contract, ledger, evaluate).run(incumbent, (challenger,))
+        assert replay.decision_id == first.decision_id
+        assert len(calls) == evaluated
+        fresh = await _runner(contract, ledger, evaluate).run(incumbent, (other,))
+        assert fresh.holdout_assessment is not None
+        assert ledger.holdout_uses(contract.contract_hash) == {
+            challenger.policy_hash: (first.campaign_id,),
+            other.policy_hash: (fresh.campaign_id,),
+        }
+
+
+@pytest.mark.asyncio
+async def test_racing_holdout_claim_is_refused_before_any_holdout_dispatch(
+    tmp_path, monkeypatch
+):
+    contract = _contract()
+    incumbent, challenger = _candidates(contract)
+    reworded = _rewording(contract, incumbent, "the same policy, described differently")
+
+    with ExperimentLedger(tmp_path / "race.sqlite3", durability="normal") as ledger:
+        first = await _runner(contract, ledger, _challengers_win).run(
+            incumbent, (challenger,)
+        )
+        # Simulate a concurrent campaign that passed the early check before
+        # the first campaign claimed the holdout.
+        monkeypatch.setattr(OptimizationRunner, "_require_unused_holdouts", lambda *_: None)
+        runner = _runner(contract, ledger, _challengers_win)
+        with pytest.raises(HoldoutAlreadyUsedError, match=first.campaign_id):
+            await runner.run(incumbent, (reworded,))
+        campaign_id = runner._build_plan(incumbent, (reworded,))["campaign_id"]
+        trials = ledger.list_trials(campaign_id)
+        assert {trial.split for trial in trials} == {"development", "confirmation"}
+        assert all(trial.status is TrialStatus.COMPLETED for trial in trials)
+        assert ledger.snapshot(campaign_id)["decision_count"] == 0

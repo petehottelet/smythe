@@ -156,6 +156,18 @@ structural minimum, not a claim of useful statistical power. Choose repetition
 counts from measured evaluator variance, and use a larger sample when the
 expected improvement is small.
 
+A challenger policy gets one sealed holdout per contract in a ledger. Holdout
+use is identified by the contract hash and the challenger's policy hash, not
+by its hypothesis text, candidate ID, or campaign. The first holdout trial a
+campaign prepares for a challenger records that use, atomically with the
+trial. A later campaign in the same ledger whose challengers include the same
+policy under the same contract is refused with `HoldoutAlreadyUsedError`
+before any evaluator call, whether the hypothesis was reworded, the
+challenger set changed, or a new `--campaign-id` was chosen. The campaign that
+used the holdout can still be resumed and replayed.
+`ExperimentLedger.holdout_uses(contract_hash)` lists recorded uses. Incumbent
+holdout trials do not count as use.
+
 The runner evaluates every policy on development seeds, removes challengers
 that fail a gate, hard metric bound, primary mean-improvement threshold, or
 secondary non-regression limit, and deterministically selects the viable
@@ -164,9 +176,11 @@ the incumbent on matching confirmation seeds. Holdout runs only if
 confirmation passes, and promotion requires both assessments to pass.
 
 Do not repeatedly tune against the holdout set: once it influences a proposal,
-it is no longer held out. The current policy also does not correct for
-repeatedly testing many candidates, so the independent one-time holdout is an
-important guard against selection bias.
+it is no longer held out. The ledger refuses a second holdout for the same
+policy and contract, but it cannot stop a new contract or a fresh ledger from
+drawing another. The current policy also does not correct for repeatedly
+testing many candidates, so the independent one-time holdout is an important
+guard against selection bias.
 
 ## Deterministic offline concurrency campaign
 
@@ -239,14 +253,18 @@ set, policy hashes, evaluator hash, runner version, promotion method,
 descriptive bootstrap configuration, and required trial count. When
 `--campaign-id` is omitted, the durable campaign identity is derived from that
 full plan. Repeating the same command reuses completed trials; changing a
-candidate or bootstrap configuration creates a different automatic campaign.
-The holdout commitment is created when a new
+candidate or bootstrap configuration creates a different automatic campaign,
+which is refused if one of its challenger policies already used its holdout
+under the same contract. The holdout commitment is created when a new
 fully bound campaign is atomically created and is checked on every resume and
 decision. Supplying `--campaign-id` does not weaken the binding: reopening it
 requires an exact plan and candidate-inventory match.
 
 The promotion method is part of the plan, so a campaign created by 0.8.0 is
 not resumed under the paired t rule: the same command derives a new campaign.
+If the earlier campaign reached its holdout, that challenger policy's holdout
+is already used and the new campaign is refused; inspect the earlier
+campaign's recorded decision instead.
 
 Inspect a campaign without mutating the ledger:
 
