@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 import pytest
 
@@ -388,6 +389,107 @@ def test_parse_rewire():
     )
     assert revision is not None
     assert revision.rewire == {"n1": ("n0", "mid")}
+
+
+@pytest.mark.parametrize("change", ['"false"', '"true"', "1", '"yes"', "null", "[true]"])
+def test_parse_change_must_be_json_true(change):
+    text = '{"change": %s, "drop": ["n1"], "reason": "x"}' % change
+    assert _parse(text) is None
+
+
+@pytest.mark.parametrize("payload", [
+    '"rewire": ["n1", "n0"]',
+    '"rewire": {"n1": "n0"}',
+    '"rewire": {"n1": [1]}',
+    '"add": {"id": "x", "label": "y"}',
+    '"add": "verify the claims"',
+    '"add": ["verify the claims"]',
+    '"add": [{"id": "x", "label": "y", "depends_on": 5}]',
+    '"add": [{"id": "x", "label": "y", "depends_on": "n0"}]',
+    '"add": [{"id": 7, "label": "y"}]',
+    '"add": [{"id": "ok", "label": "Keep"}, {"id": "bad"}]',
+    '"drop": "n1"',
+    '"drop": ["n1", 2]',
+    '"drop": {"n1": true}',
+])
+def test_parse_malformed_fields_are_no_change(payload):
+    """rewire as a list used to raise AttributeError despite the contract."""
+    assert _parse('{"change": true, %s, "reason": "x"}' % payload) is None
+
+
+def test_parse_pathological_json_is_no_change():
+    assert _parse("[" * 100_000 + "]" * 100_000) is None
+    assert _parse('{"change": true, "drop": [' + "1" * 5000 + "]}") is None
+
+
+def _additions(count):
+    return json.dumps({"change": True, "reason": "gaps", "add": [
+        {"id": f"extra{i}", "label": f"Extra {i}", "depends_on": ["n0"]} for i in range(count)
+    ]})
+
+
+def test_parse_refuses_proposals_over_the_addition_cap():
+    parse = LLMSupervisor._parse
+    assert parse(_additions(3), max_added_nodes=2) is None
+    assert len(parse(_additions(2), max_added_nodes=2).add_nodes) == 2
+    assert len(parse(_additions(12)).add_nodes) == 12  # no cap unless one is given
+
+
+class ProposingProvider(Provider):
+    """Answers the supervisor with a fixed proposal; every node with "done"."""
+
+    def __init__(self, proposal: str) -> None:
+        self._proposal = proposal
+
+    async def complete(self, system, prompt, model):
+        from smythe.supervisor import SUPERVISOR_SYSTEM_PROMPT
+
+        text = self._proposal if system == SUPERVISOR_SYSTEM_PROMPT else "done"
+        return CompletionResult(text=text, prompt_tokens=1, completion_tokens=1)
+
+
+def test_llm_supervisor_ignores_a_revision_over_the_default_cap(caplog):
+    graph = _graph("first")
+    supervisor = LLMSupervisor(ProposingProvider(_additions(4)), only_terminal=False)
+    with caplog.at_level("WARNING", logger="smythe.supervisor"):
+        asyncio.run(_executor(supervisor, max_revisions=3).run(graph))
+
+    assert [n.id for n in graph.nodes] == ["n0"]
+    assert "adds 4 nodes; max_added_nodes is 3" in caplog.text
+
+
+def test_llm_supervisor_cap_is_configurable():
+    graph = _graph("first")
+    supervisor = LLMSupervisor(
+        ProposingProvider(_additions(4)), only_terminal=False, max_added_nodes=4,
+    )
+    asyncio.run(_executor(supervisor, max_revisions=1).run(graph))
+    assert [n.id for n in graph.nodes] == ["n0", "extra0", "extra1", "extra2", "extra3"]
+
+
+@pytest.mark.parametrize("value", [-1, True, 1.5, "3", None])
+def test_max_added_nodes_must_be_a_non_negative_integer(value):
+    with pytest.raises(ValueError, match="max_added_nodes"):
+        LLMSupervisor(EchoProvider(), max_added_nodes=value)
+
+
+def test_non_default_addition_cap_is_recorded_and_bound():
+    from smythe.provider import OfflineProvider
+
+    default = LLMSupervisor(OfflineProvider(), model="m").workflow_description()
+    assert "max_added_nodes" not in default
+
+    custom = LLMSupervisor(OfflineProvider(), model="m", max_added_nodes=1)
+    assert custom.workflow_description()["max_added_nodes"] == 1
+
+    class Binding:
+        default_model = "m"
+
+        def snapshot_provider(self, provider):
+            return provider
+
+    bound = custom.bind_run(Binding())
+    assert bound.workflow_description() == custom.workflow_description()
 
 
 def test_only_terminal_review_gate():

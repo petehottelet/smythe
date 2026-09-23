@@ -27,6 +27,7 @@ whether to add work, cut work, or stop.
 from __future__ import annotations
 
 import json
+import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
@@ -41,6 +42,13 @@ from smythe.workflow_binding import (
 if TYPE_CHECKING:
     from smythe.provider import Provider
     from smythe.task import Task
+
+logger = logging.getLogger("smythe.supervisor")
+
+# The review prompt asks for minimal additions and the planner caps a
+# whole plan at 8 nodes; closing one gap rarely needs more than a step
+# or two, so three leaves headroom while bounding growth per revision.
+DEFAULT_MAX_ADDED_NODES = 3
 
 SUPERVISOR_SYSTEM_PROMPT = (
     "You supervise a running multi-agent execution graph. Your job is "
@@ -86,6 +94,10 @@ or
 Only pending steps may be dropped or rewired. Keep additions minimal."""
 
 
+def _is_str_list(value: object) -> bool:
+    return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+
 class Supervisor(ABC):
     """Reviews a running graph and may revise its unexecuted remainder."""
 
@@ -117,6 +129,10 @@ class LLMSupervisor(Supervisor):
     default) reviews at a fan-in boundary or when the whole graph has
     finished.  Parallel terminal leaves therefore produce one review,
     not one review per leaf.
+
+    The reply is model output and is read strictly: ``change`` must be
+    JSON ``true``, and a proposal with a malformed field or more than
+    ``max_added_nodes`` additions is treated as no change.
     """
 
     def __init__(
@@ -126,12 +142,18 @@ class LLMSupervisor(Supervisor):
         model: str | None = None,
         review_after: set[str] | None = None,
         only_terminal: bool = True,
+        max_added_nodes: int = DEFAULT_MAX_ADDED_NODES,
         run_binding: ComponentBinding | None = None,
     ) -> None:
+        if type(max_added_nodes) is not int or max_added_nodes < 0:
+            raise ValueError(
+                f"max_added_nodes must be a non-negative integer, got {max_added_nodes!r}"
+            )
         self._provider = provider
         self._model = model
         self._review_after = review_after
         self._only_terminal = only_terminal
+        self._max_added_nodes = max_added_nodes
         self._run_binding = run_binding
 
     def workflow_description(self, **defaults) -> dict:
@@ -147,7 +169,10 @@ class LLMSupervisor(Supervisor):
         return {"type": "llm_supervisor", "version": 1,
                 **provider_description(self._provider, model),
                 "review_after": sorted(self._review_after) if self._review_after is not None else None,
-                "only_terminal": self._only_terminal}
+                "only_terminal": self._only_terminal,
+                # Omitted at the default so existing recipes keep their identity.
+                **({"max_added_nodes": self._max_added_nodes}
+                   if self._max_added_nodes != DEFAULT_MAX_ADDED_NODES else {})}
 
     def workflow_providers(self) -> tuple[Provider, ...]:
         return (self._provider,)
@@ -157,7 +182,8 @@ class LLMSupervisor(Supervisor):
         return LLMSupervisor(
             binding.snapshot_provider(self._provider), model=self._model,
             review_after=set(self._review_after) if self._review_after is not None else None,
-            only_terminal=self._only_terminal, run_binding=binding,
+            only_terminal=self._only_terminal, max_added_nodes=self._max_added_nodes,
+            run_binding=binding,
         )
 
     def _should_review(self, graph: ExecutionGraph, node: Node) -> bool:
@@ -196,7 +222,7 @@ class LLMSupervisor(Supervisor):
             model,
         )
         validate_completion_usage(result)
-        return self._parse(result.text)
+        return self._parse(result.text, max_added_nodes=self._max_added_nodes)
 
     @staticmethod
     def _build_prompt(
@@ -229,11 +255,17 @@ class LLMSupervisor(Supervisor):
         )
 
     @staticmethod
-    def _parse(text: str) -> Revision | None:
+    def _parse(text: str, *, max_added_nodes: int | None = None) -> Revision | None:
         """Parse a proposal, treating anything malformed as 'no change'.
 
         A supervisor that cannot produce valid JSON must not be able to
-        halt a run that is otherwise going fine.
+        halt a run that is otherwise going fine.  ``change`` must be JSON
+        ``true`` (the string ``"false"`` is not).  Any field of the wrong
+        JSON type, or an addition without a label, makes the whole
+        proposal no change: applying the part that happened to parse
+        could do something the reviewer never proposed.  So does a
+        proposal with more than ``max_added_nodes`` additions; it is
+        refused, not truncated.
         """
         cleaned = text.strip()
         if cleaned.startswith("```"):
@@ -243,39 +275,51 @@ class LLMSupervisor(Supervisor):
             cleaned = parts[1].removeprefix("json").strip()
         try:
             data = json.loads(cleaned)
-        except json.JSONDecodeError:
+        except (ValueError, RecursionError):
             return None
-        if not isinstance(data, dict) or not data.get("change"):
+        if not isinstance(data, dict) or data.get("change") is not True:
+            return None
+        add_raw = data.get("add")
+        drop_raw = data.get("drop")
+        rewire_raw = data.get("rewire")
+        if (not isinstance(add_raw, (list, type(None)))
+                or not isinstance(drop_raw, (list, type(None)))
+                or not isinstance(rewire_raw, (dict, type(None)))):
+            return None
+        add_raw, drop_raw, rewire_raw = add_raw or [], drop_raw or [], rewire_raw or {}
+        if max_added_nodes is not None and len(add_raw) > max_added_nodes:
+            logger.warning(
+                "Ignoring supervisor proposal that adds %d nodes; max_added_nodes is %d",
+                len(add_raw), max_added_nodes,
+            )
             return None
 
         add_nodes: list[Node] = []
-        for entry in data.get("add") or []:
+        for entry in add_raw:
             if not isinstance(entry, dict):
-                continue
+                return None
             label = entry.get("label")
-            if not isinstance(label, str) or not label.strip():
-                continue
             node_id = entry.get("id")
-            depends_on = [
-                dep for dep in (entry.get("depends_on") or []) if isinstance(dep, str)
-            ]
+            depends_on = entry.get("depends_on")
+            depends_on = [] if depends_on is None else depends_on
+            if (not isinstance(label, str) or not label.strip()
+                    or not isinstance(node_id, (str, type(None)))
+                    or not _is_str_list(depends_on)):
+                return None
             add_nodes.append(
                 Node(
                     label=label,
-                    depends_on=depends_on,
-                    **({"id": node_id} if isinstance(node_id, str) and node_id else {}),
+                    depends_on=list(depends_on),
+                    **({"id": node_id} if node_id else {}),
                 )
             )
 
-        drop = tuple(
-            item for item in (data.get("drop") or []) if isinstance(item, str)
-        )
-        rewire_raw = data.get("rewire") or {}
-        rewire = {
-            key: tuple(dep for dep in value if isinstance(dep, str))
-            for key, value in rewire_raw.items()
-            if isinstance(key, str) and isinstance(value, list)
-        }
+        if not _is_str_list(drop_raw) or not all(
+            _is_str_list(value) for value in rewire_raw.values()
+        ):
+            return None
+        drop = tuple(drop_raw)
+        rewire = {key: tuple(value) for key, value in rewire_raw.items()}
 
         revision = Revision(
             add_nodes=tuple(add_nodes),
