@@ -68,7 +68,7 @@ class Executor(ExecutorBase):
             raise RuntimeError(f"Node {node.id!r}: upstream dependency not satisfied")
 
         if self._budget:
-            self.reserve_node_budget(node)
+            self._reserve_node(node)
 
         last_exc: Exception | None = None
         attempts = 1 + max(node.max_retries, 0) if node.failure_policy == FailurePolicy.RETRY else 1

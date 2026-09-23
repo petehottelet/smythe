@@ -274,6 +274,67 @@ def test_retry_after_truncation_passes_budget_admission_again(mode, hard_ceiling
     assert budget._reservations == {}
 
 
+def test_retry_after_truncation_counts_concurrent_reservations():
+    """A bare budget check admitted the retry while a sibling still held its
+    reservation, so the run overspent its cap before reconciliation noticed."""
+
+    class Scripted(Provider):
+        def __init__(self):
+            self.calls = []
+            self.retry_sent = asyncio.Event()
+
+        async def complete(self, system, prompt, model):
+            label = prompt.splitlines()[0]
+            self.calls.append(label)
+            if label == "A":
+                if self.calls.count("A") == 1:
+                    return CompletionResult("half", cost_usd=0.3, stop_reason="max_tokens")
+                self.retry_sent.set()
+                return CompletionResult("A done", cost_usd=0.3)
+            try:  # B stays in flight, holding its reservation.
+                await asyncio.wait_for(self.retry_sent.wait(), 0.5)
+            except TimeoutError:
+                pass
+            return CompletionResult("B done", cost_usd=0.3)
+
+    provider = Scripted()
+    graph = ExecutionGraph([Topology.FORK_JOIN], [
+        Node("A", id="A", failure_policy=FailurePolicy.RETRY, max_retries=2),
+        Node("B", id="B"),
+    ])
+    budget = Sentinel(max_budget_usd=0.8, cost_per_token=0.001)
+    executor = AsyncExecutor(provider, Registry(), Tracer(), budget=budget,
+                             estimated_tokens_per_node=300, max_concurrency=2, artifact_dir=None)
+
+    with pytest.raises(SentinelAlert):
+        asyncio.run(executor.run(graph))
+
+    assert provider.calls.count("A") == 1
+    assert budget.total_cost_usd <= budget.max_budget_usd
+
+
+def test_retry_after_truncation_reserves_the_nodes_explicit_estimate():
+    class TruncatesOnce(Provider):
+        calls = 0
+
+        async def complete(self, system, prompt, model):
+            TruncatesOnce.calls += 1
+            stop_reason = "max_tokens" if TruncatesOnce.calls == 1 else "end_turn"
+            return CompletionResult("text", cost_usd=0.6, stop_reason=stop_reason)
+
+    node = Node("A", id="A", failure_policy=FailurePolicy.RETRY, max_retries=2,
+                metadata={"estimated_cost_usd": 0.5})
+    budget = Sentinel(max_budget_usd=1.0)
+
+    with pytest.raises(SentinelAlert):
+        Executor(TruncatesOnce(), Registry(), Tracer(), budget=budget, artifact_dir=None).run(
+            ExecutionGraph([Topology.SERIAL], [node]))
+
+    # Reserving the 0.5 estimate after a 0.6 charge exceeds the 1.0 cap.
+    assert TruncatesOnce.calls == 1
+    assert budget.total_cost_usd == pytest.approx(0.6)
+
+
 def test_truncated_tool_turn_runs_no_tools_and_keeps_its_charge(mode):
     ran = []
 

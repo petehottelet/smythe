@@ -180,7 +180,9 @@ def test_invalid_later_tool_turn_preserves_prior_billed_turn(mode):
         run(mode, provider, [invalid, later], budget, tool_runtime=Runtime())
     assert provider.calls == [1, 2]
     assert budget.breakdown() == {"invalid": 0.25}
-    assert budget.total_cost_usd == 0.25
+    # The second turn reserved the node's estimate before dispatch; its
+    # unusable bill keeps that reservation, as an invalid first call does.
+    assert budget.total_cost_usd == 0.75
     assert invalid.metadata["accounting_invalid"] is True
     assert later.status is NodeStatus.PENDING
 
