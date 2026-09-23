@@ -241,7 +241,9 @@ def test_constrained_planner_catches_bad_params_type():
     ('[{}]', "string 'template'"),
     ('[{"template": "research", "params": ["x"]}]', "'params'"),
     ('[{"template": "research", "agent": {"mcp_servers": []}}]', "unsupported field"),
-    ("[" * 100_000 + "]" * 100_000, "nested too deeply"),
+    # An explicit id: pytest puts the test id in PYTEST_CURRENT_TEST, and
+    # Windows rejects environment values over 32,767 characters.
+    pytest.param("[" * 100_000 + "]" * 100_000, "nested too deeply", id="deeply-nested"),
 ])
 def test_malformed_selections_are_retried_as_value_errors(bad_response, message):
     """A reply like ["research"] used to escape the retry loop as AttributeError."""
