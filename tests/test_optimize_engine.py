@@ -7,6 +7,7 @@ import json
 import time
 from collections.abc import Callable
 from collections.abc import Mapping
+from dataclasses import replace
 
 import pytest
 
@@ -32,6 +33,7 @@ from smythe.optimize.ledger import (
     ExperimentLedger,
     HoldoutAlreadyUsedError,
     TrialStatus,
+    holdout_identity,
 )
 
 
@@ -541,10 +543,11 @@ async def test_rewording_a_hypothesis_cannot_reroll_a_used_holdout(tmp_path):
         calls.append(context)
         return await _challengers_win(context)
 
+    identity = holdout_identity(contract, EVALUATOR_HASH)
     with ExperimentLedger(tmp_path / "reroll.sqlite3", durability="normal") as ledger:
         first = await _runner(contract, ledger, evaluate).run(incumbent, (challenger,))
         assert first.holdout_assessment is not None
-        assert ledger.holdout_uses(contract.contract_hash) == {
+        assert ledger.holdout_uses(identity) == {
             challenger.policy_hash: (first.campaign_id,)
         }
         evaluated = len(calls)
@@ -568,7 +571,7 @@ async def test_rewording_a_hypothesis_cannot_reroll_a_used_holdout(tmp_path):
             with pytest.raises(HoldoutAlreadyUsedError, match=first.campaign_id) as refused:
                 await runner.run(incumbent, challengers)
             assert challenger.policy_hash in str(refused.value)
-            assert contract.contract_hash in str(refused.value)
+            assert identity in str(refused.value)
         assert len(calls) == evaluated
         campaigns = ledger._connection.execute("SELECT COUNT(*) FROM campaigns").fetchone()[0]
         assert campaigns == 1
@@ -580,10 +583,147 @@ async def test_rewording_a_hypothesis_cannot_reroll_a_used_holdout(tmp_path):
         assert len(calls) == evaluated
         fresh = await _runner(contract, ledger, evaluate).run(incumbent, (other,))
         assert fresh.holdout_assessment is not None
-        assert ledger.holdout_uses(contract.contract_hash) == {
+        assert ledger.holdout_uses(identity) == {
             challenger.policy_hash: (first.campaign_id,),
             other.policy_hash: (fresh.campaign_id,),
         }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("changes", "add_challenger"),
+    [
+        ({"max_wall_seconds": 61}, False),
+        ({"max_parallel_candidates": 1}, False),
+        ({"max_trials": 20, "max_budget_microusd": 200}, False),
+        ({"max_candidates": 3, "max_trials": 15, "max_budget_microusd": 150}, True),
+        ({"development_repetitions": 2, "max_trials": 16, "max_budget_microusd": 160}, False),
+        ({"confirmation_repetitions": 4, "max_trials": 16, "max_budget_microusd": 160}, False),
+        ({"base_seed": 18, "name": "renamed_engine_test"}, False),
+        (
+            {"mutable_field_rules": {"strength": MutableFieldRule("integer", minimum=1, maximum=9)}},
+            False,
+        ),
+    ],
+    ids=[
+        "wall-time",
+        "parallelism",
+        "trial-and-budget-caps",
+        "challenger-set",
+        "development-repetitions",
+        "confirmation-repetitions",
+        "seed-and-name",
+        "mutable-field-rules",
+    ],
+)
+async def test_operational_contract_changes_cannot_reroll_a_used_holdout(
+    tmp_path, changes, add_challenger
+):
+    contract = _contract()
+    incumbent, challenger = _candidates(contract)
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+    calls: list[TrialContext] = []
+
+    async def evaluate(context: TrialContext) -> TrialOutcome:
+        calls.append(context)
+        return await _challengers_win(context)
+
+    with ExperimentLedger(tmp_path / "operational.sqlite3", durability="normal") as ledger:
+        first = await _runner(contract, ledger, evaluate).run(incumbent, (challenger,))
+        assert first.holdout_assessment is not None
+        evaluated = len(calls)
+
+        variant = replace(contract, **changes)
+        assert variant.contract_hash != contract.contract_hash
+        assert holdout_identity(variant, EVALUATOR_HASH) == identity
+        variant_incumbent, variant_challenger = _candidates(variant)
+        assert variant_challenger.policy_hash == challenger.policy_hash
+        challengers: tuple[Candidate, ...] = (variant_challenger,)
+        if add_challenger:
+            challengers = (
+                Candidate(
+                    contract=variant,
+                    policy={"strength": 3},
+                    hypothesis="an unrelated policy",
+                    parent=variant_incumbent.candidate_id,
+                ),
+                variant_challenger,
+            )
+        with pytest.raises(HoldoutAlreadyUsedError, match=first.campaign_id) as refused:
+            await _runner(variant, ledger, evaluate).run(variant_incumbent, challengers)
+        assert identity in str(refused.value)
+        assert len(calls) == evaluated
+        campaigns = ledger._connection.execute("SELECT COUNT(*) FROM campaigns").fetchone()[0]
+        assert campaigns == 1
+        assert ledger.holdout_uses(identity) == {challenger.policy_hash: (first.campaign_id,)}
+
+
+async def _challengers_win_every_gate(context: TrialContext) -> TrialOutcome:
+    outcome = await _challengers_win(context)
+    return TrialOutcome(
+        metrics=outcome.metrics,
+        gates={gate: True for gate in context.candidate.contract.required_gates},
+        actual_cost_microusd=outcome.actual_cost_microusd,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("changes", "evaluator_hash"),
+    [
+        ({}, "sha256:" + "f" * 64),
+        ({"confidence": 0.85}, EVALUATOR_HASH),
+        ({"min_improvement": 0.2}, EVALUATOR_HASH),
+        ({"holdout_repetitions": 4, "max_trials": 16, "max_budget_microusd": 160}, EVALUATOR_HASH),
+        ({"required_gates": ("safe", "reviewed")}, EVALUATOR_HASH),
+        (
+            {
+                "objectives": (
+                    MetricObjective("quality", ObjectiveDirection.MAXIMIZE, primary=True),
+                    MetricObjective(
+                        "risk", ObjectiveDirection.MINIMIZE, hard_max=4.0, max_regression=1.0
+                    ),
+                )
+            },
+            EVALUATOR_HASH,
+        ),
+    ],
+    ids=[
+        "evaluator",
+        "confidence",
+        "min-improvement",
+        "holdout-repetitions",
+        "required-gates",
+        "objective-bound",
+    ],
+)
+async def test_changing_the_holdout_evaluation_draws_a_new_holdout(
+    tmp_path, changes, evaluator_hash
+):
+    contract = _contract()
+    incumbent, challenger = _candidates(contract)
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+    with ExperimentLedger(tmp_path / "evaluation.sqlite3", durability="normal") as ledger:
+        first = await _runner(contract, ledger, _challengers_win).run(incumbent, (challenger,))
+        assert first.holdout_assessment is not None
+
+        variant = replace(contract, **changes)
+        variant_identity = holdout_identity(variant, evaluator_hash)
+        assert variant_identity != identity
+        variant_incumbent, variant_challenger = _candidates(variant)
+        second = await OptimizationRunner(
+            variant,
+            ledger,
+            _challengers_win_every_gate,
+            evaluator_hash=evaluator_hash,
+            bootstrap_resamples=100,
+        ).run(variant_incumbent, (variant_challenger,))
+        assert second.campaign_id != first.campaign_id
+        assert second.holdout_assessment is not None
+        assert ledger.holdout_uses(variant_identity) == {
+            challenger.policy_hash: (second.campaign_id,)
+        }
+        assert ledger.holdout_uses(identity) == {challenger.policy_hash: (first.campaign_id,)}
 
 
 @pytest.mark.asyncio

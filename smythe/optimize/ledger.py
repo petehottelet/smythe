@@ -21,7 +21,12 @@ from types import MappingProxyType
 from typing import Any, Iterator
 
 from smythe._sqlite import enable_wal
-from smythe.optimize.contracts import Candidate, ExperimentContract, canonical_json_bytes
+from smythe.optimize.contracts import (
+    Candidate,
+    ExperimentContract,
+    canonical_json_bytes,
+    sha256_prefixed,
+)
 
 
 LEDGER_VERSION = 4
@@ -33,6 +38,7 @@ _SAFE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _HOLDOUT_NONCE_BYTES = 32
 _HOLDOUT_COMMITMENT_DOMAIN = b"smythe-autotune-holdout-v1\0"
+_HOLDOUT_IDENTITY_DOMAIN = "smythe.autotune.holdout-identity.v1"
 _SQLITE_INT_MAX = 2**63 - 1
 
 # Python cannot make an in-process secret cryptographically inaccessible to code
@@ -53,10 +59,11 @@ class LedgerConflictError(ExperimentLedgerError):
 
 
 class HoldoutAlreadyUsedError(LedgerConflictError):
-    """A challenger policy already consumed its sealed holdout under a contract.
+    """A challenger policy already used its sealed holdout under an identity.
 
-    Re-testing the same policy against the same contract in the same ledger
-    would draw a fresh holdout, so the ledger refuses it.
+    Re-testing the same policy under the same holdout identity (see
+    :func:`holdout_identity`) in the same ledger would draw a fresh holdout,
+    so the ledger refuses it.
     """
 
 
@@ -288,19 +295,100 @@ def _create_private_file(path: Path) -> None:
     os.close(descriptor)
 
 
-def _holdout_consumers(
-    cursor: sqlite3.Cursor,
-    contract_hash: str,
-    policy_hash: str | None = None,
-) -> dict[str, tuple[str, ...]]:
-    """Map challenger policy hashes to campaigns whose holdout evaluated them.
+def holdout_identity(contract: ExperimentContract, evaluator_hash: str) -> str:
+    """Return the identity under which challenger policies use a sealed holdout.
 
-    A holdout is consumed when a campaign prepares a holdout trial for a
-    non-incumbent candidate.  Campaigns are ordered by first holdout use.
+    A challenger policy gets one holdout per identity in a ledger.  The
+    identity covers what defines the holdout evaluation and the decision it
+    feeds, and nothing a campaign can change while leaving that evaluation
+    the same.  It is derived only from contract fields and the evaluator hash,
+    both stored with every campaign and holdout trial, so holdout rows written
+    before the identity existed count as use without a schema change.
     """
 
+    if not isinstance(contract, ExperimentContract):
+        raise TypeError("contract must be an ExperimentContract")
+    payload = {
+        "domain": _HOLDOUT_IDENTITY_DOMAIN,
+        # Included: changing any of these changes what the holdout measures or
+        # how its result is judged, so it defines a different evaluation.
+        # - The contract format that gives the fields below their meaning.
+        "contract_version": contract.version,
+        # - The evaluator hash identifies the task, scenario, and measurement
+        #   code.  A different evaluator measures something else.
+        "evaluator_hash": _sha256(evaluator_hash, "evaluator_hash"),
+        # - Objective names, directions, and the primary flag define the
+        #   metrics; hard bounds and regression allowances are promotion
+        #   thresholds.  Sorted by name, since declaration order changes
+        #   neither.
+        "objectives": sorted(
+            (objective.to_dict() for objective in contract.objectives),
+            key=lambda item: item["name"],
+        ),
+        # - Every required gate must pass for promotion; order is irrelevant.
+        "required_gates": sorted(contract.required_gates),
+        # - The holdout sample size sets the test's degrees of freedom.
+        "holdout_repetitions": contract.holdout_repetitions,
+        # - Confidence and minimum improvement set the promotion threshold.
+        "confidence": contract.confidence,
+        "min_improvement": contract.min_improvement,
+    }
+    # Excluded: changing these leaves the holdout evaluation unchanged, so
+    # letting them key a new holdout would only let the same policy re-draw it.
+    # - name: a label.
+    # - mutable_fields, mutable_field_rules: they bound which policies may be
+    #   proposed.  A challenger's settings are captured by its policy hash.
+    # - development_repetitions, confirmation_repetitions: selection stages
+    #   that decide whether a policy reaches the holdout, not how it is tested.
+    # - base_seed: it moves only development and confirmation seeds; holdout
+    #   seeds come from each campaign's fresh secret.
+    # - max_candidates, max_parallel_candidates, max_trials,
+    #   max_wall_seconds, max_budget_microusd, per_trial_reservation_microusd:
+    #   operational caps on count, concurrency, time, and spend.  The CLI
+    #   derives max_candidates and max_trials from the challenger count.  An
+    #   evaluator whose measurement depends on its deadline or cost ceiling
+    #   must say so in its evaluator hash.
+    # Nothing outside the contract enters either: not the challenger set or
+    # its order, the incumbent (chosen per campaign like the challengers),
+    # hypothesis text, candidate or campaign IDs, the plan hash, ledger
+    # durability, or the runner's promotion method, so a runner upgrade does
+    # not reopen holdouts that earlier releases used.
+    return sha256_prefixed(payload)
+
+
+def _stored_holdout_identity(contract_json: object, evaluator_hash: str) -> str:
+    """Recompute the holdout identity of a stored campaign contract and trial."""
+
+    try:
+        if not isinstance(contract_json, str):
+            raise TypeError("stored contract must be JSON text")
+        contract = ExperimentContract.from_dict(json.loads(contract_json))
+        return holdout_identity(contract, evaluator_hash)
+    except (TypeError, ValueError) as exc:
+        raise ExperimentLedgerError(
+            "stored campaign contract or holdout evaluator hash is invalid"
+        ) from exc
+
+
+def _holdout_consumers(
+    cursor: sqlite3.Cursor,
+    identity: str,
+    policy_hash: str | None = None,
+) -> dict[str, tuple[str, ...]]:
+    """Map challenger policy hashes to campaigns that used a holdout identity.
+
+    A holdout is used when a campaign prepares a holdout trial for a
+    non-incumbent candidate.  Each use's identity is recomputed from that
+    campaign's stored contract and that trial's evaluator hash, so campaigns
+    whose contracts differ only outside the identity share it.  Campaigns are
+    ordered by first holdout use.
+    """
+
+    # campaign_id determines contract_json, so it may be selected bare.
     query = """
         SELECT k.policy_hash AS policy_hash, t.campaign_id AS campaign_id,
+               t.evaluator_hash AS evaluator_hash,
+               c.contract_json AS contract_json,
                MIN(t.prepared_at_ns) AS first_used_ns
         FROM trials AS t
         JOIN campaigns AS c ON c.campaign_id = t.campaign_id
@@ -308,31 +396,44 @@ def _holdout_consumers(
             ON k.campaign_id = t.campaign_id AND k.candidate_id = t.candidate_id
         WHERE t.split = 'holdout'
           AND t.candidate_id != c.incumbent_candidate_id
-          AND c.contract_hash = ?
     """
-    values: list[object] = [contract_hash]
+    values: list[object] = []
     if policy_hash is not None:
         query += " AND k.policy_hash = ?"
         values.append(policy_hash)
     query += """
-        GROUP BY k.policy_hash, t.campaign_id
+        GROUP BY k.policy_hash, t.campaign_id, t.evaluator_hash
         ORDER BY first_used_ns, t.campaign_id
     """
+    identities: dict[tuple[Any, Any], str] = {}
     consumers: dict[str, list[str]] = {}
     for row in cursor.execute(query, values).fetchall():
-        consumers.setdefault(row["policy_hash"], []).append(row["campaign_id"])
+        key = (row["contract_json"], row["evaluator_hash"])
+        if key not in identities:
+            identities[key] = _stored_holdout_identity(
+                row["contract_json"], row["evaluator_hash"]
+            )
+        if identities[key] != identity:
+            continue
+        campaigns = consumers.setdefault(row["policy_hash"], [])
+        if row["campaign_id"] not in campaigns:
+            campaigns.append(row["campaign_id"])
     return {key: tuple(value) for key, value in consumers.items()}
 
 
-def _holdout_reuse_message(policy_hash: str, contract_hash: str, campaign_id: str) -> str:
-    """Explain why a second holdout for one policy and contract is refused."""
+def _holdout_reuse_message(policy_hash: str, identity: str, campaign_id: str) -> str:
+    """Explain why a second holdout for one policy and identity is refused."""
 
     return (
-        f"challenger policy {policy_hash} already used the sealed holdout for "
-        f"contract {contract_hash} in campaign {campaign_id!r}; re-testing the "
-        "same policy against the same contract in this ledger would re-roll "
-        "the holdout, so it is refused. Inspect that campaign's recorded "
-        "decision instead."
+        f"challenger policy {policy_hash} already used its sealed holdout "
+        f"under holdout identity {identity} in campaign {campaign_id!r}; "
+        "re-testing it in this ledger would re-roll the holdout, so it is "
+        "refused. The identity covers the evaluator, objectives and their "
+        "bounds, required gates, holdout repetitions, confidence, and minimum "
+        "improvement. A new campaign ID, challenger set, hypothesis, "
+        "development or confirmation repetition count, or operational limit "
+        f"does not change it. Inspect campaign {campaign_id!r} instead, or "
+        "leave this policy out of the challenger set."
     )
 
 
@@ -1286,15 +1387,17 @@ class ExperimentLedger:
             finally:
                 cursor.close()
 
-    def holdout_uses(self, contract_hash: str) -> dict[str, tuple[str, ...]]:
-        """Return challenger policy hashes whose sealed holdout a contract used.
+    def holdout_uses(self, identity: str) -> dict[str, tuple[str, ...]]:
+        """Return challenger policy hashes that used a sealed holdout identity.
 
-        Each policy maps to the campaigns that prepared holdout trials for it
-        as a challenger, in first-use order.  New campaigns may not re-test a
-        listed policy under the same contract.
+        ``identity`` comes from :func:`holdout_identity`.  Each policy maps to
+        the campaigns that prepared holdout trials for it as a challenger
+        under that identity, in first-use order, whatever their contracts'
+        fields outside the identity.  New campaigns may not re-test a listed
+        policy under the same identity.
         """
 
-        normalized = _sha256(contract_hash, "contract_hash")
+        normalized = _sha256(identity, "holdout identity")
         with self._lock:
             cursor = self._connection.cursor()
             try:
@@ -1494,21 +1597,25 @@ class ExperimentLedger:
                 and candidate != campaign["incumbent_candidate_id"]
             ):
                 # The first holdout row for a challenger is its durable
-                # holdout-use record, keyed by contract and policy content
-                # (never hypothesis prose or campaign identity).
+                # holdout-use record, written in this transaction before any
+                # holdout evaluation.  Use is keyed by the holdout identity of
+                # this campaign's stored contract and this trial's evaluator,
+                # plus the policy content: never hypothesis prose, campaign
+                # identity, the challenger set, or operational caps.
                 policy_hash = candidate_row["policy_hash"]
+                identity = _stored_holdout_identity(
+                    campaign["contract_json"], evaluator
+                )
                 prior = [
                     item
                     for item in _holdout_consumers(
-                        cursor, campaign["contract_hash"], policy_hash
+                        cursor, identity, policy_hash
                     ).get(policy_hash, ())
                     if item != identifier
                 ]
                 if prior:
                     raise HoldoutAlreadyUsedError(
-                        _holdout_reuse_message(
-                            policy_hash, campaign["contract_hash"], prior[0]
-                        )
+                        _holdout_reuse_message(policy_hash, identity, prior[0])
                     )
             contract = json.loads(campaign["contract_json"])
             required_ceiling = contract["per_trial_reservation_microusd"]
@@ -2192,4 +2299,5 @@ __all__ = [
     "TrialStateError",
     "TrialStatus",
     "UnknownTrialError",
+    "holdout_identity",
 ]

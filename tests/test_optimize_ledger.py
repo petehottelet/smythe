@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
+import json
 import math
 import os
 import sqlite3
@@ -16,7 +18,9 @@ from smythe.optimize.contracts import (
     Candidate,
     ExperimentContract,
     MetricObjective,
+    MutableFieldRule,
     ObjectiveDirection,
+    canonical_json_bytes,
 )
 from smythe.optimize.ledger import (
     ExperimentLedger,
@@ -28,6 +32,7 @@ from smythe.optimize.ledger import (
     TrialStateError,
     TrialStatus,
     UnknownTrialError,
+    holdout_identity,
 )
 
 
@@ -58,6 +63,7 @@ def _lease(ledger, campaign_id):
 
 
 PLAN_HASH = "sha256:" + "a" * 64
+EVALUATOR_HASH = "sha256:" + "e" * 64
 
 
 def _contract(
@@ -126,6 +132,7 @@ def _prepared(
     seed: int = 100,
     split: str = "development",
     phase: str = "evaluate",
+    evaluator_hash: str = EVALUATOR_HASH,
 ) -> str:
     return ledger.prepare_trial(
         campaign_id,
@@ -133,7 +140,7 @@ def _prepared(
         split,
         phase,
         seed,
-        evaluator_hash="sha256:" + "e" * 64,
+        evaluator_hash=evaluator_hash,
         ceiling_microusd=1_000,
     lease=_lease(ledger, campaign_id))
 
@@ -236,9 +243,10 @@ def test_concurrent_idempotent_campaign_creation_commits_one_holdout_nonce(tmp_p
     assert materials[0] == materials[1]
 
 
-def test_ledger_refuses_a_second_holdout_for_the_same_policy_and_contract(tmp_path):
+def test_ledger_refuses_a_second_holdout_for_the_same_policy_and_identity(tmp_path):
     path = tmp_path / "holdout-use.db"
     contract = _contract()
+    identity = holdout_identity(contract, EVALUATOR_HASH)
     incumbent = _candidate(contract, "incumbent")
     challenger = _candidate(contract, "challenger")
     reworded = Candidate(
@@ -254,18 +262,16 @@ def test_ledger_refuses_a_second_holdout_for_the_same_policy_and_contract(tmp_pa
         # consume a challenger's holdout.
         _prepared(ledger, first, incumbent, seed=1, split="holdout")
         _prepared(ledger, first, challenger, seed=2, split="development")
-        assert ledger.holdout_uses(contract.contract_hash) == {}
+        assert ledger.holdout_uses(identity) == {}
 
         _prepared(ledger, first, challenger, seed=1, split="holdout")
         _prepared(ledger, first, challenger, seed=3, split="holdout")
-        assert ledger.holdout_uses(contract.contract_hash) == {
-            challenger.policy_hash: ("first",)
-        }
+        assert ledger.holdout_uses(identity) == {challenger.policy_hash: ("first",)}
         with pytest.raises(HoldoutAlreadyUsedError, match="campaign 'first'") as refused:
             _prepared(ledger, second, reworded, seed=1, split="holdout")
         assert isinstance(refused.value, LedgerConflictError)
         assert challenger.policy_hash in str(refused.value)
-        assert contract.contract_hash in str(refused.value)
+        assert identity in str(refused.value)
         _prepared(ledger, second, incumbent, seed=1, split="holdout")
         _prepared(ledger, second, reworded, seed=1, split="development")
         assert not [
@@ -274,26 +280,372 @@ def test_ledger_refuses_a_second_holdout_for_the_same_policy_and_contract(tmp_pa
             if trial.split == "holdout"
         ]
 
-        # The same policy content under a different contract is a new holdout.
-        other_contract = _contract(name="other_contract")
-        other_challenger = _candidate(other_contract, "challenger")
-        assert other_challenger.policy_hash == challenger.policy_hash
+        # Renaming the contract does not define a different evaluation.
+        renamed = _contract(name="other_contract")
+        renamed_challenger = _candidate(renamed, "challenger")
+        assert renamed.contract_hash != contract.contract_hash
+        assert renamed_challenger.policy_hash == challenger.policy_hash
+        relabeled = _seal(
+            ledger,
+            renamed,
+            _candidate(renamed, "incumbent"),
+            renamed_challenger,
+            campaign_id="relabeled",
+        )
+        with pytest.raises(HoldoutAlreadyUsedError, match="campaign 'first'"):
+            _prepared(ledger, relabeled, renamed_challenger, seed=1, split="holdout")
+
+        # The same policy content under a different evaluation is a new
+        # holdout: another objective bound, or another evaluator.
+        stricter = replace(
+            contract,
+            objectives=(
+                MetricObjective(
+                    name="quality",
+                    direction=ObjectiveDirection.MAXIMIZE,
+                    primary=True,
+                    hard_min=8,
+                ),
+            ),
+        )
+        stricter_challenger = _candidate(stricter, "challenger")
         other = _seal(
             ledger,
-            other_contract,
-            _candidate(other_contract, "incumbent"),
-            other_challenger,
+            stricter,
+            _candidate(stricter, "incumbent"),
+            stricter_challenger,
             campaign_id="other",
         )
-        _prepared(ledger, other, other_challenger, seed=1, split="holdout")
-        assert ledger.holdout_uses(other_contract.contract_hash) == {
-            other_challenger.policy_hash: ("other",)
+        _prepared(ledger, other, stricter_challenger, seed=1, split="holdout")
+        assert ledger.holdout_uses(holdout_identity(stricter, EVALUATOR_HASH)) == {
+            challenger.policy_hash: ("other",)
+        }
+        other_evaluator = "sha256:" + "f" * 64
+        _prepared(
+            ledger,
+            relabeled,
+            renamed_challenger,
+            seed=1,
+            split="holdout",
+            evaluator_hash=other_evaluator,
+        )
+        assert ledger.holdout_uses(holdout_identity(contract, other_evaluator)) == {
+            challenger.policy_hash: ("relabeled",)
         }
 
     with ExperimentLedger(path, read_only=True) as reader:
-        assert reader.holdout_uses(contract.contract_hash) == {
-            challenger.policy_hash: ("first",)
+        assert reader.holdout_uses(identity) == {challenger.policy_hash: ("first",)}
+
+
+def _identity_contract(**changes: object) -> ExperimentContract:
+    fields: dict[str, object] = {
+        "name": "identity_test",
+        "objectives": (
+            MetricObjective("quality", ObjectiveDirection.MAXIMIZE, primary=True, hard_min=7),
+            MetricObjective("latency", ObjectiveDirection.MINIMIZE, hard_max=300, max_regression=10),
+        ),
+        "mutable_fields": ("prompt.logo", "sampling.temperature"),
+        "required_gates": ("format", "safety"),
+        "mutable_field_rules": {
+            "sampling.temperature": MutableFieldRule("number", minimum=0, maximum=2),
+        },
+        "development_repetitions": 1,
+        "confirmation_repetitions": 3,
+        "holdout_repetitions": 3,
+        "max_candidates": 3,
+        "max_parallel_candidates": 1,
+        "max_trials": 12,
+        "max_wall_seconds": 600,
+        "max_budget_microusd": 12_000,
+        "per_trial_reservation_microusd": 1_000,
+        "confidence": 0.95,
+        "min_improvement": 0.25,
+        "base_seed": 100,
+    }
+    fields.update(changes)
+    return ExperimentContract(**fields)  # type: ignore[arg-type]
+
+
+def test_holdout_identity_covers_the_evaluation_and_ignores_operational_fields():
+    base = _identity_contract()
+    identity = holdout_identity(base, EVALUATOR_HASH)
+    assert identity.startswith("sha256:") and len(identity) == 71
+
+    # Operational caps, selection stages, labels, the policy space, and
+    # declaration order do not define a different holdout evaluation.
+    unchanged = {
+        "name": {"name": "renamed"},
+        "mutable_fields": {
+            "mutable_fields": ("prompt.logo", "sampling.temperature", "prompt.tagline")
+        },
+        "mutable_field_rules": {
+            "mutable_field_rules": {
+                "sampling.temperature": MutableFieldRule("number", minimum=0, maximum=1.5),
+                "prompt.logo": MutableFieldRule("string", choices=("simplify", "keep")),
+            }
+        },
+        "development_repetitions": {"development_repetitions": 2},
+        "confirmation_repetitions": {"confirmation_repetitions": 4},
+        "max_candidates": {"max_candidates": 9},
+        "max_parallel_candidates": {"max_parallel_candidates": 2},
+        "max_trials": {"max_trials": 50},
+        "max_wall_seconds": {"max_wall_seconds": 601},
+        "max_budget_microusd": {"max_budget_microusd": 99_000},
+        "per_trial_reservation_microusd": {"per_trial_reservation_microusd": 500},
+        "base_seed": {"base_seed": 101},
+        "objective order": {"objectives": tuple(reversed(base.objectives))},
+        "gate order": {"required_gates": ("safety", "format")},
+    }
+    for label, changes in unchanged.items():
+        variant = _identity_contract(**changes)
+        assert variant.contract_hash != base.contract_hash, label
+        assert holdout_identity(variant, EVALUATOR_HASH) == identity, label
+
+    # Equal numbers compare equal however they are spelled.
+    assert holdout_identity(
+        _identity_contract(min_improvement=1), EVALUATOR_HASH
+    ) == holdout_identity(_identity_contract(min_improvement=1.0), EVALUATOR_HASH)
+    zero_bound = (MetricObjective("quality", ObjectiveDirection.MAXIMIZE, primary=True, hard_min=0.0),)
+    negative_zero_bound = (
+        MetricObjective("quality", ObjectiveDirection.MAXIMIZE, primary=True, hard_min=-0.0),
+    )
+    assert holdout_identity(
+        _identity_contract(objectives=zero_bound), EVALUATOR_HASH
+    ) == holdout_identity(_identity_contract(objectives=negative_zero_bound), EVALUATOR_HASH)
+
+    # A contract read back from ledger JSON has the same identity.
+    stored = ExperimentContract.from_dict(json.loads(canonical_json_bytes(base.to_dict())))
+    assert holdout_identity(stored, EVALUATOR_HASH) == identity
+
+    # Everything that defines what the holdout measures or how it is judged
+    # changes the identity.
+    quality, latency = base.objectives
+    changed = {
+        "evaluator": holdout_identity(base, "sha256:" + "f" * 64),
+        **{
+            label: holdout_identity(_identity_contract(**changes), EVALUATOR_HASH)
+            for label, changes in {
+                "objective name": {
+                    "objectives": (quality, replace(latency, name="latency_ms"))
+                },
+                "objective direction": {
+                    "objectives": (
+                        quality,
+                        replace(latency, direction=ObjectiveDirection.MAXIMIZE),
+                    )
+                },
+                "primary objective": {
+                    "objectives": (
+                        replace(quality, primary=False),
+                        replace(latency, primary=True),
+                    )
+                },
+                "hard minimum": {"objectives": (replace(quality, hard_min=8), latency)},
+                "hard maximum": {"objectives": (quality, replace(latency, hard_max=250))},
+                "regression allowance": {
+                    "objectives": (quality, replace(latency, max_regression=20))
+                },
+                "added objective": {
+                    "objectives": (
+                        quality,
+                        latency,
+                        MetricObjective("cost", ObjectiveDirection.MINIMIZE),
+                    )
+                },
+                "required gates": {"required_gates": ("format",)},
+                "holdout repetitions": {"holdout_repetitions": 4},
+                "confidence": {"confidence": 0.9},
+                "minimum improvement": {"min_improvement": 0.3},
+            }.items()
+        },
+    }
+    assert identity not in changed.values()
+    assert len(set(changed.values())) == len(changed)
+
+    with pytest.raises(ValueError, match="evaluator_hash"):
+        holdout_identity(base, "evaluator-v1")
+    with pytest.raises(TypeError, match="ExperimentContract"):
+        holdout_identity(base.to_dict(), EVALUATOR_HASH)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"name": "renamed"},
+        {"max_wall_seconds": 601},
+        {"max_parallel_candidates": 2},
+        {"max_candidates": 4, "max_trials": 20},
+        {"development_repetitions": 2, "confirmation_repetitions": 4},
+        {"base_seed": 101, "max_budget_microusd": 20_000},
+    ],
+    ids=["name", "wall-time", "parallelism", "candidate-and-trial-caps", "selection-stages",
+         "seed-and-budget"],
+)
+def test_operational_contract_changes_cannot_draw_a_second_holdout(tmp_path, changes):
+    contract = _contract()
+    variant = replace(contract, **changes)
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+    assert variant.contract_hash != contract.contract_hash
+    assert holdout_identity(variant, EVALUATOR_HASH) == identity
+    challenger = _candidate(contract, "challenger")
+    variant_challenger = _candidate(variant, "challenger")
+    with ExperimentLedger(tmp_path / "operational.db") as ledger:
+        first = _seal(
+            ledger, contract, _candidate(contract, "incumbent"), challenger, campaign_id="first"
+        )
+        _prepared(ledger, first, challenger, seed=1, split="holdout")
+        second = _seal(
+            ledger,
+            variant,
+            _candidate(variant, "incumbent"),
+            variant_challenger,
+            campaign_id="second",
+        )
+        with pytest.raises(HoldoutAlreadyUsedError, match="campaign 'first'"):
+            _prepared(ledger, second, variant_challenger, seed=1, split="holdout")
+        assert ledger.holdout_uses(identity) == {challenger.policy_hash: ("first",)}
+        assert ledger.list_trials(second) == []
+
+
+def test_equivalent_policy_spellings_share_the_seal_across_operational_changes(tmp_path):
+    contract = ExperimentContract(
+        name="spelling",
+        objectives=(MetricObjective("quality", ObjectiveDirection.MAXIMIZE, primary=True),),
+        mutable_fields=("n", "temperature"),
+        mutable_field_rules={
+            "n": MutableFieldRule("integer", minimum=1, maximum=64),
+            "temperature": MutableFieldRule("number", minimum=-1, maximum=2),
+        },
+        development_repetitions=1,
+        confirmation_repetitions=3,
+        holdout_repetitions=3,
+        max_candidates=3,
+        max_parallel_candidates=1,
+        max_trials=10,
+        max_wall_seconds=600,
+        max_budget_microusd=10_000,
+        per_trial_reservation_microusd=1_000,
+        confidence=0.95,
+        min_improvement=0.25,
+        base_seed=100,
+    )
+    variant = replace(contract, max_wall_seconds=601)
+    used = Candidate(contract=contract, policy={"n": 8, "temperature": 1}, hypothesis="one")
+    zero = Candidate(contract=contract, policy={"n": 8, "temperature": 0.0}, hypothesis="zero")
+    # Reordered keys, 1.0 for 1, and -0.0 for 0.0 do not change a policy.
+    respelled = Candidate(
+        contract=variant, policy={"temperature": 1.0, "n": 8}, hypothesis="reordered"
+    )
+    negative_zero = Candidate(
+        contract=variant, policy={"temperature": -0.0, "n": 8}, hypothesis="negative zero"
+    )
+    assert respelled.policy_hash == used.policy_hash
+    assert negative_zero.policy_hash == zero.policy_hash
+    with ExperimentLedger(tmp_path / "spelling.db") as ledger:
+        first = _seal(
+            ledger,
+            contract,
+            Candidate(contract=contract, policy={"n": 1, "temperature": 0.5}, hypothesis="base"),
+            used,
+            zero,
+            campaign_id="first",
+        )
+        _prepared(ledger, first, used, seed=1, split="holdout")
+        _prepared(ledger, first, zero, seed=1, split="holdout")
+        second = _seal(
+            ledger,
+            variant,
+            Candidate(contract=variant, policy={"temperature": 0.5, "n": 1}, hypothesis="base"),
+            respelled,
+            negative_zero,
+            campaign_id="second",
+        )
+        for candidate in (respelled, negative_zero):
+            with pytest.raises(HoldoutAlreadyUsedError, match="campaign 'first'"):
+                _prepared(ledger, second, candidate, seed=1, split="holdout")
+
+
+def _record_unsealed_holdout(
+    ledger: ExperimentLedger,
+    campaign_id: str,
+    candidate: Candidate,
+    *,
+    prepared_at_ns: int,
+    seed: int = 1,
+) -> None:
+    """Write a holdout preparation as 0.8.0 did, with no holdout-use check."""
+
+    phase = "challenger.plan_" + "0" * 64
+    trial_key = ExperimentLedger.make_trial_key(
+        campaign_id, candidate.candidate_id, "holdout", phase, seed
+    )
+    prepared = {
+        "trial_key": trial_key,
+        "campaign_id": campaign_id,
+        "candidate_id": candidate.candidate_id,
+        "split": "holdout",
+        "phase": phase,
+        "seed": seed,
+        "evaluator_hash": EVALUATOR_HASH,
+        "ceiling_microusd": 1_000,
+    }
+    ledger._connection.execute(
+        """INSERT INTO trials (
+               trial_key, campaign_id, candidate_id, split, phase, seed,
+               evaluator_hash, ceiling_microusd, prepared_json, prepared_at_ns
+           ) VALUES (?, ?, ?, 'holdout', ?, ?, ?, 1000, ?, ?)""",
+        (
+            trial_key,
+            campaign_id,
+            candidate.candidate_id,
+            phase,
+            seed,
+            EVALUATOR_HASH,
+            canonical_json_bytes(prepared).decode("utf-8"),
+            prepared_at_ns,
+        ),
+    )
+
+
+def test_holdout_rows_written_without_a_seal_record_count_as_prior_use(tmp_path):
+    # 0.8.0 kept no holdout-use record and allowed repeated draws, here under
+    # contracts that differ only operationally.  Its stored contracts and
+    # holdout trial rows alone still identify every use.
+    contract = _contract()
+    earlier = replace(contract, name="earlier", max_wall_seconds=900)
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+    challenger = _candidate(contract, "challenger")
+    with ExperimentLedger(tmp_path / "legacy.db") as ledger:
+        for campaign_id, sealed, prepared_at_ns in (
+            ("legacy-second", contract, 2),
+            ("legacy-first", earlier, 1),
+        ):
+            legacy_challenger = _candidate(sealed, "challenger")
+            _seal(
+                ledger,
+                sealed,
+                _candidate(sealed, "incumbent"),
+                legacy_challenger,
+                campaign_id=campaign_id,
+            )
+            _record_unsealed_holdout(
+                ledger, campaign_id, legacy_challenger, prepared_at_ns=prepared_at_ns
+            )
+        assert ledger.holdout_uses(identity) == {
+            challenger.policy_hash: ("legacy-first", "legacy-second")
         }
+
+        variant = replace(contract, max_parallel_candidates=2)
+        variant_challenger = _candidate(variant, "challenger")
+        new = _seal(
+            ledger,
+            variant,
+            _candidate(variant, "incumbent"),
+            variant_challenger,
+            campaign_id="new",
+        )
+        with pytest.raises(HoldoutAlreadyUsedError, match="campaign 'legacy-first'"):
+            _prepared(ledger, new, variant_challenger, seed=1, split="holdout")
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")

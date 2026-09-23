@@ -349,6 +349,30 @@ def test_student_t_quantile_matches_reference_values(probability, df, expected):
     assert student_t_quantile(1 - probability, df) == pytest.approx(-expected, rel=1e-12)
 
 
+# Extreme-tail references from the exact finite-sum Student-t tail for integer
+# degrees of freedom, solved in 100- to 400-digit decimal arithmetic (they
+# agree with SciPy's isf to about 2e-16), rounded to 16 significant digits.
+# Tolerances are the accuracy regimes stated in student_t_quantile's docstring.
+@pytest.mark.parametrize(
+    ("probability", "df", "expected", "tolerance"),
+    [
+        # Numerical inversion below 10,000 degrees of freedom, even at 1e-300.
+        (1e-300, 9_999, -38.35651906066025, 1e-13),
+        # Cornish-Fisher from 10,000: the most extreme contract tail ...
+        (2.0**-54, 10_000, -8.306845025331896, 1e-14),
+        # ... and the documented loss of accuracy in more extreme tails.
+        (1e-100, 10_000, -21.51697419391498, 1e-10),
+        (1e-300, 10_000, -38.35638432100424, 1e-8),
+    ],
+    ids=["inversion-1e-300", "cornish-fisher-contract-tail", "cornish-fisher-1e-100",
+         "cornish-fisher-1e-300"],
+)
+def test_student_t_quantile_meets_documented_accuracy_by_regime(
+    probability, df, expected, tolerance
+):
+    assert student_t_quantile(probability, df) == pytest.approx(expected, rel=tolerance)
+
+
 def test_student_t_quantile_known_table_values_and_symmetry():
     assert round(student_t_quantile(0.975, 4), 6) == 2.776445
     assert round(student_t_quantile(0.975, 1), 4) == 12.7062

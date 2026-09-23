@@ -21,6 +21,7 @@ from smythe.cli import (
     build_parser,
     main,
 )
+from smythe.optimize.contracts import canonical_json_bytes
 from smythe.optimize.engine import OptimizationRunner
 from smythe.optimize.concurrency import simulate_concurrency as reference_simulate_concurrency
 from smythe.optimize.ledger import ExperimentLedger, LedgerBudgetError, TrialStatus
@@ -407,6 +408,178 @@ def test_changing_campaign_id_cannot_reroll_a_used_holdout(tmp_path, capsys):
     assert first["campaign_id"] in error["message"]
     # The consuming campaign itself still replays.
     assert _run(ledger_path, capsys, *_SMALL_CAMPAIGN)["campaign_id"] == first["campaign_id"]
+
+
+# The review reproduction's evaluation settings; challengers are added per run.
+_HOLDOUT_EVALUATION = (
+    "--work-items",
+    "40",
+    "--development-repetitions",
+    "3",
+    "--confirmation-repetitions",
+    "3",
+    "--holdout-repetitions",
+    "3",
+    "--min-improvement",
+    "0.5",
+    "--bootstrap-resamples",
+    "10",
+)
+
+
+def _campaign_count(ledger_path: Path) -> int:
+    with ExperimentLedger(ledger_path, read_only=True) as ledger:
+        return ledger._connection.execute("SELECT COUNT(*) FROM campaigns").fetchone()[0]
+
+
+def _used_holdout(ledger_path: Path, capsys: pytest.CaptureFixture[str]) -> dict[str, object]:
+    first = _run(ledger_path, capsys, *_HOLDOUT_EVALUATION, "--candidate-concurrency", "4,8")
+    assert first["selected_candidate"]["policy"] == {"max_concurrency": 8}
+    assert first["evidence"]["holdout_assessment"] is not None
+    return first
+
+
+@pytest.mark.parametrize(
+    "variant",
+    [
+        ("--candidate-concurrency", "8"),
+        ("--candidate-concurrency", "8,4"),
+        ("--candidate-concurrency", "2,8"),
+        ("--candidate-concurrency", "4,8", "--max-wall-seconds", "301"),
+        ("--candidate-concurrency", "4,8", "--max-parallel-candidates", "1"),
+        ("--candidate-concurrency", "4,8", "--development-repetitions", "2"),
+        ("--candidate-concurrency", "4,8", "--confirmation-repetitions", "4"),
+        (
+            "--candidate-concurrency",
+            "4,8",
+            "--bootstrap-resamples",
+            "11",
+            "--ledger-durability",
+            "full",
+        ),
+    ],
+    ids=[
+        "only-the-used-challenger",
+        "reordered-challengers",
+        "different-challenger-set",
+        "max-wall-seconds",
+        "max-parallel-candidates",
+        "development-repetitions",
+        "confirmation-repetitions",
+        "bootstrap-and-durability",
+    ],
+)
+def test_operational_flags_and_challenger_sets_cannot_reroll_a_used_holdout(
+    tmp_path, capsys, variant
+):
+    ledger_path = tmp_path / "reroll.sqlite3"
+    first = _used_holdout(ledger_path, capsys)
+    assert main(
+        [
+            "optimize",
+            "concurrency",
+            "--ledger",
+            str(ledger_path),
+            "--json",
+            *_HOLDOUT_EVALUATION,
+            *variant,
+        ]
+    ) == EXIT_OPTIMIZE_STATE
+    error = _json_output(capsys)["error"]
+    assert error["type"] == "HoldoutAlreadyUsedError"
+    assert first["campaign_id"] in error["message"]
+    assert first["selected_candidate"]["policy_hash"] in error["message"]
+    assert _campaign_count(ledger_path) == 1
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        ("--provider-capacity", "12"),
+        ("--confidence", "0.9"),
+        ("--holdout-repetitions", "4"),
+    ],
+    ids=["evaluator-scenario", "confidence", "holdout-repetitions"],
+)
+def test_a_different_holdout_evaluation_draws_a_new_holdout(tmp_path, capsys, change):
+    ledger_path = tmp_path / "evaluation.sqlite3"
+    first = _used_holdout(ledger_path, capsys)
+    second = _run(
+        ledger_path,
+        capsys,
+        *_HOLDOUT_EVALUATION,
+        "--candidate-concurrency",
+        "4,8",
+        *change,
+    )
+    assert second["campaign_id"] != first["campaign_id"]
+    assert second["selected_candidate"]["policy_hash"] == first["selected_candidate"]["policy_hash"]
+    assert second["evidence"]["holdout_assessment"] is not None
+    assert _campaign_count(ledger_path) == 2
+
+
+def test_holdout_rows_from_0_8_0_still_block_a_cli_reroll(tmp_path, capsys):
+    ledger_path = tmp_path / "legacy.sqlite3"
+    args = build_parser().parse_args(
+        ["optimize", "concurrency", *_HOLDOUT_EVALUATION, "--candidate-concurrency", "4,8"]
+    )
+    contract, incumbent, challengers, scenario = _concurrency_campaign(args)
+    used = next(item for item in challengers if item.policy["max_concurrency"] == 8)
+    phase = "challenger.plan_" + "0" * 64
+    trial_key = ExperimentLedger.make_trial_key("legacy-0-8-0", used.candidate_id, "holdout", phase, 1)
+    prepared = {
+        "trial_key": trial_key,
+        "campaign_id": "legacy-0-8-0",
+        "candidate_id": used.candidate_id,
+        "split": "holdout",
+        "phase": phase,
+        "seed": 1,
+        "evaluator_hash": scenario.evaluator_hash,
+        "ceiling_microusd": 0,
+    }
+    with ExperimentLedger(ledger_path, durability="normal") as ledger:
+        ledger.create_campaign(
+            contract,
+            incumbent.candidate_id,
+            (incumbent, *challengers),
+            plan_hash="sha256:" + "0" * 64,
+            campaign_id="legacy-0-8-0",
+        )
+        # 0.8.0 kept no holdout-use record; its holdout trial row is the only
+        # trace, written here without the current holdout check.
+        ledger._connection.execute(
+            """INSERT INTO trials (
+                   trial_key, campaign_id, candidate_id, split, phase, seed,
+                   evaluator_hash, ceiling_microusd, prepared_json, prepared_at_ns
+               ) VALUES (?, 'legacy-0-8-0', ?, 'holdout', ?, 1, ?, 0, ?, 1)""",
+            (
+                trial_key,
+                used.candidate_id,
+                phase,
+                scenario.evaluator_hash,
+                canonical_json_bytes(prepared).decode("utf-8"),
+            ),
+        )
+
+    assert main(
+        [
+            "optimize",
+            "concurrency",
+            "--ledger",
+            str(ledger_path),
+            "--json",
+            *_HOLDOUT_EVALUATION,
+            "--candidate-concurrency",
+            "8",
+            "--max-wall-seconds",
+            "301",
+        ]
+    ) == EXIT_OPTIMIZE_STATE
+    error = _json_output(capsys)["error"]
+    assert error["type"] == "HoldoutAlreadyUsedError"
+    assert "legacy-0-8-0" in error["message"]
+    assert used.policy_hash in error["message"]
+    assert _campaign_count(ledger_path) == 1
 
 
 def test_inspect_is_read_only_and_missing_campaign_has_stable_exit(tmp_path, capsys):

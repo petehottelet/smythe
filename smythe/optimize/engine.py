@@ -39,6 +39,7 @@ from smythe.optimize.ledger import (
     TrialStateError,
     TrialStatus,
     UnknownTrialError,
+    holdout_identity,
 )
 from smythe.optimize.statistics import (
     MAX_BOOTSTRAP_RESAMPLES,
@@ -459,8 +460,9 @@ class OptimizationRunner:
         evidence.extend(record.trial_key for record in confirmation_candidate)
 
         if confirmation.promote:
-            # Durably claim this policy's one holdout for the contract before
-            # any holdout work is dispatched; a prior use is refused here.
+            # Durably claim this policy's one holdout for its holdout identity
+            # before any holdout work is dispatched; a use already recorded by
+            # any other campaign is refused here.
             self._require_time(deadline)
             self._prepare_trial(
                 campaign_id,
@@ -619,20 +621,33 @@ class OptimizationRunner:
     def _require_unused_holdouts(self, plan: Mapping[str, Any]) -> None:
         """Refuse a plan that would re-test a policy whose holdout was used.
 
-        Holdout use is keyed by contract and policy content, so rewording a
-        hypothesis, changing the challenger set, or choosing a new campaign ID
-        cannot draw a second holdout for the same policy in this ledger.
+        Holdout use is keyed by the challenger's policy hash and its holdout
+        identity (:func:`smythe.optimize.ledger.holdout_identity`): the
+        evaluator hash, the objectives with their bounds and regression
+        allowances, the required gates, the holdout repetition count, the
+        confidence, and the minimum improvement.  Changing any of those
+        defines a different holdout evaluation and draws a new holdout.
+
+        Nothing else does.  Rewording a hypothesis, changing or reordering
+        the challenger set, changing the incumbent, choosing a new campaign
+        ID, or changing the contract name, mutable fields or their rules,
+        development or confirmation repetitions, base seed, or any candidate,
+        parallelism, trial, wall-time, or spend cap cannot draw a second
+        holdout for the same policy in this ledger.  Neither can upgrading the
+        runner: holdouts used by earlier releases, which kept no separate
+        record, still count.
         """
 
         campaign_id: str = plan["campaign_id"]
-        uses = self.ledger.holdout_uses(self.contract.contract_hash)
+        identity = holdout_identity(self.contract, self.evaluator_hash)
+        uses = self.ledger.holdout_uses(identity)
         for candidate in plan["candidates"]:
             consumers = uses.get(candidate.policy_hash, ())
             if consumers and campaign_id not in consumers:
                 raise HoldoutAlreadyUsedError(
                     _holdout_reuse_message(
                         candidate.policy_hash,
-                        self.contract.contract_hash,
+                        identity,
                         consumers[0],
                     )
                 )
