@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 import math
+import os
 import sqlite3
+import stat
 import uuid
 from threading import Barrier
 
@@ -292,6 +294,45 @@ def test_ledger_refuses_a_second_holdout_for_the_same_policy_and_contract(tmp_pa
         assert reader.holdout_uses(contract.contract_hash) == {
             challenger.policy_hash: ("first",)
         }
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+def test_new_ledger_database_and_sidecars_are_owner_only(tmp_path):
+    previous = os.umask(0o022)
+    try:
+        path = tmp_path / "new-directory" / "autotune.db"
+        contract = _contract()
+        with ExperimentLedger(path) as ledger:
+            # Sealing a campaign writes its holdout secret through the WAL.
+            _seal(ledger, contract, _candidate(contract, "incumbent"))
+            modes = {
+                suffix: stat.S_IMODE(os.stat(f"{path}{suffix}").st_mode)
+                for suffix in ("", "-wal", "-shm")
+            }
+        assert modes == {"": 0o600, "-wal": 0o600, "-shm": 0o600}
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    finally:
+        os.umask(previous)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+def test_existing_ledger_file_permissions_are_not_changed(tmp_path):
+    previous = os.umask(0o022)
+    try:
+        path = tmp_path / "shared.db"
+        path.touch(mode=0o644)
+        contract = _contract()
+        with ExperimentLedger(path) as ledger:
+            _seal(ledger, contract, _candidate(contract, "incumbent"))
+            wal_mode = stat.S_IMODE(os.stat(f"{path}-wal").st_mode)
+        assert stat.S_IMODE(path.stat().st_mode) == 0o644
+        assert wal_mode == 0o644
+        os.chmod(path, 0o640)
+        with ExperimentLedger(path):
+            pass
+        assert stat.S_IMODE(path.stat().st_mode) == 0o640
+    finally:
+        os.umask(previous)
 
 
 def test_candidate_registration_is_idempotent_and_contract_bound(tmp_path):

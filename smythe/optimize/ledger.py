@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import json
 import math
+import os
 import re
 import secrets
 import sqlite3
@@ -265,6 +266,26 @@ def _deep_freeze_json(value: Any) -> Any:
 def _holdout_commitment(nonce: bytes) -> str:
     digest = hashlib.sha256(_HOLDOUT_COMMITMENT_DOMAIN + nonce).hexdigest()
     return f"sha256:{digest}"
+
+
+def _create_private_file(path: Path) -> None:
+    """Create a missing ledger file readable only by its owner.
+
+    SQLite gives the -wal and -shm sidecars the database file's permission
+    bits, so they follow.  An existing file keeps its mode.
+    """
+
+    try:
+        descriptor = os.open(
+            path,
+            os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0),
+            0o600,
+        )
+    except OSError:
+        # Already present, or not creatable: SQLite opens it or reports the
+        # failure exactly as it did before.
+        return
+    os.close(descriptor)
 
 
 def _holdout_consumers(
@@ -554,6 +575,8 @@ class ExperimentLedger:
             self._connection = connection
         else:
             self.path.parent.mkdir(parents=True, exist_ok=True)
+            # The database holds sealed holdout secrets: create it owner-only.
+            _create_private_file(self.path)
             self._connection = sqlite3.connect(
                 self.path,
                 isolation_level=None,

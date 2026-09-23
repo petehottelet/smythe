@@ -474,6 +474,12 @@ Append-only describes transitions made through the public Python API; it is
 not protection against an operator directly modifying the SQLite database.
 Protect and back up the database as experiment evidence.
 
+The database also stores each campaign's holdout secret. A writable open
+creates a missing ledger file with owner-only permissions (`0600`), and
+SQLite's `-wal` and `-shm` files inherit them. Existing ledger files
+keep their current permissions; tighten them with `chmod 600` if a ledger
+created by 0.8.0 or earlier should not be readable by other local users.
+
 The ledger schema in 0.8.0 is version 4. It adds campaign leases, monotonic
 owner epochs, and immutable dispatch ownership to v3's atomic plan sealing and
 single terminal-decision constraint. Writable opening upgrades a v3 database
