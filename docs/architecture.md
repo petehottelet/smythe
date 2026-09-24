@@ -72,14 +72,19 @@ digits, `-` or `_`; plans are limited to 8 nodes and 5 levels by default
 retries and 2 regenerations. A reply that breaks the schema, or that stops at
 the output token limit, is retried with the problem named, up to `max_retries`.
 
-**Changed in 0.8.2:** a generated node timeout must be at least 60 seconds
-(`smythe.loader.MODEL_PLAN_MIN_TIMEOUT_S`), because a timeout cancels provider
-calls that were already sent. `ConstrainedArchitect` limits the composed graph
-to 64 nodes by default (`ConstrainedArchitect(max_nodes=...)`) and retries a
-selection over the limit. Template builders receive model-chosen `params` and
-must bound them: the limit is checked when each builder call returns. In a
-durable run, the LLM and constrained architects also check each plan against
-the run's graph policy and plain-text node rules before planning is saved
+**Changed in 0.8.2:** a generated plan may contain at most one gating node,
+which must list the node it verifies in `depends_on`, and a generated node
+timeout must be at least 60 seconds (`smythe.loader.MODEL_PLAN_MIN_TIMEOUT_S`),
+because a timeout cancels provider calls that were already sent. No graph,
+generated or written by hand, may use the node id `__synthesis__`, which the
+synthesizer reserves for its budget and trace entries.
+
+`ConstrainedArchitect` limits the composed graph to 64 nodes by default
+(`ConstrainedArchitect(max_nodes=...)`) and retries a selection over the limit.
+Template builders receive model-chosen `params` and must bound them: the limit
+is checked when each builder call returns. In a durable run, the LLM and
+constrained architects also check each plan against the run's graph policy and
+plain-text node rules before planning is saved
 ([durable planning](workflow-accounting.md#freeze-graph-limits)).
 
 ### Topology vocabulary
@@ -186,8 +191,10 @@ prompt mutation.
   durable ledger across routing, planning, execution, verification, supervision,
   and synthesis. Request-bound quotes, fenced dispatch, and retained response
   evidence govern admission and recovery. See [managed scope](workflow-accounting.md#supported-scope).
-- A supervisor may change only pending work, and one revision may add at most
-  `max_added_nodes` nodes (default 3).
+- A supervisor may change only pending work, and cannot drop or re-route a
+  verification gate. One `LLMSupervisor` revision may add at most
+  `max_added_nodes` nodes (default 3), and a run at most
+  `max_total_added_nodes` (default 8).
 - A verifier may reset only its target and downstream dependents.
 - A resumed run keeps completed results, recorded spend, and consumed control allowances.
 

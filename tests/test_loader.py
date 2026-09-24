@@ -616,6 +616,60 @@ def test_generated_timeout_floor_leaves_developer_graphs_unchanged():
     assert developer.nodes[0].timeout_s == 0.05
 
 
+def _gate(node_id, target, **fields):
+    return {"id": node_id, "label": f"Check {target}; answer PASS or FAIL",
+            "verifies": target, "max_regenerations": 2, **fields}
+
+
+@pytest.mark.parametrize("plan, count", [
+    ({"nodes": [{"id": "draft", "label": "Draft"}]
+      + [_gate(f"g{i}", "draft", depends_on=["draft"]) for i in range(7)]}, 7),
+    ({"nodes": [{"id": "a", "label": "A"}, _gate("va", "a", depends_on=["a"]),
+                {"id": "b", "label": "B", "depends_on": ["va"]},
+                _gate("vb", "b", depends_on=["b"])]}, 2),
+])
+def test_model_plan_allows_one_gate(plan, count):
+    """Seven gates on one node bought 78 node calls from an 8-node plan."""
+    with pytest.raises(ValueError, match=f"{count} gating nodes"):
+        build_graph_from_model_output(plan)
+
+
+@pytest.mark.parametrize("depends_on", [None, [], ["research"], ["polish"]])
+def test_model_plan_gate_must_depend_on_its_target(depends_on):
+    """A gate that can run before its target has its verdict discarded, and
+    one that depends on it only indirectly never sees the target's output."""
+    fields = {} if depends_on is None else {"depends_on": depends_on}
+    plan = {"nodes": [
+        {"id": "research", "label": "Research"},
+        {"id": "draft", "label": "Draft", "depends_on": ["research"]},
+        {"id": "polish", "label": "Polish", "depends_on": ["draft"]},
+        _gate("check", "draft", **fields),
+    ]}
+    message = "'check' verifies 'draft' and must list it in 'depends_on'"
+    with pytest.raises(ValueError, match=message):
+        build_graph_from_model_output(plan)
+
+
+def test_developer_graphs_may_declare_several_gates_and_indirect_edges():
+    graph, _ = build_graph_from_dict({"nodes": [
+        {"id": "draft", "label": "Draft"},
+        {"id": "polish", "label": "Polish", "depends_on": ["draft"]},
+        {"id": "g1", "label": "Check", "depends_on": ["polish"], "verifies": "draft",
+         "max_regenerations": 3},
+        {"id": "g2", "label": "Check", "depends_on": ["draft"], "verifies": "draft"},
+    ]})
+    assert [n.verifies for n in graph.nodes] == [None, None, "draft", "draft"]
+
+
+def test_reserved_synthesis_id_is_rejected_in_plans_and_developer_graphs():
+    """LLM_MERGE books its charge under this id, so a node using it shared
+    the synthesis budget entry."""
+    with pytest.raises(ValueError, match="'__synthesis__' is reserved"):
+        build_graph_from_model_output({"nodes": [{"id": "__synthesis__", "label": "Draft"}]})
+    with pytest.raises(ValueError, match="'__synthesis__' is reserved"):
+        load_graph_from_string("nodes:\n  - id: __synthesis__\n    label: Draft\n")
+
+
 @pytest.mark.parametrize("entry", [
     _node(depends_on="other"),
     _node(depends_on=[1]),

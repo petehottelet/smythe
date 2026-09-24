@@ -11,6 +11,14 @@ from uuid import uuid4
 
 from smythe.task import Task, task_to_dict
 
+# The synthesizer's budget and trace key (smythe/synthesizer.py). A node with
+# this id would share the synthesis charge's ledger entry, so no graph may use it.
+SYNTHESIS_NODE_ID = "__synthesis__"
+
+# Node metadata marker set on every node a revision adds. It is saved with the
+# node, so a run-level cap on supervised growth survives resume and replay.
+REVISION_ADDED_KEY = "added_by_revision"
+
 
 def snapshot_run_ref(value: dict[str, Any] | None) -> dict[str, Any] | None:
     """Detach a strict durable-run reference without copying the call ledger."""
@@ -286,6 +294,8 @@ class ExecutionGraph:
             counts = Counter(n.id for n in self.nodes)
             dupes = [nid for nid, cnt in counts.items() if cnt > 1]
             raise ValueError(f"Duplicate node IDs: {dupes}")
+        if SYNTHESIS_NODE_ID in ids:
+            raise ValueError(f"Node id {SYNTHESIS_NODE_ID!r} is reserved for the synthesizer")
         for node in self.nodes:
             for dep in node.depends_on:
                 if dep not in ids:
@@ -299,6 +309,12 @@ class ExecutionGraph:
         Validated in full before anything mutates, so a rejected
         revision leaves the graph exactly as it was — a supervisor that
         proposes nonsense costs a trace entry, never a corrupt run.
+
+        Verification gates are protected. A revision may not drop a
+        verifier or the node it judges, or rewire a verifier so that it no
+        longer depends on that node: either would let the judged output
+        through unverified. Added nodes are marked in their metadata with
+        ``REVISION_ADDED_KEY``.
         """
         if revision.is_empty:
             return
@@ -315,11 +331,22 @@ class ExecutionGraph:
                     f"cannot drop node {node_id!r} with status "
                     f"{node.status.value}; only pending work may be revised"
                 )
+            if node.verifies is not None:
+                raise RevisionError(
+                    f"cannot drop verifier {node_id!r}; it judges {node.verifies!r}"
+                )
+        for node in self.nodes:
+            if node.verifies in drop:
+                raise RevisionError(
+                    f"cannot drop node {node.verifies!r}; verifier {node.id!r} judges it"
+                )
 
         seen_added: set[str] = set()
         for node in revision.add_nodes:
             if node.id in by_id:
                 raise RevisionError(f"cannot add node {node.id!r}: id already exists")
+            if node.id == SYNTHESIS_NODE_ID:
+                raise RevisionError(f"cannot add node {node.id!r}: id is reserved")
             if node.id in seen_added:
                 raise RevisionError(f"revision adds duplicate node id {node.id!r}")
             if node.status is not NodeStatus.PENDING:
@@ -339,6 +366,11 @@ class ExecutionGraph:
                 )
             if node_id in drop:
                 raise RevisionError(f"node {node_id!r} is both dropped and rewired")
+            if node.verifies is not None and node.verifies not in revision.rewire[node_id]:
+                raise RevisionError(
+                    f"cannot rewire verifier {node_id!r} off {node.verifies!r}, "
+                    f"the node it judges"
+                )
 
         kept = [n for n in self.nodes if n.id not in drop]
         candidate = kept + list(revision.add_nodes)
@@ -362,6 +394,8 @@ class ExecutionGraph:
 
         for node_id, deps in revision.rewire.items():
             by_id[node_id].depends_on = list(deps)
+        for node in revision.add_nodes:
+            node.metadata[REVISION_ADDED_KEY] = True
         self.nodes = candidate
 
     def to_json(self) -> dict[str, Any]:

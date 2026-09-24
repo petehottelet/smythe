@@ -10,6 +10,8 @@ import pytest
 from smythe.async_executor import AsyncExecutor
 from smythe.executor import Executor
 from smythe.graph import (
+    REVISION_ADDED_KEY,
+    SYNTHESIS_NODE_ID,
     ExecutionGraph,
     Node,
     NodeStatus,
@@ -19,7 +21,7 @@ from smythe.graph import (
 )
 from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
-from smythe.supervisor import LLMSupervisor, Supervisor
+from smythe.supervisor import SUPERVISOR_SYSTEM_PROMPT, LLMSupervisor, Supervisor
 from smythe.tracer import Tracer
 
 
@@ -210,6 +212,146 @@ def test_rejected_deep_revision_preserves_graph_and_proposed_nodes(invalid_depen
     assert extra.depends_on is extra_dependencies
     assert extra.depends_on == ["n4998"]
     assert extra.status is NodeStatus.PENDING
+
+
+def test_added_nodes_are_marked_only_when_the_revision_applies():
+    graph = _graph("first")
+    added = Node(id="extra", label="added", depends_on=["n0"])
+    graph.apply_revision(Revision(add_nodes=(added,)))
+    assert added.metadata[REVISION_ADDED_KEY] is True
+    assert REVISION_ADDED_KEY not in graph.nodes[0].metadata
+
+    refused = Node(id="refused", label="added", depends_on=["missing"])
+    with pytest.raises(RevisionError):
+        graph.apply_revision(Revision(add_nodes=(refused,)))
+    assert refused.metadata == {}
+
+
+def test_cannot_add_the_reserved_synthesis_id():
+    """The synthesizer books its charge under this id; a node sharing it
+    would merge its cost with synthesis in the budget breakdown."""
+    graph = _graph("first")
+    with pytest.raises(RevisionError, match="reserved"):
+        graph.apply_revision(Revision(add_nodes=(Node(id=SYNTHESIS_NODE_ID, label="x"),)))
+    assert [n.id for n in graph.nodes] == ["n0"]
+
+
+# ---------------------------------------------------------------------------
+# Verification gates cannot be revised away
+# ---------------------------------------------------------------------------
+
+
+def _gated_graph() -> ExecutionGraph:
+    nodes = [
+        Node(id="research", label="research"),
+        Node(id="draft", label="draft", depends_on=["research"]),
+        Node(id="judge", label="judge", depends_on=["draft"], verifies="draft",
+             max_regenerations=2),
+    ]
+    for node in nodes:
+        node.metadata["model"] = "test-model"
+    return ExecutionGraph(topology=[Topology.SERIAL], nodes=nodes)
+
+
+def _structure(graph):
+    return [(n.id, list(n.depends_on)) for n in graph.nodes]
+
+
+@pytest.mark.parametrize("revision, message", [
+    (Revision(drop_node_ids=("judge",)), "cannot drop verifier 'judge'"),
+    (Revision(drop_node_ids=("draft",)), "verifier 'judge' judges it"),
+    (Revision(drop_node_ids=("draft",), rewire={"judge": ("research",)}),
+     "verifier 'judge' judges it"),
+    (Revision(rewire={"judge": ("research",)}), "cannot rewire verifier 'judge' off 'draft'"),
+    (Revision(add_nodes=(Node(id="summary", label="s", depends_on=["draft"]),),
+              rewire={"judge": ("summary",)}),
+     "cannot rewire verifier 'judge' off 'draft'"),
+])
+def test_revision_cannot_remove_or_bypass_a_gate(revision, message):
+    """A verdict is only read when the judge runs after, and sees, its target."""
+    graph = _gated_graph()
+    before = _structure(graph)
+    with pytest.raises(RevisionError, match=message):
+        graph.apply_revision(revision)
+    assert _structure(graph) == before
+
+
+def test_verifier_target_is_protected_even_without_a_dependency_edge():
+    graph = _gated_graph()
+    graph.nodes[2].depends_on = ["research"]  # a hand-built gate may omit the edge
+    with pytest.raises(RevisionError, match="verifier 'judge' judges it"):
+        graph.apply_revision(Revision(drop_node_ids=("draft",)))
+
+
+def test_work_around_a_gate_can_still_be_revised():
+    graph = _gated_graph()
+    graph.nodes[0].status = NodeStatus.COMPLETED
+    graph.apply_revision(Revision(
+        add_nodes=(Node(id="facts", label="Check facts", depends_on=["research"]),
+                   Node(id="publish", label="Publish", depends_on=["judge"])),
+        rewire={"judge": ("draft", "facts"), "draft": ("research", "facts")},
+    ))
+    judge = graph.nodes[2]
+    assert judge.depends_on == ["draft", "facts"] and judge.verifies == "draft"
+    graph.apply_revision(Revision(drop_node_ids=("publish",)))
+    assert [n.id for n in graph.nodes] == ["research", "draft", "judge", "facts"]
+
+
+class GatedRunProvider(Provider):
+    """The supervisor proposes a fixed change; the judge fails every draft."""
+
+    def __init__(self, proposal: dict, *, slow_draft: bool = False) -> None:
+        self._proposal = json.dumps(proposal)
+        self._slow_draft = slow_draft
+        self.calls: list[str] = []
+
+    async def complete(self, system, prompt, model):
+        if system == SUPERVISOR_SYSTEM_PROMPT:
+            return CompletionResult(text=self._proposal, prompt_tokens=1, completion_tokens=1)
+        label = prompt.splitlines()[0]
+        self.calls.append(label)
+        if label == "draft" and self._slow_draft:
+            # Lets a judge rewired onto "research" finish before the draft.
+            await asyncio.sleep(0.2)
+        text = "FAIL - missing citations" if label == "judge" else "body"
+        return CompletionResult(text=text, prompt_tokens=1, completion_tokens=1)
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+@pytest.mark.parametrize("proposal, refusal", [
+    ({"change": True, "reason": "verification is redundant", "drop": ["judge"]},
+     "cannot drop verifier 'judge'"),
+    ({"change": True, "reason": "check sooner", "rewire": {"judge": ["research"]}},
+     "cannot rewire verifier 'judge' off 'draft'"),
+])
+def test_supervisor_proposal_cannot_remove_or_bypass_a_gate(parallel, proposal, refusal):
+    """The review prompt carries worker output, so source data can steer it.
+
+    Dropping the judge used to accept the draft unverified; rewiring it
+    onto "research" let a parallel judge finish first and its FAIL was
+    discarded. The gate must regenerate exactly as it does unsupervised.
+    """
+    provider = GatedRunProvider(proposal, slow_draft=parallel)
+    graph = _gated_graph()
+    tracer = Tracer()
+    options = dict(
+        provider=provider, registry=Registry(), tracer=tracer, artifact_dir=None,
+        supervisor=LLMSupervisor(provider, review_after={"research"}), max_revisions=1,
+    )
+    if parallel:
+        executor = AsyncExecutor(max_concurrency=4, **options)
+        asyncio.run(executor.run(graph))
+    else:
+        executor = Executor(**options)
+        executor.run(graph)
+
+    judge = graph.nodes[2]
+    assert _structure(graph) == _structure(_gated_graph())
+    assert provider.calls == ["research", "draft", "judge"] + ["draft", "judge"] * 2
+    assert judge.metadata["regenerations_used"] == 2
+    assert executor.revisions_used == 0
+    rejected = [s for s in tracer.summary() if s.get("status") == "revision_rejected"]
+    assert len(rejected) == 1 and refusal in rejected[0]["error"]
 
 
 # ---------------------------------------------------------------------------
@@ -449,6 +591,17 @@ def test_parse_refuses_proposals_over_the_addition_cap():
     assert len(parse(_additions(12)).add_nodes) == 12  # no cap unless one is given
 
 
+@pytest.mark.parametrize("length, accepted", [(500, True), (501, False), (1_000_000, False)])
+def test_parse_refuses_added_labels_over_the_length_cap(length, accepted):
+    """A 1 MB label used to become the added step's prompt; the reason was
+    already capped at 500 characters."""
+    add = [{"id": "ok", "label": "Keep"}, {"id": "long", "label": "L" * length}]
+    revision = _parse(json.dumps({"change": True, "reason": "gap", "add": add}))
+    assert (revision is not None) is accepted
+    if accepted:
+        assert revision.add_nodes[1].label == "L" * length
+
+
 class ProposingProvider(Provider):
     """Answers the supervisor with a fixed proposal; every node with "done"."""
 
@@ -481,6 +634,18 @@ def test_llm_supervisor_cap_is_configurable():
     assert [n.id for n in graph.nodes] == ["n0", "extra0", "extra1", "extra2", "extra3"]
 
 
+def test_llm_supervisor_cannot_add_the_reserved_synthesis_id():
+    add = [{"id": SYNTHESIS_NODE_ID, "label": "Merge", "depends_on": ["n0"]}]
+    proposal = json.dumps({"change": True, "reason": "gap", "add": add})
+    graph, tracer = _graph("first"), Tracer()
+    supervisor = LLMSupervisor(ProposingProvider(proposal), only_terminal=False)
+    asyncio.run(_executor(supervisor, max_revisions=1, tracer=tracer).run(graph))
+
+    assert [n.id for n in graph.nodes] == ["n0"]
+    rejected = [s for s in tracer.summary() if s.get("status") == "revision_rejected"]
+    assert "id is reserved" in rejected[0]["error"]
+
+
 @pytest.mark.parametrize("value", [-1, True, 1.5, "3", None])
 def test_max_added_nodes_must_be_a_non_negative_integer(value):
     with pytest.raises(ValueError, match="max_added_nodes"):
@@ -504,6 +669,196 @@ def test_non_default_addition_cap_is_recorded_and_bound():
 
     bound = custom.bind_run(Binding())
     assert bound.workflow_description() == custom.workflow_description()
+
+
+# ---------------------------------------------------------------------------
+# Run-level cap on supervised growth
+# ---------------------------------------------------------------------------
+
+
+class GrowingProvider(Provider):
+    """Each review proposes ``per_review`` new steps with fresh ids; nodes answer "done".
+
+    A step labelled ``fail_once`` raises on its first call, standing in
+    for a crash between two parts of a run.
+    """
+
+    def __init__(self, per_review: int, *, root: str, fail_once: str | None = None) -> None:
+        self._per_review = per_review
+        self._root = root
+        self._fail_once = fail_once
+        self.reviews = 0
+
+    async def complete(self, system, prompt, model):
+        if system != SUPERVISOR_SYSTEM_PROMPT:
+            if prompt.splitlines()[0] == self._fail_once:
+                self._fail_once = None
+                raise RuntimeError("process lost")
+            return CompletionResult(text="done", prompt_tokens=1, completion_tokens=1)
+        self.reviews += 1
+        add = [{"id": f"r{self.reviews}-{i}", "label": f"Extra {i}", "depends_on": [self._root]}
+               for i in range(self._per_review)]
+        return CompletionResult(
+            text=json.dumps({"change": True, "reason": "gap", "add": add}),
+            prompt_tokens=1, completion_tokens=1,
+        )
+
+
+def _added(graph):
+    return [n.id for n in graph.nodes if n.metadata.get(REVISION_ADDED_KEY)]
+
+
+def test_supervised_growth_is_capped_across_revisions(caplog):
+    """max_added_nodes bounds one revision; without a run-level cap, ten
+    revisions of two nodes each grew a one-node plan to 21 nodes."""
+    graph = _graph("first")
+    supervisor = LLMSupervisor(GrowingProvider(2, root="n0"), only_terminal=False)
+    executor = _executor(supervisor, max_revisions=10)
+    with caplog.at_level("WARNING", logger="smythe.supervisor"):
+        asyncio.run(executor.run(graph))
+
+    assert len(_added(graph)) == 8  # the default equals the generated-plan node limit
+    assert len(graph.nodes) == 9
+    assert all(n.status is NodeStatus.COMPLETED for n in graph.nodes)
+    assert executor.revisions_used == 4
+    assert "adds 2 nodes to 8 earlier additions; max_total_added_nodes is 8" in caplog.text
+
+
+def test_growth_cap_counts_the_additions_a_proposal_keeps():
+    """An added step that never ran frees its place when a proposal drops it."""
+    graph = _graph("first", "second")
+    graph.nodes[0].status = NodeStatus.COMPLETED
+    graph.apply_revision(Revision(add_nodes=(Node(id="extra", label="Extra", depends_on=["n0"]),)))
+    proposal = {"change": True, "reason": "swap", "add": [
+        {"id": "better", "label": "Better", "depends_on": ["n0"]},
+    ]}
+
+    def review(proposal):
+        supervisor = LLMSupervisor(ProposingProvider(json.dumps(proposal)),
+                                   review_after={"n0"}, max_total_added_nodes=1)
+        return asyncio.run(supervisor.review(
+            graph, graph.nodes[0], task=None, revisions_remaining=1,
+        ))
+
+    assert review(proposal) is None
+    revision = review(dict(proposal, drop=["extra"]))
+    assert [n.id for n in revision.add_nodes] == ["better"]
+    assert revision.drop_node_ids == ("extra",)
+
+
+def test_supervised_growth_cap_survives_checkpoint_resume(tmp_path, caplog):
+    """The count is read from saved node metadata, so resume cannot refill it."""
+    from smythe.checkpoint import FileCheckpointStore
+    from smythe.swarm import Swarm
+
+    store = FileCheckpointStore(tmp_path)
+    provider = GrowingProvider(2, root="a", fail_once="b")
+
+    def swarm():
+        supervisor = LLMSupervisor(provider, only_terminal=False, max_total_added_nodes=2)
+        return Swarm(provider=provider, model="test-model", checkpoint_store=store,
+                     artifact_dir=None, supervisor=supervisor, max_revisions=3)
+
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="a", label="a"), Node(id="b", label="b", depends_on=["a"]),
+    ])
+    with pytest.raises(RuntimeError, match="process lost"):
+        swarm().execute(graph)
+    [execution_id] = store.list_ids()
+    state = store.load(execution_id)
+    saved = {n["id"]: n["metadata"].get(REVISION_ADDED_KEY) for n in state["graph"]["nodes"]}
+    assert saved == {"a": None, "b": None, "r1-0": True, "r1-1": True}
+    assert state["control"]["revisions_used"] == 1
+
+    with caplog.at_level("WARNING", logger="smythe.supervisor"):
+        result = swarm().resume(execution_id)
+
+    assert [n.id for n in result.graph.nodes] == ["a", "b", "r1-0", "r1-1"]
+    assert all(n.status is NodeStatus.COMPLETED for n in result.graph.nodes)
+    assert provider.reviews == 4  # every later proposal was refused, none applied
+    assert store.load(execution_id)["control"]["revisions_used"] == 1
+    assert "max_total_added_nodes is 2" in caplog.text
+
+
+def test_supervised_growth_cap_survives_durable_resume(tmp_path, monkeypatch):
+    from smythe import OfflineProvider, SimpleArchitect, SQLiteWorkflowStore, Swarm
+
+    class ProcessLost(BaseException):
+        pass
+
+    reviews = []
+
+    async def complete(self, system, prompt, model):
+        if system != SUPERVISOR_SYSTEM_PROMPT:
+            return CompletionResult(f"Done: {prompt}", cost_usd=0)
+        reviews.append(prompt)
+        add = [{"id": f"r{len(reviews)}-{i}", "label": f"Extra {i}", "depends_on": ["n0"]}
+               for i in range(2)]
+        proposal = {"change": True, "reason": "gap", "add": add}
+        return CompletionResult(json.dumps(proposal), cost_usd=0)
+
+    monkeypatch.setattr(OfflineProvider, "complete", complete)
+    with SQLiteWorkflowStore(tmp_path / "growth.db") as store:
+        provider = OfflineProvider()
+        swarm = Swarm(
+            model="offline", provider=provider, architect=SimpleArchitect(), run_store=store,
+            supervisor=LLMSupervisor(provider, model="offline", only_terminal=False,
+                                     max_total_added_nodes=2),
+            max_revisions=3,
+        )
+        original = store.save_checkpoint
+        crashed = []
+
+        def save(lease, revision, state, **kwargs):
+            if crashed:
+                raise ProcessLost("Process already stopped")
+            if any(node["metadata"].get(REVISION_ADDED_KEY) and node["status"] == "completed"
+                   for node in state["graph"]["nodes"]):
+                crashed.append(lease.run_id)
+                raise ProcessLost("Stopped after an added node completed")
+            return original(lease, revision, state, **kwargs)
+
+        monkeypatch.setattr(store, "save_checkpoint", save)
+        with pytest.raises(ProcessLost):
+            swarm.execute(ExecutionGraph([Topology.SERIAL], [Node(id="n0", label="First")]))
+        run_id = crashed[0]
+        saved = store.get_checkpoint(run_id)["checkpoint"]
+        assert [node["id"] for node in saved["graph"]["nodes"]
+                if node["metadata"].get(REVISION_ADDED_KEY)] == ["r1-0", "r1-1"]
+        assert saved["revisions_used"] == 1
+
+        monkeypatch.setattr(store, "save_checkpoint", original)
+        resumed = swarm.resume(run_id)
+        assert [node.id for node in resumed.graph.nodes] == ["n0", "r1-0", "r1-1"]
+        assert all(node.status is NodeStatus.COMPLETED for node in resumed.graph.nodes)
+        assert len(reviews) == 3  # the applied review, then one refused review per added node
+        assert store.get_checkpoint(run_id)["checkpoint"]["revisions_used"] == 1
+        assert store.audit(run_id)["ok"]
+
+
+@pytest.mark.parametrize("value", [-1, True, 1.5, "8", None])
+def test_max_total_added_nodes_must_be_a_non_negative_integer(value):
+    with pytest.raises(ValueError, match="max_total_added_nodes"):
+        LLMSupervisor(EchoProvider(), max_total_added_nodes=value)
+
+
+def test_default_supervisor_description_is_unchanged():
+    """Durable recipes hash this description; new defaults must not alter it."""
+    from smythe.provider import OfflineProvider
+
+    default = LLMSupervisor(OfflineProvider(), model="m").workflow_description()
+    assert set(default) == {"type", "version", "provider", "model", "review_after", "only_terminal"}
+
+    custom = LLMSupervisor(OfflineProvider(), model="m", max_total_added_nodes=2)
+    assert custom.workflow_description() == dict(default, max_total_added_nodes=2)
+
+    class Binding:
+        default_model = "m"
+
+        def snapshot_provider(self, provider):
+            return provider
+
+    assert custom.bind_run(Binding()).workflow_description() == custom.workflow_description()
 
 
 def test_only_terminal_review_gate():

@@ -6,7 +6,7 @@ import pytest
 
 from helpers import make_completed_graph as _make_graph
 from smythe.budget import Sentinel
-from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
+from smythe.graph import SYNTHESIS_NODE_ID, ExecutionGraph, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, Provider
 from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.tracer import Tracer
@@ -94,6 +94,47 @@ def test_llm_merge_traced():
     spans = tracer.summary()
     synthesis_spans = [s for s in spans if s.get("node_id") == "__synthesis__"]
     assert len(synthesis_spans) == 1
+
+
+def test_node_cost_is_never_booked_under_the_synthesis_key(tmp_path):
+    """A plan node named '__synthesis__' shared LLM_MERGE's budget key, so the
+    node's 0.25 and the merge's 0.25 were booked as one entry."""
+    from smythe.checkpoint import FileCheckpointStore
+    from smythe.swarm import Swarm
+    from smythe.task import Task
+
+    class PricedPlanner(Provider):
+        def __init__(self) -> None:
+            self.plans = [[SYNTHESIS_NODE_ID], ["draft"]]  # the first plan is refused
+
+        async def complete(self, system, prompt, model):
+            if system.startswith("You are a task-decomposition planner"):
+                nodes = [{"id": node_id, "label": "Draft"} for node_id in self.plans.pop(0)]
+                return CompletionResult(text=json.dumps({"nodes": nodes}),
+                                        prompt_tokens=1, completion_tokens=1)
+            return CompletionResult(text="text", prompt_tokens=1, completion_tokens=1,
+                                    cost_usd=0.25)
+
+    store = FileCheckpointStore(tmp_path)
+    swarm = Swarm(provider=PricedPlanner(), model="m", artifact_dir=None, max_budget_usd=5.0,
+                  checkpoint_store=store, synthesizer=Synthesizer(SynthesisStrategy.LLM_MERGE))
+    result = swarm.execute(Task(goal="Draft"))
+
+    assert [n.id for n in result.graph.nodes] == ["draft"]
+    [execution_id] = store.list_ids()
+    node_costs = store.load(execution_id)["budget"]["node_costs"]
+    assert node_costs == {"draft": pytest.approx(0.25), SYNTHESIS_NODE_ID: pytest.approx(0.25)}
+
+
+def test_developer_graph_cannot_use_the_synthesis_key():
+    from smythe.swarm import Swarm
+
+    provider = MockSynthProvider()
+    node = Node(label="Draft", id=SYNTHESIS_NODE_ID)
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
+    with pytest.raises(ValueError, match="reserved for the synthesizer"):
+        Swarm(provider=provider, model="m", artifact_dir=None).execute(graph)
+    assert not provider.called
 
 
 def test_llm_merge_no_provider_falls_back():

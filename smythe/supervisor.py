@@ -17,7 +17,8 @@ Two guardrails keep this from becoming an unbounded agent loop:
 - ``max_revisions`` caps how many times a run may be revised.
 - Every revision is validated against the graph before it applies
   (:meth:`ExecutionGraph.apply_revision`), so a malformed proposal
-  costs a trace entry rather than a corrupt run.
+  costs a trace entry rather than a corrupt run, and no revision can
+  remove or bypass a verification gate.
 
 The design follows the adaptive-orchestration pattern: evaluate state,
 find the gap between what exists and what was asked for, then decide
@@ -32,8 +33,8 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from smythe.budget import validate_completion_usage
-from smythe.graph import ExecutionGraph, Node, NodeStatus, Revision
-from smythe.loader import MODEL_NODE_ID
+from smythe.graph import REVISION_ADDED_KEY, ExecutionGraph, Node, NodeStatus, Revision
+from smythe.loader import MODEL_NODE_ID, MODEL_PLAN_MAX_NODES
 from smythe.provider import TRUNCATED_STOP_REASONS
 from smythe.task import render_task
 from smythe.verifier import node_generation
@@ -51,6 +52,14 @@ logger = logging.getLogger("smythe.supervisor")
 # whole plan at 8 nodes; closing one gap rarely needs more than a step
 # or two, so three leaves headroom while bounding growth per revision.
 DEFAULT_MAX_ADDED_NODES = 3
+
+# Bounds growth across the whole run, whatever max_revisions allows:
+# supervision may at most double a plan of the generated-plan node limit.
+DEFAULT_MAX_TOTAL_ADDED_NODES = MODEL_PLAN_MAX_NODES
+
+# A proposal's reason is truncated to this length. An added node's label
+# is its instruction, so a longer one makes the proposal no change instead.
+MAX_PROPOSAL_TEXT_CHARS = 500
 
 SUPERVISOR_SYSTEM_PROMPT = (
     "You supervise a running multi-agent execution graph. Your job is "
@@ -134,7 +143,10 @@ class LLMSupervisor(Supervisor):
 
     The reply is model output and is read strictly: ``change`` must be
     JSON ``true``, and a proposal with a malformed field or more than
-    ``max_added_nodes`` additions is treated as no change.
+    ``max_added_nodes`` additions is treated as no change.  So is one
+    that would leave more than ``max_total_added_nodes`` revision-added
+    nodes in the graph, which bounds growth across the whole run; the
+    count is read from node metadata, so resume cannot refill it.
     """
 
     def __init__(
@@ -145,17 +157,19 @@ class LLMSupervisor(Supervisor):
         review_after: set[str] | None = None,
         only_terminal: bool = True,
         max_added_nodes: int = DEFAULT_MAX_ADDED_NODES,
+        max_total_added_nodes: int = DEFAULT_MAX_TOTAL_ADDED_NODES,
         run_binding: ComponentBinding | None = None,
     ) -> None:
-        if type(max_added_nodes) is not int or max_added_nodes < 0:
-            raise ValueError(
-                f"max_added_nodes must be a non-negative integer, got {max_added_nodes!r}"
-            )
+        for name, value in (("max_added_nodes", max_added_nodes),
+                            ("max_total_added_nodes", max_total_added_nodes)):
+            if type(value) is not int or value < 0:
+                raise ValueError(f"{name} must be a non-negative integer, got {value!r}")
         self._provider = provider
         self._model = model
         self._review_after = review_after
         self._only_terminal = only_terminal
         self._max_added_nodes = max_added_nodes
+        self._max_total_added_nodes = max_total_added_nodes
         self._run_binding = run_binding
 
     def workflow_description(self, **defaults) -> dict:
@@ -174,7 +188,9 @@ class LLMSupervisor(Supervisor):
                 "only_terminal": self._only_terminal,
                 # Omitted at the default so existing recipes keep their identity.
                 **({"max_added_nodes": self._max_added_nodes}
-                   if self._max_added_nodes != DEFAULT_MAX_ADDED_NODES else {})}
+                   if self._max_added_nodes != DEFAULT_MAX_ADDED_NODES else {}),
+                **({"max_total_added_nodes": self._max_total_added_nodes}
+                   if self._max_total_added_nodes != DEFAULT_MAX_TOTAL_ADDED_NODES else {})}
 
     def workflow_providers(self) -> tuple[Provider, ...]:
         return (self._provider,)
@@ -185,7 +201,7 @@ class LLMSupervisor(Supervisor):
             binding.snapshot_provider(self._provider), model=self._model,
             review_after=set(self._review_after) if self._review_after is not None else None,
             only_terminal=self._only_terminal, max_added_nodes=self._max_added_nodes,
-            run_binding=binding,
+            max_total_added_nodes=self._max_total_added_nodes, run_binding=binding,
         )
 
     def _should_review(self, graph: ExecutionGraph, node: Node) -> bool:
@@ -231,7 +247,24 @@ class LLMSupervisor(Supervisor):
                 "no revision applied", node.id,
             )
             return None
-        return self._parse(result.text, max_added_nodes=self._max_added_nodes)
+        revision = self._parse(result.text, max_added_nodes=self._max_added_nodes)
+        if revision is not None and revision.add_nodes:
+            # Earlier additions stay counted unless this proposal drops
+            # them; executed nodes cannot be dropped, so none that ran is
+            # ever uncounted.
+            drop = set(revision.drop_node_ids)
+            earlier = sum(
+                1 for n in graph.nodes
+                if n.metadata.get(REVISION_ADDED_KEY) and n.id not in drop
+            )
+            if earlier + len(revision.add_nodes) > self._max_total_added_nodes:
+                logger.warning(
+                    "Ignoring supervisor proposal that adds %d nodes to %d earlier additions; "
+                    "max_total_added_nodes is %d",
+                    len(revision.add_nodes), earlier, self._max_total_added_nodes,
+                )
+                return None
+        return revision
 
     @staticmethod
     def _build_prompt(
@@ -270,12 +303,13 @@ class LLMSupervisor(Supervisor):
         A supervisor that cannot produce valid JSON must not be able to
         halt a run that is otherwise going fine.  ``change`` must be JSON
         ``true`` (the string ``"false"`` is not).  Any field of the wrong
-        JSON type, an addition without a label, or an added id that is
-        not 1-64 letters, digits, ``-`` or ``_`` makes the whole
-        proposal no change: applying the part that happened to parse
-        could do something the reviewer never proposed.  So does a
-        proposal with more than ``max_added_nodes`` additions; it is
-        refused, not truncated.
+        JSON type, an addition without a label or with one longer than
+        ``MAX_PROPOSAL_TEXT_CHARS``, or an added id that is not 1-64
+        letters, digits, ``-`` or ``_`` makes the whole proposal no
+        change: applying the part that happened to parse could do
+        something the reviewer never proposed.  So does a proposal with
+        more than ``max_added_nodes`` additions; it is refused, not
+        truncated.
         """
         cleaned = text.strip()
         if cleaned.startswith("```"):
@@ -313,6 +347,7 @@ class LLMSupervisor(Supervisor):
             depends_on = entry.get("depends_on")
             depends_on = [] if depends_on is None else depends_on
             if (not isinstance(label, str) or not label.strip()
+                    or len(label) > MAX_PROPOSAL_TEXT_CHARS
                     or not isinstance(node_id, (str, type(None)))
                     or (node_id and not MODEL_NODE_ID.fullmatch(node_id))
                     or not _is_str_list(depends_on)):
@@ -336,6 +371,6 @@ class LLMSupervisor(Supervisor):
             add_nodes=tuple(add_nodes),
             drop_node_ids=drop,
             rewire=rewire,
-            reason=str(data.get("reason", ""))[:500],
+            reason=str(data.get("reason", ""))[:MAX_PROPOSAL_TEXT_CHARS],
         )
         return None if revision.is_empty else revision

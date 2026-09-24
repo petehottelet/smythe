@@ -30,6 +30,10 @@ of it** to pending. Regeneration starts after that reset is saved. Completed
 charges remain recorded; outputs and artifact references from the rejected
 generation are cleared.
 
+A [supervisor](supervisor.md#what-a-revision-may-change) cannot revise a gate
+away: a revision that drops `check` or `draft`, or rewires `check` so that it
+no longer depends on `draft`, is rejected.
+
 ## Recovery and concurrent work
 
 A completed judge records the generation it inspected. A rejection produces
@@ -199,8 +203,11 @@ task = Task(
 may add a verifier node) and every executing node (so the work knows
 the bar it is held to). The Architect is instructed to add at most one
 gate, on the node that produces the deliverable. A generated plan may
-set `max_regenerations` to at most 2; a larger value is rejected and the
-planner asks the model for a corrected plan.
+contain at most one gate, the gate must list the node it verifies in
+`depends_on`, and it may set `max_regenerations` to at most 2. A plan
+that breaks these rules is rejected and the planner asks the model for a
+corrected plan. Graphs you write in Python or YAML may declare several
+gates.
 
 The verifier's verdict is never the deliverable: `DELIVERABLE`
 synthesis excludes verifier nodes, so a gated run returns the artefact
