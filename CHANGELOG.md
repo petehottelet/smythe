@@ -21,7 +21,89 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
-No unreleased changes.
+### Fixed
+
+- **A durable run repairs a generated plan it cannot execute instead of
+  stopping for good.** A schema-valid plan that set `attach_dep_artifacts`, or
+  broke the run's `WorkflowGraphPolicy`, was rejected only after its planning
+  call was journaled, so every resume replayed it and failed. `LLMArchitect`
+  and `ConstrainedArchitect` now check each plan against the run's graph rules
+  inside their retry loop and send the reason back to the model; each repair is
+  a new journaled call. Resuming a run that 0.8.1 stopped this way asks for a
+  repair.
+- **A supervisor can no longer remove or bypass a verification gate.** A
+  revision that dropped a verifier let the output it judged through unverified,
+  and one that rewired the verifier off its target let a parallel judge finish
+  first, so its FAIL verdict was discarded. `ExecutionGraph.apply_revision` now
+  rejects a revision that drops a verifier or the node it judges, or rewires a
+  verifier without keeping that node among its dependencies. The rule applies
+  to every supervisor; a rejected revision is traced and the run continues.
+- **Generated plans may contain at most one gating node, which must list the
+  node it verifies in `depends_on`.** Every node could be a gate: an 8-node plan
+  with seven gates on one node made 78 node calls. A gate without that edge
+  could run before its target and have its verdict discarded. Such plans are
+  retried with the problem named.
+- A gate inside a `ConstrainedArchitect` template judges its own renamed
+  target. Composition prefixed node ids but not `verifies`, so the gate's
+  verdict was always discarded.
+- `LLMSupervisor` bounds growth across a run with `max_total_added_nodes`
+  (default 8, the generated-plan node limit). `max_added_nodes` bounded only one
+  revision, so five revisions could append 15 nodes. Nodes a revision adds carry
+  `"added_by_revision": true` in their metadata, so resume cannot refill the
+  allowance. An added node's label may be at most 500 characters.
+- A node can no longer use the id `__synthesis__`, the key under which
+  `LLM_MERGE` synthesis books its charge; a node with that id shared the
+  synthesis entry in the budget breakdown.
+- **Jobs artifact inspection bounds every animation frame, not only the
+  first.** A GIF frame that extends past the logical screen grew the canvas
+  during decoding: a 74-byte GIF was accepted at 10×10 after a 718 MB decode at
+  9001×9001. The canvas every GIF frame needs is now checked from the bytes
+  before Pillow parses them, and each frame, including each picture of a
+  multi-picture JPEG, against the per-image and aggregate pixel limits before
+  it is decoded.
+- WebP canvases are checked before libwebp allocates them. A 40-byte lossy
+  WebP, or a 26-byte lossless one, declaring 16383×16383 made libwebp allocate
+  about 2 GB. This covers Jobs inspection, `finish_image`, `validate_image` and
+  the design checks.
+- Jobs artifact inspection no longer changes the process's warning filters.
+  Escalating `DecompressionBombWarning` inside `warnings.catch_warnings()` is
+  not thread-safe, so overlapping inspections could leave the escalation
+  installed for the whole process. Every undecodable image, including a GIF on
+  which Pillow raises `EOFError`, `IndexError` or `struct.error`, is reported as
+  `ArtifactInspectionError`.
+- Distilled templates ignore a model-supplied param named `task` or `params`
+  instead of raising `TypeError`, which cost a paid planner retry.
+
+### Changed
+
+- A generated node `timeout_s` must be at least 60 seconds
+  (`smythe.loader.MODEL_PLAN_MIN_TIMEOUT_S`); a shorter one is retried. A timeout
+  cancels calls already sent, so their spend bought nothing, and a durable run
+  blocked on unknown billing. Developer-written Python and YAML graphs are
+  unchanged.
+- `ConstrainedArchitect` limits the composed graph to `max_nodes` (default 64),
+  checked after each builder call; a selection over the limit is retried. A
+  66-byte reply could compose 200,001 nodes. Builders receive model-chosen
+  params and must bound them.
+- In a durable run, a generated plan that the graph policy or the plain-text
+  rule rejects now costs up to `max_retries` repair calls, and planning that
+  still fails raises `ArchitectError` instead of `WorkflowBindingError`.
+- Any supervisor revision, including one from a custom `Supervisor`, that drops
+  or rewires a verification gate or adds a node with the id `__synthesis__` is
+  rejected and traced as `revision_rejected`.
+- `ExecutionGraph.validate()` raises `ValueError` for the node id
+  `__synthesis__` in any graph, including when resuming a checkpoint or durable
+  run that contains one.
+- Jobs reports an animated GIF whose frames extend past its logical screen at
+  the size of its enlarged canvas, and counts every frame at that size toward
+  the aggregate pixel limit.
+
+### Added
+
+- `LLMSupervisor(max_total_added_nodes=...)` and
+  `ConstrainedArchitect(max_nodes=...)`.
+- `smythe.loader.MODEL_PLAN_MAX_GATES` and `MODEL_PLAN_MIN_TIMEOUT_S`;
+  `smythe.graph.SYNTHESIS_NODE_ID` and `REVISION_ADDED_KEY`.
 
 ## [0.8.1] - 2026-09-22
 
