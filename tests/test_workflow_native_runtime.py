@@ -11,9 +11,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from smythe import Swarm, Task
+from smythe import Swarm, Task, WorkflowGraphPolicy
 from smythe.graph import NodeStatus
-from smythe.planner import LLMArchitect
+from smythe.planner import ArchitectError, LLMArchitect
 from smythe.prompts import PLANNING_SYSTEM_PROMPT
 from smythe.provider import ProviderAccountingError
 from smythe.provider_responses import OpenAIResponsesProvider
@@ -171,6 +171,73 @@ def test_invalid_plan_repair_is_an_additional_paid_explicit_attempt(tmp_path, na
         assert sorted(call["key"]["attempt"] for call in planning) == [0, 1]
         assert all(call["billing_state"] == "known" for call in planning)
         assert result.total_cost_usd == .0075 and len(native_transport.requests) == 5
+
+
+# Plans a durable run must not execute, with the reason the model is told.
+# POLICY admits the default PLAN, so each plan has exactly one defect.
+POLICY = WorkflowGraphPolicy(8, max_retries=1)
+UNRUNNABLE_PLANS = {
+    "attachments": ({"nodes": [
+        {"id": "draft", "label": "Draft"},
+        {"id": "judge", "label": "Check", "depends_on": ["draft"], "attach_dep_artifacts": True,
+         "agent": {"name": "Rejected reviewer"}},
+    ]}, "plain text nodes; node 'judge' uses attach_dep_artifacts"),
+    "policy": ({"nodes": [
+        {"id": "draft", "label": "Draft", "failure_policy": "retry", "max_retries": 2},
+    ]}, "Graph policy requires node 'draft' max_retries <= 1; got 2"),
+    # A node timeout cancels a call already sent, leaving unknown billing.
+    "timeout": ({"nodes": [
+        {"id": "draft", "label": "Draft", "timeout_s": 0.05},
+    ]}, "'timeout_s' on node 'draft' must be a finite number of at least 60 seconds, got 0.05"),
+}
+
+
+def planning_calls(store, run_id):
+    return sorted((call["key"]["attempt"], call["billing_state"], call["result_state"])
+                  for call in store.inspect_run(run_id)["calls"] if call["key"]["phase"] == "planning")
+
+
+@pytest.mark.parametrize("defect", sorted(UNRUNNABLE_PLANS))
+def test_plan_the_run_cannot_execute_is_repaired_as_an_additional_paid_attempt(
+    tmp_path, native_transport, defect,
+):
+    plan, reason = UNRUNNABLE_PLANS[defect]
+    native_transport.planning_outputs = [json.dumps(plan)]
+    with SQLiteWorkflowStore(tmp_path / f"repair-{defect}.db") as store:
+        result = swarm(store, graph_policy=POLICY).execute(Task("Write and check"))
+        assert result.output == "Final accepted output."
+        assert [node.id for node in result.graph.nodes] == ["draft", "judge"]
+        assert planning_calls(store, result.execution_id) == [(0, "known", "applied"), (1, "known", "applied")]
+        assert reason in native_transport.requests[1]["input"][-1]["content"]
+        assert result.total_cost_usd == .0075 and len(native_transport.requests) == 5
+        registry = store.get_checkpoint(result.execution_id)["checkpoint"]["registry"]
+        assert "Rejected reviewer" not in {agent["name"] for agent in registry["agents"]}
+        assert_exact_ledger(store, result.execution_id)
+
+
+@pytest.mark.parametrize("defect", ["attachments", "policy"])
+def test_exhausted_plan_repairs_fail_cleanly_and_resume_does_not_rebuy(tmp_path, native_transport, defect):
+    plan, reason = UNRUNNABLE_PLANS[defect]
+    native_transport.planning_outputs = [json.dumps(plan)] * 3
+    with SQLiteWorkflowStore(tmp_path / f"exhausted-{defect}.db") as store:
+        instance = swarm(store, graph_policy=POLICY)
+        with pytest.raises(ArchitectError, match="after 3 attempts") as caught:
+            instance.execute(Task("Write and check"))
+        assert reason in str(caught.value)
+        run_id = store.list_runs()[0]["run_id"]
+        before = store.inspect_run(run_id)
+        assert planning_calls(store, run_id) == [(attempt, "known", "accepted") for attempt in range(3)]
+        assert before["call_count"] == len(native_transport.requests) == 3
+        assert before["confirmed_nanousd"] == 4_500_000
+        assert before["reserved_nanousd"] == before["unknown_nanousd"] == before["unknown_calls"] == 0
+        assert store.load_run(run_id)["blocked_reason"] is None and store.get_checkpoint(run_id) is None
+        # Resume replays the saved attempts and reaches the same decision.
+        with pytest.raises(ArchitectError, match="after 3 attempts") as caught:
+            instance.resume(run_id)
+        assert reason in str(caught.value)
+        assert len(native_transport.requests) == 3
+        assert store.inspect_run(run_id)["calls"] == before["calls"]
+        assert store.audit(run_id)["ok"]
 
 
 @pytest.mark.parametrize("boundary", ["settle_call", "accept_result"])
@@ -410,6 +477,47 @@ def test_crash_after_a_successful_retry_replays_it_without_buying_the_step_again
         assert_exact_ledger(store, run_id)
         assert swarm(store).resume(run_id).output == "Final accepted output."
     assert len(native_transport.requests) == 5
+
+
+@pytest.mark.parametrize("boundary", ["before_repair_call", "before_planning_saved"])
+def test_crash_during_plan_repair_resumes_by_replaying_the_saved_attempts(
+    tmp_path, native_transport, monkeypatch, boundary,
+):
+    plan, reason = UNRUNNABLE_PLANS["attachments"]
+    native_transport.planning_outputs = [json.dumps(plan)]
+    image = tmp_path / "crashed.db"
+    with SQLiteWorkflowStore(tmp_path / "live.db") as store:
+        def crash_when(name, due):
+            original = getattr(store, name)
+
+            def crash(*args, **kwargs):
+                if due(*args) and not image.exists():
+                    with closing(sqlite3.connect(image)) as target:
+                        store._db.backup(target)
+                    raise Crash
+                return original(*args, **kwargs)
+
+            monkeypatch.setattr(store, name, crash)
+
+        if boundary == "before_repair_call":
+            # Attempt 0 is saved and was rejected; its repair was never sent.
+            crash_when("prepare_call", lambda lease, key: key.phase == "planning" and key.attempt == 1)
+        else:
+            # Both attempts are saved, but the planning decision is not.
+            crash_when("complete_operation", lambda lease, key, result: key == "planning")
+        with pytest.raises(Crash):
+            swarm(store).execute(Task("Write and check"))
+    assert len(native_transport.requests) == (1 if boundary == "before_repair_call" else 2)
+    with SQLiteWorkflowStore(image, clock_ns=lambda: time.time_ns() + 120 * 10**9) as store:
+        run_id = store.list_runs()[0]["run_id"]
+        result = swarm(store).resume(run_id)
+        assert result.output == "Final accepted output." and result.total_cost_usd == .0075
+        assert [node.id for node in result.graph.nodes] == ["draft", "judge"]
+        # The rejected plan replayed; only an unsent repair and the run were bought.
+        assert len(native_transport.requests) == 5
+        assert planning_calls(store, run_id) == [(0, "known", "applied"), (1, "known", "applied")]
+        assert reason in native_transport.requests[1]["input"][-1]["content"]
+        assert_exact_ledger(store, run_id)
 
 
 def test_resume_after_every_retry_was_rejected_sends_only_the_final_attempt_again(

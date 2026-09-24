@@ -203,7 +203,7 @@ def test_plan_retries_on_malformed_json():
     assert len(provider.prompts_received) == 2
     retry_prompt = provider.prompts_received[1]
     assert "Write something" in retry_prompt
-    assert "could not be parsed" in retry_prompt
+    assert "was rejected" in retry_prompt
 
 
 def test_plan_raises_after_max_retries():
@@ -413,6 +413,18 @@ def test_schema_errors_are_retried_with_an_accurate_prompt(bad_plan):
     retry_prompt = provider.prompts_received[1]
     assert "not valid JSON" not in retry_prompt
     assert "was not a valid plan" in retry_prompt
+
+
+def test_generated_timeout_below_the_floor_is_repaired_before_any_node_runs():
+    """A node timeout cancels calls already sent: their spend buys no result."""
+    short = json.dumps({"nodes": [{"id": "draft", "label": "Draft", "timeout_s": 0.05}]})
+    provider = MockPlanningProvider([short, SERIAL_RESPONSE])
+    planner = LLMArchitect(provider=provider, planning_model="test-model", max_retries=1)
+
+    graph, _ = planner.plan(Task(goal="Draft something"))
+
+    assert [n.id for n in graph.nodes] == ["step-1", "step-2"]
+    assert "must be a finite number of at least 60 seconds, got 0.05" in provider.prompts_received[1]
 
 
 def test_deeply_nested_json_is_retried_not_raised():

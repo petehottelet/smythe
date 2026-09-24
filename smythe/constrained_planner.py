@@ -24,6 +24,10 @@ from smythe.workflow_binding import (
     describe_component, provider_description, require_exact,
 )
 
+# The model's selections and params decide the composed graph's size. The
+# default admits eight templates the size of a default generated plan.
+DEFAULT_MAX_NODES = 64
+
 
 @dataclass
 class SubGraphTemplate:
@@ -35,7 +39,9 @@ class SubGraphTemplate:
         builder: Callable invoked as ``builder(task, **params)``, where
                  ``params`` is the optional object the model supplied with
                  its selection, returning a list of Nodes and a Registry of
-                 agents.  Params are model output: validate them.
+                 agents.  Params are model output: validate and bound them.
+                 The architect's ``max_nodes`` cap is checked when the
+                 builder returns, so it cannot limit what one call allocates.
     """
 
     name: str
@@ -58,6 +64,10 @@ class ConstrainedArchitect(Architect):
     - Agent registries are merged; agent ID uniqueness is guaranteed by
       the UUID-based Agent.id generation.
     - The composed graph is validated after assembly.
+    - The composed graph may have at most ``max_nodes`` nodes, counted
+      after each builder call.  A selection over the cap is retried like a
+      malformed one.  In a durable run, the composed plan must also pass
+      the run's own graph checks and is retried the same way.
     """
 
     def __init__(
@@ -67,13 +77,17 @@ class ConstrainedArchitect(Architect):
         model: str = "claude-opus-5-5",
         max_retries: int = 2,
         *,
+        max_nodes: int = DEFAULT_MAX_NODES,
         run_binding: ComponentBinding | None = None,
     ) -> None:
+        if type(max_nodes) is not int or max_nodes < 1:
+            raise ValueError(f"max_nodes must be a positive integer, got {max_nodes!r}")
         self._provider = provider
         self._templates = {t.name: t for t in templates}
         self._template_list = templates
         self._model = model
         self._max_retries = max_retries
+        self._max_nodes = max_nodes
         self._run_binding = run_binding
 
     def workflow_description(self, **defaults) -> dict:
@@ -94,7 +108,9 @@ class ConstrainedArchitect(Architect):
                               "builder": description})
         return {"type": "constrained_architect", "version": 1,
                 **provider_description(self._provider, self._model),
-                "max_retries": self._max_retries, "templates": templates}
+                "max_retries": self._max_retries, "templates": templates,
+                # Omitted at the default so existing recipes keep their identity.
+                **({"max_nodes": self._max_nodes} if self._max_nodes != DEFAULT_MAX_NODES else {})}
 
     def workflow_providers(self) -> tuple[Provider, ...]:
         return (self._provider,)
@@ -105,7 +121,8 @@ class ConstrainedArchitect(Architect):
             binding.snapshot_provider(self._provider),
             [SubGraphTemplate(t.name, t.description, bind_component(
                 t.builder, binding.child(f"template:{t.name}"),
-            )) for t in self._template_list], self._model, self._max_retries, run_binding=binding,
+            )) for t in self._template_list], self._model, self._max_retries,
+            max_nodes=self._max_nodes, run_binding=binding,
         )
 
     def plan(self, task: Task) -> tuple[ExecutionGraph, Registry]:
@@ -126,7 +143,7 @@ class ConstrainedArchitect(Architect):
                 prompt = (
                     user_prompt
                     + "\n\n---\n\n"
-                    + f"Your previous response could not be parsed: {last_error}\n\n"
+                    + f"Your previous response was rejected: {last_error}\n\n"
                     + CONSTRAINED_RETRY_PROMPT
                 )
 
@@ -144,12 +161,21 @@ class ConstrainedArchitect(Architect):
                         "return fewer selections"
                     )
                 selections = self._extract_selections(result.text)
-                return self._compose(selections, task)
+                graph, registry = self._compose(selections, task)
             except WorkflowBindingError:
                 raise
             except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
                 last_error = exc
                 continue
+            # A template registry the run cannot bind is terminal (above); a
+            # plan the durable run rejects is the model's choice, so repair it.
+            if self._run_binding is not None and self._run_binding.plan_check is not None:
+                try:
+                    self._run_binding.plan_check(graph, registry)
+                except (ValueError, KeyError, TypeError) as exc:
+                    last_error = exc
+                    continue
+            return graph, registry
 
         raise ArchitectError(
             f"ConstrainedArchitect failed after {1 + self._max_retries} attempts: "
@@ -216,6 +242,14 @@ class ConstrainedArchitect(Architect):
             params = sel.get("params") or {}
 
             nodes, registry = template.builder(task, **params)
+            # Stop an oversized result before it is cloned and composed.
+            nodes = list(nodes)
+            total = len(all_nodes) + len(nodes)
+            if total > self._max_nodes:
+                raise ValueError(
+                    f"Selection at index {idx} brings the graph to {total} nodes; "
+                    f"the limit is {self._max_nodes}"
+                )
             if self._run_binding is not None:
                 registry = bind_component(registry, self._run_binding.child(f"result:{idx}"))
             # Defensively clone template nodes so composition never mutates

@@ -72,6 +72,16 @@ digits, `-` or `_`; plans are limited to 8 nodes and 5 levels by default
 retries and 2 regenerations. A reply that breaks the schema, or that stops at
 the output token limit, is retried with the problem named, up to `max_retries`.
 
+**Changed in 0.8.2:** a generated node timeout must be at least 60 seconds
+(`smythe.loader.MODEL_PLAN_MIN_TIMEOUT_S`), because a timeout cancels provider
+calls that were already sent. `ConstrainedArchitect` limits the composed graph
+to 64 nodes by default (`ConstrainedArchitect(max_nodes=...)`) and retries a
+selection over the limit. Template builders receive model-chosen `params` and
+must bound them: the limit is checked when each builder call returns. In a
+durable run, the LLM and constrained architects also check each plan against
+the run's graph policy and plain-text node rules before planning is saved
+([durable planning](workflow-accounting.md#freeze-graph-limits)).
+
 ### Topology vocabulary
 
 - **Serial** for dependent stages.

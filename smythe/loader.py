@@ -30,6 +30,10 @@ MODEL_PLAN_MAX_NODES = 8
 MODEL_PLAN_MAX_DEPTH = 5
 MODEL_PLAN_MAX_RETRIES = 3
 MODEL_PLAN_MAX_REGENERATIONS = 2
+# A node timeout cancels a provider call that is already sent: the call is
+# paid for without a result, and a durable run records unknown billing and
+# blocks.  A generated plan may not set a timeout shorter than this.
+MODEL_PLAN_MIN_TIMEOUT_S = 60
 
 # Ids a model may choose, for plans and supervisor additions alike: a durable
 # journal rejects control characters and very long scope ids.
@@ -346,10 +350,10 @@ def _check_model_node(index: int, entry: object) -> None:
                       and math.isfinite(timeout_s))
         except OverflowError:  # an integer too large to become a float
             finite = False
-        if not finite or timeout_s <= 0:
+        if not finite or timeout_s < MODEL_PLAN_MIN_TIMEOUT_S:
             raise ValueError(
-                f"'timeout_s' on node {node_id!r} must be a finite positive number, "
-                f"got {timeout_s!r}"
+                f"'timeout_s' on node {node_id!r} must be a finite number of at least "
+                f"{MODEL_PLAN_MIN_TIMEOUT_S} seconds, got {timeout_s!r}"
             )
 
     metadata = entry.get("metadata")

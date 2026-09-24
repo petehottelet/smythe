@@ -469,7 +469,7 @@ def test_model_plan_builds_the_documented_schema():
              "agent": {"name": "A", "persona": "You research.", "capabilities": ["research"]}},
             {"id": "research_b", "label": "Research B", "required_capabilities": ["research"]},
             {"id": "join", "label": "Merge", "depends_on": ["research-a", "research_b"],
-             "failure_policy": "retry", "max_retries": 3, "timeout_s": 30,
+             "failure_policy": "retry", "max_retries": 3, "timeout_s": 120,
              "metadata": {"role": "adversarial"}},
             {"id": "check", "label": "Answer PASS or FAIL", "depends_on": ["join"],
              "verifies": "join", "max_regenerations": 2},
@@ -586,7 +586,7 @@ def test_model_plan_depth_limit_counts_levels():
     ("max_retries", "1"), ("max_retries", 10 ** 400),
     ("max_regenerations", 3), ("max_regenerations", -1), ("max_regenerations", False),
     ("timeout_s", 0), ("timeout_s", -5), ("timeout_s", float("inf")), ("timeout_s", float("nan")),
-    ("timeout_s", True), ("timeout_s", "30"), ("timeout_s", 10 ** 400),
+    ("timeout_s", True), ("timeout_s", "30"), ("timeout_s", 10 ** 400), ("timeout_s", 59.9),
 ])
 def test_model_plan_caps_retries_regenerations_and_timeouts(field, value):
     with pytest.raises(ValueError, match=field):
@@ -595,12 +595,25 @@ def test_model_plan_caps_retries_regenerations_and_timeouts(field, value):
 
 def test_model_plan_accepts_values_at_the_caps():
     graph, _ = build_graph_from_model_output({"nodes": [
-        {"id": "draft", "label": "x", "max_retries": 3, "timeout_s": 0.5},
+        {"id": "draft", "label": "x", "max_retries": 3, "timeout_s": 60},
         {"id": "check", "label": "y", "depends_on": ["draft"], "verifies": "draft",
          "max_regenerations": 2},
     ]})
     assert graph.nodes[0].max_retries == 3
     assert graph.nodes[1].max_regenerations == 2
+
+
+def test_generated_timeout_floor_leaves_developer_graphs_unchanged():
+    """A shorter node timeout cancels provider calls that were already sent."""
+    from smythe.loader import MODEL_PLAN_MIN_TIMEOUT_S
+
+    assert MODEL_PLAN_MIN_TIMEOUT_S == 60
+    with pytest.raises(ValueError, match="at least 60 seconds, got 0.05"):
+        build_graph_from_model_output({"nodes": [_node(timeout_s=0.05)]})
+    graph, _ = build_graph_from_model_output({"nodes": [_node(timeout_s=MODEL_PLAN_MIN_TIMEOUT_S)]})
+    assert graph.nodes[0].timeout_s == 60.0
+    developer, _ = build_graph_from_dict({"nodes": [_node(timeout_s=0.05)]})
+    assert developer.nodes[0].timeout_s == 0.05
 
 
 @pytest.mark.parametrize("entry", [
