@@ -42,6 +42,10 @@ class SubGraphTemplate:
                  agents.  Params are model output: validate and bound them.
                  The architect's ``max_nodes`` cap is checked when the
                  builder returns, so it cannot limit what one call allocates.
+                 In a durable run, return the same nodes, with the same
+                 ids, for the same task and params: resume rebuilds each
+                 saved selection, and a repair prompt can name a node id,
+                 so a random default id can conflict with the journal.
     """
 
     name: str
@@ -137,7 +141,8 @@ class ConstrainedArchitect(Architect):
 
         last_error: Exception | None = None
         # A durable run journals each retry prompt, so a parse error keeps
-        # 0.8.1's wording and a saved retry still replays after an upgrade.
+        # 0.8.1's wording. A retry saved by 0.8.1 replays after an upgrade
+        # only if the error text it quotes is also unchanged.
         problem = "could not be parsed"
         for attempt in range(1 + self._max_retries):
             if attempt == 0:

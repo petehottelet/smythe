@@ -297,6 +297,68 @@ def test_work_around_a_gate_can_still_be_revised():
     assert [n.id for n in graph.nodes] == ["research", "draft", "judge", "facts"]
 
 
+def _transitive_gated_graph() -> ExecutionGraph:
+    """A hand-built gate that reaches its target only through another node."""
+    nodes = [
+        Node(id="research", label="research"),
+        Node(id="review", label="review", depends_on=["draft"]),
+        Node(id="judge", label="judge", depends_on=["review"], verifies="draft",
+             max_regenerations=2),
+        Node(id="source", label="source"),
+        Node(id="draft", label="draft", depends_on=["source"]),
+    ]
+    for node in nodes:
+        node.metadata["model"] = "test-model"
+    return ExecutionGraph(topology=[Topology.SERIAL], nodes=nodes)
+
+
+@pytest.mark.parametrize("revision, message", [
+    (Revision(rewire={"review": ("research",)}),
+     "revision would disconnect verifier 'judge' from 'draft', the node it judges"),
+    (Revision(rewire={"review": ()}), "revision would disconnect verifier 'judge' from 'draft'"),
+    (Revision(add_nodes=(Node(id="notes", label="n", depends_on=["research"]),),
+              rewire={"review": ("notes",)}),
+     "revision would disconnect verifier 'judge' from 'draft'"),
+    # The direct rules still apply to the verifier and its target.
+    (Revision(rewire={"judge": ("review", "research")}),
+     "cannot rewire verifier 'judge' off 'draft'"),
+    (Revision(drop_node_ids=("draft",), rewire={"review": ("source",)}),
+     "verifier 'judge' judges it"),
+])
+def test_revision_cannot_cut_a_gate_off_a_target_it_reaches_through_other_nodes(revision, message):
+    """Rewiring the step between a target and its gate used to be accepted:
+    the gate then ran before its target and its FAIL verdict was discarded."""
+    graph = _transitive_gated_graph()
+    before = _structure(graph)
+    with pytest.raises(RevisionError, match=message):
+        graph.apply_revision(revision)
+    assert _structure(graph) == before
+
+
+def test_revisions_that_keep_a_gate_depending_on_its_target_still_apply():
+    graph = _transitive_gated_graph()
+    graph.nodes[0].status = NodeStatus.COMPLETED
+    # Insert a step between the target and the gate, and one after the gate.
+    graph.apply_revision(Revision(
+        add_nodes=(Node(id="facts", label="Check facts", depends_on=["draft", "research"]),
+                   Node(id="publish", label="Publish", depends_on=["judge"])),
+        rewire={"review": ("facts",)},
+    ))
+    review, judge = graph.nodes[1], graph.nodes[2]
+    assert review.depends_on == ["facts"]
+    graph.apply_revision(Revision(rewire={"review": ("draft", "research")}))
+    assert review.depends_on == ["draft", "research"]
+    # A rewire of the gate itself that keeps its target is allowed.
+    graph.apply_revision(Revision(rewire={"judge": ("draft", "review")}))
+    assert judge.depends_on == ["draft", "review"] and judge.verifies == "draft"
+    graph.apply_revision(Revision(drop_node_ids=("facts", "publish"),
+                                  rewire={"review": ("research",)}))
+    assert _structure(graph) == [
+        ("research", []), ("review", ["research"]), ("judge", ["draft", "review"]),
+        ("source", []), ("draft", ["source"]),
+    ]
+
+
 class GatedRunProvider(Provider):
     """The supervisor proposes a fixed change; the judge fails every draft."""
 
@@ -352,6 +414,37 @@ def test_supervisor_proposal_cannot_remove_or_bypass_a_gate(parallel, proposal, 
     assert executor.revisions_used == 0
     rejected = [s for s in tracer.summary() if s.get("status") == "revision_rejected"]
     assert len(rejected) == 1 and refusal in rejected[0]["error"]
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_supervisor_proposal_cannot_cut_a_gate_off_its_target_through_another_node(parallel):
+    """The judge reaches the draft only through "review". Rewiring "review"
+    onto "research" used to be accepted, so the judge ran before the draft
+    and its FAIL was consumed as "unavailable or exhausted"."""
+    proposal = {"change": True, "reason": "review sooner", "rewire": {"review": ["research"]}}
+    provider = GatedRunProvider(proposal, slow_draft=parallel)
+    graph = _transitive_gated_graph()
+    tracer = Tracer()
+    options = dict(
+        provider=provider, registry=Registry(), tracer=tracer, artifact_dir=None,
+        supervisor=LLMSupervisor(provider, review_after={"research"}), max_revisions=1,
+    )
+    if parallel:
+        executor = AsyncExecutor(max_concurrency=4, **options)
+        asyncio.run(executor.run(graph))
+    else:
+        executor = Executor(**options)
+        executor.run(graph)
+
+    assert _structure(graph) == _structure(_transitive_gated_graph())
+    gated = [label for label in provider.calls if label in {"draft", "review", "judge"}]
+    assert gated == ["draft", "review", "judge"] * 3
+    assert sorted(provider.calls) == sorted(["research", "source", *gated])
+    assert graph.nodes[2].metadata["regenerations_used"] == 2
+    assert executor.revisions_used == 0
+    rejected = [s for s in tracer.summary() if s.get("status") == "revision_rejected"]
+    assert len(rejected) == 1
+    assert "revision would disconnect verifier 'judge' from 'draft'" in rejected[0]["error"]
 
 
 # ---------------------------------------------------------------------------

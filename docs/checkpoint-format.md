@@ -106,7 +106,7 @@ Notes:
 - Node `result` values that aren't JSON-serializable are stored as their `str()` form.
 - `budget.max_budget_usd` is the cap the execution started with; resume honors it, not whatever the resuming Swarm was constructed with.
 - `control.revisions_used` is how much of the supervisor's `max_revisions` allowance the run has already spent. Resume seeds the executor from it, so the cap bounds the **run**, not each attempt: a crash-resume cycle cannot refill the allowance and revise past the limit the caller set.
-- A node that a revision added carries `"added_by_revision": true` in its `metadata` (from 0.8.2). `LLMSupervisor` counts these nodes against `max_total_added_nodes`, so the growth cap also survives resume. Nodes added before 0.8.2 have no marker and are not counted.
+- A node that a revision added carries `"added_by_revision": true` in its `metadata` (from 0.8.2). `LLMSupervisor` counts these nodes against `max_total_added_nodes`, so resume does not reset the count ([what the cap limits](supervisor.md#safety)). Nodes added before 0.8.2 have no marker and are not counted.
 - `task.done_when` carries the acceptance criteria forward. A resumed run that had forgotten them could not hold its own output to them.
 
 ## Verification state

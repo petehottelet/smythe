@@ -40,13 +40,35 @@ History is immutable. Completed, running, and failed nodes are never
 dropped or re-pointed, so a revision can never invalidate a result the
 run has already banked or the money already spent on it.
 
-Verification gates are protected too. A revision cannot drop a verifier
-node (one that sets `verifies`) or the node it judges, and cannot rewire a
-verifier unless its new dependencies still include that node. Without
-this, a revision could let the judged output through unverified, or let a
-parallel judge finish before its target so that its verdict was discarded.
-The review prompt includes worker output, so text in source data could
-steer a model supervisor toward such a revision.
+Verification gates are protected too. A revision cannot:
+
+- drop a verifier node (one that sets `verifies`) or the node it judges;
+- rewire a verifier unless its new dependencies include the node it judges;
+- rewire other nodes so that a verifier that depended on the node it judges,
+  directly or through other nodes, no longer depends on it. In a hand-built
+  `draft → review → check` gate, rewiring `review` off `draft` is rejected.
+
+These rules allow a rewire of the verifier that keeps the node it judges
+among its dependencies, and a rewire elsewhere that leaves the verifier
+depending on that node, such as inserting a step between them.
+Without these rules, a revision could let the judged output through
+unverified, or let a judge run before its target so that its verdict was
+discarded. The review prompt includes worker output, so text in source data
+could steer a model supervisor toward such a revision.
+
+### Steps added after a gate
+
+Gate protection keeps each gate judging its target. It does not stop a
+revision from adding work after that target: a revision may add a step that
+depends on a gated node, such as a `final` step after `draft`, or rewire a
+pending step to depend on it. No existing gate judges that step. Under
+`DELIVERABLE` synthesis, the default, a node that a non-verifier step depends
+on is not terminal, so the run returns the new step's output in place of the
+judged node's. Limiting `review_after` to nodes that run before the gate does
+not prevent this, because a new step may depend on work that is still
+pending. To keep the gated node's output as the run's output, run without
+revisions (`max_revisions=0`, the default) or use a `Supervisor` of your own
+that never proposes such a step.
 
 ## Safety
 
@@ -57,11 +79,11 @@ Five guardrails do that:
    Supervision is off by default (`max_revisions=0`).
 2. **Full validation before mutation.** `ExecutionGraph.apply_revision`
    checks every rule — no unknown nodes, no orphaned dependents, no
-   cycles, no touching finished work, no removing or bypassing a gate, no
-   node id `__synthesis__` (reserved for the synthesizer's budget entry) —
-   and mutates nothing if any check fails. A malformed proposal costs a
-   trace entry, not a corrupt run. These rules apply to every supervisor,
-   including one you write.
+   cycles, no touching finished work, no dropping a gate or the node it
+   judges, no cutting a gate off from that node, no node id `__synthesis__`
+   (reserved for the synthesizer's budget entry) — and mutates nothing if
+   any check fails. A malformed proposal costs a trace entry, not a corrupt
+   run. These rules apply to every supervisor, including one you write.
 3. **Contained proposal failure.** Ordinary supervisor errors and invalid
    revisions are recorded and ignored. Invalid provider accounting raises
    `BudgetValidationError`, stops the run, and blocks resume until the charge
@@ -82,21 +104,32 @@ Five guardrails do that:
    adds more than `max_added_nodes` nodes (default 3) is treated as no
    change, not truncated, and logged as a warning on the `smythe.supervisor`
    logger. `max_total_added_nodes` (default 8, the generated-plan node
-   limit) bounds growth across the whole run the same way: a proposal that
-   would leave more revision-added nodes in the graph is refused and
+   limit) limits the revision-added nodes in the graph the same way: a
+   proposal that would leave more of them in the graph is refused and
    logged. The caps apply to model proposals; a `Supervisor` you write
    yourself is your code and is not capped.
 
 ```python
 LLMSupervisor(provider, max_added_nodes=1)         # at most one new step per revision
-LLMSupervisor(provider, max_total_added_nodes=4)   # at most four across the run
+LLMSupervisor(provider, max_total_added_nodes=4)   # at most four added steps in the graph
 ```
 
 A node that a revision added carries `"added_by_revision": true` in its
-metadata, and `LLMSupervisor` counts those nodes. The count is saved with the
-graph, so resuming a checkpoint or a durable run cannot refill the allowance.
-A pending added node that a later revision drops never ran, so it stops
-counting. Non-default caps are part of a durable run's recipe.
+metadata, and `LLMSupervisor` counts the marked nodes in the graph when it
+reads a proposal. The marker is saved with the graph, so resuming a checkpoint
+or a durable run does not reset the count. The cap limits the added nodes the
+graph holds, not every node added during a run, so a run can add, and run,
+more than the cap in total:
+
+- A pending added node that a later revision drops stops counting, and that
+  revision or a later one can add another in its place. This includes an
+  added node that ran and was then reset to pending by a gate's regeneration.
+- A durable run saves each review's decision before applying it. If the run
+  stops in between, resume applies the saved decision without checking the
+  cap again, so nodes that another review added first during recovery are not
+  counted against it.
+
+Non-default caps are part of a durable run's recipe.
 
 ## Triggering reviews
 

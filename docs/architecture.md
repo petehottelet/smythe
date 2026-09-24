@@ -87,7 +87,11 @@ Template builders receive model-chosen `params` and must bound them: the limit
 is checked when each builder call returns. In a durable run, the LLM and
 constrained architects also check each plan against the run's graph policy and
 plain-text node rules before planning is saved
-([durable planning](workflow-accounting.md#freeze-graph-limits)).
+([durable planning](workflow-accounting.md#freeze-graph-limits)). A durable
+run's template builders must return the same nodes, with the same ids, for the
+same task and params: resume rebuilds each saved selection, and a repair prompt
+can name a node id, so a builder that relies on `Node`'s random default id can
+make resume fail with `WorkflowConflictError`.
 
 ### Topology vocabulary
 
@@ -193,10 +197,12 @@ prompt mutation.
   durable ledger across routing, planning, execution, verification, supervision,
   and synthesis. Request-bound quotes, fenced dispatch, and retained response
   evidence govern admission and recovery. See [managed scope](workflow-accounting.md#supported-scope).
-- A supervisor may change only pending work, and cannot drop or re-route a
-  verification gate. One `LLMSupervisor` revision may add at most
-  `max_added_nodes` nodes (default 3), and a run at most
-  `max_total_added_nodes` (default 8).
+- A supervisor may change only pending work. It cannot drop a verification
+  gate or the node it judges, or leave the gate no longer depending on that
+  node; a step it adds after that node is not judged by the gate. One
+  `LLMSupervisor` revision may add at most `max_added_nodes` nodes (default 3),
+  and a proposal that would leave more than `max_total_added_nodes` (default 8)
+  revision-added nodes in the graph is refused.
 - A verifier may reset only its target and downstream dependents.
 - A resumed run keeps completed results, recorded spend, and consumed control allowances.
 

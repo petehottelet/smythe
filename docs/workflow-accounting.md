@@ -247,7 +247,9 @@ is planned; the ordinary `AnthropicProvider` cannot enter this managed path.
 
 Custom local architects, template builders, supervisors, and synthesizers use
 `LocalOnly(factory, identity, version, role=...)`. The factory must return a fresh
-component that performs no provider calls or external side effects. This is an
+component that performs no provider calls or external side effects. A template
+builder must also return the same nodes, with the same ids, for the same task
+and params ([why](architecture.md#planning-tiers)). This is an
 explicit caller contract, not a sandbox. Arbitrary paid custom components,
 scripted offline response cursors, tools, image attachments, active capability
 hydration, live planner memory, and a separate checkpoint store are rejected.
