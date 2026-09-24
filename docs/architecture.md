@@ -75,9 +75,11 @@ the output token limit, is retried with the problem named, up to `max_retries`.
 **Changed in 0.8.2:** a generated plan may contain at most one gating node,
 which must list the node it verifies in `depends_on`, and a generated node
 timeout must be at least 60 seconds (`smythe.loader.MODEL_PLAN_MIN_TIMEOUT_S`),
-because a timeout cancels provider calls that were already sent. No graph,
-generated or written by hand, may use the node id `__synthesis__`, which the
-synthesizer reserves for its budget and trace entries.
+because a timeout cancels provider calls that were already sent. A planning
+reply that the provider refused or filtered is retried like a truncated one
+([stop reasons](execution.md)). No graph, generated or written by hand, may use
+the node id `__synthesis__`, which the synthesizer reserves for its budget and
+trace entries.
 
 `ConstrainedArchitect` limits the composed graph to 64 nodes by default
 (`ConstrainedArchitect(max_nodes=...)`) and retries a selection over the limit.

@@ -76,7 +76,9 @@ Five guardrails do that:
 5. **Strictly read proposals.** `LLMSupervisor` applies a reply only when
    `change` is JSON `true` (not the string `"true"`) and every field has the
    type shown in its prompt; anything else means no change. So does an
-   added node whose label is longer than 500 characters. A proposal that
+   added node whose label is longer than 500 characters, and so does a
+   review that stopped at the output token limit or that the provider
+   refused or filtered ([stop reasons](execution.md)). A proposal that
    adds more than `max_added_nodes` nodes (default 3) is treated as no
    change, not truncated, and logged as a warning on the `smythe.supervisor`
    logger. `max_total_added_nodes` (default 8, the generated-plan node

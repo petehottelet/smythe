@@ -1,6 +1,6 @@
 # Native Claude Messages
 
-Available since **Smythe 0.8.0**. Install `pip install "smythe[anthropic]==0.8.1"`
+Available since **Smythe 0.8.0**. Install `pip install "smythe[anthropic]==0.8.2"`
 and set `ANTHROPIC_API_KEY` locally. `AnthropicMessagesProvider` supports
 `claude-fable-5-1` text workflows through Anthropic's global Messages endpoint.
 

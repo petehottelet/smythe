@@ -21,6 +21,17 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [0.8.2] - 2026-09-23
+
+This correctness release closes gaps that the 0.8.1 reviews found in the
+execution envelope: rejected durable plans, verification gates a supervisor
+could revise away, refused provider replies counted as output, and image
+frames decoded before they were bounded. Some fixes tighten rules that 0.8.1
+accepted; each is listed under **Changed**. The
+[upgrade guide](docs/release-0.8.2.md) lists what to check before upgrading.
+
 ### Fixed
 
 - **A durable run repairs a generated plan it cannot execute instead of
@@ -73,6 +84,21 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   `ArtifactInspectionError`.
 - Distilled templates ignore a model-supplied param named `task` or `params`
   instead of raising `TypeError`, which cost a paid planner retry.
+- **Refused and filtered replies no longer count as output.** With the
+  Anthropic, OpenAI and Gemini SDK providers, an Anthropic `refusal`, an OpenAI
+  `content_filter` finish, or a Gemini finish other than `STOP` or `MAX_TOKENS`
+  (such as `SAFETY`, `RECITATION` or `MALFORMED_FUNCTION_CALL`) completed its
+  node with any partial text, and a filtered OpenAI turn ran its tool calls.
+  The node now fails with `OutputRefusedError` after its cost is recorded, no
+  tool call from that turn runs, and its failure policy applies. A refused plan
+  is retried with the stop reason named, a refused supervisor review applies no
+  revision, and a refused `LLM_MERGE` synthesis fails the run.
+- Twelve exceptions whose constructors take more than a message, including
+  `SentinelAlert`, `BudgetReconciliationError`, `ProviderRequestRejectedError`
+  and `ResponseQuoteError`, raised `TypeError` when unpickled or copied, and
+  `OutputTruncatedError` and `AssetPreflightError` came back with their message
+  wrapped twice. They now survive `pickle`, `copy.copy` and `copy.deepcopy` with
+  their message and fields, including across process boundaries.
 
 ### Changed
 
@@ -97,9 +123,17 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 - Jobs reports an animated GIF whose frames extend past its logical screen at
   the size of its enlarged canvas, and counts every frame at that size toward
   the aggregate pixel limit.
+- `OpenAIProvider` and `GeminiProvider` report the stop reasons
+  `content_filter` and (Gemini only) `incomplete` where they reported
+  `end_turn` or `tool_use`; see the [execution guide](docs/execution.md). Stop
+  reasons outside `TRUNCATED_STOP_REASONS` and `REFUSED_STOP_REASONS`,
+  including any a custom provider returns, still count as complete.
+  `OutputTruncatedError` now subclasses `IncompleteOutputError`.
 
 ### Added
 
+- `IncompleteOutputError` and `OutputRefusedError`, exported from `smythe`, and
+  `smythe.provider.REFUSED_STOP_REASONS`.
 - `LLMSupervisor(max_total_added_nodes=...)` and
   `ConstrainedArchitect(max_nodes=...)`.
 - `smythe.loader.MODEL_PLAN_MAX_GATES` and `MODEL_PLAN_MIN_TIMEOUT_S`;
@@ -1232,7 +1266,8 @@ Initial public release.
   60ms sleep, which is too tight for `time.sleep()` precision on Windows.
   Passes consistently in isolation. Tracked for fix in 0.1.1.
 
-[Unreleased]: https://github.com/petehottelet/smythe/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/petehottelet/smythe/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/petehottelet/smythe/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/petehottelet/smythe/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/petehottelet/smythe/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/petehottelet/smythe/compare/v0.6.0...v0.7.0

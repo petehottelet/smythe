@@ -282,8 +282,8 @@ identical fixtures, so this shows recovery correctness, not speed.
 
 ## Project status
 
-**Smythe 0.8.1** is the current library release. See the
-[release notes and upgrade guide](docs/release-0.8.1.md). The API is pre-1.0;
+**Smythe 0.8.2** is the current library release. See the
+[release notes and upgrade guide](docs/release-0.8.2.md). The API is pre-1.0;
 minor releases may change it. Later source changes appear in the
 [changelog](CHANGELOG.md#unreleased).
 

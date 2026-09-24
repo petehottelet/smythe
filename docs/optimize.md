@@ -39,7 +39,7 @@ The package is pre-1.0 and its API may change. The programmatic runner is
 The [0.7.0 release](https://github.com/petehottelet/smythe/blob/v0.7.0/docs/optimize.md)
 uses ledger schema v3. Campaign ownership, schema v4, and HTML reports below
 ship in **0.8.0**; 0.8.1 adds the paired Student-t promotion rule and holdout
-sealing. Install `pip install "smythe==0.8.1"`.
+sealing. Install `pip install "smythe==0.8.2"`.
 
 ## Experiment contracts and budgets
 

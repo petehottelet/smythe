@@ -4,7 +4,7 @@ Examples 01–05, 08–14, and the acquisition-diligence example run offline
 out of the box. A built-in `DemoProvider` returns deterministic responses so
 you can inspect planning, fan-out, budgets, recovery, and synthesis without an
 API key. Examples 06 and 07 are live MCP integration tours. These examples
-target [Smythe 0.8.1](https://github.com/petehottelet/smythe/releases/tag/v0.8.1)
+target [Smythe 0.8.2](https://github.com/petehottelet/smythe/releases/tag/v0.8.2)
 and use files from the repository. Run them from its root:
 
 ```bash
@@ -14,12 +14,13 @@ python examples/14_durable_text_workflow.py
 
 Example 14 explicitly selects fixture responses even when API keys are set.
 It demonstrates planning, execution and recovery with zero provider calls.
-The [0.8.1 release guide](../docs/release-0.8.1.md) covers upgrading from 0.8.0;
-the [0.8.0 guide](../docs/release-0.8.0.md) covers the low-level Autotune migration.
+The [0.8.2 release guide](../docs/release-0.8.2.md) covers upgrading from 0.8.1,
+the [0.8.1 guide](../docs/release-0.8.1.md) upgrading from 0.8.0, and the
+[0.8.0 guide](../docs/release-0.8.0.md) the low-level Autotune migration.
 
 The durable artifact-job example uses the installed CLI. Install its optional
 dependencies with `pip install -e ".[jobs]"` from this checkout, or
-`pip install "smythe[jobs]==0.8.1"` for the release package. The example is
+`pip install "smythe[jobs]==0.8.2"` for the release package. The example is
 completely offline and its approval token is bound to the exact manifest and
 budget:
 
@@ -90,7 +91,7 @@ Use a new output filename for each export.
 | [02_dynamic_planning.py](02_dynamic_planning.py) | The `LLMArchitect` designs the execution graph from the task itself. Inspect it, then execute with the [complete task snapshot](../docs/tasks.md). |
 | [03_parallel_budget.py](03_parallel_budget.py) | Eight-node broadcast under a USD budget cap with `max_concurrency=3`, a per-node cost breakdown, and [strict cost guardrails](../docs/budgets.md). |
 | [04_resume_after_crash.py](04_resume_after_crash.py) | Resume preserves completed nodes and their costs. [File checkpoints](../docs/checkpoint-format.md) flush complete snapshots and use independent temporary files for atomic publication. [Verification recovery](../docs/verifier.md#recovery-and-concurrent-work) completes pending rejection and regeneration decisions before dispatch. |
-| [05_mcp_filesystem.py](05_mcp_filesystem.py) | MCP tool use, fully offline: an agent reads real files through a bundled MCP server ([mcp_file_server.py](mcp_file_server.py)) via the bounded tool loop. Needs `pip install "smythe[mcp]==0.8.1"`. |
+| [05_mcp_filesystem.py](05_mcp_filesystem.py) | MCP tool use, fully offline: an agent reads real files through a bundled MCP server ([mcp_file_server.py](mcp_file_server.py)) via the bounded tool loop. Needs `pip install "smythe[mcp]==0.8.2"`. |
 | [06_mcp_github.py](06_mcp_github.py) | The real GitHub MCP server with a mandatory tool allowlist and `env_passthrough` for the token. Env-gated: needs `GITHUB_PERSONAL_ACCESS_TOKEN`, an LLM key, and npx. |
 | [07_mcp_saas.py](07_mcp_saas.py) | Any SaaS MCP server over streamable HTTP (Linear, Notion, ...), configured entirely by environment variables. Env-gated. |
 | [08_learning_loop.py](08_learning_loop.py) | Record run 1 in `PlannerMemory` and recall it into run 2's planning prompt; the Architect returns a leaner plan (8 nodes → 3). The [history validation](../docs/architecture.md#learning-loop) skips malformed recalled fields and labels summed node time. |
