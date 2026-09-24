@@ -16,7 +16,8 @@ from smythe.task import Task, task_to_dict
 SYNTHESIS_NODE_ID = "__synthesis__"
 
 # Node metadata marker set on every node a revision adds. It is saved with the
-# node, so a run-level cap on supervised growth survives resume and replay.
+# node, so a cap on the revision-added nodes in a graph still counts them after
+# resume and replay.
 REVISION_ADDED_KEY = "added_by_revision"
 
 
@@ -69,6 +70,20 @@ def _has_cycle_in(adjacency: Mapping[str, list[str]]) -> bool:
             if dep not in done:
                 visiting.add(dep)
                 stack.append((dep, iter(adjacency.get(dep, ()))))
+    return False
+
+
+def _depends_on(adjacency: Mapping[str, list[str]], node_id: str, target: str) -> bool:
+    """Whether ``node_id`` depends on ``target``, directly or through other nodes."""
+    seen: set[str] = set()
+    pending = list(adjacency.get(node_id, ()))
+    while pending:
+        current = pending.pop()
+        if current == target:
+            return True
+        if current not in seen:
+            seen.add(current)
+            pending.extend(adjacency.get(current, ()))
     return False
 
 
@@ -311,9 +326,14 @@ class ExecutionGraph:
         proposes nonsense costs a trace entry, never a corrupt run.
 
         Verification gates are protected. A revision may not drop a
-        verifier or the node it judges, or rewire a verifier so that it no
-        longer depends on that node: either would let the judged output
-        through unverified. Added nodes are marked in their metadata with
+        verifier or the node it judges, or rewire a verifier without
+        keeping that node among its new dependencies. Nor may it rewire
+        other nodes so that a verifier that depended on the node it
+        judges, directly or through other nodes, no longer depends on it.
+        Each of these would let the judged output through unverified; a
+        rewire that keeps the dependency is allowed. A revision may still
+        add nodes that depend on the judged node, and no existing verifier
+        judges them. Added nodes are marked in their metadata with
         ``REVISION_ADDED_KEY``.
         """
         if revision.is_empty:
@@ -391,6 +411,20 @@ class ExecutionGraph:
 
         if _has_cycle_in(adjacency):
             raise RevisionError("revision would introduce a cycle")
+
+        # A verifier can reach the node it judges through other nodes
+        # (target -> review -> verifier), which the rewire check above does
+        # not see. Cutting that path would let the verifier run first and
+        # its verdict be discarded, so it must still depend on its target.
+        before = {n.id: n.depends_on for n in self.nodes}
+        for node in kept:
+            if (node.verifies is not None
+                    and _depends_on(before, node.id, node.verifies)
+                    and not _depends_on(adjacency, node.id, node.verifies)):
+                raise RevisionError(
+                    f"revision would disconnect verifier {node.id!r} from "
+                    f"{node.verifies!r}, the node it judges"
+                )
 
         for node_id, deps in revision.rewire.items():
             by_id[node_id].depends_on = list(deps)

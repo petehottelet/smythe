@@ -7,7 +7,7 @@ import json
 import pytest
 
 from smythe import LocalOnly, OfflineProvider, SimpleArchitect, SQLiteWorkflowStore, Swarm, Task
-from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
+from smythe.graph import ExecutionGraph, Node, NodeStatus, Revision, Topology
 from smythe.provider import CompletionResult
 from smythe.supervisor import LLMSupervisor, SUPERVISOR_SYSTEM_PROMPT
 from smythe.workflow_store import WorkflowLeaseError
@@ -184,6 +184,65 @@ def test_saved_proposal_cannot_change_a_journal_accepted_worker(tmp_path, monkey
             assert saved_operation["state"] == "applied" and store.audit(run_id)["ok"]
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("request_matches", [False, True])
+def test_revision_cannot_add_a_node_under_an_id_with_journaled_calls(
+    tmp_path, monkeypatch, request_matches,
+):
+    """Calls are keyed by node id and generation. "A" runs, the gate resets it,
+    and a revision drops it; a new generation-0 node under its id then
+    conflicted with its saved call, or replayed its result without running."""
+    judges, steps = [], []
+
+    async def complete(self, system, prompt, model):
+        if prompt.startswith("Judge"):
+            judges.append(prompt)
+            return CompletionResult("FAIL: revise" if len(judges) == 1 else "PASS", cost_usd=0)
+        if prompt.startswith("Step"):
+            steps.append(prompt)
+        return CompletionResult("Accepted " + prompt.splitlines()[0], cost_usd=0)
+
+    class Review:
+        async def review(self, graph, node, **kwargs):
+            ids = {item.id for item in graph.nodes}
+            if node.id == "draft" and node.metadata.get("execution_generation", 0) == 0:
+                return Revision(add_nodes=(Node(id="A", label="Step A", depends_on=["draft"]),),
+                                rewire={"judge": ("draft", "A")})
+            if node.id == "draft" and "A" in ids:
+                return Revision(drop_node_ids=("A",), rewire={"judge": ("draft",)})
+            if node.id == "judge" and "A" not in ids:
+                if not request_matches:
+                    revised = Node(id="A", label="Step A, revised", depends_on=["draft"])
+                    return Revision(add_nodes=(revised,))
+                # A dependent keeps the new "A" non-terminal, so its prompt matches the old one.
+                return Revision(add_nodes=(Node(id="A", label="Step A", depends_on=["draft"]),
+                                           Node(id="B", label="Step B", depends_on=["A"])))
+            return None
+
+    monkeypatch.setattr(OfflineProvider, "complete", complete)
+    with SQLiteWorkflowStore(tmp_path / "readd.db") as store:
+        swarm = Swarm(
+            model="offline", provider=OfflineProvider(), architect=SimpleArchitect(), run_store=store,
+            supervisor=LocalOnly(Review, "readd-review", "1", role="supervisor"), max_revisions=3,
+        )
+        result = swarm.execute(ExecutionGraph([Topology.SERIAL], [
+            Node(id="draft", label="Draft"),
+            Node(id="judge", label="Judge", depends_on=["draft"], verifies="draft", max_regenerations=1),
+        ]))
+        assert [(node.id, node.status) for node in result.graph.nodes] == [
+            ("draft", NodeStatus.COMPLETED), ("judge", NodeStatus.COMPLETED),
+        ]
+        assert result.output == "Accepted Draft"
+        assert len(judges) == 2 and len(steps) == 1
+        rejected = [span for span in result.trace if span["status"] == "revision_rejected"]
+        assert len(rejected) == 1
+        assert "already has calls in the durable journal" in rejected[0]["error"]
+        assert store.get_checkpoint(result.execution_id)["checkpoint"]["revisions_used"] == 2
+        keys = [call["key"] for call in store.inspect_run(result.execution_id)["calls"]]
+        assert [key["generation"] for key in keys if key["scope_id"] == "node/A"] == [0]
+        assert swarm.resume(result.execution_id).output == result.output
+        assert store.audit(result.execution_id)["ok"]
 
 
 def test_grouped_supervisor_journal_error_is_not_committed_as_nochange(tmp_path):

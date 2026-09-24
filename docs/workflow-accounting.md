@@ -72,7 +72,11 @@ also apply: `LLMArchitect` retries a plan over 8 nodes or 5 levels, so pass
 
 **Changed in 0.8.2:** the built-in LLM and constrained architects check each
 generated plan against the policy and the run's other graph rules, such as
-plain-text nodes, before planning is saved. A rejected plan goes back to the
+plain-text nodes and node ids the journal can key, before planning is saved.
+The journal keys each node's calls by its id, so an id must be at most 507
+characters with no control characters. A caller-built graph with another id
+fails before any node runs, and so does resuming a run whose saved graph has
+such an id. A rejected plan goes back to the
 model with the reason, like a schema error, and each repair is a new journaled,
 paid call. When `max_retries` repairs are used up, planning raises
 `ArchitectError`. Resuming replays the saved attempts to the same result
@@ -204,7 +208,10 @@ that commit resumes through local settlement and decoding. Accepted outputs
 are replayed locally until a graph checkpoint consumes them. Planning saves
 the exact parsed graph and agent identities before execution starts. Supervision
 saves the graph it reviewed and its decision, then commits the resulting
-control state and consumed operation together. Verification retains its existing
+control state and consumed operation together. Calls are keyed by node id and
+generation, so a revision that adds a node under the id of a node with
+journaled calls is rejected and traced: the new node would conflict with, or
+replay, the earlier node's calls. Verification retains its existing
 generation and regeneration receipts.
 
 The SQLite journal uses WAL, full synchronization, fenced leases, and checkpoint
@@ -247,7 +254,9 @@ is planned; the ordinary `AnthropicProvider` cannot enter this managed path.
 
 Custom local architects, template builders, supervisors, and synthesizers use
 `LocalOnly(factory, identity, version, role=...)`. The factory must return a fresh
-component that performs no provider calls or external side effects. This is an
+component that performs no provider calls or external side effects. A template
+builder must also return the same nodes, with the same ids, for the same task
+and params ([why](architecture.md#planning-tiers)). This is an
 explicit caller contract, not a sandbox. Arbitrary paid custom components,
 scripted offline response cursors, tools, image attachments, active capability
 hydration, live planner memory, and a separate checkpoint store are rejected.

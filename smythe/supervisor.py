@@ -17,8 +17,10 @@ Two guardrails keep this from becoming an unbounded agent loop:
 - ``max_revisions`` caps how many times a run may be revised.
 - Every revision is validated against the graph before it applies
   (:meth:`ExecutionGraph.apply_revision`), so a malformed proposal
-  costs a trace entry rather than a corrupt run, and no revision can
-  remove or bypass a verification gate.
+  costs a trace entry rather than a corrupt run.  No revision can drop
+  a verification gate or the node it judges, or leave the gate no
+  longer depending on that node; a step a revision adds after that
+  node is not judged by the gate.
 
 The design follows the adaptive-orchestration pattern: evaluate state,
 find the gap between what exists and what was asked for, then decide
@@ -53,8 +55,8 @@ logger = logging.getLogger("smythe.supervisor")
 # or two, so three leaves headroom while bounding growth per revision.
 DEFAULT_MAX_ADDED_NODES = 3
 
-# Bounds growth across the whole run, whatever max_revisions allows:
-# supervision may at most double a plan of the generated-plan node limit.
+# Refuses a proposal that would leave more revision-added nodes in the graph,
+# whatever max_revisions allows; the default is the generated-plan node limit.
 DEFAULT_MAX_TOTAL_ADDED_NODES = MODEL_PLAN_MAX_NODES
 
 # A proposal's reason is truncated to this length. An added node's label
@@ -145,8 +147,10 @@ class LLMSupervisor(Supervisor):
     JSON ``true``, and a proposal with a malformed field or more than
     ``max_added_nodes`` additions is treated as no change.  So is one
     that would leave more than ``max_total_added_nodes`` revision-added
-    nodes in the graph, which bounds growth across the whole run; the
-    count is read from node metadata, so resume cannot refill it.
+    nodes in the graph.  The count is read from node metadata, so resume
+    does not reset it; it limits the added nodes the graph holds when a
+    proposal is read, not every node added during a run
+    (see docs/supervisor.md).
     """
 
     def __init__(

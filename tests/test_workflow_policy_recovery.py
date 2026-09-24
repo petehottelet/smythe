@@ -10,10 +10,14 @@ from smythe import (
     WorkflowGraphPolicy,
 )
 from smythe.checkpoint import graph_from_dict, graph_to_dict, node_to_dict
-from smythe.graph import Node, NodeStatus, Revision
+from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
+from smythe.constrained_prompts import CONSTRAINED_SYSTEM_PROMPT
+from smythe.graph import ExecutionGraph, Node, NodeStatus, Revision, Topology
 from smythe.loader import build_graph_from_model_output
 from smythe.planner import ArchitectError, LLMArchitect
+from smythe.provider import CompletionResult
 from smythe.provider_responses import OpenAIResponsesProvider
+from smythe.registry import Registry
 from test_workflow_native_runtime import native_transport as native_transport
 from test_workflow_policy import make_graph, policy_swarm
 
@@ -271,6 +275,123 @@ def test_plan_check_applies_planning_rules_without_adopting_the_candidate(store)
     assert graph_to_dict(candidate) == saved and runtime.graph is None
     assert runtime.registry.workflow_description() == before
     assert store.list_runs() == []
+
+
+@pytest.mark.parametrize("node_id, accepted", [
+    ("intro\nnotes", False), ("tab\there", False), ("x" * 508, False), ("x" * 507, True),
+])
+def test_plan_check_applies_the_journal_node_id_rule(store, node_id, accepted):
+    """The journal keys a node's calls by "node/<id>" and rejects control
+    characters and scopes over 512 characters at the node's first call."""
+    runtime = policy_swarm(store)._workflow_runtime()
+    runtime.run_id = "candidate-check"
+    runtime._bind()
+    candidate = ExecutionGraph([Topology.SERIAL], [Node(id=node_id, label="Draft")])
+    if accepted:
+        runtime._check_plan(candidate, Registry())
+        return
+    with pytest.raises(WorkflowBindingError, match=(
+        "cannot key the workflow journal: node ids must be at most 507 characters, "
+        "with no control characters"
+    )):
+        runtime._check_plan(candidate, Registry())
+
+
+def constrained_swarm(store, monkeypatch, selections):
+    """A durable run whose only template names its node from a model param."""
+    replies, prompts = list(selections), []
+
+    async def complete(self, system, prompt, model):
+        if system == CONSTRAINED_SYSTEM_PROMPT:
+            prompts.append(prompt)
+            return CompletionResult(replies.pop(0), cost_usd=0)
+        return CompletionResult("Section written", cost_usd=0)
+
+    def section(task, name="intro"):
+        return [Node(label="Write the section", id=str(name))], Registry()
+
+    monkeypatch.setattr(OfflineProvider, "complete", complete)
+    provider = OfflineProvider()
+    templates = [SubGraphTemplate("section", "One section; params: name", LocalOnly(
+        lambda: section, "section", "1", role="template_builder"))]
+    swarm = Swarm(model="offline", provider=provider, run_store=store,
+                  architect=ConstrainedArchitect(provider, templates, model="offline"))
+    return swarm, prompts
+
+
+def selection(name):
+    return json.dumps([{"template": "section", "params": {"name": name}}])
+
+
+UNJOURNALED_IDS = [
+    pytest.param("intro\nnotes", id="newline"), pytest.param("x" * 600, id="overlong"),
+]
+
+
+@pytest.mark.parametrize("name", UNJOURNALED_IDS)
+def test_constrained_node_id_the_journal_rejects_is_repaired_before_planning_is_saved(
+    store, monkeypatch, name,
+):
+    """The plan check passed such an id, so planning was saved and the node's
+    first call failed; every resume replayed the plan and failed again."""
+    swarm, prompts = constrained_swarm(store, monkeypatch, [selection(name), selection("intro")])
+    result = swarm.execute(Task("Write it"))
+    assert [node.id for node in result.graph.nodes] == ["section-0-intro"]
+    assert result.output == "Section written"
+    assert "Your previous response was rejected: Node id 'section-0-" in prompts[1]
+    assert "cannot key the workflow journal" in prompts[1]
+    planning = [call for call in store.inspect_run(result.execution_id)["calls"]
+                if call["key"]["phase"] == "planning"]
+    assert sorted(call["key"]["attempt"] for call in planning) == [0, 1]
+    assert store.audit(result.execution_id)["ok"]
+
+
+@pytest.mark.parametrize("name", UNJOURNALED_IDS)
+def test_exhausted_node_id_repairs_raise_architect_error_and_resume_does_not_rebuy(
+    store, monkeypatch, name,
+):
+    swarm, prompts = constrained_swarm(store, monkeypatch, [selection(name)] * 3)
+    runs = capture_runs(store, monkeypatch)
+    with pytest.raises(ArchitectError,
+                       match="after 3 attempts: Node id .* cannot key the workflow journal"):
+        swarm.execute(Task("Write it"))
+    run_id = runs[0]
+    before = store.inspect_run(run_id)
+    assert before["call_count"] == len(prompts) == 3
+    assert {call["key"]["phase"] for call in before["calls"]} == {"planning"}
+    assert store.get_checkpoint(run_id) is None
+    with pytest.raises(ArchitectError, match="cannot key the workflow journal"):
+        swarm.resume(run_id)
+    assert len(prompts) == 3 and store.inspect_run(run_id)["calls"] == before["calls"]
+
+
+def test_caller_graph_node_id_the_journal_rejects_fails_before_execution(store, monkeypatch):
+    monkeypatch.setattr(OfflineProvider, "complete", lambda *args: pytest.fail("Provider called"))
+    runs = capture_runs(store, monkeypatch)
+    graph = ExecutionGraph([Topology.SERIAL], [Node(id="draft\r", label="Draft")])
+    with pytest.raises(WorkflowBindingError,
+                       match=r"Node id 'draft\\r' cannot key the workflow journal"):
+        policy_swarm(store).execute(graph)
+    assert store.inspect_run(runs[0])["call_count"] == 0
+    assert store.get_checkpoint(runs[0]) is None
+
+
+def test_restored_graph_node_id_the_journal_rejects_fails_before_dispatch(store, monkeypatch):
+    swarm = policy_swarm(store)
+    run_id = swarm.plan(Task("Report")).run_ref["run_id"]
+    original = store.get_checkpoint
+
+    def load(identity):
+        value = deepcopy(original(identity))
+        value["checkpoint"]["graph"]["nodes"][0]["id"] = "draft\n"
+        return value
+
+    monkeypatch.setattr(store, "get_checkpoint", load)
+    monkeypatch.setattr(store, "save_checkpoint", lambda *args, **kwargs: pytest.fail("Invalid checkpoint"))
+    monkeypatch.setattr(OfflineProvider, "complete", lambda *args: pytest.fail("Provider called"))
+    with pytest.raises(WorkflowBindingError, match="cannot key the workflow journal"):
+        swarm.resume(run_id)
+    assert store.inspect_run(run_id)["call_count"] == 0
 
 
 @pytest.mark.parametrize("violation", ["nodes", "model", "retries", "regenerations", "cycle"])

@@ -31,8 +31,13 @@ charges remain recorded; outputs and artifact references from the rejected
 generation are cleared.
 
 A [supervisor](supervisor.md#what-a-revision-may-change) cannot revise a gate
-away: a revision that drops `check` or `draft`, or rewires `check` so that it
-no longer depends on `draft`, is rejected.
+away: a revision that drops `check` or `draft`, rewires `check` without
+keeping `draft` among its dependencies, or rewires another step so that
+`check` no longer depends on `draft` at all, is rejected. A revision can still
+add a step after `draft`. The gate does not judge that step, and under
+`DELIVERABLE` synthesis a step that depends on `draft` becomes the returned
+output instead of `draft`
+([steps added after a gate](supervisor.md#steps-added-after-a-gate)).
 
 ## Recovery and concurrent work
 
