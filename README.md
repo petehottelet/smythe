@@ -21,22 +21,16 @@ Set spending and concurrency limits, verify outputs, and recover saved work afte
 an interruption.
 
 Use it for research pipelines, document production, and artifact generation
-where you need to see what will run and account for what happened.
+where you need to see what will run and account for results. 
 
 <p align="center">
   <img src="assets/glyph_rain/glyph-rain-loop.gif" alt="Animated rain showing only the 192 revised Smythe glyphs" width="900">
 </p>
 <p align="center"><em><a href="screensaver/README.md">Glyph Rain</a> is Smythe's parallel-processing example: each glyph is an independent task, and Smythe runs the tasks concurrently.</em></p>
 
-**192 glyphs in 20.5 seconds, 56.2× faster than serial.** Smythe runs the glyph
-set as one 192-node fan-out graph, one node per glyph, with up to 64 nodes in
-flight; run one node at a time, the same graph took 1,149.6 seconds. All 192
-passed validation and were unique. This is a controlled offline run with 5.8
-seconds of simulated provider latency per call, so it measures Smythe's
-scheduling, not an image API. The revised glyphs in the animation are also
-compiled, validated, and exported in parallel: 256 SVG glyphs in 8.06 seconds
-median with eight process workers, 2.20× faster than one worker, with no API
-calls. [Fan-out benchmark](benchmarks/glyph_screensaver_benchmark.md) ·
+Example Task: Smythe generated **192 glyphs in 20.5 seconds, 56.2× faster than serial.** Smythe runs the glyph
+set as one 192-node fan-out graph, one node per glyph, with up to 64 nodes; run one node at a time, the same graph took 1,149.6 seconds. Controlled offline run with fixed latency per call measures Smythe's scheduling. Glyphs are compiled, validated, and exported in parallel: 256 SVG glyphs in 8.06 seconds
+median with eight process workers, 2.20× faster than one worker, with no API calls. [Fan-out benchmark](benchmarks/glyph_screensaver_benchmark.md) ·
 [SVG workflow benchmark](benchmarks/svg_v2_results.md)
 
 <p align="center">
@@ -126,7 +120,7 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
             max_output_tokens=8192,
         ),
         run_store=store,
-        max_budget_usd=5.00,
+        max_budget_usd=50.00,
         parallel=True,
         max_concurrency=8,
     )
@@ -139,7 +133,7 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
     print(result.output)
 ```
 
-This makes paid API calls under a **$5 run allowance**. The SQLite ledger
+This makes paid API calls under a **$50 run allowance**. The SQLite ledger
 accounts for planning and execution, reserves requests before dispatch, and
 retains responses for recovery. See [budget scope](docs/budgets.md) and
 [durable text workflows](docs/workflow-accounting.md). Claude and Gemini
@@ -283,9 +277,7 @@ identical fixtures, so this shows recovery correctness, not speed.
 ## Project status
 
 **Smythe 0.8.2** is the current library release. See the
-[release notes and upgrade guide](docs/release-0.8.2.md). The API is pre-1.0;
-minor releases may change it. Later source changes appear in the
-[changelog](CHANGELOG.md#unreleased).
+[release notes and upgrade guide](docs/release-0.8.2.md).
 
 Next priorities are complete-deliverable checks, broader external-task
 benchmarks, and separately controlled Astra scheduler and framework studies.
@@ -293,7 +285,7 @@ See the [roadmap](ROADMAP.md) for status and acceptance criteria.
 
 The [Glyph Rain screensaver](screensaver/README.md) is an artifact-generation
 showcase with source builds and a [web explorer](screensaver/svg-preview/README.md).
-Precompiled screensaver distribution is paused.
+Screensaver distribution is source only, but you're welcome to compile your own binary.
 
 [Documentation](docs/index.md) · [Contributing](CONTRIBUTING.md) ·
 [Releases](https://github.com/petehottelet/smythe/releases) ·
