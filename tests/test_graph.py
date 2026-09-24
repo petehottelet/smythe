@@ -4,7 +4,9 @@ import random
 
 import pytest
 
-from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
+from smythe.graph import (
+    SYNTHESIS_NODE_ID, ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology,
+)
 
 
 def test_roots_returns_nodes_without_deps():
@@ -73,6 +75,16 @@ def test_validate_passes_for_valid_dag():
     graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[a, b, c])
 
     graph.validate()
+
+
+def test_validate_rejects_the_reserved_synthesis_id():
+    """The synthesizer's budget and trace key; a node using it would share
+    the synthesis charge's ledger entry."""
+    node = Node(label="A", id=SYNTHESIS_NODE_ID)
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
+
+    with pytest.raises(ValueError, match="reserved for the synthesizer"):
+        graph.validate()
 
 
 # --- __repr__ and __str__ ---

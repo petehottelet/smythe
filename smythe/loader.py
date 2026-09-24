@@ -25,11 +25,13 @@ from smythe.registry import Registry
 # generated plan may not raise them past small fixed ceilings: three
 # retries ride out transient provider errors, and two regenerations
 # leave headroom over the prompt's recommended one while bounding a
-# single gate to three runs of the subtree it judges.
+# single gate to three runs of the subtree it judges.  More gates would
+# multiply those runs, so a plan may have only the one the prompt allows.
 MODEL_PLAN_MAX_NODES = 8
 MODEL_PLAN_MAX_DEPTH = 5
 MODEL_PLAN_MAX_RETRIES = 3
 MODEL_PLAN_MAX_REGENERATIONS = 2
+MODEL_PLAN_MAX_GATES = 1
 
 # Ids a model may choose, for plans and supervisor additions alike: a durable
 # journal rejects control characters and very long scope ids.
@@ -254,7 +256,11 @@ def build_graph_from_model_output(
     agent is created, and nothing is returned unless every check passes.
 
     ``max_depth`` counts levels: the number of nodes on the longest
-    dependency chain, so a single node has depth 1.
+    dependency chain, so a single node has depth 1.  A plan may have at
+    most ``MODEL_PLAN_MAX_GATES`` gating nodes (nodes that set
+    ``verifies``), and a gate must depend directly on the node it
+    verifies: a gate that could run before its target would have its
+    verdict discarded.
 
     Raises:
         ValueError: The plan breaks the schema or a limit.  The message
@@ -280,6 +286,17 @@ def build_graph_from_model_output(
         _check_model_node(index, entry)
 
     graph, registry = build_graph_from_dict(data)
+    gates = [node for node in graph.nodes if node.verifies is not None]
+    if len(gates) > MODEL_PLAN_MAX_GATES:
+        raise ValueError(
+            f"The plan has {len(gates)} gating nodes {[node.id for node in gates]}; "
+            f"the limit is {MODEL_PLAN_MAX_GATES}, on the node that produces the deliverable"
+        )
+    for gate in gates:
+        if gate.verifies not in gate.depends_on:
+            raise ValueError(
+                f"Node {gate.id!r} verifies {gate.verifies!r} and must list it in 'depends_on'"
+            )
     levels = graph.depth + 1
     if levels > max_depth:
         raise ValueError(

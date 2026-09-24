@@ -415,6 +415,26 @@ def test_schema_errors_are_retried_with_an_accurate_prompt(bad_plan):
     assert "was not a valid plan" in retry_prompt
 
 
+@pytest.mark.parametrize("bad_plan, problem", [
+    ({"nodes": [{"id": "draft", "label": "Draft"},
+                {"id": "c1", "label": "Check", "depends_on": ["draft"], "verifies": "draft"},
+                {"id": "c2", "label": "Check", "depends_on": ["draft"], "verifies": "draft"}]},
+     "2 gating nodes"),
+    ({"nodes": [{"id": "draft", "label": "Draft"},
+                {"id": "check", "label": "Check", "verifies": "draft"}]},
+     "'check' verifies 'draft' and must list it in 'depends_on'"),
+    ({"nodes": [{"id": "__synthesis__", "label": "Draft"}]}, "'__synthesis__' is reserved"),
+])
+def test_gate_and_reserved_id_errors_are_fed_back_for_a_corrected_plan(bad_plan, problem):
+    provider = MockPlanningProvider([json.dumps(bad_plan), SERIAL_RESPONSE])
+    planner = LLMArchitect(provider=provider, planning_model="test-model", max_retries=1)
+
+    graph, _ = planner.plan(Task(goal="Write it"))
+
+    assert [n.id for n in graph.nodes] == ["step-1", "step-2"]
+    assert problem in provider.prompts_received[1]
+
+
 def test_deeply_nested_json_is_retried_not_raised():
     provider = MockPlanningProvider(["[" * 100_000 + "]" * 100_000, SERIAL_RESPONSE])
     planner = LLMArchitect(provider=provider, planning_model="test-model", max_retries=1)

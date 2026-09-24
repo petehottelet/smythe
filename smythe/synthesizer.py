@@ -11,7 +11,7 @@ from typing import Any
 from smythe.budget import (
     BudgetEstimateRequired, BudgetValidationError, Sentinel, validate_completion_usage,
 )
-from smythe.graph import ExecutionGraph, Node, NodeStatus
+from smythe.graph import SYNTHESIS_NODE_ID, ExecutionGraph, Node, NodeStatus
 from smythe.provider import (
     Provider, ProviderResponseError, _native_receipt, _native_response_errors,
     _raise_if_truncated, _settle_response_error, _settle_response_group,
@@ -264,22 +264,22 @@ class Synthesizer:
             if estimate is None and requires_explicit:
                 if resolved_budget.max_budget_usd is not None:
                     raise BudgetEstimateRequired(
-                        "__synthesis__",
+                        SYNTHESIS_NODE_ID,
                         resolved_model or "",
                         type(resolved_provider).__name__,
                     )
             elif estimate is not None:
                 resolved_budget.reserve(
-                    "__synthesis__", estimate, hard_ceiling=requires_explicit,
+                    SYNTHESIS_NODE_ID, estimate, hard_ceiling=requires_explicit,
                 )
             else:
                 resolved_budget.reserve(
-                    "__synthesis__",
+                    SYNTHESIS_NODE_ID,
                     DEFAULT_SYNTHESIS_ESTIMATED_TOKENS
                     * resolved_budget.cost_per_token,
                 )
 
-        synth_node = Node(label="Synthesis merge", id="__synthesis__")
+        synth_node = Node(label="Synthesis merge", id=SYNTHESIS_NODE_ID)
         if resolved_tracer:
             resolved_tracer.on_node_start(synth_node)
 
@@ -291,7 +291,7 @@ class Synthesizer:
             _native_receipt(synth_node.metadata, result.native_receipt, phase="synthesis")
 
             if resolved_budget:
-                cost = resolved_budget.add_cost("__synthesis__", result)
+                cost = resolved_budget.add_cost(SYNTHESIS_NODE_ID, result)
                 synth_node.metadata["cost_usd"] = cost
             # Checked after billing so a truncated merge keeps its charge.
             _raise_if_truncated(result, where="Synthesis")
@@ -303,9 +303,9 @@ class Synthesizer:
             if resolved_tracer:
                 resolved_tracer.on_node_error(synth_node, exc)
             if not _native_response_errors(exc) and resolved_budget:
-                resolved_budget.release("__synthesis__")
+                resolved_budget.release(SYNTHESIS_NODE_ID)
             _settle_response_group(exc, lambda error: _settle_response_error(
-                error, budget=resolved_budget, node_id="__synthesis__",
+                error, budget=resolved_budget, node_id=SYNTHESIS_NODE_ID,
                 metadata=synth_node.metadata, phase="synthesis",
             ))
         except ProviderResponseError as exc:
@@ -313,13 +313,13 @@ class Synthesizer:
             if resolved_tracer:
                 resolved_tracer.on_node_error(synth_node, exc)
             _settle_response_error(
-                exc, budget=resolved_budget, node_id="__synthesis__",
+                exc, budget=resolved_budget, node_id=SYNTHESIS_NODE_ID,
                 metadata=synth_node.metadata, phase="synthesis",
             )
             raise
         except Exception as exc:
             if resolved_budget and not isinstance(exc, BudgetValidationError):
-                resolved_budget.release("__synthesis__")
+                resolved_budget.release(SYNTHESIS_NODE_ID)
             synth_node.status = NodeStatus.FAILED
             if resolved_tracer:
                 resolved_tracer.on_node_error(synth_node, exc)
