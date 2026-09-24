@@ -124,6 +124,7 @@
     "tests/test_glyph_screensaver_benchmark.py",
     "tests/test_graph.py",
     "tests/test_graph_export.py",
+    "tests/test_images.py",
     "tests/test_integration.py",
     "tests/test_jobs_artifact_io.py",
     "tests/test_jobs_artifact_namespace.py",
