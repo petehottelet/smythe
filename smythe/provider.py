@@ -114,9 +114,10 @@ TRUNCATED_STOP_REASONS = frozenset({"max_tokens", "model_context_window_exceeded
 
 # Stop reasons meaning the provider refused, filtered or otherwise ended the
 # response unfinished. Built-in providers normalize their native signals to
-# these values: Anthropic "refusal"; "content_filter" for OpenAI's content
-# filter and Gemini's safety, recitation, blocklist and prohibited-content
-# finishes; "incomplete" for any other Gemini finish short of STOP. Any other
+# these values: "refusal" for an Anthropic refusal or an OpenAI message
+# refusal; "content_filter" for OpenAI's content filter, Gemini's safety,
+# recitation, blocklist and prohibited-content finishes, and a prompt Gemini
+# blocked; "incomplete" for any other Gemini finish short of STOP. Any other
 # stop reason, including one a custom provider defines, counts as complete.
 REFUSED_STOP_REASONS = frozenset({"refusal", "content_filter", "incomplete"})
 
@@ -814,6 +815,10 @@ class OpenAIProvider(Provider):
                 "length": "max_tokens",
                 "content_filter": "content_filter",
             }.get(finish, "tool_use" if tool_calls else "end_turn")
+            refusal = getattr(message, "refusal", None)
+            if isinstance(refusal, str) and refusal:
+                # A refusal arrives as finish_reason "stop" with no content.
+                stop = "refusal"
 
         usage = response.usage
         return CompletionResult(
@@ -1226,7 +1231,9 @@ class GeminiProvider(Provider):
                 cost_usd_unknown = True
 
         finish = self._finish_reason(response)
-        if finish in (None, "STOP", "FINISH_REASON_UNSPECIFIED"):
+        if self._prompt_blocked(response):
+            stop = "content_filter"
+        elif finish in (None, "STOP", "FINISH_REASON_UNSPECIFIED"):
             stop = "tool_use" if tool_calls else "end_turn"
         elif finish == "MAX_TOKENS":
             stop = "max_tokens"
@@ -1262,6 +1269,22 @@ class GeminiProvider(Provider):
         # The SDK returns a string enum; its value is the wire name.
         reason = getattr(reason, "value", reason)
         return reason.upper() if isinstance(reason, str) else None
+
+    @staticmethod
+    def _prompt_blocked(response) -> bool:
+        """Whether Gemini blocked the prompt itself.
+
+        A blocked prompt returns no candidates, only ``prompt_feedback`` with
+        a ``block_reason`` such as SAFETY, PROHIBITED_CONTENT or OTHER.
+        """
+        candidates = getattr(response, "candidates", None)
+        if isinstance(candidates, (list, tuple)) and candidates:
+            return False
+        reason = getattr(getattr(response, "prompt_feedback", None), "block_reason", None)
+        reason = getattr(reason, "value", reason)
+        return isinstance(reason, str) and reason.upper() not in (
+            "", "BLOCKED_REASON_UNSPECIFIED", "BLOCK_REASON_UNSPECIFIED",
+        )
 
     @staticmethod
     def _extract_artifacts(response) -> list[Artifact]:
