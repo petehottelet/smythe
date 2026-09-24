@@ -56,7 +56,9 @@ that was needed to close a correctness gap. Check these before upgrading:
   plain-text rule rejects now costs up to `max_retries` repair calls, and
   planning that still fails raises `ArchitectError` instead of
   `WorkflowBindingError`. A 0.8.1 run stopped by such a rejection resumes into
-  a repair.
+  a repair. Durable node ids must be at most 256 characters with no control
+  characters, and a revision cannot add a node under the id of a node that
+  already made journaled calls.
 - **Supervisors.** A revision from any supervisor, including your own, that
   drops a verification gate or its target, or cuts the gate off from its
   target, is rejected and traced. `LLMSupervisor`

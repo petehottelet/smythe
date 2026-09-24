@@ -42,6 +42,12 @@ accepted; each is listed under **Changed**. The
   inside their retry loop and send the reason back to the model; each repair is
   a new journaled call. Resuming a run that 0.8.1 stopped this way asks for a
   repair.
+- A durable plan with a node id the journal cannot key (over 256 characters, or
+  with a control character) is repaired before planning is saved, instead of
+  failing at the node's first call on every resume.
+- In a durable run, a revision that adds a node under the id of a node with
+  journaled calls is rejected and traced. It raised `WorkflowConflictError` on
+  every resume, or replayed the old node's result when the request matched.
 - **A supervisor revision can no longer drop a verification gate or cut it off
   from the node it judges.** A revision that dropped a verifier let the output
   it judged through unverified, and one that rewired the verifier off its target
@@ -121,6 +127,10 @@ accepted; each is listed under **Changed**. The
 - In a durable run, a generated plan that the graph policy or the plain-text
   rule rejects now costs up to `max_retries` repair calls, and planning that
   still fails raises `ArchitectError` instead of `WorkflowBindingError`.
+- In a durable run, a node id must be at most 256 characters with no control
+  characters (`smythe.workflow.MAX_NODE_ID_CHARS`). A caller-built graph, or a
+  resumed saved graph, with another id raises `WorkflowBindingError` before any
+  node runs.
 - Any supervisor revision, including one from a custom `Supervisor`, that drops
   a verification gate or its target, cuts the gate off from its target, or adds
   a node with the id `__synthesis__` is rejected and traced as
@@ -145,7 +155,8 @@ accepted; each is listed under **Changed**. The
 - `LLMSupervisor(max_total_added_nodes=...)` and
   `ConstrainedArchitect(max_nodes=...)`.
 - `smythe.loader.MODEL_PLAN_MAX_GATES` and `MODEL_PLAN_MIN_TIMEOUT_S`;
-  `smythe.graph.SYNTHESIS_NODE_ID` and `REVISION_ADDED_KEY`.
+  `smythe.graph.SYNTHESIS_NODE_ID` and `REVISION_ADDED_KEY`;
+  `smythe.workflow.MAX_NODE_ID_CHARS`.
 
 ## [0.8.1] - 2026-09-22
 
