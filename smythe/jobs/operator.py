@@ -24,6 +24,7 @@ import time
 import traceback
 from uuid import uuid4
 
+from smythe._errors import PicklableError
 from smythe.jobs.store import MAX_SQLITE_INTEGER, OperationStatus, RunStatus, RunStoreError, SQLiteRunStore
 
 
@@ -39,7 +40,7 @@ _FINISHED = {"completed", "partial", "failed", "budget_overrun", "needs_attentio
 _FAILED = {"partial", "failed", "budget_overrun", "needs_attention"}
 
 
-class WorkerStartupError(RunStoreError):
+class WorkerStartupError(PicklableError, RunStoreError):
     """Launch failed; metadata identifies any already-visible authorization."""
 
     def __init__(self, message: str, launch: dict) -> None:
@@ -49,7 +50,7 @@ class WorkerStartupError(RunStoreError):
                          f"worker log: {launch['log_path']}")
 
 
-class WorkerStartupInterrupted(KeyboardInterrupt):
+class WorkerStartupInterrupted(PicklableError, KeyboardInterrupt):
     """Interrupted launch with the durable run and private log still locatable."""
 
     def __init__(self, launch: dict) -> None:

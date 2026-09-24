@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 import json
 from typing import TYPE_CHECKING
 
+from smythe._errors import PicklableError
 from smythe.provider import (
     CompletionResult, OfflineProvider, Provider, ProviderAccountingCancelledError,
     ProviderAccountingError, ProviderResponseError,
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
     from smythe.workflow_store import CallKey, LeaseToken, SQLiteWorkflowStore
 
 
-class ProviderRequestRejectedError(RuntimeError):
+class ProviderRequestRejectedError(PicklableError, RuntimeError):
     """The provider refused a journaled request before any model work.
 
     Only a 401, 403, 404, 413 or 429 response with the provider's plain error

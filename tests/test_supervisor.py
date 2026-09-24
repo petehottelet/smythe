@@ -978,3 +978,24 @@ def test_truncated_supervisor_review_applies_no_revision(caplog):
 
     assert [n.id for n in graph.nodes] == ["n0"]
     assert "cut off at the output token limit" in caplog.text
+
+
+@pytest.mark.parametrize("stop_reason", ["refusal", "content_filter", "incomplete"])
+def test_refused_supervisor_review_applies_no_revision(caplog, stop_reason):
+    class RefusedProposal(ProposingProvider):
+        async def complete(self, system, prompt, model):
+            result = await super().complete(system, prompt, model)
+            from smythe.supervisor import SUPERVISOR_SYSTEM_PROMPT
+
+            if system == SUPERVISOR_SYSTEM_PROMPT:
+                result.stop_reason = stop_reason
+            return result
+
+    graph = _graph("first")
+    supervisor = LLMSupervisor(RefusedProposal(_additions(1)), only_terminal=False)
+    with caplog.at_level("WARNING", logger="smythe.supervisor"):
+        asyncio.run(_executor(supervisor, max_revisions=1).run(graph))
+
+    assert [n.id for n in graph.nodes] == ["n0"]
+    assert "refused, filtered or stopped early" in caplog.text
+    assert f"stop_reason={stop_reason!r}" in caplog.text

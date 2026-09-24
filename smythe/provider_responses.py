@@ -19,6 +19,7 @@ import os
 import re
 from typing import Any
 
+from smythe._errors import PicklableError
 from smythe.pricing import (
     PRICE_VERSION, NativeReceipt, conservative_quote, price_native_response,
 )
@@ -168,7 +169,7 @@ class ResponseQuote:
     envelope: RawResponseEnvelope = field(repr=False)
 
 
-class ResponseQuoteError(ValueError):
+class ResponseQuoteError(PicklableError, ValueError):
     """Input counting failed; no generation request was made by ``quote``."""
 
     def __init__(self, message: str, envelope: RawResponseEnvelope) -> None:

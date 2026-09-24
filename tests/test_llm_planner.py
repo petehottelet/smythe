@@ -571,3 +571,37 @@ def test_plan_that_is_always_truncated_fails_with_a_clear_error():
     )
     with pytest.raises(ArchitectError, match="cut off at the output token limit"):
         planner.plan(Task(goal="Write something"))
+
+
+@pytest.mark.parametrize("stop_reason", ["refusal", "content_filter", "incomplete"])
+def test_refused_plan_is_retried_with_feedback_even_when_it_parses(stop_reason):
+    class RefusedOnce(MockPlanningProvider):
+        async def complete(self, system, prompt, model):
+            result = await super().complete(system, prompt, model)
+            if self._call_index == 1:
+                result.stop_reason = stop_reason
+            return result
+
+    provider = RefusedOnce([SERIAL_RESPONSE, SERIAL_RESPONSE])
+    planner = LLMArchitect(provider=provider, planning_model="test-model", max_retries=1)
+
+    graph, _ = planner.plan(Task(goal="Write something"))
+
+    assert len(graph.nodes) == 2
+    assert len(provider.prompts_received) == 2
+    assert "refused, filtered or stopped early" in provider.prompts_received[1]
+    assert f"stop_reason={stop_reason!r}" in provider.prompts_received[1]
+
+
+def test_plan_that_is_always_refused_fails_with_a_clear_error():
+    class AlwaysFiltered(MockPlanningProvider):
+        async def complete(self, system, prompt, model):
+            result = await super().complete(system, prompt, model)
+            result.stop_reason = "content_filter"
+            return result
+
+    planner = LLMArchitect(
+        provider=AlwaysFiltered([SERIAL_RESPONSE]), planning_model="test-model", max_retries=1,
+    )
+    with pytest.raises(ArchitectError, match="refused, filtered or stopped early"):
+        planner.plan(Task(goal="Write something"))

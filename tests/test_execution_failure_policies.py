@@ -14,7 +14,7 @@ from smythe.checkpoint import FileCheckpointStore
 from smythe.executor import Executor
 from smythe.executor_base import SKIPPED_DEPENDENCY_RESULT, TERMINAL_DELIVERABLE_NOTE
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
-from smythe.provider import CompletionResult, OutputTruncatedError, Provider
+from smythe.provider import CompletionResult, OutputRefusedError, OutputTruncatedError, Provider
 from smythe.registry import Registry
 from smythe.swarm import Swarm
 from smythe.tools import ToolCall, ToolResult, ToolSpec
@@ -359,6 +359,98 @@ def test_truncated_tool_turn_runs_no_tools_and_keeps_its_charge(mode):
     graph = ExecutionGraph([Topology.SERIAL], [Node("problem", id="problem")])
     budget = Sentinel(10)
     with pytest.raises(OutputTruncatedError):
+        run(mode, provider, graph, budget, tool_runtime=Tools())
+
+    assert ran == []
+    assert provider.calls == ["problem"]
+    assert budget.breakdown() == {"problem": 0.0625}
+
+
+# Normalized stop reasons for a refused, filtered or otherwise unfinished reply.
+REFUSED = ["refusal", "content_filter", "incomplete"]
+
+
+class RefusingProvider(ScriptedProvider):
+    """The "problem" step is refused on its first `refusals` calls."""
+
+    def __init__(self, refusals, stop_reason):
+        super().__init__()
+        self.refusals = refusals
+        self.stop_reason = stop_reason
+
+    async def complete(self, system, prompt, model):
+        if prompt.splitlines()[0] == "problem" and self.refusals:
+            self.refusals -= 1
+            self.calls.append("problem")
+            return CompletionResult("filtered partial", cost_usd=0.0625,
+                                    stop_reason=self.stop_reason)
+        return await super().complete(system, prompt, model)
+
+
+@pytest.mark.parametrize("stop_reason", REFUSED)
+@pytest.mark.parametrize("policy,refusals,outcome", [
+    (FailurePolicy.HALT, 1, NodeStatus.FAILED),
+    (FailurePolicy.RETRY, 1, NodeStatus.COMPLETED),
+    (FailurePolicy.RETRY, 3, NodeStatus.FAILED),
+    (FailurePolicy.SKIP, 1, NodeStatus.SKIPPED),
+])
+def test_refused_output_is_a_billed_failure_under_the_node_policy(
+    mode, stop_reason, policy, refusals, outcome,
+):
+    provider = RefusingProvider(refusals, stop_reason)
+    graph, budget = make_graph(policy), Sentinel(10)
+
+    if outcome is NodeStatus.FAILED:
+        with pytest.raises(OutputRefusedError) as caught:
+            run(mode, provider, graph, budget)
+        assert caught.value.stop_reason == stop_reason
+        assert_halted(graph)
+    else:
+        run(mode, provider, graph, budget)
+
+    problem = graph.nodes[1]
+    assert problem.status is outcome
+    attempts = 3 if policy is FailurePolicy.RETRY else 1
+    refused = min(refusals, attempts)
+    assert provider.calls.count("problem") == min(refusals + 1, attempts)
+    if outcome is NodeStatus.COMPLETED:
+        assert problem.result == "done: problem"
+    else:
+        # The refused reply's text is never presented as the node's output.
+        assert "filtered partial" not in problem.result
+        assert f"stop_reason={stop_reason!r}" in problem.result
+    # Each refused call is billed exactly once, and each charge survives.
+    expected = refused * 0.0625 + (0.125 if outcome is NodeStatus.COMPLETED else 0)
+    assert budget.breakdown()["problem"] == expected
+    assert problem.metadata["cost_usd"] == expected
+    assert budget._reservations == {}
+
+
+@pytest.mark.parametrize("stop_reason", REFUSED)
+def test_refused_tool_turn_runs_no_tools_and_keeps_its_charge(mode, stop_reason):
+    ran = []
+
+    class Tools:
+        @asynccontextmanager
+        async def open(self, agent):
+            async def call(tool_call):
+                ran.append(tool_call.arguments)
+                return ToolResult(tool_call_id=tool_call.id, content="ran")
+            yield SimpleNamespace(tools=[ToolSpec("x.write", "Write", {"type": "object"})],
+                                  call=call)
+
+    class RefusedToolCall(ScriptedProvider):
+        async def chat(self, system, messages, model, tools=None):
+            self.calls.append(messages[0].content.splitlines()[0])
+            return CompletionResult(
+                "", tool_calls=[ToolCall("t1", "x.write", {"path": "/tmp/a"})],
+                stop_reason=stop_reason, cost_usd=0.0625,
+            )
+
+    provider = RefusedToolCall()
+    graph = ExecutionGraph([Topology.SERIAL], [Node("problem", id="problem")])
+    budget = Sentinel(10)
+    with pytest.raises(OutputRefusedError):
         run(mode, provider, graph, budget, tool_runtime=Tools())
 
     assert ran == []

@@ -908,6 +908,9 @@ class _GeminiFinishReason(str, enum.Enum):
 
     STOP = "STOP"
     MAX_TOKENS = "MAX_TOKENS"
+    SAFETY = "SAFETY"
+    RECITATION = "RECITATION"
+    OTHER = "OTHER"
 
 
 def _gemini_finish_response(finish_reason, *, function_calls=None):
@@ -1001,6 +1004,133 @@ def test_truncated_provider_output_fails_node_after_recording_cost(name):
     # The truncated call was billed; its charge must survive the failure.
     assert budget.breakdown()["report"] > 0
     assert node.metadata["cost_usd"] == budget.breakdown()["report"]
+
+
+# ---------------------------------------------------------------------------
+# Refused, filtered and unfinished output is a billed failure, not a success
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("finish_reason,expected", [
+    (_GeminiFinishReason.SAFETY, "content_filter"),
+    (_GeminiFinishReason.RECITATION, "content_filter"),
+    ("BLOCKLIST", "content_filter"),
+    ("PROHIBITED_CONTENT", "content_filter"),
+    ("SPII", "content_filter"),
+    ("IMAGE_SAFETY", "content_filter"),
+    ("IMAGE_PROHIBITED_CONTENT", "content_filter"),
+    ("IMAGE_RECITATION", "content_filter"),
+    (_GeminiFinishReason.OTHER, "incomplete"),
+    ("LANGUAGE", "incomplete"),
+    ("MALFORMED_FUNCTION_CALL", "incomplete"),
+    ("UNEXPECTED_TOOL_CALL", "incomplete"),
+    ("NO_IMAGE", "incomplete"),
+    ("IMAGE_OTHER", "incomplete"),
+    ("A_REASON_ADDED_LATER", "incomplete"),
+    ("FINISH_REASON_UNSPECIFIED", "end_turn"),
+])
+def test_gemini_maps_refused_and_unfinished_finish_reasons(finish_reason, expected):
+    p, _ = _gemini_with_mock(_gemini_finish_response(finish_reason))
+    result = asyncio.run(p.complete("sys", "prompt", "gemini-3-pro"))
+    assert result.stop_reason == expected
+
+
+def test_gemini_filtered_tool_call_reports_content_filter():
+    from unittest.mock import MagicMock
+
+    call = MagicMock()
+    call.name = "wx__get_weather"
+    call.args = {"city": "Paris"}
+    p, _ = _gemini_with_mock(_gemini_finish_response("SAFETY", function_calls=[call]))
+    result = asyncio.run(
+        p.chat("sys", [ChatMessage(role="user", content="q")], "m", tools=[WEATHER_TOOL])
+    )
+    assert result.tool_calls
+    assert result.stop_reason == "content_filter"
+
+
+def test_openai_content_filter_finish_reason_reports_content_filter():
+    rc = _openai_tool_call("call_1", "wx__get_weather", '{"city": "Paris"}')
+    for tool_calls in (None, [rc]):
+        p, _ = _openai_with_mock(_make_openai_response(
+            content="partial", tool_calls=tool_calls, finish_reason="content_filter",
+        ))
+        result = asyncio.run(
+            p.chat("sys", [ChatMessage(role="user", content="q")], "m", tools=[WEATHER_TOOL])
+        )
+        # Not "end_turn", nor "tool_use" (which ran the calls) when a call is present.
+        assert result.stop_reason == "content_filter"
+
+
+def test_anthropic_refusal_stop_reason_passes_through():
+    p, _ = _anthropic_with_mock(_make_anthropic_response(
+        [_TextBlock("I can't help with that.")], stop_reason="refusal",
+    ))
+    result = asyncio.run(p.complete("sys", "prompt", "claude-x"))
+    assert result.stop_reason == "refusal"
+
+
+def _refusing_providers():
+    anthropic, _ = _anthropic_with_mock(_make_anthropic_response(
+        [_TextBlock("partial answer")], stop_reason="refusal",
+    ))
+    openai, _ = _openai_with_mock(
+        _make_openai_response(content="partial answer", finish_reason="content_filter")
+    )
+    gemini, _ = _gemini_with_mock(_gemini_finish_response(_GeminiFinishReason.RECITATION))
+    gemini_other, _ = _gemini_with_mock(_gemini_finish_response(_GeminiFinishReason.OTHER))
+    return {
+        "anthropic": (anthropic, "refusal"),
+        "openai": (openai, "content_filter"),
+        "gemini": (gemini, "content_filter"),
+        "gemini-other": (gemini_other, "incomplete"),
+    }
+
+
+@pytest.mark.parametrize("name", ["anthropic", "openai", "gemini", "gemini-other"])
+def test_refused_provider_output_fails_node_after_recording_cost(name):
+    from smythe.budget import Sentinel
+    from smythe.executor import Executor
+    from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
+    from smythe.provider import IncompleteOutputError, OutputRefusedError
+    from smythe.registry import Registry
+    from smythe.tracer import Tracer
+
+    provider, stop_reason = _refusing_providers()[name]
+    node = Node("Write the report", id="report", metadata={"model": "m"})
+    graph = ExecutionGraph([Topology.SERIAL], [node])
+    budget = Sentinel(max_budget_usd=10.0)
+
+    with pytest.raises(OutputRefusedError, match=stop_reason) as caught:
+        Executor(provider=provider, registry=Registry(), tracer=Tracer(),
+                 budget=budget, artifact_dir=None).run(graph)
+
+    assert caught.value.stop_reason == stop_reason
+    assert isinstance(caught.value, IncompleteOutputError)
+    assert node.status is NodeStatus.FAILED
+    # The partial text of a filtered reply (Gemini RECITATION) is not a result.
+    assert "partial answer" not in str(node.result)
+    assert budget.breakdown()["report"] > 0
+    assert node.metadata["cost_usd"] == budget.breakdown()["report"]
+
+
+@pytest.mark.parametrize("stop_reason", ["stop", "end_turn", "stop_sequence", "custom"])
+def test_custom_provider_stop_reasons_outside_the_normalized_sets_complete(stop_reason):
+    from smythe.executor import Executor
+    from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
+    from smythe.registry import Registry
+    from smythe.tracer import Tracer
+
+    class CustomStops(Provider):
+        async def complete(self, system, prompt, model):
+            return CompletionResult(text="answer", stop_reason=stop_reason)
+
+    node = Node("Answer", id="answer")
+    Executor(provider=CustomStops(), registry=Registry(), tracer=Tracer(),
+             artifact_dir=None).run(ExecutionGraph([Topology.SERIAL], [node]))
+
+    assert node.status is NodeStatus.COMPLETED
+    assert node.result == "answer"
 
 
 # ---------------------------------------------------------------------------

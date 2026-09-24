@@ -295,6 +295,28 @@ def test_llm_merge_truncated_output_raises_after_recording_cost(stop_reason):
     assert [s["node_id"] for s in tracer.summary() if s.get("error")] == ["__synthesis__"]
 
 
+@pytest.mark.parametrize("stop_reason", ["refusal", "content_filter", "incomplete"])
+def test_llm_merge_refused_output_raises_after_recording_cost(stop_reason):
+    """A refused or filtered merge is not a deliverable either, but it was billed."""
+    from smythe.provider import OutputRefusedError
+
+    class _RefusingProvider(Provider):
+        async def complete(self, system, prompt, model):
+            return CompletionResult(text="Half of the mer", prompt_tokens=30,
+                                    completion_tokens=40, stop_reason=stop_reason)
+
+    budget, tracer = Sentinel(max_budget_usd=1.0), Tracer()
+    synth = Synthesizer(strategy=SynthesisStrategy.LLM_MERGE, provider=_RefusingProvider(),
+                        budget=budget, tracer=tracer)
+
+    with pytest.raises(OutputRefusedError, match=stop_reason):
+        synth.synthesize(_make_graph("A", "B"))
+
+    assert budget.breakdown()["__synthesis__"] == pytest.approx(70 * budget.cost_per_token)
+    assert budget._reservations == {}
+    assert [s["node_id"] for s in tracer.summary() if s.get("error")] == ["__synthesis__"]
+
+
 # ---------------------------------------------------------------------------
 # DELIVERABLE strategy (the default)
 # ---------------------------------------------------------------------------

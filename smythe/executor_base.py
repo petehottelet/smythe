@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
+from smythe._errors import PicklableError
 from smythe.agent import Agent
 from smythe.budget import (
     BudgetEstimateRequired,
@@ -22,7 +23,7 @@ from smythe.budget import (
 )
 from smythe.graph import ExecutionGraph, Node, NodeStatus, RevisionError
 from smythe.provider import (
-    CompletionResult, Provider, ProviderResponseError, _native_receipt, _raise_if_truncated,
+    CompletionResult, Provider, ProviderResponseError, _native_receipt, _raise_if_incomplete,
     _settle_response_error, _native_response_errors, _settle_response_group,
 )
 from smythe.registry import Registry
@@ -54,7 +55,7 @@ def _raise_workflow_error(error: BaseException) -> None:
                 raise found from error
 
 
-class NodeFinalizationError(RuntimeError):
+class NodeFinalizationError(PicklableError, RuntimeError):
     """Raised after a billed response cannot be persisted safely.
 
     This error is non-retryable at the executor layer: repeating the provider
@@ -729,8 +730,8 @@ class ExecutorBase:
             self._readmit_node_budget(node)
             result = await self._provider_chat(node, system, messages, model)
             self._record_cost(node, result)
-            # Only after the charge is recorded: truncated output is billed.
-            _raise_if_truncated(result, where=f"Node {node.id!r}")
+            # Only after the charge is recorded: incomplete output is billed.
+            _raise_if_incomplete(result, where=f"Node {node.id!r}")
             return result
 
         collected_artifacts: list = []
@@ -741,9 +742,10 @@ class ExecutorBase:
                 self._readmit_node_budget(node)
                 result = await self._provider_chat(node, system, messages, model, tools=tools, turn=turn)
                 self._record_cost(node, result)
-                # A truncated turn may carry half-written tool arguments, so
-                # it is rejected (after billing) before any tool runs.
-                _raise_if_truncated(result, where=f"Node {node.id!r}")
+                # A truncated, refused or filtered turn may carry half-written
+                # or blocked tool calls, so it is rejected (after billing)
+                # before any tool runs.
+                _raise_if_incomplete(result, where=f"Node {node.id!r}")
                 # Artifacts on intermediate turns are already billed —
                 # carry them to the final result so they get persisted.
                 if result.artifacts:
