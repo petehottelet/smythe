@@ -32,12 +32,15 @@ pip install "smythe[anthropic]==0.8.2"
   revision-added nodes in a run's graph by default (`max_total_added_nodes`),
   and an added node's label is at most 500 characters.
 - **Refused and filtered replies fail their node.** With the Anthropic,
-  OpenAI and Gemini SDK providers, a refusal, a content filter or an
-  unfinished Gemini response raises `OutputRefusedError` after its cost is
-  recorded, and no tool call from that turn runs.
-- **Jobs bounds every image frame.** GIF frames that grow the canvas, and
-  WebP canvases, are checked from the bytes before Pillow or libwebp allocates
-  memory, and inspection no longer changes the process's warning filters.
+  OpenAI and Gemini SDK providers, a refusal, a content filter, a blocked
+  Gemini prompt or an unfinished Gemini response raises `OutputRefusedError`
+  after its cost is recorded, and no tool call from that turn runs.
+- **Image decoding is bounded frame by frame.** GIF frames that grow the
+  canvas, and WebP canvases, are checked from the bytes before Pillow or
+  libwebp allocates memory, in Jobs inspection, `validate_image`,
+  `finish_image` and the design checks. A GIF whose blocks Pillow would read
+  past a terminator is refused, and Jobs inspection no longer changes the
+  process's warning filters.
 - **Exceptions survive pickle and copy,** including across process
   boundaries.
 
@@ -68,14 +71,17 @@ that was needed to close a correctness gap. Check these before upgrading:
   (`ConstrainedArchitect(max_nodes=...)`). Template builders receive
   model-chosen params and must bound them.
 - **SDK providers.** An Anthropic `refusal`, an OpenAI `content_filter` finish
-  or any Gemini finish except `STOP`, `MAX_TOKENS` or an unspecified one fails
-  its node under the node's failure policy; `RETRY` makes another billed call.
+  or `refusal` message, a blocked Gemini prompt, or any Gemini finish except
+  `STOP`, `MAX_TOKENS` or an unspecified one fails its node under the node's
+  failure policy; `RETRY` makes another billed call.
   Durable runs are unaffected, because they accept only the native providers,
   which already reject unfinished responses.
 - **Reserved id.** No graph may use the node id `__synthesis__`, so 0.8.2
   cannot resume a checkpoint or durable run that contains a node with that id.
-- **Jobs** reports an animated GIF whose frames extend past its logical screen
-  at the size of its enlarged canvas.
+- **Images.** Jobs reports an animated GIF whose frames extend past its logical
+  screen at the size of its enlarged canvas, and a GIF with bytes after a block
+  terminator that Pillow would read past is refused everywhere Smythe decodes
+  images.
 - **Rollback.** Checkpoints stay at version 4. A durable run whose plan was
   repaired under 0.8.2, or that uses a non-default `max_total_added_nodes` or
   `ConstrainedArchitect(max_nodes=...)`, cannot be resumed by 0.8.1; finish it

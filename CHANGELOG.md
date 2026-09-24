@@ -81,11 +81,16 @@ accepted; each is listed under **Changed**. The
   9001×9001. The canvas every GIF frame needs is now checked from the bytes
   before Pillow parses them, and each frame, including each picture of a
   multi-picture JPEG, against the per-image and aggregate pixel limits before
-  it is decoded.
+  it is decoded. Pillow reads on past two GIF block terminators where the
+  format ends a block, so a frame hidden after one escaped the check; a GIF
+  with bytes after such a terminator is refused as undecodable. The GIF check
+  also covers `validate_image`, `finish_image` and the design checks, where
+  Pillow allocated an oversized first frame while opening the file.
 - WebP canvases are checked before libwebp allocates them. A 40-byte lossy
   WebP, or a 26-byte lossless one, declaring 16383×16383 made libwebp allocate
   about 2 GB. This covers Jobs inspection, `finish_image`, `validate_image` and
-  the design checks.
+  the design checks, which now open a path once, so the bytes checked are the
+  bytes decoded.
 - Jobs artifact inspection no longer changes the process's warning filters.
   Escalating `DecompressionBombWarning` inside `warnings.catch_warnings()` is
   not thread-safe, so overlapping inspections could leave the escalation
@@ -99,7 +104,8 @@ accepted; each is listed under **Changed**. The
   `content_filter` finish, or any Gemini finish except `STOP`, `MAX_TOKENS` or an
   unspecified one (such as `SAFETY`, `RECITATION` or `MALFORMED_FUNCTION_CALL`)
   completed its node with any partial text, and a filtered OpenAI turn ran its
-  tool calls.
+  tool calls. So did a Gemini response to a blocked prompt (no candidates and a
+  `prompt_feedback.block_reason`) and an OpenAI message with `refusal` set.
   The node now fails with `OutputRefusedError` after its cost is recorded, no
   tool call from that turn runs, and its failure policy applies. A refused plan
   is retried with the stop reason named, a refused supervisor review applies no
@@ -141,9 +147,12 @@ accepted; each is listed under **Changed**. The
 - Jobs reports an animated GIF whose frames extend past its logical screen at
   the size of its enlarged canvas, and counts every frame at that size toward
   the aggregate pixel limit.
-- `OpenAIProvider` and `GeminiProvider` report the stop reasons
-  `content_filter` and (Gemini only) `incomplete` where they reported
-  `end_turn` or `tool_use`; see the [execution guide](docs/execution.md). Stop
+- A GIF with bytes after a block terminator that Pillow would read past is
+  refused by Jobs inspection, `validate_image`, `finish_image` and the design
+  checks.
+- `OpenAIProvider` and `GeminiProvider` report the stop reasons `refusal`
+  (OpenAI only), `content_filter` and (Gemini only) `incomplete` where they
+  reported `end_turn` or `tool_use`; see the [execution guide](docs/execution.md). Stop
   reasons outside `TRUNCATED_STOP_REASONS` and `REFUSED_STOP_REASONS`,
   including any a custom provider returns, still count as complete.
   `OutputTruncatedError` now subclasses `IncompleteOutputError`.
