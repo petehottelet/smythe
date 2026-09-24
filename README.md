@@ -28,15 +28,9 @@ where you need to see what will run and account for what happened.
 </p>
 <p align="center"><em><a href="screensaver/README.md">Glyph Rain</a> is Smythe's parallel-processing example: each glyph is an independent task, and Smythe runs the tasks concurrently.</em></p>
 
-**192 glyphs in 20.5 seconds, 56.2× faster than serial.** Smythe runs the glyph
-set as one 192-node fan-out graph, one node per glyph, with up to 64 nodes in
-flight; run one node at a time, the same graph took 1,149.6 seconds. All 192
-passed validation and were unique. This is a controlled offline run with 5.8
-seconds of simulated provider latency per call, so it measures Smythe's
-scheduling, not an image API. The revised glyphs in the animation are also
-compiled, validated, and exported in parallel: 256 SVG glyphs in 8.06 seconds
-median with eight process workers, 2.20× faster than one worker, with no API
-calls. [Fan-out benchmark](benchmarks/glyph_screensaver_benchmark.md) ·
+Example Task: Smythe generated **192 glyphs in 20.5 seconds, 56.2× faster than serial.** Smythe runs the glyph
+set as one 192-node fan-out graph, one node per glyph, with up to 64 nodes; run one node at a time, the same graph took 1,149.6 seconds. Controlled offline run with fixed latency per call measures Smythe's scheduling. Glyphs are compiled, validated, and exported in parallel: 256 SVG glyphs in 8.06 seconds
+median with eight process workers, 2.20× faster than one worker, with no API calls. [Fan-out benchmark](benchmarks/glyph_screensaver_benchmark.md) ·
 [SVG workflow benchmark](benchmarks/svg_v2_results.md)
 
 <p align="center">
