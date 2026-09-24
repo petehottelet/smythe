@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import os
 import stat
 import struct
@@ -11,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
-from smythe._images import NOT_ALLOWED_MESSAGE, open_image, webp_dimensions
+from smythe._images import NOT_ALLOWED_MESSAGE, gif_dimensions, open_image, webp_dimensions
 
 
 _SUPPORTED_IMAGE_MIME_BY_FORMAT = {
@@ -50,11 +51,15 @@ def inspect_artifact(data: bytes, declared_mime_type: str) -> ArtifactInspection
 
     PNG, JPEG, GIF, and WebP candidates are verified and fully decoded with
     Pillow before their MIME type or dimensions are accepted. Declared sizes,
-    including the canvas every GIF frame requires, are bounded from the bytes
-    before Pillow parses them, and each frame again before it is decoded.
-    Unknown non-image binary types retain their declared MIME type and omit
-    dimensions. Declared image data fails closed when it cannot be decoded.
-    No other Pillow format plugin is consulted, whatever the declared MIME type.
+    including a WebP canvas and the canvas every GIF frame requires, are
+    bounded from the bytes before Pillow parses them, whatever
+    ``PIL.Image.MAX_IMAGE_PIXELS`` allows, and each frame again before it is
+    decoded. A GIF whose blocks Pillow would read past a data sub-block
+    terminator (see :func:`smythe._images.gif_dimensions`) is refused as
+    undecodable before Pillow reads it. Unknown non-image binary types retain
+    their declared MIME type and omit dimensions. Declared image data fails
+    closed when it cannot be decoded. No other Pillow format plugin is
+    consulted, whatever the declared MIME type.
     """
     if not isinstance(data, bytes):
         raise ArtifactInspectionError("artifact data must be bytes")
@@ -327,8 +332,14 @@ def _image_header(
         return "image/png", width, height
 
     if len(data) >= 10 and data[:6] in (b"GIF87a", b"GIF89a"):
-        width, height = _gif_dimensions(data)
-        return "image/gif", width, height
+        try:
+            dimensions = gif_dimensions(io.BytesIO(data))
+        except ValueError as exc:
+            # Pillow would read these blocks differently from the GIF format.
+            raise ArtifactInspectionError(
+                f"image artifact could not be fully decoded: bytes are {NOT_ALLOWED_MESSAGE}"
+            ) from exc
+        return "image/gif", *(dimensions or (None, None))
 
     if len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP":
         dimensions = webp_dimensions(data)
@@ -339,45 +350,6 @@ def _image_header(
         return "image/jpeg", *(dimensions or (None, None))
 
     return declared_mime_type, None, None
-
-
-def _gif_dimensions(data: bytes) -> tuple[int, int]:
-    """Return the largest canvas Pillow reaches while seeking every frame.
-
-    A frame may extend past the logical screen. Pillow then grows the canvas
-    during ``seek()`` and allocates the frame's disposal area there, before
-    any later size check can run. This walks the blocks as Pillow does,
-    including skipping stray bytes between them.
-    """
-    width, height = struct.unpack("<HH", data[6:10])
-    offset = 13
-    if len(data) > 10 and data[10] & 0x80:  # global color table
-        offset += 3 << ((data[10] & 7) + 1)
-    while offset < len(data):
-        block = data[offset]
-        if block == 0x3B:  # trailer
-            break
-        if block == 0x2C:  # image descriptor
-            if offset + 10 > len(data):
-                break
-            left, top, frame_width, frame_height, flags = struct.unpack(
-                "<HHHHB", data[offset + 1 : offset + 10]
-            )
-            width = max(width, left + frame_width)
-            height = max(height, top + frame_height)
-            offset += 10
-            if flags & 0x80:  # local color table
-                offset += 3 << ((flags & 7) + 1)
-            offset += 1  # LZW minimum code size
-        elif block == 0x21:  # extension introducer and label
-            offset += 2
-        else:
-            offset += 1
-            continue
-        while offset < len(data) and data[offset]:  # data sub-blocks
-            offset += data[offset] + 1
-        offset += 1
-    return width, height
 
 
 def _jpeg_dimensions(data: bytes) -> tuple[int, int] | None:

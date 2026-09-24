@@ -354,13 +354,14 @@ def _openai_with_mock(response):
     return p, mock_client
 
 
-def _make_openai_response(content=None, tool_calls=None, finish_reason="stop"):
+def _make_openai_response(content=None, tool_calls=None, finish_reason="stop", refusal=None):
     from unittest.mock import MagicMock
 
     response = MagicMock()
     choice = MagicMock()
     choice.message.content = content
     choice.message.tool_calls = tool_calls
+    choice.message.refusal = refusal
     choice.finish_reason = finish_reason
     response.choices = [choice]
     response.usage = MagicMock(prompt_tokens=10, completion_tokens=5)
@@ -1049,6 +1050,56 @@ def test_gemini_filtered_tool_call_reports_content_filter():
     assert result.stop_reason == "content_filter"
 
 
+class _GeminiBlockedReason(str, enum.Enum):
+    """Stands in for google.genai.types.BlockedReason (a string enum)."""
+
+    BLOCKED_REASON_UNSPECIFIED = "BLOCKED_REASON_UNSPECIFIED"
+    SAFETY = "SAFETY"
+    OTHER = "OTHER"
+
+
+def _gemini_blocked_prompt_response(block_reason, *, candidates=()):
+    from unittest.mock import MagicMock
+
+    response = MagicMock()
+    response.text = None  # The SDK's text is None without candidates.
+    response.candidates = list(candidates) if candidates is not None else None
+    response.function_calls = None
+    response.prompt_feedback.block_reason = block_reason
+    response.usage_metadata = MagicMock(prompt_token_count=12, candidates_token_count=None)
+    return response
+
+
+@pytest.mark.parametrize("block_reason,expected", [
+    (_GeminiBlockedReason.SAFETY, "content_filter"),
+    (_GeminiBlockedReason.OTHER, "content_filter"),
+    ("PROHIBITED_CONTENT", "content_filter"),
+    ("BLOCKLIST", "content_filter"),
+    ("IMAGE_SAFETY", "content_filter"),
+    ("A_REASON_ADDED_LATER", "content_filter"),
+    (_GeminiBlockedReason.BLOCKED_REASON_UNSPECIFIED, "end_turn"),
+    ("BLOCK_REASON_UNSPECIFIED", "end_turn"),
+    (None, "end_turn"),
+])
+@pytest.mark.parametrize("candidates", [(), None], ids=["empty", "absent"])
+def test_gemini_blocked_prompt_reports_content_filter(block_reason, expected, candidates):
+    """Regression: a prompt Gemini blocked returns no candidates and sets
+    prompt_feedback.block_reason; it completed as an empty "end_turn" answer."""
+    p, _ = _gemini_with_mock(_gemini_blocked_prompt_response(block_reason, candidates=candidates))
+    result = asyncio.run(p.complete("sys", "prompt", "gemini-3-pro"))
+    assert result.stop_reason == expected
+    assert result.text == ""
+    assert result.prompt_tokens == 12
+
+
+def test_gemini_block_reason_beside_candidates_keeps_their_finish_reason():
+    response = _gemini_finish_response(_GeminiFinishReason.STOP)
+    response.prompt_feedback.block_reason = "SAFETY"
+    p, _ = _gemini_with_mock(response)
+    result = asyncio.run(p.complete("sys", "prompt", "gemini-3-pro"))
+    assert result.stop_reason == "end_turn"
+
+
 def test_openai_content_filter_finish_reason_reports_content_filter():
     rc = _openai_tool_call("call_1", "wx__get_weather", '{"city": "Paris"}')
     for tool_calls in (None, [rc]):
@@ -1060,6 +1111,31 @@ def test_openai_content_filter_finish_reason_reports_content_filter():
         )
         # Not "end_turn", nor "tool_use" (which ran the calls) when a call is present.
         assert result.stop_reason == "content_filter"
+
+
+def test_openai_message_refusal_reports_refusal():
+    """Regression: a refusal arrives as finish_reason "stop" with no content and
+    the explanation in message.refusal; it completed as an empty answer."""
+    p, _ = _openai_with_mock(_make_openai_response(refusal="I'm sorry, I can't help with that."))
+    result = asyncio.run(p.complete("sys", "prompt", "gpt-x"))
+    assert result.stop_reason == "refusal"
+    assert result.text == ""
+
+
+@pytest.mark.parametrize("refusal", [None, ""])
+def test_openai_without_a_refusal_keeps_text_and_tool_call_stop_reasons(refusal):
+    rc = _openai_tool_call("call_1", "wx__get_weather", '{"city": "Paris"}')
+    p, _ = _openai_with_mock(_make_openai_response(
+        tool_calls=[rc], finish_reason="tool_calls", refusal=refusal,
+    ))
+    result = asyncio.run(
+        p.chat("sys", [ChatMessage(role="user", content="q")], "m", tools=[WEATHER_TOOL])
+    )
+    assert result.stop_reason == "tool_use"
+    assert [call.name for call in result.tool_calls] == ["wx.get_weather"]
+    p, _ = _openai_with_mock(_make_openai_response(content="answer", refusal=refusal))
+    result = asyncio.run(p.complete("sys", "prompt", "gpt-x"))
+    assert (result.stop_reason, result.text) == ("end_turn", "answer")
 
 
 def test_anthropic_refusal_stop_reason_passes_through():
@@ -1079,15 +1155,21 @@ def _refusing_providers():
     )
     gemini, _ = _gemini_with_mock(_gemini_finish_response(_GeminiFinishReason.RECITATION))
     gemini_other, _ = _gemini_with_mock(_gemini_finish_response(_GeminiFinishReason.OTHER))
+    openai_refusal, _ = _openai_with_mock(_make_openai_response(refusal="I can't help with that."))
+    gemini_blocked, _ = _gemini_with_mock(_gemini_blocked_prompt_response("PROHIBITED_CONTENT"))
     return {
         "anthropic": (anthropic, "refusal"),
         "openai": (openai, "content_filter"),
         "gemini": (gemini, "content_filter"),
         "gemini-other": (gemini_other, "incomplete"),
+        "openai-refusal": (openai_refusal, "refusal"),
+        "gemini-blocked-prompt": (gemini_blocked, "content_filter"),
     }
 
 
-@pytest.mark.parametrize("name", ["anthropic", "openai", "gemini", "gemini-other"])
+@pytest.mark.parametrize("name", [
+    "anthropic", "openai", "gemini", "gemini-other", "openai-refusal", "gemini-blocked-prompt",
+])
 def test_refused_provider_output_fails_node_after_recording_cost(name):
     from smythe.budget import Sentinel
     from smythe.executor import Executor
