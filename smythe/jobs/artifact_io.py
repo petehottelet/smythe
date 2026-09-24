@@ -125,14 +125,10 @@ def _decode_image(data: bytes) -> tuple[str, int, int]:
                 decoded.load()
             # A GIF canvas only grows, so its final size is the largest.
             size = decoded.size
-    except (
-        UnidentifiedImageError,
-        OSError,
-        SyntaxError,
-        ValueError,
-        Image.DecompressionBombError,
-        Image.DecompressionBombWarning,  # Only if the host escalates it.
-    ) as exc:
+    except Exception as exc:
+        # Malformed bytes surface as many exception types (Pillow's GIF
+        # plugin also raises EOFError, IndexError and struct.error), and a
+        # host may escalate DecompressionBombWarning. All mean undecodable.
         if isinstance(exc, ArtifactInspectionError):
             raise
         if isinstance(exc, UnidentifiedImageError):

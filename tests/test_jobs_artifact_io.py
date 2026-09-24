@@ -357,3 +357,25 @@ def test_concurrent_inspections_leave_the_process_warning_filters_alone(monkeypa
 
     assert errors == []
     assert warnings.filters == before
+
+
+@pytest.mark.parametrize("gif_hex", [
+    # The last image descriptor is cut short: Pillow raises struct.error.
+    pytest.param(
+        "4749463839610800080080000000000000000021ff0b4e45545343415045322e3003010000"
+        "0021fe0268690021f90400050000002c000000000800080000080f0001081c48b0a0c18308"
+        "132a4c1810002c3b",
+        id="struct-error",
+    ),
+    # A truncated extension block: Pillow raises IndexError while seeking.
+    pytest.param(
+        "474946383961080008008000f900000000000021ff0b4e45545343415045322e3003010000"
+        "0021fe0268690088f90400050000002c000000000800080000080f0001081c48b0a0c18308"
+        "132a4c18100021",
+        id="index-error",
+    ),
+])
+def test_malformed_gif_blocks_fail_as_inspection_errors(gif_hex):
+    """Pillow's GIF plugin raised these types past the decode step."""
+    with pytest.raises(ArtifactInspectionError, match="could not be fully decoded"):
+        inspect_artifact(bytes.fromhex(gif_hex), "image/gif")
