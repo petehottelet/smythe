@@ -278,7 +278,7 @@ def test_plan_check_applies_planning_rules_without_adopting_the_candidate(store)
 
 
 @pytest.mark.parametrize("node_id, accepted", [
-    ("intro\nnotes", False), ("tab\there", False), ("x" * 508, False), ("x" * 507, True),
+    ("intro\nnotes", False), ("tab\there", False), ("x" * 257, False), ("x" * 256, True),
 ])
 def test_plan_check_applies_the_journal_node_id_rule(store, node_id, accepted):
     """The journal keys a node's calls by "node/<id>" and rejects control
@@ -291,10 +291,23 @@ def test_plan_check_applies_the_journal_node_id_rule(store, node_id, accepted):
         runtime._check_plan(candidate, Registry())
         return
     with pytest.raises(WorkflowBindingError, match=(
-        "cannot key the workflow journal: node ids must be at most 507 characters, "
+        "cannot key the workflow journal: node ids must be at most 256 characters, "
         "with no control characters"
     )):
         runtime._check_plan(candidate, Registry())
+
+
+def test_node_id_cap_leaves_room_for_every_journal_key_that_embeds_it():
+    """Ids of 499 to 507 characters fit "node/<id>" but failed at the node's
+    first supervision decision, keyed "supervision/<id>/<generation>"."""
+    from smythe.workflow import MAX_NODE_ID_CHARS
+    from smythe.workflow_store import WorkflowValidationError, _text
+
+    longest = "x" * MAX_NODE_ID_CHARS
+    _text(f"node/{longest}", "scope_id")
+    _text(f"supervision/{longest}/{10 ** 9}", "operation_key")
+    with pytest.raises(WorkflowValidationError):
+        _text(f"supervision/{'x' * 507}/0", "operation_key")
 
 
 def constrained_swarm(store, monkeypatch, selections):

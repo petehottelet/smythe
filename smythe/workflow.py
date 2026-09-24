@@ -37,6 +37,10 @@ from smythe.workflow_store import (
     WorkflowStateError, WorkflowValidationError, _is_http_rejection,
 )
 
+# Journal keys that embed a node id stop at 512 characters. Capping durable node
+# ids well below that leaves room for "supervision/<id>/<generation>".
+MAX_NODE_ID_CHARS = 256
+
 
 def _canonical(value):
     return json.dumps(json_snapshot(value), sort_keys=True, separators=(",", ":"), allow_nan=False)
@@ -309,16 +313,20 @@ class WorkflowRuntime:
         json_snapshot(graph_to_dict(graph))
         self._validate_graph_policy(graph)
         for node in graph.nodes:
-            # The journal keys every call a node makes by "node/<id>". An id it
-            # rejects would fail the node's first call, after planning is saved.
+            # The journal keys a node's calls by "node/<id>" and its supervision
+            # decisions by "supervision/<id>/<generation>", each at most 512
+            # characters without control characters. An id it rejects would fail
+            # after planning is saved; the length cap leaves room for every key.
             try:
+                if type(node.id) is not str or len(node.id) > MAX_NODE_ID_CHARS:
+                    raise WorkflowValidationError("Node id is too long for the journal")
                 CallKey("execution", f"node/{node.id}")
             except WorkflowValidationError as error:
                 shown = str(node.id)
                 shown = shown if len(shown) <= 60 else shown[:60] + "..."
                 raise WorkflowBindingError(
                     f"Node id {shown!r} cannot key the workflow journal: node ids must be "
-                    "at most 507 characters, with no control characters"
+                    f"at most {MAX_NODE_ID_CHARS} characters, with no control characters"
                 ) from error
             if fresh and (node.status is not NodeStatus.PENDING or node.result is not None):
                 raise WorkflowBindingError("A new workflow requires pending nodes without prior results")
