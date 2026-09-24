@@ -7,12 +7,11 @@ import os
 import stat
 import struct
 import tempfile
-import warnings
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
-from smythe._images import NOT_ALLOWED_MESSAGE, open_image
+from smythe._images import NOT_ALLOWED_MESSAGE, open_image, webp_dimensions
 
 
 _SUPPORTED_IMAGE_MIME_BY_FORMAT = {
@@ -50,10 +49,12 @@ def inspect_artifact(data: bytes, declared_mime_type: str) -> ArtifactInspection
     """Inspect an artifact without trusting its filename or header alone.
 
     PNG, JPEG, GIF, and WebP candidates are verified and fully decoded with
-    Pillow before their MIME type or dimensions are accepted. Unknown
-    non-image binary types retain their declared MIME type and omit dimensions.
-    Declared image data fails closed when it cannot be decoded. No other
-    Pillow format plugin is consulted, whatever the declared MIME type.
+    Pillow before their MIME type or dimensions are accepted. Declared sizes,
+    including the canvas every GIF frame requires, are bounded from the bytes
+    before Pillow parses them, and each frame again before it is decoded.
+    Unknown non-image binary types retain their declared MIME type and omit
+    dimensions. Declared image data fails closed when it cannot be decoded.
+    No other Pillow format plugin is consulted, whatever the declared MIME type.
     """
     if not isinstance(data, bytes):
         raise ArtifactInspectionError("artifact data must be bytes")
@@ -94,32 +95,43 @@ def _decode_image(data: bytes) -> tuple[str, int, int]:
             "Image artifact validation requires Pillow; install smythe[jobs]"
         ) from exc
 
+    # Explicit limits bound every decode. Pillow's warning filters are left
+    # alone: they are process-global, and Jobs inspects in worker threads.
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", Image.DecompressionBombWarning)
-            # Only the PNG, JPEG, GIF, and WebP plugins may parse provider
-            # bytes; any other format is refused before its plugin runs.
-            with open_image(data, max_pixels=MAX_IMAGE_PIXELS) as candidate:
-                _validate_image_shape(
-                    *candidate.size,
-                    frames=getattr(candidate, "n_frames", 1),
-                )
-                candidate.verify()
-            with open_image(data, max_pixels=MAX_IMAGE_PIXELS) as decoded:
-                format_name = (decoded.format or "").upper()
-                size = decoded.size
-                frame_count = getattr(decoded, "n_frames", 1)
-                _validate_image_shape(*size, frames=frame_count)
-                for frame_index in range(frame_count):
-                    decoded.seek(frame_index)
-                    decoded.load()
+        # Only the PNG, JPEG, GIF, and WebP plugins may parse provider
+        # bytes; any other format is refused before its plugin runs.
+        with open_image(data, max_pixels=MAX_IMAGE_PIXELS) as candidate:
+            _validate_image_shape(
+                *candidate.size,
+                frames=getattr(candidate, "n_frames", 1),
+            )
+            candidate.verify()
+        with open_image(data, max_pixels=MAX_IMAGE_PIXELS) as decoded:
+            format_name = (decoded.format or "").upper()
+            frame_count = getattr(decoded, "n_frames", 1)
+            _validate_image_shape(*decoded.size, frames=frame_count)
+            decoded_pixels = 0
+            for frame_index in range(frame_count):
+                decoded.seek(frame_index)
+                # Seeking can resize: a GIF frame may grow the canvas and each
+                # MPO frame declares its own size. Bound this frame and the
+                # running total before its pixels are allocated.
+                _validate_image_shape(*decoded.size, frames=1)
+                decoded_pixels += decoded.size[0] * decoded.size[1]
+                if decoded_pixels > MAX_TOTAL_DECODED_PIXELS:
+                    raise ArtifactInspectionError(
+                        "decoded image frames exceed the aggregate pixel limit"
+                    )
+                decoded.load()
+            # A GIF canvas only grows, so its final size is the largest.
+            size = decoded.size
     except (
         UnidentifiedImageError,
         OSError,
         SyntaxError,
         ValueError,
         Image.DecompressionBombError,
-        Image.DecompressionBombWarning,
+        Image.DecompressionBombWarning,  # Only if the host escalates it.
     ) as exc:
         if isinstance(exc, ArtifactInspectionError):
             raise
@@ -319,11 +331,11 @@ def _image_header(
         return "image/png", width, height
 
     if len(data) >= 10 and data[:6] in (b"GIF87a", b"GIF89a"):
-        width, height = struct.unpack("<HH", data[6:10])
+        width, height = _gif_dimensions(data)
         return "image/gif", width, height
 
     if len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP":
-        dimensions = _webp_dimensions(data)
+        dimensions = webp_dimensions(data)
         return "image/webp", *(dimensions or (None, None))
 
     if len(data) >= 4 and data.startswith(b"\xff\xd8"):
@@ -331,6 +343,45 @@ def _image_header(
         return "image/jpeg", *(dimensions or (None, None))
 
     return declared_mime_type, None, None
+
+
+def _gif_dimensions(data: bytes) -> tuple[int, int]:
+    """Return the largest canvas Pillow reaches while seeking every frame.
+
+    A frame may extend past the logical screen. Pillow then grows the canvas
+    during ``seek()`` and allocates the frame's disposal area there, before
+    any later size check can run. This walks the blocks as Pillow does,
+    including skipping stray bytes between them.
+    """
+    width, height = struct.unpack("<HH", data[6:10])
+    offset = 13
+    if len(data) > 10 and data[10] & 0x80:  # global color table
+        offset += 3 << ((data[10] & 7) + 1)
+    while offset < len(data):
+        block = data[offset]
+        if block == 0x3B:  # trailer
+            break
+        if block == 0x2C:  # image descriptor
+            if offset + 10 > len(data):
+                break
+            left, top, frame_width, frame_height, flags = struct.unpack(
+                "<HHHHB", data[offset + 1 : offset + 10]
+            )
+            width = max(width, left + frame_width)
+            height = max(height, top + frame_height)
+            offset += 10
+            if flags & 0x80:  # local color table
+                offset += 3 << ((flags & 7) + 1)
+            offset += 1  # LZW minimum code size
+        elif block == 0x21:  # extension introducer and label
+            offset += 2
+        else:
+            offset += 1
+            continue
+        while offset < len(data) and data[offset]:  # data sub-blocks
+            offset += data[offset] + 1
+        offset += 1
+    return width, height
 
 
 def _jpeg_dimensions(data: bytes) -> tuple[int, int] | None:
@@ -367,18 +418,4 @@ def _jpeg_dimensions(data: bytes) -> tuple[int, int] | None:
             height, width = struct.unpack(">HH", data[offset + 3 : offset + 7])
             return width, height
         offset += segment_length
-    return None
-
-
-def _webp_dimensions(data: bytes) -> tuple[int, int] | None:
-    if len(data) < 30:
-        return None
-    chunk = data[12:16]
-    if chunk == b"VP8X" and len(data) >= 30:
-        width = 1 + int.from_bytes(data[24:27], "little")
-        height = 1 + int.from_bytes(data[27:30], "little")
-        return width, height
-    if chunk == b"VP8L" and len(data) >= 25 and data[20] == 0x2F:
-        bits = int.from_bytes(data[21:25], "little")
-        return (bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1
     return None

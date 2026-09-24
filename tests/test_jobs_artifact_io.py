@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import io
+import struct
+import threading
+import warnings
+from contextlib import contextmanager
 
 import pytest
 
@@ -194,3 +198,162 @@ def test_animated_image_frame_count_is_bounded(monkeypatch):
 
     with pytest.raises(ArtifactInspectionError, match="frame"):
         inspect_artifact(buffer.getvalue(), "image/gif")
+
+
+def _gif(screen: tuple[int, int], frames: list[tuple[int, int, int, int, int]]) -> bytes:
+    """Build a GIF from ``(left, top, width, height, disposal)`` frame descriptors.
+
+    Each frame carries one LZW-coded pixel, so only 1x1 frames decode fully;
+    larger frames exist only to be refused before Pillow reads them.
+    """
+    data = bytearray(b"GIF89a" + struct.pack("<HHBBB", *screen, 0x80, 0, 0))
+    data += b"\x00\x00\x00\xff\xff\xff"  # two-color global color table
+    for left, top, width, height, disposal in frames:
+        data += b"\x21\xf9\x04" + bytes([disposal << 2, 0, 0, 0, 0])  # graphic control
+        data += b"\x2c" + struct.pack("<HHHHB", left, top, width, height, 0)
+        data += bytes([2, 2, 0x44, 0x01, 0])  # code size 2: clear, index 0, end
+    return bytes(data + b"\x3b")
+
+
+@pytest.mark.parametrize(
+    ("frames", "interlude"),
+    [
+        # A 1x1 frame far outside the 1x1 screen grows the canvas to 9001x9001.
+        ([(0, 0, 1, 1, 0), (9000, 9000, 1, 1, 0)], b""),
+        # A 9001x9001 frame also has its disposal area allocated inside seek().
+        ([(0, 0, 1, 1, 0), (0, 0, 9001, 9001, 2)], b""),
+        # A first frame that large is allocated while Pillow opens the file.
+        ([(0, 0, 9001, 9001, 2)], b""),
+        # A comment block and a stray byte, which Pillow skips, hide nothing.
+        ([(0, 0, 1, 1, 0), (9000, 9000, 1, 1, 0)], b"\x21\xfe\x03,,,\x02,,\x00\x07"),
+    ],
+    ids=["offset-frame", "disposal-frame", "first-frame", "after-comment"],
+)
+def test_gif_frames_cannot_grow_the_canvas_past_the_pixel_limit(monkeypatch, frames, interlude):
+    """Regression: only the first frame's size was checked. A 74-byte GIF whose
+    second frame grew the canvas to 9001x9001 was accepted with its first-frame
+    size after a 718 MB decode."""
+    from PIL import GifImagePlugin
+
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", None)  # A host may disable Pillow's limit.
+    calls = _spy_on_plugin_open(monkeypatch, GifImagePlugin.GifImageFile)
+    data = _gif((1, 1), frames)
+    last_frame = data.rindex(b"\x21\xf9\x04")
+    data = data[:last_frame] + interlude + data[last_frame:]
+
+    with pytest.raises(ArtifactInspectionError, match="pixel limit"):
+        inspect_artifact(data, "image/gif")
+    assert calls == []
+
+
+def test_gif_canvas_growth_counts_toward_the_aggregate_pixel_limit(monkeypatch):
+    monkeypatch.setattr(artifact_io, "MAX_TOTAL_DECODED_PIXELS", 25_000)
+    # The second frame grows the 1x1 canvas to 100x100: four frames decode 30,001 pixels.
+    data = _gif((1, 1), [(0, 0, 1, 1, 0)] + [(99, 99, 1, 1, 0)] * 3)
+
+    with pytest.raises(ArtifactInspectionError, match="aggregate pixel limit"):
+        inspect_artifact(data, "image/gif")
+
+
+def test_gif_reports_the_canvas_its_frames_grow_to():
+    observed = inspect_artifact(_gif((1, 1), [(0, 0, 1, 1, 0), (99, 49, 1, 1, 0)]), "image/gif")
+
+    assert (observed.mime_type, observed.width, observed.height) == ("image/gif", 100, 50)
+
+
+def test_later_mpo_frames_are_bounded_before_they_are_decoded(monkeypatch):
+    """Regression: each MPO frame declares its own size and only the first was
+    checked, so a 1.4 KB file could allocate gigabytes before its format was
+    refused."""
+    from PIL import ImageFile
+
+    buffer = io.BytesIO()
+    frames = [Image.new("RGB", (8, 8), (index * 40, 0, 0)) for index in range(2)]
+    frames[0].save(buffer, format="MPO", save_all=True, append_images=frames[1:])
+    data = bytearray(buffer.getvalue())
+    start_of_frame = b"\xff\xc0\x00\x11\x08"  # baseline SOF0 for 8-bit RGB
+    second = data.index(start_of_frame, data.index(start_of_frame) + 1)
+    data[second + 5 : second + 9] = struct.pack(">HH", 9000, 9000)  # height, width
+    prepared = []
+    original = ImageFile.ImageFile.load_prepare
+
+    def spy(self):
+        prepared.append(self.size)
+        return original(self)
+
+    monkeypatch.setattr(ImageFile.ImageFile, "load_prepare", spy)
+
+    with pytest.raises(ArtifactInspectionError, match="pixel limit"):
+        inspect_artifact(bytes(data), "image/jpeg")
+    assert (9000, 9000) not in prepared
+
+
+def _webp_declaring(chunk: bytes, width: int, height: int) -> bytes:
+    """Build the smallest WebP file whose first chunk declares this canvas."""
+    if chunk == b"VP8 ":  # key-frame tag, start code, 14-bit sizes, filler
+        payload = b"\x30\x00\x00\x9d\x01\x2a" + struct.pack("<HH", width, height) + bytes(10)
+    elif chunk == b"VP8L":  # signature, then 14-bit sizes minus one
+        payload = b"\x2f" + ((width - 1) | (height - 1) << 14).to_bytes(4, "little")
+    else:  # VP8X: flags, then 24-bit sizes minus one
+        payload = bytes(4) + (width - 1).to_bytes(3, "little") + (height - 1).to_bytes(3, "little")
+    body = b"WEBP" + chunk + struct.pack("<I", len(payload)) + payload + bytes(len(payload) % 2)
+    return b"RIFF" + struct.pack("<I", len(body)) + body
+
+
+@pytest.mark.parametrize("chunk", [b"VP8 ", b"VP8L", b"VP8X"])
+def test_webp_canvas_is_bounded_before_libwebp_allocates_it(monkeypatch, chunk):
+    """Regression: a 40-byte lossy WebP declaring 16383x16383 reached libwebp,
+    which allocated about 2 GB before any size check, and a 26-byte lossless
+    one slipped under the header parser's 30-byte minimum the same way."""
+    from PIL import WebPImagePlugin
+
+    calls = _spy_on_plugin_open(monkeypatch, WebPImagePlugin.WebPImageFile)
+
+    with pytest.raises(ArtifactInspectionError, match="pixel limit"):
+        inspect_artifact(_webp_declaring(chunk, 8193, 8193), "image/webp")
+    assert calls == []
+
+
+def test_concurrent_inspections_leave_the_process_warning_filters_alone(monkeypatch):
+    """Regression: inspection escalated DecompressionBombWarning inside
+    warnings.catch_warnings(), which swaps the process-global filter list.
+    Overlapping worker-thread inspections left the "error" filter installed."""
+    both_open = threading.Barrier(2, timeout=10)
+    first_done = threading.Event()
+    seen = threading.local()
+    original_open = artifact_io.open_image
+
+    @contextmanager
+    def overlapping_open(source, **kwargs):
+        # Hold both inspections inside their decode at once, then let the
+        # first finish before the second, as two worker threads can.
+        if not getattr(seen, "opened", False):
+            seen.opened = True
+            both_open.wait()
+            if threading.current_thread().name == "second":
+                assert first_done.wait(10)
+        with original_open(source, **kwargs) as image:
+            yield image
+
+    monkeypatch.setattr(artifact_io, "open_image", overlapping_open)
+    before = list(warnings.filters)
+    errors = []
+
+    def inspect(name):
+        try:
+            inspect_artifact(_png_bytes((4, 4)), "image/png")
+        except BaseException as exc:  # Reported by the assertion below.
+            errors.append(exc)
+        finally:
+            if name == "first":
+                first_done.set()
+
+    threads = [threading.Thread(target=inspect, args=(name,), name=name)
+               for name in ("first", "second")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(30)
+
+    assert errors == []
+    assert warnings.filters == before
