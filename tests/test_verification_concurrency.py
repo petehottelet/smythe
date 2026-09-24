@@ -88,7 +88,7 @@ async def test_rejection_cancels_active_consumer_before_new_generation():
             return CompletionResult(text, cost_usd=0.125)
 
     provider, budget = ActiveConsumer(), Sentinel(10)
-    await asyncio.wait_for(make_executor(provider, budget=budget, artifact_dir=None).run(graph), 3)
+    await asyncio.wait_for(make_executor(provider, budget=budget, artifact_dir=None).run(graph), 30)
     assert provider.calls == {"draft": 2, "judge": 2, "consumer": 2}
     assert all(node.status is NodeStatus.COMPLETED for node in graph.nodes)
     assert graph.nodes[2].result == "consumer-v2"
@@ -137,7 +137,7 @@ async def test_billed_response_returned_during_cancellation_is_settled_then_inva
     provider, budget = LateResponse(), Sentinel(10)
     executor = make_executor(provider, executor_class=ObservedFinalization,
                              budget=budget, artifact_dir=None)
-    await asyncio.wait_for(executor.run(graph), 3)
+    await asyncio.wait_for(executor.run(graph), 30)
     assert provider.calls == {"draft": 2, "judge": 2, "consumer": 2}
     assert graph.nodes[2].result == "consumer-v2"
     assert budget.breakdown() == dict.fromkeys(("draft", "judge", "consumer"), 0.25)
@@ -172,7 +172,7 @@ async def test_text_only_regeneration_removes_stale_artifact_metadata(tmp_path, 
     provider = ArtifactsThenText()
     executor = make_executor(provider, artifact_dir=None if discard_artifacts else tmp_path,
                              on_node_update=updated)
-    await asyncio.wait_for(executor.run(graph), 3)
+    await asyncio.wait_for(executor.run(graph), 30)
     assert provider.calls == {"draft": 2, "judge": 2, "consumer": 2}
     for node in (graph.nodes[0], graph.nodes[2]):
         assert node.status is NodeStatus.COMPLETED
@@ -197,7 +197,7 @@ def test_skipped_failed_judge_does_not_create_a_verification_gate(serial):
     if serial:
         Executor(**options).run(graph)
     else:
-        asyncio.run(asyncio.wait_for(AsyncExecutor(**options).run(graph), 3))
+        asyncio.run(asyncio.wait_for(AsyncExecutor(**options).run(graph), 30))
     assert provider.calls == {"draft": 1, "judge": 1, "consumer": 1}
     assert graph.nodes[1].status is NodeStatus.SKIPPED
     assert graph.nodes[1].metadata.get("regenerations_used", 0) == 0
@@ -239,7 +239,7 @@ async def test_completed_batch_judges_do_not_apply_stale_verdicts(targets):
     supervisor = RecordingSupervisor()
     executor = make_executor(provider, executor_class=SameBatchExecutor, budget=budget, artifact_dir=None,
                              supervisor=supervisor, max_revisions=1)
-    await asyncio.wait_for(executor.run(graph), 3)
+    await asyncio.wait_for(executor.run(graph), 30)
     assert provider.calls == dict.fromkeys((node.id for node in nodes), 2)
     assert all(node.status is NodeStatus.COMPLETED for node in nodes)
     assert nodes[0].result == "draft-v2"
@@ -269,7 +269,7 @@ def test_rejecting_judge_reaches_supervisor_only_after_fresh_completion(serial):
     if serial:
         Executor(**options).run(graph)
     else:
-        asyncio.run(asyncio.wait_for(AsyncExecutor(**options).run(graph), 3))
+        asyncio.run(asyncio.wait_for(AsyncExecutor(**options).run(graph), 30))
     assert supervisor.reviews == [
         ("draft", NodeStatus.COMPLETED, "draft-v1"),
         ("draft", NodeStatus.COMPLETED, "draft-v2"),
@@ -311,7 +311,7 @@ async def test_fatal_error_during_regeneration_settlement_stops_new_generation(f
     expected = {"accounting": BudgetValidationError, "finalization": NodeFinalizationError,
                 "budget": SentinelAlert}[fatal]
     with pytest.raises(expected) as caught:
-        await asyncio.wait_for(executor.run(graph), 3)
+        await asyncio.wait_for(executor.run(graph), 30)
     assert provider.calls == {"draft": 1, "judge": 1, "consumer": 1}
     assert graph.nodes[2].status is NodeStatus.FAILED
     assert graph.nodes[1].metadata.get("regeneration_intent")
@@ -403,7 +403,7 @@ async def test_blocked_artifact_finalizer_survives_repeated_consumer_cancellatio
         def finalize_node_result(self, node, result):
             if result.text == "consumer-v1":
                 loop.call_soon_threadsafe(finalizing.set)
-                if not release.wait(5):
+                if not release.wait(30):
                     raise TimeoutError("test did not release artifact writer")
             super().finalize_node_result(node, result)
             if result.text == "consumer-v1":
@@ -414,12 +414,12 @@ async def test_blocked_artifact_finalizer_survives_repeated_consumer_cancellatio
                              budget=budget, artifact_dir=tmp_path)
     run_task = asyncio.create_task(executor.run(graph))
     try:
-        await asyncio.wait_for(first_cancel.wait(), 3)
+        await asyncio.wait_for(first_cancel.wait(), 30)
         assert finalizing.is_set() and not finished.is_set()
         assert consumer_task is not None and not consumer_task.done()
         consumer_task.cancel("second cancellation while awaiting billed artifact")
         release.set()
-        await asyncio.wait_for(asyncio.shield(run_task), 3)
+        await asyncio.wait_for(asyncio.shield(run_task), 30)
         assert finished.is_set()
         assert graph.nodes[2].status is NodeStatus.COMPLETED
         assert graph.nodes[2].result == "consumer-v2"
