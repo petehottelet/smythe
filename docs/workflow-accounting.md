@@ -208,7 +208,10 @@ that commit resumes through local settlement and decoding. Accepted outputs
 are replayed locally until a graph checkpoint consumes them. Planning saves
 the exact parsed graph and agent identities before execution starts. Supervision
 saves the graph it reviewed and its decision, then commits the resulting
-control state and consumed operation together. Verification retains its existing
+control state and consumed operation together. Calls are keyed by node id and
+generation, so a revision that adds a node under the id of a node with
+journaled calls is rejected and traced: the new node would conflict with, or
+replay, the earlier node's calls. Verification retains its existing
 generation and regeneration receipts.
 
 The SQLite journal uses WAL, full synchronization, fenced leases, and checkpoint

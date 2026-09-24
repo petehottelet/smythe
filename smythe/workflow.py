@@ -706,8 +706,19 @@ class _WorkflowSupervisor:
         # to PENDING on recovery must not make that work rewritable history.
         targets = set(proposal.drop_node_ids) | set(proposal.rewire)
         generations = {item.id: node_generation(item) for item in graph.nodes if item.id in targets}
+        # Calls are keyed by node id and generation. A new node that reuses the
+        # id of a dropped node that made calls would conflict with, or replay,
+        # that node's calls.
+        present = {item.id for item in graph.nodes}
+        reused = {f"node/{item.id}" for item in proposal.add_nodes if item.id not in present}
         for call in runtime.store.inspect_run(runtime.run_id)["calls"]:
             call_key = call["key"]
+            if call_key["scope_id"] in reused:
+                runtime.trace.on_revision(
+                    node, proposal, applied=False,
+                    detail="Revision adds a node whose id already has calls in the durable journal",
+                )
+                return None
             target = call_key["scope_id"].removeprefix("node/")
             if (call_key["phase"] in {"execution", "verification"}
                     and call_key["scope_id"].startswith("node/") and target in generations

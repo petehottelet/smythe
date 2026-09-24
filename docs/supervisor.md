@@ -83,7 +83,10 @@ Five guardrails do that:
    judges, no cutting a gate off from that node, no node id `__synthesis__`
    (reserved for the synthesizer's budget entry) — and mutates nothing if
    any check fails. A malformed proposal costs a trace entry, not a corrupt
-   run. These rules apply to every supervisor, including one you write.
+   run. These rules apply to every supervisor, including one you write. A
+   [durable run](workflow-accounting.md#recovery-boundaries) also rejects a
+   revision that adds a node under the id of a node that already made
+   journaled calls.
 3. **Contained proposal failure.** Ordinary supervisor errors and invalid
    revisions are recorded and ignored. Invalid provider accounting raises
    `BudgetValidationError`, stops the run, and blocks resume until the charge
