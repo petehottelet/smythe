@@ -67,11 +67,18 @@ plans, caller-built and YAML graphs, edited handoffs, recovered checkpoints,
 and replayed planning decisions. A revision is checked on a detached candidate
 before it can change the live graph. A disallowed graph fails before node
 execution; any planning charges remain in the ledger. The planner's own limits
-apply first: `LLMArchitect` retries a plan over 8 nodes or 5 levels, so keep
-its `max_nodes` at or below the policy's, and pass
-`architect=LLMArchitect(max_nodes=...)` for a policy above 8 nodes. The policy
-is checked after planning, and resume replays the saved plan, so a plan the
-policy rejects needs a new run.
+also apply: `LLMArchitect` retries a plan over 8 nodes or 5 levels, so pass
+`architect=LLMArchitect(max_nodes=...)` for a policy above 8 nodes.
+
+**Changed in 0.8.2:** the built-in LLM and constrained architects check each
+generated plan against the policy and the run's other graph rules, such as
+plain-text nodes, before planning is saved. A rejected plan goes back to the
+model with the reason, like a schema error, and each repair is a new journaled,
+paid call. When `max_retries` repairs are used up, planning raises
+`ArchitectError`. Resuming replays the saved attempts to the same result
+without buying them again, so start a new run. A run that 0.8.1 stopped after
+such a rejection resumes: its saved plan replays, is rejected, and the planner
+asks for a repair if `max_retries` allows one.
 
 `max_nodes` counts every node in the current graph, including verification,
 completed, and skipped nodes. Optional limits set to `None` add no restriction.
@@ -172,7 +179,9 @@ cancels nothing. A cancelled node whose generation request was already sent
 holds unknown exposure at its quoted ceiling, so the run is blocked with
 `unknown_exposure` and resuming it fails. Runs that execute one node at a time
 (`parallel=False`, the default, or `max_concurrency=1`) have no other call in
-flight.
+flight. A node's `timeout_s` also cancels a call that was already sent, with
+the same result, even in a serial run. A generated plan cannot set a timeout
+below 60 seconds.
 
 `result.total_cost_usd` is a compatibility projection of confirmed charges.
 `workflow_accounting` reports exact `confirmed_nanousd`, `reserved_nanousd`,

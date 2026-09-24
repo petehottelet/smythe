@@ -10,7 +10,7 @@ from smythe.constrained_prompts import (
     CONSTRAINED_SYSTEM_PROMPT,
     build_constrained_user_prompt,
 )
-from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
+from smythe.constrained_planner import DEFAULT_MAX_NODES, ConstrainedArchitect, SubGraphTemplate
 from smythe.graph import ExecutionGraph, Node
 from smythe.planner import ArchitectError
 from smythe.provider import CompletionResult, Provider
@@ -160,7 +160,7 @@ def test_constrained_planner_retries():
     graph, _ = planner.plan(task)
     assert len(graph.nodes) == 1
     assert len(provider.prompts_received) == 2
-    assert "could not be parsed" in provider.prompts_received[1]
+    assert "was rejected" in provider.prompts_received[1]
 
 
 def test_constrained_planner_prompt_contains_menu():
@@ -234,6 +234,59 @@ def test_constrained_planner_catches_bad_params_type():
     graph, _ = planner.plan(task)
     assert len(graph.nodes) == 1
     assert len(provider.prompts_received) == 2
+
+
+def _counting_templates(calls):
+    """A fan-out template whose model-chosen param multiplies its nodes."""
+    def fan(task, copies=1):
+        calls.append(("fan", copies))
+        return [Node(id=f"part-{i}", label=f"Part {i}") for i in range(copies)], Registry()
+
+    def tail(task):
+        calls.append(("tail", None))
+        return [Node(id="tail", label="Finish")], Registry()
+
+    return [SubGraphTemplate("fan", "Fan out copies", fan), SubGraphTemplate("tail", "Finish", tail)]
+
+
+def test_node_cap_stops_param_amplification_before_later_builders_and_repairs():
+    """A 66-byte reply used to compose a 200,001-node graph."""
+    calls = []
+    provider = MockConstrainedProvider([
+        json.dumps([{"template": "fan", "params": {"copies": 5}}, {"template": "tail"}]),
+        json.dumps([{"template": "fan", "params": {"copies": 3}}, {"template": "tail"}]),
+    ])
+    planner = ConstrainedArchitect(provider=provider, templates=_counting_templates(calls), max_nodes=4)
+
+    graph, _ = planner.plan(Task(goal="Fan out"))
+
+    assert len(graph.nodes) == 4
+    assert calls == [("fan", 5), ("fan", 3), ("tail", None)]
+    assert "Selection at index 0 brings the graph to 5 nodes; the limit is 4" in provider.prompts_received[1]
+
+
+def test_node_cap_counts_the_whole_composition():
+    provider = MockConstrainedProvider([json.dumps([{"template": "tail"}] * 5)])
+    planner = ConstrainedArchitect(provider=provider, templates=_counting_templates([]),
+                                   max_nodes=4, max_retries=0)
+    with pytest.raises(ArchitectError, match="index 4 brings the graph to 5 nodes; the limit is 4"):
+        planner.plan(Task(goal="Too many steps"))
+
+
+def test_default_node_cap_admits_64_nodes():
+    templates = _counting_templates([])
+    at_cap = MockConstrainedProvider([json.dumps([{"template": "fan", "params": {"copies": 64}}])])
+    graph, _ = ConstrainedArchitect(provider=at_cap, templates=templates).plan(Task(goal="At the cap"))
+    assert len(graph.nodes) == DEFAULT_MAX_NODES == 64
+    over = MockConstrainedProvider([json.dumps([{"template": "fan", "params": {"copies": 65}}])])
+    with pytest.raises(ArchitectError, match="65 nodes; the limit is 64"):
+        ConstrainedArchitect(provider=over, templates=templates, max_retries=0).plan(Task(goal="Over"))
+
+
+@pytest.mark.parametrize("value", [0, -1, True, 1.5, "64", None])
+def test_node_cap_must_be_a_positive_integer(value):
+    with pytest.raises(ValueError, match="max_nodes"):
+        ConstrainedArchitect(provider=MockConstrainedProvider([]), templates=TEMPLATES, max_nodes=value)
 
 
 @pytest.mark.parametrize("bad_response, message", [

@@ -9,8 +9,9 @@ from smythe import (
     LocalOnly, OfflineProvider, SQLiteWorkflowStore, Swarm, Task, WorkflowBindingError,
     WorkflowGraphPolicy,
 )
-from smythe.checkpoint import graph_to_dict, node_to_dict
+from smythe.checkpoint import graph_from_dict, graph_to_dict, node_to_dict
 from smythe.graph import Node, NodeStatus, Revision
+from smythe.loader import build_graph_from_model_output
 from smythe.planner import ArchitectError, LLMArchitect
 from smythe.provider_responses import OpenAIResponsesProvider
 from test_workflow_native_runtime import native_transport as native_transport
@@ -158,11 +159,13 @@ def test_generated_graph_controls_are_rejected_before_execution(store, monkeypat
                       1, node_model="offline", max_retries=1, max_regenerations=0,
                   ))
     runs = capture_runs(store, monkeypatch)
-    with pytest.raises(WorkflowBindingError, match="Graph policy"):
+    # The planner repairs each rejection; this provider repeats the plan.
+    with pytest.raises(ArchitectError, match="Graph policy"):
         swarm.plan(Task("Report"))
     accounting = store.inspect_run(runs[0])
-    assert accounting["call_count"] == 1 and accounting["calls"][0]["key"]["phase"] == "planning"
-    assert accounting["calls"][0]["billing_state"] == "known"
+    assert accounting["call_count"] == 3
+    assert {call["key"]["phase"] for call in accounting["calls"]} == {"planning"}
+    assert all(call["billing_state"] == "known" for call in accounting["calls"])
     assert store.get_checkpoint(runs[0]) is None
 
 
@@ -190,31 +193,32 @@ def test_rejected_native_planning_stays_metered_and_replays_without_rebuying(
     model = "gpt-6-astra"
     native_transport.planning_outputs = [json.dumps({"nodes": [
         {"id": f"n{i}", "label": f"Step {i}", "max_retries": 0} for i in range(9)
-    ]})]
+    ]})] * 3
     provider = OpenAIResponsesProvider(api_key="dummy-no-network", max_output_tokens=100)
     swarm = Swarm(
         model=model, provider=provider, run_store=store, max_budget_usd=1,
-        # The planner's own limit (default 8) would reject and repair this
-        # plan; raise it so the graph policy is what refuses the result.
+        # The planner's own limit (default 8) would also reject this plan;
+        # raise it so the graph policy is what refuses each attempt.
         architect=LLMArchitect(provider, planning_model=model, max_nodes=9),
         graph_policy=WorkflowGraphPolicy(8, node_model=model, max_retries=0, max_regenerations=0),
     )
     runs = capture_runs(store, monkeypatch)
-    with pytest.raises(WorkflowBindingError, match="max_nodes=8"):
+    with pytest.raises(ArchitectError, match="max_nodes=8"):
         swarm.execute(Task("Report"))
     run_id = runs[0]
     before = store.inspect_run(run_id)
-    assert len(native_transport.requests) == len(native_transport.counts) == before["call_count"] == 1
-    assert before["calls"][0]["key"]["phase"] == "planning"
-    assert before["calls"][0]["billing_state"] == "known"
-    assert before["confirmed_nanousd"] == 1_500_000
+    # The planner fed each refusal back, up to its two repairs.
+    assert len(native_transport.requests) == len(native_transport.counts) == before["call_count"] == 3
+    assert {call["key"]["phase"] for call in before["calls"]} == {"planning"}
+    assert all(call["billing_state"] == "known" for call in before["calls"])
+    assert before["confirmed_nanousd"] == 4_500_000
     assert before["reserved_nanousd"] == before["unknown_nanousd"] == 0
     assert store.get_checkpoint(run_id) is None
     assert store.load_run(run_id)["config"]["components"]["architect"]["type"] == "llm_architect"
-    with pytest.raises(WorkflowBindingError, match="max_nodes=8"):
+    with pytest.raises(ArchitectError, match="max_nodes=8"):
         swarm.resume(run_id)
     after = store.inspect_run(run_id)
-    assert len(native_transport.requests) == 1
+    assert len(native_transport.requests) == 3
     assert after["calls"] == before["calls"]
     assert store.get_checkpoint(run_id) is None and store.audit(run_id)["ok"]
 
@@ -242,6 +246,31 @@ def test_default_planner_limit_repairs_an_oversized_plan_before_the_policy(
     assert sorted(call["key"]["attempt"] for call in planning) == [0, 1]
     assert all(call["billing_state"] == "known" for call in planning)
     assert "9 nodes; the limit is 8" in native_transport.requests[1]["input"][-1]["content"]
+
+
+def test_plan_check_applies_planning_rules_without_adopting_the_candidate(store):
+    runtime = policy_swarm(store, WorkflowGraphPolicy(2, max_retries=1))._workflow_runtime()
+    runtime.run_id = "candidate-check"
+    runtime._bind()
+    before = runtime.registry.workflow_description()
+    candidate, registry = build_graph_from_model_output({"nodes": [
+        {"id": "draft", "label": "Draft", "agent": {"name": "Writer"}},
+    ]})
+    saved = graph_to_dict(candidate)
+    # The planner has not returned, so its agent is found in its own registry.
+    runtime._check_plan(candidate, registry)
+    for change, message in (
+        (lambda node: setattr(node, "attach_dep_artifacts", True), "plain text nodes; node 'draft'"),
+        (lambda node: setattr(node, "max_retries", 2), "Graph policy"),
+        (lambda node: setattr(node, "agent_id", "unregistered"), "unknown agent"),
+    ):
+        rejected = graph_from_dict(saved)
+        change(rejected.nodes[0])
+        with pytest.raises(WorkflowBindingError, match=message):
+            runtime._check_plan(rejected, registry)
+    assert graph_to_dict(candidate) == saved and runtime.graph is None
+    assert runtime.registry.workflow_description() == before
+    assert store.list_runs() == []
 
 
 @pytest.mark.parametrize("violation", ["nodes", "model", "retries", "regenerations", "cycle"])

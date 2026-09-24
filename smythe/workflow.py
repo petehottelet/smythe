@@ -185,8 +185,10 @@ class WorkflowRuntime:
                 "recipe_sha256": self.run["config_sha256"]}
 
     def _bind(self):
+        # Planners run _check_plan on each candidate inside their retry loops.
         binding = ComponentBinding(self.run_id, "workflow", "execution", self._component_call,
-                                   default_provider=self.provider, default_model=self.model)
+                                   default_provider=self.provider, default_model=self.model,
+                                   plan_check=self._check_plan)
         self.execution_provider = binding.snapshot_provider(self.provider)
         phases = {"architect": "planning", "router": "routing", "registry": "execution",
                   "synthesizer": "synthesis", "supervisor": "supervision"}
@@ -302,7 +304,7 @@ class WorkflowRuntime:
         if self.graph_policy is not None:
             self.graph_policy.validate(graph, default_model=self.model)
 
-    def _validate_graph(self, graph, *, fresh=False):
+    def _validate_graph(self, graph, *, fresh=False, registry=None):
         graph.validate()
         json_snapshot(graph_to_dict(graph))
         self._validate_graph_policy(graph)
@@ -326,10 +328,24 @@ class WorkflowRuntime:
             ):
                 raise WorkflowBindingError("Node timeout must be finite and positive")
             if node.attach_dep_artifacts or node.metadata.get("attachments") or node.metadata.get("artifacts"):
-                raise WorkflowBindingError("Durable workflows currently support plain text nodes")
+                raise WorkflowBindingError(
+                    f"Durable workflows currently support plain text nodes; node {node.id!r} "
+                    "uses attach_dep_artifacts, attachments or artifacts"
+                )
             validate_workflow_model(self.execution_provider, node.metadata.get("model", self.model))
-            if node.agent_id is not None and self.registry.get(node.agent_id) is None:
+            if node.agent_id is not None and self.registry.get(node.agent_id) is None and (
+                registry is None or registry.get(node.agent_id) is None
+            ):
                 raise WorkflowBindingError(f"Node {node.id!r} names an unknown agent")
+
+    def _check_plan(self, graph, registry):
+        """Apply _plan's checks to a candidate plan without adopting it.
+
+        A planner calls this before it returns, so the plan's agents are found
+        in its own registry rather than registered with the run.
+        """
+        registry.workflow_description()
+        self._validate_graph(graph, fresh=True, registry=registry)
 
     def _prepare_graph(self, graph, *, fresh=False):
         self._validate_graph(graph, fresh=fresh)

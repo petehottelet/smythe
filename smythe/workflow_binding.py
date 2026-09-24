@@ -9,9 +9,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 import inspect
 import json
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from smythe.provider import Provider
+
+if TYPE_CHECKING:
+    from smythe.graph import ExecutionGraph
+    from smythe.registry import Registry
 
 
 class WorkflowBindingError(ValueError):
@@ -105,6 +109,11 @@ class ComponentBinding:
     call_factory: Callable[[Provider, CallScope], Provider] = field(repr=False, compare=False)
     default_provider: Provider | None = field(default=None, repr=False, compare=False)
     default_model: str = ""
+    # Set by the durable runtime. Planners call it on each candidate plan inside
+    # their retry loop, so a plan the run would reject is repaired, not final.
+    plan_check: Callable[[ExecutionGraph, Registry], None] | None = field(
+        default=None, repr=False, compare=False,
+    )
     _provider_snapshots: dict = field(default_factory=dict, repr=False, compare=False)
 
     def __post_init__(self):

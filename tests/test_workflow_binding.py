@@ -1,6 +1,7 @@
 """Public preflight and per-run component bindings never rewrite shared objects."""
 
 import asyncio
+from dataclasses import replace
 import json
 
 import pytest
@@ -8,7 +9,7 @@ import pytest
 from smythe.agent import Agent, AgentProfile
 from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
-from smythe.planner import DeterministicArchitect, LLMArchitect, SimpleArchitect
+from smythe.planner import ArchitectError, DeterministicArchitect, LLMArchitect, SimpleArchitect
 from smythe.provider import CompletionResult, OfflineProvider, Provider, ProviderResponseError
 from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.registry import Registry
@@ -339,6 +340,66 @@ def test_bad_local_template_registry_is_terminal_after_one_selection():
     with pytest.raises(WorkflowBindingError):
         bind_component(original, binding(factory)).plan(Task("goal"))
     assert len(factory.calls) == 1
+
+
+def template_planner(**options):
+    declaration = LocalOnly(lambda: lambda task, copies=1: (
+        [Node(f"Part {i}", id=f"p{i}") for i in range(copies)], Registry(),
+    ), "builder", "1", role="template_builder")
+    return ConstrainedArchitect(OfflineProvider(), [SubGraphTemplate("part", "part", declaration)],
+                                model="test", **options)
+
+
+def rejecting_check(times):
+    """A durable run's plan check that refuses the first ``times`` candidates."""
+    checked = []
+
+    def check(graph, registry):
+        checked.append((graph, registry))
+        if len(checked) <= times:
+            raise WorkflowBindingError("Durable workflows currently support plain text nodes")
+
+    return check, checked
+
+
+PLANNERS = [
+    pytest.param(lambda: LLMArchitect(OfflineProvider(), planning_model="test"), PLAN, id="llm"),
+    pytest.param(template_planner, '[{"template":"part"}]', id="constrained"),
+]
+
+
+@pytest.mark.parametrize("planner, reply", PLANNERS)
+def test_bound_planners_repair_a_plan_their_run_rejects(planner, reply):
+    check, checked = rejecting_check(1)
+    factory = Factory(reply, reply)
+    graph, registry = bind_component(planner(), replace(binding(factory), plan_check=check)).plan(Task("goal"))
+    assert len(checked) == 2 and checked[1][0] is graph and checked[1][1] is registry
+    assert [c[1].attempt for c in factory.calls] == [0, 1]
+    assert "was rejected: Durable workflows currently support plain text nodes" in factory.calls[1][3]
+
+
+@pytest.mark.parametrize("planner, reply", PLANNERS)
+def test_bound_planners_fail_cleanly_when_their_run_rejects_every_plan(planner, reply):
+    check, checked = rejecting_check(3)
+    factory = Factory(reply, reply, reply)
+    with pytest.raises(ArchitectError, match="after 3 attempts: Durable workflows currently support"):
+        bind_component(planner(), replace(binding(factory), plan_check=check)).plan(Task("goal"))
+    assert len(checked) == len(factory.calls) == 3
+
+
+def test_constrained_node_cap_keeps_default_recipes_and_binds_a_custom_cap():
+    default = describe_component(template_planner())
+    # The fields a 0.8.1 recipe records, so existing durable runs keep their identity.
+    assert set(default) == {"type", "version", "provider", "model", "max_retries", "templates"}
+    custom = template_planner(max_nodes=2)
+    assert describe_component(custom) == {**default, "max_nodes": 2}
+    factory = Factory('[{"template":"part","params":{"copies":3}}]',
+                      '[{"template":"part","params":{"copies":2}}]')
+    bound = bind_component(custom, binding(factory))
+    assert bound.workflow_description() == {**default, "max_nodes": 2}
+    graph, _ = bound.plan(Task("goal"))
+    assert [node.id for node in graph.nodes] == ["part-0-p0", "part-0-p1"]
+    assert "Selection at index 0 brings the graph to 3 nodes; the limit is 2" in factory.calls[1][3]
 
 
 @pytest.mark.asyncio

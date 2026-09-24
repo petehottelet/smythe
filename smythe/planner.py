@@ -111,9 +111,9 @@ class LLMArchitect(Architect):
     ``max_nodes`` nodes and ``max_depth`` levels.  A reply that breaks
     the schema is retried like malformed JSON, up to ``max_retries``.
 
-    A durable run's ``WorkflowGraphPolicy`` is checked after planning and
-    its rejection is final, so keep ``max_nodes`` at or below the policy's
-    ``max_nodes``: an oversized plan is then repaired, not fatal.
+    In a durable run, each plan must also pass the run's own graph checks,
+    including its ``WorkflowGraphPolicy``, before planning is saved; a
+    plan they reject is retried the same way.
     """
 
     def __init__(
@@ -221,7 +221,7 @@ class LLMArchitect(Architect):
                 prompt = (
                     user_prompt
                     + "\n\n---\n\n"
-                    + f"Your previous response could not be parsed: {last_error}\n\n"
+                    + f"Your previous response was rejected: {last_error}\n\n"
                     + RETRY_PROMPT
                 )
             provider = (self._run_binding.for_call(self._provider, trigger="task", attempt=attempt)
@@ -242,6 +242,8 @@ class LLMArchitect(Architect):
                     data, max_nodes=self._max_nodes, max_depth=self._max_depth,
                 )
                 graph.estimated_cost_usd = self._estimate_cost(graph)
+                if self._run_binding is not None and self._run_binding.plan_check is not None:
+                    self._run_binding.plan_check(graph, registry)
                 return graph, registry
             except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
                 last_error = exc
