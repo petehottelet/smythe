@@ -85,8 +85,8 @@ trace entries.
 (`ConstrainedArchitect(max_nodes=...)`) and retries a selection over the limit.
 Template builders receive model-chosen `params` and must bound them: the limit
 is checked when each builder call returns. In a durable run, the LLM and
-constrained architects also check each plan against the run's graph policy and
-plain-text node rules before planning is saved
+constrained architects also check each plan against the run's graph policy,
+plain-text node rules and journal node-id rule before planning is saved
 ([durable planning](workflow-accounting.md#freeze-graph-limits)). A durable
 run's template builders must return the same nodes, with the same ids, for the
 same task and params: resume rebuilds each saved selection, and a repair prompt

@@ -72,7 +72,11 @@ also apply: `LLMArchitect` retries a plan over 8 nodes or 5 levels, so pass
 
 **Changed in 0.8.2:** the built-in LLM and constrained architects check each
 generated plan against the policy and the run's other graph rules, such as
-plain-text nodes, before planning is saved. A rejected plan goes back to the
+plain-text nodes and node ids the journal can key, before planning is saved.
+The journal keys each node's calls by its id, so an id must be at most 507
+characters with no control characters. A caller-built graph with another id
+fails before any node runs, and so does resuming a run whose saved graph has
+such an id. A rejected plan goes back to the
 model with the reason, like a schema error, and each repair is a new journaled,
 paid call. When `max_retries` repairs are used up, planning raises
 `ArchitectError`. Resuming replays the saved attempts to the same result

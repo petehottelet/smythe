@@ -34,7 +34,7 @@ from smythe.workflow_provider import (
 from smythe.workflow_policy import snapshot_graph_policy
 from smythe.workflow_store import (
     CallKey, SQLiteWorkflowStore, WorkflowConflictError, WorkflowError, WorkflowLeaseError,
-    WorkflowStateError, _is_http_rejection,
+    WorkflowStateError, WorkflowValidationError, _is_http_rejection,
 )
 
 
@@ -309,6 +309,17 @@ class WorkflowRuntime:
         json_snapshot(graph_to_dict(graph))
         self._validate_graph_policy(graph)
         for node in graph.nodes:
+            # The journal keys every call a node makes by "node/<id>". An id it
+            # rejects would fail the node's first call, after planning is saved.
+            try:
+                CallKey("execution", f"node/{node.id}")
+            except WorkflowValidationError as error:
+                shown = str(node.id)
+                shown = shown if len(shown) <= 60 else shown[:60] + "..."
+                raise WorkflowBindingError(
+                    f"Node id {shown!r} cannot key the workflow journal: node ids must be "
+                    "at most 507 characters, with no control characters"
+                ) from error
             if fresh and (node.status is not NodeStatus.PENDING or node.result is not None):
                 raise WorkflowBindingError("A new workflow requires pending nodes without prior results")
             if fresh and any(key in node.metadata for key in (
