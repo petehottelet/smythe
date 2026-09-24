@@ -269,6 +269,9 @@ class ConstrainedArchitect(Architect):
 
             for node in nodes:
                 node.depends_on = [id_map.get(d, d) for d in node.depends_on]
+                # A gate must judge the renamed node, or its verdict is discarded.
+                if node.verifies is not None:
+                    node.verifies = id_map.get(node.verifies, node.verifies)
 
             roots = [n for n in nodes if not n.depends_on]
             if prev_leaf_ids:

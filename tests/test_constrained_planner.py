@@ -296,6 +296,30 @@ def test_node_cap_must_be_a_positive_integer(value):
         ConstrainedArchitect(provider=MockConstrainedProvider([]), templates=TEMPLATES, max_nodes=value)
 
 
+def _gated_builder(task: Task) -> tuple[list[Node], Registry]:
+    """Template whose judge gates its own draft."""
+    draft = Node(id="draft", label="Draft the memo")
+    check = Node(id="check", label="Check the memo; answer PASS or FAIL",
+                 depends_on=["draft"], verifies="draft", max_regenerations=1)
+    return [draft, check], Registry()
+
+
+def test_template_gates_judge_their_own_renamed_target():
+    """Composition renamed nodes but not 'verifies', so a template's gate
+    judged an id that no longer existed and its verdict was discarded."""
+    provider = MockConstrainedProvider([json.dumps([{"template": "gated"}, {"template": "gated"}])])
+    templates = [SubGraphTemplate(name="gated", description="Gated draft", builder=_gated_builder)]
+
+    graph, _ = ConstrainedArchitect(provider=provider, templates=templates).plan(Task(goal="Memo"))
+
+    by_id = {node.id: node for node in graph.nodes}
+    gates = [node for node in graph.nodes if node.verifies is not None]
+    assert [(gate.id, gate.verifies) for gate in gates] == [
+        ("gated-0-check", "gated-0-draft"), ("gated-1-check", "gated-1-draft"),
+    ]
+    assert all(gate.verifies in by_id and gate.verifies in gate.depends_on for gate in gates)
+
+
 @pytest.mark.parametrize("bad_response, message", [
     ('["research"]', "must be an object"),
     ('[{"template": 1}]', "string 'template'"),
