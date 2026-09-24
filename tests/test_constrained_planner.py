@@ -7,6 +7,7 @@ import pytest
 
 from smythe.agent import Agent, AgentProfile
 from smythe.constrained_prompts import (
+    CONSTRAINED_RETRY_PROMPT,
     CONSTRAINED_SYSTEM_PROMPT,
     build_constrained_user_prompt,
 )
@@ -160,7 +161,13 @@ def test_constrained_planner_retries():
     graph, _ = planner.plan(task)
     assert len(graph.nodes) == 1
     assert len(provider.prompts_received) == 2
-    assert "was rejected" in provider.prompts_received[1]
+    # A durable run journals this prompt, so its wording is part of the
+    # request that a run saved by an earlier release replays on resume.
+    first_prompt, retry_prompt = provider.prompts_received
+    assert retry_prompt.startswith(
+        first_prompt + "\n\n---\n\nYour previous response could not be parsed: "
+    )
+    assert retry_prompt.endswith("\n\n" + CONSTRAINED_RETRY_PROMPT)
 
 
 def test_constrained_planner_prompt_contains_menu():

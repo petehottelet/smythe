@@ -10,6 +10,7 @@ import pytest
 from smythe.graph import ExecutionGraph, Topology
 from smythe.memory import ExecutionOutcome, PlannerMemory
 from smythe.planner import ArchitectError, LLMArchitect
+from smythe.prompts import RETRY_PROMPT
 from smythe.provider import CompletionResult, Provider
 from smythe.task import Task
 
@@ -203,7 +204,13 @@ def test_plan_retries_on_malformed_json():
     assert len(provider.prompts_received) == 2
     retry_prompt = provider.prompts_received[1]
     assert "Write something" in retry_prompt
-    assert "was rejected" in retry_prompt
+    # A durable run journals this prompt, so its wording is part of the
+    # request that a run saved by an earlier release replays on resume.
+    first_prompt = provider.prompts_received[0]
+    assert retry_prompt.startswith(
+        first_prompt + "\n\n---\n\nYour previous response could not be parsed: "
+    )
+    assert retry_prompt.endswith("\n\n" + RETRY_PROMPT)
 
 
 def test_plan_raises_after_max_retries():

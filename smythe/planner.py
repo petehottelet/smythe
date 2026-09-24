@@ -214,6 +214,9 @@ class LLMArchitect(Architect):
                             "defaults stated in the rules.")
 
         last_error: Exception | None = None
+        # A durable run journals each retry prompt, so a parse error keeps
+        # 0.8.1's wording and a saved retry still replays after an upgrade.
+        problem = "could not be parsed"
         for attempt in range(1 + self._max_retries):
             if attempt == 0:
                 prompt = user_prompt
@@ -221,7 +224,7 @@ class LLMArchitect(Architect):
                 prompt = (
                     user_prompt
                     + "\n\n---\n\n"
-                    + f"Your previous response was rejected: {last_error}\n\n"
+                    + f"Your previous response {problem}: {last_error}\n\n"
                     + RETRY_PROMPT
                 )
             provider = (self._run_binding.for_call(self._provider, trigger="task", attempt=attempt)
@@ -242,12 +245,16 @@ class LLMArchitect(Architect):
                     data, max_nodes=self._max_nodes, max_depth=self._max_depth,
                 )
                 graph.estimated_cost_usd = self._estimate_cost(graph)
-                if self._run_binding is not None and self._run_binding.plan_check is not None:
-                    self._run_binding.plan_check(graph, registry)
-                return graph, registry
             except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
-                last_error = exc
+                last_error, problem = exc, "could not be parsed"
                 continue
+            if self._run_binding is not None and self._run_binding.plan_check is not None:
+                try:
+                    self._run_binding.plan_check(graph, registry)
+                except (ValueError, KeyError, TypeError) as exc:
+                    last_error, problem = exc, "was rejected"
+                    continue
+            return graph, registry
 
         raise ArchitectError(
             f"Failed to produce a valid plan after {1 + self._max_retries} attempts: "

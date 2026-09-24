@@ -136,6 +136,9 @@ class ConstrainedArchitect(Architect):
         user_prompt = build_constrained_user_prompt(task, menu)
 
         last_error: Exception | None = None
+        # A durable run journals each retry prompt, so a parse error keeps
+        # 0.8.1's wording and a saved retry still replays after an upgrade.
+        problem = "could not be parsed"
         for attempt in range(1 + self._max_retries):
             if attempt == 0:
                 prompt = user_prompt
@@ -143,7 +146,7 @@ class ConstrainedArchitect(Architect):
                 prompt = (
                     user_prompt
                     + "\n\n---\n\n"
-                    + f"Your previous response was rejected: {last_error}\n\n"
+                    + f"Your previous response {problem}: {last_error}\n\n"
                     + CONSTRAINED_RETRY_PROMPT
                 )
 
@@ -165,7 +168,7 @@ class ConstrainedArchitect(Architect):
             except WorkflowBindingError:
                 raise
             except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
-                last_error = exc
+                last_error, problem = exc, "could not be parsed"
                 continue
             # A template registry the run cannot bind is terminal (above); a
             # plan the durable run rejects is the model's choice, so repair it.
@@ -173,7 +176,7 @@ class ConstrainedArchitect(Architect):
                 try:
                     self._run_binding.plan_check(graph, registry)
                 except (ValueError, KeyError, TypeError) as exc:
-                    last_error = exc
+                    last_error, problem = exc, "was rejected"
                     continue
             return graph, registry
 
