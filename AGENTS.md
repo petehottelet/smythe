@@ -69,3 +69,11 @@ behavior belongs in the linked guide for that subsystem.
 - Stage only files changed for the current task; never use `git add .` or
   `git add -A`.
 - Never use destructive reset, checkout, clean, or force-push operations.
+
+## Commit and GitHub messages
+
+- Commit messages, pull requests, release notes, issues, and comments posted
+  to GitHub describe code changes, features, and behavior.
+- Never describe private workflows or file structure in them: planning,
+  review, or publication processes, internal tools or agents, local paths, or
+  private materials such as `00_project_files/`.
