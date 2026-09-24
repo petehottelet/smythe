@@ -21,7 +21,7 @@ Set spending and concurrency limits, verify outputs, and recover saved work afte
 an interruption.
 
 Use it for research pipelines, document production, and artifact generation
-where you need to see what will run and account for what happened.
+where you need to see what will run and account for results. 
 
 <p align="center">
   <img src="assets/glyph_rain/glyph-rain-loop.gif" alt="Animated rain showing only the 192 revised Smythe glyphs" width="900">
@@ -120,7 +120,7 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
             max_output_tokens=8192,
         ),
         run_store=store,
-        max_budget_usd=5.00,
+        max_budget_usd=50.00,
         parallel=True,
         max_concurrency=8,
     )
@@ -133,7 +133,7 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
     print(result.output)
 ```
 
-This makes paid API calls under a **$5 run allowance**. The SQLite ledger
+This makes paid API calls under a **$50 run allowance**. The SQLite ledger
 accounts for planning and execution, reserves requests before dispatch, and
 retains responses for recovery. See [budget scope](docs/budgets.md) and
 [durable text workflows](docs/workflow-accounting.md). Claude and Gemini
@@ -277,9 +277,7 @@ identical fixtures, so this shows recovery correctness, not speed.
 ## Project status
 
 **Smythe 0.8.1** is the current library release. See the
-[release notes and upgrade guide](docs/release-0.8.1.md). The API is pre-1.0;
-minor releases may change it. Later source changes appear in the
-[changelog](CHANGELOG.md#unreleased).
+[release notes and upgrade guide](docs/release-0.8.1.md). 
 
 Next priorities are complete-deliverable checks, broader external-task
 benchmarks, and separately controlled Astra scheduler and framework studies.
@@ -287,7 +285,7 @@ See the [roadmap](ROADMAP.md) for status and acceptance criteria.
 
 The [Glyph Rain screensaver](screensaver/README.md) is an artifact-generation
 showcase with source builds and a [web explorer](screensaver/svg-preview/README.md).
-Precompiled screensaver distribution is paused.
+Screensaver distribution is source only, but you're welcome to compile your own binary.
 
 [Documentation](docs/index.md) · [Contributing](CONTRIBUTING.md) ·
 [Releases](https://github.com/petehottelet/smythe/releases) ·
