@@ -196,9 +196,17 @@ artifact, 67,108,864 pixels per image or animation frame, 256 frames, and
 canvas and the canvas every GIF frame requires, are checked from the bytes
 before Pillow parses them, and each frame is checked again before its pixels
 are decoded. An artifact over a limit is refused like undecodable data. The
-limits hold whatever `PIL.Image.MAX_IMAGE_PIXELS` allows, and inspection leaves
-the process's warning filters unchanged. An animated GIF whose frames extend
-past its logical screen reports the enlarged canvas as its dimensions.
+limits hold whatever `PIL.Image.MAX_IMAGE_PIXELS` allows, including `None`,
+and inspection leaves the process's warning filters unchanged. An animated GIF
+whose frames extend past its logical screen reports the enlarged canvas as its
+dimensions.
+
+To find every GIF frame, inspection reads the blocks the way Pillow does.
+Pillow reads on past a data sub-block terminator in two places where the GIF
+format ends the block: after an extension other than a comment whose first
+sub-block is empty, and after a NETSCAPE2.0 extension before the first frame
+whose looping sub-block is empty. A GIF with more bytes after such a
+terminator is refused like undecodable data before Pillow reads it.
 
 Each new run receives a persistent artifact namespace. Its files live beneath
 `<output_directory>/run-<namespace>`; snapshots expose that final component as

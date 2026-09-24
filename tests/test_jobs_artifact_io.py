@@ -19,6 +19,11 @@ from smythe.jobs.artifact_io import (  # noqa: E402
     atomic_write_bytes,
     inspect_artifact,
 )
+from test_images import (  # noqa: E402
+    READ_PAST_TERMINATOR_CASES,
+    gif_hiding_a_frame,
+    refuse_large_allocations,
+)
 
 
 def _png_bytes(size: tuple[int, int] = (320, 180)) -> bytes:
@@ -259,6 +264,30 @@ def test_gif_reports_the_canvas_its_frames_grow_to():
     observed = inspect_artifact(_gif((1, 1), [(0, 0, 1, 1, 0), (99, 49, 1, 1, 0)]), "image/gif")
 
     assert (observed.mime_type, observed.width, observed.height) == ("image/gif", 100, 50)
+
+
+@pytest.mark.parametrize(("extension", "second_frame"), READ_PAST_TERMINATOR_CASES)
+def test_gif_blocks_pillow_reads_past_a_terminator_are_refused_before_decoding(
+    monkeypatch, extension, second_frame
+):
+    """Regression: the pre-scan stopped at a terminator Pillow reads past, so
+    a frame hidden behind it was never bounded. A 258-byte file reached a
+    13000x13000 disposal allocation, or 60000x60000 with Pillow's own limit
+    disabled."""
+    from PIL import GifImagePlugin
+
+    refused = refuse_large_allocations(monkeypatch)
+    calls = _spy_on_plugin_open(monkeypatch, GifImagePlugin.GifImageFile)
+    data = gif_hiding_a_frame(extension, second_frame=second_frame)
+
+    for pillow_limit in (Image.MAX_IMAGE_PIXELS, None):
+        monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", pillow_limit)
+        with pytest.raises(
+            ArtifactInspectionError, match="not a recognizable PNG, JPEG, GIF, or WebP"
+        ):
+            inspect_artifact(data, "image/gif")
+    assert calls == []
+    assert refused == []
 
 
 def test_later_mpo_frames_are_bounded_before_they_are_decoded(monkeypatch):
