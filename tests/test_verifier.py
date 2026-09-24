@@ -334,9 +334,10 @@ def test_unclosed_code_fence_is_read_quickly(text, passed):
     pytest.param("Verdict: x\n" * 5_000, id="verdict-labels"),
 ])
 def test_large_adversarial_reply_is_read_in_linear_time(text):
+    """CI runs this under coverage, so the bound only rules out super-linear time."""
     verdict, seconds = _timed_verdict(text)
     assert isinstance(verdict.passed, bool)
-    assert seconds < 0.5
+    assert seconds < 5
 
 
 def test_overlong_reply_fails_closed():
