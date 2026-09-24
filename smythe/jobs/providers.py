@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from enum import Enum
 from typing import Callable
 
+from smythe._errors import PicklableError
 from smythe.jobs.models import ProviderKind
 from smythe.jobs.preflight import PlannedOperationV1
 from smythe.provider import GeminiProvider, OfflineProvider, OpenAIImageProvider, Provider
@@ -28,7 +29,7 @@ class ProviderPreflightKind(str, Enum):
     SDK = "sdk"
 
 
-class ProviderPreflightError(ProviderConfigurationError):
+class ProviderPreflightError(PicklableError, ProviderConfigurationError):
     """A categorized provider failure that is safe to record pre-dispatch."""
 
     def __init__(self, kind: ProviderPreflightKind, message: str) -> None:

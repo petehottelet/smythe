@@ -10,6 +10,8 @@ from itertools import chain
 import math
 from typing import TYPE_CHECKING, Iterable
 
+from smythe._errors import PicklableError
+
 if TYPE_CHECKING:
     from smythe.provider import CompletionResult
 
@@ -64,7 +66,7 @@ def _sum_costs(values: Iterable[float]) -> float:
     return _validate_usd(total, "Total cost")
 
 
-class SentinelAlert(Exception):
+class SentinelAlert(PicklableError, Exception):
     """Raised when cumulative execution cost would exceed the budget limit."""
 
     def __init__(self, spent: float, limit: float, node_id: str) -> None:
@@ -77,7 +79,7 @@ class SentinelAlert(Exception):
         )
 
 
-class BudgetEstimateRequired(ValueError):
+class BudgetEstimateRequired(PicklableError, ValueError):
     """Raised before a priced call whose cost cannot be bounded safely.
 
     Image APIs charge on dimensions, quality, inputs, and outputs.  A generic

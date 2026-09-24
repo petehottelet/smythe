@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
+from smythe._errors import PicklableError
 from smythe.agent import Agent
 from smythe.budget import (
     BudgetEstimateRequired,
@@ -54,7 +55,7 @@ def _raise_workflow_error(error: BaseException) -> None:
                 raise found from error
 
 
-class NodeFinalizationError(RuntimeError):
+class NodeFinalizationError(PicklableError, RuntimeError):
     """Raised after a billed response cannot be persisted safely.
 
     This error is non-retryable at the executor layer: repeating the provider

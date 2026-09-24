@@ -15,6 +15,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Iterable
 
+from smythe._errors import PicklableError
+
 
 _ASSET_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 _RASTER_LOGO_SUFFIXES = {".gif", ".jpeg", ".jpg", ".png", ".webp"}
@@ -289,7 +291,7 @@ class BrandSpec:
                 raise ValueError("production brand mode does not allow a generated logo_prompt")
 
 
-class AssetPreflightError(ValueError):
+class AssetPreflightError(PicklableError, ValueError):
     """Raised when an asset package is unsafe or internally inconsistent."""
 
     def __init__(self, violations: Iterable[str]) -> None:

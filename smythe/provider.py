@@ -23,6 +23,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from uuid import uuid4
 
+from smythe._errors import PicklableError
 from smythe.budget import BudgetValidationError
 from smythe.tools import ChatMessage, ToolCall, ToolSpec, display_name, wire_name
 
@@ -112,7 +113,7 @@ class CompletionResult:
 TRUNCATED_STOP_REASONS = frozenset({"max_tokens", "model_context_window_exceeded"})
 
 
-class OutputTruncatedError(RuntimeError):
+class OutputTruncatedError(PicklableError, RuntimeError):
     """The model stopped before completing its response.
 
     Callers raise this only after the call's usage has been recorded, so
