@@ -231,17 +231,18 @@ fixes change behavior that 0.8.0 accepted; read the upgrade notes first.
 
 ## Shipped (v0.8.2): correctness fixes
 
-The [0.8.2 release](docs/release-0.8.2.md) closes gaps that the 0.8.1 reviews
-found in the execution envelope. Some fixes tighten rules that 0.8.1 accepted;
-read the upgrade notes first.
+The [0.8.2 release](docs/release-0.8.2.md) closes gaps in the execution
+envelope. Some fixes tighten rules that 0.8.1 accepted; read the upgrade notes
+first.
 
 - **Durable plan repair** — a generated plan that the run's graph policy or
   plain-text rule rejects goes back to the model inside the planner's retry
   loop instead of wedging the run.
   [Durable planning](docs/workflow-accounting.md#freeze-graph-limits).
-- **Protected verification gates** — no revision can drop or re-route a gate;
-  a generated plan has at most one gate, which depends on its target; supervised
-  growth is bounded per run. [Supervisor](docs/supervisor.md).
+- **Protected verification gates** — no revision can drop a gate or its
+  target or cut the gate off from its target; a generated plan has at most one
+  gate, which depends on its target; supervised growth is bounded.
+  [Supervisor](docs/supervisor.md).
 - **Refused output fails its node** — SDK provider refusals, content filters and
   unfinished Gemini responses raise `OutputRefusedError` after billing.
   [Execution policies](docs/execution.md).

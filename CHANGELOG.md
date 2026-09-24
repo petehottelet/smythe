@@ -25,8 +25,8 @@ No unreleased changes.
 
 ## [0.8.2] - 2026-09-23
 
-This correctness release closes gaps that the 0.8.1 reviews found in the
-execution envelope: rejected durable plans, verification gates a supervisor
+This correctness release closes gaps in the execution envelope: rejected
+durable plans that stopped a run for good, verification gates a supervisor
 could revise away, refused provider replies counted as output, and image
 frames decoded before they were bounded. Some fixes tighten rules that 0.8.1
 accepted; each is listed under **Changed**. The
@@ -42,13 +42,16 @@ accepted; each is listed under **Changed**. The
   inside their retry loop and send the reason back to the model; each repair is
   a new journaled call. Resuming a run that 0.8.1 stopped this way asks for a
   repair.
-- **A supervisor can no longer remove or bypass a verification gate.** A
-  revision that dropped a verifier let the output it judged through unverified,
-  and one that rewired the verifier off its target let a parallel judge finish
-  first, so its FAIL verdict was discarded. `ExecutionGraph.apply_revision` now
-  rejects a revision that drops a verifier or the node it judges, or rewires a
-  verifier without keeping that node among its dependencies. The rule applies
-  to every supervisor; a rejected revision is traced and the run continues.
+- **A supervisor revision can no longer drop a verification gate or cut it off
+  from the node it judges.** A revision that dropped a verifier let the output
+  it judged through unverified, and one that rewired the verifier off its target
+  let a parallel judge finish first, so its FAIL verdict was discarded.
+  `ExecutionGraph.apply_revision` now rejects a revision that drops a verifier
+  or the node it judges, or that leaves the verifier no longer depending on
+  that node, directly or through the nodes between them. The rule applies to
+  every supervisor; a rejected revision is traced and the run continues. A
+  revision can still add steps after a gated node, and the gate does not judge
+  their output.
 - **Generated plans may contain at most one gating node, which must list the
   node it verifies in `depends_on`.** Every node could be a gate: an 8-node plan
   with seven gates on one node made 78 node calls. A gate without that edge
@@ -57,11 +60,12 @@ accepted; each is listed under **Changed**. The
 - A gate inside a `ConstrainedArchitect` template judges its own renamed
   target. Composition prefixed node ids but not `verifies`, so the gate's
   verdict was always discarded.
-- `LLMSupervisor` bounds growth across a run with `max_total_added_nodes`
-  (default 8, the generated-plan node limit). `max_added_nodes` bounded only one
-  revision, so five revisions could append 15 nodes. Nodes a revision adds carry
-  `"added_by_revision": true` in their metadata, so resume cannot refill the
-  allowance. An added node's label may be at most 500 characters.
+- `LLMSupervisor` limits how many revision-added nodes a run's graph may hold
+  with `max_total_added_nodes` (default 8, the generated-plan node limit).
+  `max_added_nodes` bounded only one revision, so five revisions could append 15
+  nodes. Nodes a revision adds carry `"added_by_revision": true` in their
+  metadata, so resuming does not reset the count. An added node's label may be
+  at most 500 characters.
 - A node can no longer use the id `__synthesis__`, the key under which
   `LLM_MERGE` synthesis books its charge; a node with that id shared the
   synthesis entry in the budget breakdown.
@@ -86,19 +90,22 @@ accepted; each is listed under **Changed**. The
   instead of raising `TypeError`, which cost a paid planner retry.
 - **Refused and filtered replies no longer count as output.** With the
   Anthropic, OpenAI and Gemini SDK providers, an Anthropic `refusal`, an OpenAI
-  `content_filter` finish, or a Gemini finish other than `STOP` or `MAX_TOKENS`
-  (such as `SAFETY`, `RECITATION` or `MALFORMED_FUNCTION_CALL`) completed its
-  node with any partial text, and a filtered OpenAI turn ran its tool calls.
+  `content_filter` finish, or any Gemini finish except `STOP`, `MAX_TOKENS` or an
+  unspecified one (such as `SAFETY`, `RECITATION` or `MALFORMED_FUNCTION_CALL`)
+  completed its node with any partial text, and a filtered OpenAI turn ran its
+  tool calls.
   The node now fails with `OutputRefusedError` after its cost is recorded, no
   tool call from that turn runs, and its failure policy applies. A refused plan
   is retried with the stop reason named, a refused supervisor review applies no
   revision, and a refused `LLM_MERGE` synthesis fails the run.
-- Twelve exceptions whose constructors take more than a message, including
-  `SentinelAlert`, `BudgetReconciliationError`, `ProviderRequestRejectedError`
-  and `ResponseQuoteError`, raised `TypeError` when unpickled or copied, and
-  `OutputTruncatedError` and `AssetPreflightError` came back with their message
-  wrapped twice. They now survive `pickle`, `copy.copy` and `copy.deepcopy` with
-  their message and fields, including across process boundaries.
+- Twelve exceptions whose constructors take more than a message could not be
+  unpickled or copied intact. Most, including `SentinelAlert`,
+  `BudgetReconciliationError`, `ProviderRequestRejectedError` and
+  `ResponseQuoteError`, raised `TypeError`; `WorkerStartupInterrupted` raised
+  `ValueError`; `OutputTruncatedError` came back with its message wrapped twice
+  and `AssetPreflightError` with its message split into characters. They now
+  survive `pickle`, `copy.copy` and `copy.deepcopy` with their message and
+  fields, including across process boundaries.
 
 ### Changed
 
@@ -115,8 +122,9 @@ accepted; each is listed under **Changed**. The
   rule rejects now costs up to `max_retries` repair calls, and planning that
   still fails raises `ArchitectError` instead of `WorkflowBindingError`.
 - Any supervisor revision, including one from a custom `Supervisor`, that drops
-  or rewires a verification gate or adds a node with the id `__synthesis__` is
-  rejected and traced as `revision_rejected`.
+  a verification gate or its target, cuts the gate off from its target, or adds
+  a node with the id `__synthesis__` is rejected and traced as
+  `revision_rejected`.
 - `ExecutionGraph.validate()` raises `ValueError` for the node id
   `__synthesis__` in any graph, including when resuming a checkpoint or durable
   run that contains one.
