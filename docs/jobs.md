@@ -190,6 +190,16 @@ The distinction between `prepared` and `dispatched` controls recovery:
   formats are refused before any other Pillow decoder runs. Like undecodable
   data, they become `unknown_outcome` with the reason in the attempt error.
 
+Inspection applies its own limits, whatever the manifest requests: 32 MiB per
+artifact, 67,108,864 pixels per image or animation frame, 256 frames, and
+268,435,456 decoded pixels across all frames. Declared sizes, including a WebP
+canvas and the canvas every GIF frame requires, are checked from the bytes
+before Pillow parses them, and each frame is checked again before its pixels
+are decoded. An artifact over a limit is refused like undecodable data. The
+limits hold whatever `PIL.Image.MAX_IMAGE_PIXELS` allows, and inspection leaves
+the process's warning filters unchanged. An animated GIF whose frames extend
+past its logical screen reports the enlarged canvas as its dimensions.
+
 Each new run receives a persistent artifact namespace. Its files live beneath
 `<output_directory>/run-<namespace>`; snapshots expose that final component as
 `artifact_directory`. Run IDs remain the public identifiers, so `Run`, `run`,
