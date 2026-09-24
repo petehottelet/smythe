@@ -210,3 +210,30 @@ def test_distilled_template_tolerates_model_supplied_params():
 
     assert len(built.nodes) == 2
     assert provider.calls == 1
+
+
+def test_model_params_named_like_the_builder_arguments_are_ignored():
+    """Regression: a model param named ``task`` raised TypeError (multiple values
+    for argument 'task'), which cost a paid planner retry."""
+    from smythe.constrained_planner import ConstrainedArchitect
+    from smythe.provider import CompletionResult, Provider
+
+    class PickWithClashingParams(Provider):
+        def __init__(self):
+            self.calls = 0
+
+        async def complete(self, system, prompt, model):
+            self.calls += 1
+            return CompletionResult(
+                text='[{"template": "learned", "params": {"task": "x", "params": 5}}]'
+            )
+
+    graph, registry = _completed_graph()
+    template = distill_template(graph, name="learned", registry=registry)
+    provider = PickWithClashingParams()
+    architect = ConstrainedArchitect(provider=provider, templates=[template], max_retries=0)
+    built, _ = architect.plan(Task(goal="A brand new task"))
+
+    assert provider.calls == 1
+    assert [n.id for n in built.nodes] == ["learned-0-research", "learned-0-review"]
+    assert all("A brand new task" in n.label for n in built.nodes)

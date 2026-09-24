@@ -88,11 +88,12 @@ def distill_template(
     ]
 
     def builder(
-        task: Task, params: dict | None = None, **model_params: object,
+        task: Task, params: dict | None = None, /, **model_params: object,
     ) -> tuple[list[Node], Registry]:
         # A distilled shape has no parameters. ConstrainedArchitect passes
         # the model's params as keywords, so accept and ignore them rather
-        # than failing every selection that carries any.
+        # than failing every selection that carries any. Positional-only
+        # arguments keep a param named "task" or "params" from colliding.
         template_registry = Registry()
         nodes: list[Node] = []
         for entry in blueprint:
