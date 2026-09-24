@@ -15,18 +15,32 @@ place of its result. The error text stays in the node's `result`, the trace,
 and checkpoints for diagnosis, but it never enters a dependent's prompt or the
 synthesized output. Resumed runs apply the same rule to saved skipped nodes.
 
-Truncated output is a provider error for the SDK providers (`AnthropicProvider`,
-`OpenAIProvider` and `GeminiProvider`). When a response stops at its output
-limit (Anthropic `stop_reason` `max_tokens` or `model_context_window_exceeded`,
-OpenAI `finish_reason` `length`, Gemini `finish_reason` `MAX_TOKENS`), the
-executor records the call's charge and then raises `OutputTruncatedError`. The
-node's failure policy applies, a retry reserves the node's estimated cost again
-before it is sent, and no tool call from the truncated turn runs.
-An `LLM_MERGE` synthesis raises the same error after recording its charge;
-synthesis has no failure policy, so the run fails. Raising the provider's
-`max_tokens` is the usual fix. The native `AnthropicMessagesProvider` and
-`OpenAIResponsesProvider` treat a truncated response as a terminal response
-error instead.
+Incomplete output is a provider error for the SDK providers
+(`AnthropicProvider`, `OpenAIProvider` and `GeminiProvider`). When a response
+stops at its output limit (Anthropic `stop_reason` `max_tokens` or
+`model_context_window_exceeded`, OpenAI `finish_reason` `length`, Gemini
+`finish_reason` `MAX_TOKENS`), the executor records the call's charge and then
+raises `OutputTruncatedError`. A response that the provider refused, filtered
+or ended early raises `OutputRefusedError` the same way, with one of these
+`stop_reason` values:
+
+| `stop_reason` | Provider signal |
+|---|---|
+| `refusal` | Anthropic `stop_reason` `refusal` |
+| `content_filter` | OpenAI `finish_reason` `content_filter`; Gemini `SAFETY`, `RECITATION`, `BLOCKLIST`, `PROHIBITED_CONTENT`, `SPII`, `IMAGE_SAFETY`, `IMAGE_PROHIBITED_CONTENT` or `IMAGE_RECITATION` |
+| `incomplete` | Any other Gemini `finish_reason` except `STOP` or an unspecified one, such as `OTHER` or `MALFORMED_FUNCTION_CALL` |
+
+Both errors subclass `IncompleteOutputError`. The node's failure policy
+applies, a retry reserves the node's estimated cost again before it is sent,
+and no tool call from the rejected turn runs. An `LLM_MERGE` synthesis raises
+the same errors after recording its charge; synthesis has no failure policy,
+so the run fails. `LLMArchitect` and `ConstrainedArchitect` retry such a
+planning reply with the problem named, up to `max_retries`, and
+`LLMSupervisor` makes no revision from such a review. Raising the provider's
+`max_tokens` is the usual fix for truncation. Stop reasons outside these
+values, including any a custom provider returns, count as complete. The native
+`AnthropicMessagesProvider` and `OpenAIResponsesProvider` treat any response
+that did not complete as a terminal response error instead.
 
 A node timeout follows its failure policy. Invalid accounting, budget
 admission or reconciliation failures, and failures persisting a billed result

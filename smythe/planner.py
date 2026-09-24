@@ -19,7 +19,7 @@ from smythe.prompts import (
     build_agent_inventory,
     build_user_prompt,
 )
-from smythe.provider import TRUNCATED_STOP_REASONS, Provider
+from smythe.provider import REFUSED_STOP_REASONS, TRUNCATED_STOP_REASONS, Provider
 from smythe.registry import Registry
 from smythe.task import Task
 from smythe.workflow_binding import (
@@ -236,6 +236,12 @@ class LLMArchitect(Architect):
                     raise ValueError(
                         "the response was cut off at the output token limit; "
                         "return a smaller plan"
+                    )
+                if result.stop_reason in REFUSED_STOP_REASONS:
+                    # A refused or filtered reply is not a plan, even if it parses.
+                    raise ValueError(
+                        "the response was refused, filtered or stopped early "
+                        f"(stop_reason={result.stop_reason!r})"
                     )
                 data = self._extract_json(result.text)
                 graph, registry = build_graph_from_model_output(

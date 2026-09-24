@@ -16,7 +16,7 @@ from smythe.constrained_prompts import (
 )
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.planner import Architect, ArchitectError, _strip_code_fence
-from smythe.provider import TRUNCATED_STOP_REASONS, Provider
+from smythe.provider import REFUSED_STOP_REASONS, TRUNCATED_STOP_REASONS, Provider
 from smythe.registry import Registry
 from smythe.task import Task
 from smythe.workflow_binding import (
@@ -142,6 +142,11 @@ class ConstrainedArchitect(Architect):
                     raise ValueError(
                         "the response was cut off at the output token limit; "
                         "return fewer selections"
+                    )
+                if result.stop_reason in REFUSED_STOP_REASONS:
+                    raise ValueError(
+                        "the response was refused, filtered or stopped early "
+                        f"(stop_reason={result.stop_reason!r})"
                     )
                 selections = self._extract_selections(result.text)
                 return self._compose(selections, task)

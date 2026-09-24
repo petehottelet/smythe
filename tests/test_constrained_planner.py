@@ -290,3 +290,24 @@ def test_truncated_selection_is_retried_even_when_it_parses():
     assert len(graph.nodes) == 1
     assert len(provider.prompts_received) == 2
     assert "cut off at the output token limit" in provider.prompts_received[1]
+
+
+@pytest.mark.parametrize("stop_reason", ["refusal", "content_filter", "incomplete"])
+def test_refused_selection_is_retried_even_when_it_parses(stop_reason):
+    class RefusedOnce(MockConstrainedProvider):
+        async def complete(self, system, prompt, model):
+            result = await super().complete(system, prompt, model)
+            if self._call_index == 1:
+                result.stop_reason = stop_reason
+            return result
+
+    response = json.dumps([{"template": "draft"}])
+    provider = RefusedOnce([response, response])
+    planner = ConstrainedArchitect(provider=provider, templates=TEMPLATES, max_retries=1)
+
+    graph, _ = planner.plan(Task(goal="Retry test"))
+
+    assert len(graph.nodes) == 1
+    assert len(provider.prompts_received) == 2
+    assert "refused, filtered or stopped early" in provider.prompts_received[1]
+    assert f"stop_reason={stop_reason!r}" in provider.prompts_received[1]

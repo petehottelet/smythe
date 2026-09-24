@@ -112,13 +112,30 @@ class CompletionResult:
 # (OpenAI finish_reason "length" and Gemini MAX_TOKENS become "max_tokens").
 TRUNCATED_STOP_REASONS = frozenset({"max_tokens", "model_context_window_exceeded"})
 
+# Stop reasons meaning the provider refused, filtered or otherwise ended the
+# response unfinished. Built-in providers normalize their native signals to
+# these values: Anthropic "refusal"; "content_filter" for OpenAI's content
+# filter and Gemini's safety, recitation, blocklist and prohibited-content
+# finishes; "incomplete" for any other Gemini finish short of STOP. Any other
+# stop reason, including one a custom provider defines, counts as complete.
+REFUSED_STOP_REASONS = frozenset({"refusal", "content_filter", "incomplete"})
 
-class OutputTruncatedError(PicklableError, RuntimeError):
+
+class IncompleteOutputError(PicklableError, RuntimeError):
+    """The model's response is incomplete, so it is not used as output.
+
+    Subclasses set ``stop_reason`` to the normalized stop reason. Callers
+    raise them only after the call's usage has been recorded, so the billed
+    charge is kept. They are ordinary provider failures: a node's failure
+    policy applies (RETRY retries, SKIP skips, HALT stops the run).
+    """
+
+    stop_reason: str
+
+
+class OutputTruncatedError(IncompleteOutputError):
     """The model stopped before completing its response.
 
-    Callers raise this only after the call's usage has been recorded, so
-    the billed charge is kept. It is an ordinary provider failure: a node's
-    failure policy applies (RETRY retries, SKIP skips, HALT stops the run).
     Raising the provider's ``max_tokens`` is the usual remedy.
     """
 
@@ -131,10 +148,30 @@ class OutputTruncatedError(PicklableError, RuntimeError):
         )
 
 
-def _raise_if_truncated(result: CompletionResult, *, where: str | None = None) -> None:
+class OutputRefusedError(IncompleteOutputError):
+    """The provider refused, filtered or otherwise ended the response unfinished.
+
+    ``stop_reason`` is one of ``REFUSED_STOP_REASONS``.
+    """
+
+    _CAUSES = {
+        "refusal": "the model refused to respond",
+        "content_filter": "the provider's content filter stopped the response",
+    }
+
+    def __init__(self, stop_reason: str, *, where: str | None = None) -> None:
+        self.stop_reason = stop_reason
+        prefix = f"{where}: " if where else ""
+        cause = self._CAUSES.get(stop_reason, "the provider ended the response before it completed")
+        super().__init__(f"{prefix}{cause} (stop_reason={stop_reason!r}); the output is not usable")
+
+
+def _raise_if_incomplete(result: CompletionResult, *, where: str | None = None) -> None:
     """Reject incomplete output. Call only after the result's cost is recorded."""
     if result.stop_reason in TRUNCATED_STOP_REASONS:
         raise OutputTruncatedError(result.stop_reason, where=where)
+    if result.stop_reason in REFUSED_STOP_REASONS:
+        raise OutputRefusedError(result.stop_reason, where=where)
 
 
 class ProviderResponseError(RuntimeError):
@@ -775,6 +812,7 @@ class OpenAIProvider(Provider):
                 "stop": "end_turn",
                 "tool_calls": "tool_use",
                 "length": "max_tokens",
+                "content_filter": "content_filter",
             }.get(finish, "tool_use" if tool_calls else "end_turn")
 
         usage = response.usage
@@ -1026,6 +1064,13 @@ class GeminiProvider(Provider):
     which token math badly underestimates.
     """
 
+    # Finish reasons for a response that Gemini's safety, recitation or
+    # content policies stopped; they become the "content_filter" stop reason.
+    _FILTERED_FINISH_REASONS = frozenset({
+        "SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII",
+        "IMAGE_SAFETY", "IMAGE_PROHIBITED_CONTENT", "IMAGE_RECITATION",
+    })
+
     def __init__(
         self,
         *,
@@ -1180,10 +1225,17 @@ class GeminiProvider(Provider):
                 cost_usd_is_estimate = False
                 cost_usd_unknown = True
 
-        if self._finish_reason(response) == "MAX_TOKENS":
-            stop = "max_tokens"
-        else:
+        finish = self._finish_reason(response)
+        if finish in (None, "STOP", "FINISH_REASON_UNSPECIFIED"):
             stop = "tool_use" if tool_calls else "end_turn"
+        elif finish == "MAX_TOKENS":
+            stop = "max_tokens"
+        elif finish in self._FILTERED_FINISH_REASONS:
+            stop = "content_filter"
+        else:
+            # OTHER, LANGUAGE, MALFORMED_FUNCTION_CALL, NO_IMAGE or a newer
+            # reason: the response ended short of a normal stop.
+            stop = "incomplete"
 
         usage = response.usage_metadata
         # The SDK can set token-count attributes to None (observed on
