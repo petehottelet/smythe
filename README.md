@@ -8,13 +8,6 @@
     <a href="LICENSE"><img src="assets/badges/license.svg" alt="License: MIT"></a>
   </p>
   <p>
-    <a href="#quickstart"><img src="assets/badges/quickstart.svg" alt="Quickstart runs with no API key"></a>
-    <a href="#with-a-real-model"><img src="assets/badges/providers.svg" alt="Providers: OpenAI, Anthropic, and Google"></a>
-    <a href="docs/workflow-accounting.md"><img src="assets/badges/durable.svg" alt="Durable runs: SQLite journal"></a>
-    <a href="benchmarks/README.md"><img src="assets/badges/benchmarks.svg" alt="Benchmarks with raw records"></a>
-    <img src="assets/badges/typed.svg" alt="Typed: ships py.typed">
-  </p>
-  <p>
     <a href="#quickstart">Quickstart</a> ·
     <a href="#how-it-works">How it works</a> ·
     <a href="#measured-results">Measured results</a> ·

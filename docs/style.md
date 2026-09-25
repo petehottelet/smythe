@@ -80,11 +80,10 @@ Every public diagram carries the same pure black-and-white init header, kept as
 ## Badges
 
 Use the repository-native SVG badges in `assets/badges/` for release, Python,
-and license information, and for the quickstart, providers, durable journal,
-benchmark records, and typing. Each uses the
+and license information. Each uses the
 conventional two-tone split—a black label field with white type and a white
 value field with black type—inside a complete one-pixel black rectangular
-border, in 11 px Verdana. Keep their values synchronized with the release.
+border. Keep their values synchronized with the release.
 
 The CI badge uses GitHub's live workflow badge, scoped to push runs on `main`.
 Its status color is an intentional exception: green means the latest applicable
