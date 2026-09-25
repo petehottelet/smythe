@@ -29,7 +29,7 @@ def render_workflow(path):
     maximum = math.ceil(max(row["max_s"] for row in rows) / 5) * 5
     body = _patterns()
     body += _text(40, 36, "AUTHORED SVG WORKFLOW / V2", size=12, weight="700", tracking=1.6)
-    body += _text(40, 76, "More glyphs. The same complete workflow.", size=30, family=SERIF, weight="700")
+    body += _text(40, 76, "More output, same workflow.", size=30, family=SERIF, weight="700")
     body += _text(40, 106, "Three repetitions per cell · compilation, four-size validation, pair comparisons, file export", size=13)
     for panel, count in enumerate((192, 256)):
         x = 40 + panel * 540
