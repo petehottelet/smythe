@@ -7,7 +7,7 @@
   </pattern>
 </defs>
 <text x="40" y="36" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="700" letter-spacing="1.6">AUTHORED SVG WORKFLOW / V2</text>
-<text x="40" y="76" font-family="Georgia,'Times New Roman',serif" font-size="30" fill="#000000" text-anchor="start" font-weight="700">More glyphs. The same complete workflow.</text>
+<text x="40" y="76" font-family="Georgia,'Times New Roman',serif" font-size="30" fill="#000000" text-anchor="start" font-weight="700">More output, same workflow.</text>
 <text x="40" y="106" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="13" fill="#000000" text-anchor="start" font-weight="normal">Three repetitions per cell · compilation, four-size validation, pair comparisons, file export</text>
 <text x="40" y="163" font-family="'Trajan Pro 3','Trajan Pro',Trajan,Cinzel,Georgia,serif" font-size="42" fill="#000000" text-anchor="start" font-weight="700">192</text>
 <text x="152" y="148" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="18" fill="#000000" text-anchor="start" font-weight="700">6.66s best median</text>
