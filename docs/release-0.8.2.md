@@ -7,7 +7,7 @@ Smythe 0.8.2 is a correctness release. It closes gaps in the execution
 envelope: a durable run repairs a generated plan it cannot execute instead of
 stopping for good, a supervisor revision can no longer drop a verification gate
 or cut it off from its target, refused or filtered provider replies stop
-counting as output, and Jobs bounds every image frame before decoding it.
+counting as output, and every image frame is bounded before it is decoded.
 
 ```bash
 pip install "smythe[openai]==0.8.2"
@@ -44,7 +44,7 @@ pip install "smythe[anthropic]==0.8.2"
 - **Exceptions survive pickle and copy,** including across process
   boundaries.
 
-Full behavior and fixes are in the [changelog](../CHANGELOG.md#082---2026-09-23).
+Full behavior and fixes are in the [changelog](../CHANGELOG.md#082---2026-09-25).
 
 ## Upgrade from 0.8.1
 
