@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="108" height="20" viewBox="0 0 108 20" role="img" aria-label="Typed: ships py.typed">
+  <rect x="0.5" y="0.5" width="107" height="19" fill="#ffffff" stroke="#000000"/>
+  <rect x="1" y="1" width="44" height="18" fill="#000000"/>
+  <g font-family="Verdana, 'DejaVu Sans', sans-serif" font-size="11" text-anchor="middle">
+    <text x="23" y="14" fill="#ffffff">typed</text>
+    <text x="76" y="14" fill="#000000">py.typed</text>
+  </g>
+</svg>

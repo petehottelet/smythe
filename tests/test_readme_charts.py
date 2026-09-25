@@ -96,7 +96,7 @@ def test_committed_benchmark_charts_match_the_current_evidence_renderer():
 def test_readme_badges_use_live_ci_and_bordered_black_and_white_metadata():
     readme = ROOT.joinpath("README.md").read_text(encoding="utf-8")
     badge_paths = re.findall(r'src="(assets/badges/[^"]+\.svg)"', readme)
-    assert len(badge_paths) == 3
+    assert len(badge_paths) == 8
     for relative in badge_paths:
         svg = ROOT.joinpath(relative).read_text(encoding="utf-8")
         assert set(HEX_COLOR.findall(svg)) == MONOCHROME
