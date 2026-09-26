@@ -26,6 +26,17 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ### Added
 
+- `OpenAIImageProvider(background=...)` accepts `"auto"` (default),
+  `"opaque"` or `"transparent"`. It is sent only when not `"auto"`, so
+  existing requests are unchanged; a transparent background requires PNG or
+  WebP output.
+- Noumenon benchmark lanes for transparent PNGs and SVG conversion.
+  `--background transparent` keeps the provider's alpha, asks for a
+  transparent background in the prompt, gates every tile on an objective
+  transparency check, and refuses models without transparent output before
+  any call. `--vectorize` traces every accepted tile into an even-odd SVG in
+  pure Python and Pillow and accepts it only when it rasterizes back to the
+  source mask at an IoU of at least 0.98.
 - `tools/evidence_archive.py` builds a deterministic archive of retired
   benchmark evidence from git history and verifies it against a committed
   pointer, every member's SHA-256 and, optionally, the recorded commit.
@@ -47,6 +58,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   tests and the screensaver workflow. The glyph generator, its contours and the
   192-glyph catalog stay in Smythe under `benchmarks/noumenon/`, where the SVG
   workflow benchmark imports them.
+- A live Noumenon run that halts, for example on a provider rate limit,
+  records what its completed calls charged and marks the total incomplete,
+  instead of recording no cost.
+- Benchmark environment snapshots mark a checkout `dirty` only when tracked
+  files differ from the recorded revision, and count untracked files
+  separately in `untracked_files`.
 - Released changelog sections 0.1.0 through 0.8.1 moved, unchanged, to
   [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md).
 
