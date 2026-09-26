@@ -34,7 +34,7 @@ pip install "smythe[anthropic]==0.8.1"
 - **Autotune** promotes on a paired Student-t lower bound and seals each
   challenger's holdout.
 
-Full behavior and fixes are in the [changelog](../CHANGELOG.md#081---2026-09-22).
+Full behavior and fixes are in the [changelog](../CHANGELOG-ARCHIVE.md#081---2026-09-22).
 
 ## Upgrade from 0.8.0
 

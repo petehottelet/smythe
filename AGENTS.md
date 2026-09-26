@@ -35,7 +35,8 @@ behavior belongs in the linked guide for that subsystem.
 - Keep shipped counts, model/provider names, CLI commands, and artifact links
   consistent across those surfaces.
 - Put unreleased changes only under `## [Unreleased]` in `CHANGELOG.md`; released
-  sections are immutable.
+  sections are immutable, including those moved unchanged to
+  `CHANGELOG-ARCHIVE.md`.
 - Use the visual rules in `docs/style.md` for diagrams and landing-page assets.
 - Validate local Markdown links after broad documentation edits.
 
