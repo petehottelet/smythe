@@ -778,11 +778,46 @@ def test_openai_image_provider_rejects_empty_image_data():
             {"output_format": "png", "output_compression": 90},
             "supported only for JPEG or WebP",
         ),
+        ({"background": "none"}, "background must be one of"),
+        ({"background": "Transparent"}, "background must be one of"),
+        (
+            {"background": "transparent", "output_format": "jpeg"},
+            "requires output_format 'png' or 'webp'",
+        ),
     ],
 )
 def test_openai_image_provider_validates_image_options(kwargs, message):
     with pytest.raises(ValueError, match=message):
         OpenAIImageProvider(api_key="fake", **kwargs)
+
+
+@pytest.mark.parametrize("background", [None, "auto"])
+def test_openai_image_auto_background_keeps_the_request_payload_unchanged(background):
+    kwargs = {} if background is None else {"background": background}
+    provider = _openai_image_with_response(_openai_image_response(), **kwargs)
+
+    asyncio.run(provider.complete("sys", "prompt", "gpt-image-2"))
+
+    assert "background" not in provider._client.images.generate.call_args.kwargs
+
+
+@pytest.mark.parametrize(
+    ("background", "output_format"),
+    [("transparent", "png"), ("transparent", "webp"), ("opaque", "jpeg")],
+)
+def test_openai_image_sends_explicit_background(background, output_format):
+    provider = _openai_image_with_response(
+        _openai_image_response(),
+        background=background,
+        output_format=output_format,
+    )
+
+    result = asyncio.run(provider.complete("sys", "glyph", "gpt-image-2.5-flare"))
+
+    sent = provider._client.images.generate.call_args.kwargs
+    assert sent["background"] == background
+    assert sent["output_format"] == output_format
+    assert result.artifacts[0].mime_type == f"image/{output_format}"
 
 
 def test_gemini_image_config_passthrough():
