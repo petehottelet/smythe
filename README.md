@@ -28,8 +28,8 @@ where you need to see what will run and account for results.
 </p>
 <p align="center"><em><a href="benchmarks/noumenon_benchmark.md">Noumenon</a> is Smythe's parallel-processing example: each glyph is an independent task, and Smythe runs the tasks concurrently.</em></p>
 
-Example Task: Smythe generated **192 glyphs in 20.5 seconds, 56.2× faster than serial.** Smythe runs the glyph
-set as one 192-node fan-out graph, one node per glyph, with up to 64 nodes; run one node at a time, the same graph took 1,149.6 seconds. Controlled offline run with fixed latency per call measures Smythe's scheduling. Glyphs are compiled, validated, and exported in parallel: 256 SVG glyphs in 8.06 seconds
+Example Task: Smythe generated **192 glyphs in 21.7 seconds, 52.3× faster than serial.** Smythe runs the glyph
+set as one 192-node fan-out graph, one node per glyph, with up to 64 nodes; run one node at a time, the same graph took 1,133.3 seconds. Controlled offline run with fixed latency per call measures Smythe's scheduling. Glyphs are compiled, validated, and exported in parallel: 256 SVG glyphs in 8.06 seconds
 median with eight process workers, 2.20× faster than one worker, with no API calls. [Fan-out benchmark](benchmarks/noumenon_benchmark.md) ·
 [SVG workflow benchmark](benchmarks/svg_v2_results.md)
 
@@ -183,7 +183,7 @@ from the committed records.
 | [Interruption and recovery](benchmarks/durability_benchmark.md) | 8 repeated dispatches versus LangGraph's 32 | Three matched hard-kill trials with 64 operations |
 | [Generated topology](benchmarks/shape_suite.md) | 14% less wall time than a fixed pipeline, planning included | Five task shapes, three repetitions; wall time and observed quality |
 | [SVG catalog workflow](benchmarks/svg_v2_results.md) | 256 SVGs in 8.06 seconds median; 2.20× the serial baseline | Local compilation, validation, and export of authored designs; no API calls |
-| [Noumenon glyph fan-out](benchmarks/noumenon_benchmark.md) | 56.2× faster than serial at concurrency 64 | Controlled offline runs at 64 to 256 nodes; simulated provider latency |
+| [Noumenon glyph fan-out](benchmarks/noumenon_benchmark.md) | 52.3× faster than serial at concurrency 64 | Controlled offline runs at 64 to 256 nodes; simulated provider latency |
 | [Jobs at 5,000 operations](benchmarks/jobs_scale_5000_20260907_results.md) | 5,000 accepted artifacts after a hard kill and recovery | One offline campaign with identical fixtures; correctness, not speed |
 
 ### Framework efficiency
@@ -249,8 +249,8 @@ Process workers trade more memory for shorter completion time:
   <img src="assets/benchmarks/svg_v2_memory.svg" alt="Measured parent-plus-worker memory at each catalog size and concurrency" width="900">
 </p>
 
-At concurrency 64, generating 192 glyphs took **20.5 seconds** versus 1,149.6
-seconds serially, **56.2× faster**, and all 192 validated as unique. This is a
+At concurrency 64, generating 192 glyphs took **21.7 seconds** versus 1,133.3
+seconds serially, **52.3× faster**, and all 192 validated as unique. This is a
 controlled offline measurement with 5.8 seconds of simulated provider latency
 per call; every 64-, 128-, 192- and 256-node run produced complete sets of
 valid, unique tiles. [Noumenon protocol and records](benchmarks/noumenon_benchmark.md).
@@ -258,6 +258,10 @@ valid, unique tiles. [Noumenon protocol and records](benchmarks/noumenon_benchma
 <p align="center">
   <img src="assets/benchmarks/noumenon_scaling.svg" alt="Controlled offline Noumenon glyph generation at four graph widths, with all tiles valid and unique at every measured concurrency" width="900">
 </p>
+
+Live GPT Image lanes generated the same 192 glyphs as transparent PNGs, and
+traced them into SVGs, three calls at a time within the account's image rate
+limit. [Live lanes](benchmarks/noumenon_benchmark.md#live-image-lanes).
 
 ### Jobs at 5,000 operations
 

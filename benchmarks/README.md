@@ -22,7 +22,8 @@ publishing benchmark updates.
 | [Original SVG workflow](svg_glyph_benchmark.md) | **Historical v1 timing**; visual acceptance superseded | 192 original glyphs in 4.03 s median including full validation and assembly; 2.95× process-c1 speed; all 30 workflows accepted |
 | [Task-shape suite v3](shape_suite.md) | **Claimable for wall time and observed quality** | 14% lower end-to-end wall time; historical cost excludes planning |
 | [Hard-kill durability v2](durability_benchmark.md) | **Claimable** | 8 duplicate dispatches after resume versus LangGraph's 32, across 3 reps |
-| [Noumenon width-scaling sweep](noumenon_benchmark.md#width-scaling-from-64-to-256-nodes) | **Claimable** | 64, 128, 192, and 256 valid unique tiles at every concurrency; 40.37×–56.21× at concurrency 64; isolated outputs |
+| [Noumenon width-scaling sweep](noumenon_benchmark.md#width-scaling-from-64-to-256-nodes) | **Claimable** | 64, 128, 192, and 256 valid unique tiles at every concurrency; 43.73×–53.98× at concurrency 64; isolated outputs |
+| [Noumenon live transparent and SVG lanes](noumenon_benchmark.md#live-image-lanes) | Ecological; one account | 192/192 transparent PNGs from gpt-image-2.5-flare, and 192/192 SVGs that rasterize back at IoU 1.0, three calls at a time under a 20-images-per-minute limit |
 | [Image concurrency sweep](image_benchmarks.md) | **Claimable** | 6.6× wall-clock speedup at concurrency 8; 72/72 valid images |
 | [Corrected framework head-to-head](#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12) | **Claimable for the fixed arms** | 77% fewer tokens and 28% less wall time than CrewAI; highest observed blind score |
 | Original self-baselines and pre-correction framework record | Diagnostic | Preserved because they found payload, assembly, and measurement defects; superseded by corrected campaigns |
@@ -297,10 +298,10 @@ generation result.
 ## Noumenon fan-out
 
 The [Noumenon workload](noumenon_benchmark.md) is Smythe's parallel-processing
-example. It turns wide
-artifact generation into something directly inspectable: one independent node
-per original fictional cyber glyph, 192 calls total, followed by objective PNG
-normalization and SHA-256 uniqueness checks.
+example. It turns wide artifact generation into something directly
+inspectable: one independent node per original fictional cyber glyph, 192
+calls total, followed by objective PNG normalization and SHA-256 uniqueness
+checks.
 
 ```bash
 python benchmarks/run_noumenon.py
@@ -332,37 +333,48 @@ python benchmarks/run_noumenon.py --live --concurrency 8 \
   --max-cost-per-call-usd 0.01 --max-budget-usd 1.92
 ```
 
-Those values are examples of the guardrail shape, not current pricing advice.
-Verify provider pricing immediately before any paid run. The offline sweep is
-an executor benchmark; only a repeated live lane can support claims about an
-external image API's latency or rate limits.
+Transparent-PNG and SVG lanes add `--background transparent` and `--vectorize`
+with a model that supports transparent output; see the [live image
+lanes](noumenon_benchmark.md#live-image-lanes). Those values are examples of
+the guardrail shape, not current pricing advice. Verify provider pricing and
+the account's image rate limit immediately before any paid run. The offline
+sweep is an executor benchmark; only a repeated live lane can support claims
+about an external image API's latency or rate limits.
 
 The matched [width-scaling records](noumenon_benchmark.md#width-scaling-from-64-to-256-nodes)
 cover 64, 128, 192, and 256 nodes in separate output namespaces. Every width
 produced a complete set of valid, SHA-256-unique tiles at every measured
-concurrency; speedup at concurrency 64 ranged from 40.37× to 56.21×.
+concurrency; speedup at concurrency 64 ranged from 43.73× to 53.98×.
 
-### Results — realistic-latency profile (2026-08-05)
+### Results — realistic-latency profile (2026-09-25)
 
 One 192-node broadcast graph, simulated 5.8 s per-call latency (the live
 image lane's measured serial mean), all 192 tiles valid and SHA-256-unique
 at every concurrency
-([record](results/glyph_screensaver_offline_realistic.json)):
+([record](results/noumenon_offline_realistic.json)):
 
 | Concurrency | Wall | Speedup | Parallel efficiency |
 |---:|---:|---:|---:|
-| 1 | 1,149.6 s | 1.0× | — |
-| 4 | 285.7 s | 4.02× | 100% |
-| 8 | 144.2 s | 7.97× | 100% |
-| 16 | 74.1 s | 15.5× | 97% |
-| 32 | 40.6 s | 28.3× | 88% |
-| 64 | 20.5 s | 56.2× | 88% |
+| 1 | 1,133.3 s | 1.00× | — |
+| 4 | 283.3 s | 4.00× | 100% |
+| 8 | 144.7 s | 7.83× | 98% |
+| 16 | 75.1 s | 15.08× | 94% |
+| 32 | 39.0 s | 29.08× | 91% |
+| 64 | 21.7 s | 52.32× | 82% |
 
-The default 250 ms profile
-([record](results/glyph_screensaver_offline.json)) plateaus near 7× because
-fsync'd per-tile artifact journaling (~70 ms/tile on the reference
-Windows/NTFS machine) dominates its short latency envelope — that floor is
-documented in the protocol rather than hidden by construction.
+The default 250 ms profile ([record](results/noumenon_offline.json)) plateaus
+near 4.9× at concurrency 16 because fsync'd per-tile artifact journaling (~70
+ms/tile on the reference Windows/NTFS machine) dominates its short latency
+envelope — that floor is documented in the protocol rather than hidden by
+construction.
+
+### Live transparent and SVG lanes (2026-09-25)
+
+Two live GPT Image lanes generated all 192 glyphs as transparent PNGs, three
+calls at a time within the account's limit of 20 images per minute. The second
+lane also traced every tile into an SVG that rasterized back to its mask at an
+IoU of 1.0. Both records, and two diagnostic attempts, are in the
+[live lane results](noumenon_benchmark.md#live-image-lanes).
 
 ## Hard-kill durability
 

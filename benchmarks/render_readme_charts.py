@@ -483,10 +483,10 @@ def _glyph_marker(kind: str, x: float, y: float) -> str:
 
 def render_noumenon_scaling() -> str:
     """Render the isolated 64-, 128-, 192-, and 256-node Noumenon sweeps."""
-    record_64, runs_64 = _glyph_runs("glyph_screensaver_64_offline_realistic.json")
-    record_128, runs_128 = _glyph_runs("glyph_screensaver_128_offline_realistic.json")
-    record_192, runs_192 = _glyph_runs("glyph_screensaver_offline_realistic.json")
-    record_256, runs_256 = _glyph_runs("glyph_screensaver_256_offline_realistic.json")
+    record_64, runs_64 = _glyph_runs("noumenon_64_offline_realistic.json")
+    record_128, runs_128 = _glyph_runs("noumenon_128_offline_realistic.json")
+    record_192, runs_192 = _glyph_runs("noumenon_offline_realistic.json")
+    record_256, runs_256 = _glyph_runs("noumenon_256_offline_realistic.json")
     series = (
         (64, record_64, runs_64, "2 6", "triangle", 2.0),
         (128, record_128, runs_128, "12 5 2 5", "diamond", 2.0),

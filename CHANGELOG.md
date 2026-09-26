@@ -52,6 +52,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   records are `benchmarks/results/noumenon_*.json`, its report is
   [`benchmarks/noumenon_benchmark.md`](benchmarks/noumenon_benchmark.md), and its
   charts are `assets/benchmarks/noumenon_scaling.svg` and `assets/noumenon/`.
+- **The Noumenon benchmark was re-run.** The four-width realistic-latency sweep
+  and the default 250 ms profile ran again from a clean checkout under the
+  unchanged protocol. At 192 nodes, concurrency 64 now measures 52.32×
+  (21.7 s against 1,133.3 s serially); the superseded August records,
+  which measured 56.21×, are in the evidence archive. Live GPT Image lanes
+  recorded 192 transparent PNGs and their SVG conversions.
 - **The screensaver apps moved to the
   [Noumenon repository](https://github.com/petehottelet/noumenon)**: the web
   explorer, the Windows, macOS and Linux ports, the catalog exporters, their

@@ -122,10 +122,10 @@ def test_noumenon_scaling_chart_uses_all_four_isolated_records():
         "128 nodes",
         "192 nodes",
         "256 nodes",
-        "40.37×",
-        "44.51×",
-        "56.21×",
-        "49.56×",
+        "43.73×",
+        "51.38×",
+        "52.32×",
+        "53.98×",
         "64 / 128 / 192 / 256 valid unique tiles",
     ):
         assert value in svg
@@ -189,7 +189,7 @@ def test_framework_charts_reject_invalid_evidence(monkeypatch, defect):
 
 @pytest.mark.parametrize("defect", ["speedup", "completed", "validation"])
 def test_glyph_chart_rejects_invalid_run_metrics(monkeypatch, defect):
-    record = deepcopy(render_readme_charts._load("glyph_screensaver_64_offline_realistic.json"))
+    record = deepcopy(render_readme_charts._load("noumenon_64_offline_realistic.json"))
     if defect == "speedup":
         record["runs"][-1]["speedup_vs_concurrency_1"] = 1000
     elif defect == "completed":
