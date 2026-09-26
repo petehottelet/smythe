@@ -1,6 +1,9 @@
+import json
 from pathlib import Path
 import subprocess
 from types import SimpleNamespace
+
+import pytest
 
 import smythe
 from benchmarks import artifact_records
@@ -9,8 +12,14 @@ from benchmarks.artifact_records import (
     environment_snapshot,
     image_mime_type,
     portable_path,
+    redact_account_identifiers,
     resolve_record_path,
 )
+
+
+def _identifier(prefix: str, length: int) -> str:
+    """Build identifier-shaped text at runtime so no literal is committed."""
+    return prefix + ("A1b2" * length)[:length]
 
 
 def test_image_mime_type_uses_the_actual_extension():
@@ -89,3 +98,47 @@ def test_source_snapshot_remains_usable_without_git(monkeypatch):
     monkeypatch.setattr(artifact_records.subprocess, "run", missing_git)
     assert artifact_records._source_control_snapshot() == {
         "revision": None, "dirty": None, "untracked_files": None}
+
+
+@pytest.mark.parametrize(
+    ("identifier", "replacement"),
+    [
+        (_identifier("org-", 24), "org-[redacted]"),
+        (_identifier("proj_", 24), "proj_[redacted]"),
+        (_identifier("sk-proj-", 48), "sk-[redacted]"),
+        (_identifier("sk-" + "ant-api03-", 48), "sk-[redacted]"),
+        ("sk-proj-" + "*" * 40 + "Ab12", "sk-[redacted]"),
+        (_identifier("AIza", 35), "AIza[redacted]"),
+        (_identifier("AQ.", 40), "AQ.[redacted]"),
+        ("gen-lang-client-" + "0123456789", "gen-lang-client-[redacted]"),
+        ("project_number:" + "123456789012", "project_number:[redacted]"),
+    ],
+)
+def test_redaction_replaces_each_account_identifier_format(identifier, replacement):
+    assert redact_account_identifiers(f"consumer '{identifier}' was refused") == (
+        f"consumer '{replacement}' was refused"
+    )
+
+
+def test_redaction_reaches_every_string_in_a_nested_record():
+    organization = _identifier("org-", 24)
+    record = {
+        "errors": [{"error": f"429 in organization {organization} on images per min"}],
+        "detail": (f"organization {organization}", 3, None),
+        organization: 1.5,
+    }
+
+    redacted = redact_account_identifiers(record)
+
+    assert organization not in json.dumps(redacted)
+    assert redacted == {
+        "errors": [{"error": "429 in organization org-[redacted] on images per min"}],
+        "detail": ["organization org-[redacted]", 3, None],
+        "org-[redacted]": 1.5,
+    }
+
+
+def test_redaction_leaves_ordinary_text_and_placeholder_keys_alone():
+    text = "org-chart " + "sk-" + "offline-test project_number:42 gen-lang-client-7"
+
+    assert redact_account_identifiers(text) == text

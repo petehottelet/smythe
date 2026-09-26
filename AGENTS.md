@@ -58,6 +58,20 @@ behavior belongs in the linked guide for that subsystem.
   entries and frozen evidence remain provenance; they do not authorize new
   public implementation plans or reviews.
 
+## Private account information
+
+- Never commit private account information in files, commit messages, or
+  GitHub text: API keys or fragments of them; organization, project, billing,
+  or account IDs; email addresses other than the GitHub noreply identity; or
+  local user paths.
+- Provider error messages embed some of these. Redact them with
+  `redact_account_identifiers` from `benchmarks/artifact_records.py` before
+  writing any benchmark record, and review every staged diff for them before
+  committing.
+- `tests/test_committed_identifiers.py` fails when a tracked file contains an
+  identifier or key in a known provider format. Extend its patterns when a
+  provider introduces a new format.
+
 ## Code quality
 
 - Read a file in full before making a wide-ranging edit to it.

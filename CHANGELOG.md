@@ -24,7 +24,15 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
-No unreleased changes.
+### Fixed
+
+- The Noumenon benchmark redacts account identifiers, such as the
+  organization named in a provider's rate-limit error, from the records it
+  writes. `redact_account_identifiers` in `benchmarks/artifact_records.py`
+  covers OpenAI organization, project and key formats and Google API key and
+  project formats.
+- A repository test fails when any tracked file contains an identifier or key
+  in one of those formats.
 
 ## [0.9.0] - 2026-09-26
 
