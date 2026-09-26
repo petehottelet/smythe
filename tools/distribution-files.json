@@ -157,6 +157,7 @@
     "tests/test_native_response_accounting.py",
     "tests/test_noumenon_assets.py",
     "tests/test_noumenon_benchmark.py",
+    "tests/test_noumenon_vectorize.py",
     "tests/test_offline_policy.py",
     "tests/test_offline_provider.py",
     "tests/test_openclaw_adapter.py",

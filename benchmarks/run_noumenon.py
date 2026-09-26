@@ -6,6 +6,11 @@ Offline (default, zero cost):
 Explicitly budgeted GPT Image run:
     python benchmarks/run_noumenon.py --live --concurrency 8 \
       --max-cost-per-call-usd 0.01 --max-budget-usd 1.92
+
+Transparent tiles from a model that supports them, traced to validated SVGs:
+    python benchmarks/run_noumenon.py --live --model gpt-image-2.5-flare \
+      --background transparent --vectorize --concurrency 8 \
+      --max-cost-per-call-usd 0.01 --max-budget-usd 2.00
 """
 
 from __future__ import annotations
@@ -31,6 +36,11 @@ from benchmarks.noumenon_assets import (  # noqa: E402
     GLYPH_SPECS,
     MAX_GLYPH_COUNT,
     TILE_SIZE,
+    TRANSPARENCY_CORNER_FRACTION,
+    TRANSPARENCY_MAX_VISIBLE_FRACTION,
+    TRANSPARENCY_MIN_OPAQUE_FRACTION,
+    TRANSPARENCY_OPAQUE_ALPHA,
+    TRANSPARENCY_VISIBLE_ALPHA,
     ProceduralGlyphProvider,
     assemble_animation,
     assemble_atlas,
@@ -38,8 +48,16 @@ from benchmarks.noumenon_assets import (  # noqa: E402
     assemble_preview,
     glyph_prompt,
     get_glyph_specs,
+    inspect_tile_transparency,
     normalize_tile,
     render_glyph_tile,
+)
+from benchmarks.noumenon_vectorize import (  # noqa: E402
+    ALPHA_THRESHOLD,
+    IOU_THRESHOLD,
+    LUMINANCE_THRESHOLD,
+    VECTORIZATION_METHOD,
+    vectorize_tile,
 )
 from smythe import Swarm  # noqa: E402
 from smythe.provider import GeminiProvider, OpenAIImageProvider  # noqa: E402
@@ -67,6 +85,14 @@ DEFAULT_CONCURRENCIES = (1, 4, 8, 16)
 DEFAULT_LATENCY_S = 0.25
 ASSEMBLY_GLYPH_COUNTS = (GLYPH_COUNT, MAX_GLYPH_COUNT)
 IMAGE_GENERATION_GUIDE = "https://developers.openai.com/api/docs/guides/image-generation"
+BACKGROUNDS = ("auto", "transparent")
+# OpenAI's image-generation guide documents transparent backgrounds for
+# gpt-image-2.5-sunburst and gpt-image-2.5-flare; gpt-image-2 (the default
+# lane's model, including dated snapshots) does not support them. Refusing
+# that pairing before dispatch keeps a whole paid run from producing opaque
+# tiles that the transparency gate would then reject.
+TRANSPARENT_MODEL_EXAMPLE = "gpt-image-2.5-flare"
+_OPAQUE_ONLY_MODEL = re.compile(r"gpt-image-2(?:-\d{4}-\d{2}-\d{2})?")
 
 
 def build_graph(*, glyph_count: int, estimated_cost_per_call_usd: float) -> ExecutionGraph:
@@ -107,10 +133,23 @@ def _validate_and_normalize(
     graph: ExecutionGraph,
     *,
     run_dir: Path,
-) -> tuple[list[dict[str, Any]], list[str], dict[str, Any]]:
+    background: str = "auto",
+) -> tuple[
+    list[dict[str, Any]], list[str], dict[str, Any], list[tuple[str, dict[str, Any]]]
+]:
+    """Normalize every tile and apply the objective gates.
+
+    Returns the tile receipts, all normalized tile paths, the validation
+    summary, and the accepted ``(tile path, receipt)`` pairs. A transparent
+    run keeps the provider's alpha and requires each tile to pass
+    ``inspect_tile_transparency``.
+    """
+    transparent = background == "transparent"
     receipts: list[dict[str, Any]] = []
     tile_paths: list[str] = []
+    accepted: list[tuple[str, dict[str, Any]]] = []
     validation_errors: list[str] = []
+    transparent_tiles = 0
     tile_dir = run_dir / "tiles"
 
     for node in graph.nodes:
@@ -125,7 +164,9 @@ def _validate_and_normalize(
             continue
         source = Path(artifacts[0]["path"])
         try:
-            receipt = normalize_tile(source, tile_dir / f"{node.id}.png")
+            receipt = normalize_tile(
+                source, tile_dir / f"{node.id}.png", preserve_alpha=transparent
+            )
         except Exception as exc:
             validation_errors.append(f"{node.id}: normalization failed: {exc}")
             continue
@@ -133,13 +174,31 @@ def _validate_and_normalize(
         record["node_id"] = node.id
         receipts.append(record)
         tile_paths.append(receipt.path)
+        tile_errors: list[str] = []
         if receipt.format != "PNG":
-            validation_errors.append(f"{node.id}: expected PNG, got {receipt.format}")
+            tile_errors.append(f"{node.id}: expected PNG, got {receipt.format}")
         if (receipt.width, receipt.height) != (TILE_SIZE, TILE_SIZE):
-            validation_errors.append(
+            tile_errors.append(
                 f"{node.id}: expected {TILE_SIZE}x{TILE_SIZE}, "
                 f"got {receipt.width}x{receipt.height}"
             )
+        if transparent:
+            try:
+                check = inspect_tile_transparency(receipt.path, source=source)
+            except Exception as exc:
+                tile_errors.append(f"{node.id}: transparency check failed: {exc}")
+            else:
+                record["transparency"] = {**asdict(check), "reasons": list(check.reasons)}
+                if check.passed:
+                    transparent_tiles += 1
+                else:
+                    tile_errors.append(
+                        f"{node.id}: transparency check failed: "
+                        + "; ".join(check.reasons)
+                    )
+        validation_errors.extend(tile_errors)
+        if not tile_errors:
+            accepted.append((receipt.path, record))
 
     unique_hashes = len({receipt["sha256"] for receipt in receipts})
     expected = len(graph.nodes)
@@ -151,18 +210,101 @@ def _validate_and_normalize(
         validation_errors.append(
             f"expected {expected} unique tile hashes, found {unique_hashes}"
         )
-    validation = {
+    validation: dict[str, Any] = {
         "passed": not validation_errors,
         "expected_tiles": expected,
         "valid_png_tiles": len(receipts),
-        "tile_size": [TILE_SIZE, TILE_SIZE],
-        "unique_tile_hashes": unique_hashes,
-        "errors": validation_errors,
     }
-    return receipts, tile_paths, validation
+    if transparent:
+        validation["transparent_tiles"] = transparent_tiles
+    validation.update(
+        {
+            "tile_size": [TILE_SIZE, TILE_SIZE],
+            "unique_tile_hashes": unique_hashes,
+            "errors": validation_errors,
+        }
+    )
+    return receipts, tile_paths, validation, accepted
 
 
-def _live_provider(name: str, max_cost_per_call_usd: float):
+def _vectorize_tiles(
+    accepted: Sequence[tuple[str, dict[str, Any]]],
+    *,
+    expected: int,
+) -> dict[str, Any]:
+    """Trace each accepted tile into an SVG beside its PNG and summarize the gate."""
+    valid = 0
+    ious: list[float] = []
+    outlines = 0
+    svg_bytes = 0
+    errors: list[str] = []
+    for tile_path, record in accepted:
+        png = Path(tile_path)
+        node_id = record["node_id"]
+        try:
+            receipt = vectorize_tile(png, png.with_suffix(".svg"))
+        except Exception as exc:
+            errors.append(f"{node_id}: vectorization failed: {type(exc).__name__}: {exc}")
+            continue
+        svg = asdict(receipt)
+        if receipt.path is not None:
+            svg["path"] = portable_path(receipt.path)
+        svg["errors"] = list(receipt.errors)
+        record["svg"] = svg
+        outlines += receipt.outline_count
+        svg_bytes += receipt.byte_size
+        if receipt.iou is not None:
+            ious.append(receipt.iou)
+        if receipt.valid:
+            valid += 1
+        else:
+            errors.append(f"{node_id}: SVG validation failed: " + "; ".join(receipt.errors))
+    return {
+        "passed": valid == expected and not errors,
+        "expected_svgs": expected,
+        "vectorized_tiles": len(accepted),
+        "valid_svgs": valid,
+        "iou_threshold": IOU_THRESHOLD,
+        "iou_min": min(ious, default=None),
+        "iou_max": max(ious, default=None),
+        "outline_count": outlines,
+        "svg_bytes": svg_bytes,
+        "errors": errors,
+    }
+
+
+def _transparency_protocol() -> dict[str, Any]:
+    return {
+        "provider_transparency_required": True,
+        "corner_size_px": max(1, round(TILE_SIZE * TRANSPARENCY_CORNER_FRACTION)),
+        "corner_max_alpha": 0,
+        "opaque_alpha_min": TRANSPARENCY_OPAQUE_ALPHA,
+        "min_opaque_fraction": TRANSPARENCY_MIN_OPAQUE_FRACTION,
+        "visible_alpha_min": TRANSPARENCY_VISIBLE_ALPHA,
+        "max_visible_fraction": TRANSPARENCY_MAX_VISIBLE_FRACTION,
+    }
+
+
+def _vectorization_protocol() -> dict[str, Any]:
+    return {
+        "method": VECTORIZATION_METHOD,
+        "mask": (
+            f"alpha > {ALPHA_THRESHOLD} when the tile has transparency, "
+            f"otherwise luminance > {LUMINANCE_THRESHOLD}"
+        ),
+        "output": (
+            "one SVG per accepted tile beside its PNG: a single "
+            f'fill-rule="evenodd" path, viewBox 0 0 {TILE_SIZE} {TILE_SIZE}'
+        ),
+        "validation": (
+            "re-read the SVG, rasterize its outlines at pixel centers with "
+            "even-odd parity, and compare with the source mask"
+        ),
+        "iou_threshold": IOU_THRESHOLD,
+    }
+
+
+def _live_provider(name: str, max_cost_per_call_usd: float, *, background: str = "auto"):
     if name == "gemini":
         return GeminiProvider(
             cost_per_image_usd=GEMINI_COST_PER_IMAGE_USD,
@@ -173,6 +315,7 @@ def _live_provider(name: str, max_cost_per_call_usd: float):
         size="1024x1024",
         quality="low",
         output_format="png",
+        background=background,
         n=1,
         max_cost_per_call_usd=max_cost_per_call_usd,
     )
@@ -189,11 +332,15 @@ async def _run_once(
     live_provider: str,
     max_cost_per_call_usd: float,
     max_budget_usd: float,
+    background: str = "auto",
+    vectorize: bool = False,
 ) -> tuple[dict[str, Any], list[str]]:
+    # The procedural provider always renders transparent RGBA tiles, so an
+    # offline transparent run exercises the same alpha gate as the live lane.
     provider = (
         ProceduralGlyphProvider(latency_s=latency_s, tile_size=TILE_SIZE)
         if mode == "offline"
-        else _live_provider(live_provider, max_cost_per_call_usd)
+        else _live_provider(live_provider, max_cost_per_call_usd, background=background)
     )
     graph = build_graph(
         glyph_count=glyph_count,
@@ -219,10 +366,16 @@ async def _run_once(
     generation_wall_s = time.perf_counter() - started
 
     validation_started = time.perf_counter()
-    tile_receipts, tile_paths, validation = _validate_and_normalize(
-        graph, run_dir=run_dir
+    tile_receipts, tile_paths, validation, accepted = _validate_and_normalize(
+        graph, run_dir=run_dir, background=background
     )
     validation_wall_s = time.perf_counter() - validation_started
+    vectorization = None
+    vectorization_wall_s = None
+    if vectorize:
+        vectorization_started = time.perf_counter()
+        vectorization = _vectorize_tiles(accepted, expected=len(graph.nodes))
+        vectorization_wall_s = time.perf_counter() - vectorization_started
     errors = _node_errors(graph)
     if execution_error is not None:
         errors.insert(
@@ -241,15 +394,34 @@ async def _run_once(
         }
         for error in validation["errors"]
     )
+    if vectorization is not None:
+        errors.extend(
+            {
+                "node_id": "__vectorization__",
+                "status": "failed",
+                "error": error,
+            }
+            for error in vectorization["errors"]
+        )
+    passed = (
+        not errors
+        and validation["passed"]
+        and (vectorization is None or vectorization["passed"])
+    )
 
     completed = sum(node.status is NodeStatus.COMPLETED for node in graph.nodes)
     run = {
         "concurrency": concurrency,
-        "status": "passed" if not errors and validation["passed"] else "failed",
+        "status": "passed" if passed else "failed",
         "execution_id": result.execution_id if result is not None else None,
         "generation_wall_s": round(generation_wall_s, 6),
         "validation_wall_s": round(validation_wall_s, 6),
-        "end_to_end_wall_s": round(generation_wall_s + validation_wall_s, 6),
+        "vectorization_wall_s": (
+            round(vectorization_wall_s, 6) if vectorization_wall_s is not None else None
+        ),
+        "end_to_end_wall_s": round(
+            generation_wall_s + validation_wall_s + (vectorization_wall_s or 0.0), 6
+        ),
         "completed_nodes": completed,
         "throughput_glyphs_per_s": round(completed / generation_wall_s, 4),
         "cost_usd": round(result.total_cost_usd, 6) if result is not None else None,
@@ -258,6 +430,7 @@ async def _run_once(
             result.cost_contains_estimates if result is not None else mode == "live"
         ),
         "validation": validation,
+        "vectorization": vectorization,
         "tile_receipts": tile_receipts,
         "errors": errors,
     }
@@ -292,11 +465,27 @@ async def run_benchmark(
     max_budget_usd: float | None,
     live_provider: str = "openai",
     partition: str | None = None,
+    background: str = "auto",
+    vectorize: bool = False,
 ) -> dict[str, Any]:
     """Execute the configured benchmark and return its portable evidence record."""
     mode = "live" if live else "offline"
     if live_provider not in LIVE_PROVIDER_DEFAULTS:
         raise ValueError(f"unknown live provider {live_provider!r}")
+    if background not in BACKGROUNDS:
+        raise ValueError(
+            f"--background must be one of {list(BACKGROUNDS)}, got {background!r}"
+        )
+    if live and background == "transparent":
+        if live_provider != "openai":
+            raise ValueError(
+                "--background transparent is supported only with --live-provider openai"
+            )
+        if _OPAQUE_ONLY_MODEL.fullmatch(model.lower()):
+            raise ValueError(
+                f"{model} does not support transparent backgrounds; pass a model "
+                f"that does, for example --model {TRANSPARENT_MODEL_EXAMPLE}"
+            )
     if live:
         env_name = LIVE_PROVIDER_DEFAULTS[live_provider]["env"]
         if not os.environ.get(env_name):
@@ -344,6 +533,8 @@ async def run_benchmark(
             live_provider=live_provider,
             max_cost_per_call_usd=max_cost_per_call_usd,
             max_budget_usd=max_budget_usd,
+            background=background,
+            vectorize=vectorize,
         )
         runs.append(run)
         paths_by_concurrency[concurrency] = tile_paths
@@ -381,7 +572,17 @@ async def run_benchmark(
             "one_provider_call_per_node": True,
             "concurrencies": list(concurrencies),
             "offline_latency_s": latency_s if not live else None,
-            "normalization": f"PNG {TILE_SIZE}x{TILE_SIZE}",
+            "normalization": (
+                f"PNG {TILE_SIZE}x{TILE_SIZE} RGBA; provider alpha preserved"
+                if background == "transparent"
+                else f"PNG {TILE_SIZE}x{TILE_SIZE}"
+            ),
+            "background": background,
+            "transparency_check": (
+                _transparency_protocol() if background == "transparent" else None
+            ),
+            "vectorize": vectorize,
+            "vectorization": _vectorization_protocol() if vectorize else None,
             "assembly_requires_glyphs": (
                 glyph_count if glyph_count in ASSEMBLY_GLYPH_COUNTS else None
             ),
@@ -404,6 +605,7 @@ async def run_benchmark(
                 if live
                 else "deterministic-procedural"
             ),
+            "background": background if live and live_provider == "openai" else None,
             "cost_per_image_usd_estimate": (
                 GEMINI_COST_PER_IMAGE_USD if live and live_provider == "gemini" else None
             ),
@@ -452,12 +654,24 @@ def _resolve_output_paths(
     partition: str | None,
     out: str | None,
     results: str | None,
+    background: str = "auto",
+    vectorize: bool = False,
 ) -> tuple[Path, Path, str | None]:
-    """Resolve isolated defaults while preserving the default 192-glyph paths."""
+    """Resolve isolated defaults while preserving the default 192-glyph paths.
+
+    Non-default widths, backgrounds, and vectorization each get their own
+    partition, so they never overwrite the default lane's record or tiles.
+    """
 
     resolved_partition = partition
-    if resolved_partition is None and glyph_count != GLYPH_COUNT:
-        resolved_partition = f"glyphs_{glyph_count}_{mode}"
+    if resolved_partition is None:
+        suffixes = [background] if background != "auto" else []
+        if vectorize:
+            suffixes.append("svg")
+        if glyph_count != GLYPH_COUNT:
+            resolved_partition = "_".join([f"glyphs_{glyph_count}_{mode}", *suffixes])
+        elif suffixes:
+            resolved_partition = "_".join([mode, *suffixes])
     if resolved_partition is None:
         default_out = f"smythe_artifacts/noumenon/{mode}"
         default_results = f"benchmarks/results/noumenon_{mode}.json"
@@ -494,6 +708,30 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
+
+
+def _run_summary_line(run: dict[str, Any]) -> str:
+    line = (
+        f"  c={run['concurrency']:<2} {run['status']:<6} "
+        f"wall={run['generation_wall_s']:.3f}s "
+        f"throughput={run['throughput_glyphs_per_s']:.1f}/s "
+        f"speedup={run['speedup_vs_concurrency_1']}"
+    )
+    validation = run["validation"]
+    if "transparent_tiles" in validation:
+        line += (
+            f" transparent={validation['transparent_tiles']}/"
+            f"{validation['expected_tiles']}"
+        )
+    vectorization = run.get("vectorization")
+    if vectorization is not None:
+        iou_min, iou_max = vectorization["iou_min"], vectorization["iou_max"]
+        iou = "n/a" if iou_min is None else f"{iou_min:.4f}-{iou_max:.4f}"
+        line += (
+            f" svg={vectorization['valid_svgs']}/{vectorization['expected_svgs']}"
+            f" iou={iou} vectorize={run['vectorization_wall_s']:.3f}s"
+        )
+    return line
 
 
 def main() -> None:
@@ -545,6 +783,23 @@ def main() -> None:
         default=None,
         help="image model for --live (default: the provider's current default)",
     )
+    parser.add_argument(
+        "--background",
+        choices=BACKGROUNDS,
+        default="auto",
+        help=(
+            "tile background (default: auto, no transparency claim). 'transparent' "
+            "requests transparent PNGs from the OpenAI lane (the model must support "
+            f"them, e.g. {TRANSPARENT_MODEL_EXAMPLE}), preserves alpha, and gates "
+            "every tile on an objective transparency check; offline, the procedural "
+            "tiles take the same check"
+        ),
+    )
+    parser.add_argument(
+        "--vectorize",
+        action="store_true",
+        help="trace every accepted tile into a validated even-odd SVG beside its PNG",
+    )
     parser.add_argument("--max-cost-per-call-usd", type=float, default=None)
     parser.add_argument("--max-budget-usd", type=float, default=None)
     args = parser.parse_args()
@@ -569,6 +824,8 @@ def main() -> None:
         partition=args.partition,
         out=args.out,
         results=args.results,
+        background=args.background,
+        vectorize=args.vectorize,
     )
     concurrencies = (args.concurrency,) if args.live else args.concurrencies
     model = args.model or LIVE_PROVIDER_DEFAULTS[args.live_provider]["model"]
@@ -585,6 +842,8 @@ def main() -> None:
                 max_cost_per_call_usd=args.max_cost_per_call_usd,
                 max_budget_usd=args.max_budget_usd,
                 partition=partition,
+                background=args.background,
+                vectorize=args.vectorize,
             )
         )
     except ValueError as exc:
@@ -592,16 +851,12 @@ def main() -> None:
     _write_json(results, payload)
 
     print(
-        f"[{mode}] {args.glyphs} nodes; fastest concurrency="
+        f"[{mode}] {args.glyphs} nodes; background={args.background}; "
+        f"vectorize={'on' if args.vectorize else 'off'}; fastest concurrency="
         f"{payload['fastest_concurrency']}; cost=${payload['total_recorded_cost_usd']:.6f}"
     )
     for run in payload["runs"]:
-        print(
-            f"  c={run['concurrency']:<2} {run['status']:<6} "
-            f"wall={run['generation_wall_s']:.3f}s "
-            f"throughput={run['throughput_glyphs_per_s']:.1f}/s "
-            f"speedup={run['speedup_vs_concurrency_1']}"
-        )
+        print(_run_summary_line(run))
     print(f"Wrote {results}")
     if payload["status"] != "passed":
         raise SystemExit(1)

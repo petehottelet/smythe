@@ -31,6 +31,7 @@ from benchmarks.noumenon_assets import (  # noqa: E402
     build_noumenon_assets,
     get_glyph_specs,
     glyph_prompt,
+    inspect_tile_transparency,
     normalize_tile,
     render_glyph_tile,
 )
@@ -157,6 +158,101 @@ def test_normalize_tile_rejects_opaque_rectangular_pseudo_glyph(tmp_path):
 
     with pytest.raises(ValueError, match="no separable glyph foreground"):
         normalize_tile(source.getvalue(), tmp_path / "invalid.png")
+
+
+def _png(image: Image.Image) -> bytes:
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _on_black(data: bytes, *, mode: str) -> bytes:
+    with Image.open(io.BytesIO(data)) as tile:
+        rgba = tile.convert("RGBA")
+    ground = Image.new("RGBA", rgba.size, (0, 0, 0, 255))
+    ground.alpha_composite(rgba)
+    return _png(ground.convert(mode))
+
+
+def test_every_procedural_tile_passes_the_transparency_gate():
+    for spec in GLYPH_CATALOG_SPECS:
+        data = render_glyph_tile(spec)
+        check = inspect_tile_transparency(data, source=data)
+        assert check.passed, (spec.id, check.reasons)
+        assert check.source_has_transparency is True
+        assert (check.corner_size, check.corner_max_alpha) == (8, 0)
+
+
+def test_preserve_alpha_leaves_transparent_provider_output_unchanged(tmp_path):
+    data = render_glyph_tile(GLYPH_SPECS[0], size=256)
+
+    default = normalize_tile(data, tmp_path / "default.png")
+    preserved = normalize_tile(data, tmp_path / "preserved.png", preserve_alpha=True)
+
+    assert preserved.sha256 == default.sha256
+    assert inspect_tile_transparency(preserved.path, source=data).passed
+
+
+@pytest.mark.parametrize("mode", ["RGBA", "RGB"])
+def test_transparent_lane_rejects_opaque_provider_output(tmp_path, mode):
+    opaque = _on_black(render_glyph_tile(GLYPH_SPECS[0], size=256), mode=mode)
+
+    synthesized = normalize_tile(opaque, tmp_path / "default.png")
+    preserved = normalize_tile(opaque, tmp_path / "preserved.png", preserve_alpha=True)
+
+    # Default normalization separates the glyph from the black canvas, so its
+    # tile alone looks transparent; that is why the default lane makes no
+    # transparency claim and the check also inspects the provider output.
+    assert inspect_tile_transparency(synthesized.path).passed
+    assert not inspect_tile_transparency(synthesized.path, source=opaque).passed
+    check = inspect_tile_transparency(preserved.path, source=opaque)
+    assert not check.passed
+    assert check.source_has_transparency is False
+    assert check.corner_max_alpha == 255
+    assert check.reasons[0] == "provider output has no transparent pixels"
+
+
+def test_letterbox_padding_cannot_stand_in_for_provider_transparency(tmp_path):
+    wide = Image.new("RGB", (256, 128), (0, 0, 0))
+    ImageDraw.Draw(wide).rectangle((40, 30, 215, 97), fill=(30, 240, 90))
+    source = _png(wide)
+
+    preserved = normalize_tile(source, tmp_path / "wide.png", preserve_alpha=True)
+    check = inspect_tile_transparency(preserved.path, source=source)
+
+    assert check.corner_max_alpha == 0
+    assert check.reasons == ("provider output has no transparent pixels",)
+
+
+def _transparent_tile(*shapes: tuple[tuple[int, int, int, int], int]) -> bytes:
+    image = Image.new("RGBA", (TILE_SIZE, TILE_SIZE), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    for box, alpha in shapes:
+        draw.rectangle(box, fill=(40, 250, 90, alpha))
+    return _png(image)
+
+
+@pytest.mark.parametrize(
+    ("shapes", "reason"),
+    [
+        ((((30, 20, 97, 107), 200),), "opaque fraction 0.0000 is below 0.01"),
+        (
+            (((10, 10, 117, 117), 120), ((50, 30, 77, 97), 255)),
+            "visible fraction 0.7119 exceeds 0.6",
+        ),
+        (
+            (((50, 30, 77, 97), 255), ((127, 127, 127, 127), 3)),
+            "8x8 corner regions reach alpha 3; expected 0",
+        ),
+    ],
+    ids=["no-opaque-glyph", "translucent-plate", "corner-residue"],
+)
+def test_transparency_gate_rejects_each_objective_violation(shapes, reason):
+    check = inspect_tile_transparency(_transparent_tile(*shapes))
+
+    assert not check.passed
+    assert check.reasons == (reason,)
+    assert check.source_has_transparency is None
 
 
 def test_complete_suite_has_valid_dimensions_animation_html_and_receipts(tmp_path):

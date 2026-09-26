@@ -39,6 +39,16 @@ ATLAS_GRID = (16, 12)
 ATLAS_SIZE = (ATLAS_GRID[0] * TILE_SIZE, ATLAS_GRID[1] * TILE_SIZE)
 DEFAULT_SEED = 0x5A17_2026
 
+# Objective transparent-background gate. Each corner square (1/16 of the tile
+# side, 8 px at 128) must be fully transparent; at least 1% of pixels must be
+# opaque (alpha >= 250); and no more than 60% may be visible (alpha >= 17), the
+# same ceiling that normalization and assembly apply to glyph masks.
+TRANSPARENCY_CORNER_FRACTION = 1 / 16
+TRANSPARENCY_OPAQUE_ALPHA = 250
+TRANSPARENCY_VISIBLE_ALPHA = 17
+TRANSPARENCY_MIN_OPAQUE_FRACTION = 0.01
+TRANSPARENCY_MAX_VISIBLE_FRACTION = 0.60
+
 # Stroke canvas: an upright ideograph cell, wider than a roman em box.
 CANVAS_W = 100.0
 CANVAS_H = 140.0
@@ -108,6 +118,19 @@ class OutputReceipt:
     width: int
     height: int
     frames: int = 1
+
+
+@dataclass(frozen=True, slots=True)
+class TransparencyReceipt:
+    """Objective alpha facts behind one tile's transparent-background claim."""
+
+    passed: bool
+    source_has_transparency: bool | None
+    corner_size: int
+    corner_max_alpha: int
+    opaque_fraction: float
+    visible_fraction: float
+    reasons: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -789,24 +812,43 @@ def _text_receipt(path: Path, *, width: int, height: int) -> OutputReceipt:
     )
 
 
+def _image_stream(source: str | os.PathLike[str] | bytes):
+    return io.BytesIO(source) if isinstance(source, bytes) else Path(source)
+
+
+def _has_transparency(image) -> bool:
+    """Whether a loaded image carries alpha with at least one non-opaque pixel."""
+    has_alpha = any(band in ("A", "a") for band in image.getbands()) or (
+        "transparency" in image.info
+    )
+    return has_alpha and image.convert("RGBA").getchannel("A").getextrema()[0] < 255
+
+
 def normalize_tile(
     source: str | os.PathLike[str] | bytes,
     destination: str | os.PathLike[str],
     *,
     size: int = TILE_SIZE,
+    preserve_alpha: bool = False,
 ) -> OutputReceipt:
-    """Normalize arbitrary raster input to a centered transparent square PNG."""
+    """Normalize arbitrary raster input to a centered transparent square PNG.
+
+    By default an opaque canvas gets an alpha mask separated from its
+    corner-estimated background. With ``preserve_alpha=True`` the source alpha
+    is only resampled, never synthesized, so a transparency check of the result
+    judges the provider's own output: an opaque source stays opaque.
+    """
 
     if isinstance(size, bool) or not isinstance(size, int):
         raise TypeError("size must be an integer")
     if size < 16:
         raise ValueError("size must be at least 16")
     Image, _, _, ImageOps = _pillow()
-    stream = io.BytesIO(source) if isinstance(source, bytes) else Path(source)
-    with Image.open(stream) as loaded:
+    with Image.open(_image_stream(source)) as loaded:
         loaded.load()
         tile = loaded.convert("RGBA")
-    tile.putalpha(_extract_glyph_mask(tile))
+    if not preserve_alpha:
+        tile.putalpha(_extract_glyph_mask(tile))
     contained = ImageOps.contain(
         tile,
         (size, size),
@@ -865,6 +907,74 @@ def _extract_glyph_mask(rgba):
             "background or rectangular pseudo-glyph"
         )
     return alpha
+
+
+def inspect_tile_transparency(
+    tile: str | os.PathLike[str] | bytes,
+    *,
+    source: str | os.PathLike[str] | bytes | None = None,
+) -> TransparencyReceipt:
+    """Check that a normalized tile really has a transparent background.
+
+    The tile passes when every corner square is fully transparent, enough
+    pixels are opaque to form a glyph, and the visible area stays below the
+    glyph-mask ceiling. When the original provider output is given, its alpha
+    must include non-opaque pixels: neither an opaque RGBA container nor
+    letterbox padding added during normalization may stand in for
+    transparency the provider did not deliver.
+    """
+
+    Image, _, _, _ = _pillow()
+    with Image.open(_image_stream(tile)) as loaded:
+        loaded.load()
+        alpha = loaded.convert("RGBA").getchannel("A")
+    width, height = alpha.size
+    corner = max(1, round(min(width, height) * TRANSPARENCY_CORNER_FRACTION))
+    corner_max_alpha = max(
+        alpha.crop(box).getextrema()[1]
+        for box in (
+            (0, 0, corner, corner),
+            (width - corner, 0, width, corner),
+            (0, height - corner, corner, height),
+            (width - corner, height - corner, width, height),
+        )
+    )
+    histogram = alpha.histogram()
+    total = width * height
+    opaque_fraction = sum(histogram[TRANSPARENCY_OPAQUE_ALPHA:]) / total
+    visible_fraction = sum(histogram[TRANSPARENCY_VISIBLE_ALPHA:]) / total
+    source_has_transparency = None
+    if source is not None:
+        with Image.open(_image_stream(source)) as original:
+            original.load()
+            source_has_transparency = _has_transparency(original)
+
+    reasons = []
+    if source_has_transparency is False:
+        reasons.append("provider output has no transparent pixels")
+    if corner_max_alpha:
+        reasons.append(
+            f"{corner}x{corner} corner regions reach alpha {corner_max_alpha}; expected 0"
+        )
+    if opaque_fraction < TRANSPARENCY_MIN_OPAQUE_FRACTION:
+        reasons.append(
+            f"opaque fraction {opaque_fraction:.4f} is below "
+            f"{TRANSPARENCY_MIN_OPAQUE_FRACTION}"
+        )
+    if visible_fraction > TRANSPARENCY_MAX_VISIBLE_FRACTION:
+        reasons.append(
+            f"visible fraction {visible_fraction:.4f} exceeds "
+            f"{TRANSPARENCY_MAX_VISIBLE_FRACTION}"
+        )
+    return TransparencyReceipt(
+        passed=not reasons,
+        source_has_transparency=source_has_transparency,
+        corner_size=corner,
+        corner_max_alpha=corner_max_alpha,
+        opaque_fraction=round(opaque_fraction, 6),
+        visible_fraction=round(visible_fraction, 6),
+        reasons=tuple(reasons),
+    )
 
 
 def _load_tile_masks(tile_paths: Sequence[str | os.PathLike[str]], size: int):
@@ -1247,10 +1357,16 @@ __all__ = [
     "MAX_GLYPH_COUNT",
     "PREVIEW_SIZE",
     "TILE_SIZE",
+    "TRANSPARENCY_CORNER_FRACTION",
+    "TRANSPARENCY_MAX_VISIBLE_FRACTION",
+    "TRANSPARENCY_MIN_OPAQUE_FRACTION",
+    "TRANSPARENCY_OPAQUE_ALPHA",
+    "TRANSPARENCY_VISIBLE_ALPHA",
     "GlyphSpec",
     "GlyphSuiteReceipt",
     "OutputReceipt",
     "ProceduralGlyphProvider",
+    "TransparencyReceipt",
     "assemble_animation",
     "assemble_atlas",
     "assemble_html",
@@ -1258,6 +1374,7 @@ __all__ = [
     "build_noumenon_assets",
     "get_glyph_specs",
     "glyph_prompt",
+    "inspect_tile_transparency",
     "normalize_tile",
     "render_glyph_tile",
 ]

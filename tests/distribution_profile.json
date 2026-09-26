@@ -34,6 +34,7 @@
     "test_glyph_design_v2.py": "Noumenon glyph generator and catalog",
     "test_noumenon_assets.py": "Noumenon benchmark assets",
     "test_noumenon_benchmark.py": "Noumenon benchmark runner",
+    "test_noumenon_vectorize.py": "Noumenon SVG vectorizer",
     "test_jobs_scale_archive.py": "Jobs scale evidence archiver",
     "test_jobs_scale_benchmark.py": "Jobs scale benchmark runner",
     "test_jobs_scale_chart.py": "Jobs scale chart renderer",
