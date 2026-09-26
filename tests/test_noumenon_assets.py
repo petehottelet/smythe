@@ -250,11 +250,11 @@ def _transparent_tile(*shapes: tuple[tuple[int, int, int, int], int]) -> bytes:
             "visible fraction 0.7119 exceeds 0.6",
         ),
         (
-            (((50, 30, 77, 97), 255), ((127, 127, 127, 127), 3)),
-            "8x8 corner regions reach alpha 3; expected 0",
+            (((50, 30, 77, 97), 255), ((127, 127, 127, 127), 40)),
+            "8x8 corner regions reach alpha 40; expected invisible (below 17)",
         ),
     ],
-    ids=["no-opaque-glyph", "translucent-plate", "corner-residue"],
+    ids=["no-opaque-glyph", "translucent-plate", "visible-corner"],
 )
 def test_transparency_gate_rejects_each_objective_violation(shapes, reason):
     check = inspect_tile_transparency(_transparent_tile(*shapes))
@@ -262,6 +262,17 @@ def test_transparency_gate_rejects_each_objective_violation(shapes, reason):
     assert not check.passed
     assert check.reasons == (reason,)
     assert check.source_has_transparency is None
+
+
+@pytest.mark.parametrize("residue", [1, 16])
+def test_transparency_gate_accepts_invisible_glow_residue_in_corners(residue):
+    # Live GPT Image tiles can carry glow that fades to alpha 1 at a corner.
+    check = inspect_tile_transparency(
+        _transparent_tile(((50, 30, 77, 97), 255), ((0, 0, 7, 7), residue))
+    )
+
+    assert check.passed, check.reasons
+    assert check.corner_max_alpha == residue
 
 
 def test_complete_suite_has_valid_dimensions_animation_html_and_receipts(tmp_path):

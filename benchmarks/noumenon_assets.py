@@ -40,7 +40,7 @@ ATLAS_SIZE = (ATLAS_GRID[0] * TILE_SIZE, ATLAS_GRID[1] * TILE_SIZE)
 DEFAULT_SEED = 0x5A17_2026
 
 # Objective transparent-background gate. Each corner square (1/16 of the tile
-# side, 8 px at 128) must be fully transparent; at least 1% of pixels must be
+# side, 8 px at 128) must hold no visible pixel; at least 1% of pixels must be
 # opaque (alpha >= 250); and no more than 60% may be visible (alpha >= 17), the
 # same ceiling that normalization and assembly apply to glyph masks.
 TRANSPARENCY_CORNER_FRACTION = 1 / 16
@@ -925,9 +925,10 @@ def inspect_tile_transparency(
 ) -> TransparencyReceipt:
     """Check that a normalized tile really has a transparent background.
 
-    The tile passes when every corner square is fully transparent, enough
-    pixels are opaque to form a glyph, and the visible area stays below the
-    glyph-mask ceiling. When the original provider output is given, its alpha
+    The tile passes when no corner square holds a visible pixel (alpha of
+    ``TRANSPARENCY_VISIBLE_ALPHA`` or more), enough pixels are opaque to form a
+    glyph, and the visible area stays below the glyph-mask ceiling. Faint glow
+    that fades to near-zero alpha at a corner is not an opaque background. When the original provider output is given, its alpha
     must include non-opaque pixels: neither an opaque RGBA container nor
     letterbox padding added during normalization may stand in for
     transparency the provider did not deliver.
@@ -961,9 +962,10 @@ def inspect_tile_transparency(
     reasons = []
     if source_has_transparency is False:
         reasons.append("provider output has no transparent pixels")
-    if corner_max_alpha:
+    if corner_max_alpha >= TRANSPARENCY_VISIBLE_ALPHA:
         reasons.append(
-            f"{corner}x{corner} corner regions reach alpha {corner_max_alpha}; expected 0"
+            f"{corner}x{corner} corner regions reach alpha {corner_max_alpha}; "
+            f"expected invisible (below {TRANSPARENCY_VISIBLE_ALPHA})"
         )
     if opaque_fraction < TRANSPARENCY_MIN_OPAQUE_FRACTION:
         reasons.append(

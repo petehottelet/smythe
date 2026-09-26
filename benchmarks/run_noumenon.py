@@ -279,7 +279,7 @@ def _transparency_protocol() -> dict[str, Any]:
     return {
         "provider_transparency_required": True,
         "corner_size_px": max(1, round(TILE_SIZE * TRANSPARENCY_CORNER_FRACTION)),
-        "corner_max_alpha": 0,
+        "corner_max_alpha": TRANSPARENCY_VISIBLE_ALPHA - 1,
         "opaque_alpha_min": TRANSPARENCY_OPAQUE_ALPHA,
         "min_opaque_fraction": TRANSPARENCY_MIN_OPAQUE_FRACTION,
         "visible_alpha_min": TRANSPARENCY_VISIBLE_ALPHA,
