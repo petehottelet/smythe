@@ -24,6 +24,17 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [0.9.0] - 2026-09-26
+
+This release narrows the repository to the framework and its evidence. The
+glyph fan-out example is now Noumenon and was re-measured under its
+unchanged protocol; the screensaver apps and Repo Doctor moved to their own
+repositories; and retired benchmark records moved into an archive pinned by
+SHA-256. The Python API changes only by addition. See the
+[release guide](docs/release-0.9.0.md).
+
 ### Added
 
 - `OpenAIImageProvider(background=...)` accepts `"auto"` (default),
@@ -224,5 +235,6 @@ accepted; each is listed under **Changed**. The
   `smythe.graph.SYNTHESIS_NODE_ID` and `REVISION_ADDED_KEY`;
   `smythe.workflow.MAX_NODE_ID_CHARS`.
 
-[Unreleased]: https://github.com/petehottelet/smythe/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/petehottelet/smythe/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/petehottelet/smythe/compare/v0.8.2...v0.9.0
 [0.8.2]: https://github.com/petehottelet/smythe/compare/v0.8.1...v0.8.2

@@ -250,6 +250,23 @@ first.
 - **Bounded image decoding** — every GIF frame and WebP canvas is checked before
   Jobs or the design checks allocate memory. [Jobs](docs/jobs.md).
 
+## Shipped (v0.9.0): Noumenon and pinned evidence
+
+The [0.9.0 release](docs/release-0.9.0.md) narrows the repository to the
+framework and its evidence. The Python API changes only by addition.
+
+- **Transparent GPT Image output** — `OpenAIImageProvider(background=...)`
+  requests transparent backgrounds from models that support them.
+- **Noumenon benchmark** — the glyph fan-out example, renamed and re-run under
+  its unchanged protocol, with live transparent-PNG and SVG lanes.
+  [Report](benchmarks/noumenon_benchmark.md).
+- **Separate repositories** — the screensaver apps in
+  [Noumenon](https://github.com/petehottelet/noumenon) and Repo Doctor in
+  [repodoctor](https://github.com/petehottelet/repodoctor).
+- **Pinned evidence archive** — retired records stay verifiable byte for byte
+  from a release asset pinned by SHA-256.
+  [Archive](benchmarks/archive/README.md).
+
 ## Completed benchmark evidence
 
 Every benchmark publication includes the [materials completion check](docs/current-materials.md#completion-check-for-every-benchmark-update): current glyph sheets, previews, exports, charts, links, and consistent documentation.
