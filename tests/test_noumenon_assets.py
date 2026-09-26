@@ -14,7 +14,7 @@ import pytest
 pytest.importorskip("PIL")
 from PIL import Image, ImageDraw  # noqa: E402
 
-from benchmarks.glyph_screensaver_assets import (  # noqa: E402
+from benchmarks.noumenon_assets import (  # noqa: E402
     ATLAS_SIZE,
     GIF_FRAMES,
     GIF_SIZE,
@@ -28,7 +28,7 @@ from benchmarks.glyph_screensaver_assets import (  # noqa: E402
     assemble_atlas,
     assemble_html,
     assemble_preview,
-    build_glyph_screensaver_assets,
+    build_noumenon_assets,
     get_glyph_specs,
     glyph_prompt,
     normalize_tile,
@@ -75,7 +75,7 @@ def test_extended_catalog_assembles_16_by_16_atlas_and_html(tmp_path):
 
     atlas = assemble_atlas(tile_paths, tmp_path / "atlas.png")
     html = assemble_html(
-        tmp_path / "glyph-rain.html",
+        tmp_path / "noumenon.html",
         glyph_count=MAX_GLYPH_COUNT,
     )
     html_text = Path(html.path).read_text(encoding="utf-8")
@@ -160,7 +160,7 @@ def test_normalize_tile_rejects_opaque_rectangular_pseudo_glyph(tmp_path):
 
 
 def test_complete_suite_has_valid_dimensions_animation_html_and_receipts(tmp_path):
-    receipt = build_glyph_screensaver_assets(tmp_path)
+    receipt = build_noumenon_assets(tmp_path)
     assert len(receipt.tiles) == GLYPH_COUNT
     assert receipt.unique_tile_hashes == GLYPH_COUNT
     assert len({tile.sha256 for tile in receipt.tiles}) == GLYPH_COUNT

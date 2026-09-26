@@ -1116,14 +1116,14 @@ def _html_document(seed: int, specs: Sequence[GlyphSpec]) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Fictional Cyber Glyph Rain</title>
+<title>Noumenon</title>
 <style>
 html,body{{margin:0;width:100%;height:100%;overflow:hidden;background:#000}}
 canvas{{display:block;width:100vw;height:100vh;background:#000}}
 </style>
 </head>
 <body>
-<canvas id="rain" width="1920" height="1080" aria-label="Animated fictional green cyber glyph rain"></canvas>
+<canvas id="rain" width="1920" height="1080" aria-label="Noumenon: animated fictional green cyber glyphs"></canvas>
 <script>
 const strokes={json.dumps(strokes, separators=(",", ":"))};
 const speeds={json.dumps(speeds, separators=(",", ":"))};
@@ -1199,7 +1199,7 @@ def assemble_html(
     return _text_receipt(path, width=PREVIEW_SIZE[0], height=PREVIEW_SIZE[1])
 
 
-def build_glyph_screensaver_assets(
+def build_noumenon_assets(
     output_dir: str | os.PathLike[str],
     *,
     seed: int = DEFAULT_SEED,
@@ -1219,10 +1219,10 @@ def build_glyph_screensaver_assets(
     if unique != GLYPH_COUNT:
         raise RuntimeError(f"expected {GLYPH_COUNT} unique tiles, got {unique}")
     tile_paths = [receipt.path for receipt in tile_receipts]
-    preview = assemble_preview(tile_paths, root / "glyph-rain-preview.png", seed=seed)
-    animation = assemble_animation(tile_paths, root / "glyph-rain-loop.gif", seed=seed)
+    preview = assemble_preview(tile_paths, root / "noumenon-preview.png", seed=seed)
+    animation = assemble_animation(tile_paths, root / "noumenon-loop.gif", seed=seed)
     atlas = assemble_atlas(tile_paths, root / "glyph-atlas.png")
-    html = assemble_html(root / "glyph-rain.html", seed=seed)
+    html = assemble_html(root / "noumenon.html", seed=seed)
     return GlyphSuiteReceipt(
         tiles=tile_receipts,
         preview=preview,
@@ -1255,7 +1255,7 @@ __all__ = [
     "assemble_atlas",
     "assemble_html",
     "assemble_preview",
-    "build_glyph_screensaver_assets",
+    "build_noumenon_assets",
     "get_glyph_specs",
     "glyph_prompt",
     "normalize_tile",

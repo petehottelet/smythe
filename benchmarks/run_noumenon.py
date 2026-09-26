@@ -1,10 +1,10 @@
 """Benchmark a wide glyph fan-out and assemble a digital-rain showcase.
 
 Offline (default, zero cost):
-    python benchmarks/run_glyph_screensaver.py
+    python benchmarks/run_noumenon.py
 
 Explicitly budgeted GPT Image run:
-    python benchmarks/run_glyph_screensaver.py --live --concurrency 8 \
+    python benchmarks/run_noumenon.py --live --concurrency 8 \
       --max-cost-per-call-usd 0.01 --max-budget-usd 1.92
 """
 
@@ -26,7 +26,7 @@ from typing import Any, Sequence
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from benchmarks.artifact_records import environment_snapshot, portable_path  # noqa: E402
-from benchmarks.glyph_screensaver_assets import (  # noqa: E402
+from benchmarks.noumenon_assets import (  # noqa: E402
     GLYPH_COUNT,
     GLYPH_SPECS,
     MAX_GLYPH_COUNT,
@@ -268,9 +268,9 @@ def _assemble(tile_paths: Sequence[str], output_dir: Path) -> dict[str, Any]:
     started = time.perf_counter()
     output_dir.mkdir(parents=True, exist_ok=True)
     atlas = assemble_atlas(tile_paths, output_dir / "glyph-atlas.png")
-    preview = assemble_preview(tile_paths, output_dir / "glyph-rain-preview.png")
-    animation = assemble_animation(tile_paths, output_dir / "glyph-rain-loop.gif")
-    html = assemble_html(output_dir / "glyph-rain.html", glyph_count=len(tile_paths))
+    preview = assemble_preview(tile_paths, output_dir / "noumenon-preview.png")
+    animation = assemble_animation(tile_paths, output_dir / "noumenon-loop.gif")
+    html = assemble_html(output_dir / "noumenon.html", glyph_count=len(tile_paths))
     return {
         "wall_s": round(time.perf_counter() - started, 6),
         "atlas": _receipt_dict(atlas),
@@ -370,7 +370,7 @@ async def run_benchmark(
         run["cost_usd"] for run in runs if run["cost_usd"] is not None
     )
     return {
-        "benchmark": "glyph-screensaver-fanout",
+        "benchmark": "noumenon-fanout",
         "record_version": 1,
         "partition": partition,
         "mode": mode,
@@ -459,15 +459,15 @@ def _resolve_output_paths(
     if resolved_partition is None and glyph_count != GLYPH_COUNT:
         resolved_partition = f"glyphs_{glyph_count}_{mode}"
     if resolved_partition is None:
-        default_out = f"smythe_artifacts/glyph_screensaver/{mode}"
-        default_results = f"benchmarks/results/glyph_screensaver_{mode}.json"
+        default_out = f"smythe_artifacts/noumenon/{mode}"
+        default_results = f"benchmarks/results/noumenon_{mode}.json"
     else:
         default_out = (
-            "smythe_artifacts/glyph_screensaver/partitions/"
+            "smythe_artifacts/noumenon/partitions/"
             f"{resolved_partition}"
         )
         default_results = (
-            f"benchmarks/results/glyph_screensaver_{resolved_partition}.json"
+            f"benchmarks/results/noumenon_{resolved_partition}.json"
         )
     return Path(out or default_out), Path(results or default_results), resolved_partition
 

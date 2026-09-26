@@ -17,10 +17,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 if __package__:
-    from .glyph_screensaver_assets import GlyphSpec
+    from .noumenon_assets import GlyphSpec
 else:
     sys.path.insert(0, str(Path(__file__).parents[1]))
-    from glyph_screensaver_assets import GlyphSpec
+    from noumenon_assets import GlyphSpec
 
 ROOT = Path(__file__).parents[1]
 RESULTS = ROOT / "benchmarks" / "results"

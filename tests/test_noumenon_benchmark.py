@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from benchmarks.run_glyph_screensaver import (
+from benchmarks.run_noumenon import (
     DEFAULT_LATENCY_S,
     _parse_concurrencies,
     _parse_partition,
@@ -69,10 +69,10 @@ def test_non_flagship_output_defaults_are_partitioned():
 
     assert partition == "256_offline_realistic"
     assert out == Path(
-        "smythe_artifacts/glyph_screensaver/partitions/256_offline_realistic"
+        "smythe_artifacts/noumenon/partitions/256_offline_realistic"
     )
     assert results == Path(
-        "benchmarks/results/glyph_screensaver_256_offline_realistic.json"
+        "benchmarks/results/noumenon_256_offline_realistic.json"
     )
 
     flagship_out, flagship_results, flagship_partition = _resolve_output_paths(
@@ -83,8 +83,8 @@ def test_non_flagship_output_defaults_are_partitioned():
         results=None,
     )
     assert flagship_partition is None
-    assert flagship_out == Path("smythe_artifacts/glyph_screensaver/offline")
-    assert flagship_results == Path("benchmarks/results/glyph_screensaver_offline.json")
+    assert flagship_out == Path("smythe_artifacts/noumenon/offline")
+    assert flagship_results == Path("benchmarks/results/noumenon_offline.json")
 
 
 def test_partition_name_rejects_path_traversal():

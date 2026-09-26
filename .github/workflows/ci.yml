@@ -94,7 +94,7 @@ jobs:
           --results "$RUNNER_TEMP/asset.json"
       - name: Exercise glyph fan-out offline
         run: >-
-          python benchmarks/run_glyph_screensaver.py
+          python benchmarks/run_noumenon.py
           --glyphs 4
           --concurrencies 1,2
           --latency-s 0
