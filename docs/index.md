@@ -36,7 +36,7 @@ verification, trace, artifact, and recovery controls.
 
 ## Connect models and tools
 
-- [GPT-6 Astra quickstart](../README.md#quickstart) — native text planning and execution within one saved $5 allowance
+- [GPT-6 Astra and Claude Fable 5.1 quickstarts](../README.md#with-a-real-model) — native text planning and execution within one saved $50 allowance
 - [Native OpenAI Responses](openai-responses.md) — Astra/Sol function tools, exact token prices, request quotes, and retained failure receipts
 - [Original Astra pilot results](../benchmarks/results/astra_20260913/README.md) — historical 24-workflow calibration snapshot with complete native receipts
 - [What the Astra study found](../benchmarks/astra_findings.md) — scoped findings and an offline reproduction supplement
