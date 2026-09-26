@@ -1,0 +1,3794 @@
+{
+  "benchmark": "noumenon-fanout",
+  "record_version": 1,
+  "partition": "live_transparent",
+  "mode": "live",
+  "status": "passed",
+  "protocol": {
+    "graph_nodes": 192,
+    "topology": "broadcast_reduce",
+    "one_provider_call_per_node": true,
+    "concurrencies": [
+      3
+    ],
+    "offline_latency_s": null,
+    "normalization": "PNG 128x128 RGBA; provider alpha preserved",
+    "background": "transparent",
+    "transparency_check": {
+      "provider_transparency_required": true,
+      "corner_size_px": 8,
+      "corner_max_alpha": 16,
+      "opaque_alpha_min": 250,
+      "min_opaque_fraction": 0.01,
+      "visible_alpha_min": 17,
+      "max_visible_fraction": 0.6
+    },
+    "vectorize": false,
+    "vectorization": null,
+    "assembly_requires_glyphs": 192,
+    "assembly_supported_glyphs": [
+      192,
+      256
+    ]
+  },
+  "provider": {
+    "name": "OpenAIImageProvider",
+    "model": "gpt-image-2.5-flare",
+    "size": "1024x1024",
+    "quality": "low",
+    "background": "transparent",
+    "cost_per_image_usd_estimate": null,
+    "max_cost_per_call_usd": 0.01,
+    "max_budget_usd": 2.0,
+    "official_guide": "https://developers.openai.com/api/docs/guides/image-generation"
+  },
+  "environment": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "packages": {
+      "smythe": "0.8.2",
+      "pillow": "12.3.0",
+      "openai": "2.45.0",
+      "google-genai": "2.11.0"
+    },
+    "installed_packages": {
+      "smythe": "0.1.0",
+      "pillow": "12.3.0",
+      "openai": "2.45.0",
+      "google-genai": "2.11.0"
+    },
+    "smythe_source": {
+      "version": "0.8.2",
+      "module": "smythe/__init__.py"
+    },
+    "source_control": {
+      "revision": "867cef9aa165be389b634c311e4921bb1a1aa324",
+      "dirty": false,
+      "untracked_files": 0
+    }
+  },
+  "runs": [
+    {
+      "concurrency": 3,
+      "status": "passed",
+      "execution_id": "2aea515ca3214f5d878dbba61483c7d6",
+      "generation_wall_s": 551.684005,
+      "validation_wall_s": 33.395165,
+      "vectorization_wall_s": null,
+      "end_to_end_wall_s": 585.07917,
+      "completed_nodes": 192,
+      "throughput_glyphs_per_s": 0.348,
+      "cost_usd": 1.92,
+      "cost_is_complete": true,
+      "cost_contains_estimates": true,
+      "validation": {
+        "passed": true,
+        "expected_tiles": 192,
+        "valid_png_tiles": 192,
+        "transparent_tiles": 192,
+        "tile_size": [
+          128,
+          128
+        ],
+        "unique_tile_hashes": 192,
+        "errors": []
+      },
+      "vectorization": null,
+      "tile_receipts": [
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-000.png",
+          "sha256": "32f17748aa112e1ae6e9d71d08fb6ef2c2fd885dc55f466ee6ef870d989809f5",
+          "byte_size": 8246,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-000",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.068909,
+            "visible_fraction": 0.130432,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-001.png",
+          "sha256": "00539798f5db609edc139863ea931b1e6116ace4f876145b8489980c3af323a0",
+          "byte_size": 9164,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-001",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.059875,
+            "visible_fraction": 0.120911,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-002.png",
+          "sha256": "35bc22c1e29745fde71610139e7adc00a8c68c247b21c57a2c1de6295886158c",
+          "byte_size": 17040,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-002",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.087097,
+            "visible_fraction": 0.20459,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-003.png",
+          "sha256": "4b7c385dc680558739a6188f8823cf1689548cc293c2d0c83b99c87533fec53f",
+          "byte_size": 7660,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-003",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.074585,
+            "visible_fraction": 0.126709,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-004.png",
+          "sha256": "b2044f51db63b93f13646453bf79423548900e509773f8290f46cf06f683d548",
+          "byte_size": 9475,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-004",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.066589,
+            "visible_fraction": 0.129211,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-005.png",
+          "sha256": "8df93f24544a265e09772176e9a62e90bb7e914d7a1ddba2b0a1f2b8e6081c19",
+          "byte_size": 8297,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-005",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.073181,
+            "visible_fraction": 0.139404,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-006.png",
+          "sha256": "873816ea503818d56ab23ce00f3e522f7c5f8255990b05465aaf8aa78b63d432",
+          "byte_size": 9662,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-006",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.083862,
+            "visible_fraction": 0.152344,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-007.png",
+          "sha256": "6a1566566577c89c2c25c5acd2c780a52077be63122f241a119167ccfebf5981",
+          "byte_size": 9258,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-007",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.076233,
+            "visible_fraction": 0.143616,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-008.png",
+          "sha256": "b68c86ed37547a283624e4daddcc225e2124b33fb36c712a1d5805b20404ec12",
+          "byte_size": 9036,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-008",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.078064,
+            "visible_fraction": 0.143127,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-009.png",
+          "sha256": "7ffb70e3977e346fb87a47b35ea64238c59bd187d7418be0e3447996c8f4f72e",
+          "byte_size": 8432,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-009",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.06781,
+            "visible_fraction": 0.132263,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-010.png",
+          "sha256": "86b61fdb63091c1d984334b929d4c0cebbedff494d765e886cb8fc9c18bc34a2",
+          "byte_size": 13406,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-010",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.075256,
+            "visible_fraction": 0.188599,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-011.png",
+          "sha256": "a02c70c83420b9c726ee4135f99a66a3d9c4e522e67ef312153b4add3045df24",
+          "byte_size": 11209,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-011",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.076721,
+            "visible_fraction": 0.151001,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-012.png",
+          "sha256": "4ebc1ca716dc9dad7d40361e02f5465c6707f9a4ad17e36f6582fa2c32310e30",
+          "byte_size": 14757,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-012",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.087891,
+            "visible_fraction": 0.210388,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-013.png",
+          "sha256": "300b73cb90891bde94f7e0753ee0936133c16fb789236317c17886e62fcc38a1",
+          "byte_size": 8365,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-013",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.052856,
+            "visible_fraction": 0.111023,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-014.png",
+          "sha256": "4f679008769ae39e799e9deeb65771bdf8b8a0f01ba35ce97f71207ed8a2518b",
+          "byte_size": 7374,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-014",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.063293,
+            "visible_fraction": 0.120483,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-015.png",
+          "sha256": "a78bec995d7f05f35610a40fe618b216e0f9ccd09e7475e4be21f57369266862",
+          "byte_size": 9277,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-015",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.065796,
+            "visible_fraction": 0.124878,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-016.png",
+          "sha256": "edf9b952bee4f59e3e4d68ee275e890d93e141cb9edcd3c926516df07d952232",
+          "byte_size": 7805,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-016",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.06012,
+            "visible_fraction": 0.121094,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-017.png",
+          "sha256": "e3cf7517a04951d529bf8b5dc1c53d333e30fa22f39d8ef005a7718780f6e434",
+          "byte_size": 8533,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-017",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.079834,
+            "visible_fraction": 0.145874,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-018.png",
+          "sha256": "2f66f36a2510a8a80bfabe34b6c42aba8c6ed1e2d591548a932ad42f4f9959cc",
+          "byte_size": 6433,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-018",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.045166,
+            "visible_fraction": 0.094116,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-019.png",
+          "sha256": "fe7c0894b8c1f9a9cf7a9d1f90d06f03f5922b7fc315c5801aa2dc2439e00c55",
+          "byte_size": 13370,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-019",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.082153,
+            "visible_fraction": 0.156128,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-020.png",
+          "sha256": "507f339a2a04ab032d695fbcc7d80c06cca6597e8bbcc7a40bd91e88db4d0f5a",
+          "byte_size": 8467,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-020",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.070312,
+            "visible_fraction": 0.135193,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-021.png",
+          "sha256": "cef3dc2266af391f199d28caf55839ef27bb84808187af6a3ff601e516f1142c",
+          "byte_size": 9759,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-021",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.076294,
+            "visible_fraction": 0.143494,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-022.png",
+          "sha256": "b73cf26f422c1534549615b975968e9ac6f8523197061834482279761d6e2fca",
+          "byte_size": 7305,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-022",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.067261,
+            "visible_fraction": 0.116516,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-023.png",
+          "sha256": "bf09e57d963dbc567e596c4f0c3320264a9efccc387f55b6ec2c1cc682269d53",
+          "byte_size": 9283,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-023",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.073669,
+            "visible_fraction": 0.135315,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-024.png",
+          "sha256": "8b8e21ad560a5713f1360fcf28095652b603890d91c4b1fdab7e774164214602",
+          "byte_size": 10546,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-024",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.07489,
+            "visible_fraction": 0.133118,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-025.png",
+          "sha256": "fa3f9698c12a9da69a1e56454c18d9ebee7c582fc25dc304288d567b73946b30",
+          "byte_size": 8026,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-025",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.060181,
+            "visible_fraction": 0.119263,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-026.png",
+          "sha256": "e2ebf5e1242523a4219669ddc60bbaebc0164a8b73d3e77188b4da231d25cc28",
+          "byte_size": 7888,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-026",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.060913,
+            "visible_fraction": 0.120361,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-027.png",
+          "sha256": "db9a43d86ef094f873fa39833e9fbefadbf94baf3530b614059ee860c2499726",
+          "byte_size": 9435,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-027",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.079895,
+            "visible_fraction": 0.144775,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-028.png",
+          "sha256": "07d674bcda505714cbe7225fbe9e9869b091974b7780a663ed14aeaeccdb4a31",
+          "byte_size": 9817,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-028",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.085144,
+            "visible_fraction": 0.152405,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-029.png",
+          "sha256": "a1acb1dcd51b108e3d12927f97010b43e58a5e242e786e30c00d3727e1c6d690",
+          "byte_size": 10365,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-029",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.077271,
+            "visible_fraction": 0.140503,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-030.png",
+          "sha256": "7d38dcc8e9d5051e18d98669b03b05745eb749bc585a23eb7e9abca44b210916",
+          "byte_size": 7783,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-030",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.078369,
+            "visible_fraction": 0.130005,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-031.png",
+          "sha256": "786450ff818719981d967dc5ffdd7c7f298b7705aaa184c2e34fab8dea16831e",
+          "byte_size": 7664,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-031",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.062134,
+            "visible_fraction": 0.118408,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-032.png",
+          "sha256": "5a05a38f18a1fdffadebccfe2690488640b3b8a23310608bd4d157e0f36070b8",
+          "byte_size": 8996,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-032",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.077515,
+            "visible_fraction": 0.143982,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-033.png",
+          "sha256": "0778b874a078328bc0e56e262f59c7cca5ffd6ded98649880b3731c624d82a1b",
+          "byte_size": 8471,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-033",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.060486,
+            "visible_fraction": 0.128052,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-034.png",
+          "sha256": "f4f6361c3063c04269f8d0642e6edb0cc20fb2d0656930b8c27e850ed7473b5c",
+          "byte_size": 8501,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-034",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.065796,
+            "visible_fraction": 0.127991,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-035.png",
+          "sha256": "de865816e485aa7a73184b45bc6bad6fc90ca3b568ac571e0c2875edc67b0295",
+          "byte_size": 8606,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-035",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.078552,
+            "visible_fraction": 0.139221,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-036.png",
+          "sha256": "60e227ccdca034c5d1e37e910b5170bc0acc126b46b495be3012854ddcecea89",
+          "byte_size": 10262,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-036",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.086792,
+            "visible_fraction": 0.166626,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-037.png",
+          "sha256": "84ef7bd33fbf9de2b9d3b43825c3ab50cf0919d8fadb000b5841c214feac0cb9",
+          "byte_size": 8031,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-037",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.069275,
+            "visible_fraction": 0.132019,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-038.png",
+          "sha256": "857faf0e8f932aeaf15290d28201f62ef4548d951af7500ca210688438bd7858",
+          "byte_size": 8854,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-038",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.077698,
+            "visible_fraction": 0.143188,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-039.png",
+          "sha256": "85430cd59345b35db5e2b037b1bd2d38ade85bcd44217c2ed400590bd157c20e",
+          "byte_size": 8922,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-039",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.080017,
+            "visible_fraction": 0.149414,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-040.png",
+          "sha256": "c89c59627d040e6222105a3a700628db9f3acbf04d321c5a3ddc1c63cd106448",
+          "byte_size": 7937,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-040",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.062805,
+            "visible_fraction": 0.123474,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-041.png",
+          "sha256": "6a87c43342e322b3c2505408b872885e4cd67adce56f02b32336236aa2d3f8d5",
+          "byte_size": 9745,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-041",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.093567,
+            "visible_fraction": 0.1604,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-042.png",
+          "sha256": "6be87f09c262673e4a3e537b29fa3f91de5dba03bc475edd6d237b1531a561ed",
+          "byte_size": 9154,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-042",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.074219,
+            "visible_fraction": 0.140198,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-043.png",
+          "sha256": "3548cad287218ba25c1fca76f3e30354489fc742a528f2a242d45a8b51be61d9",
+          "byte_size": 7431,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-043",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.052612,
+            "visible_fraction": 0.109131,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-044.png",
+          "sha256": "2e0c72b51ef34f3c9ae7d29209bc7a8d655690eba1c53bd68a3f3a0803c67b52",
+          "byte_size": 8231,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-044",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.080322,
+            "visible_fraction": 0.137756,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-045.png",
+          "sha256": "22965b5e1ad53a08cf21e970333ea2d4693920dc4032a1eab570030d70a10490",
+          "byte_size": 10855,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-045",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.060669,
+            "visible_fraction": 0.118286,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-046.png",
+          "sha256": "92c5ed24ebbb8d7c6cfa746c5e18ef85861645de75a583e6463dc67bc78ad950",
+          "byte_size": 9523,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-046",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.054199,
+            "visible_fraction": 0.111694,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-047.png",
+          "sha256": "da8dfba24c7dbeb6012da072e67403c73d075eae8b1435ec05f99b9e119cf7ce",
+          "byte_size": 9111,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-047",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.07843,
+            "visible_fraction": 0.148193,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-048.png",
+          "sha256": "9823365f48c313a5f00b5dcdc020aa3ffd253da2afee2475318c13140f25d785",
+          "byte_size": 14405,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-048",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.093445,
+            "visible_fraction": 0.1698,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-049.png",
+          "sha256": "fc01d233e75164660adb558ae115cf832f800e53a9b9e00916ec38c227efcdb8",
+          "byte_size": 8572,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-049",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.064819,
+            "visible_fraction": 0.127686,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-050.png",
+          "sha256": "19ed4ca7d5b36748bb9e60f706e566b947b91d468f938a4c9a89f25eb3784584",
+          "byte_size": 8989,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-050",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.066284,
+            "visible_fraction": 0.128601,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-051.png",
+          "sha256": "b1d43603dc9bcc40fe1005f622e4f66f62948dd234906c9c6bdfe9bec4c1013e",
+          "byte_size": 9535,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-051",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.085083,
+            "visible_fraction": 0.157043,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-052.png",
+          "sha256": "f540e0e52da630c9fb8e7d0b12660ac9c7d6390f1efe5ceff9d77dbdaedff903",
+          "byte_size": 9587,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-052",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.071716,
+            "visible_fraction": 0.145447,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-053.png",
+          "sha256": "4f22739362e65b0867305b81934d932ac04b58be182e036c7962e51f5910430a",
+          "byte_size": 7766,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-053",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.070312,
+            "visible_fraction": 0.124878,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-054.png",
+          "sha256": "3cbfdfd32ec354a1e58e0ddccd0f2df5004f89d99d00668d7555af56eabcaa12",
+          "byte_size": 9480,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-054",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.072998,
+            "visible_fraction": 0.136292,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-055.png",
+          "sha256": "397aa802a6adaf983639ca8634a1d869687081d7900e9723dc34171f3b8ce7f8",
+          "byte_size": 9627,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-055",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.08783,
+            "visible_fraction": 0.152954,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-056.png",
+          "sha256": "481e4553bc0d97b9f494abbc85fe1ea94b1b8ebd74f9dab6b894d06a8f6d9679",
+          "byte_size": 9663,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-056",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.077576,
+            "visible_fraction": 0.143738,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-057.png",
+          "sha256": "092fd9848145b1dcbc67073bc83a4df3d042d9777c8af6b4d451b2c686831398",
+          "byte_size": 8574,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-057",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.071899,
+            "visible_fraction": 0.13623,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-058.png",
+          "sha256": "d46da68ab5a0ca50d15d5ca19a6bc5dae154828751a5adad21a9535e8ca79ffc",
+          "byte_size": 13810,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-058",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.09021,
+            "visible_fraction": 0.165344,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-059.png",
+          "sha256": "6a47926987b76851c2fa8d94fcb3d221257074169e2556968387a81711c94d77",
+          "byte_size": 9416,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-059",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.067749,
+            "visible_fraction": 0.123535,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-060.png",
+          "sha256": "d0f607f2605321feee585686cf215df58a32df251c7043bcf3d4505da7e4f6c7",
+          "byte_size": 11810,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-060",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.076538,
+            "visible_fraction": 0.139587,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-061.png",
+          "sha256": "1b2ec16692cb438940a17b1b3b7356200c6660d5cfa2e1226f20ae6b7b9c5798",
+          "byte_size": 9255,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-061",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.080017,
+            "visible_fraction": 0.147034,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-062.png",
+          "sha256": "3b3593941f3d0b60245a73cbab0ff357f772dff717c91a75c7cf5b17012200cb",
+          "byte_size": 8558,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-062",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.078064,
+            "visible_fraction": 0.137817,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-063.png",
+          "sha256": "6bba91286d6ebe055c5eff90366d85d3102260cf4b5fdf819cdf7e6fd348353f",
+          "byte_size": 14662,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-063",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.078613,
+            "visible_fraction": 0.180786,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-064.png",
+          "sha256": "629ba875a4385b4633d271731714023fe83c1986f44551f059663c5c9ec990e3",
+          "byte_size": 10840,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-064",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.096924,
+            "visible_fraction": 0.177307,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-065.png",
+          "sha256": "a2c6b85cb7b18dc001b3e3779ac51e1277abf9134a314f15efa3e23f9a3a4701",
+          "byte_size": 9470,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-065",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.081543,
+            "visible_fraction": 0.147522,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-066.png",
+          "sha256": "979cee194a830de9aaf97b674231e7fcd62a517a9bff0d39af68aff6b3d4a976",
+          "byte_size": 9975,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-066",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.089355,
+            "visible_fraction": 0.162659,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-067.png",
+          "sha256": "5b5bb6460caf2e9ac2bed852fda9a9bd4049b988cf8c247b32ad15b0db572ec2",
+          "byte_size": 8550,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-067",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.066162,
+            "visible_fraction": 0.130615,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-068.png",
+          "sha256": "2764c942b8bf4027ae035a3c252e9718a2f8db7683ac732f34ab7bcd0f7abd6b",
+          "byte_size": 7514,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-068",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.063965,
+            "visible_fraction": 0.123718,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-069.png",
+          "sha256": "31c471a31cdeb211a5862aaa70627bb3771a06fadb645192fd25a6898db24d1b",
+          "byte_size": 8127,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-069",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.089172,
+            "visible_fraction": 0.147217,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-070.png",
+          "sha256": "32dfe50eb2b6a1a470e7ecb7ea6dcbcd825af9eadd2335daba16615c61429380",
+          "byte_size": 8299,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-070",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.058167,
+            "visible_fraction": 0.125061,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-071.png",
+          "sha256": "a5d07cd204a419e50313dabb2b8f4181c6b2d93523b16dfd974307566ba63b66",
+          "byte_size": 9050,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-071",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.087524,
+            "visible_fraction": 0.156494,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-072.png",
+          "sha256": "6e12123a7a2bb69c7f6fe0dfdf6ebda6596f273336a440da1b0c96810b13eff7",
+          "byte_size": 8066,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-072",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.052917,
+            "visible_fraction": 0.108459,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-073.png",
+          "sha256": "72c6ba874355159657d24cfbbd72a47627c76db1725cc900212a209e59cbc60f",
+          "byte_size": 14325,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-073",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.066711,
+            "visible_fraction": 0.166809,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-074.png",
+          "sha256": "95f67be7deba755c4e5bad932c38c0bf308ae3cb81f0bdb055f52de9cc357fe4",
+          "byte_size": 9477,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-074",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.083984,
+            "visible_fraction": 0.141052,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-075.png",
+          "sha256": "46455f9ae656a0aab126cd240a91541048b4846e1f7ca6af98ca59a7c4c5b0ac",
+          "byte_size": 11412,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-075",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.093872,
+            "visible_fraction": 0.159424,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-076.png",
+          "sha256": "a99dc6015a75b3eb24967fb5dcc2d682b5a16b4710cb8d8e9e140c7783e40b67",
+          "byte_size": 8490,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-076",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.072205,
+            "visible_fraction": 0.130432,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-077.png",
+          "sha256": "2d8b1cd16659e2351999d9a6736788e1ddd7628776fd95fc186be94c558d1298",
+          "byte_size": 12690,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-077",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.082153,
+            "visible_fraction": 0.152588,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-078.png",
+          "sha256": "d18cd581520fbb52e8952ddb98b77062f60808433a6a672d0862562dd34da18d",
+          "byte_size": 10758,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-078",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.107422,
+            "visible_fraction": 0.184814,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-079.png",
+          "sha256": "f70b82cd9fad6501db952cbf850f5d7af5506efb077cf8899046b5f023863e45",
+          "byte_size": 14909,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-079",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.089233,
+            "visible_fraction": 0.16748,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-080.png",
+          "sha256": "1c2df52f9ddd2ea91fae1fb6f58f793927d4d8c2dbe465645259782931b56b9b",
+          "byte_size": 6917,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-080",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.052734,
+            "visible_fraction": 0.103638,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-081.png",
+          "sha256": "0347548a324cde4845d318cfff94b9b73e133074b443283f3397b78102d2c7e1",
+          "byte_size": 8218,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-081",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.056885,
+            "visible_fraction": 0.117065,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-082.png",
+          "sha256": "2430a5171217ebdad045970a14ec70d34c6906f21b2ec371124c8fcb228d3c44",
+          "byte_size": 12755,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-082",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.070618,
+            "visible_fraction": 0.147095,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-083.png",
+          "sha256": "72f0542a95fb381bdd6556a93e0f378c5409fc36767eee4e82bdf465776693b3",
+          "byte_size": 9245,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-083",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.075317,
+            "visible_fraction": 0.140015,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-084.png",
+          "sha256": "b4630e258c054ad86051adde8fb4e9527061508081cd9a529874cee8cfba27a0",
+          "byte_size": 11327,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-084",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.052429,
+            "visible_fraction": 0.120789,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-085.png",
+          "sha256": "561e733860034c74c3a4a72a847047ff5b367945b89f6980223c4279ea3e34d8",
+          "byte_size": 9694,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-085",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.096619,
+            "visible_fraction": 0.164185,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-086.png",
+          "sha256": "cb72edf0e9b5710c8e8bad17f9297b553ccff7099557c579ad42ccc845f9062b",
+          "byte_size": 8852,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-086",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.089783,
+            "visible_fraction": 0.152344,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-087.png",
+          "sha256": "eeca8894804ecf28388dd2790a90aa3e698068f3828a759f422471b34f795813",
+          "byte_size": 9369,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-087",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.079224,
+            "visible_fraction": 0.143738,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-088.png",
+          "sha256": "5d29aac2f8a88b4d5511bcfae05a28fbb7cdee46e105b52dc7a6f232d00493d3",
+          "byte_size": 9175,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-088",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.079712,
+            "visible_fraction": 0.14917,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-089.png",
+          "sha256": "79640b091a1263b25d9bb3e9574c8b58f2b3fdad4847b5b19d15d2b6ee155401",
+          "byte_size": 8650,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-089",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.072083,
+            "visible_fraction": 0.132996,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-090.png",
+          "sha256": "a407cb216c7a19ccd67dd5f59b15d2923b3ce0d30505813e1ecee8b88ecfab5b",
+          "byte_size": 8940,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-090",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.075256,
+            "visible_fraction": 0.134277,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-091.png",
+          "sha256": "0f2916996845393e73fe7fc11d58aff1a27e3d3d5f97110332b5f3d7e5bf78f6",
+          "byte_size": 9319,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-091",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.086487,
+            "visible_fraction": 0.154785,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-092.png",
+          "sha256": "6a3f221755310504e2f25cb8aafc598075965be7effbc68e4adb964bfa149095",
+          "byte_size": 8688,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-092",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.062805,
+            "visible_fraction": 0.131409,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-093.png",
+          "sha256": "5806f700cb8c5675f5274f8475b8887646b8fc63196c3498dcf55011fb576806",
+          "byte_size": 7849,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-093",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.052734,
+            "visible_fraction": 0.113281,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-094.png",
+          "sha256": "aeeef6b83acf39e9c9e7f7786916d99ab7d625826fc58f8dfc45a471481a22f7",
+          "byte_size": 8461,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-094",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.075317,
+            "visible_fraction": 0.135315,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-095.png",
+          "sha256": "641d5aabbce8cf8f2314441fa4a61bf6ab3df7116f6cbf9c6be6aeb19b05f29f",
+          "byte_size": 8417,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-095",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.070557,
+            "visible_fraction": 0.125916,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-096.png",
+          "sha256": "e9ce3f6a58e55bcd45daaa7e2cf96d2e426f074410dbeea421ff18b477fbc0c8",
+          "byte_size": 12998,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-096",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.069702,
+            "visible_fraction": 0.139282,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-097.png",
+          "sha256": "a890999da8c6ff60ae61628dafb1aabb7eb723f8e9b9d3011077b0b75bb4e99a",
+          "byte_size": 9137,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-097",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.062012,
+            "visible_fraction": 0.125671,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-098.png",
+          "sha256": "9be8df303f49868146e22c0908a80c8f0659cf7f5cd66ff556df050cc5c39add",
+          "byte_size": 8577,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-098",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.072083,
+            "visible_fraction": 0.13562,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-099.png",
+          "sha256": "afb3aa4a04bc7aa9ac4ecfa753f9c0bbcc8fda1e161129e5bd39eec9e3b0873a",
+          "byte_size": 7995,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-099",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.078979,
+            "visible_fraction": 0.133606,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-100.png",
+          "sha256": "9dace595152e17e264bac17cb94d8a94e3f595ced3c6367e097ef038debed214",
+          "byte_size": 10861,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-100",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.081787,
+            "visible_fraction": 0.143982,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-101.png",
+          "sha256": "e1176a9b2ac0e1b5bef3c7417f67edc020ac6c94bd9da62c5d8f5a50d799fca5",
+          "byte_size": 7697,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-101",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.060364,
+            "visible_fraction": 0.120056,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-102.png",
+          "sha256": "71292ca6568012ebe692fa32ab4867afdece35971a3325031b78cc82da6d6bc4",
+          "byte_size": 12630,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-102",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.086426,
+            "visible_fraction": 0.154663,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-103.png",
+          "sha256": "91d1ef1180536871a21f9724dbc14762aedd240ec78cbf0e549df6ddc65378f0",
+          "byte_size": 10037,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-103",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.071655,
+            "visible_fraction": 0.131653,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-104.png",
+          "sha256": "db830dcbdd4384b2042dba673007792d59b2b009ecf036ea398984950d66fbcd",
+          "byte_size": 9631,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-104",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.077148,
+            "visible_fraction": 0.141357,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-105.png",
+          "sha256": "e387385508228037e2d7c92003256f6e5f3908ef7a004836e0dc9c16cbb76c23",
+          "byte_size": 11244,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-105",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.097961,
+            "visible_fraction": 0.163757,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-106.png",
+          "sha256": "720e7f79c029910745d687e8db5ec3a3edcb30181bdd07ef2802f387d9b0b173",
+          "byte_size": 8639,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-106",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.068359,
+            "visible_fraction": 0.13092,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-107.png",
+          "sha256": "07c537805e24f2428ce67f0e0c4877bba16de67797e5b329ade85716bf4852b0",
+          "byte_size": 9313,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-107",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.080261,
+            "visible_fraction": 0.146301,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-108.png",
+          "sha256": "bc6c243cc561fdb9f7a95e1cf706eb2c9aa3a25116ebef868874dbd152ee1720",
+          "byte_size": 10656,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-108",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.072754,
+            "visible_fraction": 0.1427,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-109.png",
+          "sha256": "51baf7533e7c3b38740283917c84d23614d87b7d2987f1505ab8865a44bd0998",
+          "byte_size": 8318,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-109",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.08429,
+            "visible_fraction": 0.145203,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-110.png",
+          "sha256": "07bde6968428e4a61a6d9e42a589c292a2d30f6d0e5d4f727ad21c4c42b93ba0",
+          "byte_size": 7678,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-110",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.069885,
+            "visible_fraction": 0.126892,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-111.png",
+          "sha256": "65ad12d8e564ed578690347d58506b982b75dc60bab754ed941bca4792956ea0",
+          "byte_size": 9616,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-111",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.085205,
+            "visible_fraction": 0.153564,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-112.png",
+          "sha256": "de68547f903652c8d488a22df160c211f205569903e807f83cf4813cd98cf1af",
+          "byte_size": 12957,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-112",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.073853,
+            "visible_fraction": 0.153137,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-113.png",
+          "sha256": "0a8064ae862a4cc2209371ab716483be4318b2536de82b9ad8c1fc981b8434f7",
+          "byte_size": 7535,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-113",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.077698,
+            "visible_fraction": 0.130432,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-114.png",
+          "sha256": "2ef0c5aac2a4dd5f19ad719e1ab4bbd0c91e51a6d09f0931c0e2cd529a49bcad",
+          "byte_size": 9051,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-114",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.077148,
+            "visible_fraction": 0.13916,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-115.png",
+          "sha256": "4d566122afe8d6d4cc4a49dfb72737417e4100486e4715ebc2c2e1f5629f1c30",
+          "byte_size": 8297,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-115",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.066589,
+            "visible_fraction": 0.130859,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-116.png",
+          "sha256": "203ca0bfd7659f8dca42c27f05c1a41dbc8baa84dca928ac2db76871263077d4",
+          "byte_size": 8945,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-116",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.076904,
+            "visible_fraction": 0.140808,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-117.png",
+          "sha256": "fdafcbfe215b297a4b532c915a01f3fa82123b2300d236e643343dd574dbe18b",
+          "byte_size": 8067,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-117",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.07196,
+            "visible_fraction": 0.131165,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-118.png",
+          "sha256": "2c1f19d9d3a17d4ebd73654bda70779549491fe0290282fa1a9a73c5abb767c3",
+          "byte_size": 7565,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-118",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.06842,
+            "visible_fraction": 0.125,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-119.png",
+          "sha256": "f2c0f280d903421fdb1ebe15ef0f10a0bbe7236d27dc4b0a96e3b1924bf2a6e9",
+          "byte_size": 9414,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-119",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.075195,
+            "visible_fraction": 0.145752,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-120.png",
+          "sha256": "328ca1b8a5fee2a98632bdf93ac9ce3f0c1312893d70a3a3c3f8038e4b287c49",
+          "byte_size": 10306,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-120",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.092407,
+            "visible_fraction": 0.17334,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-121.png",
+          "sha256": "1a65525576b750546a5d96e72b5ebfdf607791321f39763f5f005f6ab9d2edbe",
+          "byte_size": 8329,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-121",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.069336,
+            "visible_fraction": 0.135376,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-122.png",
+          "sha256": "d7ca217fa2e078a1c5ff64490bcb105d20afb3d9a1a0df735bfa9a506b8d7ec4",
+          "byte_size": 9687,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-122",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.079224,
+            "visible_fraction": 0.1474,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-123.png",
+          "sha256": "d3b2a9ac27ca1074555389b0abe7dffead474ecb2a48eadb30828ee3ef3f9008",
+          "byte_size": 12726,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-123",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.076782,
+            "visible_fraction": 0.144714,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-124.png",
+          "sha256": "467e68ab1b12e3e14b7e50fab41d669a27b130cee9eef421f503dc3e465e7f77",
+          "byte_size": 9645,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-124",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.076233,
+            "visible_fraction": 0.145447,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-125.png",
+          "sha256": "40b5395f20eb6f8a469bd92505f81c268b923041ce367a6bed8a71f166102c23",
+          "byte_size": 9277,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-125",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.074951,
+            "visible_fraction": 0.140747,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-126.png",
+          "sha256": "f6ffa56925575af1296221773e4800a5b2ef92c8c226db8aba9af1b406b2a73b",
+          "byte_size": 7405,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-126",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.071045,
+            "visible_fraction": 0.126831,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-127.png",
+          "sha256": "ba2136ebe938e2479f851b834fddbc0466b9e42e06133d6186dc26ae4511a6bc",
+          "byte_size": 9242,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-127",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.097595,
+            "visible_fraction": 0.159363,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-128.png",
+          "sha256": "a80ba55718bd9c3c1c65fe62e6ba7568909f32cebcd89a507d313455a584ac21",
+          "byte_size": 9265,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-128",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.074402,
+            "visible_fraction": 0.144348,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-129.png",
+          "sha256": "e3b3ad00a51e43a38868aa109093ce61fb15e94fe5425f0f32b2043ae3ddc7fa",
+          "byte_size": 8252,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-129",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.071777,
+            "visible_fraction": 0.128357,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-130.png",
+          "sha256": "ac074e2fb34b4ff3d0fd36b127e83565d6a7ae731b4cbb245694f90a2c646cde",
+          "byte_size": 7378,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-130",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.054321,
+            "visible_fraction": 0.111633,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-131.png",
+          "sha256": "6d6fa8688ee99e3c589d53d9faf6b26bd7c39f01867281f055597db5d34c8187",
+          "byte_size": 13407,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-131",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.086426,
+            "visible_fraction": 0.17688,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-132.png",
+          "sha256": "2378ae502a8d4f9a10f229aa337218132d2f94343732b7116ed74c02a009e6e8",
+          "byte_size": 10740,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-132",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.075378,
+            "visible_fraction": 0.137024,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-133.png",
+          "sha256": "37417dc46f9671193ee817c6213128fa37b62ba7aa9c0c5ae35e800407f84501",
+          "byte_size": 9505,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-133",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.069458,
+            "visible_fraction": 0.130432,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-134.png",
+          "sha256": "72b4fbc032ca8e0bc901c0684bbf37fd4cb26599bd09481e44aab99b642282fa",
+          "byte_size": 8837,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-134",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.084473,
+            "visible_fraction": 0.146606,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-135.png",
+          "sha256": "a2fa3fd6bf29865462ae2d90642f5642137cce289a205d60b270fc6aa207164e",
+          "byte_size": 9373,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-135",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.073914,
+            "visible_fraction": 0.137268,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-136.png",
+          "sha256": "83127e49f4d2e99d1838a62f243f20934658b5facd18328f3de562c71380f5a1",
+          "byte_size": 11129,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-136",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.09967,
+            "visible_fraction": 0.169067,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-137.png",
+          "sha256": "2134d14a0a3b74e9453f0ce9b0d8a85e2b8911b3b4349f31c26feb2f7ba5a631",
+          "byte_size": 9266,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-137",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.066833,
+            "visible_fraction": 0.133484,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-138.png",
+          "sha256": "974c6b327aa54050811c0355889b87334e413e8ccb9679bf24fc7006f6817200",
+          "byte_size": 9630,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-138",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.069275,
+            "visible_fraction": 0.129639,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-139.png",
+          "sha256": "ae627cd645385eab2f17c7d6588667090c233b379a765a2aef675be3b9e63bca",
+          "byte_size": 9127,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-139",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.073242,
+            "visible_fraction": 0.137146,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-140.png",
+          "sha256": "3ac9df39827313979862086ff5ef4a20bf0a89b274a42d1a658e986282b91ac2",
+          "byte_size": 13331,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-140",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.05835,
+            "visible_fraction": 0.16272,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-141.png",
+          "sha256": "28f40ad419949c3ab9abb75057644c25e730a7b1c153e5814fd6ee6dc92891dd",
+          "byte_size": 8453,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-141",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.075745,
+            "visible_fraction": 0.137146,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-142.png",
+          "sha256": "0587afae8af16d3359ce012872f6e84da3fabc5a9c3d79e3751ba56a535f4761",
+          "byte_size": 17567,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-142",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.059814,
+            "visible_fraction": 0.270813,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-143.png",
+          "sha256": "97cd0f111ded06e6c498a3a20726341401c9ead4a09902fd0cff6527de254604",
+          "byte_size": 7791,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-143",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.060974,
+            "visible_fraction": 0.117004,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-144.png",
+          "sha256": "7a7c9a7e39215b6717bfc16fd5fff95840704314b2501dfafc1daa095e8ad7c3",
+          "byte_size": 8929,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-144",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.073669,
+            "visible_fraction": 0.131531,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-145.png",
+          "sha256": "5b7d1890da7068d3a9777c030062ef5baed08377d45ebadac3ddf66c935fa957",
+          "byte_size": 7936,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-145",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.074829,
+            "visible_fraction": 0.125366,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-146.png",
+          "sha256": "e4e1e56c56f5ed4bf2e9f677faffd7e21682c5eddab96257e48a656a4289eb04",
+          "byte_size": 8719,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-146",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.059814,
+            "visible_fraction": 0.125732,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-147.png",
+          "sha256": "4bf0973a4745516512577c6da206d4dff7a0f5596c21c2576cf54234984c2863",
+          "byte_size": 12611,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-147",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.059387,
+            "visible_fraction": 0.13324,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-148.png",
+          "sha256": "1b68e917e2ac24e0f6a69aa3893915785c6c31d3e1ead007f17c0aa12126ac36",
+          "byte_size": 9888,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-148",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.08667,
+            "visible_fraction": 0.154663,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-149.png",
+          "sha256": "24abda1d4ad5383465cd6ff5bf8c2a43bd5c5e18223e0ce0e1861e1486773dce",
+          "byte_size": 8867,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-149",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.086792,
+            "visible_fraction": 0.14209,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-150.png",
+          "sha256": "fa363301d4c4011ad0d014bf36ebdc901a1d49b62c3fe25234ad7f9cbbdcec6a",
+          "byte_size": 9875,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-150",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.08197,
+            "visible_fraction": 0.14856,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-151.png",
+          "sha256": "a21424f1cf30d609f4bbf24b6e5928c88a1f540c97ede1882631b2d5b22336c0",
+          "byte_size": 8441,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-151",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.085754,
+            "visible_fraction": 0.147095,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-152.png",
+          "sha256": "fbbf3fe2e0be3e2f2881ebce8a8084b61c1ef27080e4b2029cf0324eb728bb29",
+          "byte_size": 7792,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-152",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.054443,
+            "visible_fraction": 0.114868,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-153.png",
+          "sha256": "9c2e9d719d48422597f935c3ca2a309c42366a69ba61861358e45a2aff300e28",
+          "byte_size": 11013,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-153",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.061768,
+            "visible_fraction": 0.145569,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-154.png",
+          "sha256": "e82360d250a64fc98092d82fb17eae9fe6f0aeb19bd5f2996d43c913054a39bd",
+          "byte_size": 8512,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-154",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.076843,
+            "visible_fraction": 0.124451,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-155.png",
+          "sha256": "1742e81aa1d214b9f58ae6189a0208ae5eaf6b3dd15bb9c82b1fbb4623bd2b4e",
+          "byte_size": 9479,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-155",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.081726,
+            "visible_fraction": 0.142029,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-156.png",
+          "sha256": "7ff52eedcd31493dacc6fbb4f041a12dbd6a23e8e0f4d2eada7bbb781393d97b",
+          "byte_size": 9042,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-156",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.087219,
+            "visible_fraction": 0.152344,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-157.png",
+          "sha256": "52e4cbb06db29fc6e31a19d5bf0111b03dafb0b8221669b6d1074b43de3cd428",
+          "byte_size": 7653,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-157",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.067261,
+            "visible_fraction": 0.127686,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-158.png",
+          "sha256": "2313b6766308ee4f8fa941031585d7130c04e7d35c344b873c4855ef57f61f9f",
+          "byte_size": 9490,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-158",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.088257,
+            "visible_fraction": 0.150208,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-159.png",
+          "sha256": "dd79fcb667beffe0a5481ce0c94c0b139b9458f90d1d2f39c58025e3e9b33456",
+          "byte_size": 10728,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-159",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.075623,
+            "visible_fraction": 0.145264,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-160.png",
+          "sha256": "ba75d31b27d3753555bc67cc23515fc62f5609cb8ae7a175823d13e401025760",
+          "byte_size": 8000,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-160",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.07782,
+            "visible_fraction": 0.13385,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-161.png",
+          "sha256": "5f3e1a7ac9fa2f49cfa0debbf53bbfcd90091aee57819e69d2151fb0d6ac2a3e",
+          "byte_size": 9173,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-161",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.07135,
+            "visible_fraction": 0.137451,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-162.png",
+          "sha256": "70d0c98993571ec72328c0386a97240d986580d67984b5b0842e27a0f1a9281e",
+          "byte_size": 7891,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-162",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.057251,
+            "visible_fraction": 0.113098,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-163.png",
+          "sha256": "7cdafca6da1427c40d99a0e5c1d748cabb017f69ce6b80fcd257f6e25c57dfd9",
+          "byte_size": 8642,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-163",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.070801,
+            "visible_fraction": 0.13623,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-164.png",
+          "sha256": "df6ae8c76e472e1fd8927630b5362e1f672896282eb66b489a931ab2c28c4a2e",
+          "byte_size": 8012,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-164",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.065796,
+            "visible_fraction": 0.126343,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-165.png",
+          "sha256": "1186af8a2419be6e5835b4bc4ceb49cf678e682100e36485aad45afde2f8e578",
+          "byte_size": 7693,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-165",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.047424,
+            "visible_fraction": 0.099792,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-166.png",
+          "sha256": "c9b1806fdb852b7c3dd4fe72172202a0d097345d2b2fc9666ac598da48a3ffe8",
+          "byte_size": 8107,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-166",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.077209,
+            "visible_fraction": 0.135437,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-167.png",
+          "sha256": "c82836a8c25c8652a418df0f9caca24507640ea39edb9aa75ea154ff4ee74794",
+          "byte_size": 11079,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-167",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.093567,
+            "visible_fraction": 0.166992,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-168.png",
+          "sha256": "d6fa30dc0a9e8e74d4452f47ebdf7e83f2f73823a81b08978d6a16b04771ff39",
+          "byte_size": 9336,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-168",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.079163,
+            "visible_fraction": 0.145081,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-169.png",
+          "sha256": "b69f8ae2c7dcf7365261e1080f55aa51cc08a7f26ca484fa2e00a567ec3b8325",
+          "byte_size": 7774,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-169",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.074646,
+            "visible_fraction": 0.130798,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-170.png",
+          "sha256": "f9f844a9d7f852de6a6763fea6129032a79073f74f78d01389eab4996550aec3",
+          "byte_size": 9029,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-170",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.065186,
+            "visible_fraction": 0.131531,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-171.png",
+          "sha256": "5e1f1022cbd8fb3f8c0f685a55e60928e0e2ae9c69fa78d02d2291bdd978ab52",
+          "byte_size": 8995,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-171",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.065247,
+            "visible_fraction": 0.132446,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-172.png",
+          "sha256": "5be7dbe00c687d86993183f7e92a80d4be01843bc1e51bff519e0c8d44c6ad08",
+          "byte_size": 8898,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-172",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.059326,
+            "visible_fraction": 0.12207,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-173.png",
+          "sha256": "95548a6d44af7c42a63fce6af9343ca7cbe2ed38bbb9263c9a575cb50bcde33a",
+          "byte_size": 9935,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-173",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.072632,
+            "visible_fraction": 0.137817,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-174.png",
+          "sha256": "19d7ac6f06f8c45d7dc077f777ac5814b48fa9cda3494f6ff8a42f23427a6f29",
+          "byte_size": 10492,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-174",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.069275,
+            "visible_fraction": 0.139221,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-175.png",
+          "sha256": "2e5f2cadf2194dc21dbfdddab7fffe660d526e3c9075c83a14727731649feaaa",
+          "byte_size": 7953,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-175",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.05835,
+            "visible_fraction": 0.121765,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-176.png",
+          "sha256": "62d630ccb1bf1f9c7c709ba22cd8dba2a725afd589233cfbdefba8ce82b00a14",
+          "byte_size": 12109,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-176",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.094238,
+            "visible_fraction": 0.169922,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-177.png",
+          "sha256": "27c60facd6679375b5e8b83162433a603e6526cab486746c44ee94429470343d",
+          "byte_size": 7541,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-177",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.055542,
+            "visible_fraction": 0.113708,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-178.png",
+          "sha256": "fef7e508e34a1595caee6513b1ff8c0c2b9f57bb952cc611015887dcbd370aa6",
+          "byte_size": 8195,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-178",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.063599,
+            "visible_fraction": 0.124817,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-179.png",
+          "sha256": "bf9dcff6accecfdd2c0e0808515893b1a0082c47e954d077b9d45540a18957f3",
+          "byte_size": 10134,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-179",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.075684,
+            "visible_fraction": 0.140015,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-180.png",
+          "sha256": "901def5127b635b2cc94254d71082330258d07e6a00373f7f8bc3a731db591af",
+          "byte_size": 8049,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-180",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.060974,
+            "visible_fraction": 0.127258,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-181.png",
+          "sha256": "1e5aa980bfcd6afe08c537cf3bf1b7deab52f3717251781fda102058e3d146bc",
+          "byte_size": 10757,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-181",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.077454,
+            "visible_fraction": 0.151672,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-182.png",
+          "sha256": "31f21a5658e905be0a5d5b89d56542d38b6cef1eb32926c3295a9bd58c466b22",
+          "byte_size": 8488,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-182",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.077209,
+            "visible_fraction": 0.140442,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-183.png",
+          "sha256": "e0947888fb9720db51b209c1c8a43373c4fcae6ebe4e46546ccf8f725716c66a",
+          "byte_size": 12820,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-183",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.085205,
+            "visible_fraction": 0.151733,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-184.png",
+          "sha256": "02356014401ca4349364671f7c86c9125f0ece9c25b762f36d08eb258d504397",
+          "byte_size": 11763,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-184",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.068848,
+            "visible_fraction": 0.143616,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-185.png",
+          "sha256": "bf4e41a9876af037f71ae0c1094858219d013dc0c5ef7fad5d70415d8b285a67",
+          "byte_size": 8976,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-185",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.083496,
+            "visible_fraction": 0.150513,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-186.png",
+          "sha256": "aba9b56d9522e599fcb7c641695bdff12c195e421a6c18eac39a3d1c8ae0173c",
+          "byte_size": 8361,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-186",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.065002,
+            "visible_fraction": 0.124634,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-187.png",
+          "sha256": "1ae300379df63701f38577f6a42eb5ca047d99bc399a2668d7be1a83ed64f6a5",
+          "byte_size": 11853,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-187",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.088745,
+            "visible_fraction": 0.163879,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-188.png",
+          "sha256": "b8334d23d008892691a2af03d17e9d9f8279ad4c7d44b9555973556c333e7560",
+          "byte_size": 9418,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-188",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.074646,
+            "visible_fraction": 0.146973,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-189.png",
+          "sha256": "08625d847b2f0aa87eed894a0ecbdc84630e7331102a9a2e19a326d71d760fb6",
+          "byte_size": 6984,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-189",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.051208,
+            "visible_fraction": 0.105164,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-190.png",
+          "sha256": "dca799c88d45c5180f793b25d2d102235a4c0c7af613debe2bd3a9492d90b438",
+          "byte_size": 7480,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-190",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.064758,
+            "visible_fraction": 0.121094,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-3/tiles/glyph-191.png",
+          "sha256": "e17a9761cd10c160432794ae57b9810fa0fa55c2aa85513ec87a413f08ca2c13",
+          "byte_size": 9660,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-191",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.069031,
+            "visible_fraction": 0.142639,
+            "reasons": []
+          }
+        }
+      ],
+      "errors": [],
+      "speedup_vs_concurrency_1": null,
+      "parallel_efficiency": null
+    }
+  ],
+  "fastest_concurrency": 3,
+  "assembly": {
+    "wall_s": 4.037133,
+    "atlas": {
+      "path": "smythe_artifacts/noumenon/live_openai_transparent/assembled/glyph-atlas.png",
+      "sha256": "ba97d79e3b4a76148948fd5c1b5f983ae4eabc2c92581460d0331de7ed62570f",
+      "byte_size": 1269186,
+      "format": "PNG",
+      "width": 2048,
+      "height": 1536,
+      "frames": 1
+    },
+    "preview": {
+      "path": "smythe_artifacts/noumenon/live_openai_transparent/assembled/noumenon-preview.png",
+      "sha256": "5bc42235aad970d1a4e0fa86d78709f29844a12d507c3e41f129e174e6dc45c2",
+      "byte_size": 1599650,
+      "format": "PNG",
+      "width": 1920,
+      "height": 1080,
+      "frames": 1
+    },
+    "animation": {
+      "path": "smythe_artifacts/noumenon/live_openai_transparent/assembled/noumenon-loop.gif",
+      "sha256": "0ae428a681884db6ece91cdb47e35a07aae11829ee4f9b2a7de6dd9d61b3b3f2",
+      "byte_size": 1005174,
+      "format": "GIF",
+      "width": 640,
+      "height": 360,
+      "frames": 12
+    },
+    "html": {
+      "path": "smythe_artifacts/noumenon/live_openai_transparent/assembled/noumenon.html",
+      "sha256": "80e74029d3f18fd3313bc379adea4e3b3f2a37849cfd0a5b4f8fcb72032a0625",
+      "byte_size": 36794,
+      "format": "HTML",
+      "width": 1920,
+      "height": 1080,
+      "frames": 0
+    }
+  },
+  "total_recorded_cost_usd": 1.92,
+  "errors": []
+}

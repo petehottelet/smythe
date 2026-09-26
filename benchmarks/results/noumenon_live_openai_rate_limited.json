@@ -1,0 +1,4118 @@
+{
+  "benchmark": "noumenon-fanout",
+  "record_version": 1,
+  "partition": "live_transparent",
+  "mode": "live",
+  "status": "failed",
+  "protocol": {
+    "graph_nodes": 192,
+    "topology": "broadcast_reduce",
+    "one_provider_call_per_node": true,
+    "concurrencies": [
+      8
+    ],
+    "offline_latency_s": null,
+    "normalization": "PNG 128x128 RGBA; provider alpha preserved",
+    "background": "transparent",
+    "transparency_check": {
+      "provider_transparency_required": true,
+      "corner_size_px": 8,
+      "corner_max_alpha": 0,
+      "opaque_alpha_min": 250,
+      "min_opaque_fraction": 0.01,
+      "visible_alpha_min": 17,
+      "max_visible_fraction": 0.6
+    },
+    "vectorize": false,
+    "vectorization": null,
+    "assembly_requires_glyphs": 192,
+    "assembly_supported_glyphs": [
+      192,
+      256
+    ]
+  },
+  "provider": {
+    "name": "OpenAIImageProvider",
+    "model": "gpt-image-2.5-flare",
+    "size": "1024x1024",
+    "quality": "low",
+    "background": "transparent",
+    "cost_per_image_usd_estimate": null,
+    "max_cost_per_call_usd": 0.01,
+    "max_budget_usd": 2.0,
+    "official_guide": "https://developers.openai.com/api/docs/guides/image-generation"
+  },
+  "environment": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "packages": {
+      "smythe": "0.8.2",
+      "pillow": "12.3.0",
+      "openai": "2.45.0",
+      "google-genai": "2.11.0"
+    },
+    "installed_packages": {
+      "smythe": "0.1.0",
+      "pillow": "12.3.0",
+      "openai": "2.45.0",
+      "google-genai": "2.11.0"
+    },
+    "smythe_source": {
+      "version": "0.8.2",
+      "module": "smythe/__init__.py"
+    },
+    "source_control": {
+      "revision": "2054dfe286846128af7bc924d1cce3855a59c98b",
+      "dirty": false
+    }
+  },
+  "runs": [
+    {
+      "concurrency": 8,
+      "status": "failed",
+      "execution_id": null,
+      "generation_wall_s": 37.044399,
+      "validation_wall_s": 1.744451,
+      "vectorization_wall_s": null,
+      "end_to_end_wall_s": 38.78885,
+      "completed_nodes": 28,
+      "throughput_glyphs_per_s": 0.7558,
+      "cost_usd": null,
+      "cost_is_complete": false,
+      "cost_contains_estimates": true,
+      "validation": {
+        "passed": false,
+        "expected_tiles": 192,
+        "valid_png_tiles": 28,
+        "transparent_tiles": 28,
+        "tile_size": [
+          128,
+          128
+        ],
+        "unique_tile_hashes": 28,
+        "errors": [
+          "glyph-027: node status is pending",
+          "glyph-029: node status is pending",
+          "glyph-030: node status is pending",
+          "glyph-031: node status is failed",
+          "glyph-032: node status is pending",
+          "glyph-033: node status is pending",
+          "glyph-034: node status is pending",
+          "glyph-035: node status is pending",
+          "glyph-036: node status is pending",
+          "glyph-037: node status is pending",
+          "glyph-038: node status is pending",
+          "glyph-039: node status is pending",
+          "glyph-040: node status is pending",
+          "glyph-041: node status is pending",
+          "glyph-042: node status is pending",
+          "glyph-043: node status is pending",
+          "glyph-044: node status is pending",
+          "glyph-045: node status is pending",
+          "glyph-046: node status is pending",
+          "glyph-047: node status is pending",
+          "glyph-048: node status is pending",
+          "glyph-049: node status is pending",
+          "glyph-050: node status is pending",
+          "glyph-051: node status is pending",
+          "glyph-052: node status is pending",
+          "glyph-053: node status is pending",
+          "glyph-054: node status is pending",
+          "glyph-055: node status is pending",
+          "glyph-056: node status is pending",
+          "glyph-057: node status is pending",
+          "glyph-058: node status is pending",
+          "glyph-059: node status is pending",
+          "glyph-060: node status is pending",
+          "glyph-061: node status is pending",
+          "glyph-062: node status is pending",
+          "glyph-063: node status is pending",
+          "glyph-064: node status is pending",
+          "glyph-065: node status is pending",
+          "glyph-066: node status is pending",
+          "glyph-067: node status is pending",
+          "glyph-068: node status is pending",
+          "glyph-069: node status is pending",
+          "glyph-070: node status is pending",
+          "glyph-071: node status is pending",
+          "glyph-072: node status is pending",
+          "glyph-073: node status is pending",
+          "glyph-074: node status is pending",
+          "glyph-075: node status is pending",
+          "glyph-076: node status is pending",
+          "glyph-077: node status is pending",
+          "glyph-078: node status is pending",
+          "glyph-079: node status is pending",
+          "glyph-080: node status is pending",
+          "glyph-081: node status is pending",
+          "glyph-082: node status is pending",
+          "glyph-083: node status is pending",
+          "glyph-084: node status is pending",
+          "glyph-085: node status is pending",
+          "glyph-086: node status is pending",
+          "glyph-087: node status is pending",
+          "glyph-088: node status is pending",
+          "glyph-089: node status is pending",
+          "glyph-090: node status is pending",
+          "glyph-091: node status is pending",
+          "glyph-092: node status is pending",
+          "glyph-093: node status is pending",
+          "glyph-094: node status is pending",
+          "glyph-095: node status is pending",
+          "glyph-096: node status is pending",
+          "glyph-097: node status is pending",
+          "glyph-098: node status is pending",
+          "glyph-099: node status is pending",
+          "glyph-100: node status is pending",
+          "glyph-101: node status is pending",
+          "glyph-102: node status is pending",
+          "glyph-103: node status is pending",
+          "glyph-104: node status is pending",
+          "glyph-105: node status is pending",
+          "glyph-106: node status is pending",
+          "glyph-107: node status is pending",
+          "glyph-108: node status is pending",
+          "glyph-109: node status is pending",
+          "glyph-110: node status is pending",
+          "glyph-111: node status is pending",
+          "glyph-112: node status is pending",
+          "glyph-113: node status is pending",
+          "glyph-114: node status is pending",
+          "glyph-115: node status is pending",
+          "glyph-116: node status is pending",
+          "glyph-117: node status is pending",
+          "glyph-118: node status is pending",
+          "glyph-119: node status is pending",
+          "glyph-120: node status is pending",
+          "glyph-121: node status is pending",
+          "glyph-122: node status is pending",
+          "glyph-123: node status is pending",
+          "glyph-124: node status is pending",
+          "glyph-125: node status is pending",
+          "glyph-126: node status is pending",
+          "glyph-127: node status is pending",
+          "glyph-128: node status is pending",
+          "glyph-129: node status is pending",
+          "glyph-130: node status is pending",
+          "glyph-131: node status is pending",
+          "glyph-132: node status is pending",
+          "glyph-133: node status is pending",
+          "glyph-134: node status is pending",
+          "glyph-135: node status is pending",
+          "glyph-136: node status is pending",
+          "glyph-137: node status is pending",
+          "glyph-138: node status is pending",
+          "glyph-139: node status is pending",
+          "glyph-140: node status is pending",
+          "glyph-141: node status is pending",
+          "glyph-142: node status is pending",
+          "glyph-143: node status is pending",
+          "glyph-144: node status is pending",
+          "glyph-145: node status is pending",
+          "glyph-146: node status is pending",
+          "glyph-147: node status is pending",
+          "glyph-148: node status is pending",
+          "glyph-149: node status is pending",
+          "glyph-150: node status is pending",
+          "glyph-151: node status is pending",
+          "glyph-152: node status is pending",
+          "glyph-153: node status is pending",
+          "glyph-154: node status is pending",
+          "glyph-155: node status is pending",
+          "glyph-156: node status is pending",
+          "glyph-157: node status is pending",
+          "glyph-158: node status is pending",
+          "glyph-159: node status is pending",
+          "glyph-160: node status is pending",
+          "glyph-161: node status is pending",
+          "glyph-162: node status is pending",
+          "glyph-163: node status is pending",
+          "glyph-164: node status is pending",
+          "glyph-165: node status is pending",
+          "glyph-166: node status is pending",
+          "glyph-167: node status is pending",
+          "glyph-168: node status is pending",
+          "glyph-169: node status is pending",
+          "glyph-170: node status is pending",
+          "glyph-171: node status is pending",
+          "glyph-172: node status is pending",
+          "glyph-173: node status is pending",
+          "glyph-174: node status is pending",
+          "glyph-175: node status is pending",
+          "glyph-176: node status is pending",
+          "glyph-177: node status is pending",
+          "glyph-178: node status is pending",
+          "glyph-179: node status is pending",
+          "glyph-180: node status is pending",
+          "glyph-181: node status is pending",
+          "glyph-182: node status is pending",
+          "glyph-183: node status is pending",
+          "glyph-184: node status is pending",
+          "glyph-185: node status is pending",
+          "glyph-186: node status is pending",
+          "glyph-187: node status is pending",
+          "glyph-188: node status is pending",
+          "glyph-189: node status is pending",
+          "glyph-190: node status is pending",
+          "glyph-191: node status is pending",
+          "expected 192 valid tiles, found 28",
+          "expected 192 unique tile hashes, found 28"
+        ]
+      },
+      "vectorization": null,
+      "tile_receipts": [
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-000.png",
+          "sha256": "38bd91db2e1294f226a4fd0ce73c4b9a8933fa21647d3d254d173e29e692e2df",
+          "byte_size": 9043,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-000",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.073242,
+            "visible_fraction": 0.142395,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-001.png",
+          "sha256": "522a3ebf8638b1149745a4efb13fdea604f87c25ea85c6b3afa92f89180a0bad",
+          "byte_size": 8136,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-001",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.066589,
+            "visible_fraction": 0.125671,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-002.png",
+          "sha256": "1936f3d3e0059ef31e5c57b67ee83c8b1698ec0fc7a6b219ac49b2c1f59f05e8",
+          "byte_size": 8187,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-002",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.073364,
+            "visible_fraction": 0.135559,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-003.png",
+          "sha256": "b0ec3eb02c08f8bc5759b8b2e37a74c48b5937001fe3dc7dbeaada1ad8770039",
+          "byte_size": 7746,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-003",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.057983,
+            "visible_fraction": 0.117859,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-004.png",
+          "sha256": "71a030b79b7c859d2167bdb0913c6c75821f17a52ac96b8054baa582c2e4b2b7",
+          "byte_size": 7362,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-004",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.063538,
+            "visible_fraction": 0.122009,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-005.png",
+          "sha256": "93d6c5fcc3b24b87677a097961510e14685c457532541d8ba7f00ef400efddbe",
+          "byte_size": 14563,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-005",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.077087,
+            "visible_fraction": 0.198303,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-006.png",
+          "sha256": "a164c3e9d518d1e6459e6dc434fccbf22cfc70eafb9e119eaa526a5f8156eb6a",
+          "byte_size": 9253,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-006",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.076111,
+            "visible_fraction": 0.143677,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-007.png",
+          "sha256": "cd82d9459ca37f7183926fc51000d73d49b62fcf98a045f9d4f701fb68dcbb77",
+          "byte_size": 7966,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-007",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.06427,
+            "visible_fraction": 0.119568,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-008.png",
+          "sha256": "f32b72182371f31556af7f40f078af24c9c14857d1c306a17b600b2542efa418",
+          "byte_size": 9510,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-008",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.07843,
+            "visible_fraction": 0.149658,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-009.png",
+          "sha256": "1036d0574b76562b789b119e3ae86db0b23cec59c096943de2690bcf87c7c5bb",
+          "byte_size": 8609,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-009",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.085205,
+            "visible_fraction": 0.142578,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-010.png",
+          "sha256": "e9c3dc8d195900d587b51f6d0b9e479de3707b224ee604847126b2d398f623c1",
+          "byte_size": 7294,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-010",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.059814,
+            "visible_fraction": 0.117737,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-011.png",
+          "sha256": "4726b052912f996b4e902ece1252e9c03b1ae9ade4aa086949c8d275f7af6feb",
+          "byte_size": 13284,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-011",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.0755,
+            "visible_fraction": 0.155273,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-012.png",
+          "sha256": "893f1ab0d0189c874772bc8a0ce7cbbdf8df9552356895c742e9b25a5e1c5f6e",
+          "byte_size": 7779,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-012",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.067078,
+            "visible_fraction": 0.12085,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-013.png",
+          "sha256": "96bcde0bbb0d9a17604f47fe074267affdebe1bdce43a6444ffae2a8d4ea342f",
+          "byte_size": 8650,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-013",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.088318,
+            "visible_fraction": 0.150208,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-014.png",
+          "sha256": "421c8deab88a72582bfa38a1b286c408579573be47659d7be15b64afb501c5c8",
+          "byte_size": 15781,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-014",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.082336,
+            "visible_fraction": 0.223083,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-015.png",
+          "sha256": "1d5c4c4c4a67dd8fa38b5145921064e6db007bcbeb38942f3cdbd45942106522",
+          "byte_size": 9170,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-015",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.088745,
+            "visible_fraction": 0.158386,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-016.png",
+          "sha256": "567071626c77258885a72bb2e5adae8563a308586a2de2e637877d06bb688c62",
+          "byte_size": 9519,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-016",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.078735,
+            "visible_fraction": 0.144897,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-017.png",
+          "sha256": "34b6f8f52139b588154d0d36ec6fc4feb1b28dd512636ff24b10c04d6dd26f06",
+          "byte_size": 8862,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-017",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.084534,
+            "visible_fraction": 0.141968,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-018.png",
+          "sha256": "42435a684e6ad50c39c6556696477354bd71baefd032d5bf2d3752e4888e0b36",
+          "byte_size": 11266,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-018",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.100403,
+            "visible_fraction": 0.166443,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-019.png",
+          "sha256": "0dc1812efd14dd6f045e40142b7f69c4a6eb8c188ca1f3c5899a88db59d9f259",
+          "byte_size": 9960,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-019",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.077026,
+            "visible_fraction": 0.13501,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-020.png",
+          "sha256": "611adb726cf9ba7c221af05c9ecab069fea5ecc7353fd1527900306478fb934a",
+          "byte_size": 7536,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-020",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.052856,
+            "visible_fraction": 0.109558,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-021.png",
+          "sha256": "82ad9310b273e0c70045ee2ceb92e23667b6d69dbf796510477ef38b8fe2f271",
+          "byte_size": 9593,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-021",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.073608,
+            "visible_fraction": 0.148682,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-022.png",
+          "sha256": "efb0950b6d2a1124777a3223262bec3a63d9b27a53013b224edc50e9e6a2670d",
+          "byte_size": 9788,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-022",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.079712,
+            "visible_fraction": 0.139282,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-023.png",
+          "sha256": "a0602d3edb5b6955a8d66e95024ccaeae94abe58c0b5e78a16fc4cc03af99039",
+          "byte_size": 8269,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-023",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.058533,
+            "visible_fraction": 0.111511,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-024.png",
+          "sha256": "a9a9dc2f92c5f139e9e23b9dc258f120b2cfb03b75ab33655e7548d7ae9b7d31",
+          "byte_size": 9696,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-024",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.089355,
+            "visible_fraction": 0.156677,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-025.png",
+          "sha256": "8c54bc4583e7a9bbb5d56d89565be4ccc831fd12422f26b0505c808c7ce188b1",
+          "byte_size": 7752,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-025",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.05188,
+            "visible_fraction": 0.113647,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-026.png",
+          "sha256": "b57df82be637107fb337a0ff0f4334f335fafa0b43b992348d62cdd9c6970018",
+          "byte_size": 12803,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-026",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.079468,
+            "visible_fraction": 0.1828,
+            "reasons": []
+          }
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_openai_transparent/runs/concurrency-8/tiles/glyph-028.png",
+          "sha256": "0c0f1d2e48fad3a4c364d75f3a3faa089911be0342680f1967c3168095db3165",
+          "byte_size": 9496,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-028",
+          "transparency": {
+            "passed": true,
+            "source_has_transparency": true,
+            "corner_size": 8,
+            "corner_max_alpha": 0,
+            "opaque_fraction": 0.068848,
+            "visible_fraction": 0.136902,
+            "reasons": []
+          }
+        }
+      ],
+      "errors": [
+        {
+          "node_id": "__execution__",
+          "status": "failed",
+          "error": "RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for gpt-image-2.5-flare (for limit gpt-image) in organization org-9vyCkLh9wnUvrHxcMDtPZs3I on input-images per min: Limit 20, Used 20, Requested 1. Please try again in 3s. Visit https://platform.openai.com/account/rate-limits to learn more.', 'type': 'input-images', 'param': None, 'code': 'rate_limit_exceeded'}}"
+        },
+        {
+          "node_id": "glyph-027",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-029",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-030",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-031",
+          "status": "failed",
+          "error": "Error code: 429 - {'error': {'message': 'Rate limit reached for gpt-image-2.5-flare (for limit gpt-image) in organization org-9vyCkLh9wnUvrHxcMDtPZs3I on input-images per min: Limit 20, Used 20, Requested 1. Please try again in 3s. Visit https://platform.openai.com/account/rate-limits to learn more.', 'type': 'input-images', 'param': None, 'code': 'rate_limit_exceeded'}}"
+        },
+        {
+          "node_id": "glyph-032",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-033",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-034",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-035",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-036",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-037",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-038",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-039",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-040",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-041",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-042",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-043",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-044",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-045",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-046",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-047",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-048",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-049",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-050",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-051",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-052",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-053",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-054",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-055",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-056",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-057",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-058",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-059",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-060",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-061",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-062",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-063",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-064",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-065",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-066",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-067",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-068",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-069",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-070",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-071",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-072",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-073",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-074",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-075",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-076",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-077",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-078",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-079",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-080",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-081",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-082",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-083",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-084",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-085",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-086",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-087",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-088",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-089",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-090",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-091",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-092",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-093",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-094",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-095",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-096",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-097",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-098",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-099",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-100",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-101",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-102",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-103",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-104",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-105",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-106",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-107",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-108",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-109",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-110",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-111",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-112",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-113",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-114",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-115",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-116",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-117",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-118",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-119",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-120",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-121",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-122",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-123",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-124",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-125",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-126",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-127",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-128",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-129",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-130",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-131",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-132",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-133",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-134",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-135",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-136",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-137",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-138",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-139",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-140",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-141",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-142",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-143",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-144",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-145",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-146",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-147",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-148",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-149",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-150",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-151",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-152",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-153",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-154",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-155",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-156",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-157",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-158",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-159",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-160",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-161",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-162",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-163",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-164",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-165",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-166",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-167",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-168",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-169",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-170",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-171",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-172",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-173",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-174",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-175",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-176",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-177",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-178",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-179",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-180",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-181",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-182",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-183",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-184",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-185",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-186",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-187",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-188",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-189",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-190",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "glyph-191",
+          "status": "pending",
+          "error": "node did not complete"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-027: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-029: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-030: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-031: node status is failed"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-032: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-033: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-034: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-035: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-036: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-037: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-038: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-039: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-040: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-041: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-042: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-043: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-044: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-045: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-046: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-047: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-048: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-049: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-050: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-051: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-052: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-053: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-054: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-055: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-056: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-057: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-058: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-059: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-060: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-061: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-062: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-063: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-064: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-065: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-066: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-067: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-068: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-069: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-070: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-071: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-072: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-073: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-074: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-075: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-076: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-077: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-078: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-079: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-080: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-081: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-082: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-083: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-084: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-085: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-086: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-087: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-088: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-089: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-090: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-091: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-092: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-093: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-094: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-095: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-096: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-097: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-098: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-099: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-100: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-101: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-102: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-103: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-104: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-105: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-106: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-107: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-108: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-109: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-110: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-111: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-112: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-113: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-114: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-115: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-116: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-117: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-118: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-119: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-120: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-121: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-122: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-123: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-124: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-125: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-126: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-127: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-128: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-129: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-130: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-131: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-132: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-133: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-134: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-135: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-136: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-137: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-138: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-139: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-140: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-141: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-142: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-143: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-144: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-145: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-146: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-147: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-148: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-149: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-150: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-151: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-152: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-153: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-154: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-155: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-156: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-157: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-158: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-159: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-160: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-161: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-162: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-163: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-164: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-165: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-166: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-167: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-168: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-169: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-170: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-171: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-172: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-173: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-174: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-175: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-176: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-177: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-178: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-179: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-180: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-181: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-182: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-183: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-184: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-185: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-186: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-187: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-188: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-189: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-190: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-191: node status is pending"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "expected 192 valid tiles, found 28"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "expected 192 unique tile hashes, found 28"
+        }
+      ],
+      "speedup_vs_concurrency_1": null,
+      "parallel_efficiency": null
+    }
+  ],
+  "fastest_concurrency": null,
+  "assembly": null,
+  "total_recorded_cost_usd": 0,
+  "errors": [
+    {
+      "node_id": "__execution__",
+      "status": "failed",
+      "error": "RateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for gpt-image-2.5-flare (for limit gpt-image) in organization org-9vyCkLh9wnUvrHxcMDtPZs3I on input-images per min: Limit 20, Used 20, Requested 1. Please try again in 3s. Visit https://platform.openai.com/account/rate-limits to learn more.', 'type': 'input-images', 'param': None, 'code': 'rate_limit_exceeded'}}"
+    },
+    {
+      "node_id": "glyph-027",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-029",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-030",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-031",
+      "status": "failed",
+      "error": "Error code: 429 - {'error': {'message': 'Rate limit reached for gpt-image-2.5-flare (for limit gpt-image) in organization org-9vyCkLh9wnUvrHxcMDtPZs3I on input-images per min: Limit 20, Used 20, Requested 1. Please try again in 3s. Visit https://platform.openai.com/account/rate-limits to learn more.', 'type': 'input-images', 'param': None, 'code': 'rate_limit_exceeded'}}"
+    },
+    {
+      "node_id": "glyph-032",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-033",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-034",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-035",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-036",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-037",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-038",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-039",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-040",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-041",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-042",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-043",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-044",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-045",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-046",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-047",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-048",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-049",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-050",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-051",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-052",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-053",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-054",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-055",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-056",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-057",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-058",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-059",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-060",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-061",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-062",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-063",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-064",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-065",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-066",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-067",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-068",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-069",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-070",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-071",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-072",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-073",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-074",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-075",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-076",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-077",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-078",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-079",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-080",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-081",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-082",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-083",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-084",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-085",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-086",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-087",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-088",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-089",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-090",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-091",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-092",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-093",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-094",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-095",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-096",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-097",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-098",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-099",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-100",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-101",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-102",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-103",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-104",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-105",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-106",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-107",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-108",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-109",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-110",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-111",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-112",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-113",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-114",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-115",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-116",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-117",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-118",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-119",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-120",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-121",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-122",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-123",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-124",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-125",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-126",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-127",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-128",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-129",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-130",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-131",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-132",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-133",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-134",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-135",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-136",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-137",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-138",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-139",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-140",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-141",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-142",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-143",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-144",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-145",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-146",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-147",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-148",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-149",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-150",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-151",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-152",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-153",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-154",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-155",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-156",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-157",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-158",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-159",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-160",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-161",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-162",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-163",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-164",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-165",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-166",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-167",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-168",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-169",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-170",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-171",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-172",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-173",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-174",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-175",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-176",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-177",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-178",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-179",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-180",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-181",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-182",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-183",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-184",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-185",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-186",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-187",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-188",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-189",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-190",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "glyph-191",
+      "status": "pending",
+      "error": "node did not complete"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-027: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-029: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-030: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-031: node status is failed"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-032: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-033: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-034: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-035: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-036: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-037: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-038: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-039: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-040: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-041: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-042: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-043: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-044: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-045: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-046: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-047: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-048: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-049: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-050: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-051: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-052: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-053: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-054: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-055: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-056: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-057: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-058: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-059: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-060: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-061: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-062: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-063: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-064: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-065: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-066: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-067: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-068: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-069: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-070: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-071: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-072: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-073: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-074: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-075: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-076: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-077: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-078: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-079: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-080: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-081: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-082: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-083: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-084: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-085: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-086: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-087: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-088: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-089: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-090: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-091: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-092: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-093: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-094: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-095: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-096: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-097: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-098: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-099: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-100: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-101: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-102: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-103: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-104: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-105: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-106: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-107: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-108: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-109: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-110: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-111: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-112: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-113: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-114: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-115: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-116: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-117: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-118: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-119: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-120: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-121: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-122: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-123: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-124: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-125: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-126: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-127: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-128: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-129: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-130: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-131: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-132: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-133: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-134: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-135: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-136: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-137: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-138: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-139: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-140: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-141: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-142: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-143: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-144: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-145: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-146: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-147: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-148: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-149: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-150: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-151: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-152: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-153: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-154: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-155: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-156: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-157: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-158: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-159: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-160: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-161: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-162: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-163: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-164: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-165: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-166: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-167: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-168: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-169: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-170: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-171: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-172: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-173: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-174: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-175: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-176: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-177: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-178: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-179: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-180: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-181: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-182: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-183: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-184: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-185: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-186: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-187: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-188: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-189: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-190: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-191: node status is pending"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "expected 192 valid tiles, found 28"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "expected 192 unique tile hashes, found 28"
+    }
+  ]
+}
