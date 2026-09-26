@@ -10,10 +10,11 @@ verification, trace, artifact, and recovery controls.
 - [Architecture](architecture.md) — the two core abstractions and component boundaries
 - [Examples](../examples/README.md) — offline-first feature tours plus explicitly gated live integrations
 - [Benchmarks](../benchmarks/README.md) — evidence status, protocols, and raw records
+- [Smythe 0.9.0](release-0.9.0.md) — Noumenon re-run, separate screensaver and Repo Doctor repositories, and a pinned evidence archive; upgrading from 0.8.2
 - [Smythe 0.8.2](release-0.8.2.md) — correctness release: what changed and how to upgrade from 0.8.1
 - [Smythe 0.8.1](release-0.8.1.md) — security release: what changed and how to upgrade from 0.8.0
 - [Smythe 0.8.0](release-0.8.0.md) — scope, compatibility changes and release verification
-- [Smythe 0.7.0 verification](release-0.7.0.md) — published package checks, historical native checksums, and retained evidence
+- [Smythe 0.7.0 verification](release-0.7.0.md) — published package checks and retained evidence
 
 ## Plan and execute graphs
 
@@ -59,21 +60,18 @@ verification, trace, artifact, and recovery controls.
 - [Jobs at 5,000 operations](../benchmarks/jobs_scale_5000_20260907_results.md) — one reconciled offline recovery campaign, with all artifacts, journal entries, source hashes, and interrupted-attempt lineage retained
 - [Framework comparison](../benchmarks/README.md#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12) — matched Smythe, LangGraph, and CrewAI evidence
 - [Image benchmarks](../benchmarks/image_benchmarks.md) — image fan-out and exact-spec finishing
-- [Glyph Rain benchmark](../benchmarks/glyph_screensaver_benchmark.md) — an artifact fan-out example with isolated 64-, 128-, 192-, and 256-node measurements
+- [Noumenon fan-out benchmark](../benchmarks/noumenon_benchmark.md) — Smythe's parallel-processing example, with isolated 64-, 128-, 192-, and 256-node measurements
 - [Historical v1 SVG workflow](../benchmarks/svg_glyph_benchmark.md) — archived geometry, validation, assembly, and timing records; current artwork is linked above
-- [Glyph Rain screensaver](../screensaver/README.md) — source builds for Windows, macOS, and Linux using 56 reference and 192 original SVG shapes, with the current v2 originals and a 10% original mix; no precompiled distribution
-- [Web explorer and animated preview](../screensaver/svg-preview/README.md) — new-glyph-only gallery and animation; adjustable reference mix, Matrix green rain, and pixel controls
+- [Noumenon screensaver](https://github.com/petehottelet/noumenon) — the screensaver, web explorer, and Windows, macOS, and Linux source builds using 56 reference and 192 original SVG shapes, in their own repository; no precompiled distribution
 - [Glyph reference measurements](data/glyph-style-summary.json) — source-population distributions; [measurement method](data/glyph-style-method.json)
-- [Explorer controls and checks](../screensaver/svg-preview/README.md) — current renderer behavior, settings and verification commands
-- [Renderer timing protocol](../benchmarks/renderer_performance_20260907.md) — six independent Classic/3D sessions, raw callback and CPU-submission samples, and explicit backend qualification
-- [Renderer measurements](../benchmarks/renderer_performance_20260907_results.md) — all six target-missing sessions, a separate blank-page cadence control, and a ten-minute travel/resize check
+- [Retired benchmark evidence](../benchmarks/archive/README.md) — superseded, diagnostic, and historical records, including the renderer timing study, in one SHA-256-pinned archive
 
 ## Project guides
 
 - [Coming soon](../ROADMAP.md#coming-soon) — acceptance criteria for runtime and measurement improvements
 - [Contributing](../CONTRIBUTING.md)
-- [Packages and typing](distribution.md) — slim source archives, explicit library tests, installed type checks and versioned Repo Doctor ZIPs
+- [Packages and typing](distribution.md) — slim source archives, explicit library tests, and installed type checks
 - [Roadmap](../ROADMAP.md)
-- [Changelog](../CHANGELOG.md)
+- [Changelog](../CHANGELOG.md) — current releases; 0.1.0 through 0.8.1 are in the [changelog archive](../CHANGELOG-ARCHIVE.md)
 - [Releasing](../RELEASING.md) — package builds, release assets, and PyPI publication
 - [Security](../SECURITY.md)

@@ -892,6 +892,11 @@ class OpenAIImageProvider(OpenAIProvider):
     ``max_budget_usd`` because current prices vary by model, quality, size, and
     image inputs.  ``cost_per_image_usd`` remains available as the recorded
     per-output estimate for backwards compatibility.
+
+    ``background`` is sent only when it is not ``"auto"``, so default requests
+    are unchanged.  ``"transparent"`` requires PNG or WebP output and a model
+    that supports transparent backgrounds; OpenAI's image-generation guide
+    lists current model support.
     """
 
     _OUTPUT_MIME_TYPES = {
@@ -899,6 +904,8 @@ class OpenAIImageProvider(OpenAIProvider):
         "jpeg": "image/jpeg",
         "webp": "image/webp",
     }
+    _BACKGROUNDS = ("auto", "opaque", "transparent")
+    _ALPHA_OUTPUT_FORMATS = ("png", "webp")
 
     def __init__(
         self,
@@ -910,6 +917,7 @@ class OpenAIImageProvider(OpenAIProvider):
         output_format: str = "png",
         output_compression: int | None = None,
         moderation: str = "auto",
+        background: str = "auto",
         n: int = 1,
         cost_per_image_usd: float | None = None,
         max_cost_per_call_usd: float | None = None,
@@ -938,6 +946,15 @@ class OpenAIImageProvider(OpenAIProvider):
             raise ValueError(
                 f"moderation must be one of ['auto', 'low'], got {moderation!r}"
             )
+        if background not in self._BACKGROUNDS:
+            raise ValueError(
+                f"background must be one of {list(self._BACKGROUNDS)}, got {background!r}"
+            )
+        if background == "transparent" and output_format not in self._ALPHA_OUTPUT_FORMATS:
+            raise ValueError(
+                "background 'transparent' requires output_format 'png' or 'webp', "
+                f"got {output_format!r}"
+            )
         if output_compression is not None and not 0 <= output_compression <= 100:
             raise ValueError(
                 "output_compression must be between 0 and 100, "
@@ -965,6 +982,7 @@ class OpenAIImageProvider(OpenAIProvider):
         self._image_output_format = output_format
         self._image_output_compression = output_compression
         self._image_moderation = moderation
+        self._image_background = background
         self._images_per_call = n
         self._cost_per_image_usd = cost_per_image_usd
         self._max_cost_per_call_usd = max_cost_per_call_usd
@@ -1016,6 +1034,8 @@ class OpenAIImageProvider(OpenAIProvider):
         }
         if self._image_output_compression is not None:
             payload["output_compression"] = self._image_output_compression
+        if self._image_background != "auto":
+            payload["background"] = self._image_background
 
         response = await self._get_client().images.generate(**payload)
         mime_type = self._OUTPUT_MIME_TYPES[self._image_output_format]

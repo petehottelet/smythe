@@ -5,7 +5,7 @@
 dated, model-specific token price. Smythe 0.7.0 includes this explicit adapter:
 
 ```bash
-pip install "smythe[openai]==0.8.2"
+pip install "smythe[openai]==0.9.0"
 ```
 
 Set `OPENAI_API_KEY`. Select the provider explicitly; automatic provider

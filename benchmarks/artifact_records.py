@@ -51,19 +51,26 @@ def resolve_record_path(path: str | Path, *, root: Path = REPO_ROOT) -> Path:
 
 
 def _source_control_snapshot() -> dict:
-    """Distinguish a clean revision from measurements of an edited checkout."""
+    """Distinguish a clean revision from measurements of an edited checkout.
+
+    ``dirty`` reports changes to tracked files only. Untracked files, such as
+    records an earlier run wrote, are counted separately so they cannot be
+    mistaken for edited sources.
+    """
     try:
         revision = subprocess.run(
             ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, check=True,
             capture_output=True, text=True, timeout=5,
         ).stdout.strip()
         status = subprocess.run(
-            ["git", "status", "--porcelain"], cwd=REPO_ROOT, check=True,
-            capture_output=True, text=True, timeout=5,
+            ["git", "status", "--porcelain", "--untracked-files=all"], cwd=REPO_ROOT,
+            check=True, capture_output=True, text=True, timeout=5,
         ).stdout
     except (OSError, subprocess.SubprocessError):
-        return {"revision": None, "dirty": None}
-    return {"revision": revision, "dirty": bool(status.strip())}
+        return {"revision": None, "dirty": None, "untracked_files": None}
+    lines = [line for line in status.splitlines() if line.strip()]
+    untracked = sum(line.startswith("??") for line in lines)
+    return {"revision": revision, "dirty": len(lines) > untracked, "untracked_files": untracked}
 
 
 def environment_snapshot(*packages: str) -> dict:

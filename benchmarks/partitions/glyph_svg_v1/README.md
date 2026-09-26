@@ -5,6 +5,6 @@ This partition retains the catalog and checks used by the
 acceptance was superseded by the 12 September contour review. Timing records
 continue to describe their original v1 inputs.
 
-See the [current v2 catalog](../../../screensaver/glyph-design-v2/README.md)
+See the [current v2 catalog](../../noumenon/catalog/README.md)
 for all 192 new glyphs, test sheets, and previews. No v1 result is a v2 timing
 or artwork-quality claim.

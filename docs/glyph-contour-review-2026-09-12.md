@@ -5,8 +5,8 @@ Those gates did not establish a consistent type style. This review supersedes
 the earlier optical acceptance for future artwork selection; it does not
 rewrite the measured v1 files or their timing records.
 
-**Current deliverable:** [192 rebuilt glyphs](../screensaver/glyph-design-v2/contact-sheet-128.png)
-and [per-glyph measurements](../screensaver/glyph-design-v2/measurements.json).
+**Current deliverable:** [192 rebuilt glyphs](../benchmarks/noumenon/catalog/contact-sheet-128.png)
+and [per-glyph measurements](../benchmarks/noumenon/catalog/measurements.json).
 Current sheets, gallery, stills, animation, and native source exports use v2.
 The gallery and README animation show only the new originals. The live
 reference mix remains adjustable; historical benchmark evidence retains v1.
@@ -16,11 +16,11 @@ reference mix remains adjustable; historical benchmark evidence retains v1.
 Re-examined all 137 cached column-A images from the supplied spreadsheet and
 verified every image against the SHA-256 in the committed
 [per-row record](data/glyph-style-measurements.csv). Also inspected the entire
-[56-glyph classic vector catalog](../screensaver/svg-preview/reference/README.md)
+[56-glyph classic vector catalog](https://github.com/petehottelet/noumenon/blob/main/svg-preview/reference/README.md)
 and selected exact vector cross-sections. Spreadsheet images remain research
 inputs; none were traced, copied into the new contours, or redistributed here.
 The licensed base catalog retains its
-[credits and MIT notice](../screensaver/svg-preview/reference/README.md).
+[credits and MIT notice](https://github.com/petehottelet/noumenon/blob/main/svg-preview/reference/README.md).
 
 The spreadsheet contains **56 classic-flagged and 81 expanded forms**, not one
 uniform face. The expanded forms deliberately include rounded ends and bulb
@@ -101,8 +101,8 @@ These are authored design targets, not additional measurements of the source:
 
 ## The complete v2 catalog
 
-The [authoring module](../screensaver/glyph_design_v2.py) constructs all 192
-outlines from [authored contour data](../screensaver/glyph_contours_v2.json).
+The [authoring module](../benchmarks/noumenon/glyph_design_v2.py) constructs all 192
+outlines from [authored contour data](../benchmarks/noumenon/glyph_contours_v2.json).
 It reuses the restricted SVG serializer and rasterizer, not v1 geometry.
 All exposed terminals follow the cut-end policy. No circular punches,
 random notches, or post-composition erosion/dilation are applied.
@@ -114,11 +114,11 @@ including aligned reflections; it does not add small defects for uniqueness.
 A second pass replaced the remaining immediate letter-like readings in
 005, 007, 010, 016, and 021.
 
-Inspect [the complete sheet](../screensaver/glyph-design-v2/contact-sheet-128.png)
-or [four enlarged sections](../screensaver/glyph-design-v2/README.md).
+Inspect [the complete sheet](../benchmarks/noumenon/catalog/contact-sheet-128.png)
+or [four enlarged sections](../benchmarks/noumenon/catalog/README.md).
 All small-size sheets contain the same current 192 IDs. Geometry, silhouette,
-raster, export, and browser checks are recorded in
-[the review receipt](../screensaver/glyph-design-v2/review.json). They do not
+raster, export, and browser checks are recorded in the review receipt, kept in
+the [evidence archive](../benchmarks/archive/README.md). They do not
 establish a measured generation speed or universal uniqueness across scripts.
 
 | Current 192-glyph sample, 128 px cells | Measured value |
@@ -132,7 +132,7 @@ establish a measured generation speed or universal uniqueness across scripts.
 
 These describe the current set; they are not a score for aesthetic quality.
 The full pair comparison is retained in
-[distinctness.json](../screensaver/glyph-design-v2/distinctness.json).
+[distinctness.json](../benchmarks/noumenon/catalog/distinctness.json).
 
 ### Letter and numeral rejection pass
 
@@ -159,11 +159,11 @@ piece in the character's center. Revision 4 keeps the roof and descending
 curve, then places a flat rectangular bar inside that opening. The bar is
 25 × 13 units on the 100-unit canvas, with a minimum 9-unit gap from the
 outer stroke. Both components remain separate at 16, 32 and 128 px.
-[Inspect revised 017](../screensaver/glyph-design-v2/glyph-017-detail.png).
+[Inspect revised 017](../benchmarks/noumenon/catalog/glyph-017-detail.png).
 
-The approved 017 SVG is preserved byte-for-byte in the full set. The
-[review record](../screensaver/glyph-design-v2/review.json) binds the completed
-catalog, checks, and all current presentation assets.
+The approved 017 SVG is preserved byte-for-byte in the full set. The review
+record in the [evidence archive](../benchmarks/archive/README.md) binds the
+completed catalog, checks, and the presentation assets of that date.
 
 ## Completion status and next work
 

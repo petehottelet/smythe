@@ -24,7 +24,7 @@ Candidate branches can run the same platform matrix with
 `gh workflow run ci.yml --ref BRANCH`. That manual qualification does not
 replace the required successful push checks on `main` before publication.
 
-The [0.8.2 release guide](docs/release-0.8.2.md) records its scope,
+The [0.9.0 release guide](docs/release-0.9.0.md) records its scope,
 compatibility changes and verification commands.
 
 ## Per-release flow
@@ -57,10 +57,7 @@ compatibility changes and verification commands.
    the tested commit, check URLs, package hashes, and release notes.
 5. Push the version commit and verify its CI checks. Create tag `vX.Y.Z` at
    that exact commit and publish its GitHub release. This triggers `publish.yml`.
-6. Keep the screensaver distribution source-only while precompiled releases
-   are paused. Verify the Windows, macOS, and Linux source exports against
-   `screensaver/native-catalog.json`; do not attach compiled native packages.
-7. Verify the successful publish workflow. In a fresh environment, install
+6. Verify the successful publish workflow. In a fresh environment, install
    `smythe==X.Y.Z` from PyPI, check its version, and exercise the installed CLI.
    Download the workflow's retained distributions and `package-hashes.txt`;
    confirm PyPI serves those exact wheel and sdist bytes. Build hosts can use
@@ -68,14 +65,19 @@ compatibility changes and verification commands.
    the publication workflow's artifact hashes.
    Update the PyPI badge only after the published version is available.
 
-## Skill and evidence assets
+## Evidence assets
 
-The Repo Doctor workflow builds a ZIP from the exact source commit, verifies
-it against the published runtime pinned in `skills/repo-doctor/runtime.txt`,
-and attaches the archive and checksum receipt on release publication.
-Keep that pin on a tested, available runtime; a runtime upgrade requires an
-explicit compatibility check. Manual workflow runs retain candidates without
-publishing a release. Existing asset names are never overwritten.
+When a release retires benchmark evidence, build its archive from git history
+and verify it before attaching it to the release its pointer names:
+
+```bash
+python tools/evidence_archive.py build SPEC.json --out /path/to/fresh/evidence --pointer benchmarks/archive/NAME.json
+python tools/evidence_archive.py verify /path/to/fresh/evidence/NAME.zip --pointer benchmarks/archive/NAME.json --against-git
+```
+
+Commit the pointer with the release, upload the verified ZIP under the exact
+name in its `release_asset` URL, and download it again to confirm the
+SHA-256. Existing asset names are never overwritten.
 
 Before a release, review the package's exact file manifest and run the
 [distribution checks](docs/distribution.md). Internal plans and review notes
