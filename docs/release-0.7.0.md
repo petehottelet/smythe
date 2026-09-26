@@ -62,32 +62,23 @@ calibration gates.
 
 ## Historical screensaver packages
 
-Precompiled screensaver packages were withdrawn on 7 September 2026.
-[Build the native ports from source](../screensaver/README.md#ports). The
-checksums and observations below are retained historical evidence.
+Precompiled screensaver packages were withdrawn on 7 September 2026. The
+screensaver is now the source-only
+[Noumenon repository](https://github.com/petehottelet/noumenon); build its
+native ports from source there.
 
 The release originally included native **1.1** packages from source
 `a0327aa58f80e6c7206f5c3eeeae1b48985953e6` and
 [build 34123023804](https://github.com/petehottelet/smythe/actions/runs/34123023804).
 They contain 56 visible reference glyphs, the reference blank slot, and all
-192 original Smythe SVG shapes, with a 10% original mix.
+192 original Smythe SVG shapes, with a 10% original mix. All three packages,
+their checksum list, build information and the candidate verification ZIP
+matched the uploaded files when downloaded again after publication.
 
-| Native package | SHA-256 |
-|---|---|
-| `SmytheGlyphRain.scr` | `c7660ee87d6d0e7774b1ee0c044d66dabf8cd92ebd8b8d193a55e6621ac177ea` |
-| `GlyphRain-macos-universal.zip` | `d6b3d8367efa23526b0458c4dc81b59e39044e82e5c5133ac2e26af042c820a8` |
-| `SmytheGlyphRain-linux-x86_64.tar.gz` | `a42a258e5fa85ed0939bc5ba1f4cd1a74237786bc9566b7a420819ac4af178a5` |
-
-All three packages, `SHA256SUMS`, `BUILD_INFO.json`, and the candidate
-verification ZIP were downloaded again after publication and matched the
-uploaded files. The native packages retain their own version and source
-identity; attaching them to 0.7.0 does not imply a new build.
-
-[Native rendering and host checks](../screensaver/README.md#native-verification)
-cover Windows, Apple Silicon, Intel Mac, and Ubuntu 22.04/24.04. macOS remains
-ad-hoc signed, and Linux requires X11. Native layered rain and the web
-explorer's REGL effect, 3D travel, and settings have separate implementation
-scope.
+The packages' file names and SHA-256 checksums, their build information, and
+the native rendering receipts for Windows, Apple Silicon, Intel Mac, and
+Ubuntu 22.04/24.04 are retained, with this guide's original text, in the
+[evidence archive](../benchmarks/archive/README.md).
 
 ## Retained evidence
 
@@ -106,5 +97,5 @@ including the initial checksum comparison against Windows CRLF checkout bytes
 instead of the uploaded LF file.
 
 The [5,000-operation recovery report](../benchmarks/jobs_scale_5000_20260907_results.md)
-and [renderer study](../benchmarks/renderer_performance_20260907_results.md)
+and the renderer study in the [evidence archive](../benchmarks/archive/README.md)
 retain their own frozen sources, protocols, and measurement limits.

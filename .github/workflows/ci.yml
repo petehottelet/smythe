@@ -92,14 +92,14 @@ jobs:
           python benchmarks/run_asset_suite.py
           --out "$RUNNER_TEMP/asset-artifacts"
           --results "$RUNNER_TEMP/asset.json"
-      - name: Exercise glyph fan-out offline
+      - name: Exercise the Noumenon fan-out offline
         run: >-
-          python benchmarks/run_glyph_screensaver.py
+          python benchmarks/run_noumenon.py
           --glyphs 4
           --concurrencies 1,2
           --latency-s 0
-          --out "$RUNNER_TEMP/glyph-artifacts"
-          --results "$RUNNER_TEMP/glyph.json"
+          --out "$RUNNER_TEMP/noumenon-artifacts"
+          --results "$RUNNER_TEMP/noumenon.json"
       - name: Exercise original SVG generation and validation offline
         run: >-
           python benchmarks/run_svg_glyph_benchmark.py
@@ -107,27 +107,6 @@ jobs:
           --repeats 1 --render-sizes 64
           --out "$RUNNER_TEMP/svg-glyph-artifacts"
           --results "$RUNNER_TEMP/svg-glyph.json"
-      - name: Verify the persistent 3D world and camera
-        run: node screensaver/svg-preview/verify-model.mjs
-      - name: Verify all native catalog exports match the canonical SVGs
-        run: python screensaver/export_native_glyphs.py --check
-      - name: Verify reference presets and settings
-        run: |
-          node screensaver/svg-preview/verify-settings.mjs
-          node screensaver/svg-preview/verify-config.mjs
-          node screensaver/svg-preview/verify-timing.mjs
-          node screensaver/svg-preview/verify-lifecycle.mjs
-      - name: Verify browser receipt provenance checks
-        run: node screensaver/svg-preview/verify-provenance.mjs
-      - name: Verify browser helper process handling
-        run: node screensaver/svg-preview/verify-browser-command.mjs
-      - name: Verify benchmark receipt overwrite protection
-        run: node screensaver/svg-preview/verify-measure-guard.mjs
-      - name: Verify renderer measurements and browser identity
-        run: |
-          node screensaver/svg-preview/verify-measurement.mjs
-          node screensaver/svg-preview/verify-browser-metadata.mjs
-          node screensaver/svg-preview/verify-raf-control.mjs
 
   openai-responses-contract:
     runs-on: ubuntu-latest
@@ -194,21 +173,6 @@ jobs:
           "$RUNNER_TEMP/smythe-wheel/bin/python" -c "from pathlib import Path; import hashlib; Path('database.sha256').write_text(hashlib.sha256(Path('report.sqlite3').read_bytes()).hexdigest())"
           "$RUNNER_TEMP/smythe-wheel/bin/smythe" optimize inspect package-report --ledger report.sqlite3 --json --out report.html > after.json
           "$RUNNER_TEMP/smythe-wheel/bin/python" -c "from pathlib import Path; import hashlib,json; assert json.loads(Path('before.json').read_text()) == json.loads(Path('after.json').read_text()); assert hashlib.sha256(Path('report.sqlite3').read_bytes()).hexdigest() == Path('database.sha256').read_text(); page = Path('report.html').read_text(); assert '<html' in page and 'Content-Security-Policy' in page and 'package-report' in page; print('Installed report: unchanged inspection JSON and database bytes')"
-
-  skill-smoke:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-      - name: Build the skill from the tested commit
-        run: python tools/skill_archive.py --out "$RUNNER_TEMP/skill-dist"
-      - name: Verify against the exact released runtime
-        run: |
-          python -m venv "$RUNNER_TEMP/skill-runtime"
-          "$RUNNER_TEMP/skill-runtime/bin/python" -m pip install -r skills/repo-doctor/runtime.txt
-          python tools/skill_archive.py --verify "$RUNNER_TEMP/skill-dist/"*.zip --python "$RUNNER_TEMP/skill-runtime/bin/python"
 
   windows-smoke:
     runs-on: windows-latest

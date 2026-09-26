@@ -24,20 +24,20 @@ Use it for research pipelines, document production, and artifact generation
 where you need to see what will run and account for results. 
 
 <p align="center">
-  <img src="assets/glyph_rain/glyph-rain-loop.gif" alt="Animated rain showing only the 192 revised Smythe glyphs" width="900">
+  <img src="assets/noumenon/noumenon-loop.gif" alt="Animated Noumenon rain showing only the 192 revised Smythe glyphs" width="900">
 </p>
-<p align="center"><em><a href="screensaver/README.md">Glyph Rain</a> is Smythe's parallel-processing example: each glyph is an independent task, and Smythe runs the tasks concurrently.</em></p>
+<p align="center"><em><a href="benchmarks/noumenon_benchmark.md">Noumenon</a> is Smythe's parallel-processing example: each glyph is an independent task, and Smythe runs the tasks concurrently.</em></p>
 
-Example Task: Smythe generated **192 glyphs in 20.5 seconds, 56.2× faster than serial.** Smythe runs the glyph
-set as one 192-node fan-out graph, one node per glyph, with up to 64 nodes; run one node at a time, the same graph took 1,149.6 seconds. Controlled offline run with fixed latency per call measures Smythe's scheduling. Glyphs are compiled, validated, and exported in parallel: 256 SVG glyphs in 8.06 seconds
-median with eight process workers, 2.20× faster than one worker, with no API calls. [Fan-out benchmark](benchmarks/glyph_screensaver_benchmark.md) ·
+Example Task: Smythe generated **192 glyphs in 21.7 seconds, 52.3× faster than serial.** Smythe runs the glyph
+set as one 192-node fan-out graph, one node per glyph, with up to 64 nodes; run one node at a time, the same graph took 1,133.3 seconds. Controlled offline run with fixed latency per call measures Smythe's scheduling. Glyphs are compiled, validated, and exported in parallel: 256 SVG glyphs in 8.06 seconds
+median with eight process workers, 2.20× faster than one worker, with no API calls. [Fan-out benchmark](benchmarks/noumenon_benchmark.md) ·
 [SVG workflow benchmark](benchmarks/svg_v2_results.md)
 
 <p align="center">
-  <a href="screensaver/glyph-design-v2/contact-sheet-128.png">192-glyph sheet</a> ·
+  <a href="benchmarks/noumenon/catalog/contact-sheet-128.png">192-glyph sheet</a> ·
   <a href="benchmarks/partitions/glyph_svg_v2_256/catalog/contact-sheet-128.png">256-glyph sheet</a> ·
-  <a href="screensaver/glyph-design-v2/README.md">Individual SVGs</a> ·
-  <a href="screensaver/svg-preview/README.md">Web explorer</a> ·
+  <a href="benchmarks/noumenon/catalog/README.md">Individual SVGs</a> ·
+  <a href="https://github.com/petehottelet/noumenon">Noumenon screensaver</a> ·
   <a href="docs/current-materials.md">All materials</a>
 </p>
 
@@ -183,7 +183,7 @@ from the committed records.
 | [Interruption and recovery](benchmarks/durability_benchmark.md) | 8 repeated dispatches versus LangGraph's 32 | Three matched hard-kill trials with 64 operations |
 | [Generated topology](benchmarks/shape_suite.md) | 14% less wall time than a fixed pipeline, planning included | Five task shapes, three repetitions; wall time and observed quality |
 | [SVG catalog workflow](benchmarks/svg_v2_results.md) | 256 SVGs in 8.06 seconds median; 2.20× the serial baseline | Local compilation, validation, and export of authored designs; no API calls |
-| [Glyph generation at scale](benchmarks/glyph_screensaver_benchmark.md) | 56.2× faster than serial at concurrency 64 | Controlled offline runs at 64 to 256 nodes; simulated provider latency |
+| [Noumenon glyph fan-out](benchmarks/noumenon_benchmark.md) | 52.3× faster than serial at concurrency 64 | Controlled offline runs at 64 to 256 nodes; simulated provider latency |
 | [Jobs at 5,000 operations](benchmarks/jobs_scale_5000_20260907_results.md) | 5,000 accepted artifacts after a hard kill and recovery | One offline campaign with identical fixtures; correctness, not speed |
 
 ### Framework efficiency
@@ -249,15 +249,19 @@ Process workers trade more memory for shorter completion time:
   <img src="assets/benchmarks/svg_v2_memory.svg" alt="Measured parent-plus-worker memory at each catalog size and concurrency" width="900">
 </p>
 
-At concurrency 64, generating 192 glyphs took **20.5 seconds** versus 1,149.6
-seconds serially, **56.2× faster**, and all 192 validated as unique. This is a
+At concurrency 64, generating 192 glyphs took **21.7 seconds** versus 1,133.3
+seconds serially, **52.3× faster**, and all 192 validated as unique. This is a
 controlled offline measurement with 5.8 seconds of simulated provider latency
 per call; every 64-, 128-, 192- and 256-node run produced complete sets of
-valid, unique tiles. [Glyph protocol and records](benchmarks/glyph_screensaver_benchmark.md).
+valid, unique tiles. [Noumenon protocol and records](benchmarks/noumenon_benchmark.md).
 
 <p align="center">
-  <img src="assets/benchmarks/glyph_scaling.svg" alt="Controlled offline glyph generation at four graph widths, with all tiles valid and unique at every measured concurrency" width="900">
+  <img src="assets/benchmarks/noumenon_scaling.svg" alt="Controlled offline Noumenon glyph generation at four graph widths, with all tiles valid and unique at every measured concurrency" width="900">
 </p>
+
+Live GPT Image lanes generated the same 192 glyphs as transparent PNGs, and
+traced them into SVGs, three calls at a time within the account's image rate
+limit. [Live lanes](benchmarks/noumenon_benchmark.md#live-image-lanes).
 
 ### Jobs at 5,000 operations
 
@@ -276,16 +280,17 @@ identical fixtures, so this shows recovery correctness, not speed.
 
 ## Project status
 
-**Smythe 0.8.2** is the current library release. See the
-[release notes and upgrade guide](docs/release-0.8.2.md).
+**Smythe 0.9.0** is the current library release. See the
+[release notes and upgrade guide](docs/release-0.9.0.md).
 
 Next priorities are complete-deliverable checks, broader external-task
 benchmarks, and separately controlled Astra scheduler and framework studies.
 See the [roadmap](ROADMAP.md) for status and acceptance criteria.
 
-The [Glyph Rain screensaver](screensaver/README.md) is an artifact-generation
-showcase with source builds and a [web explorer](screensaver/svg-preview/README.md).
-Screensaver distribution is source only, but you're welcome to compile your own binary.
+The [Noumenon screensaver](https://github.com/petehottelet/noumenon) renders
+Smythe's glyph catalog, with a web explorer and native Windows, macOS and Linux
+ports in its own repository. Distribution is source only, but you're welcome to
+compile your own binary.
 
 [Documentation](docs/index.md) · [Contributing](CONTRIBUTING.md) ·
 [Releases](https://github.com/petehottelet/smythe/releases) ·

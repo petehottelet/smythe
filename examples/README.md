@@ -4,7 +4,7 @@ Examples 01–05, 08–14, and the acquisition-diligence example run offline
 out of the box. A built-in `DemoProvider` returns deterministic responses so
 you can inspect planning, fan-out, budgets, recovery, and synthesis without an
 API key. Examples 06 and 07 are live MCP integration tours. These examples
-target [Smythe 0.8.2](https://github.com/petehottelet/smythe/releases/tag/v0.8.2)
+target [Smythe 0.9.0](https://github.com/petehottelet/smythe/releases/tag/v0.9.0)
 and use files from the repository. Run them from its root:
 
 ```bash
@@ -14,13 +14,14 @@ python examples/14_durable_text_workflow.py
 
 Example 14 explicitly selects fixture responses even when API keys are set.
 It demonstrates planning, execution and recovery with zero provider calls.
-The [0.8.2 release guide](../docs/release-0.8.2.md) covers upgrading from 0.8.1,
-the [0.8.1 guide](../docs/release-0.8.1.md) upgrading from 0.8.0, and the
+The [0.9.0 release guide](../docs/release-0.9.0.md) covers upgrading from 0.8.2,
+the [0.8.2 guide](../docs/release-0.8.2.md) upgrading from 0.8.1, the
+[0.8.1 guide](../docs/release-0.8.1.md) upgrading from 0.8.0, and the
 [0.8.0 guide](../docs/release-0.8.0.md) the low-level Autotune migration.
 
 The durable artifact-job example uses the installed CLI. Install its optional
 dependencies with `pip install -e ".[jobs]"` from this checkout, or
-`pip install "smythe[jobs]==0.8.2"` for the release package. The example is
+`pip install "smythe[jobs]==0.9.0"` for the release package. The example is
 completely offline and its approval token is bound to the exact manifest and
 budget:
 
@@ -46,13 +47,6 @@ retains a full offline fixture campaign on the earlier schema-v3 runtime;
 it verifies safe resume and explicit unknown rerolls separately from the
 current operator commands and schema-v4 namespaces.
 
-For local graphics measurements, the [renderer protocol](../benchmarks/renderer_performance_20260907.md)
-defines six fresh browser sessions and validates their raw timing receipts.
-It uses no provider calls and keeps rendering separate from glyph generation.
-The [completed study](../benchmarks/renderer_performance_20260907_results.md)
-retains all six primary sessions, their missed pacing target, a separate browser
-cadence control, and the ten-minute travel/resize check.
-
 The repository's [Autotune concurrency command](../docs/optimize.md#run-the-offline-campaign)
 remains offline. Its [campaign ownership](../docs/optimize.md#campaign-ownership)
 update acquires and renews a lease automatically; the CLI needs no new flags.
@@ -75,23 +69,23 @@ Use a new output filename for each export.
 
 | Example | What it shows |
 |---|---|
-| [Packages and typing](../docs/distribution.md) | Build and test a slim source package, verify typed sync/async consumers against an installed wheel, and install the standalone Repo Doctor skill. |
+| [Packages and typing](../docs/distribution.md) | Build and test a slim source package and verify typed sync/async consumers against an installed wheel. |
 | [Current materials](../docs/current-materials.md) | Revised 192/256 contact sheets, detail sheets, animation, still image, native source exports, and each benchmark's evidence status. |
 | [GPT-6 Astra quickstart](../README.md#quickstart) | Generate, inspect, and execute a text-only task graph through native Responses, with a $5 run allowance, concurrency eight, and planning included in the SQLite ledger. |
 | [Native Astra/Sol Responses](../docs/openai-responses.md) | Smythe counts and quotes an exact request before generation, records native token prices, and retains function-tool continuation and failed-response receipts. |
 | [Astra campaign preparation](../benchmarks/astra_benchmark_plan.md#prepared-experiment) | Validate 13 original task/source packs and reproduce the 12-pilot/200-main schedule locally, with no API calls. Factual checks remain separate from quality scoring. |
-| [Glyph contour study](../screensaver/glyph-design-v2/README.md) | Inspect all 192 v2 glyphs, their small-size sheets, and individual SVGs. Current previews and native source exports use v2. [Matched 192/256 workflow measurements](../benchmarks/svg_v2_results.md) cover compilation, validation and export; the live catalog remains 192. |
+| [Glyph contour study](../benchmarks/noumenon/catalog/README.md) | Inspect all 192 v2 glyphs, their small-size sheets, and individual SVGs. Current previews and native source exports use v2. [Matched 192/256 workflow measurements](../benchmarks/svg_v2_results.md) cover compilation, validation and export; the live catalog remains 192. |
 | [Astra findings and reproduction](../benchmarks/astra_findings.md) | Read the completed comparison and independently check archived members, native accounting, human-output bindings and both charts without provider calls. |
 | [Astra campaign runners and results](../benchmarks/results/astra_20260913_main/README.md) | Inspect all 200 matched outcomes (191 automatically accepted), both native ledgers, blind judgments and the full retained cost reserve. Human review accepts all eight flagged answers at 4/4; the original automatic scores remain unchanged. Reproduce the analysis without paid calls; [runner guide](../benchmarks/astra_runtime.md). |
 | [Planner-only instructions](../docs/workflow-accounting.md#freeze-graph-limits) | Bind graph policy through `LLMArchitect.planning_instructions`, with answer requirements kept in `Task.constraints`. |
 | [Fable 5.1 study](../benchmarks/fable_51_benchmark_plan.md) | [Native and Code pilots](../benchmarks/results/fable_20260914_pilot/README.md) and the [ten-task Code Workflow study](../benchmarks/results/fable_code_20260914/README.md) have complete evidence. Human pilot ratings gate the 100 native main workflows and matched comparison. |
 | [Native Claude Messages](../docs/anthropic-messages.md) | Fable text workflows with exact cache billing, retained raw responses, and local recovery. |
-| [Glyph Rain](../screensaver/README.md) | [Animated preview and export record](../screensaver/svg-preview/README.md#readme-animation). A 192-node artifact workflow with native ports using 56 reference and 192 revised v2 SVG shapes, mixed 90/10. Build the native ports from source; no precompiled binaries are distributed. The [web explorer](../screensaver/svg-preview/README.md) adapts the MIT reference renderer and base artwork, with Matrix green rain, presets, VT323 pixel controls, and a Trajan Bold outline logo. Browser interaction and stability checks pass; the [headless timing report](../benchmarks/renderer_performance_20260907_results.md) preserves its missed pacing target. [Current 192/256 workflow measurements](../benchmarks/svg_v2_results.md) cover the authored v2 method; [controlled 64–256-node scaling](../benchmarks/glyph_screensaver_benchmark.md) has its own protocol. |
+| [Noumenon fan-out](../benchmarks/noumenon_benchmark.md) | Smythe's parallel-processing example: a 192-node artifact workflow in which each glyph is an independent task, validated objectively and assembled into an atlas, still, GIF and HTML page. [Controlled 64–256-node scaling](../benchmarks/noumenon_benchmark.md#width-scaling-from-64-to-256-nodes) has its own protocol; [current 192/256 workflow measurements](../benchmarks/svg_v2_results.md) cover the authored v2 method. The [Noumenon screensaver](https://github.com/petehottelet/noumenon) renders the catalog with a web explorer and source-only native ports. |
 | [01_quickstart_yaml.py](01_quickstart_yaml.py) | Load a declarative YAML DAG ([01_pipeline.yaml](01_pipeline.yaml)) with [halt, retry, and skip policies](../docs/execution.md) and per-node timeouts, execute it in parallel. Iterative graph traversal also supports [deep dependency chains](../docs/execution.md#deep-graphs). |
 | [02_dynamic_planning.py](02_dynamic_planning.py) | The `LLMArchitect` designs the execution graph from the task itself. Inspect it, then execute with the [complete task snapshot](../docs/tasks.md). |
 | [03_parallel_budget.py](03_parallel_budget.py) | Eight-node broadcast under a USD budget cap with `max_concurrency=3`, a per-node cost breakdown, and [strict cost guardrails](../docs/budgets.md). |
 | [04_resume_after_crash.py](04_resume_after_crash.py) | Resume preserves completed nodes and their costs. [File checkpoints](../docs/checkpoint-format.md) flush complete snapshots and use independent temporary files for atomic publication. [Verification recovery](../docs/verifier.md#recovery-and-concurrent-work) completes pending rejection and regeneration decisions before dispatch. |
-| [05_mcp_filesystem.py](05_mcp_filesystem.py) | MCP tool use, fully offline: an agent reads real files through a bundled MCP server ([mcp_file_server.py](mcp_file_server.py)) via the bounded tool loop. Needs `pip install "smythe[mcp]==0.8.2"`. |
+| [05_mcp_filesystem.py](05_mcp_filesystem.py) | MCP tool use, fully offline: an agent reads real files through a bundled MCP server ([mcp_file_server.py](mcp_file_server.py)) via the bounded tool loop. Needs `pip install "smythe[mcp]==0.9.0"`. |
 | [06_mcp_github.py](06_mcp_github.py) | The real GitHub MCP server with a mandatory tool allowlist and `env_passthrough` for the token. Env-gated: needs `GITHUB_PERSONAL_ACCESS_TOKEN`, an LLM key, and npx. |
 | [07_mcp_saas.py](07_mcp_saas.py) | Any SaaS MCP server over streamable HTTP (Linear, Notion, ...), configured entirely by environment variables. Env-gated. |
 | [08_learning_loop.py](08_learning_loop.py) | Record run 1 in `PlannerMemory` and recall it into run 2's planning prompt; the Architect returns a leaner plan (8 nodes → 3). The [history validation](../docs/architecture.md#learning-loop) skips malformed recalled fields and labels summed node time. |

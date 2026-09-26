@@ -67,9 +67,19 @@ def test_environment_snapshot_does_not_confuse_stale_install_with_source(monkeyp
 
 
 def test_source_snapshot_records_revision_and_dirty_status(monkeypatch):
-    replies = iter([SimpleNamespace(stdout="abc123\n"), SimpleNamespace(stdout=" M file.py\n")])
+    replies = iter([SimpleNamespace(stdout="abc123\n"),
+                    SimpleNamespace(stdout=" M file.py\n?? out.json\n")])
     monkeypatch.setattr(artifact_records.subprocess, "run", lambda *a, **kw: next(replies))
-    assert artifact_records._source_control_snapshot() == {"revision": "abc123", "dirty": True}
+    assert artifact_records._source_control_snapshot() == {
+        "revision": "abc123", "dirty": True, "untracked_files": 1}
+
+
+def test_untracked_outputs_do_not_mark_the_sources_dirty(monkeypatch):
+    replies = iter([SimpleNamespace(stdout="abc123\n"),
+                    SimpleNamespace(stdout="?? benchmarks/results/a.json\n?? smoke.json\n")])
+    monkeypatch.setattr(artifact_records.subprocess, "run", lambda *a, **kw: next(replies))
+    assert artifact_records._source_control_snapshot() == {
+        "revision": "abc123", "dirty": False, "untracked_files": 2}
 
 
 def test_source_snapshot_remains_usable_without_git(monkeypatch):
@@ -77,4 +87,5 @@ def test_source_snapshot_remains_usable_without_git(monkeypatch):
         raise subprocess.CalledProcessError(1, "git")
 
     monkeypatch.setattr(artifact_records.subprocess, "run", missing_git)
-    assert artifact_records._source_control_snapshot() == {"revision": None, "dirty": None}
+    assert artifact_records._source_control_snapshot() == {
+        "revision": None, "dirty": None, "untracked_files": None}

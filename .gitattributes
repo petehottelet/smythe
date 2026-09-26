@@ -15,58 +15,18 @@
 /benchmarks/svg_v2_evidence.py text eol=lf
 /benchmarks/svg_v2_protocol.md text eol=lf
 /docs/data/glyph-style-summary.json text eol=lf
-/screensaver/svg-preview/*.js text eol=lf
-/screensaver/svg-preview/*.mjs text eol=lf
-/screensaver/svg-preview/*.html text eol=lf
-/screensaver/svg-preview/*.css text eol=lf
-
-# Preserve pinned reference notices, code, and artwork bytes.
-/screensaver/import_reference_glyphs.py text eol=lf
-/screensaver/svg-preview/reference/* text eol=lf
-/screensaver/svg-preview/reference/*.png -text
-/screensaver/svg-preview/engine/** text eol=lf
-/screensaver/svg-preview/lib/** text eol=lf
-/screensaver/svg-preview/*.png -text
-/screensaver/export_generated_sdf.py text eol=lf
-/screensaver/svg-preview/generated-sdf.json text eol=lf
-
-# Preserve the outlined explorer logo and bundled font provenance.
-/screensaver/svg-preview/wordmark.svg text eol=lf
-/screensaver/svg-preview/fonts/*.ttf -text
-/screensaver/svg-preview/fonts/*.txt text eol=lf
-/screensaver/svg-preview/fonts/*.json text eol=lf
 
 # These measured files include original CRLF bytes. Preserve their recorded hashes.
-/screensaver/svg-preview/settings.css -text
 /assets/wordmark.svg -text
-/benchmarks/partitions/glyph_rain_reference_v1/*.json -text
-/benchmarks/partitions/glyph_rain_reference_v1/*.zip -text
-/benchmarks/partitions/glyph_svg_v1/renderer-v1/** -text
 
-# Native exports and receipts carry cross-platform catalog and package hashes.
-/screensaver/export_native_glyphs.py text eol=lf
-/screensaver/native-catalog.json text eol=lf
-/screensaver/windows/GlyphData.cs text eol=lf
-/screensaver/macos/glyphs.json text eol=lf
-/screensaver/linux/glyph_data.h text eol=lf
-/screensaver/glyph_design_v2.py text eol=lf
-/screensaver/glyph_contours_v2.json text eol=lf
-/screensaver/glyph-design-v2/*.svg text eol=lf
-/screensaver/glyph-design-v2/*.json text eol=lf
-/screensaver/glyph-design-v2/*.js text eol=lf
-/screensaver/glyph-design-v2/*.png -text
-/screensaver/glyphs.js text eol=lf
-/screensaver/svg-preview/preview-animation.json text eol=lf
-/assets/glyph_rain/glyph_specimens.svg text eol=lf
-/screensaver/dist/*.json text eol=lf
-/screensaver/dist/verification/*.json text eol=lf
-/screensaver/dist/verification/*.md text eol=lf
-/screensaver/verification/*.py text eol=lf
-
-# Current renderer protocols and receipts retain their measured bytes.
-/benchmarks/renderer_performance_20260907.md text eol=lf
-/benchmarks/renderer_cadence_control_20260907.md text eol=lf
-/benchmarks/results/glyph_rain_regl_20260907*.json -text
+# The Noumenon generator and catalog carry the SVG hashes that benchmarks record.
+/benchmarks/noumenon/glyph_design_v2.py text eol=lf
+/benchmarks/noumenon/glyph_contours_v2.json text eol=lf
+/benchmarks/noumenon/catalog/*.svg text eol=lf
+/benchmarks/noumenon/catalog/*.json text eol=lf
+/benchmarks/noumenon/catalog/*.js text eol=lf
+/benchmarks/noumenon/catalog/*.png -text
+/assets/noumenon/noumenon_specimens.svg text eol=lf
 
 # Recovery evidence preserves original raw bytes and reproducible review code.
 /benchmarks/archive_jobs_scale.py text eol=lf

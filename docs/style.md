@@ -5,9 +5,9 @@ the product imagery and live CI status described below.
 Landing-page assets should feel like a well-set title page: decisive hierarchy,
 precise rules, generous white space, and no decorative interface chrome.
 
-The Glyph Rain screenshot, atlas, animation, and explorer controls are the
-intentional product color exception. They show the green product artifact itself. Every graph, chart,
-diagram, landing-page wordmark, and callout uses black and white only.
+The Noumenon animation is the intentional product color exception: it shows
+the green product artifact itself. Every graph, chart, diagram, landing-page
+wordmark, and callout uses black and white only.
 
 ## Palette
 
@@ -53,7 +53,7 @@ double rule, or a dashed outline on white.
 ## Diagrams
 
 Use hand-authored SVG for landing-page diagrams whose routing and hierarchy
-matter. Catalog-bound plates, such as the Glyph Rain specimens, should be
+matter. Catalog-bound plates, such as the Noumenon specimens, should be
 rendered deterministically from their committed source data. Use Mermaid for
 detailed documentation diagrams that must track code; keep it off the landing
 page when a polished example graph already tells the story.
@@ -92,16 +92,10 @@ a static passing badge.
 
 ## Explorer controls
 
-Use VT323 pixel lettering for explorer headings, labels, numerals, buttons,
-inputs, and help text. The separate SMYTHE logo uses outlined Trajan Pro Bold,
-with generous black padding above and below it. Keep text controls borderless,
-without interface glow, corner ornaments, or stepped edges.
-Use primary `#37FF6E`, bright `#9CFFBC`, and black, following
-[hottelet.com](https://www.hottelet.com/). Focus and selection use visible
-outlines or solid fills. These UI colors do not change the rain's 137°
-Matrix green body grade, `#A2FFD8` leading glyphs, or bloom.
-This explorer treatment does not change the chart typography or the README's
-strictly black-and-white charts.
+The Noumenon web explorer's controls follow their own pixel-lettering style,
+documented in the [Noumenon repository](https://github.com/petehottelet/noumenon).
+It does not change the chart typography or the README's strictly
+black-and-white charts.
 
 ## Operator reports
 

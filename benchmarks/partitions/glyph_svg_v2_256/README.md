@@ -43,4 +43,4 @@ separate benchmark/review set, not a replacement native package.
 Style research and the live effect credit [m8e/matrix-rain](https://github.com/m8e/matrix-rain)
 and Rezmason. These sheets contain only Smythe's original contours. The
 licensed base artwork remains separate with its
-[MIT notice and provenance](../../../screensaver/svg-preview/reference/README.md).
+[MIT notice and provenance](https://github.com/petehottelet/noumenon/blob/main/svg-preview/reference/README.md).

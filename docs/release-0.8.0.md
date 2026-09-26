@@ -30,7 +30,7 @@ pip install "smythe[anthropic]==0.8.0"
   unknown-cost bounds. Generated plans increased mean time on the study's reused
   task set; these records do not support a general speedup claim.
 
-Full behavior and fixes are in the [changelog](../CHANGELOG.md#080---2026-09-21).
+Full behavior and fixes are in the [changelog](../CHANGELOG-ARCHIVE.md#080---2026-09-21).
 
 ## Upgrade from 0.7
 

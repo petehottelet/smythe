@@ -59,8 +59,8 @@ gates pass. These checks establish valid, stable, distinct artifacts within
 the catalog; they do not score aesthetic quality or universal originality.
 
 The first 192 authored SVGs are unchanged. The additional 64 use the same
-cut terminals, broad strokes and deliberate spacing. The live web/native
-screensaver catalog remains 192 originals; the extension is a separate
+cut terminals, broad strokes and deliberate spacing. The Noumenon
+screensaver's live catalog remains 192 originals; the extension is a separate
 benchmark and review artifact.
 
 ## Resource tradeoff

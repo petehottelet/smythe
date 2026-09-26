@@ -2,14 +2,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
-# Python build output and local native build products.
+# Python build output.
 /dist/
-/screensaver/dist/*
-!/screensaver/dist/.gitattributes
-!/screensaver/dist/README.md
-!/screensaver/dist/BUILD_INFO.json
-!/screensaver/dist/SHA256SUMS
-!/screensaver/dist/verification/
 build/
 *.egg-info/
 *.egg
@@ -51,7 +45,5 @@ Thumbs.db
 /docs/benchmark-delivery-audit-*.md
 /docs/distribution-plan-review-*.md
 /docs/data/distribution-review-*.json
-/docs/glyph-rain-plan.md
-/docs/glyph-rain-parity-plan.md
 /docs/windows-defender-*.md
 .claude/

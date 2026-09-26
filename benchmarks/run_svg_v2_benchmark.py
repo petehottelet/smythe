@@ -29,7 +29,7 @@ from benchmarks.run_svg_glyph_benchmark import (  # noqa: E402
 from benchmarks.svg_glyph_measurements import find_near_matches, measure_glyph  # noqa: E402
 from benchmarks.svg_glyphs import render_svg  # noqa: E402
 from benchmarks.svg_v2_evidence import PROTOCOL, review_record  # noqa: E402
-from screensaver.glyph_design_v2 import OUTLINES, generate_glyph  # noqa: E402
+from benchmarks.noumenon.glyph_design_v2 import OUTLINES, generate_glyph  # noqa: E402
 from smythe import Swarm  # noqa: E402
 from smythe.graph import NodeStatus  # noqa: E402
 from smythe.provider import CompletionResult, Provider  # noqa: E402
@@ -46,7 +46,7 @@ def source_hashes() -> dict:
     files = [p for p in (ROOT / "smythe").rglob("*.py")
              if "tmp" not in p.relative_to(ROOT).parts]
     files += [Path(__file__), EXTRA_PATH, *[ROOT / name for name in (
-        "screensaver/glyph_design_v2.py", "screensaver/glyph_contours_v2.json",
+        "benchmarks/noumenon/glyph_design_v2.py", "benchmarks/noumenon/glyph_contours_v2.json",
         "benchmarks/svg_glyphs.py", "benchmarks/svg_glyph_measurements.py",
         "benchmarks/run_svg_glyph_benchmark.py", "benchmarks/artifact_records.py",
         "benchmarks/svg_v2_evidence.py",
