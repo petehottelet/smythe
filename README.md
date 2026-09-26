@@ -101,9 +101,9 @@ calling the provider again.
 
 ### With a real model
 
-Install a provider extra, set `OPENAI_API_KEY`, and let
+Install a provider extra and set its API key. With `OPENAI_API_KEY`,
 [GPT-6 Astra](https://developers.openai.com/api/docs/models/gpt-6-astra)
-write the plan and the answers:
+writes the plan and the answers:
 
 ```bash
 pip install "smythe[openai]"
@@ -133,13 +133,46 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
     print(result.output)
 ```
 
-This makes paid API calls under a **$50 run allowance**. The SQLite ledger
-accounts for planning and execution, reserves requests before dispatch, and
-retains responses for recovery. See [budget scope](docs/budgets.md) and
-[durable text workflows](docs/workflow-accounting.md). Claude and Gemini
-install the same way, with `smythe[anthropic]` and `smythe[gemini]`; durable run
-stores accept the OpenAI Responses and Claude Messages providers.
-[More examples](examples/README.md).
+With `ANTHROPIC_API_KEY`,
+[Claude Fable 5.1](https://platform.claude.com/docs/en/about-claude/models/overview)
+does the same through the native Claude Messages provider:
+
+```bash
+pip install "smythe[anthropic]"
+```
+
+```python
+from smythe import AnthropicMessagesProvider, SQLiteWorkflowStore, Swarm, Task
+
+with SQLiteWorkflowStore("smythe-runs.db") as store:
+    swarm = Swarm(
+        model="claude-fable-5-1",
+        provider=AnthropicMessagesProvider(
+            reasoning_effort="medium",
+            max_output_tokens=8192,
+        ),
+        run_store=store,
+        max_budget_usd=50.00,
+        parallel=True,
+        max_concurrency=8,
+    )
+    graph = swarm.plan(Task(
+        goal="Compare SQLite, PostgreSQL, and DuckDB for a local analytics app.",
+        constraints=["Stay under 400 words", "Recommend one database"],
+    ))
+    print(graph)
+    result = swarm.execute(graph)
+    print(result.output)
+```
+
+Both examples make paid API calls under a **$50 run allowance**. The SQLite
+ledger accounts for planning and execution, reserves requests before dispatch,
+and retains responses for recovery. See [budget scope](docs/budgets.md),
+[durable text workflows](docs/workflow-accounting.md) and
+[native Claude Messages](docs/anthropic-messages.md), which covers the
+`claude-fable-5-1` text workflows it supports. Gemini installs the same way,
+with `smythe[gemini]`; durable run stores accept the OpenAI Responses and Claude
+Messages providers. [More examples](examples/README.md).
 
 ## How it works
 
