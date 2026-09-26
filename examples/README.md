@@ -71,7 +71,7 @@ Use a new output filename for each export.
 |---|---|
 | [Packages and typing](../docs/distribution.md) | Build and test a slim source package and verify typed sync/async consumers against an installed wheel. |
 | [Current materials](../docs/current-materials.md) | Revised 192/256 contact sheets, detail sheets, animation, still image, native source exports, and each benchmark's evidence status. |
-| [GPT-6 Astra quickstart](../README.md#quickstart) | Generate, inspect, and execute a text-only task graph through native Responses, with a $5 run allowance, concurrency eight, and planning included in the SQLite ledger. |
+| [GPT-6 Astra and Claude Fable 5.1 quickstarts](../README.md#with-a-real-model) | Generate, inspect, and execute a text-only task graph through native Responses or native Claude Messages, with a $50 run allowance, concurrency eight, and planning included in the SQLite ledger. |
 | [Native Astra/Sol Responses](../docs/openai-responses.md) | Smythe counts and quotes an exact request before generation, records native token prices, and retains function-tool continuation and failed-response receipts. |
 | [Astra campaign preparation](../benchmarks/astra_benchmark_plan.md#prepared-experiment) | Validate 13 original task/source packs and reproduce the 12-pilot/200-main schedule locally, with no API calls. Factual checks remain separate from quality scoring. |
 | [Glyph contour study](../benchmarks/noumenon/catalog/README.md) | Inspect all 192 v2 glyphs, their small-size sheets, and individual SVGs. Current previews and native source exports use v2. [Matched 192/256 workflow measurements](../benchmarks/svg_v2_results.md) cover compilation, validation and export; the live catalog remains 192. |
