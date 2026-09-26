@@ -127,6 +127,15 @@ def test_procedural_provider_returns_one_matching_tile_per_concurrent_prompt():
     assert len(hashes) == GLYPH_COUNT
 
 
+def test_transparent_prompts_select_the_same_procedural_glyphs():
+    provider = ProceduralGlyphProvider(latency_s=0)
+    spec = GLYPH_SPECS[7]
+    prompt = glyph_prompt(spec, background="transparent")
+    assert "transparent background" in prompt and "black" not in prompt
+    asyncio.run(provider.complete("", prompt, "procedural-glyph-v1"))
+    assert provider.calls == [spec.id]
+
+
 def test_normalize_tile_contains_rectangular_input_on_transparent_square(tmp_path):
     source = io.BytesIO()
     image = Image.new("RGB", (240, 80), (2, 4, 3))

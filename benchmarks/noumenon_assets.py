@@ -594,14 +594,23 @@ def get_glyph_specs(count: int = GLYPH_COUNT) -> tuple[GlyphSpec, ...]:
     return GLYPH_CATALOG_SPECS[:count]
 
 
-def glyph_prompt(spec: GlyphSpec) -> str:
-    """Return a stable prompt that lets a concurrent provider select a glyph."""
+def glyph_prompt(spec: GlyphSpec, *, background: str = "auto") -> str:
+    """Return a stable prompt that lets a concurrent provider select a glyph.
 
+    A transparent run asks for a transparent background; asking for black
+    there would contradict the request's ``background`` parameter.
+    """
+
+    field = (
+        "a fully transparent background with no fill or backdrop"
+        if background == "transparent"
+        else "a plain solid black background"
+    )
     return (
         f"CYBER_GLYPH_ID={spec.id}\n"
         "Draw one fictional calligraphic cyber glyph: bold luminous green "
-        "brush strokes (bars, stems, hooks, curves) centered on a plain "
-        "solid black background. Flat 2D mark only - no tile, no frame, no "
+        f"brush strokes (bars, stems, hooks, curves) centered on {field}. "
+        "Flat 2D mark only - no tile, no frame, no "
         "border, no glass, no 3D object, no scene, no background art, and "
         "no real letters, kanji, kana, arabic script, existing symbols, "
         "logos, or branded marks. Invent the mark."

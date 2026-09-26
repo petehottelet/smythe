@@ -125,6 +125,17 @@ def test_build_graph_creates_one_independent_bounded_node_per_glyph():
     assert all(node.metadata["estimated_cost_usd"] == 0.125 for node in graph.nodes)
 
 
+def test_transparent_graph_prompts_ask_for_transparency_not_black():
+    default = build_graph(glyph_count=2, estimated_cost_per_call_usd=0)
+    transparent = build_graph(glyph_count=2, estimated_cost_per_call_usd=0, background="transparent")
+
+    assert all("solid black background" in node.label for node in default.nodes)
+    for node in transparent.nodes:
+        assert "fully transparent background" in node.label
+        assert "black background" not in node.label
+        assert f"CYBER_GLYPH_ID={node.id}" in node.label
+
+
 def test_build_graph_supports_256_unique_glyph_nodes():
     graph = build_graph(glyph_count=256, estimated_cost_per_call_usd=0)
 

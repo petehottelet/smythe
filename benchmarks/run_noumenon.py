@@ -95,13 +95,15 @@ TRANSPARENT_MODEL_EXAMPLE = "gpt-image-2.5-flare"
 _OPAQUE_ONLY_MODEL = re.compile(r"gpt-image-2(?:-\d{4}-\d{2}-\d{2})?")
 
 
-def build_graph(*, glyph_count: int, estimated_cost_per_call_usd: float) -> ExecutionGraph:
+def build_graph(
+    *, glyph_count: int, estimated_cost_per_call_usd: float, background: str = "auto"
+) -> ExecutionGraph:
     """Build one independent Smythe node per fictional glyph."""
     specs = get_glyph_specs(glyph_count)
     nodes = [
         Node(
             id=spec.id,
-            label=glyph_prompt(spec),
+            label=glyph_prompt(spec, background=background),
             failure_policy=FailurePolicy.HALT,
             max_retries=0,
             metadata={"estimated_cost_usd": estimated_cost_per_call_usd},
@@ -345,6 +347,7 @@ async def _run_once(
     graph = build_graph(
         glyph_count=glyph_count,
         estimated_cost_per_call_usd=max_cost_per_call_usd,
+        background=background,
     )
     run_dir = out / "runs" / f"concurrency-{concurrency}"
     swarm = Swarm(
