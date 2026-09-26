@@ -9,7 +9,7 @@ from shapely import LineString, Point, box
 
 from benchmarks.svg_glyph_measurements import find_near_matches, measure_glyph
 from benchmarks.svg_glyphs import render_svg, validate_svg
-from screensaver.glyph_design_v2 import COUNT, generate_glyph, geometry, write_study
+from benchmarks.noumenon.glyph_design_v2 import COUNT, generate_glyph, geometry, write_study
 
 
 @pytest.mark.parametrize("index", range(COUNT))
@@ -112,15 +112,3 @@ def test_catalog_has_no_aligned_or_reflected_repeats():
     assert result["compared_pairs"] == 18336
     assert not result["aligned_exact_pairs"]
     assert not result["near_matches"]
-
-
-def test_current_web_catalog_and_source_exports_use_the_revised_contours():
-    from pathlib import Path
-    from screensaver.export_glyphs import _payload
-    from screensaver.export_native_glyphs import ORIGINAL, REPO_ROOT
-    assert ORIGINAL == Path("screensaver/glyph-design-v2")
-    current = json.loads((REPO_ROOT / ORIGINAL / "catalog.json").read_text(encoding="utf-8"))
-    assert _payload()["paths"] == [g["paths"] for g in current["glyphs"]]
-    browser = (REPO_ROOT / "screensaver/svg-preview/glyphs.js").read_text(encoding="utf-8")
-    assert json.loads(browser.split(" = ", 1)[1].strip().removesuffix(";")) == current
-    assert [g["svg_sha256"] for g in current["glyphs"]] == [generate_glyph(i)["sha256"] for i in range(COUNT)]

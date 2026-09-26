@@ -552,7 +552,7 @@ operations required explicit rerolls; their original unknown call records remain
 in the ledger. Its frozen schema-v3 runtime predates
 the schema-v4 namespaces and operator commands documented above.
 
-The related [glyph screensaver benchmark](../benchmarks/glyph_screensaver_benchmark.md)
+The related [Noumenon fan-out benchmark](../benchmarks/noumenon_benchmark.md)
 is one concrete use of Smythe's general-purpose artifact execution model. It
 uses a 192-node `BROADCAST_REDUCE` graph to generate 192 original cyber-glyph
 tiles, validate dimensions and uniqueness, and assemble a 1920x1080 still,

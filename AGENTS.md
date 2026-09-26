@@ -20,8 +20,10 @@ behavior belongs in the linked guide for that subsystem.
 - Treat committed benchmark records as the source of truth for numbers.
 - A README headline may cite only a current campaign that its benchmark report
   marks as claimable and free of known measurement defects.
-- Keep diagnostic and superseded campaigns in the repository, but label their
-  evidence status and do not promote them as current results.
+- Keep diagnostic and superseded campaigns available with their evidence status
+  labeled, either in the tree or byte for byte in a SHA-256-pinned evidence
+  archive that `benchmarks/archive/` points to. Build archives with
+  `tools/evidence_archive.py`. Do not promote them as current results.
 - Prefer exact, positive claims such as “19% lower measured cost” over broad
   superlatives. Preserve scope in the linked protocol.
 - Render landing-page charts from committed records with

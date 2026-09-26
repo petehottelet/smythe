@@ -24,7 +24,31 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
-No unreleased changes.
+### Changed
+
+- **The glyph fan-out example is now Noumenon.** The harness is
+  `benchmarks/run_noumenon.py` (assets in `benchmarks/noumenon_assets.py`), its
+  records are `benchmarks/results/noumenon_*.json`, its report is
+  [`benchmarks/noumenon_benchmark.md`](benchmarks/noumenon_benchmark.md), and its
+  charts are `assets/benchmarks/noumenon_scaling.svg` and `assets/noumenon/`.
+- **The screensaver apps moved to the
+  [Noumenon repository](https://github.com/petehottelet/noumenon)**: the web
+  explorer, the Windows, macOS and Linux ports, the catalog exporters, their
+  tests and the screensaver workflow. The glyph generator, its contours and the
+  192-glyph catalog stay in Smythe under `benchmarks/noumenon/`, where the SVG
+  workflow benchmark imports them.
+- Released changelog sections 0.1.0 through 0.8.1 moved, unchanged, to
+  [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md).
+
+### Added
+
+- `tools/evidence_archive.py` builds a deterministic archive of retired
+  benchmark evidence from git history and verifies it against a committed
+  pointer, every member's SHA-256 and, optionally, the recorded commit.
+  [`benchmarks/archive/`](benchmarks/archive/README.md) pins the first archive:
+  the first glyph fan-out campaign, the browser renderer timing study,
+  superseded glyph partitions, review records and the withdrawn native package
+  receipts, read from `v0.8.2`.
 
 ## [0.8.2] - 2026-09-25
 

@@ -34,8 +34,7 @@ Follow [RELEASING.md](https://github.com/petehottelet/smythe/blob/main/RELEASING
 - [ ] The version commit is pushed and its CI checks pass; tag `vX.Y.Z` points to that tested commit.
 - [ ] `.github/workflows/publish.yml` exists and uses the GitHub environment `pypi` with `id-token: write`.
 - [ ] The GitHub release uses the matching tag and reviewed release notes.
-- [ ] Current contact sheets, previews, source exports, charts, and documentation pass the [materials check](https://github.com/petehottelet/smythe/blob/main/docs/current-materials.md#completion-check-for-every-benchmark-update).
-- [ ] Screensaver distribution remains source-only while precompiled releases are paused; native source exports match `screensaver/native-catalog.json` and no compiled native packages are attached.
+- [ ] Current contact sheets, previews, charts, and documentation pass the [materials check](https://github.com/petehottelet/smythe/blob/main/docs/current-materials.md#completion-check-for-every-benchmark-update).
 
 ## PyPI
 

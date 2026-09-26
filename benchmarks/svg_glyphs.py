@@ -1,4 +1,4 @@
-"""Original filled SVG glyphs governed by the measured Glyph Rain style brief.
+"""Original filled SVG glyphs governed by the measured Noumenon style brief.
 
 Geometry is composed from independently authored writing gestures. No reference
 image, font, traced outline, or upstream implementation is read by this module.

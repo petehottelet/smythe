@@ -85,7 +85,7 @@ python -m pytest tests/ --distribution -q
 ```
 
 `--distribution` selects the documented library test profile; it does not
-claim to exercise omitted benchmarks, screensaver code or skills. The normal
+claim to exercise omitted benchmarks or skills. The normal
 test command requires the full checkout and fails on missing materials.
 See [package contents and verification](docs/distribution.md).
 

@@ -14,10 +14,10 @@ from benchmarks.render_readme_charts import (
     render_astra_distributions,
     render_framework_callouts,
     render_framework_comparison,
-    render_glyph_pipeline,
-    render_glyph_scaling,
-    render_glyph_specimens,
     render_jobs_scale_observation,
+    render_noumenon_pipeline,
+    render_noumenon_scaling,
+    render_noumenon_specimens,
     render_recovery,
     render_shape_efficiency,
     render_svg_workflow,
@@ -57,9 +57,9 @@ def test_generated_public_charts_are_strictly_black_and_white():
         render_svg_workflow,
         render_recovery,
         render_jobs_scale_observation,
-        render_glyph_scaling,
-        render_glyph_pipeline,
-        render_glyph_specimens,
+        render_noumenon_scaling,
+        render_noumenon_pipeline,
+        render_noumenon_specimens,
     ):
         colors = set(HEX_COLOR.findall(renderer()))
         assert colors == MONOCHROME
@@ -81,7 +81,7 @@ def test_committed_benchmark_charts_match_the_current_evidence_renderer():
         "framework_comparison.svg": render_framework_comparison,
         "framework_callouts.svg": render_framework_callouts,
         "shape_efficiency.svg": render_shape_efficiency,
-        "glyph_scaling.svg": render_glyph_scaling,
+        "noumenon_scaling.svg": render_noumenon_scaling,
         "svg_workflow.svg": render_svg_workflow,
         "recovery.svg": render_recovery,
         "jobs_scale.svg": render_jobs_scale_observation,
@@ -106,17 +106,17 @@ def test_readme_badges_use_live_ci_and_bordered_black_and_white_metadata():
     assert 'src="assets/badges/ci.svg"' not in readme
 
 
-def test_glyph_diagrams_use_the_committed_vector_catalog():
-    pipeline = render_glyph_pipeline()
-    specimens = render_glyph_specimens()
+def test_noumenon_diagrams_use_the_committed_vector_catalog():
+    pipeline = render_noumenon_pipeline()
+    specimens = render_noumenon_specimens()
     assert "192-node generated graph" in pipeline
     for glyph_id in ("GLYPH-000", "GLYPH-151"):
         assert glyph_id in specimens
     assert "12 / 192" in specimens
 
 
-def test_glyph_scaling_chart_uses_all_four_isolated_records():
-    svg = render_glyph_scaling()
+def test_noumenon_scaling_chart_uses_all_four_isolated_records():
+    svg = render_noumenon_scaling()
     for value in (
         "64 nodes",
         "128 nodes",
@@ -132,7 +132,7 @@ def test_glyph_scaling_chart_uses_all_four_isolated_records():
     assert "Scaling across 64, 128, 192 and 256 nodes" in svg
 
 
-def test_readme_links_benchmark_evidence_and_the_glyph_showcase():
+def test_readme_links_benchmark_evidence_and_the_noumenon_showcase():
     readme = ROOT.joinpath("README.md").read_text(encoding="utf-8")
     # Claims must remain traceable when the product page's layout changes.
     destinations = set(re.findall(r"\[[^\]]+\]\(([^)]+)\)", readme))
@@ -141,14 +141,16 @@ def test_readme_links_benchmark_evidence_and_the_glyph_showcase():
         "benchmarks/astra_findings.md",
         "benchmarks/durability_benchmark.md",
         "benchmarks/svg_v2_results.md",
-        "screensaver/README.md",
+        "benchmarks/noumenon_benchmark.md",
     ):
         assert target in destinations
         assert ROOT.joinpath(target).is_file()
+    assert 'src="assets/noumenon/noumenon-loop.gif"' in readme
+    assert "https://github.com/petehottelet/noumenon" in readme
 
-    guide = ROOT.joinpath("screensaver/README.md").read_text(encoding="utf-8")
-    for name in ("glyph_pipeline.svg", "glyph_specimens.svg"):
-        assert f"../assets/glyph_rain/{name}" in guide
+    report = ROOT.joinpath("benchmarks/noumenon_benchmark.md").read_text(encoding="utf-8")
+    for name in ("noumenon_pipeline.svg", "noumenon_specimens.svg"):
+        assert f"../assets/noumenon/{name}" in report
 
 
 def test_shape_chart_promotes_complete_wall_time_and_not_partial_cost():
@@ -234,6 +236,6 @@ def test_public_mermaid_avoids_reserved_graph_node_id():
 
 def test_screensaver_is_one_word_in_public_landing_copy():
     readme = ROOT.joinpath("README.md").read_text(encoding="utf-8")
-    pipeline = render_glyph_pipeline()
+    pipeline = render_noumenon_pipeline()
     assert not re.search(r"screen saver", readme, re.IGNORECASE)
     assert "SCREEN SAVER" not in pipeline

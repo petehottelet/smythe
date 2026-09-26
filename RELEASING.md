@@ -57,10 +57,7 @@ compatibility changes and verification commands.
    the tested commit, check URLs, package hashes, and release notes.
 5. Push the version commit and verify its CI checks. Create tag `vX.Y.Z` at
    that exact commit and publish its GitHub release. This triggers `publish.yml`.
-6. Keep the screensaver distribution source-only while precompiled releases
-   are paused. Verify the Windows, macOS, and Linux source exports against
-   `screensaver/native-catalog.json`; do not attach compiled native packages.
-7. Verify the successful publish workflow. In a fresh environment, install
+6. Verify the successful publish workflow. In a fresh environment, install
    `smythe==X.Y.Z` from PyPI, check its version, and exercise the installed CLI.
    Download the workflow's retained distributions and `package-hashes.txt`;
    confirm PyPI serves those exact wheel and sdist bytes. Build hosts can use

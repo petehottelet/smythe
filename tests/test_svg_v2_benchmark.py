@@ -8,7 +8,7 @@ import pytest
 
 from benchmarks import run_svg_v2_benchmark as runner
 from benchmarks.svg_glyphs import render_svg
-from screensaver.glyph_design_v2 import generate_glyph, write_study
+from benchmarks.noumenon.glyph_design_v2 import generate_glyph, write_study
 
 
 def test_extension_preserves_every_reviewed_svg_and_adds_64_valid_shapes():

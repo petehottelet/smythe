@@ -20,13 +20,13 @@ publishing benchmark updates.
 | [V2 SVG catalog workflow](svg_v2_results.md) | **Claimable local workflow** | 256 glyphs in 8.06 s median; 2.20× same-backend c1 speed; all 36 matched 192/256 workflows pass, with sampled memory |
 | [Fable 5.1 extension](results/fable_20260914_pilot/README.md) | **Pilots and Code study complete; native main awaits human review** | 12 native pilot workflows cost $1.40473. The separate [ten-task Code Workflow cohort](results/fable_code_20260914/README.md) cost $3.77506525; its pilot and five diagnostic main attempts are retained separately. Human pilot ratings gate 100 native main workflows. |
 | [Original SVG workflow](svg_glyph_benchmark.md) | **Historical v1 timing**; visual acceptance superseded | 192 original glyphs in 4.03 s median including full validation and assembly; 2.95× process-c1 speed; all 30 workflows accepted |
-| [REGL rendering and cadence control](renderer_performance_20260907_results.md) | Completed diagnostics; target not met | Six valid Classic/3D sessions: 56.21–56.24 draws/s, 18.10 ms P95 callback interval; three blank-page controls showed similar source cadence |
 | [Task-shape suite v3](shape_suite.md) | **Claimable for wall time and observed quality** | 14% lower end-to-end wall time; historical cost excludes planning |
 | [Hard-kill durability v2](durability_benchmark.md) | **Claimable** | 8 duplicate dispatches after resume versus LangGraph's 32, across 3 reps |
-| [Glyph Rain width-scaling sweep](glyph_screensaver_benchmark.md#width-scaling-from-64-to-256-nodes) | **Claimable** | 64, 128, 192, and 256 valid unique tiles at every concurrency; 40.37×–56.21× at concurrency 64; isolated outputs |
+| [Noumenon width-scaling sweep](noumenon_benchmark.md#width-scaling-from-64-to-256-nodes) | **Claimable** | 64, 128, 192, and 256 valid unique tiles at every concurrency; 40.37×–56.21× at concurrency 64; isolated outputs |
 | [Image concurrency sweep](image_benchmarks.md) | **Claimable** | 6.6× wall-clock speedup at concurrency 8; 72/72 valid images |
 | [Corrected framework head-to-head](#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12) | **Claimable for the fixed arms** | 77% fewer tokens and 28% less wall time than CrewAI; highest observed blind score |
 | Original self-baselines and pre-correction framework record | Diagnostic | Preserved because they found payload, assembly, and measurement defects; superseded by corrected campaigns |
+| [Retired evidence](archive/README.md) | Superseded, diagnostic, and historical | The first glyph fan-out campaign, the browser renderer timing study (all six sessions missed the pacing target), superseded partitions, and review records, byte for byte in one SHA-256-pinned archive |
 | [Control ablation](control_ablation.md) | Mechanism scope | Objective gates remain valuable; routine LLM supervision and judged-prose gating are not default quality paths |
 | [Jobs at 5,000 operations](jobs_scale_5000_20260907_results.md) | **Claimable correctness observation** | One offline schema-v3 campaign: 5,000 accepted identical fixtures after a hard kill, safe resume, and eight explicit rerolls; zero accepted work reissued and zero calls on completed resume. No comparative timing or model-quality claim. |
 | [Astra/Sol amended study](results/astra_20260913_main/README.md) | **Human review complete; claimable within recorded descriptive scope** | All 200 workflows retained, 191 automatically accepted; all eight flagged answers accepted by human review at 4/4. Anonymous judging, graph/phase breakdowns and task-clustered comparisons. One failed call retains its full $0.169645 reserve. Reused synthetic tasks; all earlier diagnostics and charges remain separate. |
@@ -280,30 +280,30 @@ delivered catalog. Thread and process backends use five concurrency settings
 and three repetitions each. Every configuration remains in the record;
 the headline selects the lowest median complete workflow time.
 
-[Current v2 contact sheet](../screensaver/glyph-design-v2/contact-sheet-128.png) ·
+[Current v2 contact sheet](noumenon/catalog/contact-sheet-128.png) ·
 [Raw campaign](results/glyph_svg_v1.json) ·
-[Navigable web explorer](../screensaver/svg-preview/README.md).
+[Noumenon web explorer](https://github.com/petehottelet/noumenon).
 
 This is local procedural generation. It has no simulated delay and makes no
 provider API calls. Reference research and design calibration happen before
 the campaign and are recorded separately. Browser rendering uses its own
 timing and navigation protocol.
 
-The separate [REGL renderer campaign](renderer_performance_20260907_results.md)
-completed six valid sessions with the default 90/10 catalog mix. Every run
-missed the predeclared pacing target. Raw callback intervals, CPU submission,
-and the blank-page cadence control remain separate from GPU presentation and
-from the original-glyph generation result.
+The browser renderer now lives in the Noumenon repository. Its six-session
+timing study, which missed the predeclared pacing target in every run, is in
+the [evidence archive](archive/README.md), separate from the original-glyph
+generation result.
 
-## Glyph screensaver fan-out
+## Noumenon fan-out
 
-The [glyph screensaver workload](glyph_screensaver_benchmark.md) turns wide
+The [Noumenon workload](noumenon_benchmark.md) is Smythe's parallel-processing
+example. It turns wide
 artifact generation into something directly inspectable: one independent node
 per original fictional cyber glyph, 192 calls total, followed by objective PNG
 normalization and SHA-256 uniqueness checks.
 
 ```bash
-python benchmarks/run_glyph_screensaver.py
+python benchmarks/run_noumenon.py
 ```
 
 The default lane is deterministic, local, and costs nothing. It sweeps
@@ -328,7 +328,7 @@ key, explicit inclusive per-call ceiling, and a whole-run budget large enough
 for every call:
 
 ```bash
-python benchmarks/run_glyph_screensaver.py --live --concurrency 8 \
+python benchmarks/run_noumenon.py --live --concurrency 8 \
   --max-cost-per-call-usd 0.01 --max-budget-usd 1.92
 ```
 
@@ -337,7 +337,7 @@ Verify provider pricing immediately before any paid run. The offline sweep is
 an executor benchmark; only a repeated live lane can support claims about an
 external image API's latency or rate limits.
 
-The matched [width-scaling records](glyph_screensaver_benchmark.md#width-scaling-from-64-to-256-nodes)
+The matched [width-scaling records](noumenon_benchmark.md#width-scaling-from-64-to-256-nodes)
 cover 64, 128, 192, and 256 nodes in separate output namespaces. Every width
 produced a complete set of valid, SHA-256-unique tiles at every measured
 concurrency; speedup at concurrency 64 ranged from 40.37× to 56.21×.

@@ -9,13 +9,14 @@ Historical 0.7.0 artifacts remain unchanged.
 |---|---|
 | Use Smythe's Python API or CLI | Install the wheel with `pip install smythe` and the required provider extra |
 | Build and test the library from source | Use the source distribution and its explicit library test profile |
-| Reproduce benchmarks or build the screensaver | Clone the repository or download its GitHub source archive |
+| Reproduce benchmarks | Clone the repository or download its GitHub source archive |
+| Build the Noumenon screensaver | Clone the [Noumenon repository](https://github.com/petehottelet/noumenon) |
 | Audit another project with Repo Doctor | Use the separately verified skill ZIP and its exact runtime pin |
 
 The wheel contains Smythe, its typing marker, license and package metadata.
 The source distribution adds tests, build and audit tools, README, changelog
-and build configuration. Benchmark archives, screensaver sources, media and
-skills stay in the repository. The `benchmarks` extra installs dependencies;
+and build configuration. Benchmark archives, media and skills stay in the
+repository. The `benchmarks` extra installs dependencies;
 the benchmark scripts themselves require a checkout.
 
 ## Build and verify a source package

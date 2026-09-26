@@ -72,14 +72,15 @@ It adds the following runtime guarantees and measured evidence:
 6. **Typed production asset contracts** — concept-versus-production brand
    rules, exact master/text compositing, atomic finishing, hash receipts, and
    deterministic validation gates separated from advisory judgments
-7. **Glyph Rain fan-out example** — isolated 64-, 128-, 192-, and 256-node
+7. **Noumenon fan-out example** — isolated 64-, 128-, 192-, and 256-node
    partitions with objectively validated unique tiles, realistic-latency
    concurrency sweeps through k=64, live Gemini and GPT Image lanes, and assembled
-   preview/GIF/atlas/HTML deliverables plus web, Windows, macOS, and Linux X11
-   ports with layered green trails using 56 reference and 192 original SVG
-   shapes with a 10% original mix. Native ports are distributed as source.
-   Historical rendering checks cover Windows, Apple Silicon, Intel Mac, and
-   Ubuntu 22.04/24.04; their checksums and receipts remain archived
+   preview/GIF/atlas/HTML deliverables. The screensaver's web, Windows, macOS,
+   and Linux X11 ports use 56 reference and 192 original SVG shapes with a 10%
+   original mix and now live, as source, in the
+   [Noumenon repository](https://github.com/petehottelet/noumenon). Historical rendering checks cover Windows,
+   Apple Silicon, Intel Mac, and Ubuntu 22.04/24.04; their checksums and
+   receipts are in the [evidence archive](benchmarks/archive/README.md)
 8. **Bounded Autotune v1**: immutable hash-bound contracts and allowlisted
    candidates, a zero-API-spend offline concurrency campaign, plan-bound async
    orchestration, atomic dispatch claims, paired confirmation and sealed
@@ -102,13 +103,13 @@ It adds the following runtime guarantees and measured evidence:
     ([report](benchmarks/README.md#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12))
 12. **Original SVG workflow and web explorer** — independently authored filled
     contours, measured style gates, duplicate detection, and hash-bound contact
-    sheets. The web preview now adapts the MIT-licensed m8e/Rezmason renderer
-    and 56 visible base glyphs plus their blank slot, with a 10% original-glyph
-    mix, Classic/3D/Operator presets, Matrix green rain, simple VT323 pixel
-    controls, and a Trajan Bold outline logo on black. Browser interaction checks
-    pass. The [six-session headless study](benchmarks/renderer_performance_20260907_results.md)
-    and ten-minute stability check are complete; visible presentation and
-    quantified reference parity remain pending.
+    sheets. The web explorer, now in the Noumenon repository, adapts the
+    MIT-licensed m8e/Rezmason renderer and 56 visible base glyphs plus their
+    blank slot, with a 10% original-glyph mix, Classic/3D/Operator presets,
+    Matrix green rain, simple VT323 pixel controls, and a Trajan Bold outline
+    logo on black. Browser interaction checks pass. A six-session headless
+    timing study and a ten-minute stability check are complete and archived;
+    visible presentation and quantified reference parity remain pending.
     The [workflow protocol](benchmarks/svg_glyph_benchmark.md) measures fresh
     generation, validation, and assembly across repeated thread/process runs;
     browser frame timing is measured separately.
@@ -255,11 +256,11 @@ Every benchmark publication includes the [materials completion check](docs/curre
 
 The [12 September glyph review](docs/glyph-contour-review-2026-09-12.md)
 identifies contour defects missed by the old numerical gates. The complete
-[192-glyph v2 catalog](screensaver/glyph-design-v2/README.md), small-size sheets,
-web previews, and native source exports are now updated. The
-[192/256-glyph v2 benchmark](benchmarks/svg_v2_results.md) completes 36 matched
-compilation, validation and export workflows, with timing and memory evidence.
-Newly compiled native builds still need platform qualification. The
+[192-glyph v2 catalog](benchmarks/noumenon/catalog/README.md) and its small-size
+sheets are updated, and Noumenon's web previews and native source exports use
+it. The [192/256-glyph v2 benchmark](benchmarks/svg_v2_results.md) completes 36
+matched compilation, validation and export workflows, with timing and memory
+evidence. The
 [benchmark index](benchmarks/README.md#coming-soon) lists separate outstanding
 measurements and their evidence scope.
 
@@ -303,27 +304,15 @@ The remaining runtime and evidence priorities are:
 |---|---|---|
 | P1 | Complete-deliverable contracts and graph selection | Require every requested output part, reject incomplete assembly, and compare fixed/generated selection on newly frozen held-out tasks. Retain failures and charge planning. |
 | P1 | Broader complete-workflow cost evidence | Extend the completed Astra evidence to harder external tasks using the native ledger, declared prices, failed attempts and all optimization trials. |
-| P2 | Web renderer parity and presentation | Follow the [completed headless study](benchmarks/renderer_performance_20260907_results.md) with measured visible-display cadence, GPU timing, and quantified reference tolerances. All six primary sessions missed their frozen pacing target; the separate blank-page control showed similar callback cadence. Archived Canvas v1 timings remain superseded diagnostics. |
 
 ### Product and scale
 
-**Windows Defender review:** resolve the v0.7.0 `SmytheGlyphRain.scr`
-detection before restoring precompiled Windows downloads. Keep quarantined
-copies quarantined, obtain Microsoft analysis, investigate build provenance,
-and publish the review outcome with exact artifact identities. The cause
-is unresolved; precompiled distribution remains suspended.
-
-The Windows, macOS, and Linux source ports contain the licensed base catalog
-and current original SVGs. Earlier compiled catalog, rendering, and host
-checks remain archived; precompiled distribution is suspended.
-Next, bring the [web explorer's](screensaver/svg-preview/README.md) exposure
-pipeline, 3D navigation, and settings into native exploration modes. Preserve
-normal screensaver input dismissal and verify each compiled control. The
-original-glyph generation benchmark remains separate from renderer changes.
-
-Native distribution work includes Developer ID signing and notarization for
-macOS downloads, plus native Wayland screensaver integration. The current
-Linux port targets X11; the macOS bundle uses an ad-hoc signature.
+**Noumenon screensaver:** the screensaver, web explorer, and native ports
+continue in the [Noumenon repository](https://github.com/petehottelet/noumenon): web renderer parity and
+visible-display timing, the Windows Defender review of the withdrawn v0.7.0
+Windows package, native exploration modes, macOS signing and notarization,
+and Wayland support. Precompiled distribution remains suspended. The
+original-glyph generation benchmark stays in Smythe.
 
 1. **Deterministic deliverable contracts** — make every requested output part
    explicit in the graph and mechanically verify complete assembly, removing

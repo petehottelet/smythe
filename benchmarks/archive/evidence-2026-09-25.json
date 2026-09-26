@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "archive": "smythe-evidence-2026-09-25.zip",
+  "bytes": 28312547,
+  "sha256": "28f9029d80939e4c85eefccf77822e367c25ba7987901ac203cfb6a83708ea73",
+  "release_asset": "https://github.com/petehottelet/smythe/releases/download/v0.9.0/smythe-evidence-2026-09-25.zip",
+  "source": {
+    "ref": "v0.8.2",
+    "commit": "c11bbe0f751b0c3b0514052fc207e1131da5850e"
+  },
+  "manifest_sha256": "073d41e1a99579415e93dad74ac84a77addc6d27184528d631c39f959866ae71",
+  "groups": [
+    {
+      "id": "fanout-2026-08",
+      "title": "First glyph fan-out campaign",
+      "status": "superseded",
+      "description": "The August 2026 realistic-latency sweep at 64, 128, 192 and 256 nodes, its zero-latency run, one partial and three diagnostic live-provider runs, the 256-node partition's assembled assets, and the report that described them. The 2026-09-25 Noumenon sweep re-measured every width under the same protocol and replaces these records.",
+      "files": 15,
+      "bytes": 6674108
+    },
+    {
+      "id": "renderer-2026-09-07",
+      "title": "Browser renderer timing study",
+      "status": "diagnostic",
+      "description": "The 7 September 2026 study of the web renderer: protocol, results, blank-page cadence control, verifier and its test, the timing and review records, and the frozen renderer source. All six primary sessions missed the pacing target. The renderer now lives in the Noumenon repository.",
+      "files": 52,
+      "bytes": 16644392
+    },
+    {
+      "id": "superseded-partitions",
+      "title": "Superseded glyph partitions",
+      "status": "superseded",
+      "description": "The stroke-based v1 glyph partition and the renderer copy kept beside the v1 SVG partition. The v2 contour catalog replaces both; the v1 SVG catalog and its workflow records remain in the repository.",
+      "files": 25,
+      "bytes": 8013105
+    },
+    {
+      "id": "review-records",
+      "title": "Materials and catalog review records",
+      "status": "historical",
+      "description": "The 13 September 2026 materials check, the catalog review record and the web explorer's browser checks. They hash preview files under earlier names. The catalog, its measurements and contact sheets are unchanged.",
+      "files": 3,
+      "bytes": 146325
+    },
+    {
+      "id": "native-build-receipts",
+      "title": "Withdrawn native package receipts",
+      "status": "historical",
+      "description": "Build information, SHA-256 checksums and rendering receipts for the precompiled Windows, macOS and Linux screensaver packages withdrawn on 7 September 2026, and the 0.7.0 verification guide that listed them. The screensaver is now the source-only Noumenon repository.",
+      "files": 20,
+      "bytes": 3031094
+    }
+  ],
+  "files": 115,
+  "total_bytes": 34509024
+}

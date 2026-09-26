@@ -1,6 +1,6 @@
 # Original SVG glyph workflow benchmark — historical v1
 
-The current artwork is the [192-glyph v2 catalog](../screensaver/glyph-design-v2/README.md).
+The current artwork is the [192-glyph v2 catalog](noumenon/catalog/README.md).
 This report measures v1 only. Its visual acceptance was superseded by the
 [12 September contour review](../docs/glyph-contour-review-2026-09-12.md); the
 timing records retain their original inputs and results. No v2 timing claim
@@ -20,7 +20,7 @@ identical SVG, pixel, and measurement hashes. The campaign is **claimable for
 this local procedural workflow**, with no known measurement defects.
 
 [Raw record](results/glyph_svg_v1.json) ·
-[Current v2 contact sheet](../screensaver/glyph-design-v2/contact-sheet-128.png) ·
+[Current v2 contact sheet](noumenon/catalog/contact-sheet-128.png) ·
 [Historical v1 SVGs and manifest](partitions/glyph_svg_v1/catalog/).
 
 ![Complete SVG workflow and stage breakdown](../assets/benchmarks/svg_workflow.svg)
@@ -79,9 +79,10 @@ The separate 192-glyph static rasterization study recorded median batch times
 of **0.546 s at 64px**, **0.979 s at 128px**, and **10.961 s at 512px**.
 All three repetitions at each size produced identical pixel hashes. These are
 static rasterization and hashing times, not animation frame rates.
-[Browser measurement and navigation checks](../screensaver/svg-preview/README.md#renderer-and-checks)
-have separate receipts. The [first renderer's archived measurements](partitions/glyph_svg_v1/renderer-v1/README.md)
-cover its original-only Canvas implementation; they do not measure the revised
+Browser measurement and navigation checks for the renderer live in the
+[Noumenon repository](https://github.com/petehottelet/noumenon). The first renderer's measurements, which cover
+its original-only Canvas implementation, are in the
+[evidence archive](archive/README.md); they do not measure the revised
 mixed-glyph WebGL renderer.
 
 ## Run
@@ -177,7 +178,7 @@ python benchmarks/publish_svg_catalog.py \
   --source smythe_artifacts/svg_glyph_v1/runs/r01-thread-c1 \
   --destination benchmarks/partitions/glyph_svg_v1/catalog \
   --results benchmarks/results/glyph_svg_v1.json \
-  --preview screensaver/svg-preview/glyphs.js
+  --preview smythe_artifacts/svg_glyph_v1/glyphs.js
 ```
 
 Use the actual source directory and aggregate record from the campaign; the example paths do not select a result automatically. `--results` verifies that exactly one passed run identifies these source artifacts and binds its path, hash, execution ID, and configuration in the published manifest. Without it, the manifest still records the source directory and individual artifact hashes.

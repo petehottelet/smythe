@@ -5,7 +5,7 @@ by the [v1 benchmark](../../../svg_glyph_benchmark.md).
 
 Use the revised catalogs for current examples:
 
-- [Complete 192-glyph sheet](../../../../screensaver/glyph-design-v2/contact-sheet-128.png)
+- [Complete 192-glyph sheet](../../../noumenon/catalog/contact-sheet-128.png)
 - [Complete 256-glyph sheet](../../glyph_svg_v2_256/catalog/contact-sheet-128.png)
 - [Current sheets, previews, exports, and benchmark reports](../../../../docs/current-materials.md)
 

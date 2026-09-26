@@ -25,7 +25,7 @@ else:
 ROOT = Path(__file__).parents[1]
 RESULTS = ROOT / "benchmarks" / "results"
 OUT = ROOT / "assets" / "benchmarks"
-GLYPH_OUT = ROOT / "assets" / "glyph_rain"
+NOUMENON_OUT = ROOT / "assets" / "noumenon"
 
 BLACK = "#000000"
 WHITE = "#ffffff"
@@ -481,8 +481,8 @@ def _glyph_marker(kind: str, x: float, y: float) -> str:
     raise ValueError(f"unknown glyph chart marker: {kind}")
 
 
-def render_glyph_scaling() -> str:
-    """Render the isolated 64-, 128-, 192-, and 256-node sweeps."""
+def render_noumenon_scaling() -> str:
+    """Render the isolated 64-, 128-, 192-, and 256-node Noumenon sweeps."""
     record_64, runs_64 = _glyph_runs("glyph_screensaver_64_offline_realistic.json")
     record_128, runs_128 = _glyph_runs("glyph_screensaver_128_offline_realistic.json")
     record_192, runs_192 = _glyph_runs("glyph_screensaver_offline_realistic.json")
@@ -499,7 +499,7 @@ def render_glyph_scaling() -> str:
     if any(record["protocol"]["offline_latency_s"] != 5.8 for _, record, *_ in series):
         raise ValueError("glyph scaling records do not use the matched 5.8-second latency")
 
-    body = _text(40, 49, "ARTIFACT FAN-OUT", size=11, weight="700", tracking=2.2)
+    body = _text(40, 49, "NOUMENON FAN-OUT", size=11, weight="700", tracking=2.2)
     body += _text(
         40,
         86,
@@ -608,7 +608,7 @@ def render_glyph_scaling() -> str:
         574,
         body,
         label=(
-            "Throughput chart for isolated 64-, 128-, 192-, and 256-node Glyph Rain "
+            "Throughput chart for isolated 64-, 128-, 192-, and 256-node Noumenon "
             "sweeps. Every run produces valid unique tiles at each measured concurrency."
         ),
     )
@@ -780,9 +780,9 @@ def render_recovery() -> str:
     return render()
 
 
-def render_glyph_pipeline() -> str:
-    """Render the Glyph Rain example as a generated graph and execution envelope."""
-    body = _text(40, 49, "FROM BRIEF TO SCREENSAVER", size=11, weight="700", tracking=2.2)
+def render_noumenon_pipeline() -> str:
+    """Render the Noumenon example as a generated graph and execution envelope."""
+    body = _text(40, 49, "FROM BRIEF TO ARTIFACTS", size=11, weight="700", tracking=2.2)
     body += _text(40, 86, "One example of Smythe at high fan-out", size=29, weight="700", family=SERIF)
     body += f'<line x1="40" y1="108" x2="920" y2="108" stroke="{BLACK}" stroke-width="2"/>\n'
 
@@ -790,7 +790,7 @@ def render_glyph_pipeline() -> str:
         (40, 146, 176, 108, "01", "BRIEF", "Define the artifact"),
         (274, 146, 176, 108, "192", "GENERATE", "One node per glyph"),
         (508, 146, 176, 108, "192", "VERIFY", "Size + PNG + SHA-256"),
-        (742, 146, 178, 108, "04", "ASSEMBLE", "Atlas + web + ports"),
+        (742, 146, 178, 108, "04", "ASSEMBLE", "Atlas, PNG, GIF, HTML"),
     )
     for index, (x, y, width, height, number, title, detail) in enumerate(stages):
         fill = BLACK if index == len(stages) - 1 else WHITE
@@ -828,7 +828,7 @@ def render_glyph_pipeline() -> str:
         326,
         body,
         label=(
-            "Glyph Rain example pipeline. A brief becomes a 192-node generated graph, "
+            "Noumenon example pipeline. A brief becomes a 192-node generated graph, "
             "each glyph is verified, and the outputs are assembled into four artifacts."
         ),
     )
@@ -857,10 +857,10 @@ def _glyph_strokes(spec: GlyphSpec, *, x: float, y: float, scale: float) -> str:
     return body + "</g>\n"
 
 
-def render_glyph_specimens() -> str:
+def render_noumenon_specimens() -> str:
     """Render selected current SVG contours as a specimen table."""
     selected = (0, 3, 5, 12, 14, 21, 32, 44, 63, 80, 107, 151)
-    catalog = json.loads((ROOT / "screensaver/glyph-design-v2/catalog.json").read_text(encoding="utf-8"))["glyphs"]
+    catalog = json.loads((ROOT / "benchmarks/noumenon/catalog/catalog.json").read_text(encoding="utf-8"))["glyphs"]
     specs = tuple(catalog[index] for index in selected)
     body = _text(40, 49, "SELECTED GLYPHS", size=11, weight="700", tracking=2.2)
     body += _text(40, 86, "Twelve marks from the generated catalog", size=29, weight="700", family=SERIF)
@@ -908,7 +908,7 @@ def render_glyph_specimens() -> str:
         body,
         label=(
             "Line-art table of twelve representative glyphs selected from the "
-            "192-character deterministic Glyph Rain catalog."
+            "192-character deterministic Noumenon catalog."
         ),
     )
 
@@ -937,12 +937,12 @@ def main() -> None:
     from benchmarks.svg_v2_charts import RECORD, render_memory, render_workflow
 
     OUT.mkdir(parents=True, exist_ok=True)
-    GLYPH_OUT.mkdir(parents=True, exist_ok=True)
+    NOUMENON_OUT.mkdir(parents=True, exist_ok=True)
     charts: dict[Path, Callable[[], str]] = {
         OUT / "framework_comparison.svg": render_framework_comparison,
         OUT / "framework_callouts.svg": render_framework_callouts,
         OUT / "shape_efficiency.svg": render_shape_efficiency,
-        OUT / "glyph_scaling.svg": render_glyph_scaling,
+        OUT / "noumenon_scaling.svg": render_noumenon_scaling,
         OUT / "svg_workflow.svg": render_svg_workflow,
         OUT / "svg_v2_workflow.svg": lambda: render_workflow(RESULTS / RECORD),
         OUT / "svg_v2_memory.svg": lambda: render_memory(RESULTS / RECORD),
@@ -950,8 +950,8 @@ def main() -> None:
         OUT / "jobs_scale.svg": render_jobs_scale_observation,
         OUT / "astra_workflows.svg": render_astra_distributions,
         OUT / "astra_differences.svg": render_astra_differences,
-        GLYPH_OUT / "glyph_pipeline.svg": render_glyph_pipeline,
-        GLYPH_OUT / "glyph_specimens.svg": render_glyph_specimens,
+        NOUMENON_OUT / "noumenon_pipeline.svg": render_noumenon_pipeline,
+        NOUMENON_OUT / "noumenon_specimens.svg": render_noumenon_specimens,
     }
     for destination, renderer in charts.items():
         destination.write_text(renderer(), encoding="utf-8", newline="\n")

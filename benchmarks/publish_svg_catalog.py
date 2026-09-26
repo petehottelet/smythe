@@ -2,7 +2,7 @@
 
 python benchmarks/publish_svg_catalog.py --source smythe_artifacts/svg_glyph_v1/runs/RUN \
   --destination benchmarks/partitions/glyph_svg_v1/catalog \
-  --preview screensaver/svg-preview/glyphs.js
+  --preview smythe_artifacts/svg_glyph_v1/glyphs.js
 """
 
 from __future__ import annotations
