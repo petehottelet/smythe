@@ -45,13 +45,17 @@ def _opaque_on_black(data: bytes) -> bytes:
     return buffer.getvalue()
 
 
-def _install_fake_openai(monkeypatch, *, opaque: bool = False) -> list[dict]:
+def _install_fake_openai(
+    monkeypatch, *, opaque: bool = False, fail_after: int | None = None
+) -> list[dict]:
     """Serve procedural glyph PNGs through a fake Image API client; no network."""
     calls: list[dict] = []
 
     class Images:
         async def generate(self, **kwargs):
             calls.append(kwargs)
+            if fail_after is not None and len(calls) > fail_after:
+                raise RuntimeError("Error code: 429 - rate limit reached")
             spec = _SPECS[_GLYPH_ID.search(kwargs["prompt"]).group(1)]
             data = render_glyph_tile(spec, size=256)
             if opaque:
@@ -368,6 +372,20 @@ def test_live_transparent_lane_sends_background_and_gates_alpha_and_svgs(
         assert receipt["transparency"]["passed"]
         assert receipt["transparency"]["source_has_transparency"] is True
         assert receipt["svg"]["valid"] and receipt["svg"]["iou"] == 1.0
+
+
+def test_halted_live_run_records_what_its_completed_calls_charged(tmp_path, monkeypatch):
+    _install_fake_openai(monkeypatch, fail_after=2)
+
+    payload = _live(tmp_path, concurrencies=(1,))
+
+    assert payload["status"] == "failed"
+    [run] = payload["runs"]
+    assert run["completed_nodes"] == 2
+    assert run["cost_usd"] == pytest.approx(0.02)
+    assert run["cost_is_complete"] is False
+    assert payload["total_recorded_cost_usd"] == pytest.approx(0.02)
+    assert "429" in run["errors"][0]["error"]
 
 
 def test_live_transparent_lane_fails_closed_on_opaque_model_output(tmp_path, monkeypatch):

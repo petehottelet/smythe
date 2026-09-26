@@ -413,6 +413,21 @@ async def _run_once(
     )
 
     completed = sum(node.status is NodeStatus.COMPLETED for node in graph.nodes)
+    if result is not None:
+        cost_usd: float | None = round(result.total_cost_usd, 6)
+        cost_is_complete = result.cost_is_complete
+    else:
+        # A halted run still paid for the calls that finished. Record what the
+        # completed nodes charged; calls in flight at the halt report no cost,
+        # so the total is never complete.
+        charged = [
+            node.metadata.get("cost_usd")
+            for node in graph.nodes
+            if node.status is NodeStatus.COMPLETED
+        ]
+        known = [cost for cost in charged if isinstance(cost, (int, float))]
+        cost_usd = round(math.fsum(known), 6) if known else None
+        cost_is_complete = False
     run = {
         "concurrency": concurrency,
         "status": "passed" if passed else "failed",
@@ -427,8 +442,8 @@ async def _run_once(
         ),
         "completed_nodes": completed,
         "throughput_glyphs_per_s": round(completed / generation_wall_s, 4),
-        "cost_usd": round(result.total_cost_usd, 6) if result is not None else None,
-        "cost_is_complete": result.cost_is_complete if result is not None else False,
+        "cost_usd": cost_usd,
+        "cost_is_complete": cost_is_complete,
         "cost_contains_estimates": (
             result.cost_contains_estimates if result is not None else mode == "live"
         ),
