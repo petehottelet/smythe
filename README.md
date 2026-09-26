@@ -280,8 +280,8 @@ identical fixtures, so this shows recovery correctness, not speed.
 
 ## Project status
 
-**Smythe 0.8.2** is the current library release. See the
-[release notes and upgrade guide](docs/release-0.8.2.md).
+**Smythe 0.9.0** is the current library release. See the
+[release notes and upgrade guide](docs/release-0.9.0.md).
 
 Next priorities are complete-deliverable checks, broader external-task
 benchmarks, and separately controlled Astra scheduler and framework studies.

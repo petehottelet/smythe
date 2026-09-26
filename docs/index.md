@@ -10,6 +10,7 @@ verification, trace, artifact, and recovery controls.
 - [Architecture](architecture.md) — the two core abstractions and component boundaries
 - [Examples](../examples/README.md) — offline-first feature tours plus explicitly gated live integrations
 - [Benchmarks](../benchmarks/README.md) — evidence status, protocols, and raw records
+- [Smythe 0.9.0](release-0.9.0.md) — Noumenon re-run, separate screensaver and Repo Doctor repositories, and a pinned evidence archive; upgrading from 0.8.2
 - [Smythe 0.8.2](release-0.8.2.md) — correctness release: what changed and how to upgrade from 0.8.1
 - [Smythe 0.8.1](release-0.8.1.md) — security release: what changed and how to upgrade from 0.8.0
 - [Smythe 0.8.0](release-0.8.0.md) — scope, compatibility changes and release verification

@@ -11,7 +11,7 @@ journal with Anthropic-specific cache categories, quotes, and response decoding.
 
 ## Start a bounded Astra workflow
 
-Install `pip install "smythe[openai]==0.8.2"` and set
+Install `pip install "smythe[openai]==0.9.0"` and set
 `OPENAI_API_KEY`.
 This example makes paid generation calls under a $5 run allowance:
 

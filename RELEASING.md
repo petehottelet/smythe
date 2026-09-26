@@ -24,7 +24,7 @@ Candidate branches can run the same platform matrix with
 `gh workflow run ci.yml --ref BRANCH`. That manual qualification does not
 replace the required successful push checks on `main` before publication.
 
-The [0.8.2 release guide](docs/release-0.8.2.md) records its scope,
+The [0.9.0 release guide](docs/release-0.9.0.md) records its scope,
 compatibility changes and verification commands.
 
 ## Per-release flow
