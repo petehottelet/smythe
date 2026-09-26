@@ -34,7 +34,7 @@ Status: pre-1.0. Minor versions may break APIs (see [CHANGELOG.md](CHANGELOG.md)
   25 images in 10.2 s at k=25, objective metrics only
   ([benchmarks/image_benchmarks.md](benchmarks/image_benchmarks.md))
 - ✅ **Repo Doctor MVP** — offline-first release-readiness auditor built
-  on smythe ([skills/repo-doctor/](skills/repo-doctor/))
+  on smythe, now its own project: [repodoctor](https://github.com/petehottelet/repodoctor)
 
 ## Shipped (v0.6 line)
 
@@ -188,8 +188,8 @@ ownership automatically. Read the migration guide before upgrading a ledger.
   and successful main CI at that exact commit.
 
 - **Distribution and typing** — explicit source-package contents and library
-  test profile, clean source rebuilds, installed consumer type checks, and a
-  versioned Repo Doctor ZIP with runtime pin and checksums.
+  test profile, clean source rebuilds, and installed consumer type checks.
+  Repo Doctor ZIPs now ship from the repodoctor repository.
   [Packages, tests and installation](docs/distribution.md).
 
 - **Autotune inspection reports** — export saved decisions, paired comparison

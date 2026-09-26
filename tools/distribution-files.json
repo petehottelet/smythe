@@ -185,9 +185,7 @@
     "tests/test_recovery_chart.py",
     "tests/test_registry.py",
     "tests/test_release_gate.py",
-    "tests/test_repo_doctor.py",
     "tests/test_router.py",
-    "tests/test_skill_archive.py",
     "tests/test_skills.py",
     "tests/test_skills_registry.py",
     "tests/test_sqlite_initialization.py",
@@ -229,7 +227,6 @@
     "tools/large_files.py",
     "tools/package_smoke.py",
     "tools/provider_probe.py",
-    "tools/release_gate.py",
-    "tools/skill_archive.py"
+    "tools/release_gate.py"
   ]
 }

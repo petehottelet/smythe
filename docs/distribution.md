@@ -11,11 +11,11 @@ Historical 0.7.0 artifacts remain unchanged.
 | Build and test the library from source | Use the source distribution and its explicit library test profile |
 | Reproduce benchmarks | Clone the repository or download its GitHub source archive |
 | Build the Noumenon screensaver | Clone the [Noumenon repository](https://github.com/petehottelet/noumenon) |
-| Audit another project with Repo Doctor | Use the separately verified skill ZIP and its exact runtime pin |
+| Audit another project with Repo Doctor | Use the [repodoctor repository](https://github.com/petehottelet/repodoctor) |
 
 The wheel contains Smythe, its typing marker, license and package metadata.
 The source distribution adds tests, build and audit tools, README, changelog
-and build configuration. Benchmark archives, media and skills stay in the
+and build configuration. Benchmark archives and media stay in the
 repository. The `benchmarks` extra installs dependencies;
 the benchmark scripts themselves require a checkout.
 
@@ -80,22 +80,10 @@ Run `python -m mypy` to check the explicit strict module set in
 modules outside that set are not part of the blocking gate. Expand that set
 only after resolving the next module's diagnostics.
 
-## Repo Doctor archive
+## Repo Doctor
 
-```bash
-python tools/skill_archive.py --out /path/to/fresh/skill-dist
-```
-
-The builder reads committed files from one exact commit, excludes untracked
-and working-tree changes, and refuses to overwrite existing candidates.
-The ZIP carries the MIT license, source commit, exact runtime requirement and
-per-file hashes. The adjacent JSON receipt records archive bytes and SHA-256.
-
-CI installs the exact published runtime in `skills/repo-doctor/runtime.txt`
-and runs the extracted skill against an offline fixture with provider keys
-cleared. The release workflow attaches verified assets without replacing old
-ones; manual workflow runs retain downloadable candidates.
-[Installation and offline usage](../skills/repo-doctor/README.md).
+Repo Doctor, the release-readiness auditor built on Smythe, is now its own
+project with its own releases: [repodoctor](https://github.com/petehottelet/repodoctor).
 
 For a smaller contributor checkout and evidence retention rules, see
 [Contributing](../CONTRIBUTING.md#working-with-a-slim-checkout).

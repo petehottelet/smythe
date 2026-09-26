@@ -69,7 +69,7 @@ verification, trace, artifact, and recovery controls.
 
 - [Coming soon](../ROADMAP.md#coming-soon) — acceptance criteria for runtime and measurement improvements
 - [Contributing](../CONTRIBUTING.md)
-- [Packages and typing](distribution.md) — slim source archives, explicit library tests, installed type checks and versioned Repo Doctor ZIPs
+- [Packages and typing](distribution.md) — slim source archives, explicit library tests, and installed type checks
 - [Roadmap](../ROADMAP.md)
 - [Changelog](../CHANGELOG.md) — current releases; 0.1.0 through 0.8.1 are in the [changelog archive](../CHANGELOG-ARCHIVE.md)
 - [Releasing](../RELEASING.md) — package builds, release assets, and PyPI publication

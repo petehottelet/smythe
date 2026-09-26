@@ -24,6 +24,16 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
+### Added
+
+- `tools/evidence_archive.py` builds a deterministic archive of retired
+  benchmark evidence from git history and verifies it against a committed
+  pointer, every member's SHA-256 and, optionally, the recorded commit.
+  [`benchmarks/archive/`](benchmarks/archive/README.md) pins the first archive:
+  the first glyph fan-out campaign, the browser renderer timing study,
+  superseded glyph partitions, review records and the withdrawn native package
+  receipts, read from `v0.8.2`.
+
 ### Changed
 
 - **The glyph fan-out example is now Noumenon.** The harness is
@@ -40,15 +50,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 - Released changelog sections 0.1.0 through 0.8.1 moved, unchanged, to
   [`CHANGELOG-ARCHIVE.md`](CHANGELOG-ARCHIVE.md).
 
-### Added
+### Removed
 
-- `tools/evidence_archive.py` builds a deterministic archive of retired
-  benchmark evidence from git history and verifies it against a committed
-  pointer, every member's SHA-256 and, optionally, the recorded commit.
-  [`benchmarks/archive/`](benchmarks/archive/README.md) pins the first archive:
-  the first glyph fan-out campaign, the browser renderer timing study,
-  superseded glyph partitions, review records and the withdrawn native package
-  receipts, read from `v0.8.2`.
+- **Repo Doctor moved to its own repository,
+  [repodoctor](https://github.com/petehottelet/repodoctor).** The skill, its
+  archive builder `tools/skill_archive.py`, its tests and its distribution
+  workflow left Smythe, and Smythe releases no longer attach the skill ZIP.
 
 ## [0.8.2] - 2026-09-25
 

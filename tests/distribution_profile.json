@@ -3,7 +3,6 @@
   "required_repository_files": [
     "benchmarks/README.md",
     "benchmarks/noumenon/catalog/catalog.json",
-    "skills/repo-doctor/SKILL.md",
     "examples/12_jobs_manifest.yaml",
     "docs/index.md",
     "assets/wordmark.svg",
@@ -42,7 +41,6 @@
     "test_publish_svg_catalog.py": "SVG benchmark catalog publisher",
     "test_readme_charts.py": "Landing-page charts and committed records",
     "test_recovery_chart.py": "Recovery chart renderer",
-    "test_repo_doctor.py": "Separately distributed Repo Doctor skill",
     "test_svg_glyph_benchmark.py": "SVG benchmark runner",
     "test_svg_glyph_measurements.py": "Glyph measurement tooling and catalogs",
     "test_svg_glyphs.py": "SVG glyph benchmark implementation",

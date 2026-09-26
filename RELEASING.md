@@ -65,14 +65,19 @@ compatibility changes and verification commands.
    the publication workflow's artifact hashes.
    Update the PyPI badge only after the published version is available.
 
-## Skill and evidence assets
+## Evidence assets
 
-The Repo Doctor workflow builds a ZIP from the exact source commit, verifies
-it against the published runtime pinned in `skills/repo-doctor/runtime.txt`,
-and attaches the archive and checksum receipt on release publication.
-Keep that pin on a tested, available runtime; a runtime upgrade requires an
-explicit compatibility check. Manual workflow runs retain candidates without
-publishing a release. Existing asset names are never overwritten.
+When a release retires benchmark evidence, build its archive from git history
+and verify it before attaching it to the release its pointer names:
+
+```bash
+python tools/evidence_archive.py build SPEC.json --out /path/to/fresh/evidence --pointer benchmarks/archive/NAME.json
+python tools/evidence_archive.py verify /path/to/fresh/evidence/NAME.zip --pointer benchmarks/archive/NAME.json --against-git
+```
+
+Commit the pointer with the release, upload the verified ZIP under the exact
+name in its `release_asset` URL, and download it again to confirm the
+SHA-256. Existing asset names are never overwritten.
 
 Before a release, review the package's exact file manifest and run the
 [distribution checks](docs/distribution.md). Internal plans and review notes

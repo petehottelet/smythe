@@ -174,21 +174,6 @@ jobs:
           "$RUNNER_TEMP/smythe-wheel/bin/smythe" optimize inspect package-report --ledger report.sqlite3 --json --out report.html > after.json
           "$RUNNER_TEMP/smythe-wheel/bin/python" -c "from pathlib import Path; import hashlib,json; assert json.loads(Path('before.json').read_text()) == json.loads(Path('after.json').read_text()); assert hashlib.sha256(Path('report.sqlite3').read_bytes()).hexdigest() == Path('database.sha256').read_text(); page = Path('report.html').read_text(); assert '<html' in page and 'Content-Security-Policy' in page and 'package-report' in page; print('Installed report: unchanged inspection JSON and database bytes')"
 
-  skill-smoke:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-      - name: Build the skill from the tested commit
-        run: python tools/skill_archive.py --out "$RUNNER_TEMP/skill-dist"
-      - name: Verify against the exact released runtime
-        run: |
-          python -m venv "$RUNNER_TEMP/skill-runtime"
-          "$RUNNER_TEMP/skill-runtime/bin/python" -m pip install -r skills/repo-doctor/runtime.txt
-          python tools/skill_archive.py --verify "$RUNNER_TEMP/skill-dist/"*.zip --python "$RUNNER_TEMP/skill-runtime/bin/python"
-
   windows-smoke:
     runs-on: windows-latest
     steps:
