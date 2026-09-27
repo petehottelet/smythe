@@ -33,6 +33,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   project formats.
 - A repository test fails when any tracked file contains an identifier or key
   in one of those formats.
+- Retained benchmark records and test fixtures no longer carry local user
+  paths or identifier-shaped placeholder values. The asset-suite records use
+  repository-relative artifact paths. The September 7 jobs-scale pilots and
+  Windows detached-worker qualification replace local paths with
+  placeholders, recompute the digests their archive and qualification
+  records pin, and describe the change in their READMEs; the pilots' 25
+  byte-identical accepted PNGs are kept as one file.
 
 ## [0.9.0] - 2026-09-26
 

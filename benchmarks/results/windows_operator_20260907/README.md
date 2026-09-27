@@ -45,6 +45,11 @@ The [no-work probe log](diagnostics/restricted-job-probe.log) and its
 access-denied condition; successful creation without breakaway did not prove
 worker lifetime. These diagnostics remain separate from the final result.
 
+On September 26, 2026, local paths in the fallback summary, the CI failure log,
+the positive proof, and the qualification record's `python_prefix` were
+replaced with the placeholders `<temp>`, `<runner-temp>`, and `<checkout>`.
+The qualification record's artifact digests were recomputed for those files.
+
 Windows venv and `py.exe` launchers can own kill-on-close jobs, and nested job
 policy can prevent descendants from leaving them. The repair refuses denied
 probes for every interpreter context rather than inferring safety from its

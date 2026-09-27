@@ -4,7 +4,7 @@
   "model": "gemini-2.5-flash-image",
   "assets_pass": "8/8",
   "brand_logo": {
-    "path": "C:\\Users\\PeteHottelet\\Projects\\smythe\\smythe_artifacts\\asset_suite\\raw\\logo\\7f043ce2f0c5\\brand_logo_00.png",
+    "path": "smythe_artifacts/asset_suite/raw/logo/7f043ce2f0c5/brand_logo_00.png",
     "source": "generated",
     "cost_usd": 0.039,
     "wall_s": 6.31

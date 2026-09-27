@@ -11,7 +11,7 @@ def test_large_file_review_distinguishes_text_old_binaries_and_new_binaries(tmp_
 
     def commit():
         git("add", "--", "old.bin", "new.bin", "large.txt", "small.bin")
-        git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+        git("-c", "user.name=Fixture", "-c", "user.email=36128338+petehottelet@users.noreply.github.com",
             "-c", "commit.gpgsign=false", "commit", "-qm", "Fixture")
         return git("rev-parse", "HEAD")
 

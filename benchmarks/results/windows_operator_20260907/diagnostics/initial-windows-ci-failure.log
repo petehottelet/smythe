@@ -55,7 +55,7 @@ windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2932588Z .......
 windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2933733Z ================================== FAILURES ===================================
 windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2934880Z _ test_real_process_worker_survives_launcher_exit_and_retains_python_environment _
 windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2935833Z 
-windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2937341Z tmp_path = WindowsPath('C:/Users/runneradmin/AppData/Local/Temp/pytest-of-runneradmin/pytest-0/test_real_process_worker_survi0')
+windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2937341Z tmp_path = WindowsPath('<runner-temp>/pytest-of-runneradmin/pytest-0/test_real_process_worker_survi0')
 windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2938618Z 
 windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2939111Z     def test_real_process_worker_survives_launcher_exit_and_retains_python_environment(tmp_path):
 windows-smoke	Exercise the suite on Windows	2026-09-07T20:45:57.2939982Z         manifest, _, approval = planned(tmp_path)

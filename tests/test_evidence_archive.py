@@ -23,7 +23,7 @@ def _repo(tmp_path: Path) -> Path:
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         (root / name).write_bytes(data)
     def run(*args: str) -> None:
-        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", *args],
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=36128338+petehottelet@users.noreply.github.com", *args],
                        cwd=root, check=True, capture_output=True)
 
     run("init", "-q")

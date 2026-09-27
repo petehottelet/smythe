@@ -4,7 +4,7 @@
   "reviewed_at_utc": "2026-09-07T21:34:29.436242+00:00",
   "platform": "Windows-10-10.0.26200-SP0",
   "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
-  "python_prefix": "C:\\Users\\PeteHottelet\\Projects\\smythe\\smythe\\tmp\\parallel-test-env",
+  "python_prefix": "<checkout>\\smythe\\tmp\\parallel-test-env",
   "source_normalization": "UTF-8 decoded text with CRLF/CR normalized to LF before SHA-256",
   "final_source_lf_sha256": {
     "smythe/jobs/operator.py": "c4f48cb325fc1eae1f219c084750a794cf73d4eb295b0af39047d90849236172",
@@ -79,15 +79,15 @@
     }
   },
   "artifact_sha256": {
-    "diagnostics/fallback-qualification-summary.txt": "5251e0115afc74554aa95b8c6f73d83e1d648998597640dfca0e8a8d477efa22",
-    "diagnostics/initial-windows-ci-failure.log": "645e0ad15ebfc42b86cc1cfd58a605d3f27d442b77d1af69d04302a5873b0c61",
+    "diagnostics/fallback-qualification-summary.txt": "46d5f549cc9fdfb95f7d0f92bf3cf0ca90621b9ae29066ae0fcc35fe3e04467f",
+    "diagnostics/initial-windows-ci-failure.log": "0edc4f73365949512ef5d6245a7e158d5f067070cfecefbccdf55d19c553808e",
     "diagnostics/restricted-job-probe.log": "8c660af0e2b6ba71f68799862ac7dd19067f0504c57f37a6a5a568cbe5642726",
     "logs/combined.log": "62b7ea618bfd9423a327a0959436a1377005842a823f3ef2c3233e392aa87aae",
     "logs/final-cli.log": "869283be084edb494ea1a388b00210f6d4f72cd68aee50c76f4d3e35b06b8215",
     "proofs/kill_on_close.json": "7a16ebdf3e26f639d6761e3c7226c44db80a0aec9eaebb783a146d60878bda3e",
     "proofs/restricted.json": "16b8f46e9da85ebdc86bb4f81ba888905416c9ccafca10264c8ed92980e90365",
     "proofs/restricted_venv.json": "3489c550298727637ee73f9e34d6800be8c05d7c5edee2dda9c9c4f499414a9e",
-    "proofs/supported-local-host.json": "fb8539f48aa88f1e46113f8d37a44025f0f2db13a42a3bac3729f2647c9a8646",
+    "proofs/supported-local-host.json": "f66f8ab21f42fb55ae059e1894aee9de046ce135b6979dd4dbf8e12765751cea",
     "diagnostics/restricted-job-probe.py.txt": "a08fa13a1ce46df17d22a69cc7423dc6bf559bbfe563857ed5db2ca7c9520a1d"
   }
 }

@@ -19,7 +19,7 @@ from smythe.provider_responses import (
 from smythe.tools import ChatMessage, ToolCall, ToolResult, ToolSpec
 
 MODEL = "gpt-6-astra"
-KEY = "sk-offline-not-a-real-key"
+KEY = "offline-test-key"
 
 
 def response(**overrides):
