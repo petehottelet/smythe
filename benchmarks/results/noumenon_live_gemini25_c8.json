@@ -1,0 +1,2045 @@
+{
+  "benchmark": "noumenon-fanout",
+  "record_version": 1,
+  "partition": "live_gemini25_c8",
+  "mode": "live",
+  "status": "failed",
+  "protocol": {
+    "graph_nodes": 192,
+    "topology": "broadcast_reduce",
+    "one_provider_call_per_node": true,
+    "concurrencies": [
+      8
+    ],
+    "offline_latency_s": null,
+    "normalization": "PNG 128x128",
+    "background": "auto",
+    "transparency_check": null,
+    "vectorize": false,
+    "vectorization": null,
+    "assembly_requires_glyphs": 192,
+    "assembly_supported_glyphs": [
+      192,
+      256
+    ]
+  },
+  "provider": {
+    "name": "GeminiProvider",
+    "model": "gemini-2.5-flash-image",
+    "size": "1024x1024 (1:1 aspect config)",
+    "quality": "default",
+    "background": null,
+    "cost_per_image_usd_estimate": 0.039,
+    "max_cost_per_call_usd": 0.045,
+    "max_budget_usd": 8.64,
+    "official_guide": null
+  },
+  "environment": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "packages": {
+      "smythe": "0.9.0",
+      "pillow": "11.1.0",
+      "openai": "3.19.2",
+      "google-genai": "2.25.0"
+    },
+    "installed_packages": {
+      "smythe": "0.9.0",
+      "pillow": "11.1.0",
+      "openai": "3.19.2",
+      "google-genai": "2.25.0"
+    },
+    "smythe_source": {
+      "version": "0.9.0",
+      "module": "smythe/__init__.py"
+    },
+    "source_control": {
+      "revision": "76e3b609dea6eb08a0c26a9fe3b48581a37f5a19",
+      "dirty": false,
+      "untracked_files": 5
+    }
+  },
+  "runs": [
+    {
+      "concurrency": 8,
+      "status": "failed",
+      "execution_id": "423bbec3a35f4e53973d2f11e0d5f3e6",
+      "generation_wall_s": 143.433099,
+      "validation_wall_s": 33.717477,
+      "vectorization_wall_s": null,
+      "end_to_end_wall_s": 177.150576,
+      "completed_nodes": 192,
+      "throughput_glyphs_per_s": 1.3386,
+      "cost_usd": 8.595354,
+      "cost_is_complete": true,
+      "cost_contains_estimates": true,
+      "validation": {
+        "passed": false,
+        "expected_tiles": 192,
+        "valid_png_tiles": 191,
+        "tile_size": [
+          128,
+          128
+        ],
+        "unique_tile_hashes": 191,
+        "errors": [
+          "glyph-043: expected one artifact, found 0",
+          "expected 192 valid tiles, found 191",
+          "expected 192 unique tile hashes, found 191"
+        ]
+      },
+      "vectorization": null,
+      "tile_receipts": [
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-000.png",
+          "sha256": "5bb69b84549a7ee8fc14794ddb18ab8b9d0d90c0a2fd918912332eb7cf69efc4",
+          "byte_size": 5997,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-000"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-001.png",
+          "sha256": "cc039993fb287439572c4128294bb8215b57e116bff55e59cde9b0ee81e65c54",
+          "byte_size": 11006,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-001"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-002.png",
+          "sha256": "e34c779c07b72f1cea0695dd5a2595e2b3ed0dcb30f0447d6821804b4a7e868e",
+          "byte_size": 5760,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-002"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-003.png",
+          "sha256": "b7f1b2d89e9303466b2041b33e10fca42afa10b72dc4acee8c15e002c68faa30",
+          "byte_size": 7265,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-003"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-004.png",
+          "sha256": "8aded10280d8a9fc3482b3e7417d45f89ad2ddb5abae6be2cc48f056e4bd3b2b",
+          "byte_size": 7550,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-004"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-005.png",
+          "sha256": "3e9efdf36b2f278772ed82dc3066741536e6305bb7e50edc1e391ad007e9281a",
+          "byte_size": 5302,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-005"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-006.png",
+          "sha256": "d7355f884f52685e502d0fbda11af9622833c4462af7bc59bf8772beb84a75ca",
+          "byte_size": 5757,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-006"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-007.png",
+          "sha256": "66cced42a5b3174e45a4b03839b1ff349824b5bdfbe64db39f2997fcb6d24bff",
+          "byte_size": 8409,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-007"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-008.png",
+          "sha256": "8e4570404b0438adc5b8ee64b038a9336f5f5f786e80331b24c859b4e5f01080",
+          "byte_size": 4754,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-008"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-009.png",
+          "sha256": "e370beadf626ec0d5b6a2702e31c43030fdae0d51c39aff686bc081d0b4de7fb",
+          "byte_size": 3405,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-009"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-010.png",
+          "sha256": "4c24876b199c09225747222ae8154612b3614f1ad7d7b8918fb788b6d7db683a",
+          "byte_size": 4887,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-010"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-011.png",
+          "sha256": "6d5c0c944709e51db30a74d5802033a49fc67066e623b12474a3aae8688654ff",
+          "byte_size": 5011,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-011"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-012.png",
+          "sha256": "a7e5f144b06d801f9cee34a5f884e53f1f7f9c2d2421c652c9795aceea9d481c",
+          "byte_size": 7947,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-012"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-013.png",
+          "sha256": "c3afd6965d532a421d34b911689eb647234d7c56fccec1806b1089cef5da3e64",
+          "byte_size": 6660,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-013"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-014.png",
+          "sha256": "f89e61c443628512890167afb8f1146ffd844a2c1d75bfc06a4b223812e5ce74",
+          "byte_size": 6230,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-014"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-015.png",
+          "sha256": "d4645f80fdae84497b63fc799258724110fb8946a23f2fe0a3ce0f3bba98121a",
+          "byte_size": 4151,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-015"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-016.png",
+          "sha256": "752cdd55af8014d1457915f28f176ade8bcb20d5fbea018484a93bd8f1d71187",
+          "byte_size": 5521,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-016"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-017.png",
+          "sha256": "7c941fb124afe0a32882579ad9e53bb88efd275499b579bcf4ec69518f1b075d",
+          "byte_size": 9028,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-017"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-018.png",
+          "sha256": "eac39132dd4fb1b1047dbb5bb0e4e406e834709010c895268132ca980cb9650d",
+          "byte_size": 4535,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-018"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-019.png",
+          "sha256": "b9a388c2898fc0041da2ed65e11afa95a7e8ded881aca19380fe6181b312d383",
+          "byte_size": 5478,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-019"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-020.png",
+          "sha256": "011f1906183fe4093d6e0cd9c2fafaa854cee9957c76bc0e182bb7a8750a099c",
+          "byte_size": 5440,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-020"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-021.png",
+          "sha256": "5d2b40d47edde8e3f528da78572d96321da48a3f949c6a8a533a97ebf9b58c37",
+          "byte_size": 4500,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-021"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-022.png",
+          "sha256": "a2edb04a1d45fd71eb6a3277c1ceab51655771b4159b6ad4d614149e024465f9",
+          "byte_size": 6691,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-022"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-023.png",
+          "sha256": "ad5f4e7f26e9c3bcffdf5d9c0a1d986e58024b66768cef8227e6a8d489d5a045",
+          "byte_size": 3652,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-023"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-024.png",
+          "sha256": "5df0a50792e90f58ca5c6f1d7eaafdac9ed51f69e8dfefaf155f4df0a86784cc",
+          "byte_size": 7031,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-024"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-025.png",
+          "sha256": "9bb73f9203158ec308f5c54ef75c474ebace77c6a88fb7ab18e9bcba7ab0e5ac",
+          "byte_size": 6444,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-025"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-026.png",
+          "sha256": "1dcf6eae1679c603bd664d9a980b183bf44a04cdb502a5a43b1bb8e1d123c3c3",
+          "byte_size": 6036,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-026"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-027.png",
+          "sha256": "32fcc6ef225a73b8ae4e35c5e23a0185f2a04632087184f57caec48900ca4aa7",
+          "byte_size": 7177,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-027"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-028.png",
+          "sha256": "30e984503cfeebb0c38f04c1da233e899c7b55e10cb40881a64302c0d42f263d",
+          "byte_size": 5115,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-028"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-029.png",
+          "sha256": "ebb8457adcb81cad51591bd05fb981a4a0fe1248776b08dfefa9fc82d7a5ae41",
+          "byte_size": 6701,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-029"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-030.png",
+          "sha256": "d82c005d955f2d2e123cbfcbc040101b32a4e9b2b211991f216e5f26486ece34",
+          "byte_size": 6645,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-030"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-031.png",
+          "sha256": "7754dff72dce051d58b751be46fd614706fb53482a90df6f4205e0ad464b1ec5",
+          "byte_size": 7602,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-031"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-032.png",
+          "sha256": "af59e49d54be5598c80c17a0f0a55e35f03d15ad8cbf206b69a6715a609187ce",
+          "byte_size": 4449,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-032"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-033.png",
+          "sha256": "9124e5fb3ffe7fee4383ca49dd9bcb1617ac07338ffd2f991b7f63e12cd917e1",
+          "byte_size": 5237,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-033"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-034.png",
+          "sha256": "998712cf8d4c238f722a8a4c31415a656113b3beaf9944c21ac3c45386aacde6",
+          "byte_size": 9524,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-034"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-035.png",
+          "sha256": "6251ddc8b67a643ca18fc5f421d2545cd339bb810f868605a0e07d0d3a1c625a",
+          "byte_size": 7270,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-035"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-036.png",
+          "sha256": "f1efd7cb01d9fc50843257c3c0219479e5a3ca729ce6143a1c1567cbe47ee133",
+          "byte_size": 3623,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-036"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-037.png",
+          "sha256": "be1d3856ee23bf998b91c891472d0e8ec37748ed93ec6c18bc06d4defecd9d49",
+          "byte_size": 3697,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-037"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-038.png",
+          "sha256": "81fb2144ccff1e425ba4760c49ff0bf4fd01149ec58abb2b036a9f8ea4eee59f",
+          "byte_size": 5006,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-038"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-039.png",
+          "sha256": "ff97e188eafce835c2e72b8a7bd6d4ad17d881bc618cd535a4082c8687cb2f75",
+          "byte_size": 3780,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-039"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-040.png",
+          "sha256": "c58466b53bd66cc457f4dc3b9878de94698e427c9e5bbe0ddcbceb9e4491f54c",
+          "byte_size": 5892,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-040"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-041.png",
+          "sha256": "a4ddd02c3da46b499015110868c4aec5f3875b10cacc6d3af2cf0edfcf0d5afa",
+          "byte_size": 4805,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-041"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-042.png",
+          "sha256": "6f706d617eea7769dfd74db6bd67e079f43b2579cba9f17be4b57cd6c61cc5ab",
+          "byte_size": 3712,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-042"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-044.png",
+          "sha256": "4d4847a4955cb72bdea313490b3c3c7e9edcdf2ef7d07c9dce20b2d4c0085fba",
+          "byte_size": 5646,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-044"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-045.png",
+          "sha256": "313455b082b9b5996eb258f234a06c781be406c1701683547b54a573e7cee461",
+          "byte_size": 8800,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-045"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-046.png",
+          "sha256": "aec1821204d791b61f16beefc5f4854b410a10e8abc97b7b2aaa436918d59f3f",
+          "byte_size": 5345,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-046"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-047.png",
+          "sha256": "074d3d01bc7d7bf2d7d85e0aceb0616b7c3d516c5885b757f0bf0c0508355e29",
+          "byte_size": 5099,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-047"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-048.png",
+          "sha256": "9e6f14481803be0c79d3c578256bfd0b7127c3c3d40d107c1e5b604fc39e7f85",
+          "byte_size": 5163,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-048"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-049.png",
+          "sha256": "c195c93658516ecc6665ed4a9d366d4d6553ffc92507fb4e6b755b5e48bcc5e9",
+          "byte_size": 4171,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-049"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-050.png",
+          "sha256": "81cd8ee0a4c30daf59a6d0e7d127ab32432a2e28f4f5b16667197a000d07b380",
+          "byte_size": 6896,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-050"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-051.png",
+          "sha256": "8ceba02ee9c1aee73518c8a15865b92fe339d3952ad7c626ebd4fdeccb053d17",
+          "byte_size": 6013,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-051"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-052.png",
+          "sha256": "d10c6b422af1bf3aecd3c1d1d3638404a5be0844a4ccc2aaae777c8a24ac66e1",
+          "byte_size": 3856,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-052"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-053.png",
+          "sha256": "04d336c469c7b2306e0784d1a8b13ba5730cb6cd68e8f2c02906e70a46cc928a",
+          "byte_size": 5977,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-053"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-054.png",
+          "sha256": "88a8d906cbcc9ce308cc670a3703a46d5218868d76b1558c918c92b658f6c1fa",
+          "byte_size": 5242,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-054"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-055.png",
+          "sha256": "ba7670f5ad8aae964616f05a2cbd45486341f4e5e3d5232e2f669c628e20d53f",
+          "byte_size": 7524,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-055"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-056.png",
+          "sha256": "87d9111d4e9cbb0051f3f71cfeaef588f5401c36d4ba3e05c4d0306c6c663105",
+          "byte_size": 5809,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-056"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-057.png",
+          "sha256": "e71315380f9c21244faf19de8ff4bdfb43038786dc0180dfad9d5d50fa03b7f6",
+          "byte_size": 4437,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-057"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-058.png",
+          "sha256": "8fe7794d41d278f61a2a6d4d3c25092c477bfc6169cc3d19af271d37ecb6ab34",
+          "byte_size": 5929,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-058"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-059.png",
+          "sha256": "77d1a4e9e054171ac21e2d71727d822bfda4073ac46b11b362d3927b7492e892",
+          "byte_size": 6878,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-059"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-060.png",
+          "sha256": "c0a28addb144976880b79dd47a998b7094d7361da12186a56a0caaca5a687cfa",
+          "byte_size": 6915,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-060"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-061.png",
+          "sha256": "b3a2d3c537a51cb2c06d919f977084b5038ea04dfdaaa165bfb320ae99437347",
+          "byte_size": 9306,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-061"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-062.png",
+          "sha256": "1baa80a33771e6db80fb1faf75559beded2c06567e8e909ee967f8f614ef06a5",
+          "byte_size": 4628,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-062"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-063.png",
+          "sha256": "b9af2623c26108ba3ef5e6478813b04899336891cb7d4864017e0354bd92a161",
+          "byte_size": 4322,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-063"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-064.png",
+          "sha256": "5cb03aac64458379862327041cbc82ca430928ad67d9d8f6e12c7fd0c9b121e6",
+          "byte_size": 5394,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-064"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-065.png",
+          "sha256": "5b4d06a0307aca76493027731c561d7095aaf2bf2991df3e640689db1433229a",
+          "byte_size": 4450,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-065"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-066.png",
+          "sha256": "e766448d99f863ea6baae9e0fea3d35e49af0108a81952fb294a0ada3a5a5a69",
+          "byte_size": 3342,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-066"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-067.png",
+          "sha256": "89fcee76c29241d2656cbf00b137873accea97389fdb185f7a562925a8eb95ea",
+          "byte_size": 9042,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-067"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-068.png",
+          "sha256": "9ab887ea0e20b1dbdcdb47813f6a2edbc148fad77d5b5b01507c0b1d2f510c0d",
+          "byte_size": 7234,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-068"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-069.png",
+          "sha256": "fc85401914ac3a6df5d98a7dd2c0fd00bbd9d4c9d3aab5ad292bdbecbc5a872f",
+          "byte_size": 4015,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-069"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-070.png",
+          "sha256": "0126e97c97e46fe2d0a663481dbb0b0641f944670d39cafb58f89d837994e882",
+          "byte_size": 6013,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-070"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-071.png",
+          "sha256": "ee2667136947a77c7c441233859d3d6df7a04ebe518bf0470ad546e0d11523f2",
+          "byte_size": 5956,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-071"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-072.png",
+          "sha256": "1695d7b39449adc80d709a80facdcdc230c2ded1d4fdfedf9d8114844c7f2d5a",
+          "byte_size": 5559,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-072"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-073.png",
+          "sha256": "bf8d8774a913421634fd90e66cd0544954ac5f7810d25a663b616da3aa5c9c10",
+          "byte_size": 7511,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-073"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-074.png",
+          "sha256": "013dcb1c31723a323eeac4896d79837f3a6aa76af695a07bbd3dd0b2ca2c369d",
+          "byte_size": 5626,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-074"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-075.png",
+          "sha256": "6da95c9d11be2f7676d518dcc680547177a387d64465896aba6b783fb1db3b3d",
+          "byte_size": 4718,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-075"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-076.png",
+          "sha256": "5b8f44f5d42c259e98bac7f5bcba35f4311245914c3ef95b837029868a3b7492",
+          "byte_size": 4987,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-076"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-077.png",
+          "sha256": "d56d8c7e82afa74d449f98c26ce48a03fc3af144e9d3ba8a99429c77ee4fa96d",
+          "byte_size": 5738,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-077"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-078.png",
+          "sha256": "57282d51a0e236c9cb65571486b506251899d35696f480ec38c03b9a402dcfd6",
+          "byte_size": 6458,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-078"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-079.png",
+          "sha256": "e8f534e615de358af5aa51a4fe81a935eb71b72b49e874509bc87e9b037fb0e9",
+          "byte_size": 5726,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-079"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-080.png",
+          "sha256": "f6159cf7c6939ef0d377d4c5daab832b05c869ccce12cbb625e2fcf5bb230f32",
+          "byte_size": 5238,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-080"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-081.png",
+          "sha256": "6f0754ac1892f57142b03ec342ae6c822d232a8a1131dad714e6eb9e5574af7b",
+          "byte_size": 4519,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-081"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-082.png",
+          "sha256": "1fa9656ddc80ce6a748fce9d0fff32d36da93aa88719b52796dc8c8e67de3f97",
+          "byte_size": 4802,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-082"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-083.png",
+          "sha256": "5d027eb57cd0921174fb278cc564c6174c0cc9bb4b90890b86e94361b6ebd588",
+          "byte_size": 7359,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-083"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-084.png",
+          "sha256": "0529650f87c1ae6fc0608fea6e9e6d2853bed6bb0bf741a9852f810c0b501d5f",
+          "byte_size": 10564,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-084"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-085.png",
+          "sha256": "b3f0df08c96b060df13b5c4375961b5756e93487fa6b78ab140078d18ab01be7",
+          "byte_size": 4835,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-085"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-086.png",
+          "sha256": "823d1f82e2a4c1306c2b062080bdbde963f6752a897977e544b50f2c6eb8c0b6",
+          "byte_size": 5035,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-086"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-087.png",
+          "sha256": "3f9a853eb042c635a8229dfa51a5df81802fa7f0137e3687be6637439e5b02b5",
+          "byte_size": 6248,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-087"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-088.png",
+          "sha256": "1d6d53dbe26809323e84c3e165668b8c0894c155a16516c5f57dfa481ddff6df",
+          "byte_size": 4706,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-088"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-089.png",
+          "sha256": "0f047544f9e3ccbd167483398a36997c74e5c9311ec0484882c8b9aee0a88af4",
+          "byte_size": 5505,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-089"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-090.png",
+          "sha256": "375250c765627db4862a263a242d9a62b15aa6c97be39681f5bbd7f2fb07affc",
+          "byte_size": 4352,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-090"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-091.png",
+          "sha256": "87feb11da6b68122ebdd3587d752cca019f08dae86378fe965290b4a7475d0c4",
+          "byte_size": 5612,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-091"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-092.png",
+          "sha256": "798602243f33ad76d08efabd30661616367d49e25e14ff57be5dfd93d32b2116",
+          "byte_size": 3582,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-092"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-093.png",
+          "sha256": "4742f3aed1aae4162b2a0f612aa0f2886f72e9d9ab308d07f619c76642ed97ca",
+          "byte_size": 3297,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-093"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-094.png",
+          "sha256": "a0d281e68598264ffcef11146e26500bca2629f2eb4dfaa23d11bc1e5830b6fd",
+          "byte_size": 5430,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-094"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-095.png",
+          "sha256": "62bb856837909dbdb4a32619c0aee19e6021651fe7b577338025e48573bc0875",
+          "byte_size": 4711,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-095"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-096.png",
+          "sha256": "f7fe9fc20dd83474eefa59a5407a382c9090e1dfefb0fc8daf58beebb110fc9f",
+          "byte_size": 4717,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-096"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-097.png",
+          "sha256": "1eb43b8b7ca224140f06dbcb40e241ec6acadd181be9644c52cc00172346399c",
+          "byte_size": 8465,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-097"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-098.png",
+          "sha256": "8813e110cee6a5ea9ab649c70a7b6d2a4ce4f804d21d717b8e837edc7b87485a",
+          "byte_size": 4695,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-098"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-099.png",
+          "sha256": "e7d436e38db2859fbab48c73c2e38a4eb18b5b94284b484a5fdc04cf55e07e33",
+          "byte_size": 3818,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-099"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-100.png",
+          "sha256": "54e3bcb8c877d29adea1beb9ad188b193dd5e65844923ed48b5b516c2ad057af",
+          "byte_size": 9427,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-100"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-101.png",
+          "sha256": "02d7204ca7370d942cb12a2873ccaf5af7596a51395b05bccd01d6560b499a28",
+          "byte_size": 4845,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-101"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-102.png",
+          "sha256": "5ebab8059ae19a30d872114cfd48bfd8826c60405cbe754343829d1efb1ddf55",
+          "byte_size": 6632,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-102"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-103.png",
+          "sha256": "46b6135d36ba37fe5bf0be6a8fbb60e535cd16a79b61726c2754335761fec163",
+          "byte_size": 5537,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-103"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-104.png",
+          "sha256": "eb3fc6071dfc484b2276a95ea957532d5485a346edd25407ba3ae4b886a7ef01",
+          "byte_size": 7345,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-104"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-105.png",
+          "sha256": "04c2919ad27410e28bb92f40c220db84d4dd67f5dc11c8a8757fb3453bd13a4f",
+          "byte_size": 5475,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-105"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-106.png",
+          "sha256": "a33ceae5ec607a19da044c37934b70952fe9a0f16d1483c697f5a1c6c2bf7f91",
+          "byte_size": 5280,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-106"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-107.png",
+          "sha256": "568e7acb651d63f0576b6bcf11fe9d7794834db7a483922a105b87065f87a5f0",
+          "byte_size": 4712,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-107"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-108.png",
+          "sha256": "3aca19f338d45ede554e1c2925b814e58d66d4dc12fa53632ddf61d95e953399",
+          "byte_size": 4745,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-108"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-109.png",
+          "sha256": "e37c7c558b8068305e9b0d8b90bf0f2b1924c7ed516c3291b7f092f3480a6a4e",
+          "byte_size": 6275,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-109"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-110.png",
+          "sha256": "7c5dc3c174b4b68815c949b0308ab8f991a30d4e58d6f45a9c66bfd6349f6b27",
+          "byte_size": 6722,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-110"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-111.png",
+          "sha256": "b073583890ca06d5ac8bdcb9d020aec9bfa5878267df3c945dd390223efb4842",
+          "byte_size": 3628,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-111"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-112.png",
+          "sha256": "0a1910108463b7bd07cfcbf9540fd32a7916837631a566369ce184a77d3ca9ad",
+          "byte_size": 4961,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-112"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-113.png",
+          "sha256": "8406c57530b00ea58eec95e945eaf9f39fd3f5062e657da0945a8a199f5107dd",
+          "byte_size": 6937,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-113"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-114.png",
+          "sha256": "6e180cde8709209768c9ec7db652908bc1bebc7c304be2b7737786d2f5163532",
+          "byte_size": 5596,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-114"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-115.png",
+          "sha256": "f916b730364d2eb3a3f62a1eec4e455f38bcd6ef2761b8abada22346791cbdd9",
+          "byte_size": 6985,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-115"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-116.png",
+          "sha256": "c6bcc076bf9129cce2c78d0415c7ced11d1aa48fe77dfc7f8bcee415ebe10f9b",
+          "byte_size": 3545,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-116"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-117.png",
+          "sha256": "67cf706f3c8ed3b9f8f0665ee6adda7fd49726d16aec7e8258758d9c082ce529",
+          "byte_size": 7857,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-117"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-118.png",
+          "sha256": "c6158d4f8687d2532f8c07eadf8e8b9d8df62c0fe5a82d95d249afc6fb050b7c",
+          "byte_size": 6541,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-118"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-119.png",
+          "sha256": "f835ea65aabccb124d47a705961737f46e18d85e424fa65535a844dfa855dda3",
+          "byte_size": 7433,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-119"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-120.png",
+          "sha256": "773ca95abc405dca22252e49dd0be7a3837068e81c50226492cdc8e3af88fa8f",
+          "byte_size": 6388,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-120"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-121.png",
+          "sha256": "597ccf9102d053208ac91d33fe4303250b659ba4b6a7d296f4c573a50ae18582",
+          "byte_size": 9506,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-121"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-122.png",
+          "sha256": "5d516c88cfc5ebb606950070432c44ee76e27dfe24b4adf831cbfbaa778e4fc7",
+          "byte_size": 7127,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-122"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-123.png",
+          "sha256": "da0f89ad8fe821535cf6226ba6659e896541898f1c5a1104df2170a5d9b1fd62",
+          "byte_size": 10183,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-123"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-124.png",
+          "sha256": "94eedbf468a6c1c6c867bc3ff1a34e96e78a28e71bfebb001050c662962a1def",
+          "byte_size": 5270,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-124"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-125.png",
+          "sha256": "f5e0f8ef2deac938a4aaa3f21f2c4f065ff25450bcab75bb393b776410f8e04d",
+          "byte_size": 10342,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-125"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-126.png",
+          "sha256": "ef94e516602b0b73847722b812966bdb5cc02aff33f7a51c659ff4a7caacb543",
+          "byte_size": 6340,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-126"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-127.png",
+          "sha256": "3b6b3be453239b4bef79b031717d41cb824fe95b5f604b1683cdc86e40c76ce9",
+          "byte_size": 6138,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-127"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-128.png",
+          "sha256": "d13633d99d9204b91f16a43d0bc8b48c0b3cf35951bb7e9b4d12839640aa21d5",
+          "byte_size": 4889,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-128"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-129.png",
+          "sha256": "64f79c4e20be442878b6440a39b2358e12c6da3105dd31e7f5fa8ff0c428fb04",
+          "byte_size": 7375,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-129"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-130.png",
+          "sha256": "bed70218245baa0ced447fe8b45a0d8eb0fc562f1241859ef63e85bf5a6cef1a",
+          "byte_size": 3942,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-130"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-131.png",
+          "sha256": "33f5ef1e9b9feb3ba03768a49bf41dcdb58fc095141e34fd7cbba9397ba8d70e",
+          "byte_size": 7742,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-131"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-132.png",
+          "sha256": "6c0dc35e40abb048c9b81851ab6135ec12ea10638f38aff63eb4511a6bf890ca",
+          "byte_size": 4881,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-132"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-133.png",
+          "sha256": "0ff162f774adfbfdcd599f3c26c83d442a1ce983034db2a4fb0b6da9047c0645",
+          "byte_size": 4458,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-133"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-134.png",
+          "sha256": "18547182bfad9d668845c20a63b19838cbaf05724bf1b5d24d66e7f0526f5fb4",
+          "byte_size": 5755,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-134"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-135.png",
+          "sha256": "1d642eb3790273cf608e39f85921b53ebbbefcf0c2e2add624856049feaa0543",
+          "byte_size": 7132,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-135"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-136.png",
+          "sha256": "8fd648accbeedcadbd37d57ba944267101c906be736f73d5472a29502a5d0677",
+          "byte_size": 6432,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-136"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-137.png",
+          "sha256": "faca3e61b320c85c2c295ea44519cff8c5fa78c495eb4a841b76f6600a5f1417",
+          "byte_size": 3667,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-137"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-138.png",
+          "sha256": "a016a5943c5abce8286f908eed6c339b2e5406134320bfc2916b99317aefc672",
+          "byte_size": 6239,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-138"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-139.png",
+          "sha256": "c523a0e6ac64ce46c9a82f5f618429357f5ee199a6c8582ec8cb59b24aa8b93d",
+          "byte_size": 4257,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-139"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-140.png",
+          "sha256": "bee253abc63164f7892e066b3dbd174965d57ea916dc98a74798d189fa413e78",
+          "byte_size": 4856,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-140"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-141.png",
+          "sha256": "adec1c98a65961d2429d8fe53eda9008dd53ce1880e1af875c5f47523b853774",
+          "byte_size": 8527,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-141"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-142.png",
+          "sha256": "c65f45df608c881e0767c1a7e47eecd7a2f817f231cf6f20b126925ebf69b6c1",
+          "byte_size": 4469,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-142"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-143.png",
+          "sha256": "07a0322865418c3013e9f96209a15e242ebed7110022ee1a44c80a31c00e92ca",
+          "byte_size": 6509,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-143"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-144.png",
+          "sha256": "6f402715c97560caf10ef4b18983b5c3a4010be4bb6b6abd9b281f97f56f8e60",
+          "byte_size": 4414,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-144"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-145.png",
+          "sha256": "ede59d755768aec1cf5c1c3db7d8757861f8164cb80eadf5047a5f4f8e89990d",
+          "byte_size": 6429,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-145"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-146.png",
+          "sha256": "b9b2ac263ed4db706895a416b63354dd2bbdb114ac01cb672dfce54136132260",
+          "byte_size": 5974,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-146"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-147.png",
+          "sha256": "9fb74317f70668b45bb26efb28fa469c30e23366e3257933f5a513f1f59770e1",
+          "byte_size": 5195,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-147"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-148.png",
+          "sha256": "fe9b6063d61715a2ad0ea2a0cf249fd65168f3f17957d2b9dbc95604d605b576",
+          "byte_size": 8183,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-148"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-149.png",
+          "sha256": "daa0d8750a75ae6b8017375808c9cea4e367abb5bef24804f0e752f87ddfa4b0",
+          "byte_size": 4371,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-149"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-150.png",
+          "sha256": "4d6d48fbb0572004c18cccd1380ce9a690593ac26f2b60e696665c4a1e22c4aa",
+          "byte_size": 5855,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-150"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-151.png",
+          "sha256": "1d57cdb43b54594b19cd6e95b90231eeffe56006efa3c57054d4b7cf9785f3e7",
+          "byte_size": 6931,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-151"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-152.png",
+          "sha256": "dff12c150c569be2619044cf5bb6c67e86c2519dd5664a8d66801dc4b8d1d8a4",
+          "byte_size": 8299,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-152"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-153.png",
+          "sha256": "274bebdbb380dc87f6e114c4154b56f853b750c7d01508e86b051e882c1c6e39",
+          "byte_size": 5639,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-153"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-154.png",
+          "sha256": "50a3900e7123fe0f035c6f5c27a3a42e175eeec7041ef4f0287186467b750893",
+          "byte_size": 7386,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-154"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-155.png",
+          "sha256": "e98118f0e77ea58320bf453c55a8aed0cb192cf12664f289d782c09ba2174386",
+          "byte_size": 5478,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-155"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-156.png",
+          "sha256": "8a62a19ea569ca7c2eddc8cfe96478c08c2940d4e91a62195ce7478b404ded81",
+          "byte_size": 5861,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-156"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-157.png",
+          "sha256": "7ff83782372e0c1da23cfb8e9ce9b07d6fde9f29acdf3584ccf30193c7a0f47f",
+          "byte_size": 6320,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-157"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-158.png",
+          "sha256": "114f860cca5c506be236932f3c06d242eeea11a7dd26c7d1cf2875f2b483e86a",
+          "byte_size": 4956,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-158"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-159.png",
+          "sha256": "02b6d5c232c622c859ca7d091f8e2793043b07d5d50a6f8902210ed6a87f1bf6",
+          "byte_size": 5821,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-159"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-160.png",
+          "sha256": "52f46c229374d667e4084e6f3ebc7db8d5d4c64623e653fc04da3b9cd2c694fb",
+          "byte_size": 6403,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-160"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-161.png",
+          "sha256": "59c1886aef518b7fe53abb34c38ee67f5622ec387212822bb794077adab25cca",
+          "byte_size": 4402,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-161"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-162.png",
+          "sha256": "0e179dc928c97378f4116d20eb687474e03edc93cf3ec90473566f0250cef5a7",
+          "byte_size": 5178,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-162"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-163.png",
+          "sha256": "6c7358f6bc1c0e927a2dc36692ece519295edb9f4ff9aae4e80e869ec7ded5a4",
+          "byte_size": 6215,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-163"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-164.png",
+          "sha256": "872adcb49b04c718c9351d77400ce0b292c5a38873873e5c0d24006bf1bad1fa",
+          "byte_size": 4354,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-164"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-165.png",
+          "sha256": "8bf9b46a90aab97353e462b676d2042810bb375e3f11f79539226ae6109e33cb",
+          "byte_size": 4058,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-165"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-166.png",
+          "sha256": "c836df1e1a19e289ea21b32eba2a74eb6f8d1e64530bc809540276b24d2ef593",
+          "byte_size": 4504,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-166"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-167.png",
+          "sha256": "66118546e623a13af2ad06367fadc783647b3f0c8eadd17696e9530f203ef178",
+          "byte_size": 5621,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-167"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-168.png",
+          "sha256": "1933fea6636d979a61a31d5ef757a9eca9da9786bcc337d9d04ffb1926fdbff0",
+          "byte_size": 6107,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-168"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-169.png",
+          "sha256": "81f61d2eb78254ab7ed9fd243a6aa7e962576e3f52a71bfea19c674e81ed903f",
+          "byte_size": 6569,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-169"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-170.png",
+          "sha256": "d1c90df230217c96efdae2d47afc3de9189aaf28c95cbb82be94e88ac18e6161",
+          "byte_size": 6394,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-170"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-171.png",
+          "sha256": "dcd95c1abd072bec8ea6a40212ae5dadaa3adb0888c3bea9c25f9d034e1d8ab0",
+          "byte_size": 5569,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-171"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-172.png",
+          "sha256": "d57bf24a53e874e7e56cddcc5665b9ce2e2a3536970368a174c07f1cbf69c230",
+          "byte_size": 9115,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-172"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-173.png",
+          "sha256": "816cfdd11917f2970c7ea59a483b9befa4f2baa4b2cc0dd2dc928c527c88a362",
+          "byte_size": 4458,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-173"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-174.png",
+          "sha256": "cc568ae92363bb8e9dece9d1d9f54d4ac08904f64e789438498ae2449bd57b90",
+          "byte_size": 4922,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-174"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-175.png",
+          "sha256": "85ac273876b3b21b8aa970e92c523d482c684ac629bc80c478f997e22311136d",
+          "byte_size": 4628,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-175"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-176.png",
+          "sha256": "c430889f1f26b60a90930517b49ba2779d317be74f6944ce08f70f460b064fca",
+          "byte_size": 5716,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-176"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-177.png",
+          "sha256": "888a0d8132139584d37b2c9b10ea81cf6921683196d489a0b22e24dadfd369e7",
+          "byte_size": 5849,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-177"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-178.png",
+          "sha256": "353f18e5d6515fd28edc261888a35d272727c009c53f1ba0e1d5937375c48517",
+          "byte_size": 4180,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-178"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-179.png",
+          "sha256": "93a6cb6ade9d83979ca48ae45c273be0fdd24010014e7b10f93019fc500a489e",
+          "byte_size": 5701,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-179"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-180.png",
+          "sha256": "2778313cc467af8435ac043b4d6aa974cd9e7c9b387e09cadf239f01213b38eb",
+          "byte_size": 7245,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-180"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-181.png",
+          "sha256": "838d57769c3100b161c5b61eb8fd998f1f9ea1ffad498311cdd1635bfdb117db",
+          "byte_size": 5266,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-181"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-182.png",
+          "sha256": "f5ce9365469a151486685fe57955c8143e08c733a29372758d2084cb48d1af0b",
+          "byte_size": 7747,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-182"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-183.png",
+          "sha256": "0e7d3088b0446bc45105ba0ab7e0ccd9b111e5df4a63011bc1ec597530340e2a",
+          "byte_size": 5720,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-183"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-184.png",
+          "sha256": "01506ac53f7fe2b3eee7355fd999d92c6d8cb89a2038422bf82288556878f1ec",
+          "byte_size": 9438,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-184"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-185.png",
+          "sha256": "73e43aa26045d46fb33b7501433940d0e7ec8ccd939cb7efe6cc333ffd12da0b",
+          "byte_size": 5995,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-185"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-186.png",
+          "sha256": "ed35797ab3b17b3c0bc3105c851ef737c19087ea0470707fa26f438a960578a0",
+          "byte_size": 6441,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-186"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-187.png",
+          "sha256": "72267dde99bf2fdc94624b52405069b760dc9a1204c7e35f82f9f7dd47aa0d9f",
+          "byte_size": 6197,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-187"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-188.png",
+          "sha256": "e3880e62ba46c2bb44ba44be061251846961bc67e1af1ecf9c5e589dc2b9e9aa",
+          "byte_size": 6160,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-188"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-189.png",
+          "sha256": "9422318842a405ae19291ab0da753c0148453b988dbb31a63ecff64c016cb4e5",
+          "byte_size": 4842,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-189"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-190.png",
+          "sha256": "dd240110431c14abf69d776eeaed6dcfa3e6ffd502237fa07d79bc4d3981c265",
+          "byte_size": 5724,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-190"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/live_gemini25_c8/runs/concurrency-8/tiles/glyph-191.png",
+          "sha256": "b7a283ce112dc7ce53cd1951c2d84cbf1539e3d6029f90416411e208b1d3ff70",
+          "byte_size": 9143,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-191"
+        }
+      ],
+      "errors": [
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-043: expected one artifact, found 0"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "expected 192 valid tiles, found 191"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "expected 192 unique tile hashes, found 191"
+        }
+      ],
+      "speedup_vs_concurrency_1": null,
+      "parallel_efficiency": null
+    }
+  ],
+  "fastest_concurrency": null,
+  "assembly": null,
+  "total_recorded_cost_usd": 8.595354,
+  "errors": [
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-043: expected one artifact, found 0"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "expected 192 valid tiles, found 191"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "expected 192 unique tile hashes, found 191"
+    }
+  ]
+}

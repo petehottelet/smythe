@@ -24,6 +24,14 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
+### Added
+
+- Diagnostic benchmark records from September 26, 2026: second runs of the
+  live transparent and SVG Noumenon lanes, a zero-latency Noumenon profile, a
+  192-glyph Gemini concurrency sweep up to 128 with repeats at 32 and 64,
+  Gemini smoke runs on both image models, and a repeat of the image
+  concurrency sweep with three k=25 runs. The reports label them diagnostic.
+
 ### Changed
 
 - The jobs scale campaign refuses an evidence folder inside the home folder,

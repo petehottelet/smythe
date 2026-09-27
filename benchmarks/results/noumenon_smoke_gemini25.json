@@ -1,0 +1,179 @@
+{
+  "benchmark": "noumenon-fanout",
+  "record_version": 1,
+  "partition": "smoke_gemini25",
+  "mode": "live",
+  "status": "passed",
+  "protocol": {
+    "graph_nodes": 8,
+    "topology": "broadcast_reduce",
+    "one_provider_call_per_node": true,
+    "concurrencies": [
+      8
+    ],
+    "offline_latency_s": null,
+    "normalization": "PNG 128x128",
+    "background": "auto",
+    "transparency_check": null,
+    "vectorize": false,
+    "vectorization": null,
+    "assembly_requires_glyphs": null,
+    "assembly_supported_glyphs": [
+      192,
+      256
+    ]
+  },
+  "provider": {
+    "name": "GeminiProvider",
+    "model": "gemini-2.5-flash-image",
+    "size": "1024x1024 (1:1 aspect config)",
+    "quality": "default",
+    "background": null,
+    "cost_per_image_usd_estimate": 0.039,
+    "max_cost_per_call_usd": 0.06,
+    "max_budget_usd": 0.48,
+    "official_guide": null
+  },
+  "environment": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "packages": {
+      "smythe": "0.9.0",
+      "pillow": "11.1.0",
+      "openai": "3.19.2",
+      "google-genai": "2.25.0"
+    },
+    "installed_packages": {
+      "smythe": "0.9.0",
+      "pillow": "11.1.0",
+      "openai": "3.19.2",
+      "google-genai": "2.25.0"
+    },
+    "smythe_source": {
+      "version": "0.9.0",
+      "module": "smythe/__init__.py"
+    },
+    "source_control": {
+      "revision": "76e3b609dea6eb08a0c26a9fe3b48581a37f5a19",
+      "dirty": false,
+      "untracked_files": 1
+    }
+  },
+  "runs": [
+    {
+      "concurrency": 8,
+      "status": "passed",
+      "execution_id": "09a79bdcb296482887813b70fb540bf2",
+      "generation_wall_s": 16.69537,
+      "validation_wall_s": 3.371853,
+      "vectorization_wall_s": null,
+      "end_to_end_wall_s": 20.067224,
+      "completed_nodes": 8,
+      "throughput_glyphs_per_s": 0.4792,
+      "cost_usd": 0.48,
+      "cost_is_complete": true,
+      "cost_contains_estimates": true,
+      "validation": {
+        "passed": true,
+        "expected_tiles": 8,
+        "valid_png_tiles": 8,
+        "tile_size": [
+          128,
+          128
+        ],
+        "unique_tile_hashes": 8,
+        "errors": []
+      },
+      "vectorization": null,
+      "tile_receipts": [
+        {
+          "path": "smythe_artifacts/noumenon/smoke_gemini25/runs/concurrency-8/tiles/glyph-000.png",
+          "sha256": "3f761c9b387d98e18abe8c819e7c814f69b18c04f649efe30b913a50fbf7139c",
+          "byte_size": 6694,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-000"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/smoke_gemini25/runs/concurrency-8/tiles/glyph-001.png",
+          "sha256": "ec414e9ffb353c50674c5bf47a4958e9e7eeaa43e5f7700642d5361dee7ab518",
+          "byte_size": 10622,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-001"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/smoke_gemini25/runs/concurrency-8/tiles/glyph-002.png",
+          "sha256": "4b5159b4cd5895525c80032ede0c9668c47909df27c9f81ddb55e641b06e682a",
+          "byte_size": 4043,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-002"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/smoke_gemini25/runs/concurrency-8/tiles/glyph-003.png",
+          "sha256": "250830d8e02351c80b7e4f4ffb9d91f041f588fb91008680f550c07dd4b2059a",
+          "byte_size": 5575,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-003"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/smoke_gemini25/runs/concurrency-8/tiles/glyph-004.png",
+          "sha256": "cf75ddcd86f63066ffe5139a29703dc8997e4f5250e4df6d58f92e472c55c1e9",
+          "byte_size": 6943,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-004"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/smoke_gemini25/runs/concurrency-8/tiles/glyph-005.png",
+          "sha256": "5867e71718939d4bbeb4e8cb080824374129b39ef8f5744af0cea296f3d2d65d",
+          "byte_size": 6224,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-005"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/smoke_gemini25/runs/concurrency-8/tiles/glyph-006.png",
+          "sha256": "8c8ca641c1549d7e0f6b2db6a8cfd37b5a3a0d7365450567ec7ce2a81a88caf4",
+          "byte_size": 5842,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-006"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/smoke_gemini25/runs/concurrency-8/tiles/glyph-007.png",
+          "sha256": "8c9867c47a55ee9ded1dff7874419a55024a0a3f46d6dcb0edf239094fbc91cf",
+          "byte_size": 7863,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-007"
+        }
+      ],
+      "errors": [],
+      "speedup_vs_concurrency_1": null,
+      "parallel_efficiency": null
+    }
+  ],
+  "fastest_concurrency": 8,
+  "assembly": null,
+  "total_recorded_cost_usd": 0.48,
+  "errors": []
+}
