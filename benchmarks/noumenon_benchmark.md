@@ -182,10 +182,13 @@ The live lane supports two providers via `--live-provider`:
 - `openai` (default): `gpt-image-2` unless `--model` names another GPT Image
   model, with low-quality 1024x1024 PNG output; see the
   [OpenAI image-generation guide](https://developers.openai.com/api/docs/guides/image-generation).
-- `gemini`: `gemini-2.5-flash-image` through `GeminiProvider` with a 1:1
+- `gemini`: `gemini-3.1-flash-image` through `GeminiProvider` with a 1:1
   aspect configuration; requires `GOOGLE_API_KEY`. The recorded per-image
-  estimate is $0.039 (the asset suite's convention) while budget enforcement
-  reserves the explicit `--max-cost-per-call-usd` ceiling.
+  estimate is $0.067, Google's price for a 1K image, while budget enforcement
+  reserves the explicit `--max-cost-per-call-usd` ceiling. A response that
+  finishes without an image fails its node instead of completing empty.
+  Earlier Gemini records used `gemini-2.5-flash-image` at $0.039; Google
+  shuts that model down on October 2, 2026.
 
 Live execution is deliberately one chosen concurrency, not a paid sweep:
 

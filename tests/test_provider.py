@@ -599,6 +599,46 @@ def test_gemini_no_modalities_for_text_models():
     assert "response_modalities" not in sent["config"]
 
 
+def test_gemini_image_request_that_finishes_without_an_image_is_incomplete():
+    # Gemini can end an image request normally with only an empty text part.
+    auto = _gemini_with_response(_image_response(images=0, text=""))
+    result = asyncio.run(auto.complete("sys", "draw a glyph", "gemini-3.1-flash-image"))
+    assert result.artifacts == []
+    assert result.stop_reason == "incomplete"
+    explicit = _gemini_with_response(_image_response(images=0), response_modalities=["IMAGE"])
+    assert asyncio.run(explicit.complete("sys", "draw", "gemini-3-flash")).stop_reason == "incomplete"
+
+
+def test_gemini_image_and_text_requests_that_deliver_are_complete():
+    image = _gemini_with_response(_image_response())
+    assert asyncio.run(image.complete("sys", "draw", "gemini-3.1-flash-image")).stop_reason == "end_turn"
+    text = _gemini_with_response(_image_response(images=0))
+    assert asyncio.run(text.complete("sys", "hello", "gemini-3-flash")).stop_reason == "end_turn"
+
+
+def test_gemini_missing_image_is_retried_under_the_retry_policy():
+    from unittest.mock import AsyncMock
+
+    from smythe.budget import Sentinel
+    from smythe.executor import Executor
+    from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
+    from smythe.registry import Registry
+    from smythe.tracer import Tracer
+
+    provider = _gemini_with_response(_image_response(), max_cost_per_call_usd=0.07)
+    provider._client.aio.models.generate_content = AsyncMock(
+        side_effect=[_image_response(images=0, text=""), _image_response()])
+    node = Node("Draw a glyph", id="glyph", metadata={"model": "gemini-3.1-flash-image"},
+                failure_policy=FailurePolicy.RETRY, max_retries=1)
+    graph = ExecutionGraph([Topology.SERIAL], [node])
+
+    Executor(provider=provider, registry=Registry(), tracer=Tracer(),
+             budget=Sentinel(max_budget_usd=10.0), artifact_dir=None).run(graph)
+
+    assert node.status is NodeStatus.COMPLETED
+    assert provider._client.aio.models.generate_content.await_count == 2
+
+
 def test_gemini_explicit_modalities_override():
     p = _gemini_with_response(_image_response(), response_modalities=["IMAGE"])
     asyncio.run(p.complete("sys", "prompt", "gemini-3-flash"))

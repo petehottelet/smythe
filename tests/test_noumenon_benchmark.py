@@ -465,7 +465,7 @@ def test_default_live_lane_keeps_its_payload_and_makes_no_transparency_claim(
         ({"model": "gpt-image-2"}, "gpt-image-2 does not support transparent backgrounds"),
         ({"model": "GPT-Image-2-2026-04-21"}, "does not support transparent backgrounds"),
         (
-            {"live_provider": "gemini", "model": "gemini-2.5-flash-image"},
+            {"live_provider": "gemini", "model": "gemini-3.1-flash-image"},
             "only with --live-provider openai",
         ),
     ],

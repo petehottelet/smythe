@@ -117,8 +117,9 @@ TRUNCATED_STOP_REASONS = frozenset({"max_tokens", "model_context_window_exceeded
 # these values: "refusal" for an Anthropic refusal or an OpenAI message
 # refusal; "content_filter" for OpenAI's content filter, Gemini's safety,
 # recitation, blocklist and prohibited-content finishes, and a prompt Gemini
-# blocked; "incomplete" for any other Gemini finish short of STOP. Any other
-# stop reason, including one a custom provider defines, counts as complete.
+# blocked; "incomplete" for any other Gemini finish short of STOP, and for a
+# Gemini image request that finished without an image. Any other stop reason,
+# including one a custom provider defines, counts as complete.
 REFUSED_STOP_REASONS = frozenset({"refusal", "content_filter", "incomplete"})
 
 
@@ -1254,7 +1255,14 @@ class GeminiProvider(Provider):
         if self._prompt_blocked(response):
             stop = "content_filter"
         elif finish in (None, "STOP", "FINISH_REASON_UNSPECIFIED"):
-            stop = "tool_use" if tool_calls else "end_turn"
+            if tool_calls:
+                stop = "tool_use"
+            elif not artifacts and any(str(item).upper() == "IMAGE" for item in modalities or ()):
+                # Gemini can finish normally with no image for an image
+                # request; the requested output was not produced.
+                stop = "incomplete"
+            else:
+                stop = "end_turn"
         elif finish == "MAX_TOKENS":
             stop = "max_tokens"
         elif finish in self._FILTERED_FINISH_REASONS:

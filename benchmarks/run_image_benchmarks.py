@@ -39,8 +39,8 @@ for _stream in (sys.stdout, sys.stderr):
     if _stream.encoding and _stream.encoding.lower() not in ("utf-8", "utf8"):
         _stream.reconfigure(encoding="utf-8")
 
-COST_PER_IMAGE_USD = 0.039
-DEFAULT_MODEL = "gemini-2.5-flash-image"
+COST_PER_IMAGE_USD = 0.067
+DEFAULT_MODEL = "gemini-3.1-flash-image"
 
 CONSTRAINTS = (
     "Photorealistic natural photography, physically plausible light and "

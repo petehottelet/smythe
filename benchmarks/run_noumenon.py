@@ -75,13 +75,13 @@ from smythe.graph import (  # noqa: E402
 
 LIVE_PROVIDER_DEFAULTS = {
     "openai": {"model": "gpt-image-2", "env": "OPENAI_API_KEY"},
-    "gemini": {"model": "gemini-2.5-flash-image", "env": "GOOGLE_API_KEY"},
+    "gemini": {"model": "gemini-3.1-flash-image", "env": "GOOGLE_API_KEY"},
 }
 # Recorded per-image estimate for the Gemini lane, mirroring the asset
 # suite's convention. The explicit --max-cost-per-call-usd ceiling, not this
 # estimate, is what budget enforcement reserves; verify current pricing
 # before any paid run.
-GEMINI_COST_PER_IMAGE_USD = 0.039
+GEMINI_COST_PER_IMAGE_USD = 0.067
 DEFAULT_CONCURRENCIES = (1, 4, 8, 16)
 # A quarter-second is short for an image API but large enough that this
 # benchmark measures bounded async fan-out instead of mostly local PNG

@@ -35,9 +35,16 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `~` in the records they write. `benchmarks/artifact_records.py` adds
   `redact_local_paths`, `scrub_record` and `evidence_directory` for new
   harnesses.
+- Gemini image benchmarks and examples default to `gemini-3.1-flash-image`,
+  recording Google's $0.067 per 1K image, because `gemini-2.5-flash-image`
+  shuts down on October 2, 2026. Committed records keep the model they ran.
 
 ### Fixed
 
+- `GeminiProvider` reports an image request that finishes without an image
+  as `incomplete`, so the node fails and a `RETRY` policy can recover it,
+  instead of completing with no artifact. Gemini can end such a request
+  normally with only an empty text part.
 - The Noumenon benchmark redacts account identifiers, such as the
   organization named in a provider's rate-limit error, from the records it
   writes. `redact_account_identifiers` in `benchmarks/artifact_records.py`
