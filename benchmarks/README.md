@@ -235,6 +235,11 @@ same delivered-output boundary used for the LangGraph and CrewAI arms.
    mechanics are deterministic. New result records also capture installed
    dependency versions. Paid model outputs remain stochastic, so reproducing
    the protocol does not promise identical scores or timings.
+5. **No private locations or account identifiers in records.** New sealed
+   campaigns run from a folder outside the home folder, because their records
+   bind absolute paths. Record writers replace the home folder with `~` and
+   redact provider account identifiers; `benchmarks/artifact_records.py`
+   provides `scrub_record` and `evidence_directory` for new harnesses.
 
 Install the complete optional harness environment from a fresh checkout:
 

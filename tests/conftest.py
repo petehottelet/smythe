@@ -2,6 +2,7 @@
 
 import ipaddress
 import json
+import os
 from pathlib import Path
 import socket
 import sys
@@ -11,6 +12,11 @@ import pytest
 TESTS = Path(__file__).resolve().parent
 ROOT = TESTS.parent
 PROFILE = json.loads((TESTS / "distribution_profile.json").read_text(encoding="utf-8"))
+
+# Offline tests create campaigns in pytest's temporary folder, inside the home
+# folder. Their records are never published, so they opt out of the evidence
+# path check; tests of that check remove this setting themselves.
+os.environ.setdefault("SMYTHE_ALLOW_PRIVATE_EVIDENCE_PATHS", "1")
 
 
 def _offline_network(event, args):

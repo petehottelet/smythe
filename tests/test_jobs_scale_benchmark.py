@@ -148,3 +148,25 @@ def test_final_zero_cost_ledger_rejects_drift():
     _validate_zero_cost({"cost": ledger})
     with pytest.raises(RuntimeError, match="ledger drifted"):
         _validate_zero_cost({"cost": ledger | {"confirmed_microusd": 1}})
+
+
+def test_campaign_directory_inside_home_is_refused_before_creation(tmp_path, monkeypatch):
+    monkeypatch.setattr(campaign_module.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.delenv(campaign_module.PRIVATE_PATHS_OVERRIDE, raising=False)
+    root = tmp_path / "campaign"
+    with pytest.raises(ValueError, match="outside the home folder"):
+        run_campaign(root, count=12, concurrency=2)
+    assert not root.exists()
+
+
+def test_finished_worker_log_has_the_home_folder_replaced_byte_for_byte(tmp_path, monkeypatch):
+    home = tmp_path / "home" / "Example Person"
+    monkeypatch.setattr(campaign_module.Path, "home", classmethod(lambda cls: home))
+    log = tmp_path / "resume-worker.log"
+    source = str(home / "repo" / "runner.py").encode()
+    log.write_bytes(b'Traceback\r\n  File "' + source + b'", line 1\r\n\xff\n')
+
+    campaign_module._scrub_worker_log(log)
+
+    expected = str(campaign_module.Path("~") / "repo" / "runner.py").encode()
+    assert log.read_bytes() == b'Traceback\r\n  File "' + expected + b'", line 1\r\n\xff\n'

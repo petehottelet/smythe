@@ -30,7 +30,7 @@ from statistics import mean
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
-from benchmarks.artifact_records import environment_snapshot  # noqa: E402
+from benchmarks.artifact_records import environment_snapshot, scrub_record  # noqa: E402
 from smythe import OfflineProvider, Swarm  # noqa: E402
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, Topology  # noqa: E402
 from smythe.provider import GeminiProvider  # noqa: E402
@@ -284,7 +284,7 @@ def main() -> None:
         else "benchmarks/results/image_k_sweep_offline.json"
     )
     Path(out).parent.mkdir(parents=True, exist_ok=True)
-    Path(out).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    Path(out).write_text(json.dumps(scrub_record(payload), indent=2), encoding="utf-8")
     print(f"\nSummary: {json.dumps(summary, indent=2)}")
     print(f"Wrote {out}")
 
