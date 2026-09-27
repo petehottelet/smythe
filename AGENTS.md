@@ -42,21 +42,17 @@ behavior belongs in the linked guide for that subsystem.
 - Use the visual rules in `docs/style.md` for diagrams and landing-page assets.
 - Validate local Markdown links after broad documentation edits.
 
-## Private planning materials
+## Private materials
 
-- Always keep internal implementation plans, proposals, project reviews,
-  scorecards, and their working measurement notes under `00_project_files/`.
-- Keep `00_project_files/` gitignored. Never stage its contents, force-add them,
-  include them in distribution or release archives, or publish copies elsewhere
-  in the repository.
-- Do not link private planning materials from public documentation. A request
-  to push repository updates does not authorize publishing these materials.
+- Internal implementation plans, proposals, project reviews, scorecards, and
+  their working notes are private. Keep them out of the repository, its
+  archives, and its distributions, and never link them from public
+  documentation. A request to push repository updates does not authorize
+  publishing them.
 - Public documentation is for user guides, product roadmaps, and benchmark
-  protocols and results. Internal implementation assessments stay private.
-- The legacy `plans/` documents and September project review have been moved
-  to private storage. Historical references inside immutable released changelog
-  entries and frozen evidence remain provenance; they do not authorize new
-  public implementation plans or reviews.
+  protocols and results.
+- References inside immutable released changelog entries and frozen evidence
+  remain provenance; they do not authorize new public plans or reviews.
 
 ## Private account information
 
@@ -93,4 +89,4 @@ behavior belongs in the linked guide for that subsystem.
   to GitHub describe code changes, features, and behavior.
 - Never describe private workflows or file structure in them: planning,
   review, or publication processes, internal tools or agents, local paths, or
-  private materials such as `00_project_files/`.
+  private materials.
