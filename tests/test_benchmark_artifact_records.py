@@ -9,12 +9,16 @@ import smythe
 from benchmarks import artifact_records
 
 from benchmarks.artifact_records import (
+    evidence_directory,
     environment_snapshot,
     image_mime_type,
     portable_path,
     redact_account_identifiers,
+    redact_local_paths,
     resolve_record_path,
+    scrub_record,
 )
+import os
 
 
 def _identifier(prefix: str, length: int) -> str:
@@ -142,3 +146,42 @@ def test_redaction_leaves_ordinary_text_and_placeholder_keys_alone():
     text = "org-chart " + "sk-" + "offline-test project_number:42 gen-lang-client-7"
 
     assert redact_account_identifiers(text) == text
+
+
+@pytest.fixture
+def fake_home(tmp_path, monkeypatch):
+    home = tmp_path / "home" / "Example Person"
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    return home
+
+
+def test_local_path_redaction_matches_separator_and_escape_spellings(fake_home):
+    native = str(fake_home / "project" / "out.json")
+
+    assert redact_local_paths(native) == os.path.join("~", "project", "out.json")
+    assert redact_local_paths(fake_home.as_posix() + "/project") == "~/project"
+    assert redact_local_paths(json.dumps(native)) == json.dumps(os.path.join("~", "project", "out.json"))
+    assert redact_local_paths(str(fake_home) + "Extra") == str(fake_home) + "Extra"
+    if os.name == "nt":
+        assert redact_local_paths(str(fake_home).upper() + "\\x") == "~\\x"
+
+
+def test_scrub_record_redacts_identifiers_and_the_home_folder(fake_home):
+    organization = _identifier("org-", 24)
+    record = {"error": f"429 in organization {organization}",
+              "paths": [str(fake_home / "out" / "tile.png")], "count": 3}
+
+    assert scrub_record(record) == {"error": "429 in organization org-[redacted]",
+                                    "paths": [os.path.join("~", "out", "tile.png")], "count": 3}
+
+
+def test_new_evidence_directories_must_not_expose_private_locations(fake_home, tmp_path, monkeypatch):
+    monkeypatch.delenv(artifact_records.PRIVATE_EVIDENCE_OVERRIDE, raising=False)
+
+    with pytest.raises(ValueError, match="outside the home folder"):
+        evidence_directory(fake_home / "campaign")
+    with pytest.raises(ValueError, match="private planning folder"):
+        evidence_directory(tmp_path / "work" / "00_project_files" / "campaign")
+    assert evidence_directory(tmp_path / "work" / "campaign") == (tmp_path / "work" / "campaign").resolve()
+    monkeypatch.setenv(artifact_records.PRIVATE_EVIDENCE_OVERRIDE, "1")
+    assert evidence_directory(fake_home / "campaign") == (fake_home / "campaign").resolve()

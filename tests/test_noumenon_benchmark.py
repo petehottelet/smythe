@@ -411,6 +411,16 @@ def test_written_record_redacts_the_organization_in_provider_errors(tmp_path, mo
     assert "Rate limit reached in organization org-[redacted]" in text
 
 
+def test_written_record_replaces_the_home_folder(tmp_path, monkeypatch):
+    home = tmp_path / "home" / "Example Person"
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    record = tmp_path / "record.json"
+
+    _write_json(record, {"out": str(home / "artifacts" / "tile.png")})
+
+    assert json.loads(record.read_text(encoding="utf-8"))["out"] == str(Path("~") / "artifacts" / "tile.png")
+
+
 def test_live_transparent_lane_fails_closed_on_opaque_model_output(tmp_path, monkeypatch):
     _install_fake_openai(monkeypatch, opaque=True)
 

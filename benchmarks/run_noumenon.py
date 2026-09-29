@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 from benchmarks.artifact_records import (  # noqa: E402
     environment_snapshot,
     portable_path,
-    redact_account_identifiers,
+    scrub_record,
 )
 from benchmarks.noumenon_assets import (  # noqa: E402
     GLYPH_COUNT,
@@ -709,7 +709,7 @@ def _resolve_output_paths(
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    payload = redact_account_identifiers(payload)
+    payload = scrub_record(payload)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary: Path | None = None
     try:

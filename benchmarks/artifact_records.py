@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import mimetypes
+import os
 import platform
 import re
 import subprocess
@@ -41,6 +42,73 @@ def redact_account_identifiers(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [redact_account_identifiers(item) for item in value]
     return value
+
+
+PRIVATE_EVIDENCE_OVERRIDE = "SMYTHE_ALLOW_PRIVATE_EVIDENCE_PATHS"
+
+
+def _home_spellings() -> set[str]:
+    home = Path.home()
+    spellings = {str(home)}
+    if os.name == "nt":
+        try:
+            import ctypes
+
+            buffer = ctypes.create_unicode_buffer(32768)
+            if ctypes.windll.kernel32.GetShortPathNameW(str(home), buffer, len(buffer)):
+                spellings.add(buffer.value)  # the 8.3 short form, whose last part ends in ~1
+        except (AttributeError, OSError):
+            pass
+    return {spelling for spelling in spellings if spelling.strip("\\/")}
+
+
+def redact_local_paths(text: str) -> str:
+    """Replace the current user's home folder, in any common spelling, with ``~``.
+
+    Forward, back and JSON-escaped separators all match, case-insensitively on
+    Windows, so logs, tracebacks and serialized records can be scrubbed alike.
+    """
+    flags = re.IGNORECASE if os.name == "nt" else 0
+    for spelling in sorted(_home_spellings(), key=len, reverse=True):
+        parts = [part for part in re.split(r"[\\/]+", spelling) if part]
+        lead = r"[\\/]+" if spelling[:1] in "\\/" else ""
+        pattern = lead + r"[\\/]+".join(re.escape(part) for part in parts) + r"(?![A-Za-z0-9_.~-])"
+        text = re.sub(pattern, "~", text, flags=flags)
+    return text
+
+
+def scrub_record(value: Any) -> Any:
+    """Redact account identifiers and the home folder from every string in a record."""
+    if isinstance(value, str):
+        return redact_local_paths(redact_account_identifiers(value))
+    if isinstance(value, dict):
+        return {scrub_record(key): scrub_record(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [scrub_record(item) for item in value]
+    return value
+
+
+def evidence_directory(path: str | Path) -> Path:
+    """Refuse a new evidence directory whose absolute path would expose private locations.
+
+    Sealed campaign records bind absolute directories. One inside the home
+    folder records the user name; one inside the private planning folder
+    records its name. Set SMYTHE_ALLOW_PRIVATE_EVIDENCE_PATHS=1 only for tests
+    and local experiments whose records will never be published.
+    """
+    resolved = Path(path).resolve()
+    if os.environ.get(PRIVATE_EVIDENCE_OVERRIDE) == "1":
+        return resolved
+    home = Path.home().resolve()
+    if resolved == home or home in resolved.parents:
+        raise ValueError(
+            "Evidence directories must be outside the home folder because sealed records "
+            f"bind their absolute path; set {PRIVATE_EVIDENCE_OVERRIDE}=1 only for records "
+            "that will never be published")
+    if any(part.lower() == "00_project_files" for part in resolved.parts):
+        raise ValueError("Evidence directories must be outside the private planning folder "
+                         "because sealed records bind their absolute path")
+    return resolved
 
 
 def image_mime_type(path: str | Path) -> str:

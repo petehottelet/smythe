@@ -19,6 +19,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import sqlite3
 import subprocess
 import sys
@@ -49,6 +50,40 @@ def _require(condition: bool, message: str) -> None:
     # Assertions must still run when the campaign is invoked with python -O.
     if not condition:
         raise RuntimeError(message)
+
+
+# Self-contained so the recorded producer sources stay this file, its test and
+# the product package.
+PRIVATE_PATHS_OVERRIDE = "SMYTHE_ALLOW_PRIVATE_EVIDENCE_PATHS"
+
+
+def _public_workdir(workdir: Path) -> Path:
+    """Refuse a campaign directory inside the home folder: its records bind absolute paths."""
+    resolved = workdir.resolve()
+    if os.environ.get(PRIVATE_PATHS_OVERRIDE) == "1":
+        return resolved
+    home = Path.home().resolve()
+    if resolved == home or home in resolved.parents:
+        raise ValueError("the campaign directory must be outside the home folder because its "
+                         f"records bind absolute paths; set {PRIVATE_PATHS_OVERRIDE}=1 only for "
+                         "records that will never be published")
+    return resolved
+
+
+def _scrub_worker_log(path: Path) -> None:
+    """Replace the home folder in a finished worker's log before any record hashes it."""
+    if not path.is_file():
+        return
+    home = str(Path.home())
+    parts = [re.escape(part) for part in re.split(r"[\\/]+", home) if part]
+    lead = r"[\\/]+" if home[:1] in "\\/" else ""
+    pattern = re.compile(lead + r"[\\/]+".join(parts) + r"(?![A-Za-z0-9_.~-])",
+                         re.IGNORECASE if os.name == "nt" else 0)
+    raw = path.read_bytes()
+    scrubbed = pattern.sub("~", raw.decode("utf-8", errors="surrogateescape"))
+    data = scrubbed.encode("utf-8", errors="surrogateescape")
+    if data != raw:
+        path.write_bytes(data)
 
 
 def _json_bytes(value: Any) -> bytes:
@@ -268,6 +303,7 @@ def _run_phase(root: Path, phase: str, timeout_s: float) -> dict:
             process.kill()
             process.wait(timeout=10)
         log.close()
+        _scrub_worker_log(root / f"{phase}-worker.log")
     result = _read_json(root / f"{phase}-result.json")
     result["parent_wall_s"] = time.perf_counter() - started
     result["provider"] = _provider_summary(_events(root / f"{phase}-provider.jsonl"))
@@ -293,6 +329,7 @@ def _kill_phase(root: Path, timeout_s: float) -> dict:
             process.kill()
             process.wait(timeout=10)
         log.close()
+        _scrub_worker_log(root / "start-worker.log")
     return {"parent_wall_s": time.perf_counter() - started, "barrier": barrier,
             "kill_time_ns": killed_at_ns, "exit_code": return_code,
             "execution_metrics": None,
@@ -370,6 +407,7 @@ def _retained_evidence(root: Path) -> dict:
 def run_campaign(workdir: Path, *, count: int = 5000, concurrency: int = 8,
                  lease_ttl_s: float = 30.0, timeout_s: float = 7200) -> dict:
     """Retain explicit failure evidence as well as verified successful observations."""
+    workdir = _public_workdir(workdir)
     existed = workdir.exists()
     started = time.perf_counter()
     try:

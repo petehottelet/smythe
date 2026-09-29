@@ -24,6 +24,18 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
+### Changed
+
+- The jobs scale campaign refuses an evidence folder inside the home folder,
+  because its journal and records bind absolute paths, and replaces the home
+  folder with `~` in worker logs before any record hashes them.
+  `SMYTHE_ALLOW_PRIVATE_EVIDENCE_PATHS=1` lifts the check for records that
+  will never be published.
+- The Noumenon and image concurrency benchmarks replace the home folder with
+  `~` in the records they write. `benchmarks/artifact_records.py` adds
+  `redact_local_paths`, `scrub_record` and `evidence_directory` for new
+  harnesses.
+
 ### Fixed
 
 - The Noumenon benchmark redacts account identifiers, such as the

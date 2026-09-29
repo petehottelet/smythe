@@ -31,11 +31,16 @@ with the Jobs dependencies installed:
 
 ```bash
 python benchmarks/jobs_scale_benchmark.py \
-  --workdir smythe/tmp/jobs-scale-evidence \
-  --output smythe/tmp/jobs-scale-result.json
+  --workdir /srv/smythe-evidence/jobs-scale \
+  --output /srv/smythe-evidence/jobs-scale-result.json
 ```
 
 Both paths must be new. The result file must sit outside the evidence folder.
+The evidence folder must also be outside your home folder, such as
+`C:\smythe-evidence` on Windows, because the journal records its absolute
+path. Worker logs have the home folder replaced with `~` before any record
+hashes them. `SMYTHE_ALLOW_PRIVATE_EVIDENCE_PATHS=1` lifts the folder check
+for local experiments whose records will never be published.
 Worker logs, the SQLite journal, provider-entry logs, and accepted files remain
 on disk after completion or failure. A failure result is diagnostic evidence;
 it does not count as a completed campaign.
