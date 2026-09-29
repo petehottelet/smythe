@@ -267,6 +267,21 @@ framework and its evidence. The Python API changes only by addition.
   from a release asset pinned by SHA-256.
   [Archive](benchmarks/archive/README.md).
 
+## Shipped (v0.9.1): Gemini image reliability and clean records
+
+The [0.9.1 release](docs/release-0.9.1.md) is a patch release. The Python API
+is unchanged.
+
+- **Missing Gemini images fail their node** — an image request that Gemini
+  finishes with no image raises `OutputRefusedError` after billing, so a
+  `RETRY` policy can recover it. [Execution policies](docs/execution.md).
+- **Gemini 3.1 image defaults** — image benchmarks and examples use
+  `gemini-3.1-flash-image` before `gemini-2.5-flash-image` shuts down on
+  October 2, 2026.
+- **Clean benchmark records** — records carry no provider account
+  identifiers or local paths, and a repository test fails on any tracked file
+  that does.
+
 ## Completed benchmark evidence
 
 Every benchmark publication includes the [materials completion check](docs/current-materials.md#completion-check-for-every-benchmark-update): current glyph sheets, previews, exports, charts, links, and consistent documentation.

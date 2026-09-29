@@ -24,6 +24,16 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [0.9.1] - 2026-09-29
+
+This patch release fails a Gemini image node that receives no image, moves
+the Gemini image benchmarks and examples to `gemini-3.1-flash-image` before
+`gemini-2.5-flash-image` shuts down on October 2, 2026, and keeps provider
+account identifiers and local paths out of benchmark records. The Python API
+is unchanged. See the [release guide](docs/release-0.9.1.md).
+
 ### Added
 
 - Diagnostic benchmark records from September 26, 2026: second runs of the
@@ -277,6 +287,7 @@ accepted; each is listed under **Changed**. The
   `smythe.graph.SYNTHESIS_NODE_ID` and `REVISION_ADDED_KEY`;
   `smythe.workflow.MAX_NODE_ID_CHARS`.
 
-[Unreleased]: https://github.com/petehottelet/smythe/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/petehottelet/smythe/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/petehottelet/smythe/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/petehottelet/smythe/compare/v0.8.2...v0.9.0
 [0.8.2]: https://github.com/petehottelet/smythe/compare/v0.8.1...v0.8.2

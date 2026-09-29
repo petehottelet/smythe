@@ -15,17 +15,17 @@ wide artifact production.
 
 ## Install
 
-Install Smythe 0.9.0 with the Jobs dependencies:
+Install Smythe 0.9.1 with the Jobs dependencies:
 
 ```bash
-pip install "smythe[jobs]==0.9.0"
+pip install "smythe[jobs]==0.9.1"
 ```
 
 Add the provider extra needed by a live manifest, for example:
 
 ```bash
-pip install "smythe[jobs,openai]==0.9.0"
-pip install "smythe[jobs,gemini]==0.9.0"
+pip install "smythe[jobs,openai]==0.9.1"
+pip install "smythe[jobs,gemini]==0.9.1"
 ```
 
 The installed command is `smythe`. Job state defaults to

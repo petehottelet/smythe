@@ -10,6 +10,7 @@ verification, trace, artifact, and recovery controls.
 - [Architecture](architecture.md) — the two core abstractions and component boundaries
 - [Examples](../examples/README.md) — offline-first feature tours plus explicitly gated live integrations
 - [Benchmarks](../benchmarks/README.md) — evidence status, protocols, and raw records
+- [Smythe 0.9.1](release-0.9.1.md) — patch release: missing Gemini images fail their node, Gemini 3.1 image defaults, and account identifiers and local paths kept out of benchmark records; upgrading from 0.9.0
 - [Smythe 0.9.0](release-0.9.0.md) — Noumenon re-run, separate screensaver and Repo Doctor repositories, and a pinned evidence archive; upgrading from 0.8.2
 - [Smythe 0.8.2](release-0.8.2.md) — correctness release: what changed and how to upgrade from 0.8.1
 - [Smythe 0.8.1](release-0.8.1.md) — security release: what changed and how to upgrade from 0.8.0
