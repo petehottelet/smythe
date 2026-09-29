@@ -38,10 +38,14 @@ def source_path_allowed(name: str) -> bool:
     return path.parts[0] in {"smythe", "tests", "tools"} and path.suffix == ".py"
 
 
-def write_manifest(root: Path = ROOT) -> None:
+def manifest_names(root: Path = ROOT) -> list[str]:
     tracked = subprocess.check_output(["git", "ls-files", "-z"], cwd=root).decode().split("\0")
-    names = sorted({name for name in tracked if name and source_path_allowed(name)}
-                   | {"tools/distribution-files.json"})
+    return sorted({name for name in tracked if name and source_path_allowed(name)}
+                  | {"tools/distribution-files.json"})
+
+
+def write_manifest(root: Path = ROOT) -> None:
+    names = manifest_names(root)
     missing = [name for name in ROOT_FILES if name not in names]
     if missing:
         raise ValueError(f"Missing tracked build inputs: {missing}")
