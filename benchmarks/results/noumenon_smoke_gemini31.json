@@ -1,0 +1,206 @@
+{
+  "benchmark": "noumenon-fanout",
+  "record_version": 1,
+  "partition": "smoke_gemini31",
+  "mode": "live",
+  "status": "failed",
+  "protocol": {
+    "graph_nodes": 8,
+    "topology": "broadcast_reduce",
+    "one_provider_call_per_node": true,
+    "concurrencies": [
+      8
+    ],
+    "offline_latency_s": null,
+    "normalization": "PNG 128x128",
+    "background": "auto",
+    "transparency_check": null,
+    "vectorize": false,
+    "vectorization": null,
+    "assembly_requires_glyphs": null,
+    "assembly_supported_glyphs": [
+      192,
+      256
+    ]
+  },
+  "provider": {
+    "name": "GeminiProvider",
+    "model": "gemini-3.1-flash-image",
+    "size": "1024x1024 (1:1 aspect config)",
+    "quality": "default",
+    "background": null,
+    "cost_per_image_usd_estimate": 0.039,
+    "max_cost_per_call_usd": 0.08,
+    "max_budget_usd": 0.64,
+    "official_guide": null
+  },
+  "environment": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "packages": {
+      "smythe": "0.9.0",
+      "pillow": "11.1.0",
+      "openai": "3.19.2",
+      "google-genai": "2.25.0"
+    },
+    "installed_packages": {
+      "smythe": "0.9.0",
+      "pillow": "11.1.0",
+      "openai": "3.19.2",
+      "google-genai": "2.25.0"
+    },
+    "smythe_source": {
+      "version": "0.9.0",
+      "module": "smythe/__init__.py"
+    },
+    "source_control": {
+      "revision": "76e3b609dea6eb08a0c26a9fe3b48581a37f5a19",
+      "dirty": false,
+      "untracked_files": 2
+    }
+  },
+  "runs": [
+    {
+      "concurrency": 8,
+      "status": "failed",
+      "execution_id": "f4a076522050457383b2984d51f2a532",
+      "generation_wall_s": 14.369318,
+      "validation_wall_s": 1.559962,
+      "vectorization_wall_s": null,
+      "end_to_end_wall_s": 15.929281,
+      "completed_nodes": 8,
+      "throughput_glyphs_per_s": 0.5567,
+      "cost_usd": 0.48204,
+      "cost_is_complete": true,
+      "cost_contains_estimates": true,
+      "validation": {
+        "passed": false,
+        "expected_tiles": 8,
+        "valid_png_tiles": 6,
+        "tile_size": [
+          128,
+          128
+        ],
+        "unique_tile_hashes": 6,
+        "errors": [
+          "glyph-000: expected one artifact, found 0",
+          "glyph-007: expected one artifact, found 0",
+          "expected 8 valid tiles, found 6",
+          "expected 8 unique tile hashes, found 6"
+        ]
+      },
+      "vectorization": null,
+      "tile_receipts": [
+        {
+          "path": "smythe_artifacts/noumenon/smoke_gemini31/runs/concurrency-8/tiles/glyph-001.png",
+          "sha256": "ffa90e420231b2e039ebc3719fbdce3fee8b097ee8ddea482adc7470a3004a5c",
+          "byte_size": 10959,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-001"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/smoke_gemini31/runs/concurrency-8/tiles/glyph-002.png",
+          "sha256": "c9c3834ff3dc14a369d840c5be17bcc4e0d5312af6d6648210ed4419e8f256de",
+          "byte_size": 13924,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-002"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/smoke_gemini31/runs/concurrency-8/tiles/glyph-003.png",
+          "sha256": "75f81609589301874e58e13cde2c82807f7b56f33f2b57d8dddd6242f33616a8",
+          "byte_size": 7702,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-003"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/smoke_gemini31/runs/concurrency-8/tiles/glyph-004.png",
+          "sha256": "597d5fa606faab381c9cb70631ebd1d8183310214331ab54c71d196618c60ad7",
+          "byte_size": 15852,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-004"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/smoke_gemini31/runs/concurrency-8/tiles/glyph-005.png",
+          "sha256": "5b867a4f44c9d25d524d92af3ff3a98783e2477d80af4cf40bde47b3fe127dd7",
+          "byte_size": 14138,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-005"
+        },
+        {
+          "path": "smythe_artifacts/noumenon/smoke_gemini31/runs/concurrency-8/tiles/glyph-006.png",
+          "sha256": "85de56f6991e7b83c2cb1aa7470e5f7da20e1fe9ed8351fe9482e64ebd19ef63",
+          "byte_size": 12148,
+          "format": "PNG",
+          "width": 128,
+          "height": 128,
+          "frames": 1,
+          "node_id": "glyph-006"
+        }
+      ],
+      "errors": [
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-000: expected one artifact, found 0"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "glyph-007: expected one artifact, found 0"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "expected 8 valid tiles, found 6"
+        },
+        {
+          "node_id": "__validation__",
+          "status": "failed",
+          "error": "expected 8 unique tile hashes, found 6"
+        }
+      ],
+      "speedup_vs_concurrency_1": null,
+      "parallel_efficiency": null
+    }
+  ],
+  "fastest_concurrency": null,
+  "assembly": null,
+  "total_recorded_cost_usd": 0.48204,
+  "errors": [
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-000: expected one artifact, found 0"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "glyph-007: expected one artifact, found 0"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "expected 8 valid tiles, found 6"
+    },
+    {
+      "node_id": "__validation__",
+      "status": "failed",
+      "error": "expected 8 unique tile hashes, found 6"
+    }
+  ]
+}

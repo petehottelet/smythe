@@ -265,7 +265,9 @@ wall-clock speedup at concurrency 8** (46.3s → 7.0s for 8 images) at
 identical cost, 81–88% of ideal parallel efficiency, 72/72 images valid,
 zero rate-limit events on one paid key. Full table, protocol, and
 measurement scope (including an observed near-duplicate pair):
-[image_benchmarks.md](image_benchmarks.md).
+[image_benchmarks.md](image_benchmarks.md). A September 26
+[repeat](image_benchmarks.md#repeat-on-2026-09-26-diagnostic) reproduced the
+serial and k=3 cells and added three k=25 runs.
 
 ## Current v2 SVG catalog workflow
 
@@ -380,6 +382,14 @@ calls at a time within the account's limit of 20 images per minute. The second
 lane also traced every tile into an SVG that rasterized back to its mask at an
 IoU of 1.0. Both records, and two diagnostic attempts, are in the
 [live lane results](noumenon_benchmark.md#live-image-lanes).
+
+### Diagnostic re-measurement (2026-09-26)
+
+Second runs of both live lanes reproduced their results within 2%. A
+192-glyph Gemini sweep reached 36.9× at concurrency 128 without a rate limit,
+but five of its seven runs failed the all-tiles gate, mostly on responses that
+finished without an image; see the
+[diagnostic records](noumenon_benchmark.md#diagnostic-re-measurement-2026-09-26).
 
 ## Hard-kill durability
 

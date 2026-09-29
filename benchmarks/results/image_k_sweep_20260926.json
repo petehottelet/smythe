@@ -1,0 +1,656 @@
+{
+  "benchmark": "image-concurrency-sweep",
+  "mode": "LIVE",
+  "model": "gemini-2.5-flash-image",
+  "cost_per_image_usd": 0.039,
+  "max_cost_per_call_usd": 0.045,
+  "environment": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "packages": {
+      "smythe": "0.9.0",
+      "google-genai": "2.25.0",
+      "pillow": "11.1.0"
+    },
+    "installed_packages": {
+      "smythe": "0.9.0",
+      "google-genai": "2.25.0",
+      "pillow": "11.1.0"
+    },
+    "smythe_source": {
+      "version": "0.9.0",
+      "module": "smythe/__init__.py"
+    },
+    "source_control": {
+      "revision": "76e3b609dea6eb08a0c26a9fe3b48581a37f5a19",
+      "dirty": false,
+      "untracked_files": 12
+    }
+  },
+  "images_per_run": 8,
+  "summary": [
+    {
+      "k": 1,
+      "runs": 3,
+      "wall_s_mean": 46.12,
+      "wall_s_range": [
+        45.94,
+        46.36
+      ],
+      "efficiency_mean": 1.0,
+      "throughput_mean_ipm": 10.4,
+      "cost_total_usd": 1.08
+    },
+    {
+      "k": 3,
+      "runs": 3,
+      "wall_s_mean": 18.18,
+      "wall_s_range": [
+        17.01,
+        19.41
+      ],
+      "efficiency_mean": 0.874,
+      "throughput_mean_ipm": 26.5,
+      "cost_total_usd": 1.08
+    },
+    {
+      "k": 8,
+      "runs": 3,
+      "wall_s_mean": 8.65,
+      "wall_s_range": [
+        7.4,
+        10.72
+      ],
+      "efficiency_mean": 0.843,
+      "throughput_mean_ipm": 57.0,
+      "cost_total_usd": 1.08
+    }
+  ],
+  "runs": [
+    {
+      "k": 1,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 45.94,
+      "sum_node_latency_s": 45.94,
+      "node_latency_s": [
+        6.86,
+        5.33,
+        5.84,
+        5.1,
+        6.05,
+        6.39,
+        5.09,
+        5.27
+      ],
+      "concurrency_factor": 1.0,
+      "efficiency_vs_ideal": 1.0,
+      "throughput_images_per_min": 10.4,
+      "cost_usd": 0.36,
+      "aspect_ratio_requested": null,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 14,
+        "dhash_pairwise_mean": 29.5
+      },
+      "execution_id": "f9b4ecb93a1242ee9181a1b92f3e3218",
+      "repeat": 0
+    },
+    {
+      "k": 1,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 46.05,
+      "sum_node_latency_s": 46.04,
+      "node_latency_s": [
+        6.26,
+        5.41,
+        6.44,
+        6.06,
+        5.81,
+        5.58,
+        5.07,
+        5.42
+      ],
+      "concurrency_factor": 1.0,
+      "efficiency_vs_ideal": 1.0,
+      "throughput_images_per_min": 10.4,
+      "cost_usd": 0.36,
+      "aspect_ratio_requested": null,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 14,
+        "dhash_pairwise_mean": 27.1
+      },
+      "execution_id": "b8f1d18c87cd4f01ac7ec48d661dddf9",
+      "repeat": 1
+    },
+    {
+      "k": 1,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 46.36,
+      "sum_node_latency_s": 46.36,
+      "node_latency_s": [
+        6.59,
+        5.74,
+        5.65,
+        5.67,
+        5.58,
+        5.94,
+        5.9,
+        5.29
+      ],
+      "concurrency_factor": 1.0,
+      "efficiency_vs_ideal": 1.0,
+      "throughput_images_per_min": 10.4,
+      "cost_usd": 0.36,
+      "aspect_ratio_requested": null,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 11,
+        "dhash_pairwise_mean": 25.0
+      },
+      "execution_id": "939c4651b1f54bb6a290306d5e788e47",
+      "repeat": 2
+    },
+    {
+      "k": 3,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 18.11,
+      "sum_node_latency_s": 46.91,
+      "node_latency_s": [
+        5.91,
+        6.98,
+        6.7,
+        4.88,
+        5.53,
+        6.09,
+        5.23,
+        5.6
+      ],
+      "concurrency_factor": 2.59,
+      "efficiency_vs_ideal": 0.863,
+      "throughput_images_per_min": 26.5,
+      "cost_usd": 0.36,
+      "aspect_ratio_requested": null,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 12,
+        "dhash_pairwise_mean": 25.6
+      },
+      "execution_id": "5fb5741d5f5d44f195275170fce140ff",
+      "repeat": 0
+    },
+    {
+      "k": 3,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 17.01,
+      "sum_node_latency_s": 45.68,
+      "node_latency_s": [
+        5.5,
+        6.31,
+        6.09,
+        5.1,
+        5.6,
+        6.13,
+        5.36,
+        5.59
+      ],
+      "concurrency_factor": 2.69,
+      "efficiency_vs_ideal": 0.895,
+      "throughput_images_per_min": 28.2,
+      "cost_usd": 0.36,
+      "aspect_ratio_requested": null,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 7,
+        "dhash_pairwise_mean": 27.3
+      },
+      "execution_id": "7ffc399f97a142e783cadd929dd4d3dd",
+      "repeat": 1
+    },
+    {
+      "k": 3,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 19.41,
+      "sum_node_latency_s": 50.29,
+      "node_latency_s": [
+        6.32,
+        6.64,
+        7.42,
+        5.55,
+        6.03,
+        5.98,
+        6.02,
+        6.33
+      ],
+      "concurrency_factor": 2.59,
+      "efficiency_vs_ideal": 0.864,
+      "throughput_images_per_min": 24.7,
+      "cost_usd": 0.36,
+      "aspect_ratio_requested": null,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 9,
+        "dhash_pairwise_mean": 28.4
+      },
+      "execution_id": "bd92e51a0a214adb9486c747b374b464",
+      "repeat": 2
+    },
+    {
+      "k": 8,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 10.72,
+      "sum_node_latency_s": 70.28,
+      "node_latency_s": [
+        5.68,
+        7.89,
+        8.78,
+        9.33,
+        9.08,
+        9.22,
+        10.01,
+        10.3
+      ],
+      "concurrency_factor": 6.56,
+      "efficiency_vs_ideal": 0.82,
+      "throughput_images_per_min": 44.8,
+      "cost_usd": 0.36,
+      "aspect_ratio_requested": null,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 15,
+        "dhash_pairwise_mean": 30.2
+      },
+      "execution_id": "e2eb0bbd7563431291fc23e4a0633d6d",
+      "repeat": 0
+    },
+    {
+      "k": 8,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 7.4,
+      "sum_node_latency_s": 51.65,
+      "node_latency_s": [
+        6.14,
+        6.23,
+        6.34,
+        6.42,
+        6.49,
+        6.53,
+        6.53,
+        6.98
+      ],
+      "concurrency_factor": 6.98,
+      "efficiency_vs_ideal": 0.873,
+      "throughput_images_per_min": 64.9,
+      "cost_usd": 0.36,
+      "aspect_ratio_requested": null,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 13,
+        "dhash_pairwise_mean": 24.6
+      },
+      "execution_id": "c62b49a34f8c4fffb02b59115ceafaad",
+      "repeat": 1
+    },
+    {
+      "k": 8,
+      "images_requested": 8,
+      "images_completed": 8,
+      "nodes_ok": "8/8",
+      "wall_s": 7.83,
+      "sum_node_latency_s": 52.31,
+      "node_latency_s": [
+        5.19,
+        5.75,
+        6.24,
+        6.68,
+        6.79,
+        6.86,
+        6.98,
+        7.83
+      ],
+      "concurrency_factor": 6.68,
+      "efficiency_vs_ideal": 0.835,
+      "throughput_images_per_min": 61.3,
+      "cost_usd": 0.36,
+      "aspect_ratio_requested": null,
+      "artifacts": {
+        "decoded": 8,
+        "total": 8,
+        "sizes": [
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ],
+          [
+            1024,
+            1024
+          ]
+        ],
+        "dhash_pairwise_min": 15,
+        "dhash_pairwise_mean": 25.9
+      },
+      "execution_id": "1246d10017d74d779c011a727a79cb8d",
+      "repeat": 2
+    }
+  ]
+}

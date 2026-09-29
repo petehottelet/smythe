@@ -96,6 +96,42 @@ Two earlier attempts are kept as diagnostics:
   a corner as transparent when it holds no visible pixel (alpha below 17), and
   both lanes above ran fresh under that rule.
 
+### Diagnostic re-measurement (2026-09-26)
+
+**Evidence status: diagnostic.** These runs used source revision `76e3b60`
+from a clean tree. That commit was not published; its published form,
+`43f2d74`, differs only in two test-fixture strings, and the benchmark code is
+identical.
+
+| Run | Record | Result |
+|---|---|---|
+| Transparent PNGs, second run | [JSON](results/noumenon_live_openai_transparent_r2.json) | 192/192 transparent tiles in 563.0 s (first run: 551.7 s) |
+| PNGs converted to SVG, second run | [JSON](results/noumenon_live_openai_svg_r2.json) | 192/192 SVGs at an IoU of 1.0 in 561.5 s, vectorization 14.8 s (first run: 558.0 s) |
+| Zero simulated latency | [JSON](results/noumenon_zero_latency.json) | 192/192 valid; 28.6 s serially, 8.5 s at concurrency 64 (22.5 glyphs/s) |
+
+The zero-latency run bounds the executor's fixed local work, tile rendering
+and fsync'd journaling, at about 150 ms per tile on the reference machine.
+
+A 192-glyph Gemini sweep with `gemini-2.5-flash-image` at a $0.045 per-call
+ceiling met no rate limit up to concurrency 128:
+
+| Concurrency | Records | Generation wall | Speedup | Valid tiles |
+|---:|---|---:|---:|---:|
+| 1 | [JSON](results/noumenon_live_gemini25_c1.json) | 921.6 s | 1.0× | 191/192 |
+| 8 | [JSON](results/noumenon_live_gemini25_c8.json) | 143.4 s | 6.4× | 191/192 |
+| 32 | [run 1](results/noumenon_live_gemini25_c32.json), [run 2](results/noumenon_live_gemini25_c32_r2.json) | 48.5 s, 37.4 s | 19.0×, 24.6× | 192/192, 192/192 |
+| 64 | [run 1](results/noumenon_live_gemini25_c64.json), [run 2](results/noumenon_live_gemini25_c64_r2.json) | 46.3 s, 66.1 s | 19.9×, 13.9× | 190/192, 190/192 |
+| 128 | [JSON](results/noumenon_live_gemini25_c128.json) | 25.0 s | 36.9× | 191/192 |
+
+Five of the seven runs failed the all-tiles gate: 6 of 1,344 calls finished
+normally without an image, and one tile failed normalization. `GeminiProvider`
+now reports such a response as incomplete, so a retry policy can recover it.
+Repeats at the same concurrency differed by up to 40%, so these single runs
+support no capacity claim. Eight-glyph smoke runs completed 8/8 on
+`gemini-2.5-flash-image` ([record](results/noumenon_smoke_gemini25.json)) and
+6/8 on `gemini-3.1-flash-image`, whose two misses returned no image
+([record](results/noumenon_smoke_gemini31.json)).
+
 ## Run it
 
 The default run is local, deterministic, and costs $0:

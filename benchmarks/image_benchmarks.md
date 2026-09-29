@@ -82,6 +82,26 @@ Diversity note: this run cycles 8 scene prompts across 25 nodes, so
 pairwise dHash includes same-prompt pairs; min distance 7 bits means
 even same-prompt regenerations differed materially.
 
+## Repeat on 2026-09-26 (diagnostic)
+
+The same protocol ran again from source revision `76e3b60` (see the
+[Noumenon report](noumenon_benchmark.md#diagnostic-re-measurement-2026-09-26)
+for its provenance), still on `gemini-2.5-flash-image`, with a $0.045
+inclusive per-call ceiling ([k=1/3/8 record](results/image_k_sweep_20260926.json),
+[k=25 record](results/image_k25_ceiling_20260926.json)):
+
+| k | Wall (mean [range]) | Throughput | Efficiency | Images |
+|--:|---|---:|---:|---|
+| 1 | 46.1 s [45.9–46.4] | 10.4 img/min | 1.00 | 24/24 |
+| 3 | 18.2 s [17.0–19.4] | 26.5 img/min | 0.87 | 24/24 |
+| 8 | 8.7 s [7.4–10.7] | 57.0 img/min | 0.84 | 24/24 |
+| 25 | 12.1 s [9.9–13.3] | 126.4 img/min | 0.77 | 75/75 |
+
+Serial latency reproduced within 0.2 s of July's 46.3 s. At k=8 the mean was
+1.7 s slower than July's, with a wider range, and the k=25 cell, now three
+runs, averaged 126 images per minute against the single July run's 147. No
+rate limit appeared at any width.
+
 ## Caveats
 
 - n=3 per cell: ranges shown; treat sub-second deltas as noise. Single
