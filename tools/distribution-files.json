@@ -104,6 +104,7 @@
     "tests/test_checkpoint.py",
     "tests/test_checkpoint_atomic.py",
     "tests/test_checkpoint_mcp_trust.py",
+    "tests/test_committed_identifiers.py",
     "tests/test_constrained_planner.py",
     "tests/test_design.py",
     "tests/test_distill.py",

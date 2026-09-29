@@ -8,7 +8,7 @@ import zipfile
 
 import pytest
 
-from tools.distribution import audit, compare_wheels, source_path_allowed
+from tools.distribution import audit, compare_wheels, manifest_names, source_path_allowed
 
 
 @pytest.mark.parametrize("name", [
@@ -102,3 +102,13 @@ def test_manifest_is_a_unique_allowlist_of_existing_approved_paths():
     names = manifest["source_files"]
     assert names == sorted(set(names))
     assert all(source_path_allowed(name) and (root / name).is_file() for name in names)
+
+
+def test_manifest_lists_every_tracked_approved_path():
+    root = Path(__file__).resolve().parents[1]
+    if not (root / ".git").exists():
+        pytest.skip("requires a git checkout")
+    manifest = json.loads((root / "tools/distribution-files.json").read_text(encoding="utf-8"))
+
+    assert manifest["source_files"] == manifest_names(root), (
+        "Run python tools/distribution.py --write-manifest")
