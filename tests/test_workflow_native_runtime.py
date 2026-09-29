@@ -109,7 +109,7 @@ def native_transport(monkeypatch):
 
 
 def swarm(store, *, rich=False, max_budget_usd=1, **options):
-    provider = OpenAIResponsesProvider(api_key="dummy-no-network", max_output_tokens=100)
+    provider = OpenAIResponsesProvider(api_key="test-key", max_output_tokens=100)
     if rich:
         options.update(
             router=WhiteRabbit(

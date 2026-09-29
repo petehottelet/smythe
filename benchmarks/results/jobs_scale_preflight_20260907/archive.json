@@ -10,8 +10,12 @@
   "comparative_claimable": false,
   "contains_5000_operation_result": false,
   "evidence_status": "pre_freeze_harness_diagnostics",
-  "file_count": 56,
+  "file_count": 32,
   "files": {
+    "ttl30_passed/accepted-artifact.png": {
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70
+    },
     "ttl30_passed/barrier.json": {
       "sha256": "8652342a0d44453645ec4ebd45fc51cd9d7209bb34aa64a9de69ad77a22e0ae3",
       "size_bytes": 115
@@ -33,8 +37,8 @@
       "size_bytes": 0
     },
     "ttl30_passed/jobs.db": {
-      "sha256": "78fef461eda7c6d8ade5b3720575be2fe3323f4a7944794bb9bffc48cc242242",
-      "size_bytes": 200704
+      "sha256": "05e5d1ea56cdb8e857fb8dbf864fb42eb8be54500672f86a66c13d2d11be2e45",
+      "size_bytes": 188416
     },
     "ttl30_passed/jobs.db-shm": {
       "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb",
@@ -43,106 +47,6 @@
     "ttl30_passed/jobs.db-wal": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size_bytes": 0
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_0/attempt-0001/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_1/attempt-0002/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_10/attempt-0001/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_11/attempt-0001/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_12/attempt-0001/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_13/attempt-0002/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_14/attempt-0002/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_15/attempt-0002/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_16/attempt-0002/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_17/attempt-0002/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_18/attempt-0002/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_19/attempt-0002/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_2/attempt-0001/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_20/attempt-0001/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_21/attempt-0001/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_22/attempt-0001/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_23/attempt-0001/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_24/attempt-0001/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_3/attempt-0001/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_4/attempt-0001/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_5/attempt-0001/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_6/attempt-0001/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_7/attempt-0001/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_8/attempt-0001/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
-    },
-    "ttl30_passed/outputs/jobs-scale/artifacts/pixel_9/attempt-0001/artifact-01.png": {
-      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
-      "size_bytes": 70
     },
     "ttl30_passed/provenance.json": {
       "sha256": "aff611209431164699ee713a3707f0a5fedce5394075d36de4588a8d78a3b9db",
@@ -221,8 +125,8 @@
       "size_bytes": 452
     },
     "ttl5_failed/resume-worker.log": {
-      "sha256": "cabceded93244f75b5131941ccc016f8e31880909d7b35e082034029dd4b5f9f",
-      "size_bytes": 2036
+      "sha256": "cea537977193b05b6c437af3764467b211942ccfb1aef17ec0634e896bcc6edf",
+      "size_bytes": 1661
     },
     "ttl5_failed/start-durability.json": {
       "sha256": "693d85e686608b2376729b243bf70e84ec65dfe2010dea0ec4e13989d2e2fc9d",
@@ -259,5 +163,59 @@
     }
   ],
   "schema": "smythe.jobs-scale-pilot-archive.v1",
-  "total_evidence_bytes": 282386
+  "total_evidence_bytes": 268043,
+  "redactions": {
+    "date": "2026-09-26",
+    "reason": "Local user paths were replaced with placeholders.",
+    "redacted_files": {
+      "ttl5_failed/resume-worker.log": {
+        "original_sha256": "cabceded93244f75b5131941ccc016f8e31880909d7b35e082034029dd4b5f9f",
+        "original_size_bytes": 2036
+      },
+      "ttl30_passed/jobs.db": {
+        "original_sha256": "78fef461eda7c6d8ade5b3720575be2fe3323f4a7944794bb9bffc48cc242242",
+        "original_size_bytes": 200704
+      }
+    },
+    "redacted_values": {
+      "ttl30_passed/jobs.db": "runs.manifest_root: local temporary directory prefix replaced with <temp>",
+      "ttl5_failed/resume-worker.log": "traceback paths: checkout prefix replaced with <checkout>, Python prefix with <python>"
+    },
+    "consolidated_artifacts": {
+      "kept_as": "ttl30_passed/accepted-artifact.png",
+      "sha256": "c414cd0e204de974f73753c7e28d7638e7b3691bb8b1a2bab6b25bb7fed7ce77",
+      "size_bytes": 70,
+      "original_paths": [
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_0/attempt-0001/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_1/attempt-0002/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_10/attempt-0001/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_11/attempt-0001/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_12/attempt-0001/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_13/attempt-0002/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_14/attempt-0002/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_15/attempt-0002/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_16/attempt-0002/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_17/attempt-0002/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_18/attempt-0002/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_19/attempt-0002/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_2/attempt-0001/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_20/attempt-0001/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_21/attempt-0001/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_22/attempt-0001/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_23/attempt-0001/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_24/attempt-0001/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_3/attempt-0001/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_4/attempt-0001/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_5/attempt-0001/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_6/attempt-0001/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_7/attempt-0001/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_8/attempt-0001/artifact-01.png",
+        "ttl30_passed/outputs/jobs-scale/artifacts/pixel_9/attempt-0001/artifact-01.png"
+      ]
+    },
+    "original_records_unchanged": [
+      "ttl30_passed/result.json",
+      "ttl5_failed/diagnostic.json"
+    ]
+  }
 }

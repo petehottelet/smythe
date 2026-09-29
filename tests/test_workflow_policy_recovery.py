@@ -198,7 +198,7 @@ def test_rejected_native_planning_stays_metered_and_replays_without_rebuying(
     native_transport.planning_outputs = [json.dumps({"nodes": [
         {"id": f"n{i}", "label": f"Step {i}", "max_retries": 0} for i in range(9)
     ]})] * 3
-    provider = OpenAIResponsesProvider(api_key="dummy-no-network", max_output_tokens=100)
+    provider = OpenAIResponsesProvider(api_key="test-key", max_output_tokens=100)
     swarm = Swarm(
         model=model, provider=provider, run_store=store, max_budget_usd=1,
         # The planner's own limit (default 8) would also reject this plan;
@@ -239,7 +239,7 @@ def test_default_planner_limit_repairs_an_oversized_plan_before_the_policy(
         json.dumps({"nodes": [{"id": "n0", "label": "Step 0", "max_retries": 0}]}),
     ]
     swarm = Swarm(
-        model=model, provider=OpenAIResponsesProvider(api_key="dummy-no-network", max_output_tokens=100),
+        model=model, provider=OpenAIResponsesProvider(api_key="test-key", max_output_tokens=100),
         run_store=store, max_budget_usd=1,
         graph_policy=WorkflowGraphPolicy(8, node_model=model, max_retries=0, max_regenerations=0),
     )

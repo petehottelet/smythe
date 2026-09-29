@@ -164,7 +164,7 @@ def test_distilled_template_composes_with_the_constrained_architect():
 
 
 @pytest.mark.parametrize("goal", [
-    r"C:\Users\me\report.docx",
+    r"D:\Uploads\me\report.docx",
     r"count every \d+ in the log",
     r"\g<0> and \1 are literal",
 ])

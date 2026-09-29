@@ -9,8 +9,8 @@ no comparative performance, production-image capacity, or speedup claim.
 | [Aggressive lease](ttl5_failed/diagnostic.json) | Failed; unbound diagnostic | 5 s / 0.25 s | The start barrier reached 12 provider entries and four accepted operations. The owned worker was hard-killed. Resume then failed with `RunLeaseError`. |
 | [Default lease](ttl30_passed/result.json) | Completed; pre-freeze pilot | 30 s / 1 s | 25 artifacts accepted; 33 provider entries, including eight explicitly acknowledged rerolls; zero automatic redispatches of unknown or already accepted operations. |
 
-The failed pilot's [original resume log](ttl5_failed/resume-worker.log) is
-retained. Its uncommitted harness did not serialize provenance before failure;
+The failed pilot's [resume log](ttl5_failed/resume-worker.log) is retained
+with local paths redacted. Its uncommitted harness did not serialize provenance before failure;
 neither an exact source revision nor missing source hashes are reconstructed.
 This pilot used a shorter lease than Jobs' production default. The recorded
 failure does not establish a failure at the default lease setting.
@@ -25,8 +25,9 @@ Do not present this pilot as a run of the subsequently frozen source commit.
 
 All artifacts are the same deterministic 70-byte, 1×1 PNG; identical content
 hashes are expected. Operation, attempt, and call identities establish which
-work ran again. The successful pilot's raw SQLite database, phase results,
-provider-entry logs, and 25 accepted PNGs are included for inspection. Its
+work ran again. The successful pilot's SQLite database, phase results,
+provider-entry logs, and one copy of the 25 byte-identical accepted PNGs are
+included for inspection. Its
 recorded 57.16-second elapsed time includes 29.27 seconds waiting for real
 lease expiry and the harness' durable evidence logging. This is one local
 observation, with no statistical or comparative interpretation.
@@ -36,7 +37,15 @@ with its size and raw-byte SHA-256. The original result
 and diagnostic files are preserved byte-for-byte. Their original evidence
 inventories were checked against the packaged files, and the successful
 pilot's accepted receipts were checked against its database and PNG bytes.
-Local Git attributes preserve original evidence bytes across checkouts.
+Local Git attributes preserve evidence bytes across checkouts.
+
+On September 26, 2026, local user paths were replaced with placeholders in the
+database's `runs.manifest_root` value and in the failed pilot's resume-log
+traceback, and the 25 byte-identical accepted PNGs were consolidated into
+[one file](ttl30_passed/accepted-artifact.png). No other database row changed.
+[archive.json](archive.json) records the current digests, the original digests
+of the two redacted files, and the original artifact paths. The inventories
+inside the unchanged result and diagnostic records keep the original digests.
 
 The current [campaign protocol](../../jobs_scale_benchmark.md) defines the
 separate 5,000-operation run. These pilots are diagnostics and must not be

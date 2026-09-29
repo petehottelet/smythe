@@ -258,6 +258,8 @@ Guardrails are fail-closed:
 - Nodes do not retry, so the declared 192-call ceiling is the whole generation
   envelope. A halted run records what its completed calls charged and marks
   the total incomplete.
+- Account identifiers in provider errors, such as the organization named in a
+  rate-limit error, are redacted before the record is written.
 - The recorded live cost is Smythe's conservative configured ceiling, not a
   claimed invoice.
 - Current pricing is intentionally not hard-coded. Verify the official

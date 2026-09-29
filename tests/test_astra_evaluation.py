@@ -110,7 +110,7 @@ def transport(monkeypatch, case):
 
 def run(case, path, output="answer", cap=1_000_000_000):
     return evaluation.run_judgment(case, output, directory=path, allowance_nanousd=cap,
-                                   api_key="offline-not-a-key", model_version=evaluation.MODEL)
+                                   api_key="test-key", model_version=evaluation.MODEL)
 
 
 def test_replay_verifies_raw_scores_and_never_rebuys(case, tmp_path, transport):

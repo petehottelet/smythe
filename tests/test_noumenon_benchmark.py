@@ -46,7 +46,11 @@ def _opaque_on_black(data: bytes) -> bytes:
 
 
 def _install_fake_openai(
-    monkeypatch, *, opaque: bool = False, fail_after: int | None = None
+    monkeypatch,
+    *,
+    opaque: bool = False,
+    fail_after: int | None = None,
+    error: str = "Error code: 429 - rate limit reached",
 ) -> list[dict]:
     """Serve procedural glyph PNGs through a fake Image API client; no network."""
     calls: list[dict] = []
@@ -55,7 +59,7 @@ def _install_fake_openai(
         async def generate(self, **kwargs):
             calls.append(kwargs)
             if fail_after is not None and len(calls) > fail_after:
-                raise RuntimeError("Error code: 429 - rate limit reached")
+                raise RuntimeError(error)
             spec = _SPECS[_GLYPH_ID.search(kwargs["prompt"]).group(1)]
             data = render_glyph_tile(spec, size=256)
             if opaque:
@@ -386,6 +390,25 @@ def test_halted_live_run_records_what_its_completed_calls_charged(tmp_path, monk
     assert run["cost_is_complete"] is False
     assert payload["total_recorded_cost_usd"] == pytest.approx(0.02)
     assert "429" in run["errors"][0]["error"]
+
+
+def test_written_record_redacts_the_organization_in_provider_errors(tmp_path, monkeypatch):
+    # A live 429 names the account's organization; the record must not.
+    organization = "org-" + "A1b2" * 6
+    _install_fake_openai(
+        monkeypatch,
+        fail_after=1,
+        error=f"Error code: 429 - Rate limit reached in organization {organization}",
+    )
+    payload = _live(tmp_path, concurrencies=(1,))
+    assert organization in json.dumps(payload)
+    record = tmp_path / "record.json"
+
+    _write_json(record, payload)
+
+    text = record.read_text(encoding="utf-8")
+    assert organization not in text
+    assert "Rate limit reached in organization org-[redacted]" in text
 
 
 def test_live_transparent_lane_fails_closed_on_opaque_model_output(tmp_path, monkeypatch):

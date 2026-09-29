@@ -94,7 +94,7 @@ def transport(monkeypatch):
 
 
 def native():
-    return OpenAIResponsesProvider(api_key="test-secret-do-not-persist", max_output_tokens=100)
+    return OpenAIResponsesProvider(api_key="test-key", max_output_tokens=100)
 
 
 async def invoke(journal, source=None, *, key=KEY, prompt="Question", model=MODEL):

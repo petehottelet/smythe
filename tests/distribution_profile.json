@@ -27,6 +27,7 @@
     "test_benchmark_artifact_records.py": "Benchmark artifact record tooling",
     "test_benchmark_usage.py": "Benchmark usage instrumentation",
     "test_benchmarks.py": "Benchmark scripts and example process helper",
+    "test_committed_identifiers.py": "Repository tracked-file audit",
     "test_durability_benchmark.py": "Durability benchmark harness",
     "test_examples_smoke.py": "Repository example scripts",
     "test_fable_runtime.py": "Fable benchmark harness and frozen task pack",

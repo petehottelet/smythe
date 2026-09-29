@@ -60,7 +60,7 @@ def test_code_and_external_destinations_are_unchanged():
     source = ('```python\nprint("[example](docs/not-a-link.md)")\n```\n'
               '~~~text\n<img src="example.png">\n~~~\n'
               '`[example](docs/not-a-link.md)` ``<a href="example.md">x</a>``\n'
-              '[API](https://example.com/x) [email](mailto:test@example.com)\n'
+              '[API](https://example.com/x) [email](mailto:36128338+petehottelet@users.noreply.github.com)\n'
               '<img src="https://example.com/a.svg"> [cdn](//example.com/x)\n')
     assert HOOK.render_pypi_readme(source, "0.7.0") == source
 
