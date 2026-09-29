@@ -28,7 +28,7 @@ or ended early raises `OutputRefusedError` the same way, with one of these
 |---|---|
 | `refusal` | Anthropic `stop_reason` `refusal`; OpenAI `message.refusal` set |
 | `content_filter` | OpenAI `finish_reason` `content_filter`; Gemini `SAFETY`, `RECITATION`, `BLOCKLIST`, `PROHIBITED_CONTENT`, `SPII`, `IMAGE_SAFETY`, `IMAGE_PROHIBITED_CONTENT` or `IMAGE_RECITATION`; a Gemini prompt blocked with no candidates and a `prompt_feedback.block_reason` such as `SAFETY`, `PROHIBITED_CONTENT` or `OTHER` |
-| `incomplete` | Any other Gemini `finish_reason` except `STOP` or an unspecified one, such as `OTHER` or `MALFORMED_FUNCTION_CALL` |
+| `incomplete` | Any other Gemini `finish_reason` except `STOP` or an unspecified one, such as `OTHER` or `MALFORMED_FUNCTION_CALL`; a Gemini image request that finishes with no image |
 
 Both errors subclass `IncompleteOutputError`. The node's failure policy
 applies, a retry reserves the node's estimated cost again before it is sent,

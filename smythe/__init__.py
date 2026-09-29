@@ -146,4 +146,4 @@ __all__ = [
     "inspect_asset",
     "load_graph",
 ]
-__version__ = "0.9.0"
+__version__ = "0.9.1"
