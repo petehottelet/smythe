@@ -40,10 +40,10 @@ if live:
             "pricing and set an inclusive per-call ceiling."
         )
     provider = GeminiProvider(
-        cost_per_image_usd=0.039,
+        cost_per_image_usd=0.067,
         max_cost_per_call_usd=float(ceiling),
     )
-    image_model = "gemini-2.5-flash-image"
+    image_model = "gemini-3.1-flash-image"
     judge_model = "gemini-flash-lite-latest"
 else:
     print("No GOOGLE_API_KEY found - running offline with OfflineProvider.")

@@ -59,8 +59,8 @@ for _stream in (sys.stdout, sys.stderr):
     if _stream.encoding and _stream.encoding.lower() not in ("utf-8", "utf8"):
         _stream.reconfigure(encoding="utf-8")
 
-COST_PER_IMAGE_USD = 0.039
-MODEL = "gemini-2.5-flash-image"
+COST_PER_IMAGE_USD = 0.067
+MODEL = "gemini-3.1-flash-image"
 
 # (asset id, width, height, format, gemini aspect bucket) — scenes come
 # from the brand config so the same spec sheet serves any brand.

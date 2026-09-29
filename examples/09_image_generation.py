@@ -40,10 +40,10 @@ if os.environ.get("GOOGLE_API_KEY"):
             "pricing and set an inclusive per-call ceiling."
         )
     provider = GeminiProvider(
-        cost_per_image_usd=0.039,
+        cost_per_image_usd=0.067,
         max_cost_per_call_usd=float(ceiling),
     )
-    model = "gemini-2.5-flash-image"
+    model = "gemini-3.1-flash-image"
 else:
     print("No GOOGLE_API_KEY found - running offline with smythe's built-in OfflineProvider.")
     print("Set GOOGLE_API_KEY to generate real images with a Gemini image model.\n")

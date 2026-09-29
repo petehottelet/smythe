@@ -7,7 +7,10 @@ of the ±0.3 judge variance documented in [README.md](README.md) applies.
 
 Harness: [run_image_benchmarks.py](run_image_benchmarks.py) (offline
 mode runs free in any checkout). Raw records:
-[results/image_k_sweep.json](results/image_k_sweep.json).
+[results/image_k_sweep.json](results/image_k_sweep.json). The harness now
+defaults to `gemini-3.1-flash-image` at a recorded $0.067 per 1K image;
+every table below used `gemini-2.5-flash-image`, which Google shuts down on
+October 2, 2026.
 
 ## Protocol
 
