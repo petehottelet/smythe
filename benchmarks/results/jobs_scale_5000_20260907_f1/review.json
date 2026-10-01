@@ -1,5 +1,5 @@
 {
-  "archive_sha256": "aad4eec40c613c1199812c25b692cc6f87f324fa2e8394151ec43acb8fd54751",
+  "archive_sha256": "2c841d8d059f2ada3dcd72d8c15a97f0a3c953173d043a3418329fcdc438bf6d",
   "checks": {
     "accepted_pointers_preserved": true,
     "archive_verified": true,
@@ -11,7 +11,7 @@
     "real_kill_verified": true,
     "zero_cost_verified": true
   },
-  "inventory_sha256": "733b572bc3825df95c6a4ef4a5b65577819e8ec2c4c1c7538360260fafb3dc93",
+  "inventory_sha256": "2566a94a6080ab0c52e670a1cf7569c4710c91172f2e0d4776526bc92122a0f5",
   "known_measurement_defects": [],
   "method": "Every original archive member verified by raw SHA/size. SQLite is inspected only from an extracted copy. Historical accepted sets are reconstructed from final ledger events/provider logs and bound receipt subsets, not historical database snapshots.",
   "observation_claimable": true,
@@ -39,7 +39,7 @@
       }
     }
   },
-  "record_sha256": "96df796d8dfe452e8ef7167f4fd7648b59ea0410a95cd5be228497e9e4626695",
+  "record_sha256": "c80c52bb377a82468f4fa957eb086f2bdaf5a9f0a9de8fa4485cd102ad0b7067",
   "review_runtime": {
     "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
     "sqlite": "3.49.1"

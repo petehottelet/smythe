@@ -24,7 +24,18 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
-No unreleased changes.
+### Fixed
+
+- Nine retained evidence archives no longer carry local user paths: the Astra
+  pilot and main-study archives with their offline and CI verification logs,
+  the Fable pilot and Fable Code archives, and the 5,000-operation Jobs
+  bundle. Paths are replaced with placeholders such as `<checkout>` and
+  `<temp>`, and frozen test sources use the placeholder API keys the live
+  tests use. Every digest, run identifier, approval token and call-evidence
+  binding derived from the changed bytes was recomputed, the Astra and Jobs
+  charts cite the new digests, and measured values are unchanged. Each results
+  folder adds `path-redaction-20260930.json`, which maps original digests to
+  their replacements.
 
 ## [0.9.1] - 2026-09-29
 

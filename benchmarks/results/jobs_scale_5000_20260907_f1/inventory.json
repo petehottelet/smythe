@@ -1,8 +1,8 @@
 {
   "archive": {
     "path": "evidence.zip",
-    "sha256": "aad4eec40c613c1199812c25b692cc6f87f324fa2e8394151ec43acb8fd54751",
-    "size_bytes": 7875780
+    "sha256": "2c841d8d059f2ada3dcd72d8c15a97f0a3c953173d043a3418329fcdc438bf6d",
+    "size_bytes": 7847919
   },
   "members": {
     "campaign/barrier.json": {
@@ -38,8 +38,8 @@
     "campaign/jobs.db": {
       "kind": "file",
       "original_mtime_ns": 1788816393487731700,
-      "sha256": "aa46b5e69bf60cc9042063e74eb0b75a11e9be9912203404df0e6ba27251e19f",
-      "size_bytes": 19234816
+      "sha256": "f0652a014baaffaa99422abc4adc352ff92416759e7653aae1302bc6d52bd23c",
+      "size_bytes": 16269312
     },
     "campaign/jobs.db-shm": {
       "kind": "file",
@@ -90152,7 +90152,7 @@
     "result.json": {
       "kind": "file",
       "original_mtime_ns": 1788816395266232800,
-      "sha256": "96df796d8dfe452e8ef7167f4fd7648b59ea0410a95cd5be228497e9e4626695",
+      "sha256": "c80c52bb377a82468f4fa957eb086f2bdaf5a9f0a9de8fa4485cd102ad0b7067",
       "size_bytes": 17558
     },
     "review-source/benchmarks/archive_jobs_scale.py": {
@@ -90534,7 +90534,7 @@
       "size_bytes": 7633
     }
   },
-  "record_sha256": "96df796d8dfe452e8ef7167f4fd7648b59ea0410a95cd5be228497e9e4626695",
+  "record_sha256": "c80c52bb377a82468f4fa957eb086f2bdaf5a9f0a9de8fa4485cd102ad0b7067",
   "schema": "smythe.jobs-scale-archive.v1",
   "source_hash_policy": "Archive members use raw bytes; source identity also requires LF-normalized equality to the frozen Git blobs.",
   "source_revision": "4bb7c0295cec658c7118d7bf9305764dae9b1c57"

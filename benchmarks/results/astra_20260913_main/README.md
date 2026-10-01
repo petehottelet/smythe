@@ -233,7 +233,21 @@ qualification and platform records above retain their historical scope.
 - [Fresh-extraction reproduction](relocated-review.json) and [chart inspection](visual-review.json)
 - [Original 24-workflow pilot snapshot](../astra_20260913/README.md)
 
-Archive SHA-256: `110e612ce24805bfc98da8eeabf80d824fdadbebabecf2786bc1fdbdba02a8ff`.
+Archive SHA-256: `50034bfb499a4cbb35aa173cc34e80bb408c67ca5792e7d37e36dd730fd6acb9`.
+
+On September 30, 2026, local paths in the archived records, test logs and CI
+logs were replaced with the placeholders `<checkout>`, `<python>`,
+`<runner-temp>` and `<runner-home>`, and placeholder API keys in the frozen
+test sources with the values the live tests use. Every digest, run identifier,
+approval token and call-evidence binding derived from the changed bytes was
+recomputed with the functions that produced it; measured values and the
+analysis are unchanged, and both charts cite the new analysis digest. The
+nested original pilot archive still matches the
+[pilot snapshot](../astra_20260913/README.md) byte for byte.
+[path-redaction-20260930.json](path-redaction-20260930.json) lists each changed
+file's original and current SHA-256 and maps every original digest to its
+replacement. The 21 September receipt and the reviews examined the original
+files.
 
 The archive includes every main output, the native SQLite ledgers, frozen sources, judge requests and
 responses, pilot human ratings, the original main review sheet, and diagnostic history.

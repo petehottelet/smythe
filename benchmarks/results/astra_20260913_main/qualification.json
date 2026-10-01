@@ -164,7 +164,7 @@
     "tests/test_astra_charts.py": "03da75fabdef9adb2874a12bd196e7378838266f51907fa3d4c0d57e12518a0e",
     "tests/test_astra_combined.py": "65861e461961d1f31d72ac67212d5a4dd38fe92204587a9beefd9915b15495fc",
     "tests/test_astra_continuation.py": "9188c4b1a4ea3f30ec12d738535e7b6daabdeb274c18133a5177f507338addee",
-    "tests/test_astra_evaluation.py": "26d225feaa5c1695171c17d2196c015f03d5ae61b064a076418b3329438d2392",
+    "tests/test_astra_evaluation.py": "3b562ab8118a1242c193d288f53c145331fd016f7e04b48bc9651e9ca95c1821",
     "tests/test_astra_evidence.py": "6aed485b30728f8ff1bd2c65b256d432697d61f6fe5cbc1114c04fbfad6d9b46",
     "tests/test_astra_judge_study.py": "f2d9d6bbabaf92522ca388fdd5c8465045803306a5034c97cb04969b015edeea",
     "tests/test_astra_main_evidence.py": "ab23798a0a74b1268ecc340426c51d4bd014a1effbb0586b2681548e153b4b3b",
@@ -241,7 +241,7 @@
     "tests/test_planner.py": "85592cf626e22c69ef9a06ec452fae3a32ef18a33dfd91227b430eab11cab03a",
     "tests/test_planner_inventory.py": "8935e413977aa97f9b049573d3499654247b330568170ff97fe8bf1da918d0fb",
     "tests/test_provider.py": "8e6bf2eb48c8714dd21de22bd3a2c7c460205b8e37a6fa1a4f4d4d151cff047f",
-    "tests/test_provider_responses.py": "32eeffd338fd2c66078bdd6dd27647b8edd5ce50e94db51c06f9b031c53dc475",
+    "tests/test_provider_responses.py": "d33ceb03e8bfa57c4293e8c4c3f35065e6e89cb0c4461b8ea7196adc3fc733dd",
     "tests/test_provider_usage_validation.py": "d010360f7331c14b1df054caa26f22940745b17096305a47d793f07fdbfe0653",
     "tests/test_publish_svg_catalog.py": "8c86fe3b70ba53f1b9f17ce3b2f5cdfafcce0a02f290011003c9c87419c0e988",
     "tests/test_pypi_readme.py": "e8fba65f5096b2153e8d399b1e3917c2f7c34dc56ec2f43483182e9e5a8664f1",
@@ -280,10 +280,10 @@
     "tests/test_workflow_binding.py": "d777f707d26e43ff40511b611f07540400a34b6187c17bfca61d8d95e7ac0338",
     "tests/test_workflow_executor.py": "225592fdc8f8e7946376262889a987a17f0bd7f2745e2f6f5daab701d3a9b832",
     "tests/test_workflow_handoff.py": "80b3b7c8158da49b09af138d81d7579e5e130d0e1882d5019075743ac8deebe7",
-    "tests/test_workflow_native_runtime.py": "c0cb3a5418325368399625b92913c6b0d50f3d057169e3afe66a5b7e92872b78",
+    "tests/test_workflow_native_runtime.py": "b989a4cf653626f9ac02b5d93aab1dc2bfe53dd6c0ad74b28b97516075a829e2",
     "tests/test_workflow_policy.py": "ee3adfe0c33bc6b2e7fc9deb4a880518d72d50e2cfd3b1c8b13852487c6eb375",
-    "tests/test_workflow_policy_recovery.py": "6d7770d0be668f2ca82499881ef5a8c78eab2156da2e5ec17697f01a3c45e69d",
-    "tests/test_workflow_provider.py": "b82205903b8b1465ae9884a1824cf196ea0b62c944329cc0bfc70c75bcfedb0d",
+    "tests/test_workflow_policy_recovery.py": "ad96cf078b3d1802b112080f949d48e2b6269334b8d9a749dd559fd5073224e5",
+    "tests/test_workflow_provider.py": "b53d0b9d6921bf85f47ca47e75b0d77bb5e437ce3a4d02420afffce51f1abad7",
     "tests/test_workflow_runtime.py": "9db848c85e8d613646ac17ea3b95d1e6d6d69efe3281dd2de0d163ad0d28fb80",
     "tests/test_workflow_runtime_control.py": "7dae302413db15863801ad7ce8b28f8856edaea0dcb730b495b902fe8e5f3615",
     "tests/test_workflow_runtime_regeneration.py": "e7165909e166d7fcdce99633c872ffbf2295f340dcb58e50406fd46076197fbe",
@@ -293,8 +293,8 @@
   "qualification_source_archive": "The archive includes the complete qualified Python/test source inventory with portable LF newlines, including preexisting local work.",
   "archive": {
     "path": "offline-verification.zip",
-    "sha256": "f276c66fe6a7db201c6b9bf001ba35d3cc4844ccda62210a77518d72f5f30dfb",
-    "bytes": 1158193
+    "sha256": "c7cb4c7538441d16708d87b8a83f6159dcf4f991e126beb8b8c8265fcc514dbe",
+    "bytes": 1158010
   },
   "markdown_links": {
     "status": "passed",

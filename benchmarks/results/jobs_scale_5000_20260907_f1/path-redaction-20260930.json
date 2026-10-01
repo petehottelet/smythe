@@ -1,0 +1,44 @@
+{
+  "date": "2026-09-30",
+  "change": "Local paths in archived records, logs and test output were replaced with placeholders. Every digest, identifier and token derived from the changed bytes was recomputed with the same functions that produced it. Measured values are unchanged.",
+  "placeholders": {
+    "<checkout>": "the repository checkout"
+  },
+  "measured_values_changed": false,
+  "files": [
+    {
+      "path": "evidence.zip",
+      "original_sha256": "aad4eec40c613c1199812c25b692cc6f87f324fa2e8394151ec43acb8fd54751",
+      "original_bytes": 7875780,
+      "sha256": "2c841d8d059f2ada3dcd72d8c15a97f0a3c953173d043a3418329fcdc438bf6d",
+      "bytes": 7847919
+    },
+    {
+      "path": "inventory.json",
+      "original_sha256": "733b572bc3825df95c6a4ef4a5b65577819e8ec2c4c1c7538360260fafb3dc93",
+      "original_bytes": 3906982,
+      "sha256": "2566a94a6080ab0c52e670a1cf7569c4710c91172f2e0d4776526bc92122a0f5",
+      "bytes": 3906982
+    },
+    {
+      "path": "result.json",
+      "original_sha256": "96df796d8dfe452e8ef7167f4fd7648b59ea0410a95cd5be228497e9e4626695",
+      "original_bytes": 17558,
+      "sha256": "c80c52bb377a82468f4fa957eb086f2bdaf5a9f0a9de8fa4485cd102ad0b7067",
+      "bytes": 17558
+    },
+    {
+      "path": "review.json",
+      "original_sha256": "619497c458cf3b8ef485fedcec963aca26fc5f5101f8b6fd36f8f5e8221ced18",
+      "original_bytes": 2431,
+      "sha256": "7bf8b8c62f0ad78c2909deb3458012c56675b0a5599f402c07df2287e467162a",
+      "bytes": 2431
+    }
+  ],
+  "digest_map": {
+    "733b572bc3825df95c6a4ef4a5b65577819e8ec2c4c1c7538360260fafb3dc93": "2566a94a6080ab0c52e670a1cf7569c4710c91172f2e0d4776526bc92122a0f5",
+    "96df796d8dfe452e8ef7167f4fd7648b59ea0410a95cd5be228497e9e4626695": "c80c52bb377a82468f4fa957eb086f2bdaf5a9f0a9de8fa4485cd102ad0b7067",
+    "aa46b5e69bf60cc9042063e74eb0b75a11e9be9912203404df0e6ba27251e19f": "f0652a014baaffaa99422abc4adc352ff92416759e7653aae1302bc6d52bd23c",
+    "aad4eec40c613c1199812c25b692cc6f87f324fa2e8394151ec43acb8fd54751": "2c841d8d059f2ada3dcd72d8c15a97f0a3c953173d043a3418329fcdc438bf6d"
+  }
+}

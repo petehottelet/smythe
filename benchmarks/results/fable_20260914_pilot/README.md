@@ -75,6 +75,15 @@ Code orchestration transcripts and source, and blind-judge reasoning.
 Publication was checked for credential values. A fresh extraction reproduced
 every native outcome and reconciled all native and judge charges.
 
+On September 30, 2026, local paths in the saved Code requests and transcripts
+and in the frozen study record were replaced with the placeholders
+`<campaign>`, `<temp>` and `<runtime>`. Every digest, run identifier and
+call-evidence binding derived from the changed bytes was recomputed with the
+functions that produced it; measured values are unchanged.
+[path-redaction-20260930.json](path-redaction-20260930.json) lists each changed
+file's original and current SHA-256 and maps every original digest to its
+replacement.
+
 After extracting the archive, inspect it without provider calls:
 
 ```bash
