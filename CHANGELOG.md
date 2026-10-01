@@ -36,6 +36,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   charts cite the new digests, and measured values are unchanged. Each results
   folder adds `path-redaction-20260930.json`, which maps original digests to
   their replacements.
+- `python -m benchmarks.verify_astra_publication` reproduces the committed
+  Astra main-study analysis exactly on Python 3.12 and later again. Python
+  3.12's `sum()` compensates float rounding, which changed the last digits of
+  the arm cost totals; the analysis now adds those values left to right, as
+  earlier Pythons did. A test recomputes the committed analysis from the
+  archive and requires an exact match.
 
 ## [0.9.1] - 2026-09-29
 
