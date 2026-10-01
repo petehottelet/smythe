@@ -5,7 +5,7 @@ import hashlib
 
 import pytest
 
-from benchmarks.astra_analysis import analyze_main, paired_interval, percentile
+from benchmarks.astra_analysis import analyze_main, ordered_sum, paired_interval, percentile
 from benchmarks.astra_campaign import load_task_pack, prepare_campaign
 from benchmarks.astra_evaluation import judge_request
 from benchmarks.astra_study import GATES
@@ -151,3 +151,10 @@ def test_reserve_mode_cannot_silently_relax_billing_requirements(complete, chang
 def test_truthy_text_cannot_enable_reserved_cost_analysis(complete):
     with pytest.raises(ValueError, match="explicit boolean"):
         analyze_main(*complete, allow_reserved_cost="false")
+
+
+def test_float_totals_add_left_to_right_on_every_python():
+    # Python 3.12's sum() compensates rounding and returns 0.6 here; the committed
+    # analysis was produced by plain left-to-right addition.
+    assert ordered_sum([0.1, 0.2, 0.3]) == (0.1 + 0.2) + 0.3 == 0.6000000000000001
+    assert ordered_sum([]) == 0

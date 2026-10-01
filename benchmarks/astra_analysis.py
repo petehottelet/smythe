@@ -14,6 +14,19 @@ from benchmarks import astra_evaluation as evaluator
 from benchmarks.astra_campaign import load_task_pack
 
 
+def ordered_sum(values):
+    """Add floats left to right, as the built-in sum() did before Python 3.12.
+
+    Python 3.12 made sum() compensate float rounding, which changes the last
+    digits of these totals. The committed analysis uses plain left-to-right
+    addition, so every supported Python reproduces it exactly.
+    """
+    total = 0
+    for value in values:
+        total += value
+    return total
+
+
 def percentile(values, quantile):
     ordered = sorted(values)
     position = (len(ordered) - 1) * quantile
@@ -100,8 +113,8 @@ def analyze_main(freeze, outcomes, judgments, bindings, *, allow_reserved_cost=F
     for name, arm in sorted(arms.items()):
         accepted = sum(r["accepted"] for r in arm)
         unknown = sum(r["cost_usd"] is None for r in arm)
-        total_lower = sum(r["cost_lower_usd"] for r in arm)
-        total_upper = sum(r["cost_upper_usd"] for r in arm)
+        total_lower = ordered_sum(r["cost_lower_usd"] for r in arm)
+        total_upper = ordered_sum(r["cost_upper_usd"] for r in arm)
         total = None if unknown else total_lower
         timing = [r["wall_seconds"] for r in arm if r["wall_seconds"] is not None]
         distributions[name] = {"workflows": len(arm), "accepted": accepted,
@@ -123,8 +136,8 @@ def analyze_main(freeze, outcomes, judgments, bindings, *, allow_reserved_cost=F
             if any(r[metric] is None for r in selected):
                 metrics[metric] = None
                 continue
-            differences = [sum(weight * mean(r[metric] for r in arms[arm] if r["trial"]["task_id"] == task)
-                               for arm, weight in weights.items()) for task in sorted(tasks)]
+            differences = [ordered_sum(weight * mean(r[metric] for r in arms[arm] if r["trial"]["task_id"] == task)
+                                       for arm, weight in weights.items()) for task in sorted(tasks)]
             metrics[metric] = paired_interval(differences, seed=gates["bootstrap_seed"],
                                                repetitions=gates["bootstrap_repetitions"])
         return metrics
