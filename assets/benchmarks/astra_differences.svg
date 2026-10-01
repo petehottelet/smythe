@@ -34,5 +34,5 @@
 <text x="40" y="492" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Intervals resample ten whole-task means (10,000 draws; seed 14173). The main study&#x27;s failed run stays included.</text>
 <text x="40" y="518" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">The report includes quality/success gates, both model contrasts, and the model-by-strategy interaction.</text>
 <text x="40" y="544" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Reused project-authored tasks limit generalization. An interval spanning zero does not establish a directional effect.</text>
-<text x="40" y="580" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="start" font-weight="normal">Source: astra_20260913_main/analysis.json · SHA-256 4184ff54fd79e8f2</text>
+<text x="40" y="580" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="start" font-weight="normal">Source: astra_20260913_main/analysis.json · SHA-256 a24b2f4c90f381a2</text>
 </svg>

@@ -119,7 +119,16 @@ offline checks. [Qualification and source hashes](qualification.json) ·
 - [Archive member hashes](archive-manifest.json) and [relocated evidence review](evidence-review.json)
 - [Experiment protocol](../../astra_benchmark_plan.md) and [runner commands](../../astra_runtime.md)
 
-Archive SHA-256: `6fee1bc87bf369c2de413661d89eaafaf04ed33737148313320ef04e9c496639`.
+Archive SHA-256: `c62ff09ae66603dd81a367e20b0252e69d650b231841b89324fc8ac5c47154f0`.
+
+On September 30, 2026, local paths in the archived records and test logs were
+replaced with the placeholder `<checkout>`, and placeholder API keys in the
+frozen test sources with the values the live tests use. Every digest, run
+identifier and approval token derived from the changed bytes was recomputed
+with the functions that produced it; measured values are unchanged.
+[path-redaction-20260930.json](path-redaction-20260930.json) lists each changed
+file's original and current SHA-256 and maps every original digest to its
+replacement. Reviews dated before that day examined the original files.
 
 Extract to a new directory. From the repository root, reconcile the corrected
 pilot without provider calls:

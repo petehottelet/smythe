@@ -33,6 +33,6 @@
 <text x="40" y="544" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">1 campaign; identical 1×1 PNG fixtures; zero API calls and zero API cost</text>
 <text x="40" y="566" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Correctness observation; no comparative speed or model-quality claim</text>
 <text x="40" y="592" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="10" fill="#000000" text-anchor="start" font-weight="normal">result.json</text>
-<text x="40" y="612" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="10" fill="#000000" text-anchor="start" font-weight="normal">RAW SHA-256 96df796d8dfe452e8ef7167f4fd7648b59ea0410a95cd5be228497e9e4626695</text>
-<!-- review-sha256: 619497c458cf3b8ef485fedcec963aca26fc5f5101f8b6fd36f8f5e8221ced18 -->
+<text x="40" y="612" font-family="'SFMono-Regular',Consolas,'Liberation Mono',monospace" font-size="10" fill="#000000" text-anchor="start" font-weight="normal">RAW SHA-256 c80c52bb377a82468f4fa957eb086f2bdaf5a9f0a9de8fa4485cd102ad0b7067</text>
+<!-- review-sha256: 7bf8b8c62f0ad78c2909deb3458012c56675b0a5599f402c07df2287e467162a -->
 </svg>

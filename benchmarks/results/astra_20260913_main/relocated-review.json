@@ -2,7 +2,7 @@
   "status": "passed",
   "provider_calls": 0,
   "members_verified": 1232,
-  "archive_sha256": "110e612ce24805bfc98da8eeabf80d824fdadbebabecf2786bc1fdbdba02a8ff",
+  "archive_sha256": "50034bfb499a4cbb35aa173cc34e80bb408c67ca5792e7d37e36dd730fd6acb9",
   "stages": {
     "typed-pilot": {
       "completed_workflows": 12,

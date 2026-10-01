@@ -8,16 +8,24 @@ speed or model-quality claim. See the
 
 | File | Contents |
 |---|---|
-| [result.json](result.json) | Original terminal producer result, unchanged |
+| [result.json](result.json) | Original terminal producer result; only its database digest was recomputed on September 30, 2026 |
 | [evidence.zip](evidence.zip) | Complete campaign tree, original result, frozen producer source, and separate review source |
 | [inventory.json](inventory.json) | Every archive member's raw SHA-256, size, kind, and original modification time; archive/result hashes |
 | [review.json](review.json) | Successful independent reconciliation, required checks, exact source/runtime identities, and no known measurement defects |
 
-The 7,875,780-byte archive contains 15,088 members: 5,085 files and 10,003
-directories. The original result's SHA-256 is
-`96df796d8dfe452e8ef7167f4fd7648b59ea0410a95cd5be228497e9e4626695`;
+The 7,847,919-byte archive contains 15,088 members: 5,085 files and 10,003
+directories. The result's SHA-256 is
+`c80c52bb377a82468f4fa957eb086f2bdaf5a9f0a9de8fa4485cd102ad0b7067`;
 the archive's SHA-256 is
-`aad4eec40c613c1199812c25b692cc6f87f324fa2e8394151ec43acb8fd54751`.
+`2c841d8d059f2ada3dcd72d8c15a97f0a3c953173d043a3418329fcdc438bf6d`.
+
+On September 30, 2026, a local path in the database's `runs.manifest_root`
+value was replaced with the placeholder `<checkout>`. No other database row
+changed. The database, result, inventory, review and archive digests and sizes
+were recomputed, and the retained reconciliation still passes with no known
+measurement defects.
+[path-redaction-20260930.json](path-redaction-20260930.json) lists each changed
+file's original and current SHA-256.
 
 The archive contains `campaign/` with the final SQLite database and sidecars,
 worker logs, configuration, provenance, provider-entry/return logs, recovery

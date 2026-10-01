@@ -91,6 +91,14 @@ source. Local credentials, Code account settings and internal plans are excluded
 A fresh extraction reproduced all fifteen outcomes, every streamed invoice,
 SQLite charge, output hash and blind-judge binding.
 
+On September 30, 2026, local paths in the saved requests and transcripts were
+replaced with the placeholders `<campaign>`, `<temp>` and `<runtime>`, and the
+digests derived from the changed bytes were recomputed; measured values are
+unchanged and all fifteen audits give the same results.
+[path-redaction-20260930.json](path-redaction-20260930.json) lists each changed
+file's original and current SHA-256 and maps every original digest to its
+replacement.
+
 From a Smythe checkout, extract all three archives into one directory and run:
 
 ```bash

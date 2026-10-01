@@ -472,5 +472,5 @@
 <text x="40" y="765" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Dashed cost range: one failed call has no usage receipt. Its full reserve bounds the charge; no point is invented.</text>
 <text x="40" y="789" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">All failures remain included. Charges use recorded usage × dated list prices; judge fees are separate.</text>
 <text x="40" y="813" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="12" fill="#000000" text-anchor="start" font-weight="normal">Amended study on reused tasks · descriptive comparison, not an external benchmark or untouched holdout.</text>
-<text x="40" y="846" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="start" font-weight="normal">Source: astra_20260913_main/analysis.json · SHA-256 4184ff54fd79e8f2</text>
+<text x="40" y="846" font-family="'Avenir Next',Avenir,'Helvetica Neue',Helvetica,sans-serif" font-size="10" fill="#000000" text-anchor="start" font-weight="normal">Source: astra_20260913_main/analysis.json · SHA-256 a24b2f4c90f381a2</text>
 </svg>

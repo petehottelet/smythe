@@ -3,7 +3,7 @@
   "verified_at_utc": "2026-09-21T05:15:49.148594+00:00",
   "kind": "offline-reproduction-not-a-new-campaign",
   "provider_calls": 0,
-  "archive_sha256": "110e612ce24805bfc98da8eeabf80d824fdadbebabecf2786bc1fdbdba02a8ff",
+  "archive_sha256": "50034bfb499a4cbb35aa173cc34e80bb408c67ca5792e7d37e36dd730fd6acb9",
   "verified_archive_members": 1232,
   "analysis_reproduced_exactly": true,
   "workflows": 200,
@@ -14,8 +14,8 @@
   "unreviewed_disputes": 0,
   "held_unknown_nanousd": 169645000,
   "charts_sha256_lf": {
-    "astra_workflows.svg": "8505a299cfa701724ce11c589134b3ed84504ca2243210754017985675f9955d",
-    "astra_differences.svg": "3c4e8058950dc0c4898a6bbe7933acdffcc9fc8f6ba2189af1269c31ac451501"
+    "astra_workflows.svg": "86a727edf4d4a80dec903be0a58056d26da1fcd5ec922bd27f10338ca83f1bf6",
+    "astra_differences.svg": "e024517123b14a8410d75f0fc180bfc1d3b32ee8a994b6161797fa78bd423df3"
   },
   "claim_scope": [
     "Descriptive records for this amended, reused ten-task study: 200 scheduled outcomes, 199 available outputs, and 191 accepted by the unchanged automatic rule.",
@@ -30,11 +30,11 @@
     "External benchmark, untouched holdout, isolated scheduler/framework effect, SVG design quality, or screensaver performance."
   ],
   "input_sha256": {
-    "benchmarks/results/astra_20260913_main/archive-manifest.json": "9c8724e7adb90222d95ddd7d08381bdfd5b98c546bf1a7dae9fcb96a222a72ed",
-    "benchmarks/results/astra_20260913_main/analysis.json": "4184ff54fd79e8f290db52742546ad534c1bf1e64e7ab275a8fb96643c5d6436",
-    "benchmarks/results/astra_20260913_main/review.json": "58afc36de126938ad2db609448ca1a3d538c68e55b55b6212ecd9750ea2df58e",
-    "benchmarks/results/astra_20260913_main/human-main-manifest.json": "43738cdd620d4996bb8def010dac5a48ea6a83390540a760263055aec80a22bd",
-    "benchmarks/results/astra_20260913_main/human-main-response.json": "f6ee4b06db6804f2b67de2c28060d4ada4ba9ed479c542e012d6eadfc262885a"
+    "benchmarks/results/astra_20260913_main/archive-manifest.json": "217e4ff67744c0080cbe8dc3b4a42f7b1ba1bde7e70570a9b2ea4ccbc4057a00",
+    "benchmarks/results/astra_20260913_main/analysis.json": "a24b2f4c90f381a27d512cd8281b5a682f5df5d9c8a714f305c1c2a776d3c7d5",
+    "benchmarks/results/astra_20260913_main/review.json": "d530a09c8ca02eedc592c3333d77541b5945c26329b4b997cce1d5b3d8da1155",
+    "benchmarks/results/astra_20260913_main/human-main-manifest.json": "e1008417d24da8032133f72b5d1153af5c54194eaf261e0b1b7fa01a62ec6ddf",
+    "benchmarks/results/astra_20260913_main/human-main-response.json": "2d28a2dbdfd6d2f7338359a60f3b097e866199c68533f6579dd39d3eb02b5c78"
   },
   "source_sha256_lf": {
     "benchmarks/archive_jobs_scale.py": "57fed8123e32733833481df860506a62117f94587f27b48ab0facbc70ced6f6d",
