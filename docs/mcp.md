@@ -40,7 +40,7 @@ The value is read from the process environment when the session opens; a missing
 ## Guardrails
 
 - `max_tool_iterations` (Swarm default 10, per-node override) bounds the loop.
-- The budget cap is checked between iterations — a runaway loop halts at the cap.
+- The budget cap is enforced between iterations. A parallel run reserves each turn's estimate before calling the model; a serial run checks the cap after each billed turn, so the turn that crosses the cap is still paid for.
 - `Node.timeout_s` covers the *whole* loop, and session teardown survives the cancellation (stdio subprocesses are reaped before the node fails).
 - `tool_timeout_s` bounds each individual tool call; a slow or failing tool returns to the model as an error result it can adapt to — it does not fail the node.
 

@@ -160,7 +160,7 @@ readable verdict is the norm.
 
 ## Gating without a model
 
-Most useful gates are objective and need no LLM at all — image
+Most useful gates are objective, and their verdict needs no LLM — image
 dimensions, JSON schema conformance, a required section:
 
 ```python
@@ -241,11 +241,12 @@ rather than the "PASS" that approved it.
 
 ## Cost
 
-A gate node is executed like any other node: it makes a provider call, and the
-verifier computes the verdict once that node finishes. A durable workflow
-journals that call in the `verification` phase. A `CallableVerifier` replaces
-only the verdict computation, so an objective gate still pays for its node's
-call, and again after each regeneration.
+A gate node is executed like any other node: it makes a provider call. When
+the gate has `max_regenerations` above 0, the verifier then computes the
+verdict from that call's result. A durable workflow, which accepts only
+`TokenVerifier`, journals the call in the `verification` phase. A
+`CallableVerifier` replaces only the verdict computation, so an objective gate
+still pays for its node's call, and again after each regeneration.
 
 Regeneration buys another provider call, so it is bounded per verifier
 by `max_regenerations` (default `0`, which makes the verdict advisory

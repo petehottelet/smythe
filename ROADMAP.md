@@ -384,8 +384,8 @@ connector or paid run.
    simpler alternative on held-out tasks
 8. **Native Agent Skills support** — discover the Agent Skills standard
    directly, add Python-backed executable skills, and keep the existing
-   OpenClaw adapter as one inventory source rather than the only packaged
-   path. Skills never grant tools or change acceptance criteria
+   OpenClaw and MCP skill providers as inventory sources alongside it.
+   Skills never grant tools or change acceptance criteria
 9. **Autotune generalization** — add calibrated sample-size and
    repeated-comparison guidance, cross-campaign reports, process-
    supervised evaluator isolation, and conservative live-evaluator adapters

@@ -576,7 +576,7 @@ def rejection_reason(verdict: Verdict) -> str:
 class CallableVerifier(Verifier):
     """Adapts a plain function into a Verifier.
 
-    Useful for objective gates that need no model at all — image
+    Useful for objective gates whose verdict needs no model — image
     dimensions, JSON schema conformance, a required section heading.
 
     The function returns a bool, a :class:`Verdict`, or an object with a

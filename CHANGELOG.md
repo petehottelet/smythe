@@ -59,7 +59,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   architecture guide no longer says that `PlannerMemory` keeps distilled
   templates or that ordinary artifact records carry hashes, and the Jobs guide
   states that the per-attempt idempotency key is a local correlation key sent
-  to no provider.
+  to no provider. The MCP guide states that a serial run checks the budget cap
+  after each billed tool-loop turn, so the turn that crosses the cap is paid
+  for.
 - `CallableVerifier` fails closed. Only `True`, `False`, a `Verdict` whose
   `passed` is a bool, or an object with a bool `passed` attribute, such as a
   `ValidationReport`, decides a gate. Any other result used to count as a pass
@@ -92,7 +94,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   constructed, using the executor's rules. Such a value used to surface only
   when the executor was built, after the router's classifier and the planner
   had already been called. Durable runs already rejected these values before
-  routing or planning.
+  routing or planning. A serial `Swarm` (`parallel=False`) with
+  `max_concurrency=0` used to run because serial execution ignores that value;
+  it is now rejected too.
 - `OpenAIImageProvider` raises `ValueError` for a request with image
   attachments, such as a node with `attach_dep_artifacts=True` whose
   dependencies produced images, instead of sending, and paying for, the
