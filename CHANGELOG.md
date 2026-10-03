@@ -42,6 +42,14 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   the arm cost totals; the analysis now adds those values left to right, as
   earlier Pythons did. A test recomputes the committed analysis from the
   archive and requires an exact match.
+- The durable workflow guide lists `AnthropicMessagesProvider` with
+  `claude-fable-5-1` among its supported providers instead of calling that
+  support planned. The verification guide states that a gate node makes its
+  own provider call even when a `CallableVerifier` computes the verdict. The
+  architecture guide no longer says that `PlannerMemory` keeps distilled
+  templates or that ordinary artifact records carry hashes, and the Jobs guide
+  states that the per-attempt idempotency key is a local correlation key sent
+  to no provider.
 
 ## [0.9.1] - 2026-09-29
 
