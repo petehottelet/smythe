@@ -497,3 +497,53 @@ def test_durable_paths_record_the_parallel_concurrency(tmp_path, parallel, expec
 
         for result in (executed, awaited, resumed):
             assert saved(result.execution_id) == expected
+
+
+# ---------------------------------------------------------------------------
+# Execution policy is validated before any routing or planning call
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("policy,match", [
+    ({"max_concurrency": 0}, "max_concurrency"),
+    ({"max_concurrency": -1}, "max_concurrency"),
+    ({"max_revisions": -1}, "max_revisions"),
+    ({"retry_backoff_s": -1}, "retry_backoff_s"),
+    ({"retry_backoff_s": float("nan")}, "retry_backoff_s"),
+    ({"retry_backoff_s": float("inf")}, "retry_backoff_s"),
+    ({"retry_backoff_s": True}, "retry_backoff_s"),
+])
+def test_invalid_execution_policy_is_rejected_before_routing_or_planning(policy, match):
+    """These values used to fail only when the executor was built, after the
+    router's classifier and the planner had already been paid."""
+    classifier = ClassifierMockProvider("autonomous")
+    planner = PlanningMockProvider()
+    router = WhiteRabbit(
+        autonomous=LLMArchitect(provider=planner, planning_model="planner"),
+        classifier_provider=classifier, classifier_model="classifier",
+    )
+
+    with pytest.raises(ValueError, match=match):
+        Swarm(model="m", provider=planner, router=router, parallel=True,
+              artifact_dir=None, **policy).execute(Task(goal="Plan this"))
+
+    assert classifier.calls == []
+    assert planner.calls == []
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+@pytest.mark.parametrize("policy", [
+    {},
+    {"max_concurrency": None},
+    {"max_concurrency": 1},
+    {"retry_backoff_s": 0},
+    {"retry_backoff_s": 1.5},
+    {"max_revisions": 2},
+])
+def test_valid_execution_policies_still_run(policy, parallel):
+    swarm = Swarm(provider=MockProvider(), architect=SimpleArchitect(),
+                  parallel=parallel, artifact_dir=None, **policy)
+
+    result = swarm.execute(Task(goal="Do something"))
+
+    assert result.graph.nodes[0].result is not None

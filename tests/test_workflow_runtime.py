@@ -96,6 +96,8 @@ def test_changed_handoff_binding_rejected_before_calls(store, tmp_path, change):
 @pytest.mark.parametrize("field,value", [
     ("max_concurrency", None), ("max_concurrency", True), ("max_concurrency", 0),
     ("max_revisions", True), ("max_revisions", -1),
+    ("retry_backoff_s", True), ("retry_backoff_s", -1), ("retry_backoff_s", float("nan")),
+    ("retry_backoff_s", float("inf")),
 ])
 def test_invalid_policy_rejected_before_planning(store, field, value, monkeypatch):
     monkeypatch.setattr(OfflineProvider, "complete", lambda *args: pytest.fail("Provider call"))

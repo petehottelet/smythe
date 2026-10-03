@@ -60,6 +60,12 @@ are terminal regardless of that policy. See [Cost guardrails](budgets.md).
 (`run_store`) records the concurrency of its first execution and keeps it when
 resumed.
 
+`Swarm` checks `max_concurrency`, `max_revisions`, and `retry_backoff_s` before
+any routing or planning call. An ordinary Swarm applies the executor's rules
+when it is constructed and raises `ValueError`. A durable Swarm applies the
+durable run's stricter rules, which also require an integer concurrency cap, at
+each `plan`, `execute`, or `resume` call and raises `WorkflowBindingError`.
+
 ## Terminal failures
 
 In serial execution, every later node remains pending after a terminal

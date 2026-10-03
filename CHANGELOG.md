@@ -77,6 +77,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   and raise `ValueError` otherwise, as durable workflows already did. `True`
   used to act as a one-second backoff, and NaN or infinity failed a serial
   retry or stalled an async retry indefinitely.
+- `Swarm` without a `run_store` rejects an invalid `max_concurrency`,
+  `max_revisions` or `retry_backoff_s` with `ValueError` when it is
+  constructed, using the executor's rules. Such a value used to surface only
+  when the executor was built, after the router's classifier and the planner
+  had already been called. Durable runs already rejected these values before
+  routing or planning.
 
 ## [0.9.1] - 2026-09-29
 

@@ -12,6 +12,7 @@ from smythe.executor_base import (
     DEFAULT_MAX_TOOL_ITERATIONS,
     ExecutorBase,
     NodeFinalizationError,
+    validate_max_concurrency,
 )
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
 from smythe.provider import Provider, ProviderResponseError
@@ -84,9 +85,7 @@ class AsyncExecutor(ExecutorBase):
         self._estimated_tokens_per_node = validate_token_count(
             estimated_tokens_per_node, "estimated_tokens_per_node",
         )
-        if max_concurrency is not None and max_concurrency < 1:
-            raise ValueError(f"max_concurrency must be >= 1, got {max_concurrency}")
-        self._max_concurrency = max_concurrency
+        self._max_concurrency = validate_max_concurrency(max_concurrency)
 
     def _schedule_state(
         self, graph: ExecutionGraph, active: dict[asyncio.Task[None], Node],

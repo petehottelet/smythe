@@ -23,7 +23,13 @@ from smythe.checkpoint import (
     task_from_dict,
 )
 from smythe.executor import Executor
-from smythe.executor_base import DEFAULT_MAX_TOOL_ITERATIONS, ExecutorBase
+from smythe.executor_base import (
+    DEFAULT_MAX_TOOL_ITERATIONS,
+    ExecutorBase,
+    validate_max_concurrency,
+    validate_max_revisions,
+    validate_retry_backoff_s,
+)
 from smythe.graph import ExecutionGraph
 from smythe.memory import PlannerMemory
 from smythe.tools import ToolRuntime
@@ -135,6 +141,13 @@ class Swarm:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
         if graph_policy is not None and run_store is None:
             raise WorkflowBindingError("graph_policy requires a durable run_store")
+        # An ordinary run builds its executor only after routing and planning,
+        # so check the executor's limits now. A durable run checks its own,
+        # stricter limits before routing or planning on every entry point.
+        if run_store is None:
+            validate_retry_backoff_s(retry_backoff_s)
+            validate_max_concurrency(max_concurrency)
+            validate_max_revisions(max_revisions)
         self._graph_policy = snapshot_graph_policy(graph_policy)
         self.model = model
         self.max_budget_usd = max_budget_usd

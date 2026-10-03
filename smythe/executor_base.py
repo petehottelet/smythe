@@ -75,6 +75,20 @@ def validate_retry_backoff_s(value: float) -> float:
     return value
 
 
+def validate_max_revisions(value: int) -> int:
+    """Accept a non-negative cap on supervisor revisions."""
+    if value < 0:
+        raise ValueError(f"max_revisions must be >= 0, got {value}")
+    return value
+
+
+def validate_max_concurrency(value: int | None) -> int | None:
+    """Accept a positive node concurrency cap, or None for unlimited."""
+    if value is not None and value < 1:
+        raise ValueError(f"max_concurrency must be >= 1, got {value}")
+    return value
+
+
 class NodeFinalizationError(PicklableError, RuntimeError):
     """Raised after a billed response cannot be persisted safely.
 
@@ -192,10 +206,8 @@ class ExecutorBase:
         self._node_lookup: dict[str, Node] = {}
         self._dependent_ids: set[str] = set()
         self._retry_backoff_s = validate_retry_backoff_s(retry_backoff_s)
-        if max_revisions < 0:
-            raise ValueError(f"max_revisions must be >= 0, got {max_revisions}")
+        self._max_revisions = validate_max_revisions(max_revisions)
         self._supervisor = supervisor
-        self._max_revisions = max_revisions
         self._default_task = snapshot_task(task) if task is not None else None
         self._task = snapshot_task(self._default_task) if self._default_task is not None else None
         # Restored from the checkpoint on resume: the revision cap is a
