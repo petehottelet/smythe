@@ -83,10 +83,12 @@ trace entries.
 
 `ConstrainedArchitect` limits the composed graph to 64 nodes by default
 (`ConstrainedArchitect(max_nodes=...)`) and retries a selection over the limit.
-Template builders receive model-chosen `params` and must bound them: the limit
-is checked when each builder call returns. In a durable run, the LLM and
-constrained architects also check each plan against the run's graph policy,
-plain-text node rules and journal node-id rule before planning is saved
+It copies its template list when constructed, so later changes to the caller's
+list do not change its menu, and it rejects duplicate template names with
+`ValueError`. Template builders receive model-chosen `params` and must bound
+them: the limit is checked when each builder call returns. In a durable run,
+the LLM and constrained architects also check each plan against the run's graph
+policy, plain-text node rules and journal node-id rule before planning is saved
 ([durable planning](workflow-accounting.md#freeze-graph-limits)). A durable
 run's template builders must return the same nodes, with the same ids, for the
 same task and params: resume rebuilds each saved selection, and a repair prompt

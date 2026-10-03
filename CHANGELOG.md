@@ -88,6 +88,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   dependencies produced images, instead of sending, and paying for, the
   request without them. The message matches the one Jobs already gives when
   it refuses OpenAI image attachments.
+- `ConstrainedArchitect` copies its template list when it is constructed and
+  raises `ValueError` for duplicate template names. It used to keep the
+  caller's list, so changing that list later changed the menu shown to the
+  model but not the templates it could select, and a selection from the
+  changed menu failed and was retried as a new paid call. With duplicate
+  names, the menu listed every template, but only the last one with a name
+  could be built.
 
 ## [0.9.1] - 2026-09-29
 
