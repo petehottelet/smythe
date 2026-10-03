@@ -50,6 +50,15 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   templates or that ordinary artifact records carry hashes, and the Jobs guide
   states that the per-attempt idempotency key is a local correlation key sent
   to no provider.
+- `CallableVerifier` fails closed. Only `True`, `False`, a `Verdict` whose
+  `passed` is a bool, or an object with a bool `passed` attribute, such as a
+  `ValidationReport`, decides a gate. Any other result used to count as a pass
+  when truthy, so the string `"FAIL"`, a non-empty list of findings, a
+  `ValidationReport` with hard findings, and an `async def` function's
+  unawaited coroutine all passed. Such results now fail, and the verdict's
+  reason names the returned type; the coroutine is closed. A function that
+  returned a truthy non-bool to pass, such as `1` or a NumPy boolean, must
+  now return `bool(...)`.
 
 ## [0.9.1] - 2026-09-29
 

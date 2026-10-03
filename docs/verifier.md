@@ -172,8 +172,22 @@ long_enough = CallableVerifier(
 swarm = Swarm(verifier=long_enough, ...)
 ```
 
-A `CallableVerifier` can return a bool or a `Verdict(passed=..., reason=...)`
-when you want the reason recorded in the trace.
+The function decides the gate only through an explicit bool. It may return:
+
+- `True` or `False`;
+- a `Verdict(passed=..., reason=...)` whose `passed` is a bool, when you want
+  the reason recorded in the trace; or
+- an object with a bool `passed` attribute, such as a
+  `smythe.assets.ValidationReport`. Its `reason` or `summary` string becomes
+  the verdict's reason; a failing report without either lists up to four of
+  its hard findings as `code: message`.
+
+Anything else **fails** the gate, with a reason that names the returned type
+(`verifier returned str`). The string `"FAIL"`, a non-empty list of
+findings, `None`, `1`, a NumPy boolean, and a `passed` that is not a bool are
+not verdicts, so return `bool(...)` when a check produces another type. The
+function is called synchronously: an `async def` function's coroutine is
+closed without running, and the gate fails.
 
 ## Gating from YAML and from a generated plan
 
