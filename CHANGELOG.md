@@ -95,6 +95,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   changed menu failed and was retried as a new paid call. With duplicate
   names, the menu listed every template, but only the last one with a name
   could be built.
+- `distill_template` keeps verification gates and execution policies. A
+  distilled node now carries its `verifies` target, `max_regenerations`,
+  `failure_policy`, `max_retries`, `timeout_s`, `attach_dep_artifacts` and
+  metadata `role`. Previously a distilled judge stopped gating, so its
+  target was never regenerated and `DELIVERABLE` synthesis returned the
+  verdict instead of the approved output. Distilling a graph in which a node
+  verifies a missing node raises `DistillationError`.
 
 ## [0.9.1] - 2026-09-29
 

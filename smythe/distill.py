@@ -14,14 +14,16 @@ item instead of re-derived:
     architect = ConstrainedArchitect(provider=p, templates=[template])
 
 What carries over is *structure*, not content: node labels, dependency
-edges, agent personas and capabilities. Results, costs, and statuses
-are deliberately left behind — a template is a shape to fill, not a
-cached answer.
+edges, agent personas and capabilities, verification gates, and each
+node's failure policy, retries, timeout, artifact attachment and role.
+Results, costs, and statuses are deliberately left behind — a template
+is a shape to fill, not a cached answer.
 """
 
 from __future__ import annotations
 
 import re
+from copy import deepcopy
 
 from smythe.agent import Agent, AgentProfile
 from smythe.constrained_planner import SubGraphTemplate
@@ -30,6 +32,9 @@ from smythe.registry import Registry
 from smythe.task import Task
 
 _GOAL_TOKEN = re.compile(r"\{goal\}")
+# Node metadata also carries execution history (model, costs, verification
+# receipts). Only the display role describes the shape.
+_STRUCTURAL_METADATA_KEYS = ("role",)
 
 
 class DistillationError(ValueError):
@@ -59,8 +64,9 @@ def distill_template(
             plan becomes a permanent one.
 
     Raises:
-        DistillationError: The graph is empty, or (under
-            ``require_success``) some node did not complete.
+        DistillationError: The graph is empty, a node verifies a node
+            the graph does not contain, or (under ``require_success``)
+            some node did not complete.
     """
     if not graph.nodes:
         raise DistillationError("cannot distill an empty graph")
@@ -76,6 +82,8 @@ def distill_template(
 
     # Snapshot structure now; the source graph must not be able to
     # mutate a template that was already handed to an architect.
+    # Gates and policies are structure too: a judge without ``verifies``
+    # no longer gates, and its verdict becomes the deliverable.
     blueprint = [
         {
             "id": node.id,
@@ -83,9 +91,28 @@ def distill_template(
             "depends_on": list(node.depends_on),
             "capabilities": list(node.required_capabilities),
             "profile": _profile_of(node, registry),
+            "verifies": node.verifies,
+            "max_regenerations": node.max_regenerations,
+            "failure_policy": node.failure_policy,
+            "max_retries": node.max_retries,
+            "timeout_s": node.timeout_s,
+            "attach_dep_artifacts": node.attach_dep_artifacts,
+            "metadata": {
+                key: deepcopy(node.metadata[key])
+                for key in _STRUCTURAL_METADATA_KEYS if key in node.metadata
+            },
         }
         for node in graph.nodes
     ]
+    # A gate on a missing node would judge nothing, or, once composed,
+    # whichever node happens to carry that id.
+    known_ids = {entry["id"] for entry in blueprint}
+    for entry in blueprint:
+        if entry["verifies"] is not None and entry["verifies"] not in known_ids:
+            raise DistillationError(
+                f"cannot distill node {entry['id']!r}: it verifies unknown "
+                f"node {entry['verifies']!r}"
+            )
 
     def builder(
         task: Task, params: dict | None = None, /, **model_params: object,
@@ -110,6 +137,13 @@ def distill_template(
                     depends_on=list(entry["depends_on"]),
                     agent_id=agent_id,
                     required_capabilities=list(entry["capabilities"]),
+                    metadata=deepcopy(entry["metadata"]),
+                    failure_policy=entry["failure_policy"],
+                    max_retries=entry["max_retries"],
+                    timeout_s=entry["timeout_s"],
+                    attach_dep_artifacts=entry["attach_dep_artifacts"],
+                    verifies=entry["verifies"],
+                    max_regenerations=entry["max_regenerations"],
                 )
             )
         return nodes, template_registry

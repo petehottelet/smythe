@@ -188,8 +188,10 @@ unchanged. Planner prompts label the recorded duration as â€œSummed node time.â€
 
 `distill_template` turns a successful completed graph into a reusable
 `SubGraphTemplate`, moving a proven topology from autonomous planning into the
-constrained tier. The template is an in-memory object that you pass to
-`ConstrainedArchitect`; `PlannerMemory` does not store templates.
+constrained tier. The template keeps the graph's dependency edges,
+verification gates, and node failure policies, retries, and timeouts; results,
+costs, and statuses stay behind. The template is an in-memory object that you
+pass to `ConstrainedArchitect`; `PlannerMemory` does not store templates.
 
 This keeps learning reviewable: execution history informs future choices, and
 promoted graph structure becomes an explicit template rather than an invisible
