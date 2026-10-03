@@ -220,9 +220,9 @@ with file hard-link support. An unsupported filesystem, conflicting owner, or
 existing destination fails without replacing earlier bytes. A collision found
 after a provider response remains an unknown outcome for explicit investigation.
 
-The local journal derives an idempotency key for every attempt, but Jobs v1
-does not yet transmit that key to every upstream provider. It is durable local
-identity, not a claim that an external API will deduplicate a repeated call.
+The local journal derives an idempotency key for every attempt from its run,
+operation, and attempt number. It is a local correlation key: Jobs transmits it
+to no provider, so no external API can use it to deduplicate a repeated call.
 
 Inspect current state and, optionally, the append-only event sequence:
 
