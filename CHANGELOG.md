@@ -24,6 +24,16 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
+### Added
+
+- Shared offline test fakes. `tests/fakes.py` has Responses and Messages SDK
+  wire fakes with request logs and failure schedules, a manual clock, crash
+  images and helpers that hard-kill a child process.
+  `tests/fixture_service.py` is a fake external service that can commit a
+  request and lose its acknowledgement, receive duplicate or reordered
+  deliveries, and report its own state for comparison with what the caller
+  saw.
+
 ### Fixed
 
 - Nine retained evidence archives no longer carry local user paths: the Astra
