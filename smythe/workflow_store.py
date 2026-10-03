@@ -675,6 +675,23 @@ class SQLiteWorkflowStore:
             if not table.admits(request["model"], today):
                 raise WorkflowValidationError("Model is retired and admits no new calls")
 
+    @staticmethod
+    def _repriced(record, request_json, tool_names_json, provider, price_version):
+        """Whether a saved call is this request under another registered price version.
+
+        Only the price version and the provider description's price_version and
+        supported_models may differ, as after a release that adds a version or
+        a model. The saved call keeps its binding, so its quote, settlement and
+        receipt use the version it recorded, even if it was not yet sent.
+        """
+        def unpriced(description):
+            return _canonical({name: value for name, value in description.items()
+                               if name not in ("price_version", "supported_models")})
+
+        return (record["request_json"] == request_json and record["tool_names_json"] == tool_names_json
+                and unpriced(record["provider"]) == unpriced(provider)
+                and _registered_price_version(provider["kind"], price_version))
+
     def prepare_call(self, lease, key, *, request_json, tool_names_json="{}", provider, price_version):
         if not isinstance(key, CallKey):
             raise WorkflowValidationError("Expected CallKey")
@@ -684,9 +701,12 @@ class SQLiteWorkflowStore:
             run = self._lease(db, lease)
             existing = db.execute("SELECT * FROM workflow_calls WHERE run_id=? AND key_json=?", (lease.run_id, key_json)).fetchone()
             if existing:
-                if existing["binding_sha"] != binding:
+                if existing["binding_sha"] == binding:
+                    return self._call_record(existing)
+                record = self._call_record(existing)
+                if not self._repriced(record, request_json, tool_names_json, provider, price_version):
                     raise WorkflowConflictError("Logical call has different immutable request bindings")
-                return self._call_record(existing)
+                return record
             # A saved call keeps the rules it was admitted under; a new one
             # must satisfy the current price version and wire rules.
             self._admission_binding(request_json, tool_names_json, provider, price_version)

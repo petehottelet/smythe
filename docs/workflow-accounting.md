@@ -219,6 +219,15 @@ A price table can give a model a retirement date (`PriceTable.retired_on`).
 From that day, by the journal clock in UTC, a durable run admits no new call to
 that model. Saved calls to it remain readable and still settle and replay.
 
+A run saved before such a release resumes. The provider descriptions in its
+saved recipe may name an earlier registered price version and a different
+supported model list; every other recipe field must still match exactly.
+Each saved call replays under the price version it recorded, including a call
+that was prepared or quoted but not yet sent, and every new call uses the
+current version. A run's total can therefore combine charges at two price
+versions, and each call's receipt names its own. The configured model must
+still be one the current version prices.
+
 ## Recovery boundaries
 
 Each call has a stable phase, component or node scope, generation, invocation,
@@ -258,7 +267,9 @@ Competing openers reuse that identity. Failed initialization rolls back;
 existing evidence and read-only inspection retain their behavior.
 
 Resume requires the same component descriptions, model configuration, budget,
-retry backoff, and concurrency policy. It does not refill allowances. An
+retry backoff, and concurrency policy, apart from the
+[price versions](#price-versions) of saved provider descriptions. It does not
+refill allowances. An
 inspected pending plan can be edited before execution; a stale graph from an
 already progressing run must use `resume()`. A graph carrying durable
 provenance cannot enter the ordinary unjournaled execution path.

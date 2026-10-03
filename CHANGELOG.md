@@ -153,6 +153,15 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   come from the current table. A new call still needs the current version,
   and a retirement date in the current table stops new calls to that model
   without affecting saved ones.
+- A durable run saved before a release that adds a price version or a
+  supported model resumes. The saved recipe embeds each provider's price
+  version and model list, and resume compared the recipe exactly, so it
+  raised `WorkflowConflictError`; a call prepared before the release raised
+  the same error when its node ran again. A saved provider description may
+  now name any registered price version and a different model list, while
+  every other recipe field still compares exactly. Saved calls replay and
+  decode at the price version they recorded, including calls not yet sent,
+  and new calls use the current version. Recipes keep their bytes.
 
 ## [0.9.1] - 2026-09-29
 

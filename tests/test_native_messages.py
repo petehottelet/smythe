@@ -164,11 +164,11 @@ def test_saved_bytes_settled_before_decode_and_no_paid_replay(journal, transport
     store, lease = journal
     original = AnthropicMessagesProvider.decode
 
-    def decode(envelope):
+    def decode(envelope, **kwargs):
         call = store.lookup_call(lease.run_id, CallKey("execution", "node"))
         assert call["billing_state"] == "known"
         assert store.load_replay(call["call_id"])["evidence"]["body"] == envelope.body
-        return original(envelope)
+        return original(envelope, **kwargs)
 
     monkeypatch.setattr(AnthropicMessagesProvider, "decode", staticmethod(decode))
     first = asyncio.run(invoke(journal))

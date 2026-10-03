@@ -924,3 +924,38 @@ def test_saved_messages_call_settles_at_its_recorded_price_version(journal, monk
     with pytest.raises(WorkflowValidationError, match="price version"):
         store.prepare_call(lease, CallKey("execution", "messages-new"), request_json=canonical(request),
                            provider=provider, price_version=recorded)
+
+
+def test_saved_call_replays_under_its_recorded_price_version_after_a_release(journal, monkeypatch):
+    store, lease, _ = journal
+    request_json = prepare(store, lease)["request_json"]
+    described = {"kind": "openai_responses", "adapter_version": "test-v1", "decoder_version": "test-v1",
+                 "endpoint_scope": "global", "price_version": PRICE_VERSION,
+                 "supported_models": ["gpt-5.6-sol", "gpt-6-astra"], "config": {"max_output_tokens": 100}}
+
+    def call(scope, provider, version, body=request_json):
+        return store.prepare_call(lease, CallKey("execution", scope), request_json=body,
+                                  provider=provider, price_version=version)
+
+    saved = call("saved", described, PRICE_VERSION)
+    evidence_id = store.append_response(dispatch(store, lease, saved), envelope(saved, response()))
+    unsent = call("unsent", described, PRICE_VERSION)
+    release_next_prices(monkeypatch, "price")
+    current = {**described, "price_version": NEXT_VERSION}
+    for scope, original in (("saved", saved), ("unsent", unsent)):
+        replayed = call(scope, current, NEXT_VERSION)
+        assert replayed["call_id"] == original["call_id"] and replayed["price_version"] == PRICE_VERSION
+        assert replayed["binding_sha256"] == original["binding_sha256"]
+    # A call that was never sent is still quoted at the version it recorded.
+    assert quote(store, lease, unsent)["ceiling_nanousd"] == 6_250_000
+    assert store.settle_call(lease, saved["call_id"], evidence_id)["cost_nanousd"] == 1_060_000
+    changed_request = canonical({**json.loads(request_json), "instructions": "changed"})
+    for provider, version, body in (
+        ({**current, "adapter_version": "test-v2"}, NEXT_VERSION, request_json),
+        ({**current, "config": {"max_output_tokens": 50}}, NEXT_VERSION, request_json),
+        ({**current, "price_version": "unregistered"}, "unregistered", request_json),
+        (current, NEXT_VERSION, changed_request),
+    ):
+        with pytest.raises(WorkflowConflictError):
+            call("saved", provider, version, body)
+    assert store.audit("run")["call_count"] == 3

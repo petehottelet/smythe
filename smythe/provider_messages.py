@@ -165,12 +165,14 @@ class AnthropicMessagesProvider(Provider):
         return ResponseQuote(prepared.request_sha256, count, cap, Decimal(ceiling).scaleb(-9), PRICE_VERSION, envelope)
 
     @staticmethod
-    def extract_receipt(envelope):
+    def extract_receipt(envelope, price_version=None):
+        """Price raw evidence at a registered price version, by default the current one."""
         try:
             raw = envelope.json()
         except ValueError:
             raw = {}
-        return price_messages_response(raw, requested_model=envelope.request.model)
+        return price_messages_response(raw, requested_model=envelope.request.model,
+                                       price_version=price_version)
 
     @staticmethod
     def _summary(envelope, receipt):
@@ -184,8 +186,8 @@ class AnthropicMessagesProvider(Provider):
         return result
 
     @staticmethod
-    def decode(envelope):
-        receipt = AnthropicMessagesProvider.extract_receipt(envelope)
+    def decode(envelope, *, price_version=None):
+        receipt = AnthropicMessagesProvider.extract_receipt(envelope, price_version)
         summary = AnthropicMessagesProvider._summary(envelope, receipt)
         if receipt.cost_usd is None or envelope.transport_error or envelope.status_code != 200:
             raise ProviderAccountingError("Messages response has unresolved billing", envelope=envelope, receipt=summary)

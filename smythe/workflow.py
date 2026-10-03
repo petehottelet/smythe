@@ -9,6 +9,7 @@ from decimal import Decimal
 import hashlib
 import json
 import math
+from types import MappingProxyType
 from uuid import uuid4
 
 from smythe.budget import BudgetValidationError, Sentinel, validate_completion_usage
@@ -34,16 +35,58 @@ from smythe.workflow_provider import (
 from smythe.workflow_policy import snapshot_graph_policy
 from smythe.workflow_store import (
     CallKey, SQLiteWorkflowStore, WorkflowConflictError, WorkflowError, WorkflowLeaseError,
-    WorkflowStateError, WorkflowValidationError, _is_http_rejection,
+    WorkflowStateError, WorkflowValidationError, _is_http_rejection, _registered_price_version,
 )
 
 # Journal keys that embed a node id stop at 512 characters. Capping durable node
 # ids well below that leaves room for "supervision/<id>/<generation>".
 MAX_NODE_ID_CHARS = 256
 
+# Recipe compatibility. Plan, execute and resume compare a saved recipe with
+# the current one exactly, field by field, except for two kinds of field:
+#
+# - Pricing metadata. A provider description's price_version and
+#   supported_models follow the price registry, which a release extends. The
+#   saved description may name any registered price version for its kind,
+#   and its model list may differ; its other fields still compare exactly.
+#   Saved calls keep the price version they recorded, and admission checks
+#   each new call against the current version.
+# - Behavior-version fields, which select a versioned behavior such as a
+#   prompt-assembly version. This maps each field to (absent, default): the
+#   value a recipe without the field means, and the value a new run records
+#   unless the caller configures one. A recipe records the field only when its
+#   value differs from `absent`, so existing recipes keep their bytes. Resume
+#   reads the value from the saved recipe into WorkflowRuntime.behavior, so a
+#   changed default applies only to new runs; a value configured explicitly in
+#   behavior_settings must equal the saved one. No such field exists yet.
+RECIPE_BEHAVIOR_FIELDS = MappingProxyType({})
+_PROVIDER_FIELDS = frozenset({"kind", "adapter_version", "decoder_version", "endpoint_scope",
+                              "price_version", "supported_models", "config"})
+
 
 def _canonical(value):
     return json.dumps(json_snapshot(value), sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+
+def _without_pricing(value, *, saved=False):
+    """Copy a recipe without its provider descriptions' pricing metadata.
+
+    A saved description keeps its fields when its price version is no longer
+    registered, so it cannot match a current one.
+    """
+    if isinstance(value, list):
+        return [_without_pricing(item, saved=saved) for item in value]
+    if not isinstance(value, dict):
+        return value
+    result = {}
+    for key, item in value.items():
+        if (key == "provider" and isinstance(item, dict) and item.keys() == _PROVIDER_FIELDS
+                and (not saved or _registered_price_version(item["kind"], item["price_version"]))):
+            result[key] = {name: field for name, field in item.items()
+                           if name not in ("price_version", "supported_models")}
+        else:
+            result[key] = _without_pricing(item, saved=saved)
+    return result
 
 
 def _hash(value):
@@ -172,6 +215,10 @@ class WorkflowRuntime:
         self.retry_backoff_s = retry_backoff_s
         self.checkpoint_every_n_nodes = checkpoint_every_n_nodes
         self.graph_policy = snapshot_graph_policy(graph_policy)
+        # Explicitly configured behavior versions (see RECIPE_BEHAVIOR_FIELDS)
+        # and, once a run is bound, the versions that run uses.
+        self.behavior_settings = {}
+        self.behavior = {}
         self.recipe = self._describe()
         self.graph = None
         self.executor = None
@@ -199,7 +246,25 @@ class WorkflowRuntime:
         # change their identity and prevent otherwise compatible recovery.
         if self.graph_policy is not None:
             recipe["graph_policy"] = self.graph_policy.to_dict()
+        for name, (absent, default) in RECIPE_BEHAVIOR_FIELDS.items():
+            value = self.behavior_settings.get(name, default)
+            if _canonical(value) != _canonical(absent):
+                recipe[name] = value
         return json_snapshot(recipe)
+
+    def _adopt_recipe(self, saved):
+        """Check a saved recipe against this runtime; bind its behavior versions."""
+        saved, current = dict(saved), dict(self.recipe)
+        behavior = {}
+        for name, (absent, _) in RECIPE_BEHAVIOR_FIELDS.items():
+            current.pop(name, None)
+            behavior[name] = saved.pop(name, absent)
+            if (name in self.behavior_settings
+                    and _canonical(self.behavior_settings[name]) != _canonical(behavior[name])):
+                raise WorkflowConflictError(f"Workflow {name} differs from the saved recipe")
+        if _canonical(_without_pricing(saved, saved=True)) != _canonical(_without_pricing(current)):
+            raise WorkflowConflictError("Workflow components or budget differ from the saved recipe")
+        self.behavior = behavior
 
     def _reference(self):
         return {"version": 1, "store_id": self.store.store_id, "run_id": self.run_id,
@@ -274,9 +339,9 @@ class WorkflowRuntime:
     @asynccontextmanager
     async def _session(self, run):
         self.run, self.run_id = run, run["run_id"]
-        if (_canonical(run["config"]) != _canonical(self.recipe)
-                or run["budget_nanousd"] != _nanousd(self.max_budget_usd)):
+        if run["budget_nanousd"] != _nanousd(self.max_budget_usd):
             raise WorkflowConflictError("Workflow components or budget differ from the saved recipe")
+        self._adopt_recipe(run["config"])
         self._bind()
         lease = self.store.acquire_lease(self.run_id, uuid4().hex, ttl_s=60)
         self.context = WorkflowProviderContext(self.store, lease, self.providers)

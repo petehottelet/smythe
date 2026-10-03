@@ -2,14 +2,21 @@
 
 import asyncio
 from copy import deepcopy
+from dataclasses import replace
+from types import MappingProxyType
 
 import pytest
 
+from fakes import NativeTransport, release_price_version
 from smythe import LocalOnly, OfflineProvider, SimpleArchitect, SQLiteWorkflowStore, Swarm, Task
+from smythe import workflow
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Revision, Topology
+from smythe.pricing import PRICE_VERSION, price_table
+from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.registry import Registry
+from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.workflow import WorkflowRuntime, _nanousd
-from smythe.workflow_store import WorkflowConflictError
+from smythe.workflow_store import CallKey, WorkflowConflictError, WorkflowCorruptionError
 
 
 @pytest.fixture
@@ -283,3 +290,95 @@ def test_invalid_node_policy_is_rejected_before_dispatch(store, field, value):
     setattr(source.nodes[0], field, value)
     with pytest.raises(ValueError):
         swarm(store).execute(source)
+
+
+def native_swarm(store):
+    provider = OpenAIResponsesProvider(api_key="test-key", max_output_tokens=100)
+    return Swarm(model="gpt-6-astra", provider=provider, max_budget_usd=1, run_store=store,
+                 synthesizer=Synthesizer(SynthesisStrategy.LLM_MERGE))
+
+
+def test_run_saved_before_a_price_release_resumes_at_recorded_and_current_prices(tmp_path, monkeypatch):
+    transport = NativeTransport().install(monkeypatch)
+    path = tmp_path / "release.db"
+    with SQLiteWorkflowStore(path) as store:
+        planned = native_swarm(store).plan(Task("Write and check"))
+        run_id = planned.run_ref["run_id"]
+        restore = crash_checkpoints(monkeypatch, store, lambda state, _: any(
+            node["status"] == "completed" for node in state["graph"]["nodes"]
+        ))
+        with pytest.raises(Crash):
+            native_swarm(store).execute(planned)
+        restore()
+        saved = {call["call_id"] for call in store.inspect_run(run_id)["calls"]}
+        recipe = store.load_run(run_id)["config_sha256"]
+    sent = len(transport.requests)
+    assert sent == len(saved) == 2
+    # The release doubles the Astra output price and adds a model, so the
+    # saved recipe's price version and model list both differ.
+    rates = dict(price_table().rates)
+    rates["gpt-6-astra"] = replace(rates["gpt-6-astra"], output=100_000)
+    rates["gpt-7-test"] = rates["gpt-5.6-sol"]
+    release_price_version(monkeypatch, version="openai-test-v2", rates=rates)
+    with SQLiteWorkflowStore(path) as store:
+        result = native_swarm(store).resume(run_id)
+        versions = {call["call_id"]: store.lookup_call(run_id, CallKey(**call["key"]))["price_version"]
+                    for call in store.inspect_run(run_id)["calls"]}
+        assert store.load_run(run_id)["config_sha256"] == recipe
+        assert store.audit(run_id)["ok"]
+    assert result.output == "Final accepted output."
+    # The accepted draft replays; only the check and synthesis are new calls.
+    assert len(transport.requests) == sent + 2
+    assert {versions[call_id] for call_id in saved} == {PRICE_VERSION}
+    assert {version for call_id, version in versions.items() if call_id not in saved} == {"openai-test-v2"}
+    # 1,500,000 nanoUSD per saved call at its recorded rates, 2,000,000 per new call.
+    assert result.workflow_accounting["confirmed_nanousd"] == 2 * 1_500_000 + 2 * 2_000_000
+    assert result.workflow_accounting["call_count"] == 4
+
+
+def test_saved_recipe_naming_an_unregistered_price_version_is_refused(tmp_path, monkeypatch):
+    transport = NativeTransport().install(monkeypatch)
+    path = tmp_path / "newer.db"
+    # A newer release saved this run under a version this one does not register.
+    with pytest.MonkeyPatch.context() as newer:
+        release_price_version(newer, version="openai-test-v2")
+        with SQLiteWorkflowStore(path) as store:
+            run_id = native_swarm(store).plan(Task("Write and check")).run_ref["run_id"]
+    sent = len(transport.requests)
+    with SQLiteWorkflowStore(path) as store:
+        with pytest.raises(WorkflowConflictError):
+            native_swarm(store).resume(run_id)
+        with pytest.raises(WorkflowCorruptionError):
+            store.inspect_run(run_id)
+    assert len(transport.requests) == sent
+
+
+def test_default_recipe_keeps_its_legacy_fields(store):
+    recipe = swarm(store)._workflow_runtime().recipe
+    assert set(recipe) == {"type", "version", "model", "provider", "components", "max_revisions",
+                           "retry_backoff_s", "max_concurrency", "verifier", "checkpoint_every_n_nodes"}
+    assert (recipe["type"], recipe["version"], recipe["verifier"]) == ("text_workflow", 1, "token-v1")
+
+
+def test_behavior_version_fields_are_read_from_the_saved_recipe(store, monkeypatch):
+    legacy = swarm(store).plan(Task("Report")).run_ref["run_id"]
+    recipe = store.load_run(legacy)["config_sha256"]
+    # A later release adds a behavior version whose default is 2.
+    monkeypatch.setattr(workflow, "RECIPE_BEHAVIOR_FIELDS", MappingProxyType({"prompt_assembly": (1, 2)}))
+    runtime = swarm(store)._workflow_runtime()
+    assert runtime.recipe["prompt_assembly"] == 2
+    assert asyncio.run(runtime.resume(legacy, max_concurrency=1)).execution_id == legacy
+    assert runtime.behavior == {"prompt_assembly": 1}
+    assert store.load_run(legacy)["config_sha256"] == recipe
+    # A new run records its default and keeps it when a later default changes.
+    started = asyncio.run(swarm(store)._workflow_runtime().plan(Task("Report"))).run_ref["run_id"]
+    assert store.load_run(started)["config"]["prompt_assembly"] == 2
+    monkeypatch.setattr(workflow, "RECIPE_BEHAVIOR_FIELDS", MappingProxyType({"prompt_assembly": (1, 3)}))
+    later = swarm(store)._workflow_runtime()
+    asyncio.run(later.resume(started, max_concurrency=1))
+    assert later.behavior == {"prompt_assembly": 2}
+    # A value configured explicitly must equal the saved one.
+    explicit = swarm(store)._workflow_runtime()
+    explicit.behavior_settings = {"prompt_assembly": 3}
+    with pytest.raises(WorkflowConflictError, match="prompt_assembly"):
+        asyncio.run(explicit.resume(started, max_concurrency=1))

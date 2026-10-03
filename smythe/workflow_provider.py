@@ -344,12 +344,15 @@ class JournaledProvider(Provider):
                 receipt=self._managed_receipt(receipt, record, replayed=replayed),
             )
         source = context._providers[self.provider_id]
+        # Price the result as the journal settled it, at the call's recorded
+        # version, even when a later release made another version current.
+        price_version = record["price_version"]
         if record.get("admission_closed"):
             # A billing latch is not a semantic rejection. Leave saved output
             # pending so resolving another call can unlock local decoding.
             try:
                 if type(source) in (OpenAIResponsesProvider, AnthropicMessagesProvider):
-                    native = source.extract_receipt(envelope)
+                    native = source.extract_receipt(envelope, price_version)
                     billing = CompletionResult(
                         "", prompt_tokens=native.input_tokens, completion_tokens=native.output_tokens,
                         cost_usd=float(native.cost_usd), native_receipt=record["receipt"],
@@ -370,7 +373,7 @@ class JournaledProvider(Provider):
             ), record, replayed=replayed)
         try:
             if type(source) in (OpenAIResponsesProvider, AnthropicMessagesProvider):
-                result = source.decode(envelope)
+                result = source.decode(envelope, price_version=price_version)
             else:
                 raw = envelope.json()
                 if type(raw.get("text")) is not str:
