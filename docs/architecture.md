@@ -23,7 +23,7 @@ flowchart LR
         synthesizer["Synthesizer<br/>final deliverable"]
     end
 
-    result["SwarmResult<br/>output · graph · trace · cost"]
+    result["SwarmResult<br/>output · graph · trace · cost · timing"]
     memory["PlannerMemory<br/>recorded run outcomes"]
 
     task --> router --> architect --> dag --> executor --> synthesizer --> result

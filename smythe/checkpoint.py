@@ -291,6 +291,7 @@ def build_state(
     output: str | None = None,
     created_at: float | None = None,
     control: dict[str, Any] | None = None,
+    timing: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assemble a checkpoint state document.
 
@@ -298,6 +299,9 @@ def build_state(
     guarantees. They must be durable: an allowance that resets on
     resume is not a cap, and a crash would silently buy more work
     than the caller authorised.
+
+    ``timing`` is an informational block of per-process timing segments.
+    It is additive within version 4: readers ignore keys they do not use.
     """
     task_data = task_to_dict(task)
     graph_task_data = task_data if graph.task is task else task_to_dict(graph.task)
@@ -306,7 +310,7 @@ def build_state(
         raise ValueError("Checkpoint graph Task conflicts with the top-level Task")
     task_data = task_data if task_data is not None else graph_task_data
     now = time.time()
-    return {
+    state = {
         "version": CHECKPOINT_VERSION,
         "execution_id": execution_id,
         "status": status,
@@ -323,3 +327,6 @@ def build_state(
         "output": output,
         "control": dict(control or {"revisions_used": 0}),
     }
+    if timing is not None:
+        state["timing"] = deepcopy(timing)
+    return state

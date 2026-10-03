@@ -95,7 +95,22 @@ and recovery controls.
     "max_budget_usd": 0.5,
     "node_costs": {"research": 0.0003}
   },
-  "output": "…final synthesized output, null until the run completes…"
+  "output": "…final synthesized output, null until the run completes…",
+  "timing": {
+    "version": 1,
+    "clock": "monotonic",
+    "segments": [
+      {
+        "started_at": 1751600000.0,
+        "ended_at": 1751600042.5,
+        "resumed": false,
+        "elapsed_ms": 42500.0,
+        "summed_node_ms": 61200.0,
+        "phases_ms": {"routing": null, "planning": 3100.0, "execution": 52000.0, "…": "…"},
+        "waiting_ms": {"retry_backoff": 0.0, "admission": 900.0, "supervision": 0.0}
+      }
+    ]
+  }
 }
 ```
 
@@ -108,6 +123,26 @@ Notes:
 - `control.revisions_used` is how much of the supervisor's `max_revisions` allowance the run has already spent. Resume seeds the executor from it, so the cap bounds the **run**, not each attempt: a crash-resume cycle cannot refill the allowance and revise past the limit the caller set.
 - A node that a revision added carries `"added_by_revision": true` in its `metadata` (from 0.8.2). `LLMSupervisor` counts these nodes against `max_total_added_nodes`, so resume does not reset the count ([what the cap limits](supervisor.md#safety)). Nodes added before 0.8.2 have no marker and are not counted.
 - `task.done_when` carries the acceptance criteria forward. A resumed run that had forgotten them could not hold its own output to them.
+- `timing` records how long each call that worked on the execution took; see [timing segments](#timing-segments).
+
+## Timing segments
+
+Each `execute()` or `resume()` call that saves the checkpoint writes one
+segment to the top-level `timing` block and carries the earlier segments
+forward, so a run that crashed and was resumed twice has three. A segment
+holds:
+
+- `started_at` and `ended_at`: wall-clock seconds, like `created_at`;
+- `resumed`: whether the call resumed this checkpoint;
+- `elapsed_ms`, `summed_node_ms`, `phases_ms` and `waiting_ms`: that call's
+  [timing](execution.md#timing), measured on its own process's monotonic clock.
+
+Monotonic readings from different processes are never subtracted from each
+other, so durations are comparable only within a segment. The gap between two
+segments, when no process was running the execution, shows only in their
+wall-clock times, which clock adjustments can shift. The block is
+informational: when it is missing or unreadable, resume starts a new list, and
+it does not change the checkpoint version.
 
 ## Verification state
 
@@ -139,7 +174,7 @@ checkpoint already handed to a custom store.
 4. Restores per-node costs into the budget so the resumed run keeps counting against the original cap.
 5. Executes the remaining nodes on the async executor, one at a time unless the resuming Swarm has `parallel=True` (then up to `max_concurrency`), synthesizes over the full graph, and writes the final checkpoint.
 
-The trace on a resumed `SwarmResult` covers only the resumed portion; spans from before the crash are not reconstructed.
+The trace on a resumed `SwarmResult` covers only the resumed portion; spans from before the crash are not reconstructed. Its `timing` likewise measures the resuming call, with `resumed` set and `latency_complete` false, and lists the earlier calls' saved segments before its own.
 
 An invalid provider usage report stops the run and preserves its live
 reservation. Node failures carry `accounting_invalid` and `accounting_error` in
@@ -154,6 +189,10 @@ resume. See [Cost guardrails](budgets.md).
 This build writes version `4` and reads versions `1` through `4`.
 Version 2 added `control` and `task.done_when`; version 1 loads their original
 defaults of zero revisions and no acceptance criteria.
+
+The top-level `timing` block is optional and keeps version `4`. Earlier
+builds ignore the key when they resume and leave it out of the checkpoints
+they write; this build resumes checkpoints that lack it.
 
 Version 4 adds no field. It records that every MCP server listed under
 `agents` came from developer configuration: from 0.8.1 on, a model-generated

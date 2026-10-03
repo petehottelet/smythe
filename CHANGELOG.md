@@ -49,6 +49,25 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `run_store` and `verifier`, with the type that was passed, `memory`,
   `tool_runtime` or `checkpoint_store`. One message used to cover memory,
   tools and the checkpoint store. The exception is still a `ValueError`.
+- Elapsed-time records for ordinary runs. `SwarmResult.timing` reports a
+  call's elapsed time on a monotonic clock beside its summed node time, the
+  time spent in routing, planning, recovery, execution, verification,
+  supervision, synthesis, checkpoint writes and waiting, and waits for retry
+  backoff, admission and supervisor reviews. Routing and planning are
+  measured only when `execute(Task)` plans in the same call. Checkpoints keep
+  one segment per call in a new top-level `timing` block and stay at version
+  4; a resumed run adds its own segment rather than comparing clocks across
+  processes. Trace spans record their attempt index, phase and outcome, and
+  `Tracer.timing()` and `Tracer(clock=..., wall_clock=...)` expose the
+  measurements and clocks. `Tracer.summary()` and `SwarmResult.trace` keep
+  their keys.
+
+### Changed
+
+- Trace span durations come from a monotonic clock, so a wall-clock
+  adjustment during an attempt no longer distorts a span's `duration_ms` or
+  `PlannerMemory`'s summed node time. `start_time` and `end_time` remain
+  wall-clock seconds.
 
 ### Fixed
 

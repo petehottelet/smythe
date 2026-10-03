@@ -66,6 +66,59 @@ when it is constructed and raises `ValueError`. A durable Swarm applies the
 durable run's stricter rules, which also require an integer concurrency cap, at
 each `plan`, `execute`, or `resume` call and raises `WorkflowBindingError`.
 
+## Timing
+
+`SwarmResult.timing` reports where a call's time went. Durations come from a
+monotonic clock in the calling process, so a wall-clock adjustment cannot
+distort them, and durations from different processes are never compared.
+
+| Key | Meaning |
+|---|---|
+| `elapsed_ms` | Time from the start of the call to its result |
+| `summed_node_ms` | Every recorded attempt's duration added together: the summed node time that `PlannerMemory` records as `total_duration_ms` |
+| `phases_ms` | Time per phase, below |
+| `waiting_ms` | Waiting time by reason, below |
+| `resumed` | `true` when the call resumed a checkpoint |
+| `latency_complete` | `false` when the call resumed a checkpoint, so `elapsed_ms` covers only part of the execution |
+| `segments` | One entry per call that worked on the execution, oldest first; see [timing segments](checkpoint-format.md#timing-segments) |
+
+| Phase | Time measured |
+|---|---|
+| `routing` | Router classification, when `execute(Task)` planned the graph in the same call and a router is set |
+| `planning` | Architect planning, when `execute(Task)` planned the graph in the same call |
+| `recovery` | Loading, checking and restoring the checkpoint on resume |
+| `execution` | Attempts of work nodes |
+| `verification` | Attempts of judge nodes, plus applying saved verdicts and regeneration resets |
+| `supervision` | Supervisor reviews |
+| `synthesis` | Producing the output from the finished graph |
+| `checkpoint` | Building and writing checkpoints |
+| `waiting` | All waits in `waiting_ms` |
+
+`routing`, `planning`, `recovery` and `synthesis` are `null` when that stage
+did not run in the call. A graph planned by an earlier `plan()` call, or built
+by hand, reports planning as not measured.
+
+| Wait | Time measured |
+|---|---|
+| `retry_backoff` | Sleeping before a retry attempt (`retry_backoff_s`) |
+| `admission` | A ready node waiting for a free concurrency slot in the async executor, which runs every parallel run and `execute_async()`, `resume()` and `aresume()`; serial `execute()` has no admission queue |
+| `supervision` | Ready work that a supervisor review kept from starting: in the async executor, ready nodes with a free slot; in serial execution, the next pending node |
+
+Phases and waits are totals. In a parallel run nodes overlap, and checkpoint
+writes, verification and supervision happen during execution, so the totals
+can add up to more than `elapsed_ms`. Comparing `summed_node_ms` with
+`elapsed_ms` shows how much work overlapped.
+
+Each attempt's trace span also records its 0-based `attempt`, its `phase`
+(`execution`, `verification` or `synthesis`) and an `outcome`: `completed`,
+`failed`, `timed_out`, `skipped` or `cancelled`. Spans measure their duration
+on the monotonic clock and keep wall-clock `start_time` and `end_time`. These
+fields are on `Tracer.spans`; the keys of `Tracer.summary()` and
+`SwarmResult.trace` are unchanged. A tracer passed to an executor reports the
+same measurements through `Tracer.timing()`, whose `elapsed_ms` starts when the
+tracer is created. `Tracer(clock=..., wall_clock=...)` takes the monotonic and
+wall clocks to use, for example fixed clocks in tests.
+
 ## Terminal failures
 
 In serial execution, every later node remains pending after a terminal

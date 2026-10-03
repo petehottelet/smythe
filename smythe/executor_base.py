@@ -235,6 +235,7 @@ class ExecutorBase:
         if remaining <= 0:
             return False
 
+        started = self._tracer.now()
         try:
             revision = await self._supervisor.review(
                 graph, node, task=snapshot_task(self._task) if self._task is not None else None,
@@ -268,6 +269,8 @@ class ExecutorBase:
             )
             self.notify_supervision_update(node, False)
             return False
+        finally:
+            self._tracer.add_phase("supervision", self._tracer.now() - started)
         if revision is None or revision.is_empty:
             self.notify_supervision_update(node, False)
             return False

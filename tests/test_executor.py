@@ -4,12 +4,15 @@ import random
 
 import pytest
 
+import smythe.executor as executor_module
+from fakes import ManualClock
 from helpers import FailingProvider
 from smythe.executor import Executor
 from smythe.executor_base import NodeFinalizationError
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, OfflineProvider, Provider
 from smythe.registry import Registry
+from smythe.supervisor import Supervisor
 from smythe.tracer import Tracer
 
 
@@ -114,6 +117,50 @@ def test_retry_count_means_additional_retries():
     graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
     executor.run(graph)
     assert node.status == NodeStatus.COMPLETED
+
+
+def test_retry_attempts_record_their_index_and_measured_backoff(monkeypatch):
+    clock = ManualClock()
+    tracer = Tracer(clock=clock.monotonic, wall_clock=lambda: clock.time_ns() / 1e9)
+    executor = Executor(provider=FailingProvider(failures=2), registry=Registry(), tracer=tracer)
+    monkeypatch.setattr(executor, "retry_delay_s", lambda attempt: 2.0 * attempt)
+    monkeypatch.setattr(executor_module.time, "sleep", clock.advance)
+    node = Node(label="EventuallyOk", id="eo", failure_policy=FailurePolicy.RETRY, max_retries=2)
+
+    executor.run(ExecutionGraph(topology=[Topology.SERIAL], nodes=[node]))
+
+    assert [(span.attempt, span.outcome) for span in tracer.spans] == [
+        (0, "failed"), (1, "failed"), (2, "completed"),
+    ]
+    timing = tracer.timing()
+    assert timing["waiting_ms"]["retry_backoff"] == 6000
+    assert timing["phases_ms"]["waiting"] == 6000
+    assert timing["elapsed_ms"] == 6000
+
+
+def test_serial_supervisor_review_with_pending_work_is_a_supervision_wait():
+    clock = ManualClock()
+    tracer = Tracer(clock=clock.monotonic, wall_clock=lambda: clock.time_ns() / 1e9)
+
+    class SlowReview(Supervisor):
+        async def review(self, graph, node, *, task, revisions_remaining):
+            clock.advance(5)
+            return None
+
+    executor = Executor(
+        provider=SuccessProvider(), registry=Registry(), tracer=tracer,
+        supervisor=SlowReview(), max_revisions=1,
+    )
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="a", label="A"), Node(id="b", label="B", depends_on=["a"]),
+    ])
+
+    executor.run(graph)
+
+    timing = tracer.timing()
+    assert timing["phases_ms"]["supervision"] == 10000
+    assert timing["waiting_ms"]["supervision"] == 5000
+    assert timing["elapsed_ms"] == 10000
 
 
 def test_serial_halts_downstream_of_failed():

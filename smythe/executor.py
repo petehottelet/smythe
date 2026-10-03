@@ -23,7 +23,8 @@ class Executor(ExecutorBase):
     def run(self, graph: ExecutionGraph) -> ExecutionGraph:
         """Execute in dependency order; stop immediately on a terminal failure."""
         self.prepare_execution(graph)
-        self.recover_verification(graph)
+        with self._tracer.phase("verification"):
+            self.recover_verification(graph)
         visited: set[str] = set()
         # The walk is recomputed each step rather than taken once, so a
         # supervisor revision that adds or drops pending work is picked
@@ -45,9 +46,15 @@ class Executor(ExecutorBase):
                 self.mark_accounting_invalid(node, exc)
                 self.notify_update(node)
                 raise
-            self.maybe_regenerate(node, graph)
+            with self._tracer.phase("verification"):
+                self.maybe_regenerate(node, graph)
             if self._supervisor is not None:
+                # Any pending node is held until the review finishes.
+                held = any(n.status is NodeStatus.PENDING for n in graph.nodes)
+                started = self._tracer.now()
                 asyncio.run(self.maybe_revise(node, graph))
+                if held:
+                    self._tracer.on_wait("supervision", self._tracer.now() - started)
         return graph
 
     def _walk(self, graph: ExecutionGraph) -> list[Node]:
@@ -77,10 +84,12 @@ class Executor(ExecutorBase):
             self._call_attempts[node.id] = attempt
             delay = self.retry_delay_s(attempt)
             if delay:
+                started = self._tracer.now()
                 time.sleep(delay)
+                self._tracer.on_wait("retry_backoff", self._tracer.now() - started, node)
             node.status = NodeStatus.RUNNING
             self.begin_verification(node, graph)
-            self._tracer.on_node_start(node)
+            self._tracer.on_node_start(node, attempt=attempt)
 
             try:
                 # Cost recording happens inside acall_node (per provider call).
