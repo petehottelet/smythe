@@ -195,6 +195,7 @@
     "tests/test_sqlite_initialization.py",
     "tests/test_supervisor.py",
     "tests/test_support_matrix.py",
+    "tests/test_support_matrix_docs.py",
     "tests/test_svg_glyph_benchmark.py",
     "tests/test_svg_glyph_measurements.py",
     "tests/test_svg_glyphs.py",

@@ -141,7 +141,8 @@ smythe jobs validate job.yaml
 
 Validation also rejects an artifact the profile cannot produce. An `offline`
 profile emits 1x1 PNGs, so it accepts only `image/png` with no dimensions or
-1x1. A `gemini_image` profile accepts only PNG, JPEG, GIF or WebP.
+1x1. A `gemini_image` profile accepts only PNG, JPEG, GIF or WebP. The
+[support matrix](support-matrix.md) lists every profile's checks.
 
 Planning prints the expanded plan and an approval token:
 

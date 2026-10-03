@@ -268,6 +268,8 @@ Those features remain available through the ordinary Swarm and artifact Jobs
 APIs within their documented accounting scopes. A rejected `run_store`,
 `verifier`, `memory`, `tool_runtime` or `checkpoint_store` raises
 `WorkflowBindingError` with a message that starts with that argument's name.
+The [support matrix](support-matrix.md) lists each accepted and rejected
+combination with the test behind it.
 
 ## Inspect a run
 

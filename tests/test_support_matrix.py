@@ -1,20 +1,34 @@
 """Support matrix cells: what each execution path accepts, and what it refuses.
 
-A rejection cell proves that the refusal happens before any provider method
-runs and before any SDK client exists, including the planning and routing
-calls a run would make.
+docs/support-matrix.md cites these tests by node id. A rejection cell proves
+that the refusal happens before any provider method runs and before any SDK
+client exists, including the planning and routing calls a run would make.
 """
 
 from __future__ import annotations
 
+import asyncio
+import inspect
+import sys
+from types import SimpleNamespace
+
 import pytest
 
+from fakes import MessagesTransport, NativeTransport
 from smythe import (
-    AnthropicMessagesProvider, AnthropicProvider, CallableVerifier, CompletionResult,
-    FileCheckpointStore, GeminiProvider, OfflineProvider, OpenAIImageProvider, OpenAIProvider,
-    OpenAIResponsesProvider, PlannerMemory, Provider, SQLiteWorkflowStore, Swarm, Task,
-    TokenVerifier, ToolRuntime, WorkflowBindingError,
+    AnthropicMessagesProvider, AnthropicProvider, Artifact, CallableVerifier, ChatMessage,
+    CompletionResult, FileCheckpointStore, GeminiProvider, OfflineProvider, OpenAIImageProvider,
+    OpenAIProvider, OpenAIResponsesProvider, PlannerMemory, Provider, SimpleArchitect,
+    SQLiteWorkflowStore, Swarm, Task, TokenVerifier, ToolRuntime, ToolSpec, WorkflowBindingError,
 )
+from smythe.graph import ExecutionGraph, Node, Topology
+from smythe.jobs import JobManifestV1, make_approval, preflight_job
+from smythe.jobs.models import ManifestValidationError
+from smythe.jobs.providers import ProviderPreflightError, ProviderPreflightKind
+from smythe.jobs.runner import JobRunner
+from smythe.jobs.store import SQLiteRunStore
+from smythe.pricing_anthropic import MODEL as FABLE
+from smythe.workflow_store import WorkflowConflictError
 
 BUILT_IN_PROVIDERS = (
     OfflineProvider, AnthropicProvider, OpenAIProvider, OpenAIImageProvider, GeminiProvider,
@@ -27,6 +41,18 @@ class CustomProvider(Provider):
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         return CompletionResult("custom")
+
+
+class OfflineSubclass(OfflineProvider):
+    pass
+
+
+class ResponsesSubclass(OpenAIResponsesProvider):
+    pass
+
+
+class MessagesSubclass(AnthropicMessagesProvider):
+    pass
 
 
 class AuditedStore(SQLiteWorkflowStore):
@@ -65,9 +91,44 @@ def store(tmp_path):
         yield value
 
 
+def durable_swarm(store, **options):
+    return Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+                 run_store=store, max_budget_usd=1, **options)
+
+
 # ---------------------------------------------------------------------------
 # Durable text workflows
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("make_provider,model", [
+    pytest.param(lambda: AnthropicProvider(api_key="test-key"), "claude-opus-5-5", id="anthropic"),
+    pytest.param(lambda: OpenAIProvider(api_key="test-key"), "gpt-5", id="openai-chat"),
+    pytest.param(lambda: OpenAIImageProvider(api_key="test-key", max_cost_per_call_usd=0.25),
+                 "gpt-image-1", id="openai-image"),
+    pytest.param(lambda: GeminiProvider(api_key="test-key"), "gemini-3-pro", id="gemini"),
+    pytest.param(lambda: GeminiProvider(api_key="test-key", max_cost_per_call_usd=0.25),
+                 "gemini-3.1-flash-image", id="gemini-image"),
+    pytest.param(lambda: OfflineProvider(artifacts_per_call=1), "offline", id="offline-artifacts"),
+    pytest.param(lambda: OfflineProvider(responses=["scripted"]), "offline", id="offline-script"),
+    pytest.param(CustomProvider, "custom", id="custom"),
+    pytest.param(OfflineSubclass, "offline", id="offline-subclass"),
+    pytest.param(lambda: ResponsesSubclass(api_key="test-key"), "gpt-6-astra", id="responses-subclass"),
+    pytest.param(lambda: MessagesSubclass(api_key="test-key"), FABLE, id="messages-subclass"),
+    pytest.param(lambda: OpenAIResponsesProvider(api_key="test-key"), "gpt-4o",
+                 id="responses-unsupported-model"),
+    pytest.param(lambda: AnthropicMessagesProvider(api_key="test-key"), "claude-opus-5-5",
+                 id="messages-unsupported-model"),
+])
+def test_durable_run_rejects_provider_before_any_call(store, monkeypatch, make_provider, model):
+    calls = forbid_provider_calls(monkeypatch)
+    # The default LLMArchitect would make a paid planning call first.
+    swarm = Swarm(model=model, provider=make_provider(), run_store=store, max_budget_usd=1)
+    for entry in (swarm.plan, swarm.execute):
+        with pytest.raises(ValueError, match="(?i)durable"):
+            entry(Task("Report"))
+    assert calls == []
+    assert store.list_runs() == []
 
 
 @pytest.mark.parametrize("argument,make_component,shown", [
@@ -102,3 +163,214 @@ def test_durable_run_rejects_component_before_any_call(
     assert shown is None or shown in message
     assert calls == []
     assert store.list_runs() == []
+
+
+@pytest.mark.parametrize("change", [
+    pytest.param(lambda node: setattr(node, "attach_dep_artifacts", True), id="attach-dep-artifacts"),
+    pytest.param(lambda node: node.metadata.update(attachments=["logo.png"]), id="attachments"),
+    pytest.param(lambda node: node.metadata.update(artifacts=[{"path": "a.png"}]), id="artifacts"),
+])
+def test_durable_run_rejects_image_inputs_on_a_caller_graph_before_any_call(store, monkeypatch, change):
+    graph = ExecutionGraph([Topology.SERIAL], [
+        Node(id="draft", label="Draft"), Node(id="review", label="Review", depends_on=["draft"]),
+    ])
+    change(graph.nodes[1])
+    calls = forbid_provider_calls(monkeypatch)
+    with pytest.raises(WorkflowBindingError, match="plain text nodes"):
+        durable_swarm(store).execute(graph)
+    assert calls == []
+    assert [store.inspect_run(run["run_id"])["call_count"] for run in store.list_runs()] == [0]
+
+
+@pytest.mark.parametrize("entry", ["resume-completed", "execute-planned"])
+def test_durable_run_rejects_a_changed_retry_backoff_before_any_call(store, monkeypatch, entry):
+    if entry == "resume-completed":
+        run_id = durable_swarm(store).execute(Task("Report")).execution_id
+    else:
+        planned = durable_swarm(store).plan(Task("Report"))
+        run_id = planned.run_ref["run_id"]
+    before = store.inspect_run(run_id)
+    calls = forbid_provider_calls(monkeypatch)
+    changed = durable_swarm(store, retry_backoff_s=0.5)
+    with pytest.raises(WorkflowConflictError, match="saved recipe"):
+        if entry == "resume-completed":
+            changed.resume(run_id)
+        else:
+            changed.execute(planned)
+    assert calls == []
+    after = store.inspect_run(run_id)
+    assert after["calls"] == before["calls"] and after["revision"] == before["revision"]
+
+
+def test_durable_run_ignores_artifact_dir_and_tool_iterations_and_allows_no_budget(store, tmp_path):
+    swarm = Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+                  run_store=store, artifact_dir=tmp_path / "artifacts", max_tool_iterations=1)
+    result = swarm.execute(Task("Report"))
+    assert result.output == "offline: Report"
+    assert result.cost_scope == "complete_text_workflow" and result.cost_is_complete
+    assert store.load_run(result.execution_id)["budget_nanousd"] is None
+    assert not (tmp_path / "artifacts").exists()
+
+
+# ---------------------------------------------------------------------------
+# Ordinary Swarm runs
+# ---------------------------------------------------------------------------
+
+
+def test_anthropic_messages_provider_runs_an_ordinary_swarm(monkeypatch):
+    transport = MessagesTransport().install(monkeypatch)
+    swarm = Swarm(model=FABLE, artifact_dir=None, max_budget_usd=5,
+                  provider=AnthropicMessagesProvider(api_key="test-key", max_cost_per_call_usd=0.5))
+    result = swarm.execute(Task("Write and check a short summary"))
+    assert result.output == "Draft accepted output."
+    assert [(record.phase, record.outcome) for record in transport.log] == [
+        ("planning", "delivered"), ("execution", "delivered"), ("execution", "delivered"),
+    ]
+    # Ordinary runs dispatch directly: no input-token quote, no journal, and
+    # each call closes the client it opened.
+    assert transport.counts == [] and result.workflow_accounting is None
+    assert [client.close.await_count for client in transport.clients] == [1, 1, 1]
+    receipts = [entry["receipt"] for node in result.graph.nodes
+                for entry in node.metadata["native_receipts"]]
+    assert [receipt["cost_nanousd"] for receipt in receipts] == [2_535_000, 2_535_000]
+    # The ordinary ledger covers execution and synthesis; planning is outside it.
+    assert result.cost_scope == "execution_and_synthesis"
+    assert result.total_cost_usd == pytest.approx(0.00507)
+    assert result.cost_is_complete and not result.cost_contains_estimates
+
+
+@pytest.mark.parametrize("message,tools", [
+    pytest.param(ChatMessage("user", "Look this up"),
+                 [ToolSpec("lookup", "Look up a fact", {"type": "object"})], id="tools"),
+    pytest.param(ChatMessage("user", "Describe the image", attachments=[Artifact(b"png")]), None,
+                 id="attachments"),
+])
+def test_anthropic_messages_provider_rejects_tools_and_attachments_before_any_request(
+    monkeypatch, message, tools,
+):
+    transport = MessagesTransport().install(monkeypatch)
+    provider = AnthropicMessagesProvider(api_key="test-key")
+    with pytest.raises(ValueError):
+        asyncio.run(provider.chat("System", [message], FABLE, tools))
+    assert transport.log == [] and transport.clients == []
+
+
+@pytest.mark.parametrize("make_provider,expected", [
+    # No max_retries argument: the SDK's own default retries apply.
+    pytest.param(lambda: AnthropicProvider(api_key="test-key"), {"api_key": "test-key"},
+                 id="anthropic-sdk-default"),
+    pytest.param(lambda: OpenAIProvider(api_key="test-key"), {"api_key": "test-key"},
+                 id="openai-sdk-default"),
+    pytest.param(lambda: OpenAIProvider(api_key="test-key", max_retries=0),
+                 {"api_key": "test-key", "max_retries": 0}, id="openai-disabled"),
+    # google-genai retries only when a retry option is configured.
+    pytest.param(lambda: GeminiProvider(api_key="test-key"), {"api_key": "test-key"},
+                 id="gemini-not-configured"),
+])
+def test_legacy_provider_clients_leave_retries_to_the_sdk_configuration(
+    monkeypatch, make_provider, expected,
+):
+    created = []
+
+    def client(**kwargs):
+        created.append(kwargs)
+        return SimpleNamespace(**kwargs)
+
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    monkeypatch.setitem(sys.modules, "anthropic", SimpleNamespace(AsyncAnthropic=client))
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(AsyncOpenAI=client))
+    monkeypatch.setitem(sys.modules, "google", SimpleNamespace(genai=SimpleNamespace(Client=client)))
+    make_provider()._get_client()
+    assert created == [expected]
+
+
+@pytest.mark.parametrize("transport_class,make_provider,model", [
+    pytest.param(NativeTransport, lambda: OpenAIResponsesProvider(api_key="test-key"), "gpt-6-astra",
+                 id="responses"),
+    pytest.param(MessagesTransport, lambda: AnthropicMessagesProvider(api_key="test-key"), FABLE,
+                 id="messages"),
+])
+def test_native_providers_refuse_a_client_with_sdk_retries(monkeypatch, transport_class, make_provider,
+                                                           model):
+    transport = transport_class().install(monkeypatch)
+    provider = make_provider()
+    provider._client = transport._client()
+    provider._client.max_retries = 2
+    with pytest.raises(ValueError, match="retries"):
+        asyncio.run(provider.complete("System", "Question", model))
+    assert transport.log == []
+
+
+@pytest.mark.parametrize("cls", [*BUILT_IN_PROVIDERS, Provider],
+                         ids=lambda cls: cls.__name__)
+def test_no_provider_offers_structured_output_or_streaming(cls):
+    # Planners parse JSON from ordinary text; no provider takes a response
+    # schema or returns a stream.
+    assert list(inspect.signature(cls.chat).parameters) == [
+        "self", "system", "messages", "model", "tools",
+    ]
+    assert list(inspect.signature(cls.complete).parameters) == ["self", "system", "prompt", "model"]
+    options = set(inspect.signature(cls.__init__).parameters)
+    assert not options & {"response_format", "json_schema", "output_schema", "stream", "streaming"}
+    assert not inspect.isasyncgenfunction(cls.chat)
+
+
+# ---------------------------------------------------------------------------
+# Jobs
+# ---------------------------------------------------------------------------
+
+
+def jobs_manifest(provider, model, ceiling, artifact=None, **extra):
+    operation = {"key": "tile", "prompt": "One tile", "profile": "default", **extra}
+    if artifact is not None:
+        operation["artifact"] = artifact
+    return {
+        "version": 1, "name": "support-matrix",
+        "profiles": [{"name": "default", "provider": provider, "model": model,
+                      "max_cost_per_call_usd": ceiling}],
+        "operations": [operation],
+        "execution": {"max_concurrency": 1, "max_attempts": 1, "max_budget_usd": ceiling},
+    }
+
+
+@pytest.mark.parametrize("provider,model,ceiling,artifact", [
+    pytest.param("offline", "offline-image", "0", {"mime_type": "image/jpeg"}, id="offline-jpeg"),
+    pytest.param("offline", "offline-image", "0",
+                 {"mime_type": "image/png", "width": 1024, "height": 1024}, id="offline-1024"),
+    pytest.param("gemini_image", "gemini-3.1-flash-image", "0.25", {"mime_type": "application/pdf"},
+                 id="gemini-pdf"),
+    pytest.param("openai_image", "gpt-image-1", "0.25", {"mime_type": "image/jpeg"},
+                 id="openai-format"),
+])
+def test_jobs_rejects_an_artifact_its_profile_cannot_produce_before_any_call(
+    tmp_path, monkeypatch, provider, model, ceiling, artifact,
+):
+    plan = preflight_job(JobManifestV1.from_dict(jobs_manifest(provider, model, ceiling, artifact)),
+                         manifest_root=tmp_path)
+    calls = forbid_provider_calls(monkeypatch)
+    with SQLiteRunStore(tmp_path / "jobs.db") as jobs:
+        with pytest.raises(ProviderPreflightError) as caught:
+            asyncio.run(JobRunner(jobs).start(plan, make_approval(plan), manifest_root=tmp_path))
+        assert jobs.list_runs() == []
+    assert caught.value.kind is ProviderPreflightKind.LOCAL
+    assert calls == []
+
+
+@pytest.mark.parametrize("provider", ["anthropic", "openai", "gemini", "openai_responses",
+                                      "anthropic_messages"])
+def test_jobs_manifest_accepts_only_image_provider_kinds(provider):
+    with pytest.raises(ManifestValidationError, match="provider is unsupported"):
+        JobManifestV1.from_dict(jobs_manifest(provider, "any-model", "0.25"))
+
+
+@pytest.mark.parametrize("section,field", [
+    ("profile", "validators"), ("operation", "verifier"), ("operation", "tools"),
+    ("execution", "memory"),
+])
+def test_jobs_manifest_has_no_validator_tool_or_memory_fields(section, field):
+    manifest = jobs_manifest("offline", "offline-image", "0")
+    target = {"profile": manifest["profiles"][0], "operation": manifest["operations"][0],
+              "execution": manifest["execution"]}[section]
+    target[field] = []
+    with pytest.raises(ManifestValidationError, match="unknown fields"):
+        JobManifestV1.from_dict(manifest)
