@@ -116,6 +116,14 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   target was never regenerated and `DELIVERABLE` synthesis returned the
   verdict instead of the approved output. Distilling a graph in which a node
   verifies a missing node raises `DistillationError`.
+- Jobs preflight rejects an artifact the profile cannot produce, so
+  `jobs validate`, `jobs plan` and `jobs run` fail before a run is created.
+  An `offline` profile emits 1x1 PNGs and now requires `image/png` with no
+  dimensions or 1x1; another MIME type or size used to pass preflight and
+  then fail every attempt. A `gemini_image` profile now requires a PNG,
+  JPEG, GIF or WebP artifact; a manifest declaring, for example,
+  `application/pdf` used to be approved and then had every paid image
+  rejected.
 
 ## [0.9.1] - 2026-09-29
 

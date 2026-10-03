@@ -11,7 +11,7 @@ from enum import Enum
 from typing import Callable
 
 from smythe._errors import PicklableError
-from smythe.jobs.models import ProviderKind
+from smythe.jobs.models import _IMAGE_EXTENSIONS_BY_MIME, ProviderKind
 from smythe.jobs.preflight import PlannedOperationV1
 from smythe.provider import GeminiProvider, OfflineProvider, OpenAIImageProvider, Provider
 
@@ -293,6 +293,18 @@ def _validate_local_operation(operation: PlannedOperationV1) -> None:
         )
         _positive_int(options.get("artifacts_per_call", 1), "artifacts_per_call")
         _string(options.get("echo_prefix", "offline: "), "echo_prefix")
+        # Any other declared artifact would be rejected after every attempt.
+        artifact = operation.artifact
+        if artifact.mime_type != "image/png" or (
+            artifact.width is not None and (artifact.width, artifact.height) != (1, 1)
+        ):
+            shown = artifact.mime_type
+            if artifact.width is not None:
+                shown += f" {artifact.width}x{artifact.height}"
+            raise ProviderConfigurationError(
+                "the offline profile emits 1x1 image/png artifacts and cannot "
+                f"produce the declared {shown} artifact"
+            )
         return
 
     if operation.provider is ProviderKind.OPENAI_IMAGE:
@@ -388,6 +400,12 @@ def _validate_local_operation(operation: PlannedOperationV1) -> None:
         image_config = options.get("image_config")
         if image_config is not None and not isinstance(image_config, Mapping):
             raise ProviderConfigurationError("image_config must be an object")
+        if operation.artifact.mime_type not in _IMAGE_EXTENSIONS_BY_MIME:
+            raise ProviderConfigurationError(
+                f"artifact.mime_type {operation.artifact.mime_type!r} cannot be "
+                "produced by gemini_image, which returns raster images; use one of "
+                f"{sorted(_IMAGE_EXTENSIONS_BY_MIME)}"
+            )
         return
 
     raise ProviderConfigurationError(

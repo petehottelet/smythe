@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 from pathlib import Path
 
 import pytest
 
+import smythe.provider as provider_module
 from smythe.cli import (
     EXIT_APPROVAL,
     EXIT_INVALID_INPUT,
@@ -17,6 +19,13 @@ from smythe.cli import (
     _portable_export,
     main,
 )
+
+
+def _jpeg_bytes() -> bytes:
+    image = pytest.importorskip("PIL.Image")
+    buffer = io.BytesIO()
+    image.new("RGB", (1, 1), (10, 20, 30)).save(buffer, format="JPEG")
+    return buffer.getvalue()
 
 
 def _manifest(tmp_path, *, mime_type: str = "image/png", attempts: int = 1):
@@ -208,8 +217,27 @@ def test_provider_preflight_has_distinct_exit_code(tmp_path, capsys, monkeypatch
     assert error["error"]["type"] == "ProviderPreflightError"
 
 
-def test_rejected_job_and_reroll_return_terminal_error_exit(tmp_path, capsys):
-    manifest = _manifest(tmp_path, mime_type="image/jpeg", attempts=2)
+def test_artifact_the_profile_cannot_produce_fails_preflight_before_any_run(tmp_path, capsys):
+    manifest = _manifest(tmp_path, mime_type="image/jpeg")
+    store = tmp_path / "jobs.sqlite3"
+
+    for command in (["validate", str(manifest)], ["plan", str(manifest)]):
+        assert main(["jobs", *command, "--json"]) == EXIT_PREFLIGHT
+        error = _json_output(capsys)
+        assert error["error"]["type"] == "ProviderPreflightError"
+        assert "offline profile" in error["error"]["message"]
+    assert main(
+        ["jobs", "run", str(manifest), "--approve", "approve_v1_any", "--store", str(store), "--json"]
+    ) == EXIT_PREFLIGHT
+    assert _json_output(capsys)["error"]["type"] == "ProviderPreflightError"
+    assert not store.exists()
+
+
+def test_rejected_job_and_reroll_return_terminal_error_exit(tmp_path, capsys, monkeypatch):
+    # Preflight accepts this manifest; the provider then returns a JPEG where
+    # the operation declared a PNG, so every attempt is rejected after dispatch.
+    monkeypatch.setattr(provider_module, "_OFFLINE_PNG", _jpeg_bytes())
+    manifest = _manifest(tmp_path, attempts=2)
     store = tmp_path / "jobs.sqlite3"
 
     assert main(["jobs", "plan", str(manifest), "--json"]) == EXIT_OK
