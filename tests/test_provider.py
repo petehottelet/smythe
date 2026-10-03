@@ -974,6 +974,28 @@ def test_gemini_maps_attachments_to_inline_data_parts():
     assert parts[1] == {"text": "pick the best"}
 
 
+def test_openai_image_rejects_attachments_instead_of_dropping_them():
+    """The Image API request was sent, and billed, without the reference
+    images the caller attached."""
+    provider = _openai_image_with_response(_openai_image_response())
+    messages = [ChatMessage(role="user", content="first"), _attachment_message()]
+
+    with pytest.raises(ValueError, match="must not silently discard their inputs"):
+        asyncio.run(provider.chat("sys", messages, "gpt-image-2"))
+
+    provider._client.images.generate.assert_not_called()
+
+
+def test_openai_image_accepts_messages_with_no_attachments():
+    provider = _openai_image_with_response(_openai_image_response())
+    message = ChatMessage(role="user", content="prompt", attachments=[])
+
+    result = asyncio.run(provider.chat("sys", [message], "gpt-image-2"))
+
+    assert len(result.artifacts) == 1
+    provider._client.images.generate.assert_called_once()
+
+
 # ---------------------------------------------------------------------------
 # Truncated output (max_tokens) is a billed failure, not a success
 # ---------------------------------------------------------------------------

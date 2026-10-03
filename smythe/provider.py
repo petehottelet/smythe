@@ -1018,6 +1018,12 @@ class OpenAIImageProvider(OpenAIProvider):
             )
         if tools:
             raise ValueError("OpenAIImageProvider does not support tool calls")
+        if any(m.attachments for m in messages):
+            raise ValueError(
+                "OpenAI image attachments are not yet supported by "
+                "OpenAIImageProvider; use GeminiProvider or remove attachments. "
+                "Reference-image requests must not silently discard their inputs."
+            )
 
         content = "\n\n".join(m.content for m in messages if m.content).strip()
         if not content:

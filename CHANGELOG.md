@@ -83,6 +83,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   when the executor was built, after the router's classifier and the planner
   had already been called. Durable runs already rejected these values before
   routing or planning.
+- `OpenAIImageProvider` raises `ValueError` for a request with image
+  attachments, such as a node with `attach_dep_artifacts=True` whose
+  dependencies produced images, instead of sending, and paying for, the
+  request without them. The message matches the one Jobs already gives when
+  it refuses OpenAI image attachments.
 
 ## [0.9.1] - 2026-09-29
 

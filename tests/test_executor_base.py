@@ -440,6 +440,50 @@ def test_attach_disabled_sends_no_attachments(tmp_path):
     assert attachments == []
 
 
+def _mocked_openai_image_provider():
+    import base64
+    from unittest.mock import AsyncMock, MagicMock
+
+    from smythe.provider import OpenAIImageProvider
+
+    item = MagicMock()
+    item.b64_json = base64.b64encode(b"generated").decode()
+    response = MagicMock(data=[item], usage=MagicMock(input_tokens=1, output_tokens=1))
+    provider = OpenAIImageProvider(api_key="fake")
+    provider._client = MagicMock()
+    provider._client.images.generate = AsyncMock(return_value=response)
+    return provider
+
+
+def test_image_node_fails_instead_of_dropping_attached_dependency_images(tmp_path):
+    """A node that attaches its dependencies' images must not reach the
+    Image API without them."""
+    graph, node = _graph_with_image_dep(tmp_path, attach=True)
+    node.metadata["model"] = "gpt-image-2"
+    provider = _mocked_openai_image_provider()
+
+    with pytest.raises(ValueError, match="must not silently discard their inputs"):
+        Executor(
+            provider=provider, registry=Registry(), tracer=Tracer(), artifact_dir=None,
+        ).run(graph)
+
+    assert node.status is NodeStatus.FAILED
+    provider._client.images.generate.assert_not_called()
+
+
+def test_image_node_without_attached_dependency_images_still_generates(tmp_path):
+    graph, node = _graph_with_image_dep(tmp_path, attach=False)
+    node.metadata["model"] = "gpt-image-2"
+    provider = _mocked_openai_image_provider()
+
+    Executor(
+        provider=provider, registry=Registry(), tracer=Tracer(), artifact_dir=None,
+    ).run(graph)
+
+    assert node.status is NodeStatus.COMPLETED
+    provider._client.images.generate.assert_called_once()
+
+
 def test_missing_and_non_image_artifacts_are_skipped(tmp_path):
     base = _make_base_with_dir(None)
     dep = Node(label="mixed", id="dep")
