@@ -130,14 +130,31 @@ class WorkflowRuntime:
                  tool_runtime, checkpoint_store, checkpoint_every_n_nodes, retry_backoff_s,
                  max_concurrency, graph_policy=None):
         if type(store) is not SQLiteWorkflowStore:
-            raise WorkflowBindingError("run_store must be SQLiteWorkflowStore")
-        Sentinel(max_budget_usd)
-        if memory is not None or tool_runtime is not None or checkpoint_store is not None:
             raise WorkflowBindingError(
-                "Durable text workflows own their checkpoints and require no live memory or tools"
+                f"run_store must be SQLiteWorkflowStore itself, not {type(store).__name__}"
+            )
+        Sentinel(max_budget_usd)
+        # Each unsupported argument is named, so a caller knows what to remove.
+        if memory is not None:
+            raise WorkflowBindingError(
+                "memory is not supported by durable text workflows; planner memory "
+                "needs an ordinary Swarm run without run_store"
+            )
+        if tool_runtime is not None:
+            raise WorkflowBindingError(
+                "tool_runtime is not supported by durable text workflows, which send "
+                "plain text without tools; tools need an ordinary Swarm run"
+            )
+        if checkpoint_store is not None:
+            raise WorkflowBindingError(
+                "checkpoint_store is not supported by durable text workflows, which "
+                "save their checkpoints in run_store"
             )
         if verifier is not None and type(verifier) is not TokenVerifier:
-            raise WorkflowBindingError("Durable text workflows require the built-in TokenVerifier")
+            raise WorkflowBindingError(
+                "verifier must be the built-in TokenVerifier in durable text workflows, "
+                f"not {type(verifier).__name__}"
+            )
         if type(max_revisions) is not int or max_revisions < 0:
             raise WorkflowBindingError("max_revisions must be a non-negative integer")
         if type(max_concurrency) is not int or max_concurrency < 1:

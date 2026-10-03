@@ -34,6 +34,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   deliveries, and report its own state for comparison with what the caller
   saw.
 
+### Changed
+
+- A durable run's `WorkflowBindingError` names the argument it refuses:
+  `run_store` and `verifier`, with the type that was passed, `memory`,
+  `tool_runtime` or `checkpoint_store`. One message used to cover memory,
+  tools and the checkpoint store. The exception is still a `ValueError`.
+
 ### Fixed
 
 - Nine retained evidence archives no longer carry local user paths: the Astra

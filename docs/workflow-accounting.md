@@ -265,7 +265,9 @@ explicit caller contract, not a sandbox. Arbitrary paid custom components,
 scripted offline response cursors, tools, image attachments, active capability
 hydration, live planner memory, and a separate checkpoint store are rejected.
 Those features remain available through the ordinary Swarm and artifact Jobs
-APIs within their documented accounting scopes.
+APIs within their documented accounting scopes. A rejected `run_store`,
+`verifier`, `memory`, `tool_runtime` or `checkpoint_store` raises
+`WorkflowBindingError` with a message that starts with that argument's name.
 
 ## Inspect a run
 
