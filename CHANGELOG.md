@@ -73,6 +73,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   attempt, so a retried node no longer reports the time of its first, failed
   attempt. `total_duration_ms` still sums every recorded span, and planner
   prompts still label it "Summed node time".
+- Executors accept only a finite, non-negative number for `retry_backoff_s`
+  and raise `ValueError` otherwise, as durable workflows already did. `True`
+  used to act as a one-second backoff, and NaN or infinity failed a serial
+  retry or stalled an async retry indefinitely.
 
 ## [0.9.1] - 2026-09-29
 

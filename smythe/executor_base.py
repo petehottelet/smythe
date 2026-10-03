@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import math
 import os
 import random
 import re
@@ -53,6 +54,25 @@ def _raise_workflow_error(error: BaseException) -> None:
                 _raise_workflow_error(child)
             except WorkflowError as found:
                 raise found from error
+
+
+def validate_retry_backoff_s(value: float) -> float:
+    """Accept a finite, non-negative retry backoff in seconds.
+
+    A bool is not a number here. NaN would make every retry delay NaN, and
+    infinity (or an integer too large for a float) would make a retry sleep
+    forever or overflow when the delay is drawn.
+    """
+    message = f"retry_backoff_s must be a finite non-negative number, got {value!r}"
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(message)
+    try:
+        finite = math.isfinite(value)
+    except OverflowError:
+        finite = False
+    if not finite or value < 0:
+        raise ValueError(message)
+    return value
 
 
 class NodeFinalizationError(PicklableError, RuntimeError):
@@ -171,9 +191,7 @@ class ExecutorBase:
         self._prepared_graph: ExecutionGraph | None = None
         self._node_lookup: dict[str, Node] = {}
         self._dependent_ids: set[str] = set()
-        if retry_backoff_s < 0:
-            raise ValueError(f"retry_backoff_s must be >= 0, got {retry_backoff_s}")
-        self._retry_backoff_s = retry_backoff_s
+        self._retry_backoff_s = validate_retry_backoff_s(retry_backoff_s)
         if max_revisions < 0:
             raise ValueError(f"max_revisions must be >= 0, got {max_revisions}")
         self._supervisor = supervisor

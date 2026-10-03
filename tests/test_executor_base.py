@@ -2,6 +2,8 @@
 
 import os
 
+import pytest
+
 from smythe.executor_base import ExecutorBase
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, Provider
@@ -347,6 +349,33 @@ def test_retry_backoff_grows_with_attempts():
         for _ in range(5):
             d = base.retry_delay_s(attempt)
             assert 0.0 <= d <= ceiling
+
+
+@pytest.mark.parametrize(
+    "value",
+    [True, False, float("nan"), float("inf"), float("-inf"), 10**400, -0.5, "0.5", None],
+    ids=["true", "false", "nan", "inf", "-inf", "huge-int", "negative", "string", "none"],
+)
+def test_retry_backoff_rejects_values_that_are_not_finite_non_negative_numbers(value):
+    """True was accepted as a one-second backoff, NaN made every retry delay
+    NaN, and infinity made a retry sleep forever."""
+    from smythe.async_executor import AsyncExecutor
+
+    for executor_type in (ExecutorBase, Executor, AsyncExecutor):
+        with pytest.raises(ValueError, match="retry_backoff_s must be a finite non-negative number"):
+            executor_type(
+                provider=DummyProvider(), registry=Registry(), tracer=Tracer(),
+                retry_backoff_s=value,
+            )
+
+
+@pytest.mark.parametrize("value", [0, 0.0, 2, 0.25])
+def test_retry_backoff_accepts_finite_non_negative_numbers(value):
+    base = ExecutorBase(
+        provider=DummyProvider(), registry=Registry(), tracer=Tracer(),
+        retry_backoff_s=value,
+    )
+    assert 0.0 <= base.retry_delay_s(2) <= 2 * value
 
 
 # ---------------------------------------------------------------------------
