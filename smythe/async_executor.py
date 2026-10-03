@@ -357,7 +357,7 @@ class AsyncExecutor(ExecutorBase):
             except Exception as exc:
                 last_exc = exc
                 self._tracer.on_node_error(node, exc)
-                self._tracer.on_node_end(node)
+                self._end_failed_attempt(node)
 
         self.release_node_budget(node)
 

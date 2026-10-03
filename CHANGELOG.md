@@ -63,6 +63,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   The executor tested truthiness, so a custom verifier's
   `Verdict(passed="false")` passed. Any other value is now a failed verdict,
   and its reason states that `passed` must be a bool.
+- A failed attempt's trace span now has status `failed` instead of `running`.
+  Serial and parallel execution recorded every attempt that raised as still
+  running, whether the node then retried, was skipped or stopped the run, and
+  serial execution did the same for terminal errors such as a budget alert.
+  The node itself still counts as running between retries, and the keys of
+  `Tracer.summary()` are unchanged.
 
 ## [0.9.1] - 2026-09-29
 

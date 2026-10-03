@@ -499,6 +499,19 @@ class ExecutorBase:
         ceiling = self._retry_backoff_s * (2 ** (attempt - 1))
         return random.uniform(0, ceiling)
 
+    def _end_failed_attempt(self, node: Node) -> None:
+        """Close the span of an attempt that raised, recording it as failed.
+
+        The node itself stays in flight until its failure policy settles
+        it, so a retry backoff or a cancellation still sees it running.
+        """
+        status = node.status
+        node.status = NodeStatus.FAILED
+        try:
+            self._tracer.on_node_end(node)
+        finally:
+            node.status = status
+
     def _reserve_node(self, node: Node) -> None:
         """Reserve this executor's pre-call estimate for one node."""
         self.reserve_node_budget(node)

@@ -15,6 +15,10 @@ place of its result. The error text stays in the node's `result`, the trace,
 and checkpoints for diagnosis, but it never enters a dependent's prompt or the
 synthesized output. Resumed runs apply the same rule to saved skipped nodes.
 
+Each attempt records its own trace span. An attempt that fails with an error
+ends its span with status `failed` and that error, whether the node then
+retries, is skipped, or stops the run.
+
 Incomplete output is a provider error for the SDK providers
 (`AnthropicProvider`, `OpenAIProvider` and `GeminiProvider`). When a response
 stops at its output limit (Anthropic `stop_reason` `max_tokens` or

@@ -104,16 +104,16 @@ class Executor(ExecutorBase):
                 # reservation: an unusable bill is not evidence of a free call.
                 if isinstance(exc, BudgetValidationError):
                     self.mark_accounting_invalid(node, exc)
-                self._tracer.on_node_error(node, exc)
-                self._tracer.on_node_end(node)
                 node.status = NodeStatus.FAILED
                 node.result = str(exc)
+                self._tracer.on_node_error(node, exc)
+                self._tracer.on_node_end(node)
                 self.notify_update(node)
                 raise
             except Exception as exc:
                 last_exc = exc
                 self._tracer.on_node_error(node, exc)
-                self._tracer.on_node_end(node)
+                self._end_failed_attempt(node)
 
         self.release_node_budget(node)
 
