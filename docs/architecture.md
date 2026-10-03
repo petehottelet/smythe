@@ -174,12 +174,23 @@ graph around capabilities that actually exist.
 
 ## Learning loop
 
-`PlannerMemory` records the task, topology, cost, summed node time, and outcome
-of each completed run and recalls relevant outcomes into later planning prompts.
-Its `total_duration_ms` field sums recorded spans; overlapping nodes contribute
-their individual durations, so this value is not elapsed wall time. Each
-attempt records its own span; a node's recorded duration is that of its final
-attempt.
+`PlannerMemory` records the task, topology, cost, summed node time, elapsed
+time, and outcome of each completed run and recalls relevant outcomes into
+later planning prompts. Its `total_duration_ms` field sums recorded spans;
+overlapping nodes contribute their individual durations, so this value is not
+elapsed wall time. Each attempt records its own span, including retries,
+regenerated work and an `LLM_MERGE` synthesis call; a node's recorded duration
+is that of its final attempt.
+
+`elapsed_ms` is the elapsed time of the call that recorded the run, from
+[`SwarmResult.timing`](execution.md#timing). A resumed run records only the
+resuming call's spans and elapsed time, with `resumed` true and
+`latency_complete` false. Each record also keeps the result's
+`cost_is_complete` and `cost_contains_estimates` flags, and `acceptance` is
+`not_evaluated`: delivery acceptance is not evaluated yet. Records written
+before these fields existed recall with them `null`, meaning not recorded, and
+recall skips rows where they are malformed. Planner prompts still show only the
+summed node time.
 
 **Added in 0.8.0:** recalled topology, success, cost, and duration fields
 are validated before ranking. Malformed records are skipped without rewriting

@@ -1,5 +1,6 @@
 """Tests for PlannerMemory — persistence and keyword-based recall."""
 
+import asyncio
 import json
 import os
 import stat
@@ -10,14 +11,21 @@ from pathlib import Path
 
 import pytest
 
+from fakes import Gate, ManualClock
+from smythe.checkpoint import FileCheckpointStore
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.memory import ExecutionOutcome, PlannerMemory
 from smythe.planner import LLMArchitect
 from smythe.prompts import build_user_prompt
 from smythe.provider import CompletionResult, Provider
-from smythe.swarm import SwarmResult
+from smythe.swarm import Swarm, SwarmResult
 from smythe.task import Task
 from smythe.tracer import Span, Tracer
+
+_OUTCOME_FIELDS = (
+    "elapsed_ms", "latency_complete", "resumed", "cost_is_complete",
+    "cost_contains_estimates", "acceptance",
+)
 
 
 def _make_memory() -> tuple[PlannerMemory, str]:
@@ -390,6 +398,158 @@ def test_parallel_history_labels_summed_node_time(tmp_path):
     assert asdict(graph) == before_graph
     assert trace == before_trace
     assert history == before_history
+
+
+def _clocked(swarm: Swarm, clock: ManualClock) -> Swarm:
+    swarm._tracer_factory = lambda: Tracer(
+        clock=clock.monotonic, wall_clock=lambda: clock.time_ns() / 1e9,
+    )
+    return swarm
+
+
+def test_parallel_run_records_summed_node_time_and_elapsed_time_separately(tmp_path):
+    """Two research nodes overlap for 3s, then the join runs for 1s."""
+    clock, gate, started = ManualClock(), Gate(), []
+
+    class OverlappingProvider(Provider):
+        async def complete(self, system, prompt, model):
+            step = next(line for line in prompt.splitlines() if line.startswith("Your step: "))
+            started.append(step)
+            if step == "Your step: Assemble findings":
+                clock.advance(1)
+            else:
+                await gate.wait()
+            return CompletionResult(text=f"done: {step}", prompt_tokens=1, completion_tokens=1)
+
+    path = tmp_path / "history.jsonl"
+    task = Task("Research signal in parallel")
+    graph = ExecutionGraph(topology=[Topology.FORK_JOIN], task=task, nodes=[
+        Node(id="a", label="Research A"), Node(id="b", label="Research B"),
+        Node(id="join", label="Assemble findings", depends_on=["a", "b"]),
+    ])
+    swarm = _clocked(Swarm(model="m", provider=OverlappingProvider(), parallel=True,
+                           memory=PlannerMemory(path), artifact_dir=None), clock)
+
+    async def run():
+        execution = asyncio.create_task(swarm.execute_async(graph))
+        for _ in range(1000):
+            if len(started) == 2:
+                break
+            await asyncio.sleep(0)
+        clock.advance(3)
+        gate.release()
+        return await execution
+
+    result = asyncio.run(run())
+    record = json.loads(path.read_text(encoding="utf-8"))
+    [outcome] = PlannerMemory(path).recall(task)
+    prompt = build_user_prompt(task, [asdict(outcome)])
+
+    assert sorted(started) == ["Your step: Assemble findings", "Your step: Research A",
+                               "Your step: Research B"]
+    assert (result.timing["summed_node_ms"], result.timing["elapsed_ms"]) == (7000, 4000)
+    assert outcome.total_duration_ms == 7000
+    assert outcome.elapsed_ms == 4000
+    assert (outcome.latency_complete, outcome.resumed) == (True, False)
+    assert (outcome.cost_is_complete, outcome.cost_contains_estimates) == (True, False)
+    assert outcome.acceptance == "not_evaluated"
+    assert "Summed node time: 7000ms" in prompt
+    assert "4000" not in prompt
+    assert "wall_time_ms" not in record
+
+
+def test_resumed_run_records_that_its_elapsed_time_is_partial(tmp_path):
+    clock = ManualClock()
+
+    class Script(Provider):
+        def __init__(self, crash_on=None):
+            self.crash_on = crash_on
+
+        async def complete(self, system, prompt, model):
+            step = next(line for line in prompt.splitlines() if line.startswith("Your step: "))
+            clock.advance(1)
+            if step == self.crash_on:
+                raise RuntimeError("process died")
+            return CompletionResult(text=f"done: {step}", prompt_tokens=1, completion_tokens=1)
+
+    path, store = tmp_path / "history.jsonl", FileCheckpointStore(tmp_path / "checkpoints")
+    task = Task("Research signal after a crash")
+    graph = ExecutionGraph(topology=[Topology.SERIAL], task=task, nodes=[
+        Node(id="a", label="Research A"),
+        Node(id="b", label="Assemble findings", depends_on=["a"]),
+    ])
+    with pytest.raises(RuntimeError, match="process died"):
+        Swarm(model="m", provider=Script(crash_on="Your step: Assemble findings"),
+              memory=PlannerMemory(path), checkpoint_store=store, artifact_dir=None).execute(graph)
+    [execution_id] = store.list_ids()
+
+    result = _clocked(Swarm(model="m", provider=Script(), memory=PlannerMemory(path),
+                            checkpoint_store=store, artifact_dir=None), clock).resume(execution_id)
+    [outcome] = PlannerMemory(path).recall(task)
+
+    assert outcome.elapsed_ms == result.timing["elapsed_ms"] == 1000
+    assert (outcome.latency_complete, outcome.resumed) == (False, True)
+    assert outcome.acceptance == "not_evaluated"
+
+
+def test_record_without_timing_leaves_elapsed_time_unrecorded(tmp_path):
+    path = tmp_path / "history.jsonl"
+    task = Task("Research signal by hand")
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="a", label="Research A", status=NodeStatus.COMPLETED),
+    ])
+
+    class BareResult:
+        trace: list = []
+        total_cost_usd = 0.0
+
+    PlannerMemory(path).record(task, graph, SwarmResult("done", graph))
+    PlannerMemory(path).record(task, graph, BareResult())
+    built, bare = PlannerMemory(path).recall(task, k=2)
+
+    assert (built.elapsed_ms, built.latency_complete, built.resumed) == (None, None, None)
+    assert (built.cost_is_complete, built.cost_contains_estimates) == (True, False)
+    assert (bare.cost_is_complete, bare.cost_contains_estimates) == (None, None)
+    assert built.acceptance == bare.acceptance == "not_evaluated"
+
+
+def test_legacy_rows_recall_with_outcome_fields_unrecorded(tmp_path):
+    path = tmp_path / "history.jsonl"
+    legacy = asdict(_make_outcome("Research signal"))
+    for name in _OUTCOME_FIELDS:
+        del legacy[name]
+    path.write_text(json.dumps(legacy) + "\n", encoding="utf-8")
+
+    [outcome] = PlannerMemory(path).recall(Task("Research signal"))
+
+    assert [getattr(outcome, name) for name in _OUTCOME_FIELDS] == [None] * 6
+
+
+@pytest.mark.parametrize("acceptance", [
+    "not_evaluated", "accepted", "rejected", "needs_review", "indeterminate",
+])
+def test_recall_keeps_valid_outcome_fields(tmp_path, acceptance):
+    path = tmp_path / "history.jsonl"
+    outcome = _make_outcome(
+        "Research signal", elapsed_ms=4000.5, latency_complete=False, resumed=True,
+        cost_is_complete=False, cost_contains_estimates=True, acceptance=acceptance,
+    )
+    _write_outcome(path, outcome)
+
+    assert PlannerMemory(path).recall(Task("Research signal")) == [outcome]
+
+
+@pytest.mark.parametrize("field,value", [
+    ("elapsed_ms", "4000"), ("elapsed_ms", -1), ("elapsed_ms", float("nan")),
+    ("elapsed_ms", float("inf")), ("elapsed_ms", True),
+    pytest.param("elapsed_ms", 10**400, id="elapsed_ms-huge-int"),
+    ("elapsed_ms", []), ("latency_complete", 1), ("latency_complete", "true"),
+    ("resumed", 0), ("resumed", "no"), ("cost_is_complete", 1),
+    ("cost_contains_estimates", "false"), ("acceptance", "approved"),
+    ("acceptance", ""), ("acceptance", 1), ("acceptance", True),
+])
+def test_recall_skips_malformed_outcome_fields_before_ranking(tmp_path, field, value):
+    _assert_bad_row_is_skipped_without_changing_ranking(tmp_path, field, value)
 
 
 def test_retried_node_duration_comes_from_its_final_attempt(tmp_path):

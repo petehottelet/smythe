@@ -61,6 +61,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `Tracer.timing()` and `Tracer(clock=..., wall_clock=...)` expose the
   measurements and clocks. `Tracer.summary()` and `SwarmResult.trace` keep
   their keys.
+- `PlannerMemory` records each run's elapsed time beside its summed node
+  time. New `ExecutionOutcome` fields `elapsed_ms`, `latency_complete`,
+  `resumed`, `cost_is_complete`, `cost_contains_estimates` and `acceptance`
+  default to `None`, meaning not recorded, so existing history recalls
+  unchanged; new records set `acceptance` to `"not_evaluated"`. Recall skips
+  rows whose new fields are malformed. `total_duration_ms` and the planner
+  prompt's "Summed node time" are unchanged.
 
 ### Changed
 
