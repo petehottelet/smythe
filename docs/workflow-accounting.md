@@ -242,16 +242,19 @@ provenance cannot enter the ordinary unjournaled execution path.
 
 ## Supported scope
 
-The initial managed path supports plain text with the exact built-in native
-Responses provider for Astra and Sol, or stateless `OfflineProvider` plan/echo
-fixtures. It binds the built-in simple, LLM, and constrained architects,
+The managed path supports plain text with three exact built-in providers:
+native `OpenAIResponsesProvider` for `gpt-6-astra` and `gpt-5.6-sol`, native
+`AnthropicMessagesProvider` for `claude-fable-5-1`, and stateless
+`OfflineProvider` plan/echo fixtures. Both native providers use their global
+endpoints. The path binds the built-in simple, LLM, and constrained architects,
 WhiteRabbit routing, static registries, LLM supervision, synthesis strategies,
 and token verification. Every reachable router tier and template is checked
 before routing can make a paid call. Provider instances are snapshotted per run.
 
-The [Fable 5.1 benchmark extension](../benchmarks/fable_51_benchmark_plan.md)
-requires a native Claude Messages adapter and journal integration. That support
-is planned; the ordinary `AnthropicProvider` cannot enter this managed path.
+[Native Claude Messages](anthropic-messages.md) shares this journal and runs
+the [Fable 5.1 benchmark extension](../benchmarks/fable_51_benchmark_plan.md).
+The ordinary `AnthropicProvider` cannot enter this managed path, and neither
+can subclasses of the supported providers.
 
 Custom local architects, template builders, supervisors, and synthesizers use
 `LocalOnly(factory, identity, version, role=...)`. The factory must return a fresh
