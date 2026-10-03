@@ -3,7 +3,8 @@
 Where the project is going, in order. Everything here converges on one
 standard: **generated execution graphs that do real tool-using and
 artifact-producing work at high fan-out, under bounded cost, with inspectable
-plans, durable recovery, and claimable benchmark evidence.** Every public
+plans, durable recovery, verified deliverables, and claimable benchmark
+evidence.** Every public
 performance claim links to its protocol and committed result record;
 superseded campaigns remain available as diagnostic history.
 
@@ -321,6 +322,78 @@ close the primary publication without changing its sealed evidence.
 
 ## Coming soon
 
+The next releases carry the execution envelope from a finished run to an
+accepted deliverable: choose an appropriate plan, execute within agreed
+limits, preserve useful work, verify the exact output returned, and learn
+which approaches work. New behavior is opt-in. A default changes only after a
+measured comparison on held-out tasks, and the local single-machine path keeps
+working without extra services.
+
+### Next: accepted deliverables
+
+| Priority | Change | Acceptance criteria |
+|---|---|---|
+| P1 | Supported-configuration matrix | State which providers, verifiers, tools, memory, artifact types, accounting scopes and resume behaviors each execution path supports: ordinary runs, durable text workflows and Jobs. Back every supported cell with a named test. Unsupported combinations fail before any paid call, including planning. |
+| P1 | Strict final acceptance and complete deliverables | An opt-in policy checks the exact output returned, after synthesis and after any step a supervisor added. Every requested output part is required, so a terminal node that returns only its own increment fails. Exhausted regeneration, an unreadable verdict or a failed validator never produces an accepted result; the rejected output stays inspectable. Runs report execution, acceptance and cost separately. Advisory gates keep their current behavior. |
+| P1 | Elapsed-time and outcome records | Record wall time separately from summed node time, split into routing, planning, queueing, execution, verification, synthesis and recovery, together with the acceptance result. Existing fields keep their meaning. |
+| P2 | Deterministic validators in durable workflows | Versioned, developer-registered local validators join `TokenVerifier` in durable text workflows. Each acceptance decision is stored with the output it judged. Resume revalidates when that record is missing, and a changed validator needs a new decision. |
+| P2 | Graph selection | Compare a strong single worker, fixed templates and generated plans on newly frozen held-out tasks, charging selection, planning, failed attempts and checks. Record why each run chose its tier. Current evidence is mixed: generated plans recorded lower wall time on the [task-shape suite](benchmarks/shape_suite.md) and higher mean wall time on [Astra's supplied-source tasks](benchmarks/astra_findings.md). |
+| P2 | Broader complete-workflow cost evidence | Extend the completed Astra evidence to harder external tasks using the native ledger, declared prices, failed attempts and all optimization trials. |
+
+### Then: recorded context, governed actions and reuse
+
+These build on strict acceptance and can proceed in parallel. Each is proven
+against deterministic fixtures and a fake external service before any live
+connector or paid run.
+
+1. **Recorded tools and context in durable workflows** — one versioned
+   read-only tool whose saved response is reused on resume instead of called
+   again; immutable snapshots of the context each worker saw, with source
+   content marked untrusted; and evidence records that carry claims, sources
+   and contradictions through synthesis. A source-to-artifact example runs
+   offline, survives interruption and resumes
+2. **Approval gates and reconciled external actions** — pause, approve or
+   reject with state that survives restart. Approval binds a verified
+   principal to the exact action or artifact, with expiry and revocation
+   checked again before dispatch. One connector gets a stable action identity
+   across retries, a receipt per action and independent readback: a write
+   whose acknowledgment is lost is reconciled or reported as unresolved, never
+   blindly repeated
+3. **Evidence-triggered control** — replace routine model supervision calls
+   with deterministic stage and anomaly triggers; reserve LLM review for a
+   result that supplies evidence the pending plan should change. A replan
+   records what it keeps, invalidates and adds, and cannot bypass final
+   acceptance
+4. **Failure-aware scheduling** — classify failures before retrying, with one
+   retry owner and a shared deadline per operation; an opt-in drain policy
+   that stops new paid work while in-flight results settle; and admission that
+   respects provider rate limits and reserves allowance for verification and
+   synthesis. Security events and revoked authority stop work immediately
+5. **Artifact lineage and selective repair** — accepted artifacts record the
+   sources, validators and tools they depend on. A changed source or validator
+   invalidates its dependents, and a repair plan shows what will be reused,
+   rechecked or regenerated before dispatch
+6. **Integrate asset policy with Jobs v1** — manifest-native production brand
+   masters, OCR and perceptual brand validators, select-from-N curation, and
+   deterministic export bundles built from accepted attempt pointers
+7. **Reviewable continual learning** — promote successful graph structures,
+   failure lessons, capability descriptions, and reusable procedures into
+   versioned supplemental state with diffs and rollback, extending
+   `PlannerMemory` and `distill_template` without mutating the base planner.
+   A candidate becomes active only after it beats its predecessor and a
+   simpler alternative on held-out tasks
+8. **Native Agent Skills support** — discover the Agent Skills standard
+   directly, add Python-backed executable skills, and keep the existing
+   OpenClaw adapter as one inventory source rather than the only packaged
+   path. Skills never grant tools or change acceptance criteria
+9. **Autotune generalization** — add calibrated sample-size and
+   repeated-comparison guidance, cross-campaign reports, process-
+   supervised evaluator isolation, and conservative live-evaluator adapters
+   after the offline campaign. Optimizers cannot change acceptance criteria,
+   spend ceilings, permissions or held-out data
+
+### Evidence and scale
+
 The [Fable 5.1 extension](benchmarks/fable_51_benchmark_plan.md) has a native
 Messages runner for its 12-workflow pilot and 100-workflow main schedule.
 Usage accounting and saved-response recovery are integrated into the durable
@@ -330,60 +403,40 @@ main study. The [ten-task Code Workflow study](benchmarks/results/fable_code_202
 is complete; its five earlier diagnostic attempts and charges remain recorded.
 Both studies share the $100 sublimit inside the existing $300 ceiling.
 
-The remaining runtime and evidence priorities are:
+- **Scale ladder** — extend the reviewed offline 5,000-operation recovery
+  observation to bounded paid 50/250/1,000-item trials with kill-and-resume
+  and duplicate detection; measure the current schema-v4 runtime separately.
+  Measure the write and storage overhead that acceptance, context and lineage
+  records add at the same scale
+- **Benchmarks, continued** — a discriminating judge, human calibration,
+  repeated k=25 cells, repeated glyph live cells, and held-out
+  brand-consistency comparisons; save delivered text and judge reasoning so
+  independent reviewers can rescore each quality result
 
-| Priority | Change | Acceptance criteria |
-|---|---|---|
-| P1 | Complete-deliverable contracts and graph selection | Require every requested output part, reject incomplete assembly, and compare fixed/generated selection on newly frozen held-out tasks. Retain failures and charge planning. |
-| P1 | Broader complete-workflow cost evidence | Extend the completed Astra evidence to harder external tasks using the native ledger, declared prices, failed attempts and all optimization trials. |
+### Noumenon
 
-### Product and scale
-
-**Noumenon screensaver:** the screensaver, web explorer, and native ports
-continue in the [Noumenon repository](https://github.com/petehottelet/noumenon): web renderer parity and
-visible-display timing, the Windows Defender review of the withdrawn v0.7.0
-Windows package, native exploration modes, macOS signing and notarization,
-and Wayland support. Precompiled distribution remains suspended. The
-original-glyph generation benchmark stays in Smythe.
-
-1. **Deterministic deliverable contracts** — make every requested output part
-   explicit in the graph and mechanically verify complete assembly, removing
-   the residual stochastic failure where a terminal node returns only its own
-   increment instead of the full deliverable
-2. **Evidence-triggered control** — replace routine model supervision calls
-   with deterministic stage and anomaly triggers; reserve LLM review for a
-   result that supplies evidence the pending plan should change
-3. **Reviewable continual learning** — promote successful graph structures,
-   failure lessons, capability descriptions, and reusable procedures into
-   versioned supplemental state with diffs and rollback, extending
-   `PlannerMemory` and `distill_template` without mutating the base planner
-4. **Native Agent Skills support** — discover the Agent Skills standard
-   directly, add Python-backed executable skills, and keep the existing
-   OpenClaw adapter as one inventory source rather than the only packaged path
-5. **Integrate asset policy with Jobs v1** — manifest-native production brand
-   masters, OCR and perceptual brand validators, select-from-N curation, and
-   deterministic export bundles built from accepted attempt pointers
-6. **Scale ladder** — extend the reviewed offline 5,000-operation recovery
-   observation to bounded paid 50/250/1,000-item trials with kill-and-resume
-   and duplicate detection; measure the current schema-v4 runtime separately
-7. **Benchmarks, continued** — a discriminating judge, human calibration,
-   repeated k=25 cells, repeated glyph live cells, and held-out
-   brand-consistency comparisons; save delivered text and judge reasoning so
-   independent reviewers can rescore each quality result
-8. **Autotune generalization**: add calibrated sample-size and
-   repeated-comparison guidance, cross-campaign reports, process-
-   supervised evaluator isolation, and conservative live-evaluator adapters
-   after the offline campaign
+The screensaver, web explorer, and native ports continue in the
+[Noumenon repository](https://github.com/petehottelet/noumenon): web renderer
+parity and visible-display timing, the Windows Defender review of the withdrawn
+v0.7.0 Windows package, native exploration modes, macOS signing and
+notarization, and Wayland support. Precompiled distribution remains suspended.
+The original-glyph generation benchmark stays in Smythe.
 
 ## Later
 
+- One optional durable backend adapter and one external worker adapter, when a
+  workload needs multi-process recovery, long waits or service boundaries that
+  the local path should not grow into. Both must pass the same acceptance,
+  authority and accounting tests as local runs
+- Coordination of external coding harnesses: bounded tasks in separate
+  workspaces, review packets that name the exact decision needed, and launch
+  limits set by review capacity, with no automatic merge rights
 - Autonomous Autotune proposal strategies after the bounded runner and
   evidence protocol are calibrated on more than the concurrency workload
 - Recursive subgraph decomposition, with depth limits and shared
   budget/trace/failure machinery
 - Direct messaging between retained agent runs with bounded family-scoped
   routing and persisted delivery receipts
-- Human-in-the-loop approval gates (pause/approve/reject, state survives restart)
 - Provider hardening: retry with backoff, streaming, response caching
 - Template/starter library and a `smythe init` command
 - Docs site, OpenTelemetry export, local-model capability metadata
@@ -392,6 +445,9 @@ original-glyph generation benchmark stays in Smythe.
 
 - A hosted SaaS or agent marketplace — the OSS core comes first
 - Rewriting in Rust/Go — Python is the right language for this audience
+- Infrastructure Smythe should integrate rather than build: a general
+  workflow engine, event broker, compute scheduler, vector or graph database,
+  or credential platform. Local use never requires a cluster
 
 ## Contributing
 

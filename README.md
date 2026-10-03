@@ -316,8 +316,9 @@ identical fixtures, so this shows recovery correctness, not speed.
 **Smythe 0.9.1** is the current library release. See the
 [release notes and upgrade guide](docs/release-0.9.1.md).
 
-Next priorities are complete-deliverable checks, broader external-task
-benchmarks, and separately controlled Astra scheduler and framework studies.
+Next priorities are strict acceptance of the exact delivered output, a tested
+matrix of supported configurations, and broader external-task benchmarks,
+including separately controlled Astra scheduler and framework studies.
 See the [roadmap](ROADMAP.md) for status and acceptance criteria.
 
 The [Noumenon screensaver](https://github.com/petehottelet/noumenon) renders
