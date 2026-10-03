@@ -24,7 +24,7 @@ flowchart LR
     end
 
     result["SwarmResult<br/>output · graph · trace · cost"]
-    memory["PlannerMemory<br/>outcomes + distilled templates"]
+    memory["PlannerMemory<br/>recorded run outcomes"]
 
     task --> router --> architect --> dag --> executor --> synthesizer --> result
     executor <--> sentinel
@@ -144,9 +144,11 @@ See [Verification](verifier.md#recovery-and-concurrent-work).
 
 ## Artifacts and jobs
 
-Provider responses can include artifacts as well as text. Execution-scoped
-artifact stores write bytes atomically and keep hashes in the graph state.
-Nodes can receive dependency images as native vision inputs.
+Provider responses can include artifacts as well as text. Each execution
+writes artifact bytes atomically into its own directory under `artifact_dir`
+and records each file's absolute path and MIME type in the node's metadata.
+These records hold no content hashes; Jobs artifact records carry a SHA-256
+digest. Nodes can receive dependency images as native vision inputs.
 
 The Jobs surface adds a manifest and operator protocol for high-fan-out work:
 complete worst-case preflight, approval bound to the exact plan and ceiling,
@@ -180,7 +182,8 @@ unchanged. Planner prompts label the recorded duration as “Summed node time.�
 
 `distill_template` turns a successful completed graph into a reusable
 `SubGraphTemplate`, moving a proven topology from autonomous planning into the
-constrained tier.
+constrained tier. The template is an in-memory object that you pass to
+`ConstrainedArchitect`; `PlannerMemory` does not store templates.
 
 This keeps learning reviewable: execution history informs future choices, and
 promoted graph structure becomes an explicit template rather than an invisible
@@ -193,10 +196,12 @@ prompt mutation.
   verification control transitions form the checkpoint boundaries.
 - Without `run_store`, the ordinary Swarm budget governs execution and synthesis;
   model-based routing, planning, and successful supervision remain outside it.
-- With `run_store=SQLiteWorkflowStore(...)`, supported text workflows share one
-  durable ledger across routing, planning, execution, verification, supervision,
-  and synthesis. Request-bound quotes, fenced dispatch, and retained response
-  evidence govern admission and recovery. See [managed scope](workflow-accounting.md#supported-scope).
+- With `run_store=SQLiteWorkflowStore(...)`, supported text workflows on the
+  native Responses or Claude Messages provider, or a stateless
+  `OfflineProvider`, share one durable ledger across routing, planning,
+  execution, verification, supervision, and synthesis. Request-bound quotes,
+  fenced dispatch, and retained response evidence govern admission and
+  recovery. See [managed scope](workflow-accounting.md#supported-scope).
 - A supervisor may change only pending work. It cannot drop a verification
   gate or the node it judges, or leave the gate no longer depending on that
   node; a step it adds after that node is not judged by the gate. One
