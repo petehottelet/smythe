@@ -5,9 +5,11 @@ is an ordinary node: planned, budgeted, traced, and checkpointed. It declares
 which node it judges:
 
 > **Lead with objective checks.** Image dimensions, schema conformance,
-> required sections, hashes, and domain rules have definitive verdicts and no
-> judging cost. Use `CallableVerifier` for those contracts. Reserve
-> `TokenVerifier` for a criterion that genuinely requires model judgment; the
+> required sections, hashes, and domain rules have definitive verdicts that a
+> local function can compute. Use `CallableVerifier` for those contracts. Only
+> the verdict is model-free: the gate node still runs like any other node and
+> makes its own provider call ([cost](#cost)). Reserve `TokenVerifier` for a
+> criterion that genuinely requires model judgment; the
 > [control ablation](../benchmarks/control_ablation.md) shows why generic prose
 > review is not the default gate.
 
@@ -219,6 +221,12 @@ synthesis excludes verifier nodes, so a gated run returns the artefact
 rather than the "PASS" that approved it.
 
 ## Cost
+
+A gate node is executed like any other node: it makes a provider call, and the
+verifier computes the verdict once that node finishes. A durable workflow
+journals that call in the `verification` phase. A `CallableVerifier` replaces
+only the verdict computation, so an objective gate still pays for its node's
+call, and again after each regeneration.
 
 Regeneration buys another provider call, so it is bounded per verifier
 by `max_regenerations` (default `0`, which makes the verdict advisory
