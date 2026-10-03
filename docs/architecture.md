@@ -173,7 +173,9 @@ graph around capabilities that actually exist.
 `PlannerMemory` records the task, topology, cost, summed node time, and outcome
 of each completed run and recalls relevant outcomes into later planning prompts.
 Its `total_duration_ms` field sums recorded spans; overlapping nodes contribute
-their individual durations, so this value is not elapsed wall time.
+their individual durations, so this value is not elapsed wall time. Each
+attempt records its own span; a node's recorded duration is that of its final
+attempt.
 
 **Added in 0.8.0:** recalled topology, success, cost, and duration fields
 are validated before ranking. Malformed records are skipped without rewriting

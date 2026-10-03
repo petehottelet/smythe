@@ -20,6 +20,7 @@ class ExecutionOutcome:
     """Record of a single task execution for planner feedback.
 
     ``total_duration_ms`` sums recorded node-span times; it is not wall time.
+    A node outcome's ``duration_ms`` is the time of that node's final attempt.
     """
 
     task_goal: str
@@ -67,6 +68,9 @@ class PlannerMemory:
 
         trace = getattr(result, "trace", [])
         total_duration = sum(s.get("duration_ms", 0) for s in trace)
+        # Each attempt records its own span. A node's duration is its final
+        # attempt's, so a retried node reports the attempt that settled it.
+        final_spans = {s.get("node_id"): s for s in trace}
 
         node_outcomes: list[dict[str, Any]] = []
         for node in graph.nodes:
@@ -75,11 +79,9 @@ class PlannerMemory:
                 "label": node.label,
                 "status": node.status.value if hasattr(node.status, "value") else str(node.status),
             }
-            matching_span = next(
-                (s for s in trace if s.get("node_id") == node.id), None
-            )
-            if matching_span:
-                node_outcome["duration_ms"] = matching_span.get("duration_ms", 0)
+            final_span = final_spans.get(node.id)
+            if final_span:
+                node_outcome["duration_ms"] = final_span.get("duration_ms", 0)
             cost = node.metadata.get("cost_usd")
             if cost is not None:
                 node_outcome["cost_usd"] = cost

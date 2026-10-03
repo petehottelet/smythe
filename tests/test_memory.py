@@ -392,6 +392,34 @@ def test_parallel_history_labels_summed_node_time(tmp_path):
     assert history == before_history
 
 
+def test_retried_node_duration_comes_from_its_final_attempt(tmp_path):
+    """Regression: a retried node reported its first, failed attempt's time."""
+    path = tmp_path / "history.jsonl"
+    task = Task("Research signal with retries")
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="a", label="Research A", status=NodeStatus.COMPLETED),
+        Node(id="b", label="Assemble findings", depends_on=["a"], status=NodeStatus.COMPLETED),
+    ])
+    tracer = Tracer()
+    tracer.spans = [
+        Span("a", "Research A", start_time=100, end_time=105, status="failed", error="timeout"),
+        Span("a", "Research A", start_time=105, end_time=106, status="failed", error="timeout"),
+        Span("a", "Research A", start_time=106, end_time=108, status="completed"),
+        Span("b", "Assemble findings", start_time=108, end_time=111, status="completed"),
+    ]
+    trace = tracer.summary()
+
+    PlannerMemory(path).record(task, graph, SwarmResult("done", graph, trace=trace))
+    [outcome] = PlannerMemory(path).recall(task)
+
+    assert [(row["id"], row["duration_ms"]) for row in outcome.node_outcomes] == [
+        ("a", 2000), ("b", 3000),
+    ]
+    # The summed total still counts every recorded attempt.
+    assert outcome.total_duration_ms == 11000
+    assert "Summed node time: 11000ms" in build_user_prompt(task, [asdict(outcome)])
+
+
 def test_prompt_without_history_keeps_existing_text():
     assert build_user_prompt(Task("Research signal")) == (
         "## Task\n\nResearch signal\n\nRespond with only the JSON object."

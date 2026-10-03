@@ -69,6 +69,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   serial execution did the same for terminal errors such as a budget alert.
   The node itself still counts as running between retries, and the keys of
   `Tracer.summary()` are unchanged.
+- `PlannerMemory` takes each node's `duration_ms` from that node's final
+  attempt, so a retried node no longer reports the time of its first, failed
+  attempt. `total_duration_ms` still sums every recorded span, and planner
+  prompts still label it "Summed node time".
 
 ## [0.9.1] - 2026-09-29
 
