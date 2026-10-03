@@ -119,6 +119,17 @@ same measurements through `Tracer.timing()`, whose `elapsed_ms` starts when the
 tracer is created. `Tracer(clock=..., wall_clock=...)` takes the monotonic and
 wall clocks to use, for example fixed clocks in tests.
 
+A durable [`run_store`](workflow-accounting.md) run can span several calls and
+processes, so its `timing` comes from the journal's wall-clock event times
+instead, and `clock` is `wall`. Each lease session is a segment with
+`started_at`, `ended_at`, `elapsed_ms` and `interrupted`, which is `true` when
+the session never released its lease, as when its process was killed; such a
+session ends at its last journal event. `elapsed_ms` is this call's session,
+and `run_wall_ms` runs from the run's creation to the result, including time
+between calls. `resumed` is `true` and `latency_complete` `false` when an
+earlier call held the run, such as the `plan()` call that produced a reviewed
+plan. Durable results report no phase totals or waits.
+
 ## Terminal failures
 
 In serial execution, every later node remains pending after a terminal

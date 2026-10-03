@@ -318,7 +318,9 @@ combination with the test behind it.
 
 `store.list_runs()` finds run IDs, including runs interrupted during planning.
 `store.inspect_run(execution_id)` returns safe call summaries, exact balances,
-hashes, and events. `store.audit(execution_id)` verifies accounting and evidence
+hashes, and events. `store.lease_sessions(execution_id)` returns the
+journal-clock bounds of each lease session, which a durable result reports as
+its [timing](execution.md#timing). `store.audit(execution_id)` verifies accounting and evidence
 bindings. Open `SQLiteWorkflowStore(path, read_only=True)` for inspection without
 schema changes or provider construction. Explicit `load_replay()` and
 `load_evidence()` calls expose sensitive saved text and raw provider responses;

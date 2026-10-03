@@ -1043,3 +1043,21 @@ def test_superseded_node_calls_lists_settled_calls_of_earlier_generations(journa
     for invalid in ([("a", 1)], {"a": True}, {"a": -1}):
         with pytest.raises(WorkflowValidationError):
             store.superseded_node_calls("run", invalid)
+def test_lease_sessions_report_journal_clock_bounds_without_writing(journal):
+    store, lease, clock = journal
+    clock.advance(5)
+    store.release_lease(lease)
+    clock.advance(10)
+    store.acquire_lease("run", "lost", ttl_s=30)  # Never released: its process died.
+    clock.advance(40)
+    store.acquire_lease("run", "next", ttl_s=30)
+    clock.advance(2)
+
+    with SQLiteWorkflowStore(store.path, read_only=True, clock_ns=clock) as reader:
+        record = reader.lease_sessions("run")
+
+    assert record == {"created_ns": 1_000_000_000, "now_ns": 58_000_000_000, "sessions": [
+        {"epoch": 1, "started_ns": 1_000_000_000, "ended_ns": 6_000_000_000, "interrupted": False},
+        {"epoch": 2, "started_ns": 16_000_000_000, "ended_ns": 16_000_000_000, "interrupted": True},
+        {"epoch": 3, "started_ns": 56_000_000_000, "ended_ns": 58_000_000_000, "interrupted": False},
+    ]}

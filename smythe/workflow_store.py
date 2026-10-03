@@ -1456,6 +1456,37 @@ class SQLiteWorkflowStore:
                                 "data": _loads(row["payload_json"], stored=True)}
                                for row in db.execute("SELECT * FROM workflow_events WHERE run_id=? ORDER BY sequence", (run_id,))]}
 
+    def lease_sessions(self, run_id):
+        """Wall-clock bounds of each lease session on a run, oldest first.
+
+        Bounds are journal clock nanoseconds, so they relate sessions held by
+        different processes. A session that still holds the lease ends now.
+        One that never released it, as when its process was killed, ends at
+        its last journal event and is marked interrupted.
+        """
+        with self._transaction(write=False) as db:
+            run, now, sessions = self._run(db, run_id), self._clock_ns(), []
+            for row in db.execute("SELECT event_type,payload_json,created FROM workflow_events "
+                                  "WHERE run_id=? ORDER BY sequence", (run_id,)):
+                kind, created = row["event_type"], row["created"]
+                if kind == "lease_acquired":
+                    epoch = _loads(row["payload_json"], stored=True).get("epoch")
+                    # The same owner renewing its active lease keeps its session.
+                    if not (sessions and sessions[-1]["open"] and sessions[-1]["epoch"] == epoch):
+                        sessions.append({"epoch": epoch, "started_ns": created, "ended_ns": created,
+                                         "open": True})
+                elif sessions and sessions[-1]["open"]:
+                    sessions[-1]["ended_ns"] = created
+                    sessions[-1]["open"] = kind != "lease_released"
+            held = run["owner"] is not None and run["expires"] > now
+            for session in sessions:
+                unreleased = session.pop("open")
+                current = unreleased and held and session["epoch"] == run["epoch"]
+                if current:
+                    session["ended_ns"] = now
+                session["interrupted"] = unreleased and not current
+            return {"created_ns": run["created"], "now_ns": now, "sessions": sessions}
+
     def recover(self, lease):
         with self._transaction() as db:
             self._lease(db, lease)

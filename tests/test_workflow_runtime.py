@@ -7,7 +7,7 @@ from types import MappingProxyType
 
 import pytest
 
-from fakes import NativeTransport, release_price_version
+from fakes import ManualClock, NativeTransport, release_price_version
 from smythe import LocalOnly, OfflineProvider, SimpleArchitect, SQLiteWorkflowStore, Swarm, Task
 from smythe import workflow
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Revision, Topology
@@ -476,3 +476,65 @@ def test_checkpoint_save_cost_does_not_grow_with_journal_history(tmp_path, monke
     # Opening checkpoint, the last node's checkpoint and the completed one.
     assert len(short) == len(long) == 3
     assert short == long
+class _TickingClock(ManualClock):
+    """A journal clock that moves forward one millisecond on every reading."""
+
+    def __call__(self):
+        self.now_ns += 1_000_000
+        return self.now_ns
+
+
+def test_durable_timing_comes_from_journal_wall_clock_within_one_call(tmp_path):
+    clock = _TickingClock()
+    with SQLiteWorkflowStore(tmp_path / "runs.db", clock_ns=clock) as store:
+        result = swarm(store).execute(Task("Report"))
+
+    timing = result.timing
+    assert timing["clock"] == "wall"
+    assert (timing["resumed"], timing["latency_complete"]) == (False, True)
+    [segment] = timing["segments"]
+    assert segment["interrupted"] is False
+    assert segment["started_at"] < segment["ended_at"]
+    assert timing["elapsed_ms"] == segment["elapsed_ms"] == round(
+        (segment["ended_at"] - segment["started_at"]) * 1000, 1)
+    assert timing["elapsed_ms"] < timing["run_wall_ms"] < timing["elapsed_ms"] + 5
+
+
+def test_durable_timing_keeps_time_between_calls_out_of_each_call(tmp_path):
+    clock = ManualClock()
+    with SQLiteWorkflowStore(tmp_path / "runs.db", clock_ns=clock) as store:
+        planned = swarm(store).plan(Task("Report"))
+        clock.advance(3600)
+        result = swarm(store).execute(planned)
+        clock.advance(60)
+        cached = swarm(store).resume(result.execution_id)
+
+    assert result.timing == {
+        "clock": "wall", "elapsed_ms": 0.0, "run_wall_ms": 3_600_000.0,
+        "latency_complete": False, "resumed": True,
+        "segments": [
+            {"started_at": 1000.0, "ended_at": 1000.0, "elapsed_ms": 0.0, "interrupted": False},
+            {"started_at": 4600.0, "ended_at": 4600.0, "elapsed_ms": 0.0, "interrupted": False},
+        ],
+    }
+    assert cached.timing["run_wall_ms"] == 3_660_000.0
+    assert [segment["started_at"] for segment in cached.timing["segments"]] == [1000.0, 4600.0, 4660.0]
+
+
+def test_durable_timing_marks_a_session_that_never_released_its_lease(tmp_path):
+    clock = ManualClock()
+    with SQLiteWorkflowStore(tmp_path / "runs.db", clock_ns=clock) as store:
+        planned = swarm(store).plan(Task("Report"))
+        run_id = planned.run_ref["run_id"]
+        clock.advance(10)
+        # A process takes the lease and is killed before it releases it.
+        store.acquire_lease(run_id, "lost-owner", ttl_s=30)
+        clock.advance(40)
+        result = swarm(store).execute(planned)
+
+    planning, lost, current = result.timing["segments"]
+    assert [planning["interrupted"], lost["interrupted"], current["interrupted"]] == [False, True, False]
+    # A lost session ends at its last journal event, here its lease acquisition.
+    assert (lost["started_at"], lost["ended_at"]) == (1010.0, 1010.0)
+    assert current["started_at"] == 1050.0
+    assert result.timing["run_wall_ms"] == 50_000.0

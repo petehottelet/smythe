@@ -68,6 +68,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   unchanged; new records set `acceptance` to `"not_evaluated"`. Recall skips
   rows whose new fields are malformed. `total_duration_ms` and the planner
   prompt's "Summed node time" are unchanged.
+- Durable `run_store` results report `SwarmResult.timing` from the journal's
+  wall-clock event times, which relate calls in different processes: one
+  segment per lease session, the call's elapsed time, the wall time since the
+  run was created, and whether a session ended without releasing its lease.
+  `SQLiteWorkflowStore.lease_sessions()` returns the same session bounds.
 
 ### Changed
 

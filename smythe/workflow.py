@@ -741,7 +741,27 @@ class WorkflowRuntime:
             workflow_accounting={key: accounting[key] for key in (
                 "confirmed_nanousd", "reserved_nanousd", "unknown_nanousd", "unknown_calls", "call_count",
             )},
+            timing=self._timing(),
         )
+
+    def _timing(self):
+        """Timing from journal wall-clock timestamps, which relate processes.
+
+        Each lease session is one segment. This call's monotonic clock is not
+        used: an earlier session may have run in another process.
+        """
+        record = self.store.lease_sessions(self.run_id)
+        segments = [{
+            "started_at": session["started_ns"] / 1e9, "ended_at": session["ended_ns"] / 1e9,
+            "elapsed_ms": round((session["ended_ns"] - session["started_ns"]) / 1e6, 1),
+            "interrupted": session["interrupted"],
+        } for session in record["sessions"]]
+        resumed = len(segments) > 1
+        return {
+            "clock": "wall", "elapsed_ms": segments[-1]["elapsed_ms"] if segments else 0.0,
+            "run_wall_ms": round((record["now_ns"] - record["created_ns"]) / 1e6, 1),
+            "latency_complete": not resumed, "resumed": resumed, "segments": segments,
+        }
 
 
 class _WorkflowSupervisor:
