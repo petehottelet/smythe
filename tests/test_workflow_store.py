@@ -17,7 +17,7 @@ from smythe import pricing_anthropic
 from smythe.pricing import PRICE_VERSION, price_table
 from smythe.workflow_store import (
     CallKey, OFFLINE_PRICE_VERSION, SQLiteWorkflowStore, WorkflowBudgetError,
-    WorkflowConflictError, WorkflowCorruptionError, WorkflowLeaseError,
+    WorkflowConflictError, WorkflowCorruptionError, WorkflowLeaseError, WorkflowNotFoundError,
     WorkflowStateError, WorkflowValidationError,
 )
 
@@ -959,3 +959,43 @@ def test_saved_call_replays_under_its_recorded_price_version_after_a_release(jou
         with pytest.raises(WorkflowConflictError):
             call("saved", provider, version, body)
     assert store.audit("run")["call_count"] == 3
+
+
+def test_superseded_node_calls_lists_settled_calls_of_earlier_generations(journal):
+    store, lease, _ = journal
+    template = prepare(store, lease, "template")
+
+    def node_call(phase, scope, generation, result, invocation=0):
+        call = store.prepare_call(lease, CallKey(phase, scope, generation, invocation),
+                                  request_json=template["request_json"], provider=template["provider"],
+                                  price_version=PRICE_VERSION)
+        if result != "prepared":
+            evidence_id = store.append_response(dispatch(store, lease, call), envelope(call, response()))
+            store.settle_call(lease, call["call_id"], evidence_id)
+        if result == "accepted":
+            store.accept_result(lease, call["call_id"], {"text": "ok"}, "test-v1")
+        elif result == "rejected":
+            store.reject_result(lease, call["call_id"], "unusable")
+        return call["call_id"]
+
+    applied = node_call("execution", "node/a", 0, "accepted")
+    store.save_checkpoint(lease, 0, {}, consumed_call_ids=[applied])
+    expected = {applied, node_call("execution", "node/a", 0, "accepted", invocation=1),
+                node_call("verification", "node/a", 0, "rejected")}
+    node_call("execution", "node/a", 0, "settled", invocation=2)
+    node_call("execution", "node/a", 0, "prepared", invocation=3)
+    node_call("execution", "node/a", 1, "accepted")
+    node_call("supervision", "node/a", 0, "accepted")
+    node_call("execution", "node/b", 0, "accepted")
+    node_call("execution", "node/removed", 0, "accepted")
+    assert set(store.superseded_node_calls("run", {"a": 1, "b": 0})) == expected
+    # Journal order; this clock never advances, so creation times tie.
+    later = store.superseded_node_calls("run", {"a": 2, "b": 1})
+    assert len(later) == 5 and later == sorted(later)
+    # Before any regeneration there is nothing to read, even for another run.
+    assert store.superseded_node_calls("missing", {"a": 0}) == []
+    with pytest.raises(WorkflowNotFoundError):
+        store.superseded_node_calls("missing", {"a": 1})
+    for invalid in ([("a", 1)], {"a": True}, {"a": -1}):
+        with pytest.raises(WorkflowValidationError):
+            store.superseded_node_calls("run", invalid)

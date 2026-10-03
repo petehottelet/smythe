@@ -467,21 +467,15 @@ class WorkflowRuntime:
         self._validate_graph_policy(self.graph)
         self.registry.workflow_description()
         calls = []
-        nodes = {node.id: node for node in self.graph.nodes}
         for node in self.graph.nodes:
             if node.status in {NodeStatus.COMPLETED, NodeStatus.FAILED, NodeStatus.SKIPPED}:
                 calls.extend(self._call_ids(self._worker_keys.get((node.id, node_generation(node)), ())))
         # Regeneration can discard an accepted descendant during cancellation
         # after the previous batched snapshot. Consume that settled call with
-        # the checkpoint that durably advances its node generation.
-        for call in self.store.inspect_run(self.run_id)["calls"]:
-            key = call["key"]
-            node = nodes.get(key["scope_id"].removeprefix("node/"))
-            if (key["phase"] in {"execution", "verification"} and key["scope_id"].startswith("node/")
-                    and node is not None and key["generation"] < node_generation(node)
-                    and call["billing_state"] == "known"
-                    and call["result_state"] in {"accepted", "rejected", "applied"}):
-                calls.append(call["call_id"])
+        # the checkpoint that durably advances its node generation. The query
+        # reads only those calls, so a save's cost does not grow with history.
+        calls.extend(self.store.superseded_node_calls(
+            self.run_id, {node.id: node_generation(node) for node in self.graph.nodes}))
         checkpoint = {
             "version": 1, "status": status, "graph": graph_to_dict(self.graph),
             "registry": self.registry.workflow_description(), "output": output,

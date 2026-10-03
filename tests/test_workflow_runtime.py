@@ -382,3 +382,49 @@ def test_behavior_version_fields_are_read_from_the_saved_recipe(store, monkeypat
     explicit.behavior_settings = {"prompt_assembly": 3}
     with pytest.raises(WorkflowConflictError, match="prompt_assembly"):
         asyncio.run(explicit.resume(started, max_concurrency=1))
+
+
+def test_checkpoint_save_cost_does_not_grow_with_journal_history(tmp_path, monkeypatch):
+    saves = []
+    original = WorkflowRuntime._save
+
+    def counted(self, *args, **kwargs):
+        statements = []
+        self.store._db.set_trace_callback(statements.append)
+        try:
+            return original(self, *args, **kwargs)
+        finally:
+            self.store._db.set_trace_callback(None)
+            saves.append(len(statements))
+
+    monkeypatch.setattr(WorkflowRuntime, "_save", counted)
+
+    def resumed_saves(prior):
+        """SQL statements per save while resuming a run with ``prior`` finished nodes."""
+        ids = [f"prior-{index}" for index in range(prior)]
+        nodes = [Node(id=node, label=node, depends_on=ids[index - 1:index]) for index, node in enumerate(ids)]
+        nodes.append(Node(id="last", label="Last", depends_on=ids[-1:]))
+        with SQLiteWorkflowStore(tmp_path / f"history-{prior}.db") as store:
+            runtime = swarm(store)
+            prepare = store.prepare_call
+
+            def stop_before_last(lease, key, **kwargs):
+                if key.scope_id == "node/last":
+                    raise Crash("Simulated process loss")
+                return prepare(lease, key, **kwargs)
+
+            monkeypatch.setattr(store, "prepare_call", stop_before_last)
+            with pytest.raises(Crash):
+                runtime.execute(ExecutionGraph([Topology.SERIAL], nodes))
+            monkeypatch.setattr(store, "prepare_call", prepare)
+            (run,) = store.list_runs()
+            history = store.inspect_run(run["run_id"])
+            assert history["call_count"] == prior and history["revision"] >= prior
+            saves.clear()
+            assert runtime.resume(run["run_id"]).cost_is_complete
+            return list(saves)
+
+    short, long = resumed_saves(1), resumed_saves(8)
+    # Opening checkpoint, the last node's checkpoint and the completed one.
+    assert len(short) == len(long) == 3
+    assert short == long

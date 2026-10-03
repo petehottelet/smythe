@@ -251,6 +251,10 @@ The SQLite journal uses WAL, full synchronization, fenced leases, and checkpoint
 revisions. Heartbeats renew ownership during calls. A former owner can append
 immutable late evidence for its exact dispatch, but cannot advance the run.
 Recovery settles available late evidence before admitting new work.
+Each plan, execute or resume entry audits the whole journal once when it
+starts. A checkpoint saved during the run reads only the calls it consumes
+and, once a node has been regenerated, the keys of settled calls, so its cost
+does not grow with the run's events, evidence or earlier checkpoints.
 
 A 0.8.0 journal holds every saved 4xx error response as unknown exposure. On
 resume, 0.8.1 settles a saved response that meets the zero-cost conditions

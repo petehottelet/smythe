@@ -745,6 +745,38 @@ class SQLiteWorkflowStore:
                     return True
             return False
 
+    def superseded_node_calls(self, run_id, generations):
+        """IDs of settled calls that earlier generations of graph nodes made.
+
+        ``generations`` maps node ids to their current generation. An execution
+        or verification call scoped ``node/<id>`` qualifies when its generation
+        is lower than that node's, its billing is known and its result was
+        accepted, rejected or applied. Only settled calls' keys are read, and
+        nothing is read until a node has been regenerated, so a checkpoint
+        need not audit the whole journal.
+        """
+        if not isinstance(generations, Mapping):
+            raise WorkflowValidationError("Node generations must be a mapping")
+        for generation in generations.values():
+            _integer(generation, "generation")
+        if not any(generations.values()):
+            return []
+        with self._transaction(write=False) as db:
+            self._run(db, run_id)
+            result = []
+            for row in db.execute("""SELECT call_id,key_json FROM workflow_calls WHERE run_id=? AND
+              billing_state='known' AND result_state IN ('accepted','rejected','applied')
+              ORDER BY created,call_id""", (run_id,)):
+                try:
+                    key = CallKey(**_loads(row["key_json"], stored=True))
+                except (WorkflowValidationError, TypeError) as exc:
+                    raise WorkflowCorruptionError("Call key is invalid") from exc
+                node = key.scope_id.removeprefix("node/")
+                if (key.phase in ("execution", "verification") and key.scope_id.startswith("node/")
+                        and node in generations and key.generation < generations[node]):
+                    result.append(row["call_id"])
+            return result
+
     @staticmethod
     def _call_record(row):
         request = _loads(row["request_json"], stored=True)

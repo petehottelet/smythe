@@ -162,6 +162,15 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   every other recipe field still compares exactly. Saved calls replay and
   decode at the price version they recorded, including calls not yet sent,
   and new calls use the current version. Recipes keep their bytes.
+- Saving a durable checkpoint no longer audits the whole journal. Each save
+  called `inspect_run`, which verified every call, evidence row and earlier
+  checkpoint and loaded every event, so checkpoint cost grew with the run's
+  history and a long run's total grew quadratically or worse. To find the
+  calls of regenerated nodes, a save now reads only the keys of settled
+  calls, through the new `SQLiteWorkflowStore.superseded_node_calls`, and
+  reads nothing until a node has been regenerated. It consumes the same
+  calls as before, and each plan, execute or resume entry still audits the
+  journal once when it starts.
 
 ## [0.9.1] - 2026-09-29
 
