@@ -31,8 +31,8 @@ from smythe.task import render_task, snapshot_task
 from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
 from smythe.tracer import Tracer
 from smythe.verifier import (
-    TokenVerifier, Verifier, VerificationRecoveryError, node_generation, verification_integer,
-    validate_verification_receipt,
+    TokenVerifier, Verifier, VerificationRecoveryError, node_generation, rejection_reason,
+    verification_integer, validate_verification_receipt,
 )
 from smythe.workflow_store import WorkflowError
 
@@ -357,13 +357,14 @@ class ExecutorBase:
             self.notify_control_update(node)
             return None
         verdict = self._verifier.verdict(node, target)
-        if verdict.passed:
+        # Only an exact True passes; a truthy "false" from a custom verifier fails.
+        if verdict.passed is True:
             node.metadata["verification_receipt"] = dict(receipt, state="consumed", passed=True, reason=verdict.reason)
             self.notify_control_update(node)
             return None
         intent = {
             "version": 1, "target_id": target.id, "target_generation": node_generation(target),
-            "judge_generation": node_generation(node), "reason": verdict.reason,
+            "judge_generation": node_generation(node), "reason": rejection_reason(verdict),
             "regenerations_used": used + 1,
             "affected_generations": {n.id: node_generation(n) for n in self._affected_nodes(target, graph)},
         }

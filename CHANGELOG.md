@@ -59,6 +59,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   reason names the returned type; the coroutine is closed. A function that
   returned a truthy non-bool to pass, such as `1` or a NumPy boolean, must
   now return `bool(...)`.
+- A gate passes only when its verifier's verdict has `passed` exactly `True`.
+  The executor tested truthiness, so a custom verifier's
+  `Verdict(passed="false")` passed. Any other value is now a failed verdict,
+  and its reason states that `passed` must be a bool.
 
 ## [0.9.1] - 2026-09-29
 

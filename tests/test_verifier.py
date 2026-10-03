@@ -15,7 +15,7 @@ from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
 from smythe.tracer import Tracer
-from smythe.verifier import CallableVerifier, TokenVerifier, Verdict
+from smythe.verifier import CallableVerifier, TokenVerifier, Verdict, Verifier
 
 
 class ScriptedProvider(Provider):
@@ -575,6 +575,37 @@ def test_callable_verifier_findings_send_the_target_back():
 
     assert provider.runs["draft"] == 2
     assert graph.nodes[0].result == "v2"
+
+
+class _QueuedVerifier(Verifier):
+    """Returns queued verdicts in order, whatever the judge wrote."""
+
+    def __init__(self, *verdicts: Verdict) -> None:
+        self._verdicts = list(verdicts)
+
+    def verdict(self, verifier_node, verified_node) -> Verdict:
+        return self._verdicts.pop(0)
+
+
+@pytest.mark.parametrize("sync", [False, True])
+@pytest.mark.parametrize("passed", ["false", "no", 1, None])
+def test_verdict_passed_must_be_exactly_true(passed, sync):
+    """A truthy ``passed`` such as the string "false" is a failed verdict."""
+    graph = _gated_graph(max_regenerations=2)
+    tracer = Tracer()
+    provider = ScriptedProvider({"draft": ["v1", "v2"], "judge": ["anything"]})
+    verifier = _QueuedVerifier(
+        Verdict(passed=passed, reason="judge said no"), Verdict(passed=True, reason="fine"),
+    )
+    _run(graph, provider, tracer=tracer, verifier=verifier, sync=sync)
+
+    assert provider.runs["draft"] == 2
+    assert graph.nodes[0].result == "v2"
+    judge = graph.nodes[1].metadata
+    assert judge["regenerations_used"] == 1
+    assert judge["verification_receipt"]["passed"] is True
+    [event] = [s for s in tracer.summary() if "regeneration" in s]
+    assert event["label"] == f"verdict 'passed' must be a bool, got {passed!r}: judge said no"
 
 
 def test_sync_executor_regenerates():

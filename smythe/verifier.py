@@ -522,9 +522,9 @@ class TokenVerifier(Verifier):
 # ---------------------------------------------------------------------------
 # Reading a function's result
 # ---------------------------------------------------------------------------
-# A gate's function is caller code, so only an explicit bool decides it.
-# Truthiness would let "FAIL", a list of findings or an unawaited coroutine
-# pass.
+# A gate's function and a custom verifier are caller code, so only an
+# explicit bool decides a gate.  Truthiness would let "FAIL", a list of
+# findings, an unawaited coroutine or ``Verdict(passed="false")`` pass.
 
 _NO_PASSED = object()  # the result has no ``passed`` attribute
 
@@ -557,6 +557,20 @@ def _report_reason(result: object, passed: bool) -> str:
         if isinstance(message, str):
             shown.append(f"{code}: {message}" if isinstance(code, str) else message)
     return _clip("; ".join(shown))
+
+
+def rejection_reason(verdict: Verdict) -> str:
+    """Why a verdict that is not exactly ``passed=True`` fails its gate.
+
+    ``passed`` must be a bool.  A custom verifier's truthy ``"false"`` or
+    ``1`` is a failed verdict, never a pass, and its reason says so.
+    """
+    if verdict.passed is False:
+        return verdict.reason
+    reason = f"verdict 'passed' must be a bool, got {_shown(verdict.passed)}"
+    if isinstance(verdict.reason, str) and verdict.reason:
+        reason += f": {verdict.reason}"
+    return _clip(reason)
 
 
 class CallableVerifier(Verifier):

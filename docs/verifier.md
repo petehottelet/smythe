@@ -189,6 +189,11 @@ not verdicts, so return `bool(...)` when a check produces another type. The
 function is called synchronously: an `async def` function's coroutine is
 closed without running, and the gate fails.
 
+The executor holds every `Verifier` to the same rule: a verdict passes only
+when its `passed` is exactly `True`. A custom verifier's
+`Verdict(passed="false")` or `Verdict(passed=1)` is a failed verdict, and the
+regeneration span records `verdict 'passed' must be a bool`.
+
 ## Gating from YAML and from a generated plan
 
 `verifies` and `max_regenerations` are ordinary node fields, so a YAML
