@@ -140,6 +140,19 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   JPEG, GIF or WebP artifact; a manifest declaring, for example,
   `application/pdf` used to be approved and then had every paid image
   rejected.
+- A durable workflow journal stays readable after a release adds a price
+  version or changes the supported models. Every saved call was checked
+  against the current price version, model list and request rules, so after
+  such a change `lookup_call`, `inspect_run`, `audit` and recovery raised
+  `WorkflowCorruptionError` for every existing run. A saved call is now
+  verified by recomputing its stored binding, needs only a registered price
+  version that prices its model, and is quoted and settled at that version's
+  rates; its stored receipt is unchanged. Price tables are registered by
+  version in `smythe.pricing.PRICE_TABLES` and
+  `smythe.pricing_anthropic.PRICE_TABLES`, and the providers' model lists
+  come from the current table. A new call still needs the current version,
+  and a retirement date in the current table stops new calls to that model
+  without affecting saved ones.
 
 ## [0.9.1] - 2026-09-29
 

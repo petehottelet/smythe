@@ -2,9 +2,13 @@
 
 from dataclasses import dataclass
 from decimal import Decimal
+from types import MappingProxyType
 from typing import Any
 
+from smythe.pricing import PriceTable, registered_table
+
 MODEL = "claude-fable-5-1"
+# The current version. Earlier versions stay registered in PRICE_TABLES.
 PRICE_VERSION = "anthropic-fable-5-1-standard-global-2026-09-13-v1"
 SOURCES = (
     "https://platform.claude.com/docs/en/build-with-claude/prompt-caching",
@@ -12,6 +16,18 @@ SOURCES = (
 )
 RATES = {"ordinary_input": 10000, "cache_read": 250, "cache_write_5m": 12500,
          "cache_write_1h": 20000, "output": 50000}
+_INPUTS = ("ordinary_input", "cache_read", "cache_write_5m", "cache_write_1h")
+
+# Every version a saved receipt or journaled call can name; see smythe.pricing.
+PRICE_TABLES = MappingProxyType({
+    PRICE_VERSION: PriceTable(PRICE_VERSION, "2026-09-13", SOURCES,
+                              MappingProxyType({MODEL: MappingProxyType(dict(RATES))})),
+})
+
+
+def price_table(price_version=None):
+    """Return a registered Messages price table; ``None`` selects the current one."""
+    return registered_table(PRICE_TABLES, PRICE_VERSION, price_version)
 
 
 def _count(value, name):
@@ -31,33 +47,40 @@ class ClaudeReceipt:
     categories: tuple[tuple[str, int], ...]
     cost_nanousd: int | None
     accounting_error: str | None
+    price_version: str = PRICE_VERSION
 
     @property
     def cost_usd(self):
         return None if self.cost_nanousd is None else Decimal(self.cost_nanousd).scaleb(-9)
 
     def safe_summary(self) -> dict[str, Any]:
+        table = price_table(self.price_version)
+        rates = table.rates[self.requested_model] if table.prices(self.requested_model) else {}
         return {
-            "version": 1, "provider_kind": "anthropic_messages", "price_version": PRICE_VERSION,
-            "price_checked_on": "2026-09-13", "pricing_scope": "model_text_tokens",
+            "version": 1, "provider_kind": "anthropic_messages", "price_version": table.price_version,
+            "price_checked_on": table.checked_on, "pricing_scope": "model_text_tokens",
             "actual_model": self.actual_model, "requested_model": self.requested_model,
             "service_tier": self.service_tier, "endpoint_scope": "global",
             "response_status": self.response_status,
             "usage": {"input_tokens": self.input_tokens, "output_tokens": self.output_tokens,
                       "reasoning_tokens": None, "thinking_included_in_output": True},
-            "categories": {name: {"tokens": count, "rate_nanousd_per_token": RATES[name],
-                                  "cost_nanousd": count * RATES[name]}
+            "categories": {name: {"tokens": count, "rate_nanousd_per_token": rates[name],
+                                  "cost_nanousd": count * rates[name]}
                            for name, count in self.categories},
             "cost_nanousd": self.cost_nanousd,
             "cost_usd": None if self.cost_usd is None else format(self.cost_usd, "f"),
             "usage_is_complete": self.accounting_error is None,
             "cost_is_complete": self.cost_nanousd is not None,
-            "accounting_error": self.accounting_error, "sources": list(SOURCES),
+            "accounting_error": self.accounting_error, "sources": list(table.sources),
         }
 
 
-def price_messages_response(raw, *, requested_model=MODEL):
-    """Do not subtract cache tokens from Claude's ordinary input count."""
+def price_messages_response(raw, *, requested_model=MODEL, price_version=None):
+    """Do not subtract cache tokens from Claude's ordinary input count.
+
+    ``price_version`` selects a registered table; the default is the current one.
+    """
+    table = price_table(price_version)
     raw = raw if type(raw) is dict else {}
     model = raw.get("model") if type(raw.get("model")) is str else None
     usage = raw.get("usage") if type(raw.get("usage")) is dict else {}
@@ -65,8 +88,9 @@ def price_messages_response(raw, *, requested_model=MODEL):
     status = raw.get("stop_reason") if type(raw.get("stop_reason")) is str else None
     categories, inputs, outputs, cost, error = (), None, None, None, None
     try:
-        if requested_model != MODEL or model != requested_model:
+        if not table.prices(requested_model) or model != requested_model:
             raise ValueError("Unpriced or unexpected Messages model")
+        rates = table.rates[requested_model]
         if tier != "standard":
             raise ValueError("Missing or unsupported Messages service tier")
         if usage.get("inference_geo") not in (None, "global"):
@@ -96,21 +120,24 @@ def price_messages_response(raw, *, requested_model=MODEL):
         inputs = ordinary + read + write
         categories = (("ordinary_input", ordinary), ("cache_read", read),
                       ("cache_write_5m", short), ("cache_write_1h", long), ("output", outputs))
-        cost = sum(count * RATES[name] for name, count in categories)
+        cost = sum(count * rates[name] for name, count in categories)
     except ValueError as exc:
         error = str(exc)
     return ClaudeReceipt(model, requested_model, tier if type(tier) is str else None,
-                         status, inputs, outputs, categories, cost, error)
+                         status, inputs, outputs, categories, cost, error, table.price_version)
 
 
-def messages_quote_nanousd(input_tokens, max_tokens, model=MODEL):
+def messages_quote_nanousd(input_tokens, max_tokens, model=MODEL, *, price_version=None):
     """Reserve uncached input with counting headroom and the entire output cap.
 
     Token counting is an estimate. A measured overrun closes workflow admission;
     it never disappears from settlement. The input reserve also covers 1h writes.
+    ``price_version`` selects a registered table; the default is the current one.
     """
+    table = price_table(price_version)
     count = _count(input_tokens, "input_tokens")
     cap = _count(max_tokens, "max_tokens")
-    if model != MODEL or not 1 <= cap <= 128000:
+    if not table.prices(model) or not 1 <= cap <= 128000:
         raise ValueError("Unsupported Messages quote")
-    return ((count * 11 + 9) // 10 + 1024) * 20000 + cap * RATES["output"]
+    rates = table.rates[model]
+    return ((count * 11 + 9) // 10 + 1024) * max(rates[name] for name in _INPUTS) + cap * rates["output"]

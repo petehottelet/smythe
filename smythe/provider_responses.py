@@ -21,7 +21,7 @@ from typing import Any
 
 from smythe._errors import PicklableError
 from smythe.pricing import (
-    PRICE_VERSION, NativeReceipt, conservative_quote, price_native_response,
+    PRICE_VERSION, NativeReceipt, conservative_quote, price_native_response, price_table,
 )
 from smythe.provider import (
     CompletionResult, Provider, ProviderAccountingCancelledError, ProviderAccountingError,
@@ -29,7 +29,8 @@ from smythe.provider import (
 )
 from smythe.tools import ChatMessage, ToolCall, ToolSpec, wire_name
 
-MODELS = frozenset({"gpt-6-astra", "gpt-5.6-sol"})
+# The models the current price version prices.
+MODELS = frozenset(price_table().models)
 _EFFORTS = frozenset({"low", "medium", "high", "xhigh", "max"})
 _ENDPOINT = "https://api.openai.com/v1"
 _NAMESPACE = "openai_responses"

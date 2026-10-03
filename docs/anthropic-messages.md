@@ -29,6 +29,8 @@ It accepts text only. Tools, attachments, assistant prefill, alternative
 endpoints, and provider fallbacks are outside this adapter's scope.
 
 The journal saves request and response bytes before interpreting the output.
+Each journaled call keeps the [price version](workflow-accounting.md#price-versions)
+it was admitted under.
 Prices use integer nanoUSD. Ordinary input, cache reads, five-minute writes,
 one-hour writes, and output are separate categories. Claude's ordinary input
 count excludes cache tokens; thinking is included in billed output once.

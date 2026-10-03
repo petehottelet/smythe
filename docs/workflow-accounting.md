@@ -196,6 +196,29 @@ all recorded phases and failed attempts, using the adapter's dated published
 token prices. It does not represent a reconciled account invoice or hardware,
 human, and external service costs. No historical benchmark is repriced.
 
+## Price versions
+
+Each native call records the price version it was admitted under, and its
+journal binding covers that version. `smythe.pricing.PRICE_TABLES` and
+`smythe.pricing_anthropic.PRICE_TABLES` register every version by name, and
+`PRICE_VERSION` in each module names the current one. A release that changes
+prices or the supported models adds a version and keeps the earlier ones
+registered.
+
+A new call must use the current version and a model that version prices. A
+saved call is verified by recomputing its stored binding instead of applying
+the current request rules: its version must still be registered and must
+price its model. Lookup, inspection, audit and recovery therefore keep working
+after such a release, and the call's quote and settlement use the rates of
+the version it recorded. A stored receipt never changes, and settling the
+same evidence again produces the same bytes. A journal that names a version
+this release does not register, such as one written by a newer release, is
+reported as corrupt.
+
+A price table can give a model a retirement date (`PriceTable.retired_on`).
+From that day, by the journal clock in UTC, a durable run admits no new call to
+that model. Saved calls to it remain readable and still settle and replay.
+
 ## Recovery boundaries
 
 Each call has a stable phase, component or node scope, generation, invocation,

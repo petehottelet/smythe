@@ -1,4 +1,4 @@
-"""Shared deterministic fakes: SDK transports, clocks, crashes and child processes.
+"""Shared deterministic fakes: SDK transports, clocks, price releases, crashes and child processes.
 
 Import this module by its own name (``from fakes import NativeTransport``), as
 with ``helpers``. Importing it as ``tests.fakes`` as well would load a second
@@ -485,6 +485,40 @@ class MessagesTransport(_Transport):
                           "cache_creation": {"ephemeral_5m_input_tokens": 10,
                                              "ephemeral_1h_input_tokens": 20},
                           "service_tier": "standard"}}
+
+
+# ---------------------------------------------------------------------------
+# Price releases
+# ---------------------------------------------------------------------------
+
+
+def release_price_version(monkeypatch, kind: str = "openai_responses", *, version: str,
+                          rates: dict | None = None, retired_on: dict | None = None):
+    """Register ``version`` and make it current, as a release with new prices does.
+
+    ``kind`` is ``"openai_responses"`` or ``"anthropic_messages"``. ``rates``
+    maps each model of the new table to its rate card; by default the table
+    copies the current one, so only the version changes. ``retired_on`` maps
+    models to ISO retirement dates. Earlier versions stay registered, and the
+    provider's current version and model list follow the new table, so
+    ``workflow_descriptor()`` describes it. Returns the new table.
+    """
+    from dataclasses import replace
+    from types import MappingProxyType
+
+    from smythe import pricing, pricing_anthropic, provider_messages, provider_responses
+
+    prices, provider = {"openai_responses": (pricing, provider_responses),
+                        "anthropic_messages": (pricing_anthropic, provider_messages)}[kind]
+    current = prices.price_table()
+    table = replace(current, price_version=version,
+                    rates=MappingProxyType(dict(current.rates if rates is None else rates)),
+                    retired_on=MappingProxyType(dict(retired_on or {})))
+    monkeypatch.setattr(prices, "PRICE_TABLES", MappingProxyType({**prices.PRICE_TABLES, version: table}))
+    monkeypatch.setattr(prices, "PRICE_VERSION", version)
+    monkeypatch.setattr(provider, "PRICE_VERSION", version)
+    monkeypatch.setattr(provider, "MODELS", frozenset(table.rates))
+    return table
 
 
 # ---------------------------------------------------------------------------

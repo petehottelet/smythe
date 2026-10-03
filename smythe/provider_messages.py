@@ -6,13 +6,16 @@ from decimal import Decimal
 import math
 import os
 
-from smythe.pricing_anthropic import MODEL, PRICE_VERSION, messages_quote_nanousd, price_messages_response
+from smythe.pricing_anthropic import (PRICE_VERSION, messages_quote_nanousd, price_messages_response,
+                                      price_table)
 from smythe.provider import (CompletionResult, Provider, ProviderAccountingCancelledError,
                              ProviderAccountingError, ProviderResponseError)
 from smythe.provider_responses import (PreparedRequest, RawResponseEnvelope, ResponseQuote,
                                       ResponseQuoteError, _close_owned, _json_dump, _safe_id)
 from smythe.tools import ChatMessage
 
+# The models the current price version prices.
+MODELS = frozenset(price_table().models)
 _ENDPOINT = "https://api.anthropic.com"
 _EFFORTS = {"low", "medium", "high", "xhigh", "max"}
 
@@ -42,7 +45,8 @@ class AnthropicMessagesProvider(Provider):
     def workflow_descriptor(self):
         return {"kind": "anthropic_messages", "adapter_version": "anthropic-messages-v1",
                 "decoder_version": "anthropic-messages-v1", "endpoint_scope": "global",
-                "price_version": PRICE_VERSION, "supported_models": [MODEL], "config": dict(self._config)}
+                "price_version": PRICE_VERSION, "supported_models": sorted(MODELS),
+                "config": dict(self._config)}
 
     def snapshot_for_workflow(self):
         return AnthropicMessagesProvider(api_key=self._api_key, **self._config)
@@ -93,7 +97,8 @@ class AnthropicMessagesProvider(Provider):
             raise TypeError("Expected PreparedRequest")
         p = prepared.payload
         if (set(p) != {"model", "system", "messages", "max_tokens", "service_tier", "output_config"}
-                or p["model"] != MODEL or p["service_tier"] != "standard_only"
+                or type(p["model"]) is not str or p["model"] not in MODELS
+                or p["service_tier"] != "standard_only"
                 or type(p["max_tokens"]) is not int or not 1 <= p["max_tokens"] <= 128000
                 or type(p["system"]) is not str
                 or p["output_config"] not in [{"effort": effort} for effort in _EFFORTS]
