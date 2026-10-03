@@ -496,11 +496,34 @@ class Crash(BaseException):
     """Stops a run where a killed process would, skipping its cleanup handlers."""
 
 
-def copy_database(connection: sqlite3.Connection, path: str | Path) -> Path:
-    """Copy a live database's committed state, as a killed process leaves it."""
+def copy_database(connection: sqlite3.Connection, path: str | Path, *,
+                  timeout: float = 10.0) -> Path:
+    """Copy a live database's last committed state, as a killed process leaves it.
+
+    A separate read-only connection to the same file takes the copy, so it
+    works inside or outside ``connection``'s open transaction and leaves that
+    transaction running; its uncommitted writes are not copied. SQLite cannot
+    back up a connection that is mid-write: the backup would wait forever.
+    An in-memory database has no file to reopen, so it is copied directly and
+    only outside a transaction. Raises ``sqlite3.OperationalError`` when
+    another writer keeps the file locked for ``timeout`` seconds.
+    """
     path = Path(path)
-    with closing(sqlite3.connect(path)) as target:
-        connection.backup(target)
+    source = connection.execute("PRAGMA database_list").fetchone()[2]
+    if not source:
+        if connection.in_transaction:
+            raise ValueError("An in-memory database cannot be copied inside a transaction")
+        with closing(sqlite3.connect(path)) as target:
+            connection.backup(target)
+        return path
+    reader = sqlite3.connect(Path(source).as_uri() + "?mode=ro", uri=True, timeout=timeout,
+                             isolation_level=None)
+    with closing(reader), closing(sqlite3.connect(path)) as target:
+        # Pin one committed snapshot first. A backup step that finds the file
+        # busy retries without limit; this read gives up after ``timeout``.
+        reader.execute("BEGIN")
+        reader.execute("SELECT count(*) FROM sqlite_master").fetchone()
+        reader.backup(target)
     return path
 
 
@@ -524,8 +547,10 @@ def crash_when(monkeypatch, target: Any, name: str, due: Callable[..., bool] | N
 
     The patched method never runs the original at or after that call, because
     a killed process makes no further writes. With ``image``, the first crash
-    first copies ``connection``'s database there; reopen that copy with a clock
-    past the lost owner's lease to resume as a new process would.
+    first copies the last committed state of ``connection``'s database there,
+    so a crash inside a transaction leaves the state before it. Reopen that
+    copy with a clock past the lost owner's lease to resume as a new process
+    would.
     """
     if image is not None and connection is None:
         raise ValueError("A crash image needs the database connection to copy")

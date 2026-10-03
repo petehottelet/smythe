@@ -2,23 +2,27 @@
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 import hashlib
 import http.client
 import json
 import os
+import sqlite3
+import threading
 
 import pytest
 
 from fakes import (
     DUPLICATE, INVALID_COUNT, LOST_RESPONSE, MALFORMED_USAGE, RATE_LIMITED, ROOT, SERVER_ERROR,
-    TRANSPORT_ERROR, Crash, Gate, ManualClock, MessagesTransport, NativeTransport, crash_when,
-    kill_and_reap, launch_child, offline_env, wait_for_barrier,
+    TRANSPORT_ERROR, Crash, Gate, ManualClock, MessagesTransport, NativeTransport, copy_database,
+    crash_when, kill_and_reap, launch_child, offline_env, wait_for_barrier,
 )
 from fixture_service import (
     AcknowledgementLost, Fault, FixtureService, LookupUnavailable, NotFound, ServiceUnavailable,
     serve_http,
 )
 from smythe import Swarm, Task
+import smythe.workflow_store as workflow_store
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, Topology
 from smythe.pricing_anthropic import MODEL as MESSAGES_MODEL
 from smythe.provider import ProviderAccountingError, ProviderResponseError
@@ -401,6 +405,98 @@ def test_crash_point_copies_the_journal_and_stops_later_writes(tmp_path, respons
         assert record["result_state"] != "accepted"
         assert reopened.acquire_lease(run["run_id"], "successor", 60).epoch == lease.epoch + 1
     assert len(responses.requests) == 1
+
+
+def finishes(function, connection, timeout=20.0):
+    """Whether ``function`` returns or raises within ``timeout`` in another thread.
+
+    A copy still waiting on ``connection``'s write transaction is freed by
+    rolling that transaction back, so a failing check cannot hang the test.
+    """
+    thread = threading.Thread(target=function, daemon=True)
+    thread.start()
+    thread.join(timeout)
+    if not thread.is_alive():
+        return True
+    connection.rollback()
+    thread.join(timeout)
+    return False
+
+
+@pytest.mark.parametrize("journal_mode", ["wal", "delete"])
+def test_crash_image_inside_an_open_write_transaction_holds_only_committed_rows(
+    tmp_path, journal_mode,
+):
+    image = tmp_path / "image.db"
+    with closing(sqlite3.connect(tmp_path / "live.db", isolation_level=None,
+                                 check_same_thread=False)) as writer:
+        writer.execute(f"PRAGMA journal_mode={journal_mode}")
+        writer.execute("CREATE TABLE rows (id INTEGER PRIMARY KEY)")
+        writer.execute("INSERT INTO rows VALUES (1)")
+        writer.execute("BEGIN IMMEDIATE")
+        writer.execute("INSERT INTO rows VALUES (2)")
+        copied = []
+        assert finishes(lambda: copied.append(copy_database(writer, image)), writer)
+        assert copied == [image]
+        # The copy neither waited for nor ended the caller's transaction.
+        assert writer.in_transaction
+        writer.execute("COMMIT")
+        assert writer.execute("SELECT id FROM rows").fetchall() == [(1,), (2,)]
+    with closing(sqlite3.connect(image)) as copy:
+        assert copy.execute("SELECT id FROM rows").fetchall() == [(1,)]
+
+
+def test_crash_image_of_an_in_memory_database_is_refused_inside_a_transaction(tmp_path):
+    with closing(sqlite3.connect(":memory:", isolation_level=None,
+                                 check_same_thread=False)) as memory:
+        memory.execute("CREATE TABLE rows (id INTEGER PRIMARY KEY)")
+        memory.execute("INSERT INTO rows VALUES (1)")
+        with closing(sqlite3.connect(copy_database(memory, tmp_path / "copy.db"))) as copy:
+            assert copy.execute("SELECT id FROM rows").fetchall() == [(1,)]
+        # No other connection can read its committed state mid-transaction.
+        memory.execute("BEGIN IMMEDIATE")
+        memory.execute("INSERT INTO rows VALUES (2)")
+        raised = []
+
+        def copy_mid_transaction():
+            try:
+                copy_database(memory, tmp_path / "partial.db")
+            except ValueError as error:
+                raised.append(error)
+
+        assert finishes(copy_mid_transaction, memory)
+        assert len(raised) == 1 and memory.in_transaction
+
+
+def test_crash_image_inside_a_journal_transaction_is_the_state_before_it(
+    tmp_path, responses, monkeypatch,
+):
+    responses.schedule("execution", 0, RATE_LIMITED)
+    clock = ManualClock()
+    image = tmp_path / "crashed.db"
+    with SQLiteWorkflowStore(tmp_path / "live.db", clock_ns=clock) as store:
+        run = store.create_run({"goal": "test"}, {}, 10**9)
+        lease = store.acquire_lease(run["run_id"], "owner", 60)
+        # Settlement prices the rejection inside its write transaction.
+        point = crash_when(monkeypatch, workflow_store, "_http_rejection_receipt",
+                           image=image, connection=store._db)
+        raised = []
+
+        def settle():
+            try:
+                asyncio.run(invoke((store, lease)))
+            except ProviderAccountingError as error:
+                raised.append(error)
+
+        assert finishes(settle, store._db)
+        assert len(raised) == 1 and isinstance(raised[0].__cause__, Crash)
+        assert point.fired and not store._db.in_transaction
+    clock.expire_lease(60)
+    with SQLiteWorkflowStore(image, clock_ns=clock) as reopened:
+        record = reopened.lookup_call(run["run_id"], KEY)
+        # The response was saved; its interrupted settlement left no trace.
+        assert record["state"] == "response_saved" and record["billing_state"] != "known"
+        assert reopened.acquire_lease(run["run_id"], "successor", 60).epoch == lease.epoch + 1
 
 
 # SDK transport fakes
