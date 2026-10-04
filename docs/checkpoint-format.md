@@ -167,7 +167,9 @@ which writes version 5, a consumed receipt also records the final verdict:
 with `max_regenerations=0` records its verdict under `advisory_verdict` in the
 judge's metadata, with version `1`, `judge_generation`, `target_id`,
 `target_generation`, `outcome`, `passed` and `reason`; such a judge also
-records `verification_target_generation`.
+records `verification_target_generation`. Each attempt of the judge drops the
+previous `advisory_verdict` when it starts, so a resumed run keeps the record
+only for a judge that completed before the crash.
 
 The intent is saved before cancellation. After affected workers settle, a
 second forced save records the reset: results and stale artifact references

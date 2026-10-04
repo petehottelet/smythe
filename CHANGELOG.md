@@ -184,19 +184,21 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   and steps after a gate need a final validator, and artifact deliverables
   are not accepted. Under a strict policy an exhausted gate's last verdict is
   read and recorded (`rejected` by default), a gate with
-  `max_regenerations=0` records its verdict under `advisory_verdict`, and an
-  unreadable or non-bool verdict, a raising verifier, or a skipped or failed
-  judge leaves acceptance `indeterminate` by default without spending a
-  regeneration or stopping the run. A result that is not accepted returns
-  `output=""` with the text in `rejected_output`. Every checkpoint of a strict
-  run is version 5 with its record, an unfinished one resumes only under the
-  same policy, and resuming a completed one rechecks the output digest, task,
-  source generations and policy, giving `indeterminate` on any mismatch. The
-  trace gains an `acceptance:delivery` span. `Verdict.invalid` marks a
-  verdict that could not be read, `smythe.acceptance.evaluate_delivery()`
-  makes the decision outside a run, `smythe.synthesizer.deliverable_sources()`
-  names the nodes `DELIVERABLE` synthesis returns, and executors take a
-  keyword-only `acceptance`. See
+  `max_regenerations=0` records each judge attempt's verdict under
+  `advisory_verdict`, and an unreadable or non-bool verdict, a raising
+  verifier, or a skipped or failed judge leaves acceptance `indeterminate` by
+  default without spending a regeneration or stopping the run. Only verdicts
+  read in the run decide it: a fresh strict run refuses a graph whose judge
+  completed before it with a recorded verdict. A result that is not accepted
+  returns `output=""` with the text in `rejected_output`. Every checkpoint of
+  a strict run is version 5 with its record, an unfinished one resumes only
+  under the same policy, and resuming a completed one rechecks the output
+  digest, task, source generations and policy, giving `indeterminate` on any
+  mismatch. The trace gains an `acceptance:delivery` span. `Verdict.invalid`
+  marks a verdict that could not be read,
+  `smythe.acceptance.evaluate_delivery()` makes the decision outside a run,
+  `smythe.synthesizer.deliverable_sources()` names the nodes `DELIVERABLE`
+  synthesis returns, and executors take a keyword-only `acceptance`. See
   [strict delivery acceptance](docs/verifier.md#strict-delivery-acceptance).
 
 ### Changed

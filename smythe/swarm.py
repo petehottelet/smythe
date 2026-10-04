@@ -64,6 +64,7 @@ from smythe.synthesizer import SynthesisStrategy, Synthesizer, deliverable_sourc
 from smythe.task import Task, snapshot_task, task_snapshots_equal, task_to_dict
 from smythe.tracer import Tracer
 from smythe.verifier import (
+    ADVISORY_VERDICT_KEY,
     Verifier,
     node_generation,
     validate_verification_checkpoint,
@@ -247,6 +248,8 @@ class Swarm:
     strict policy decides delivery acceptance after synthesis, on exactly the
     delivered output, and records the decision with the completed
     checkpoint; output it does not accept is returned as ``rejected_output``.
+    It decides only on verdicts read in the run, so a fresh strict run refuses
+    a graph whose judge completed before it with a recorded verdict.
     None, the default, and an advisory policy keep legacy behavior.
     """
 
@@ -521,6 +524,33 @@ class Swarm:
                 f"Checkpoint {execution_id!r} holds a task that its strict delivery acceptance "
                 "record does not bind"
             )
+
+    def _check_inherited_verdicts(self, graph: ExecutionGraph) -> None:
+        """Refuse a strict run on a gate whose judge completed with a verdict before it.
+
+        A strict decision rests only on verdicts read in the run it decides.
+        A pending judge replaces any record it carries when it runs, but a
+        completed judge does not run again, so its saved final verdict (a
+        consumed receipt, or ``advisory_verdict`` without regenerations)
+        would decide a run that never read it. A resumed run keeps its own
+        records and is not checked here.
+        """
+        if self._strict_policy() is None:
+            return
+        for node in graph.nodes:
+            if not node.verifies or node.status is not NodeStatus.COMPLETED:
+                continue
+            if node.max_regenerations > 0:
+                receipt = node.metadata.get("verification_receipt")
+                recorded = isinstance(receipt, dict) and receipt.get("state") == "consumed"
+            else:
+                recorded = ADVISORY_VERDICT_KEY in node.metadata
+            if recorded:
+                raise ValueError(
+                    f"Judge {node.id!r} completed before this run with a recorded verdict, "
+                    "which a strict acceptance policy does not decide on. Resume the run's "
+                    "checkpoint, or set the judge back to pending so this run reads its verdict."
+                )
 
     def plan(self, task: Task) -> ExecutionGraph:
         """Generate and assign an execution graph without running it.
@@ -1180,6 +1210,7 @@ class Swarm:
         if graph.run_ref is not None:
             raise ValueError("This graph requires its matching durable run_store")
         graph.validate()
+        self._check_inherited_verdicts(graph)
         self._stamp_model(graph)
         if graph.task is not None:
             graph.task = snapshot_task(graph.task)

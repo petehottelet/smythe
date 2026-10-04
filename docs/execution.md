@@ -206,7 +206,9 @@ is undecided still returns normally, with `output=""`, the text in
 any other run. A gate verifier that raises does not stop a strict run: the
 gate ends undecided and so does acceptance. Without a strict policy such a
 verifier stops the run as a terminal failure, and results carry no decision.
-An unfinished strict run resumes only under the policy it began with.
+An unfinished strict run resumes only under the policy it began with, and a
+fresh strict run refuses a graph whose judge already completed with a recorded
+verdict, since only verdicts read in the run decide it.
 
 ## Provider connections
 

@@ -565,6 +565,110 @@ def test_an_advisory_verdict_follows_regeneration_of_its_target():
     assert recorded["target_generation"] == 1 and recorded["judge_generation"] == 1
 
 
+_PASSED_ADVISORY_VERDICT = {"version": 1, "judge_generation": 0, "target_id": "draft",
+                            "target_generation": 0, "outcome": "passed", "passed": True}
+
+
+@pytest.mark.parametrize("sync", [True, False])
+def test_a_rerun_advisory_judge_records_its_new_verdict(sync):
+    graph = _gated(max_regenerations=0)
+    first = _swarm(Script({"judge": ["PASS"]}), acceptance=_strict(), parallel=not sync).execute(graph)
+    assert first.accepted
+    for node in graph.nodes:
+        node.status, node.result = NodeStatus.PENDING, None
+
+    provider = Script({"draft": ["## Summary\nDEFECTIVE"], "judge": ["FAIL: defective"]})
+    result = _swarm(provider, acceptance=_strict(), parallel=not sync).execute(graph)
+
+    _not_accepted(result, "rejected")
+    assert result.rejected_output == "## Summary\nDEFECTIVE"
+    assert provider.runs == {"draft": 1, "judge": 1}
+    recorded = result.graph.nodes[1].metadata["advisory_verdict"]
+    assert recorded["outcome"] == "rejected" and recorded["reason"] == "FAIL: defective"
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_an_advisory_verdict_in_a_yaml_file_does_not_decide_the_run(tmp_path, parallel):
+    path = tmp_path / "seeded.yaml"
+    path.write_text(
+        "topology: serial\nnodes:\n  - id: draft\n    label: draft\n"
+        "  - id: judge\n    label: judge\n    depends_on: [draft]\n    verifies: draft\n"
+        f"    metadata:\n      advisory_verdict: {json.dumps(_PASSED_ADVISORY_VERDICT)}\n",
+        encoding="utf-8",
+    )
+    provider = Script({"judge": ["FAIL: defective"]})
+    swarm = Swarm.from_yaml(str(path), model="test-model", provider=provider, parallel=parallel,
+                            acceptance=_strict())
+    assert swarm._yaml_graph.nodes[1].metadata["advisory_verdict"] == _PASSED_ADVISORY_VERDICT
+
+    result = swarm.execute()
+
+    _not_accepted(result, "rejected")
+    recorded = result.graph.nodes[1].metadata["advisory_verdict"]
+    assert recorded["outcome"] == "rejected" and recorded["reason"] == "FAIL: defective"
+
+
+@pytest.mark.parametrize("executor", [Executor, AsyncExecutor])
+def test_an_executor_replaces_an_advisory_verdict_when_its_judge_runs(executor):
+    graph = _gated(max_regenerations=0)
+    for node in graph.nodes:
+        node.metadata["model"] = "test-model"
+    graph.nodes[1].metadata["advisory_verdict"] = dict(_PASSED_ADVISORY_VERDICT)
+    provider = Script({"judge": ["FAIL: defective"]})
+
+    run = executor(provider, Registry(), Tracer(), artifact_dir=None, acceptance=_strict()).run(graph)
+    if inspect.isawaitable(run):
+        asyncio.run(run)
+
+    recorded = graph.nodes[1].metadata["advisory_verdict"]
+    assert recorded["outcome"] == "rejected" and recorded["reason"] == "FAIL: defective"
+
+
+def _completed_gate(max_regenerations: int) -> ExecutionGraph:
+    """A gate whose judge completed before the run, with a passing verdict recorded."""
+    graph = _gated(max_regenerations=max_regenerations)
+    draft, judge = graph.nodes
+    draft.status, draft.result = NodeStatus.COMPLETED, "## Summary\nDEFECTIVE"
+    judge.status, judge.result = NodeStatus.COMPLETED, "FAIL: defective"
+    judge.metadata["verification_target_generation"] = 0
+    if max_regenerations:
+        judge.metadata["verification_receipt"] = {
+            "version": 1, "state": "consumed", "judge_generation": 0, "target_id": "draft",
+            "target_generation": 0, "passed": True, "outcome": "passed", "reason": "",
+        }
+    else:
+        judge.metadata["advisory_verdict"] = dict(_PASSED_ADVISORY_VERDICT)
+    return graph
+
+
+@pytest.mark.parametrize("max_regenerations", [0, 1])
+@pytest.mark.parametrize("parallel", [False, True])
+def test_a_fresh_strict_run_refuses_a_judge_that_completed_with_a_verdict(max_regenerations, parallel):
+    provider = Script({})
+    swarm = _swarm(provider, acceptance=_strict(), parallel=parallel)
+    with pytest.raises(ValueError, match="'judge' completed before this run"):
+        swarm.execute(_completed_gate(max_regenerations))
+    assert provider.runs == {}
+
+    # A finished strict run's graph is refused too; resuming its checkpoint is not.
+    store = MemoryStore()
+    first = _swarm(Script({"judge": ["PASS"]}), acceptance=_strict(), store=store,
+                   parallel=parallel).execute(_gated(max_regenerations=max_regenerations))
+    assert first.accepted
+    with pytest.raises(ValueError, match="'judge' completed before this run"):
+        _swarm(provider, acceptance=_strict(), parallel=parallel).execute(first.graph)
+    assert _swarm(provider, acceptance=_strict(), store=store).resume(first.execution_id).accepted
+    assert provider.runs == {}
+
+
+@pytest.mark.parametrize("acceptance", [None, AcceptancePolicy()], ids=["none", "advisory"])
+def test_a_completed_gate_still_runs_without_a_strict_policy(acceptance):
+    provider = Script({})
+    result = _swarm(provider, acceptance=acceptance).execute(_completed_gate(1))
+    assert result.output == "## Summary\nDEFECTIVE" and result.acceptance is None
+    assert provider.runs == {}
+
+
 def test_artifact_deliverables_are_unsupported(tmp_path):
     provider = Script({"judge": ["PASS"]},
                       artifacts={"draft": [Artifact(data=b"\x89PNG", mime_type="image/png")]})

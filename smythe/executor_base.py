@@ -385,13 +385,20 @@ class ExecutorBase:
             raise VerificationRecoveryError("Could not persist verification control") from exc
 
     def begin_verification(self, node: Node, graph: ExecutionGraph) -> None:
-        """Bind the judge's request to the version of its target it observes."""
+        """Bind the judge's request to the version of its target it observes.
+
+        Under a strict policy a new attempt also drops the judge's recorded
+        ``advisory_verdict``, so the verdict recorded is always the one this
+        attempt produces, never one the judge carried into the run.
+        """
         node_generation(node)
         if node.verifies and (node.max_regenerations > 0 or self._strict):
             target = self._cached_node_by_id(node.verifies, graph)
             node.metadata["verification_target_generation"] = (
                 node_generation(target) if target is not None else None
             )
+            if self._strict:
+                node.metadata.pop(ADVISORY_VERDICT_KEY, None)
 
     def complete_verification(self, node: Node) -> None:
         """Stamp pending before any COMPLETED checkpoint can become visible."""
@@ -514,7 +521,12 @@ class ExecutorBase:
         return None
 
     def _record_advisory_verdict(self, node: Node, graph: ExecutionGraph) -> None:
-        """Strict mode: read a gate without regenerations once and record its verdict."""
+        """Strict mode: read a gate without regenerations once and record its verdict.
+
+        A record already bound to the judge's generation is kept only because
+        the judge has not run again since it was made: each attempt drops the
+        record when it begins, so this is a resumed run's saved verdict.
+        """
         generation = node_generation(node)
         recorded = node.metadata.get(ADVISORY_VERDICT_KEY)
         if (isinstance(recorded, dict) and type(recorded.get("judge_generation")) is int

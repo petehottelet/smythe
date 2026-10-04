@@ -364,9 +364,17 @@ when its judge completes and its verdict recorded under `advisory_verdict`
 in the judge's metadata; a failing verdict counts as exhausted. A judge that
 was skipped or failed, or whose target was unavailable, leaves the gate
 undecided. Each recorded verdict names the judge's and its target's
-generations, and regeneration clears it. Without a strict policy none of this
-changes: an exhausted or advisory gate's verdict is never read and a
-verifier that raises stops the run.
+generations, and regeneration clears it.
+
+Only a verdict read in the run decides it. Each attempt of a judge replaces
+the verdict record it carries, so the record holds that attempt's verdict
+even when a graph is run again or a YAML file sets the metadata. A judge that completed
+before a fresh run does not run again, so a strict `Swarm` refuses with
+`ValueError`, before any provider call, a graph in which such a judge holds a
+consumed receipt or an `advisory_verdict`; resume the run's checkpoint, or
+set the judge back to pending. Without a strict policy none of this changes:
+an exhausted or advisory gate's verdict is never read and a verifier that
+raises stops the run.
 
 **Results and recovery.** A strict result always carries its record: an
 accepted result has the exact text in `output`; any other decision returns
