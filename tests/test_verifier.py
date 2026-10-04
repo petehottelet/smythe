@@ -468,6 +468,8 @@ class _Report:
     pytest.param(_Report(True), Verdict(passed=True), id="pass"),
     pytest.param(_Report(False, outcome="error"),
                  Verdict(passed=False, reason="validator error"), id="error"),
+    pytest.param(_Report(False, outcome="error", validator=_Report(True, name="")),
+                 Verdict(passed=False, reason="validator error"), id="error-unnamed-validator"),
     pytest.param(_Report(False, outcome="error", reason="input file is missing"),
                  Verdict(passed=False, reason="input file is missing"), id="error-reason"),
 ])

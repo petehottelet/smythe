@@ -570,8 +570,10 @@ def _report_reason(result: object, passed: bool) -> str:
         return ""
     outcome = getattr(result, "outcome", None)
     if isinstance(outcome, str) and outcome == "error":
-        validator = getattr(getattr(result, "validator", None), "name", None)
-        reason = f"validator error ({validator})" if isinstance(validator, str) else "validator error"
+        reason = "validator error"
+        name = getattr(getattr(result, "validator", None), "name", None)
+        if isinstance(name, str) and name:
+            reason += f" ({name})"
         detail = _findings_text(getattr(result, "findings", None))
         return _clip(f"{reason}: {detail}" if detail else reason)
     return _clip(_findings_text(getattr(result, "hard_findings", None)))
