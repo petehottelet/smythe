@@ -718,6 +718,7 @@ def test_resume_refuses_a_completed_strict_checkpoint_without_its_record(tmp_pat
 @pytest.mark.parametrize("change", [
     lambda block: block.update(version=2),
     lambda block: block.update(decision="approved"),
+    lambda block: block.update(scope=["output"]),
 ])
 def test_resume_refuses_an_unreadable_acceptance_record(tmp_path, change):
     store = FileCheckpointStore(tmp_path)

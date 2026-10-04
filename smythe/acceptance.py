@@ -357,7 +357,8 @@ class DeliveryAcceptance:
             raise ValueError("strategy must be a non-empty string or None")
         if type(self.used_fallback) is not bool:
             raise ValueError("used_fallback must be a bool")
-        if self.scope not in _SCOPES:
+        # Check the type first: an unhashable scope cannot be looked up in a set.
+        if not isinstance(self.scope, str) or self.scope not in _SCOPES:
             raise ValueError(f"Unknown delivery acceptance scope: {self.scope!r}")
         sources = self._items("sources", AcceptanceSource)
         validators = self._items("validators", ValidatorResult)

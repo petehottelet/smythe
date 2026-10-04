@@ -326,6 +326,9 @@ def test_record_reader_rejects_unknown_decisions(decision):
     lambda data: data.pop("policy_sha256"),
     lambda data: data.update(used_fallback="no"),
     lambda data: data.update(scope="everything"),
+    lambda data: data.update(scope=[]),
+    lambda data: data.update(scope=["output"]),
+    lambda data: data.update(scope={"output": True}),
     lambda data: data.update(reasons="none"),
     lambda data: data.update(sources=[{"node_id": "draft"}]),
     lambda data: data.update(sources=[{"node_id": "draft", "execution_generation": -1}]),
@@ -372,6 +375,12 @@ def test_decided_records_bind_output_strategy_and_reasons():
 def test_constructing_an_unknown_record_version_fails():
     with pytest.raises(ValueError, match="version"):
         _record(version=2)
+
+
+@pytest.mark.parametrize("scope", [[], ["output"], {"output": True}, None])
+def test_record_rejects_a_scope_that_is_not_a_known_name(scope):
+    with pytest.raises(ValueError, match="scope"):
+        _record(scope=scope)
 
 
 def test_task_hash_follows_the_task_snapshot():
