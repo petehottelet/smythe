@@ -28,6 +28,7 @@ from smythe import (
 )
 from smythe.acceptance import (
     DELIVERY_ACCEPTANCE_VERSION,
+    AcceptanceArtifact,
     AcceptanceSource,
     ValidatorResult,
     check_validator,
@@ -458,6 +459,42 @@ def test_decided_records_bind_output_strategy_and_reasons():
     identity = RequiredHeading().identity
     with pytest.raises(ValueError, match="duplicate"):
         _record(validators=(ValidatorResult(identity, "passed"),) * 2)
+
+
+PNG_SHA256 = hashlib.sha256(b"\x89PNG").hexdigest()
+
+
+def test_record_binds_delivered_files_only_when_there_are_some():
+    artifact = AcceptanceArtifact("draft", "draft_00.png", PNG_SHA256, 4, "image/png")
+    record = _record(artifacts=(artifact,))
+    data = json.loads(json.dumps(record.to_dict()))
+
+    assert data["artifacts"] == [{"node_id": "draft", "name": "draft_00.png",
+                                  "sha256": PNG_SHA256, "size_bytes": 4, "mime_type": "image/png"}]
+    assert DeliveryAcceptance.from_dict(data) == record
+    assert "artifacts" not in _record().to_dict()
+    with pytest.raises(ValueError, match="sources"):
+        _record(artifacts=(AcceptanceArtifact("other", "a.png", PNG_SHA256, 4, "image/png"),))
+
+
+@pytest.mark.parametrize("change", [
+    lambda item: item.update(sha256="not-a-digest"),
+    lambda item: item.update(size_bytes=-1),
+    lambda item: item.update(size_bytes=True),
+    lambda item: item.update(name=""),
+    lambda item: item.update(mime_type=None),
+    lambda item: item.update(path="/absolute/draft_00.png"),
+    lambda item: item.pop("node_id"),
+])
+def test_record_reader_rejects_malformed_artifacts(change):
+    artifact = AcceptanceArtifact("draft", "draft_00.png", PNG_SHA256, 4, "image/png")
+    data = _record(artifacts=(artifact,)).to_dict()
+    change(data["artifacts"][0])
+    with pytest.raises(ValueError):
+        DeliveryAcceptance.from_dict(data)
+    data["artifacts"] = {}
+    with pytest.raises(ValueError, match="artifacts"):
+        DeliveryAcceptance.from_dict(data)
 
 
 def test_constructing_an_unknown_record_version_fails():

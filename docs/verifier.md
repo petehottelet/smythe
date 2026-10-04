@@ -350,7 +350,7 @@ in the graph is read from its recorded final verdict. The decision is:
    terminal: nothing is regenerated.
 2. Otherwise `on_exhausted` when a gate's final verdict fails.
 3. Otherwise `on_invalid` when a final validator or a gate could not decide,
-   or a delivered node wrote files.
+   or a delivered node wrote files that no check covers (see below).
 4. Otherwise `accepted` when every final validator passed, or, without final
    validators and with `allow_gate_acceptance`, when the output is byte for
    byte the result of the one node `DELIVERABLE` synthesis returned and a
@@ -410,13 +410,16 @@ started.
 
 A final validator that raises, returns an awaitable or anything other than a
 `ValidationReport`, reports `outcome="error"`, or returns a report naming
-another validator has outcome `error`. Artifact deliverables are not supported
-yet: artifact records hold no hash of their files, so output from a delivered
-node that wrote files is never accepted. The order above still applies: a
-final validator's rejection makes the decision `rejected`, and an exhausted
-gate's failing verdict makes it `on_exhausted`, because a valid negative
-decision stands whatever the files hold. Otherwise the decision is
-`on_invalid`, even when every check passed.
+another validator has outcome `error`.
+
+**Files a delivered node wrote.** Final validators check only the output text.
+A delivered node's files are covered when a passed gate that the policy
+counts judged that node at its current generation. Each file's
+record must carry the `sha256` and `size_bytes` written with it, and the file
+must still hold exactly those bytes when the run decides. A file that is not
+hashed, is missing or has changed, or files that no passed gate on their node
+covers, give `on_invalid` unless an earlier rule applies. The record binds
+every verified file under `artifacts` by name, SHA-256, size and MIME type.
 
 **Gates under a strict policy.** A valid rejection before exhaustion
 regenerates as usual. The judge's last verdict is then read, without another
@@ -455,10 +458,10 @@ and carries the record, `not_evaluated` until the run finishes. An unfinished
 strict run resumes only under a policy with the same `sha256`, and is refused
 before any provider call otherwise; a strict `Swarm` refuses an unfinished
 checkpoint written without one. Resuming a completed strict run checks the
-saved output against the record's digest, and the task, source generations
-and, when the resuming `Swarm` has a strict policy, its `sha256` against the
-record; any mismatch returns an `indeterminate` record for the saved output,
-never acceptance.
+saved output against the record's digest, re-hashes every file the record
+binds, and checks the task, source generations and, when the resuming `Swarm`
+has a strict policy, its `sha256` against the record; any mismatch returns an
+`indeterminate` record for the saved output, never acceptance.
 
 A completed checkpoint without a record (versions 1 to 4, or version 5
 without `delivery_acceptance` in `requires`) was never decided. A `Swarm`

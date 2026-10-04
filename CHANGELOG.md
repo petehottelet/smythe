@@ -190,6 +190,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   and steps after a gate need a final validator, and artifact deliverables
   are not accepted. Under a strict policy an exhausted gate's last verdict is
   read and recorded (`rejected` by default), a gate with
+  the node it judged; other synthesis strategies, the deliverable fallback
+  and steps after a gate need a final validator, and a delivered node's files
+  need a passed gate on that node. Under a strict policy an exhausted gate's
+  last verdict is read and recorded (`rejected` by default), a gate with
   `max_regenerations=0` records each judge attempt's verdict under
   `advisory_verdict`, and an unreadable or non-bool verdict, a raising
   verifier, or a skipped or failed judge leaves acceptance `indeterminate` by
@@ -305,6 +309,17 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   and then it is not kept. Runs without a strict policy still clear rejected
   generations, and a new durable workflow refuses a graph that carries these
   records. See [rejected generations](docs/verifier.md#rejected-generations).
+- Strict delivery acceptance covers files that delivered nodes wrote. Their
+  bytes are re-hashed against the `sha256` and `size_bytes` recorded with
+  them when the run decides, and they count as checked when a passed gate
+  judged their node at its current generation and the policy allows gate
+  acceptance; final validators still check only the text. The record lists
+  each verified file under `artifacts` (`AcceptanceArtifact`: node, file
+  name, SHA-256, size and MIME type), a key a text-only record leaves out. A
+  file that is not hashed, missing or changed, or that no passed gate covers,
+  gives `on_invalid`, and resuming a completed run re-hashes every bound file.
+  `smythe.acceptance.delivered_artifacts(node)` performs the file check. See
+  [files a delivered node wrote](docs/verifier.md#strict-delivery-acceptance).
 
 ### Changed
 

@@ -267,7 +267,11 @@ listing it, is refused, and so is a `completed` state whose record is
   `null` without a task. `policy_sha256` identifies the acceptance policy.
 - `validators` lists each final validator's identity and outcome (`passed`,
   `rejected` or `error`). An `accepted` record holds only `passed` outcomes.
-- `scope` is `output`: the decision covers the synthesized text.
+- `scope` is `output`: the decision covers the delivered output, meaning the
+  synthesized text and any files its source nodes wrote.
+- `artifacts`, present only when source nodes delivered files, lists each
+  file whose bytes were verified: `node_id`, file `name`, `sha256`,
+  `size_bytes` and `mime_type`.
 
 Versions 1 through 4 have no record, whatever keys they hold. Resuming one
 returns `acceptance` as `None`: a legacy run is never reported as accepted or
@@ -279,7 +283,8 @@ checkpoint without a record, including a version 5 one that does not list
 
 Resuming a completed version 5 checkpoint checks that `output` still matches
 `output_sha256`, that the task and every source node's generation are the ones
-the record binds, and, when the resuming `Swarm` has a strict policy, that its
+the record binds, that every file in `artifacts` still holds its recorded
+bytes, and, when the resuming `Swarm` has a strict policy, that its
 `sha256` is `policy_sha256`. The result's `acceptance` is the record, or, after
 any mismatch, an `indeterminate` record for the saved output that names the
 mismatch: changed output is never accepted. An `accepted` record delivers the

@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import inspect
 import json
+from pathlib import Path
 
 import pytest
 
@@ -23,6 +25,8 @@ from smythe import (
     Verdict,
 )
 from smythe.acceptance import (
+    AcceptanceArtifact,
+    DeliveryAcceptance,
     evaluate_delivery,
     task_sha256,
     text_sha256,
@@ -1145,15 +1149,82 @@ def test_a_completed_gate_still_runs_without_a_strict_policy(acceptance):
     assert provider.runs == {}
 
 
-def test_artifact_deliverables_are_unsupported(tmp_path):
-    provider = Script({"judge": ["PASS"]},
+def _drawing_swarm(tmp_path, policy, *, judge="PASS", store=None) -> Swarm:
+    provider = Script({"judge": [judge]},
                       artifacts={"draft": [Artifact(data=b"\x89PNG", mime_type="image/png")]})
-    swarm = Swarm(provider=provider, model="test-model", artifact_dir=tmp_path,
-                  checkpoint_store=MemoryStore(), acceptance=_strict(Forbids()))
-    result = swarm.execute(_gated())
+    return Swarm(provider=provider, model="test-model", artifact_dir=tmp_path,
+                 checkpoint_store=store if store is not None else MemoryStore(), acceptance=policy)
+
+
+@pytest.mark.parametrize("policy", [_strict(Forbids()), _strict()], ids=["validator", "gate"])
+def test_a_gated_artifact_deliverable_is_accepted_with_its_file_digests(tmp_path, policy):
+    result = _drawing_swarm(tmp_path, policy).execute(_gated())
+
+    assert result.accepted, result.acceptance.reasons
+    assert result.acceptance.artifacts == (AcceptanceArtifact(
+        "draft", "draft_00.png", hashlib.sha256(b"\x89PNG").hexdigest(), 4, "image/png",
+    ),)
+    data = result.acceptance.to_dict()
+    assert data["artifacts"] == [{
+        "node_id": "draft", "name": "draft_00.png",
+        "sha256": hashlib.sha256(b"\x89PNG").hexdigest(), "size_bytes": 4, "mime_type": "image/png",
+    }]
+    assert DeliveryAcceptance.from_dict(data) == result.acceptance
+
+
+def test_delivered_files_need_a_passed_gate_on_their_node(tmp_path):
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[Node(id="draft", label="draft")])
+    result = _drawing_swarm(tmp_path, _strict(Forbids())).execute(graph)
 
     _not_accepted(result, "indeterminate")
-    assert any("not hashed" in reason for reason in result.acceptance.reasons)
+    assert any("no passed gate judged node 'draft'" in reason for reason in result.acceptance.reasons)
+    assert [artifact.name for artifact in result.acceptance.artifacts] == ["draft_00.png"]
+
+
+def test_delivered_files_need_gate_acceptance_in_the_policy(tmp_path):
+    policy = _strict(Forbids(), allow_gate_acceptance=False)
+    result = _drawing_swarm(tmp_path / "files", policy).execute(_gated())
+
+    _not_accepted(result, "indeterminate")
+    assert any("does not allow gate acceptance" in reason for reason in result.acceptance.reasons)
+
+
+@pytest.mark.parametrize("change", ["unhashed", "changed", "missing"])
+def test_delivered_files_must_still_hold_their_recorded_bytes(tmp_path, change):
+    policy = _strict(Forbids())
+    result = _drawing_swarm(tmp_path, policy).execute(_gated())
+    assert result.accepted
+    draft = result.graph.nodes[0]
+    [record] = draft.metadata["artifacts"]
+    if change == "unhashed":
+        del record["sha256"]
+    elif change == "changed":
+        Path(record["path"]).write_bytes(b"\x89PNX")
+    else:
+        Path(record["path"]).unlink()
+
+    decision = evaluate_delivery(policy, result.graph, result.output, strategy="deliverable",
+                                 sources=[draft])
+
+    assert decision.decision == "indeterminate" and decision.artifacts == ()
+    expected = {"unhashed": "not hashed", "changed": "changed after it was written",
+                "missing": "is missing or cannot be read"}[change]
+    assert any(expected in reason for reason in decision.reasons), decision.reasons
+
+
+def test_completed_resume_rechecks_delivered_file_bytes(tmp_path):
+    store = MemoryStore()
+    first = _drawing_swarm(tmp_path, _strict(Forbids()), store=store).execute(_gated())
+    assert first.accepted
+    again = _drawing_swarm(tmp_path, _strict(Forbids()), store=store).resume(first.execution_id)
+    assert again.acceptance == first.acceptance and again.output == first.output
+
+    Path(first.graph.nodes[0].metadata["artifacts"][0]["path"]).write_bytes(b"\x89PNX")
+    result = _drawing_swarm(tmp_path, _strict(Forbids()), store=store).resume(first.execution_id)
+
+    _not_accepted(result, "indeterminate")
+    assert result.acceptance.artifacts == first.acceptance.artifacts
+    assert any("draft_00.png" in reason for reason in result.acceptance.reasons)
 
 
 @pytest.mark.parametrize(("script", "settings", "decision"), [

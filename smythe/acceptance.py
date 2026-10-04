@@ -3,8 +3,8 @@
 Delivery acceptance is separate from execution and cost. A run can complete,
 with its cost fully known, and still deliver output its policy did not accept.
 A :class:`DeliveryAcceptance` record binds one decision to the exact delivered
-bytes, the nodes and generations they came from, the task, the policy and the
-validators that decided it. Results and checkpoints use the key
+bytes and files, the nodes and generations they came from, the task, the policy
+and the validators that decided it. Results and checkpoints use the key
 ``delivery_acceptance`` for it.
 
 Validators are trusted local code registered in-process: an object with a
@@ -28,7 +28,8 @@ import inspect
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, Protocol
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Protocol
 
 from smythe.graph import REVISION_ADDED_KEY, ExecutionGraph, FailurePolicy, Node, _depends_on
 from smythe.task import Task, task_to_dict
@@ -46,7 +47,8 @@ DELIVERY_ACCEPTANCE_VERSION = 1
 SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS = (1,)
 ACCEPTANCE_POLICY_VERSION = 1
 
-# What a record's decision covers: the synthesized text output.
+# What a record's decision covers: the delivered output, meaning the
+# synthesized text and the files its source nodes wrote.
 _SCOPES = frozenset({"output"})
 
 # Node metadata a strict Swarm sets on each gate of a plan that an architect
@@ -319,6 +321,98 @@ class AcceptanceSource:
         return cls(data["node_id"], data["execution_generation"])
 
 
+_ARTIFACT_KEYS = frozenset({"node_id", "name", "sha256", "size_bytes", "mime_type"})
+
+
+@dataclass(frozen=True, slots=True)
+class AcceptanceArtifact:
+    """A file a delivered node wrote, bound by the SHA-256 and size of its bytes.
+
+    ``name`` is the file's name in the run's artifact directory; the node's
+    ``metadata["artifacts"]`` records hold its full path.
+    """
+
+    node_id: str
+    name: str
+    sha256: str
+    size_bytes: int
+    mime_type: str
+
+    def __post_init__(self) -> None:
+        for label in ("node_id", "name", "mime_type"):
+            value = getattr(self, label)
+            if not isinstance(value, str) or not value:
+                raise ValueError(f"artifact {label} must be a non-empty string")
+        _require_sha256(self.sha256, "artifact sha256")
+        if type(self.size_bytes) is not int or self.size_bytes < 0:
+            raise ValueError("artifact size_bytes must be a non-negative integer")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"node_id": self.node_id, "name": self.name, "sha256": self.sha256,
+                "size_bytes": self.size_bytes, "mime_type": self.mime_type}
+
+    @classmethod
+    def from_dict(cls, data: Any) -> AcceptanceArtifact:
+        _require_keys(data, "acceptance artifact", _ARTIFACT_KEYS)
+        return cls(data["node_id"], data["name"], data["sha256"], data["size_bytes"],
+                   data["mime_type"])
+
+
+def _file_sha256(path: Path, size: int) -> str | None:
+    """SHA-256 of *path* when it holds exactly *size* bytes, else None; reads at most size + 1."""
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        remaining = size
+        while remaining:
+            chunk = stream.read(min(1024 * 1024, remaining))
+            if not chunk:
+                return None
+            digest.update(chunk)
+            remaining -= len(chunk)
+        if stream.read(1):
+            return None
+    return digest.hexdigest()
+
+
+def delivered_artifacts(node: Node) -> tuple[tuple[AcceptanceArtifact, ...], tuple[str, ...]]:
+    """The files *node* delivered, bound by their bytes, and why any could not be.
+
+    Each record in ``node.metadata["artifacts"]`` must carry the ``sha256``
+    and ``size_bytes`` written with the file, and the file must still hold
+    exactly those bytes. Returns the bound files and a reason for each one
+    that is not.
+    """
+    bound: list[AcceptanceArtifact] = []
+    problems: list[str] = []
+    records = node.metadata.get("artifacts") or []
+    for record in records if isinstance(records, list) else [None]:
+        record = record if isinstance(record, dict) else {}
+        path, size = record.get("path"), record.get("size_bytes")
+        try:
+            artifact = AcceptanceArtifact(
+                node.id, Path(path).name if isinstance(path, str) else "", record.get("sha256"),
+                size, record.get("mime_type"),
+            )
+        except ValueError:
+            problems.append(
+                f"node {node.id!r} delivered a file whose bytes are not hashed: strict "
+                "acceptance needs its path, sha256, size_bytes and mime_type recorded"
+            )
+            continue
+        try:
+            observed = _file_sha256(Path(path), size)
+        except OSError:
+            problems.append(f"file {artifact.name!r} that node {node.id!r} delivered is missing "
+                            "or cannot be read")
+            continue
+        if observed != artifact.sha256:
+            problems.append(f"file {artifact.name!r} that node {node.id!r} delivered changed "
+                            "after it was written")
+            continue
+        bound.append(artifact)
+    return tuple(bound), tuple(problems)
+
+
 @dataclass(frozen=True, slots=True)
 class ValidatorResult:
     """One validator's identity and the outcome it reported."""
@@ -362,7 +456,9 @@ class DeliveryAcceptance:
     a terminal deliverable, ``task_sha256`` is :func:`task_sha256` of the
     run's task, ``policy_sha256`` is the deciding policy's
     :attr:`AcceptancePolicy.sha256`, and ``scope`` names what was evaluated
-    (``output``: the synthesized text).
+    (``output``: the delivered output). ``artifacts`` binds each file a
+    source node delivered by its SHA-256 and size; it is empty for text, and
+    :meth:`to_dict` then leaves the key out.
 
     :meth:`from_dict` rejects unknown record versions, unknown decisions and
     unknown keys rather than guessing what a newer record means.
@@ -379,6 +475,7 @@ class DeliveryAcceptance:
     reasons: tuple[str, ...] = ()
     scope: str = "output"
     version: int = DELIVERY_ACCEPTANCE_VERSION
+    artifacts: tuple[AcceptanceArtifact, ...] = ()
 
     def __post_init__(self) -> None:
         if type(self.version) is not int or self.version not in SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS:
@@ -406,6 +503,9 @@ class DeliveryAcceptance:
             raise ValueError("reasons must be non-empty strings")
         _unique([source.node_id for source in sources], "source node ids")
         _unique([result.validator.name for result in validators], "validator names")
+        source_ids = {source.node_id for source in sources}
+        if any(item.node_id not in source_ids for item in self._items("artifacts", AcceptanceArtifact)):
+            raise ValueError("artifacts must be files that the record's sources delivered")
         if decision is not AcceptanceDecision.NOT_EVALUATED:
             if self.output_sha256 is None:
                 raise ValueError(f"a {decision.value} record must bind output_sha256")
@@ -444,6 +544,7 @@ class DeliveryAcceptance:
             "policy_sha256": self.policy_sha256,
             "validators": [result.to_dict() for result in self.validators],
             "scope": self.scope,
+            **({"artifacts": [item.to_dict() for item in self.artifacts]} if self.artifacts else {}),
         }
 
     @classmethod
@@ -457,11 +558,11 @@ class DeliveryAcceptance:
                 f"Unsupported delivery acceptance record version {version!r}; this build "
                 f"reads {list(SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS)}"
             )
-        _require_keys(data, "delivery acceptance record", _RECORD_KEYS)
+        _require_keys(data, "delivery acceptance record", _RECORD_KEYS, frozenset({"artifacts"}))
         if not isinstance(data["decision"], str):
             raise ValueError(f"Unknown delivery acceptance decision: {data['decision']!r}")
-        for name in ("reasons", "sources", "validators"):
-            if not isinstance(data[name], list):
+        for name in ("reasons", "sources", "validators", "artifacts"):
+            if not isinstance(data.get(name, []), list):
                 raise ValueError(f"delivery acceptance {name} must be a list")
         return cls(
             decision=data["decision"],
@@ -475,6 +576,7 @@ class DeliveryAcceptance:
             reasons=tuple(data["reasons"]),
             scope=data["scope"],
             version=version,
+            artifacts=tuple(AcceptanceArtifact.from_dict(item) for item in data.get("artifacts", [])),
         )
 
 
@@ -627,12 +729,15 @@ def evaluate_delivery(
     The decision is ``rejected`` when a final validator rejects the output,
     then ``policy.on_exhausted`` when a gate's final verdict fails, then
     ``policy.on_invalid`` when a validator or gate could not decide or a
-    source delivered files whose bytes are not hashed. Otherwise the output
-    is ``accepted`` when it has final validators, all passed, or when the
+    source delivered files that are unchecked: not hashed, no longer holding
+    the bytes recorded with them, or not judged by a passed gate on that
+    source (final validators check only the text). Otherwise the output is
+    ``accepted`` when it has final validators, all passed, or when the
     policy allows gate acceptance and it is, byte for byte, the result of the
     single ``deliverable`` source a passed gate judged at its current
     generation, where the policy counts that gate (:meth:`AcceptancePolicy.counts_gate`).
     Any other output is covered by no check: ``policy.on_invalid``.
+    The record binds every delivered file whose bytes were verified.
     """
     if not isinstance(policy, AcceptancePolicy) or policy.mode is not AcceptanceMode.STRICT:
         raise ValueError("evaluate_delivery needs a strict AcceptancePolicy")
@@ -664,11 +769,24 @@ def evaluate_delivery(
             exhausted.append(reason)
         else:
             invalid.append(reason)
+    artifacts: list[AcceptanceArtifact] = []
     for node in sources:
-        if node.metadata.get("artifacts"):
+        if not node.metadata.get("artifacts"):
+            continue
+        bound, problems = delivered_artifacts(node)
+        artifacts.extend(bound)
+        invalid.extend(problems)
+        if problems:
+            continue
+        if not policy.allow_gate_acceptance:
             invalid.append(
-                f"node {node.id!r} delivered files whose bytes are not hashed; strict "
-                "acceptance supports text deliverables only"
+                f"node {node.id!r} delivered files, which only a passed gate on that node "
+                "accepts, and this policy does not allow gate acceptance"
+            )
+        elif node.id not in passed_targets:
+            invalid.append(
+                f"no passed gate judged node {node.id!r}, whose files are delivered; final "
+                "validators check only the output text"
             )
     if rejected:
         decision, reasons = AcceptanceDecision.REJECTED, rejected + exhausted + invalid
@@ -706,6 +824,7 @@ def evaluate_delivery(
         task_sha256=task_sha256(task),
         validators=tuple(results),
         reasons=tuple(_clip(reason) for reason in reasons),
+        artifacts=tuple(artifacts),
     )
 
 
@@ -714,6 +833,7 @@ __all__ = [
     "DELIVERY_ACCEPTANCE_VERSION",
     "GENERATED_GATE_KEY",
     "SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS",
+    "AcceptanceArtifact",
     "AcceptanceDecision",
     "AcceptanceMode",
     "AcceptancePolicy",
@@ -723,6 +843,7 @@ __all__ = [
     "Validator",
     "ValidatorResult",
     "check_validator",
+    "delivered_artifacts",
     "evaluate_delivery",
     "task_sha256",
     "text_sha256",

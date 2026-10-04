@@ -12,11 +12,13 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from smythe.acceptance import (
+    AcceptanceArtifact,
     GENERATED_GATE_KEY,
     AcceptanceDecision,
     AcceptanceMode,
     AcceptancePolicy,
     DeliveryAcceptance,
+    delivered_artifacts,
     evaluate_delivery,
     task_sha256,
     text_sha256,
@@ -481,8 +483,9 @@ class Swarm:
         """Check a completed run's decision against what its checkpoint holds now.
 
         The saved output must still match the record's digest, the task and
-        source generations it binds must be unchanged, and a strict policy on
-        this Swarm must be the one that decided. A mismatch gives an
+        source generations it binds must be unchanged, every file it binds
+        must still hold the recorded bytes, and a strict policy on this
+        Swarm must be the one that decided. A mismatch gives an
         ``indeterminate`` record for the saved output, never acceptance.
         """
         if not isinstance(output, str):
@@ -500,6 +503,16 @@ class Swarm:
                 problems.append(
                     f"node {source.node_id!r} no longer holds the generation its record bound"
                 )
+        files: dict[str, tuple[AcceptanceArtifact, ...]] = {}
+        for artifact in record.artifacts:
+            node = nodes.get(artifact.node_id)
+            if node is not None and node.id not in files:
+                files[node.id] = delivered_artifacts(node)[0]
+            if artifact not in files.get(artifact.node_id, ()):
+                problems.append(
+                    f"file {artifact.name!r} of node {artifact.node_id!r} no longer holds the "
+                    "bytes its record bound"
+                )
         policy = self._strict_policy()
         if policy is not None and policy.sha256 != record.policy_sha256:
             problems.append(
@@ -513,7 +526,7 @@ class Swarm:
             policy_sha256=record.policy_sha256 if policy is None else policy.sha256,
             output_sha256=text_sha256(output), strategy=record.strategy,
             sources=record.sources, used_fallback=record.used_fallback,
-            task_sha256=task_sha256(task), reasons=tuple(problems),
+            task_sha256=task_sha256(task), reasons=tuple(problems), artifacts=record.artifacts,
         )
 
     @staticmethod
