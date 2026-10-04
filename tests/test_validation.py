@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import subprocess
@@ -74,6 +75,48 @@ def test_report_keeps_positional_construction_and_equality():
     assert ValidationReport("a.png", (finding,)) == ValidationReport("a.png", [finding])
     assert ValidationReport("a.png", (finding,)).findings == (finding,)
     assert ValidationReport("a.png", (finding,)).validator is None
+
+
+def test_replace_derives_an_unstated_outcome_from_the_new_findings():
+    hard = hard_finding("blank_image", "image is blank")
+    passing = ValidationReport("a.png")
+
+    rejected = dataclasses.replace(passing, findings=(hard,))
+    assert rejected.outcome is ValidationOutcome.REJECTED and not rejected.passed
+    assert rejected == ValidationReport("a.png", (hard,))
+    assert rejected.to_dict() == ValidationReport("a.png", (hard,)).to_dict()
+    assert dataclasses.replace(rejected, findings=()).outcome is ValidationOutcome.PASSED
+    assert dataclasses.replace(passing, path="b.png").outcome is ValidationOutcome.PASSED
+    # Replacing the outcome itself states it, and a stated outcome is checked.
+    error = dataclasses.replace(passing, outcome="error")
+    assert error.outcome is ValidationOutcome.ERROR
+    assert dataclasses.replace(error, findings=(hard,)).outcome is ValidationOutcome.ERROR
+    with pytest.raises(ValueError, match="rejected report"):
+        dataclasses.replace(passing, outcome="rejected")
+    with pytest.raises(ValueError, match="passed report"):
+        dataclasses.replace(passing, findings=(hard,), outcome="passed")
+    assert dataclasses.replace(rejected, outcome=None, findings=()).passed
+
+
+def test_replace_still_checks_a_stated_outcome():
+    hard = hard_finding("too_short", "output is too short")
+    with pytest.raises(ValueError, match="passed report"):
+        dataclasses.replace(ValidationReport("output", outcome="passed"), findings=(hard,))
+    with pytest.raises(ValueError, match="rejected report"):
+        dataclasses.replace(ValidationReport("output", (hard,), outcome="rejected"), findings=())
+    error = ValidationReport("output", outcome="error")
+    assert dataclasses.replace(error, findings=(hard,)).outcome is ValidationOutcome.ERROR
+    # A report read from JSON states the outcome its data records.
+    restored = ValidationReport.from_dict(ValidationReport("output").to_dict())
+    with pytest.raises(ValueError, match="passed report"):
+        dataclasses.replace(restored, findings=(hard,))
+
+
+def test_how_an_outcome_was_set_is_not_part_of_a_reports_value():
+    derived, stated = ValidationReport("a.png"), ValidationReport("a.png", outcome="passed")
+    assert derived == stated and hash(derived) == hash(stated)
+    assert repr(derived) == repr(stated)
+    assert ValidationReport.from_dict(derived.to_dict()) == derived
 
 
 def test_report_round_trips_through_json():

@@ -211,6 +211,9 @@ re-exports the same classes for image validation. A report's `outcome` is
   report never passes, so as a gate result it fails.
 - A stated outcome must agree with the findings: a `passed` report has no
   hard findings and a `rejected` report has at least one.
+- `dataclasses.replace(report, findings=...)` derives an outcome that was not
+  stated again from the new findings, and checks a stated outcome against
+  them. A report read with `from_dict()` states the outcome its data records.
 
 `report.validator` optionally holds a `ValidatorIdentity`: the validator's
 name, version and `config_sha256`, the SHA-256 of its configuration as

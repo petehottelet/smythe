@@ -11,7 +11,7 @@ import hashlib
 import json
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
@@ -187,12 +187,22 @@ class ValidationReport:
     which never passes. A stated outcome must agree with the findings: a
     passed report has no hard findings and a rejected report has at least
     one. ``validator`` optionally identifies the validator that produced it.
+
+    ``dataclasses.replace()`` derives an outcome that was not stated again
+    from the new findings, and checks a stated outcome against them.
+    :meth:`from_dict` states the outcome its data records.
     """
 
     path: str
     findings: tuple[ValidationFinding, ...] = ()
     outcome: ValidationOutcome | None = None
     validator: ValidatorIdentity | None = None
+    # The outcome derived from the findings, or None when it was stated.
+    # dataclasses.replace() passes it back beside the unchanged outcome, which
+    # is how a copy tells a derived outcome from one its caller stated.
+    _derived_outcome: ValidationOutcome | None = field(
+        default=None, kw_only=True, repr=False, compare=False,
+    )
 
     def __post_init__(self) -> None:
         findings = tuple(self.findings)
@@ -200,18 +210,22 @@ class ValidationReport:
             raise TypeError("findings must contain ValidationFinding values")
         object.__setattr__(self, "findings", findings)
         hard = any(finding.severity == FindingSeverity.HARD for finding in findings)
-        if self.outcome is None:
+        stated = self.outcome
+        if stated is not None and stated is self._derived_outcome:
+            stated = None  # a derived outcome passed back unchanged is derived again
+        if stated is None:
             outcome = ValidationOutcome.REJECTED if hard else ValidationOutcome.PASSED
         else:
             try:
-                outcome = ValidationOutcome(self.outcome)
+                outcome = ValidationOutcome(stated)
             except (TypeError, ValueError) as exc:
-                raise ValueError(f"unknown validation outcome: {self.outcome!r}") from exc
+                raise ValueError(f"unknown validation outcome: {stated!r}") from exc
             if outcome is ValidationOutcome.PASSED and hard:
                 raise ValueError("a passed report cannot contain hard findings")
             if outcome is ValidationOutcome.REJECTED and not hard:
                 raise ValueError("a rejected report needs at least one hard finding")
         object.__setattr__(self, "outcome", outcome)
+        object.__setattr__(self, "_derived_outcome", outcome if stated is None else None)
         if self.validator is not None and not isinstance(self.validator, ValidatorIdentity):
             raise TypeError("validator must be a ValidatorIdentity or None")
 
