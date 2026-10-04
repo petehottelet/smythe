@@ -66,6 +66,14 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   any call's tokens at the blended `cost_per_token` rate, which
   `cost_contains_estimates` does not cover. `Sentinel.restore()` accepts the
   matching `token_estimate_nodes`. Existing flags keep their meaning.
+- `AnthropicProvider`, `OpenAIProvider` and `GeminiProvider` accept
+  `missing_usage="unknown"`. A reply without usage, or with an unset token
+  count, then marks its cost unknown (`cost_usd_unknown`) instead of counting
+  the call as a known charge for zero tokens: the ledger keeps a reservation
+  held for the call as its estimated charge, and without one the run reports
+  `cost_is_complete=False`. The default, `"zero"`, keeps the current
+  behavior. A Gemini image's per-call ceiling or per-image cost is never
+  affected.
 
 ### Changed
 

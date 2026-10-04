@@ -50,6 +50,24 @@ def _usage_tokens(usage: object, field_name: str) -> int:
     return 0 if value is None else value
 
 
+def _missing_usage_mode(value: object) -> str:
+    if type(value) is not str or value not in ("zero", "unknown"):
+        raise ValueError(f"missing_usage must be 'zero' or 'unknown', got {value!r}")
+    return value
+
+
+def _usage_unknown(mode: str, usage: object, *field_names: str) -> bool:
+    """Whether a ``missing_usage="unknown"`` provider lacks usage to price.
+
+    Usage is missing when the response has none or leaves a count unset. The
+    absent count is still recorded as zero tokens; the flag stops the ledger
+    from treating that zero as a known charge.
+    """
+    return mode == "unknown" and (
+        usage is None or any(getattr(usage, name, None) is None for name in field_names)
+    )
+
+
 @dataclass
 class Artifact:
     """A binary output from a provider call (e.g. a generated image).
@@ -640,11 +658,22 @@ class AnthropicProvider(Provider):
 
     SDK clients are cached per event loop (see ``_LoopClients``). A client
     assigned to ``_client`` is caller-owned and used as-is.
+
+    ``missing_usage`` decides what a response without usage costs. The
+    default, ``"zero"``, records zero tokens, which the Sentinel prices as a
+    known charge. ``"unknown"`` also marks the result's cost unknown
+    (``cost_usd_unknown``): the Sentinel then keeps the call's reservation as
+    an estimate or, without one, reports ``cost_is_complete=False``.
     """
 
-    def __init__(self, *, api_key: str | None = None, max_tokens: int = 4096) -> None:
+    _missing_usage = "zero"
+
+    def __init__(
+        self, *, api_key: str | None = None, max_tokens: int = 4096, missing_usage: str = "zero",
+    ) -> None:
         self._api_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
         self._max_tokens = max_tokens
+        self._missing_usage = _missing_usage_mode(missing_usage)
         self._client = None
         self._loop_clients = _LoopClients()
 
@@ -716,12 +745,16 @@ class AnthropicProvider(Provider):
         if not isinstance(stop, str):
             stop = "tool_use" if tool_calls else "end_turn"
 
+        usage = response.usage
         return CompletionResult(
             text="\n".join(text_parts),
-            prompt_tokens=_usage_tokens(response.usage, "input_tokens"),
-            completion_tokens=_usage_tokens(response.usage, "output_tokens"),
+            prompt_tokens=_usage_tokens(usage, "input_tokens"),
+            completion_tokens=_usage_tokens(usage, "output_tokens"),
             tool_calls=tool_calls,
             stop_reason=stop,
+            cost_usd_unknown=_usage_unknown(
+                self._missing_usage, usage, "input_tokens", "output_tokens",
+            ),
         )
 
     @staticmethod
@@ -781,7 +814,11 @@ class OpenAIProvider(Provider):
 
     Pass ``base_url`` to target any OpenAI-compatible endpoint —
     Ollama (http://localhost:11434/v1), LM Studio, vLLM, etc.
+    ``missing_usage`` works as on :class:`AnthropicProvider`; compatible
+    endpoints often omit usage.
     """
+
+    _missing_usage = "zero"
 
     def __init__(
         self,
@@ -791,6 +828,7 @@ class OpenAIProvider(Provider):
         base_url: str | None = None,
         request_timeout_s: float | None = None,
         max_retries: int | None = None,
+        missing_usage: str = "zero",
     ) -> None:
         if request_timeout_s is not None and (
             isinstance(request_timeout_s, bool)
@@ -805,6 +843,7 @@ class OpenAIProvider(Provider):
             or max_retries < 0
         ):
             raise ValueError("max_retries must be a non-negative integer")
+        self._missing_usage = _missing_usage_mode(missing_usage)
         self._api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
         self._max_tokens = max_tokens
         self._base_url = base_url or os.environ.get("OPENAI_BASE_URL") or None
@@ -917,6 +956,9 @@ class OpenAIProvider(Provider):
             completion_tokens=_usage_tokens(usage, "completion_tokens"),
             tool_calls=tool_calls,
             stop_reason=stop,
+            cost_usd_unknown=_usage_unknown(
+                self._missing_usage, usage, "prompt_tokens", "completion_tokens",
+            ),
         )
 
     @staticmethod
@@ -1191,7 +1233,13 @@ class GeminiProvider(Provider):
     ``cost_per_image_usd`` to bill those calls per image instead of the
     Sentinel's blended token rate — image models price output per image,
     which token math badly underestimates.
+
+    ``missing_usage`` works as on :class:`AnthropicProvider` for responses
+    without images. A response with images keeps its per-call ceiling or
+    per-image cost, which does not come from usage.
     """
+
+    _missing_usage = "zero"
 
     # Finish reasons for a response that Gemini's safety, recitation or
     # content policies stopped; they become the "content_filter" stop reason.
@@ -1209,7 +1257,9 @@ class GeminiProvider(Provider):
         cost_per_image_usd: float | None = None,
         max_cost_per_call_usd: float | None = None,
         image_config: dict | None = None,
+        missing_usage: str = "zero",
     ) -> None:
+        self._missing_usage = _missing_usage_mode(missing_usage)
         self._api_key = api_key or os.environ.get("GOOGLE_API_KEY", "")
         self._max_tokens = max_tokens
         self._response_modalities = response_modalities
@@ -1384,6 +1434,10 @@ class GeminiProvider(Provider):
             stop = "incomplete"
 
         usage = response.usage_metadata
+        if cost_usd is None:
+            cost_usd_unknown = _usage_unknown(
+                self._missing_usage, usage, "prompt_token_count", "candidates_token_count",
+            )
         # The SDK can set token-count attributes to None (observed on
         # image-only responses), so coerce before arithmetic downstream.
         return CompletionResult(

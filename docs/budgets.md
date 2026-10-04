@@ -95,5 +95,16 @@ a call; `cost_contains_estimates` still covers only provider estimates and
 conservative ceilings. The [Astra cost campaign](../benchmarks/astra_benchmark_plan.md)
 requires new records from the complete-workflow path.
 
+`AnthropicProvider`, `OpenAIProvider` and `GeminiProvider` count a reply
+without usage, or with an unset token count, as zero tokens, which the ledger
+records as a known charge. Construct them with `missing_usage="unknown"` to mark
+such a call's cost unknown instead (`cost_usd_unknown` on the result and the
+node). The ledger then treats it like any unknown cost: a reservation held for
+the call, as in parallel runs, is kept as its estimated charge
+(`cost_contains_estimates=True`); without one, the run reports
+`cost_is_complete=False`. A Gemini image's per-call ceiling or per-image cost
+does not come from usage and is unaffected; `OpenAIImageProvider` has no such
+option.
+
 [Architecture](architecture.md) · [Checkpoint format](checkpoint-format.md) ·
 [Offline budget example](../examples/03_parallel_budget.py).

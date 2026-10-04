@@ -127,8 +127,10 @@ Each path keeps money in its own unit:
   uncertainty: a blended token estimate leaves `cost_contains_estimates`
   `False`, though `Sentinel.cost_contains_token_estimates` reports it, and a
   reply without usage counts as zero tokens and leaves `cost_is_complete`
-  `True`. A call to one of them that raises or times out releases its
-  reservation and records no cost.
+  `True` unless `AnthropicProvider`, `OpenAIProvider` or `GeminiProvider` was
+  built with `missing_usage="unknown"` (see [cost guardrails](budgets.md)). A
+  call to one of them that raises or times out releases its reservation and
+  records no cost.
 - **Durable text workflows** record integer nanoUSD in the journal for every
   phase (`cost_scope="complete_text_workflow"`), from request-bound quotes.
 - **Jobs** reserve and settle integer micro-USD against each profile's
@@ -181,6 +183,7 @@ Tests:
   `tests/test_jobs_preflight.py::test_offline_plan_requires_zero_ceiling_and_budget`.
 - Uncertain ordinary-run costs: `tests/test_support_matrix.py::test_ordinary_ledger_does_not_mark_uncertain_costs_from_other_providers`,
   `tests/test_budget.py::test_blended_token_cost_is_reported_as_a_token_estimate`,
+  `tests/test_provider.py::test_run_with_missing_usage_reports_incomplete_cost_only_when_opted_in`,
   `tests/test_execution_failure_policies.py::test_terminal_failure_stops_queued_work_and_preserves_original_exception`,
   `tests/test_execution_failure_policies.py::test_timeout_obeys_failure_policy_and_settles_before_return`
   and, for the native providers,
