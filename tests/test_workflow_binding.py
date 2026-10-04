@@ -2,6 +2,7 @@
 
 import asyncio
 from dataclasses import replace
+import inspect
 import json
 
 import pytest
@@ -18,6 +19,7 @@ from smythe.skills import CapabilityHydrationMode
 from smythe.supervisor import LLMSupervisor
 from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.task import Task
+from smythe.validation import ValidationReport, ValidatorIdentity
 from smythe.workflow_binding import (
     CallScope, ComponentBinding, LocalOnly, WorkflowBindingError, bind_component,
     describe_component, json_snapshot,
@@ -298,6 +300,75 @@ def test_provider_backed_builtin_cannot_be_hidden_in_local_only():
     declared = LocalOnly(lambda: LLMArchitect(OfflineProvider()), "bad", "1")
     with pytest.raises(WorkflowBindingError):
         bind_component(declared, binding())
+
+
+class LengthCheck:
+    def __init__(self, minimum=1):
+        self.identity = ValidatorIdentity.for_config("length", "1", {"minimum": minimum})
+
+    def validate(self, subject):
+        return ValidationReport("output", validator=self.identity)
+
+
+def test_local_only_validator_builds_a_fresh_checked_validator_for_each_binding():
+    declared = LocalOnly(lambda: LengthCheck(3), "length", "1", role="validator")
+    first, second = bind_component(declared, binding(), role="validator"), declared.validator()
+    assert isinstance(first, LengthCheck) and first is not second
+    assert describe_component(declared, role="validator") == {
+        "type": "local_only", "role": "validator", "identity": "length", "version": "1",
+        "config_sha256": LengthCheck(3).identity.config_sha256,
+    }
+    # A validator serves no other role, and no other declaration is a validator.
+    with pytest.raises(WorkflowBindingError, match="role"):
+        describe_component(declared, role="architect")
+    with pytest.raises(WorkflowBindingError, match="role"):
+        describe_component(LocalOnly(LengthCheck, "length", "1"), role="validator")
+    with pytest.raises(WorkflowBindingError, match="not a validator"):
+        LocalOnly(LengthCheck, "length", "1", role="supervisor").validator()
+
+
+async def _async_factory():
+    return LengthCheck()
+
+
+class _AsyncCall:
+    async def __call__(self):
+        return LengthCheck()
+
+
+@pytest.mark.parametrize("factory", [
+    pytest.param(OfflineProvider(), id="provider"),
+    pytest.param(_async_factory, id="coroutine-function"),
+    pytest.param(_AsyncCall(), id="async-call"),
+    pytest.param("awaitable", id="awaitable"),
+])
+def test_local_only_validator_refuses_a_provider_coroutine_or_awaitable_factory(factory):
+    if factory == "awaitable":
+        factory = _async_factory()
+    with pytest.raises(WorkflowBindingError, match="LocalOnly validator factory"):
+        LocalOnly(factory, "length", "1", role="validator")
+    assert not inspect.iscoroutine(factory) or factory.cr_frame is None  # closed, never awaited
+
+
+class _AsyncValidate:
+    identity = ValidatorIdentity.for_config("length", "1")
+
+    async def validate(self, subject):
+        return ValidationReport("output")
+
+
+@pytest.mark.parametrize("built,message", [
+    pytest.param(lambda: OfflineProvider(), "local component", id="provider"),
+    pytest.param(lambda: _async_factory(), "awaitable", id="awaitable"),
+    pytest.param(lambda: LengthCheck, "class", id="class"),
+    pytest.param(lambda: _AsyncValidate(), "async validate", id="async-validate"),
+    pytest.param(lambda: object(), "no validate", id="no-validate"),
+    pytest.param(lambda: LengthCheck(), "built 'length' version '1'", id="other-version"),
+])
+def test_local_only_validator_refuses_what_its_factory_builds(built, message):
+    declared = LocalOnly(built, "length", "2", role="validator")
+    with pytest.raises(WorkflowBindingError, match=message):
+        bind_component(declared, binding(), role="validator")
 
 
 @pytest.mark.asyncio

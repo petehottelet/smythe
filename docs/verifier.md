@@ -254,6 +254,43 @@ it). `to_dict()` and `from_dict()` convert reports, findings and identities to
 and from JSON data; a tuple in a finding's `expected` or `observed` value
 becomes a JSON array, and `from_dict()` rejects unknown keys and outcomes.
 
+### Gate validators in durable workflows
+
+A [durable text workflow](workflow-accounting.md) accepts no `CallableVerifier`,
+because its function has no version a saved run could be checked against.
+Declare a validator instead, and pass the declaration as `verifier`:
+
+```python
+from smythe import LocalOnly, Swarm
+
+sources = LocalOnly(lambda: RequiredSection("## Sources"), "required-section", "1",
+                    role="validator")
+swarm = Swarm(run_store=store, verifier=sources, ...)
+```
+
+`RequiredSection` is the validator shown under
+[delivery acceptance records](#delivery-acceptance-records). The factory
+builds a fresh validator for each run; its `ValidatorIdentity` must have the
+declared name and version. Each gate then passes when the validator's report
+on the exact text of the node it judges is `passed`, and fails with the
+report's hard findings when it is `rejected`. A validator that raises, returns
+anything but its own `ValidationReport` or reports `error` fails the gate with
+a verdict marked `invalid`. The gate node still runs and makes its provider
+call; only the verdict comes from the validator.
+
+The declaration refuses a `Provider`, a coroutine function or an awaitable as
+the factory, and refuses what the factory builds when it is a provider, an
+awaitable, a class, an object without a synchronous `validate()` or one whose
+identity has another name or version. The run's recipe records
+`"verifier": "validator-v1"` and the validator's name, version and
+`config_sha256` under `validators`, so resuming the run with another
+validator, version or configuration raises `WorkflowConflictError` before any
+call. Recipes without a validator keep their bytes. An ordinary `Swarm`
+refuses a `LocalOnly` verifier with `TypeError`; there, a `CallableVerifier`
+whose function returns
+`validator.validate(ValidationSubject.from_text(target.result))` runs the
+same check.
+
 ## Delivery acceptance records
 
 A gate decides whether one node's output may move on. Delivery acceptance
@@ -661,10 +698,11 @@ keep the earlier placement unless the run's recipe records version 2.
 
 A gate node is executed like any other node: it makes a provider call. When
 the gate has `max_regenerations` above 0, the verifier then computes the
-verdict from that call's result. A durable workflow, which accepts only
-`TokenVerifier`, journals the call in the `verification` phase. A
-`CallableVerifier` replaces only the verdict computation, so an objective gate
-still pays for its node's call, and again after each regeneration.
+verdict from that call's result. A durable workflow, which accepts
+`TokenVerifier` or a [gate validator](#gate-validators-in-durable-workflows),
+journals the call in the `verification` phase. A `CallableVerifier` or a
+validator replaces only the verdict computation, so an objective gate still
+pays for its node's call, and again after each regeneration.
 
 Regeneration buys another provider call, so it is bounded per verifier
 by `max_regenerations` (default `0`, which makes the verdict advisory

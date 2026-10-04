@@ -13,6 +13,7 @@ from types import MappingProxyType
 from uuid import uuid4
 
 from smythe._money import FLOOR, NANOUSD, to_units
+from smythe.acceptance import ValidationSubject, _final_check
 from smythe.budget import BudgetValidationError, Sentinel, validate_completion_usage
 from smythe.checkpoint import (
     graph_from_dict, graph_to_dict, node_from_dict, node_to_dict, reset_incomplete_nodes,
@@ -23,13 +24,14 @@ from smythe.registry import Registry
 from smythe.provider import ProviderResponseError
 from smythe.task import Task, snapshot_task, task_from_dict, task_to_dict
 from smythe.tracer import Tracer
+from smythe.validation import ValidationOutcome
 from smythe.verifier import (
-    ADVISORY_VERDICT_KEY, TokenVerifier, node_generation, validate_verification_checkpoint,
-    verification_pending,
+    ADVISORY_VERDICT_KEY, TokenVerifier, Verdict, Verifier, node_generation,
+    validate_verification_checkpoint, verification_pending,
 )
 from smythe.workflow_binding import (
-    CallScope, ComponentBinding, WorkflowBindingError, bind_component, describe_component,
-    json_snapshot,
+    CallScope, ComponentBinding, LocalOnly, WorkflowBindingError, bind_component,
+    describe_component, json_snapshot,
 )
 from smythe.workflow_provider import (
     WorkflowProviderContext, describe_provider, validate_workflow_model,
@@ -135,6 +137,33 @@ def _nanousd(value):
     return None if value is None else to_units(value, NANOUSD, FLOOR)
 
 
+# The recipe's "verifier" for gates judged by a registered validator: the
+# rules below that turn its report into a verdict. Change it with them.
+VALIDATOR_VERIFIER_IDENTITY = "validator-v1"
+
+
+class _ValidatorVerifier(Verifier):
+    """Judges each gate by a registered validator's report on its target's exact text.
+
+    A ``passed`` report passes and a ``rejected`` one fails. A validator that
+    raises, returns anything but its own report or reports ``error``, and a
+    target without text, give a failing verdict marked ``invalid``.
+    """
+
+    def __init__(self, validator):
+        self.validator, self.identity = validator, validator.identity
+
+    def verdict(self, verifier_node, verified_node):
+        if not isinstance(verified_node.result, str):
+            return Verdict(False, f"{verified_node.id!r} has no text to validate", invalid=True)
+        outcome, reason = _final_check(
+            self.validator, self.identity, ValidationSubject.from_text(verified_node.result),
+            kind="gate validator",
+        )
+        return Verdict(outcome is ValidationOutcome.PASSED, reason,
+                       invalid=outcome is ValidationOutcome.ERROR)
+
+
 class WorkflowBudget:
     """Read-only compatibility projection; the journal alone admits and settles."""
 
@@ -225,9 +254,13 @@ class WorkflowRuntime:
                 "checkpoint_store is not supported by durable text workflows, which "
                 "save their checkpoints in run_store"
             )
-        if verifier is not None and type(verifier) is not TokenVerifier:
+        # A gate validator is declared, so its identity and version enter the
+        # recipe; other verifier code is unversioned and is refused.
+        validator = type(verifier) is LocalOnly and verifier.role == "validator"
+        if verifier is not None and type(verifier) is not TokenVerifier and not validator:
             raise WorkflowBindingError(
-                "verifier must be the built-in TokenVerifier in durable text workflows, "
+                "verifier must be the built-in TokenVerifier or a validator declared with "
+                "LocalOnly(..., role='validator') in durable text workflows, "
                 f"not {type(verifier).__name__}"
             )
         if type(max_revisions) is not int or max_revisions < 0:
@@ -242,6 +275,7 @@ class WorkflowRuntime:
         self.sources = {"architect": architect, "registry": registry, "router": router,
                         "synthesizer": synthesizer, "supervisor": supervisor}
         self.max_revisions, self.verifier = max_revisions, verifier
+        self.gate_validator = verifier if validator else None
         self.max_concurrency = max_concurrency
         self.execution_concurrency = None
         self.retry_backoff_s = retry_backoff_s
@@ -284,6 +318,9 @@ class WorkflowRuntime:
         # change their identity and prevent otherwise compatible recovery.
         if self.graph_policy is not None:
             recipe["graph_policy"] = self.graph_policy.to_dict()
+        if self.gate_validator is not None:
+            recipe["verifier"] = VALIDATOR_VERIFIER_IDENTITY
+            recipe["validators"] = [describe_component(self.gate_validator, role="validator")]
         for name, (absent, default) in RECIPE_BEHAVIOR_FIELDS.items():
             value = self.behavior_settings.get(name, default)
             if _canonical(value) != _canonical(absent):
@@ -335,6 +372,14 @@ class WorkflowRuntime:
                 self.providers[key] = source
                 self.provider_ids[id(source)] = key
         self.registry = self.bound["registry"]
+        self.gate_verifier = self.verifier
+        if self.gate_validator is not None:
+            # A fresh validator per run, which must be the one the recipe names.
+            validator = bind_component(self.gate_validator, binding.child("validator"),
+                                       role="validator")
+            if validator.identity.config_sha256 != self.recipe["validators"][0]["config_sha256"]:
+                raise WorkflowBindingError("Gate validator configuration differs from the recipe")
+            self.gate_verifier = _ValidatorVerifier(validator)
 
     def _component_call(self, source, scope):
         operation_key = _hash(scope.trigger)
@@ -713,7 +758,7 @@ class WorkflowRuntime:
             provider=self.execution_provider, registry=self.registry, tracer=self.trace,
             budget=self.budget, max_concurrency=self.execution_concurrency, artifact_dir=None,
             retry_backoff_s=self.retry_backoff_s, task=self.graph.task,
-            verifier=self.verifier, max_revisions=self.max_revisions,
+            verifier=self.gate_verifier, max_revisions=self.max_revisions,
             revisions_used=state["revisions_used"] if state else 0,
             supervisor=_WorkflowSupervisor(self) if self.bound["supervisor"] else None,
             provider_call_factory=self._worker_call, on_node_update=self._node_update,

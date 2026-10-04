@@ -345,6 +345,20 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   store or run 7. `SwarmResult.to_dict()` adds the same `execution`,
   `delivery`, `unknown_exposure` and `next_action` blocks. See
   [Inspect saved runs](docs/runs.md).
+- Gate validators in durable text workflows. `LocalOnly(factory, identity,
+  version, role="validator")` declares a registered validator, and a durable
+  `Swarm` takes the declaration as `verifier`: each gate's verdict is that
+  validator's report on the exact text of the node it judges, and a
+  validator that raises or cannot decide fails the gate as an invalid
+  verdict. The declaration refuses a `Provider`, coroutine function or
+  awaitable factory, and a built validator that is a provider, awaitable or
+  class, lacks a synchronous `validate()` or names another identity or
+  version. The recipe records `"verifier": "validator-v1"` and the
+  validator's name, version and configuration digest, so resuming with
+  another validator raises `WorkflowConflictError` before any call; recipes
+  without one are unchanged. An ordinary `Swarm` refuses a `LocalOnly`
+  verifier with `TypeError`. See
+  [gate validators in durable workflows](docs/verifier.md#gate-validators-in-durable-workflows).
 
 ### Changed
 

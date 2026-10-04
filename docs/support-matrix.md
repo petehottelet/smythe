@@ -234,13 +234,13 @@ argument's name.
 | Component | Accepted | Rejected |
 |---|---|---|
 | `run_store` | `SQLiteWorkflowStore` | Subclasses |
-| `verifier` | `None` or `TokenVerifier` | `CallableVerifier`, other verifiers and `TokenVerifier` subclasses |
+| `verifier` | `None`, `TokenVerifier`, or a validator declared with `LocalOnly(..., role="validator")` | `CallableVerifier`, other verifiers, `TokenVerifier` subclasses and other `LocalOnly` roles |
 | `memory` | `None` | Any planner memory |
 | `tool_runtime` | `None`; nodes send plain text | Any tool runtime |
 | `checkpoint_store` | `None`; the journal holds checkpoints | Any checkpoint store |
 | Architects and other components | Built-in components and `LocalOnly` factories | Subclasses and unjournaled dependencies |
 | Node inputs | Plain text | `attach_dep_artifacts`, `attachments` and `artifacts` |
-| Resume | The saved recipe: components, models, budget, `retry_backoff_s` and concurrency | Any change raises `WorkflowConflictError` |
+| Resume | The saved recipe: components, models, budget, `retry_backoff_s`, concurrency and gate validator | Any change raises `WorkflowConflictError` |
 | `max_budget_usd=None` | Runs without a budget | |
 | `artifact_dir`, `max_tool_iterations` | Ignored | |
 
@@ -255,7 +255,12 @@ Tests:
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[token-verifier-subclass]`,
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[memory]`,
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[tool-runtime]`,
-  `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[checkpoint-store]`.
+  `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[checkpoint-store]`,
+  `tests/test_workflow_acceptance.py::test_durable_runs_refuse_unregistered_verifier_code_before_any_call`.
+- Gate validators: `tests/test_workflow_acceptance.py::test_registered_validator_judges_durable_gates_from_the_exact_target_text`,
+  `tests/test_workflow_acceptance.py::test_a_changed_validator_configuration_or_version_refuses_resume_before_any_call`,
+  `tests/test_workflow_binding.py::test_local_only_validator_refuses_a_provider_coroutine_or_awaitable_factory`,
+  `tests/test_workflow_binding.py::test_local_only_validator_refuses_what_its_factory_builds`.
 - Plain-text nodes: `tests/test_support_matrix.py::test_durable_run_rejects_image_inputs_on_a_caller_graph_before_any_call`,
   `tests/test_workflow_native_runtime.py::test_plan_the_run_cannot_execute_is_repaired_as_an_additional_paid_attempt`
   and `tests/test_workflow_provider.py::test_unsupported_input_rejected_before_journal_or_http`.

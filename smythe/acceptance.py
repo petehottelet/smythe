@@ -633,9 +633,10 @@ def _clip(text: str) -> str:
 
 def _final_check(
     validator: Validator, identity: ValidatorIdentity, subject: ValidationSubject,
+    *, kind: str = "final validator",
 ) -> tuple[ValidationOutcome, str]:
-    """Run one final validator on *subject*; anything but a valid report is ``error``."""
-    name = f"final validator {identity.name!r}"
+    """Run one validator on *subject*; anything but a valid report is ``error``."""
+    name = f"{kind} {identity.name!r}"
     try:
         report = validator.validate(subject)
     except Exception as exc:

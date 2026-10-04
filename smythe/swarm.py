@@ -74,7 +74,7 @@ from smythe.verifier import (
     validate_verification_checkpoint,
     verification_pending,
 )
-from smythe.workflow_binding import WorkflowBindingError
+from smythe.workflow_binding import LocalOnly, WorkflowBindingError
 from smythe.workflow_policy import WorkflowGraphPolicy, snapshot_graph_policy
 from smythe.workflow_store import SQLiteWorkflowStore
 
@@ -280,7 +280,7 @@ class Swarm:
         retry_backoff_s: float = 0.0,
         supervisor: Supervisor | None = None,
         max_revisions: int = 0,
-        verifier: Verifier | None = None,
+        verifier: Verifier | LocalOnly | None = None,
         run_store: SQLiteWorkflowStore | None = None,
         graph_policy: WorkflowGraphPolicy | None = None,
         acceptance: AcceptancePolicy | None = None,
@@ -288,6 +288,11 @@ class Swarm:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
         if graph_policy is not None and run_store is None:
             raise WorkflowBindingError("graph_policy requires a durable run_store")
+        if isinstance(verifier, LocalOnly) and run_store is None:
+            raise TypeError(
+                "verifier: a LocalOnly validator judges gates only in a durable run_store run; "
+                "an ordinary run takes a Verifier such as CallableVerifier"
+            )
         if acceptance is not None and not isinstance(acceptance, AcceptancePolicy):
             raise TypeError(
                 f"acceptance must be an AcceptancePolicy or None, not {type(acceptance).__name__}"

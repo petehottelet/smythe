@@ -230,6 +230,7 @@
     "tests/test_verification_concurrency.py",
     "tests/test_verification_recovery.py",
     "tests/test_verifier.py",
+    "tests/test_workflow_acceptance.py",
     "tests/test_workflow_binding.py",
     "tests/test_workflow_executor.py",
     "tests/test_workflow_handoff.py",

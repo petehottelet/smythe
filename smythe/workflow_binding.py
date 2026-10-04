@@ -151,6 +151,13 @@ class LocalOnly:
 
     This is a caller contract, not a sandbox. ``factory`` must return a fresh
     instance for each binding. Stable identity/version are persisted in recipes.
+
+    With ``role="validator"`` the factory builds a validator: an object with a
+    :class:`~smythe.validation.ValidatorIdentity` whose name and version are
+    ``identity`` and ``version``, and a synchronous ``validate(subject)``. A
+    ``Provider``, a coroutine function or an awaitable is refused as the
+    factory and as what it builds, as is an ``async`` ``validate``. The
+    recipe records the identity, including its ``config_sha256``.
     """
 
     factory: Callable[[], object] = field(repr=False, compare=False)
@@ -159,22 +166,54 @@ class LocalOnly:
     role: str = "architect"
 
     def __post_init__(self):
+        if self.role == "validator":
+            _check_validator_factory(self.factory)
         if not callable(self.factory) or any(
             not isinstance(value, str) or not value.strip() for value in (self.identity, self.version)
         ):
             raise WorkflowBindingError("LocalOnly requires a factory, identity, and version")
-        if self.role not in {"architect", "supervisor", "synthesizer", "template_builder"}:
+        if self.role not in {"architect", "supervisor", "synthesizer", "template_builder", "validator"}:
             raise WorkflowBindingError("Unsupported LocalOnly component role")
 
     def workflow_description(self, **defaults) -> dict:
         require_exact(self, LocalOnly)
-        return {"type": "local_only", "role": self.role,
-                "identity": self.identity, "version": self.version}
+        description = {"type": "local_only", "role": self.role,
+                       "identity": self.identity, "version": self.version}
+        if self.role == "validator":
+            description["config_sha256"] = self.validator().identity.config_sha256
+        return description
 
     def workflow_providers(self) -> tuple[Provider, ...]:
         return ()
 
+    def validator(self):
+        """Build a fresh validator and check it against this declaration."""
+        from smythe.acceptance import check_validator
+
+        if self.role != "validator":
+            raise WorkflowBindingError(f"LocalOnly {self.role} is not a validator")
+        require_exact(self, LocalOnly)
+        component = self.factory()
+        if inspect.isawaitable(component):
+            if inspect.iscoroutine(component):
+                component.close()
+            raise WorkflowBindingError("LocalOnly validator factory returned an awaitable")
+        if component is self or isinstance(component, Provider):
+            raise WorkflowBindingError("LocalOnly factory must produce a local component")
+        try:
+            identity = check_validator(component)
+        except TypeError as error:
+            raise WorkflowBindingError(f"LocalOnly validator {self.identity!r}: {error}") from error
+        if (identity.name, identity.version) != (self.identity, self.version):
+            raise WorkflowBindingError(
+                f"LocalOnly validator {self.identity!r} version {self.version!r} built "
+                f"{identity.name!r} version {identity.version!r}"
+            )
+        return component
+
     def bind_run(self, binding: ComponentBinding):
+        if self.role == "validator":
+            return self.validator()
         self.workflow_description()
         component = self.factory()
         if component is self or isinstance(component, Provider):
@@ -186,6 +225,18 @@ class LocalOnly:
         if not callable(getattr(component, required, None)):
             raise WorkflowBindingError(f"LocalOnly {self.role} requires {required}()")
         return _BoundLocal(self, component, binding)
+
+
+def _check_validator_factory(factory):
+    if isinstance(factory, Provider):
+        raise WorkflowBindingError("A Provider cannot be a LocalOnly validator factory")
+    if inspect.isawaitable(factory):
+        if inspect.iscoroutine(factory):
+            factory.close()
+        raise WorkflowBindingError("An awaitable cannot be a LocalOnly validator factory")
+    if any(inspect.iscoroutinefunction(item) or inspect.isasyncgenfunction(item)
+           for item in (factory, getattr(type(factory), "__call__", None))):
+        raise WorkflowBindingError("A LocalOnly validator factory must not be a coroutine function")
 
 
 class _BoundLocal:
@@ -254,7 +305,7 @@ def describe_component(component, *, role=None, default_provider=None, default_m
         "architect": {"llm_architect", "simple_architect", "constrained_architect"},
         "router": {"white_rabbit"}, "registry": {"registry"},
         "supervisor": {"llm_supervisor"}, "synthesizer": {"synthesizer"},
-        "template_builder": set(),
+        "template_builder": set(), "validator": set(),
     }
     if role is not None and (
         role not in roles or not (

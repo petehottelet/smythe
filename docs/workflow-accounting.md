@@ -334,16 +334,19 @@ native `OpenAIResponsesProvider` for `gpt-6-astra` and `gpt-5.6-sol`, native
 `OfflineProvider` plan/echo fixtures. Both native providers use their global
 endpoints. The path binds the built-in simple, LLM, and constrained architects,
 WhiteRabbit routing, static registries, LLM supervision, synthesis strategies,
-and token verification. Every reachable router tier and template is checked
-before routing can make a paid call. Provider instances are snapshotted per run.
+token verification, and gates judged by a
+[registered validator](verifier.md#gate-validators-in-durable-workflows)
+declared with `LocalOnly(..., role="validator")`. Every reachable router tier
+and template is checked before routing can make a paid call. Provider
+instances are snapshotted per run.
 
 [Native Claude Messages](anthropic-messages.md) shares this journal and runs
 the [Fable 5.1 benchmark extension](../benchmarks/fable_51_benchmark_plan.md).
 The ordinary `AnthropicProvider` cannot enter this managed path, and neither
 can subclasses of the supported providers.
 
-Custom local architects, template builders, supervisors, and synthesizers use
-`LocalOnly(factory, identity, version, role=...)`. The factory must return a fresh
+Custom local architects, template builders, supervisors, synthesizers and gate
+validators use `LocalOnly(factory, identity, version, role=...)`. The factory must return a fresh
 component that performs no provider calls or external side effects. A template
 builder must also return the same nodes, with the same ids, for the same task
 and params ([why](architecture.md#planning-tiers)). This is an
