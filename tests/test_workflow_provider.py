@@ -22,7 +22,7 @@ from smythe.workflow_provider import (
 )
 from smythe.workflow_store import (
     CallKey, SQLiteWorkflowStore, WorkflowBudgetError, WorkflowConflictError, WorkflowError,
-    WorkflowLeaseError,
+    WorkflowLeaseError, WorkflowValidationError,
 )
 
 MODEL = "gpt-6-astra"
@@ -131,6 +131,27 @@ def test_saved_response_decodes_at_its_recorded_price_version_after_a_release(jo
     fresh = asyncio.run(invoke(journal, key=CallKey("execution", "node-b")))
     assert fresh.cost_usd == .002 and fresh.native_receipt["price_version"] == "openai-test-v2"
     assert store.audit(lease.run_id)["confirmed_nanousd"] == 3_500_000
+
+
+def test_quoted_call_is_not_sent_after_its_model_retires(journal, transport, monkeypatch):
+    store, lease = journal
+    reserve = store.reserve_call
+
+    def stopped(*args, **kwargs):
+        raise RuntimeError("Process stopped before reserving")
+
+    monkeypatch.setattr(store, "reserve_call", stopped)
+    with pytest.raises(RuntimeError, match="before reserving"):
+        asyncio.run(invoke(journal))
+    monkeypatch.setattr(store, "reserve_call", reserve)
+    assert store.lookup_call(lease.run_id, KEY)["state"] == "quoted"
+    # A release retires the model on a day the journal clock has passed.
+    release_price_version(monkeypatch, version="openai-test-v2", retired_on={MODEL: "2000-01-01"})
+    with pytest.raises(WorkflowValidationError, match="retired"):
+        asyncio.run(invoke(journal))
+    assert (transport.count.await_count, transport.generation.await_count) == (1, 0)
+    saved = store.lookup_call(lease.run_id, KEY)
+    assert (saved["state"], saved["price_version"]) == ("quoted", PRICE_VERSION)
 
 
 def test_descriptor_snapshot_is_local_detached_and_secret_free(monkeypatch):

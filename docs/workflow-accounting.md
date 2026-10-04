@@ -217,16 +217,21 @@ reported as corrupt.
 
 A price table can give a model a retirement date (`PriceTable.retired_on`).
 From that day, by the journal clock in UTC, a durable run admits no new call to
-that model. Saved calls to it remain readable and still settle and replay.
+that model and does not send a saved call to it that was never sent. Preparing
+such a call again, reserving it or claiming its dispatch raises
+`WorkflowValidationError`, so a resumed run neither quotes nor sends it. The
+call keeps its state and recorded price version, and
+`release_before_dispatch` frees its reservation. Calls to the model that were
+already sent remain readable and still settle and replay.
 
 A run saved before such a release resumes. The provider descriptions in its
 saved recipe may name an earlier registered price version and a different
 supported model list; every other recipe field must still match exactly.
 Each saved call replays under the price version it recorded, including a call
-that was prepared or quoted but not yet sent, and every new call uses the
-current version. A run's total can therefore combine charges at two price
-versions, and each call's receipt names its own. The configured model must
-still be one the current version prices.
+that was prepared or quoted but not yet sent, unless its model has since
+retired, and every new call uses the current version. A run's total can
+therefore combine charges at two price versions, and each call's receipt names
+its own. The configured model must still be one the current version prices.
 
 ## Recovery boundaries
 

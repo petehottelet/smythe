@@ -34,6 +34,8 @@ _MONEY = re.compile(r"0|[1-9][0-9]*")
 _PHASES = {"routing", "planning", "execution", "verification", "supervision", "synthesis"}
 _PRICED_KINDS = {"openai_responses": pricing, "anthropic_messages": pricing_anthropic}
 _OUTPUT_CAPS = {"openai_responses": "max_output_tokens", "anthropic_messages": "max_tokens"}
+# States of a call whose request has never been sent.
+_UNSENT = frozenset({"prepared", "quoted", "reserved", "released"})
 
 
 class WorkflowError(RuntimeError):
@@ -625,12 +627,29 @@ class SQLiteWorkflowStore:
                 raise WorkflowValidationError("Call model or output cap is not priced")
         return binding
 
+    def _admit_model(self, kind, model):
+        """Refuse a model the current price table does not admit today.
+
+        Today is the journal clock's date in UTC. A retirement date refuses a
+        new call and the first dispatch of a saved call never sent, which
+        otherwise keeps its recorded price version. Reading, settling and
+        replaying a call already sent are unaffected.
+        """
+        if kind in _PRICED_KINDS:
+            today = datetime.fromtimestamp(self._clock_ns() // 1_000_000_000, timezone.utc).date()
+            if not _price_table(kind).admits(model, today):
+                raise WorkflowValidationError("Model is retired and admits no new calls")
+
+    def _admit_unsent(self, call):
+        """Apply today's retirement dates to a saved call before it is sent."""
+        self._admit_model(_loads(call["provider_json"], stored=True)["kind"],
+                          _loads(call["request_json"], stored=True).get("model"))
+
     def _admission_binding(self, request_json, tool_names_json, provider, price_version):
         """Validate a new call against the current price version and wire rules.
 
         A retirement date in the current price table refuses new calls to that
-        model from that day, by the journal clock in UTC. Saved calls are
-        unaffected.
+        model from that day, by the journal clock in UTC.
         """
         request, names, kind, _ = self._binding(request_json, tool_names_json, provider, price_version)
         table = None if kind == "offline" else _price_table(kind)
@@ -670,10 +689,7 @@ class SQLiteWorkflowStore:
                 raise WorkflowValidationError("Unsupported durable Messages request") from exc
         elif price_version != OFFLINE_PRICE_VERSION:
             raise WorkflowValidationError("Offline calls require the explicit zero-cost price version")
-        if table is not None:
-            today = datetime.fromtimestamp(self._clock_ns() // 1_000_000_000, timezone.utc).date()
-            if not table.admits(request["model"], today):
-                raise WorkflowValidationError("Model is retired and admits no new calls")
+        self._admit_model(kind, request.get("model"))
 
     @staticmethod
     def _repriced(record, request_json, tool_names_json, provider, price_version):
@@ -701,11 +717,13 @@ class SQLiteWorkflowStore:
             run = self._lease(db, lease)
             existing = db.execute("SELECT * FROM workflow_calls WHERE run_id=? AND key_json=?", (lease.run_id, key_json)).fetchone()
             if existing:
-                if existing["binding_sha"] == binding:
-                    return self._call_record(existing)
                 record = self._call_record(existing)
-                if not self._repriced(record, request_json, tool_names_json, provider, price_version):
+                if (existing["binding_sha"] != binding
+                        and not self._repriced(record, request_json, tool_names_json, provider, price_version)):
                     raise WorkflowConflictError("Logical call has different immutable request bindings")
+                if record["state"] in _UNSENT:
+                    # Refuse before its quote or dispatch request is made.
+                    self._admit_unsent(existing)
                 return record
             # A saved call keeps the rules it was admitted under; a new one
             # must satisfy the current price version and wire rules.
@@ -956,6 +974,8 @@ class SQLiteWorkflowStore:
             self._admit(run)
             if call["quote_id"] != quote_id or quote_id is None:
                 raise WorkflowConflictError("Reservation quote does not match the call")
+            if call["state"] in _UNSENT:
+                self._admit_unsent(call)
             ceiling = _amount(call["ceiling"])
             if call["state"] == "reserved":
                 return CallPermit(call_id, lease.run_id, ceiling)
@@ -979,6 +999,7 @@ class SQLiteWorkflowStore:
                 raise WorkflowConflictError("Dispatch request does not match the reserved request")
             if call["state"] != "reserved" or call["dispatch_token_sha"] is not None:
                 raise WorkflowStateError("Dispatch has already been claimed or was never reserved")
+            self._admit_unsent(call)
             token = secrets.token_hex(32)
             db.execute("UPDATE workflow_calls SET state='dispatched',dispatch_token_sha=?,dispatch_epoch=?,updated=? WHERE call_id=?",
                        (_sha(token), lease.epoch, self._clock_ns(), call_id))

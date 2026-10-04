@@ -49,8 +49,9 @@ class PriceTable:
 
     ``rates`` maps a model to its provider-specific rate card. ``retired_on``
     maps a model to the first day, as an ISO date, on which a durable workflow
-    admits no new call to it. Retirement never affects pricing: saved receipts
-    and journaled calls keep the rates of the version they recorded.
+    admits no new call to it and sends no saved call that was never sent.
+    Retirement never affects pricing: saved receipts and journaled calls keep
+    the rates of the version they recorded.
     """
 
     price_version: str

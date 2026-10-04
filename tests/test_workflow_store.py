@@ -898,6 +898,50 @@ def test_retired_model_admits_no_new_call_while_saved_calls_replay(journal, monk
     assert store.audit("run")["call_count"] == 3
 
 
+def test_saved_call_never_sent_is_not_sent_after_its_model_retires(journal, monkeypatch):
+    store, lease, clock = journal
+    applied = accepted(store, lease, "applied")
+    sent = prepare(store, lease, "sent")
+    evidence_id = store.append_response(dispatch(store, lease, sent), envelope(sent, response()))
+    prepared = prepare(store, lease, "prepared")
+    quoted = prepare(store, lease, "quoted")
+    quoted_id = quote(store, lease, quoted)["quote_id"]
+    reserved = prepare(store, lease, "reserved")
+    store.reserve_call(lease, reserved["call_id"], quote(store, lease, reserved)["quote_id"])
+    released = prepare(store, lease, "released")
+    released_id = quote(store, lease, released)["quote_id"]
+    store.release_before_dispatch(lease, released["call_id"], "test")
+    unsent = {"prepared": prepared, "quoted": quoted, "reserved": reserved, "released": released}
+    # The journal clock reads 1970-01-01; Astra retires the next day.
+    release_price_version(monkeypatch, version=NEXT_VERSION, retired_on={"gpt-6-astra": "1970-01-02"})
+    assert prepare(store, lease, "prepared", price_version=NEXT_VERSION)["call_id"] == prepared["call_id"]
+    clock.advance(86_400)
+    lease = store.acquire_lease("run", "owner")
+
+    for scope in unsent:
+        for version in (PRICE_VERSION, NEXT_VERSION):
+            with pytest.raises(WorkflowValidationError, match="retired"):
+                prepare(store, lease, scope, price_version=version)
+    for call, quote_id in ((quoted, quoted_id), (released, released_id)):
+        with pytest.raises(WorkflowValidationError, match="retired"):
+            store.reserve_call(lease, call["call_id"], quote_id)
+    with pytest.raises(WorkflowValidationError, match="retired"):
+        store.claim_dispatch(lease, reserved["call_id"], reserved["request_sha256"])
+    for scope, call in unsent.items():
+        record = store.lookup_call("run", CallKey("execution", scope))
+        assert (record["state"], record["price_version"]) == (scope, PRICE_VERSION)
+    assert set(store.recover(lease)["undispatched"]) == {call["call_id"] for call in unsent.values()}
+    store.release_before_dispatch(lease, reserved["call_id"], "model retired")
+
+    # Calls already sent still replay and settle at the version they recorded.
+    assert prepare(store, lease, "applied", price_version=NEXT_VERSION)["call_id"] == applied["call_id"]
+    assert prepare(store, lease, "sent", price_version=NEXT_VERSION)["state"] == "response_saved"
+    record = store.settle_call(lease, sent["call_id"], evidence_id)
+    assert record["cost_nanousd"] == 1_060_000 and record["receipt"]["price_version"] == PRICE_VERSION
+    audit = store.audit("run")
+    assert (audit["call_count"], audit["confirmed_nanousd"], audit["reserved_nanousd"]) == (6, 2_120_000, 0)
+
+
 def test_saved_messages_call_settles_at_its_recorded_price_version(journal, monkeypatch):
     store, lease, _ = journal
     recorded = pricing_anthropic.PRICE_VERSION

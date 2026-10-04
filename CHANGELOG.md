@@ -150,9 +150,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   rates; its stored receipt is unchanged. Price tables are registered by
   version in `smythe.pricing.PRICE_TABLES` and
   `smythe.pricing_anthropic.PRICE_TABLES`, and the providers' model lists
-  come from the current table. A new call still needs the current version,
-  and a retirement date in the current table stops new calls to that model
-  without affecting saved ones.
+  come from the current table. A new call still needs the current version.
+  A retirement date in the current table stops new calls to that model and
+  the sending of saved calls to it that were never sent; calls already sent
+  still settle and replay.
 - A durable run saved before a release that adds a price version or a
   supported model resumes. The saved recipe embeds each provider's price
   version and model list, and resume compared the recipe exactly, so it
@@ -160,8 +161,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   the same error when its node ran again. A saved provider description may
   now name any registered price version and a different model list, while
   every other recipe field still compares exactly. Saved calls replay and
-  decode at the price version they recorded, including calls not yet sent,
-  and new calls use the current version. Recipes keep their bytes.
+  decode at the price version they recorded, including calls not yet sent
+  to a model that has not retired, and new calls use the current version.
+  Recipes keep their bytes.
 - Saving a durable checkpoint no longer audits the whole journal. Each save
   called `inspect_run`, which verified every call, evidence row and earlier
   checkpoint and loaded every event, so checkpoint cost grew with the run's
