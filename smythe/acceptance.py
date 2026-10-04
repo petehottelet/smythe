@@ -22,9 +22,12 @@ from __future__ import annotations
 
 import hashlib
 import inspect
+# Imported at runtime, not only for type checking, so that
+# typing.get_type_hints() can resolve the dataclass field annotations.
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import Any, Protocol
 
 from smythe.task import Task, task_to_dict
 from smythe.validation import (
@@ -35,9 +38,6 @@ from smythe.validation import (
     _require_keys,
     _require_sha256,
 )
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 DELIVERY_ACCEPTANCE_VERSION = 1
 SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS = (1,)

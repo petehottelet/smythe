@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import inspect
 import json
 import subprocess
+import typing
+from collections.abc import Sequence
 
 import pytest
 
+import smythe.acceptance
+import smythe.validation
 from fakes import child_executable, offline_env
 from smythe import (
     AcceptanceDecision,
@@ -98,6 +103,30 @@ def test_acceptance_types_import_without_an_image_library():
     )
     assert completed.returncode == 0, completed.stderr
     assert completed.stdout.strip() == "ok"
+
+
+_PUBLIC_TYPES = [
+    *(getattr(module, name) for module in (smythe.acceptance, smythe.validation)
+      for name in module.__all__ if inspect.isclass(getattr(module, name))),
+    SwarmResult,
+]
+
+
+@pytest.mark.parametrize("kind", _PUBLIC_TYPES, ids=lambda kind: kind.__name__)
+def test_public_types_resolve_their_type_hints(kind):
+    """Tools that read annotations at runtime can resolve every field and method."""
+    typing.get_type_hints(kind)
+    for member in vars(kind).values():
+        if isinstance(member, property):
+            member = member.fget
+        member = getattr(member, "__func__", member)
+        if inspect.isfunction(member):
+            typing.get_type_hints(member)
+
+
+def test_policy_type_hints_name_the_validator_protocol():
+    hints = typing.get_type_hints(AcceptancePolicy)
+    assert hints["final_validators"] == Sequence[smythe.acceptance.Validator]
 
 
 def test_subject_binds_bytes_to_their_digest():
