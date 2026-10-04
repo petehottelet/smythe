@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import os
+import sqlite3
 import stat
-from contextlib import ExitStack
+from contextlib import ExitStack, closing
 from threading import Event, Thread
 
 import pytest
@@ -16,6 +17,7 @@ from smythe.jobs.store import (
     OperationStatus,
     RunLeaseError,
     RunStatus,
+    RunStoreError,
     SQLiteRunStore,
 )
 
@@ -484,6 +486,148 @@ def test_reroll_changes_only_selected_failed_operation(tmp_path, store_factory):
         failed["operation_key"],
         operations[1]["operation_key"],
     }
+
+
+def _settle_attempt(store, run_id, operation_id, outcome="rejected"):
+    attempt = store.begin_attempt(run_id, operation_id)
+    permit = store.prepare_call(attempt["attempt_id"], 0)
+    store.mark_call_dispatched(permit.call_id)
+    if outcome == "unknown_outcome":
+        store.mark_unknown_outcome(permit.call_id, "connection lost after dispatch")
+    else:
+        store.complete_call(
+            permit.call_id,
+            cost_microusd=0,
+            cost_is_complete=True,
+            cost_is_estimate=False,
+            artifacts=[],
+            result_text="invalid",
+            accepted=False,
+            error="missing artifact",
+        )
+
+
+def _attempt_reasons(store, run_id):
+    return [attempt["reason"] for attempt in store.snapshot(run_id)["attempts"]]
+
+
+@pytest.mark.parametrize("outcome", ["rejected", "unknown_outcome"])
+def test_reroll_reason_is_recorded_on_the_attempt_it_starts(tmp_path, store_factory, outcome):
+    plan, approval = _plan(tmp_path, provider="offline", attempts=2)
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+    operation = store.pending_operations(run_id)[0]
+    _settle_attempt(store, run_id, operation["operation_id"], outcome)
+    store.queue_reroll(
+        run_id,
+        [operation["operation_key"]],
+        acknowledge_unknown=outcome == "unknown_outcome",
+        reason="replace rejected glyph",
+    )
+
+    store.begin_attempt(run_id, operation["operation_id"])
+
+    assert _attempt_reasons(store, run_id) == [None, "replace rejected glyph"]
+
+
+def test_attempts_without_a_newer_reroll_keep_no_reason(tmp_path, store_factory):
+    plan, approval = _plan(tmp_path, provider="offline", attempts=2)
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+    operation_id = store.pending_operations(run_id)[0]["operation_id"]
+    first = store.begin_attempt(run_id, operation_id)
+    store.prepare_call(first["attempt_id"], 0)
+    store.recover_inflight(run_id)
+    _settle_attempt(store, run_id, operation_id)
+    store.queue_reroll(run_id, [operation_id], reason="operator review")
+    store.begin_attempt(run_id, operation_id)
+    store.recover_inflight(run_id)
+
+    # A safe retry is a new attempt, but only the attempt a reroll started
+    # carries that reroll's reason.
+    store.begin_attempt(run_id, operation_id)
+
+    assert _attempt_reasons(store, run_id) == [None, None, "operator review", None]
+
+
+def test_attempt_after_two_rerolls_records_the_latest_reason(tmp_path, store_factory):
+    plan, approval = _plan(tmp_path, provider="offline", attempts=3)
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+    operation_id = store.pending_operations(run_id)[0]["operation_id"]
+    _settle_attempt(store, run_id, operation_id)
+    store.queue_reroll(run_id, [operation_id], reason="first review")
+    _settle_attempt(store, run_id, operation_id)
+    store.queue_reroll(run_id, [operation_id], reason="second review")
+
+    store.begin_attempt(run_id, operation_id)
+
+    assert _attempt_reasons(store, run_id) == [None, "first review", "second review"]
+
+
+def test_explicit_attempt_reason_takes_precedence_over_a_queued_reroll(tmp_path, store_factory):
+    plan, approval = _plan(tmp_path, provider="offline", attempts=2)
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+    operation_id = store.pending_operations(run_id)[0]["operation_id"]
+    _settle_attempt(store, run_id, operation_id)
+    store.queue_reroll(run_id, [operation_id], reason="operator review")
+
+    store.begin_attempt(run_id, operation_id, reason="caller reason")
+
+    assert _attempt_reasons(store, run_id) == [None, "caller reason"]
+
+
+@pytest.mark.parametrize("reason", [None, 7, ["list"]])
+def test_reroll_without_a_text_reason_leaves_the_attempt_reason_empty(tmp_path, store_factory, reason):
+    plan, approval = _plan(tmp_path, provider="offline", attempts=2)
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+    operation_id = store.pending_operations(run_id)[0]["operation_id"]
+    _settle_attempt(store, run_id, operation_id)
+    store.queue_reroll(run_id, [operation_id], reason=reason)
+
+    store.begin_attempt(run_id, operation_id)
+
+    assert _attempt_reasons(store, run_id) == [None, None]
+
+
+def test_corrupt_queued_reroll_event_refuses_the_attempt(tmp_path, store_factory):
+    plan, approval = _plan(tmp_path, provider="offline", attempts=2)
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+    operation_id = store.pending_operations(run_id)[0]["operation_id"]
+    _settle_attempt(store, run_id, operation_id)
+    store.queue_reroll(run_id, [operation_id], reason="operator review")
+    store._connection.execute(
+        "UPDATE events SET payload_json = '{bad JSON' WHERE event_type = 'reroll_queued'"
+    )
+
+    with pytest.raises(RunStoreError, match="events.payload_json"):
+        store.begin_attempt(run_id, operation_id)
+
+    assert len(store.snapshot(run_id)["attempts"]) == 1
+    assert store.pending_operations(run_id)[0]["attempt_count"] == 1
+
+
+def test_recorded_attempt_reasons_are_never_backfilled(tmp_path):
+    plan, approval = _plan(tmp_path, provider="offline", attempts=3)
+    database = tmp_path / "jobs.db"
+    with SQLiteRunStore(database) as store:
+        run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+        operation_id = store.pending_operations(run_id)[0]["operation_id"]
+        _settle_attempt(store, run_id, operation_id)
+        store.queue_reroll(run_id, [operation_id], reason="earlier reroll")
+        _settle_attempt(store, run_id, operation_id)
+    # Earlier versions left every attempt reason empty.
+    with closing(sqlite3.connect(database)) as db, db:
+        db.execute("UPDATE attempts SET reason = NULL")
+
+    with SQLiteRunStore(database) as store:
+        assert _attempt_reasons(store, run_id) == [None, None]
+        store.queue_reroll(run_id, [operation_id], reason="later reroll")
+        store.begin_attempt(run_id, operation_id)
+        assert _attempt_reasons(store, run_id) == [None, None, "later reroll"]
 
 
 def test_budget_overrun_is_derived_latched_and_blocks_every_admission(tmp_path, store_factory):

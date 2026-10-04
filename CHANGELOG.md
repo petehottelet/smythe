@@ -159,6 +159,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   attempt, so a retried node no longer reports the time of its first, failed
   attempt. `total_duration_ms` still sums every recorded span, and planner
   prompts still label it "Summed node time".
+- A Jobs attempt started by a reroll records the reroll's reason. The reason
+  was kept only in the `reroll_queued` event, so every attempt's `reason` was
+  empty. `jobs inspect` now shows it on that attempt in text, JSON and the
+  HTML report, and JSON status and export include it. First attempts and
+  safe retries after recovery keep an empty reason, attempts recorded earlier
+  are not changed, and the Jobs database stays at version 4.
 - Executors accept only a finite, non-negative number for `retry_backoff_s`
   and raise `ValueError` otherwise, as durable workflows already did. `True`
   used to act as a one-second backoff, and NaN or infinity failed a serial

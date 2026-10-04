@@ -465,8 +465,11 @@ smythe jobs reroll RUN_ID "tile[3]" \
 ```
 
 Rerolls consume the same original approval and attempt allowance. The selected
-operation receives a new immutable attempt linked to its predecessor; other
-operations are not reset, and prior artifact records remain in the journal.
+operation receives a new immutable attempt linked to its predecessor that
+records the reroll reason, which `smythe jobs inspect` shows with that attempt;
+other operations are not reset, and prior artifact records remain in the
+journal. A safe retry after recovery starts another attempt without a reason,
+and attempts recorded by earlier versions keep an empty reason.
 Successful operations cannot be casually rerolled, which preserves accepted
 outputs byte-for-byte.
 

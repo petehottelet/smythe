@@ -171,6 +171,31 @@ def test_inspecting_failed_job_succeeds_but_status_exit_is_unchanged(tmp_path, c
     assert output(capsys)["status"]["counts"] == {"rejected": 1}
 
 
+def test_reroll_reason_is_shown_on_its_attempt_in_every_inspection_format(tmp_path, capsys, monkeypatch):
+    job = seed_job(tmp_path, capsys, rejected=True, monkeypatch=monkeypatch)
+    run_id = job.run["run_id"]
+    operation = job.run["operations"][0]["operation_key"]
+    assert main(["jobs", "reroll", run_id, operation, "--reason", "MIME check",
+                 "--store", str(job.path), "--json"]) == EXIT_JOB_FAILED
+    rerolled = output(capsys)["reroll"]
+    assert [attempt["reason"] for attempt in rerolled["attempts"]] == [None, "MIME check"]
+
+    assert main(["jobs", "inspect", run_id, "--store", str(job.path), "--json"]) == EXIT_OK
+    inspected = output(capsys)["inspect"]
+    assert [attempt["reason"] for attempt in inspected["attempts"]] == [None, "MIME check"]
+
+    assert main(["jobs", "inspect", run_id, "--store", str(job.path)]) == EXIT_OK
+    human = capsys.readouterr().out
+    assert human.count("Reason:") == 1
+    assert human.index("Attempt 2") < human.index("Reason: MIME check")
+
+    destination = tmp_path / "reports" / "inspection.html"
+    assert main(["jobs", "inspect", run_id, "--out", str(destination),
+                 "--store", str(job.path), "--json"]) == EXIT_OK
+    output(capsys)
+    assert "MIME check" in destination.read_text(encoding="utf-8")
+
+
 def test_human_inspection_shows_costs_call_states_attempts_and_artifact_findings(job, capsys):
     assert main(["jobs", "inspect", job.run["run_id"], "--store", str(job.path)]) == EXIT_OK
     captured = capsys.readouterr()

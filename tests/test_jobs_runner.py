@@ -243,6 +243,19 @@ def test_start_refuses_a_used_approval_before_any_provider_call(tmp_path, store_
     assert created["payload"]["approval_reuse"] == {"prior_run_ids": ["first"]}
 
 
+def test_reroll_records_its_reason_on_the_new_attempt(tmp_path, store_factory):
+    plan = preflight_job(_manifest(count=1, attempts=2), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    runner = JobRunner(store, provider_pool=_FixedPool(_SequenceProvider()))
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path))
+    operation_key = first["operations"][0]["operation_key"]
+
+    second = asyncio.run(runner.reroll(first["run_id"], [operation_key], reason="missing glyph"))
+
+    assert [attempt["reason"] for attempt in second["attempts"]] == [None, "missing glyph"]
+    assert second["attempts"][1]["parent_attempt_id"] == second["attempts"][0]["attempt_id"]
+
+
 class _AmbiguousProvider(Provider):
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         raise ConnectionError("response lost")

@@ -45,6 +45,8 @@ _SCHEMA_COLUMNS = {
 _FENCING_COLUMNS = {"runs": {"lease_epoch"}, "attempts": {"lease_owner_id", "lease_epoch"},
                     "run_leases": {"epoch"}}
 _ARTIFACT_COLUMNS = {"artifact_namespace", "artifact_owner_id"}
+# Events whose text ``reason`` explains the next attempt of their operation.
+_QUEUED_REASON_EVENTS = ("reroll_queued",)
 _IDENTITY_RE = re.compile(r"[0-9a-f]{32}\Z")
 _CONTROL_TABLE_SQL = """CREATE TABLE IF NOT EXISTS run_controls (
     run_id TEXT PRIMARY KEY REFERENCES runs(run_id) ON DELETE CASCADE,
@@ -1062,6 +1064,9 @@ class SQLiteRunStore:
             # historical attempt numbers remain immutable and therefore advance
             # independently.
             attempt_number = previous["attempt_number"] + 1 if previous is not None else 1
+            if reason is None and previous is not None:
+                # Only an operation with an earlier attempt can be rerolled.
+                reason = self._queued_reason(cursor, run_id, operation_id)
             attempt_id = uuid4().hex
             cursor.execute(
                 """
@@ -2134,6 +2139,27 @@ class SQLiteRunStore:
             {"call_id": call["call_id"], "error": error},
             now,
         )
+
+    @staticmethod
+    def _queued_reason(cursor: sqlite3.Cursor, run_id: str, operation_id: str) -> str | None:
+        """Return the reason queued for an operation's next attempt, if any.
+
+        Only the latest queued-reason event written after the operation's last
+        ``attempt_started`` applies. Scanning newest first stops at the first
+        match, so the read covers only events since that attempt began.
+        """
+        kinds = ("attempt_started", *_QUEUED_REASON_EVENTS)
+        selected = ",".join("?" for _ in kinds)
+        row = cursor.execute(
+            f"""SELECT event_type, payload_json FROM events
+               WHERE run_id = ? AND operation_id = ? AND event_type IN ({selected})
+               ORDER BY sequence DESC LIMIT 1""",
+            (run_id, operation_id, *kinds),
+        ).fetchone()
+        if row is None or row["event_type"] == "attempt_started":
+            return None
+        reason = _read_json_object(row["payload_json"], "events.payload_json").get("reason")
+        return reason if type(reason) is str else None
 
     @staticmethod
     def _event(
