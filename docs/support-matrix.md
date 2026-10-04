@@ -71,14 +71,14 @@ Tests:
 
 | Provider | Durable text workflows | Jobs profile | Cost recorded | Retries inside the SDK |
 |---|---|---|---|---|
-| `OfflineProvider` | Static plan and echo only | `offline` | Ordinary: blended token estimate. Durable and Jobs: zero | None |
-| `AnthropicProvider` | Rejected | None | Blended token estimate | The Anthropic SDK default |
-| `OpenAIProvider` | Rejected | None | Blended token estimate | The OpenAI SDK default, unless `max_retries` is set |
+| `OfflineProvider` | Static plan and echo only | `offline` | Ordinary: unmarked blended token estimate. Durable and Jobs: zero | None |
+| `AnthropicProvider` | Rejected | None | Unmarked blended token estimate | The Anthropic SDK default |
+| `OpenAIProvider` | Rejected | None | Unmarked blended token estimate | The OpenAI SDK default, unless `max_retries` is set |
 | `OpenAIImageProvider` | Rejected | `openai_image` | Per-call ceiling; without one, a per-image estimate marked incomplete, or unknown | The OpenAI SDK default, unless `max_retries` is set. Jobs sets 0 |
-| `GeminiProvider` | Rejected | `gemini_image` | Text: blended token estimate. Images: as for `OpenAIImageProvider` | None configured |
+| `GeminiProvider` | Rejected | `gemini_image` | Text: unmarked blended token estimate. Images: as for `OpenAIImageProvider` | None configured |
 | `OpenAIResponsesProvider` | `gpt-6-astra`, `gpt-5.6-sol` | None | Exact native price | None; a client with retries is refused |
 | `AnthropicMessagesProvider` | `claude-fable-5-1` | None | Exact native price | None; a client with retries is refused |
-| Custom `Provider` | Rejected | None | Blended token estimate, or its own `cost_usd` | Its own |
+| Custom `Provider` | Rejected | None | Unmarked blended token estimate, or its own `cost_usd` | Its own |
 
 Each path keeps money in its own unit:
 
@@ -89,6 +89,13 @@ Each path keeps money in its own unit:
   `AnthropicMessagesProvider` and image-model `GeminiProvider` calls need
   `max_cost_per_call_usd`; without it the node raises
   `BudgetEstimateRequired` before its call. See [cost guardrails](budgets.md).
+  The native providers, `OpenAIResponsesProvider` and
+  `AnthropicMessagesProvider`, record an unresolved bill as unknown and keep
+  its reservation. The other providers' token-priced costs lose their
+  uncertainty: a blended token estimate leaves `cost_contains_estimates`
+  `False`, and a reply without usage counts as zero tokens and leaves
+  `cost_is_complete` `True`. A call to one of them that raises or times out
+  releases its reservation and records no cost.
 - **Durable text workflows** record integer nanoUSD in the journal for every
   phase (`cost_scope="complete_text_workflow"`), from request-bound quotes.
 - **Jobs** reserve and settle integer micro-USD against each profile's
@@ -139,6 +146,11 @@ Tests:
   `tests/test_workflow_provider.py::test_offline_zero_cost_static_plan_and_echo_no_network`,
   `tests/test_jobs_models.py::test_money_normalizes_to_exact_microdollars`,
   `tests/test_jobs_preflight.py::test_offline_plan_requires_zero_ceiling_and_budget`.
+- Uncertain ordinary-run costs: `tests/test_support_matrix.py::test_ordinary_ledger_does_not_mark_uncertain_costs_from_other_providers`,
+  `tests/test_execution_failure_policies.py::test_terminal_failure_stops_queued_work_and_preserves_original_exception`,
+  `tests/test_execution_failure_policies.py::test_timeout_obeys_failure_policy_and_settles_before_return`
+  and, for the native providers,
+  `tests/test_native_response_accounting.py::test_native_failure_is_terminal_and_preserves_exposure`.
 - Price ceilings for capped runs: `tests/test_provider.py::test_openai_image_hard_budget_requires_inclusive_call_ceiling`,
   `tests/test_provider.py::test_gemini_hard_budget_uses_only_inclusive_call_ceiling`,
   `tests/test_provider_responses.py::test_legacy_budget_requires_inclusive_explicit_ceiling`.

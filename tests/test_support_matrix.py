@@ -273,6 +273,23 @@ def test_native_provider_failure_on_an_ordinary_run_is_terminal_under_a_retry_po
     assert graph.nodes[0].status is NodeStatus.FAILED
 
 
+@pytest.mark.parametrize("make_provider,model,charged", [
+    pytest.param(OfflineProvider, "offline", True, id="blended-estimate"),
+    pytest.param(CustomProvider, "custom", False, id="missing-usage"),
+])
+def test_ordinary_ledger_does_not_mark_uncertain_costs_from_other_providers(
+    make_provider, model, charged,
+):
+    graph = ExecutionGraph([Topology.SERIAL], [Node(id="draft", label="Draft")])
+    result = Swarm(model=model, provider=make_provider(), artifact_dir=None,
+                   max_budget_usd=5).execute(graph)
+    assert result.cost_scope == "execution_and_synthesis"
+    # A blended token estimate is recorded as an exact charge, and a reply
+    # without usage as zero tokens, so the result still reads as complete.
+    assert (result.total_cost_usd > 0) is charged
+    assert not result.cost_contains_estimates and result.cost_is_complete
+
+
 @pytest.mark.parametrize("message,tools", [
     pytest.param(ChatMessage("user", "Look this up"),
                  [ToolSpec("lookup", "Look up a fact", {"type": "object"})], id="tools"),
