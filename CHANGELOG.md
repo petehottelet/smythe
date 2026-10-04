@@ -115,7 +115,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   result's decision as `acceptance`, and `"not_evaluated"` without a record.
 - Checkpoint version 5: a state with a delivery acceptance record keeps it in
   a top-level `delivery_acceptance` block, and `build_state(...,
-  delivery_acceptance=record)` writes it. Ordinary runs still write version
+  delivery_acceptance=record)` writes it. Every version 5 checkpoint names
+  the state features its reader must understand in a top-level `requires`
+  list, here `["delivery_acceptance"]`; a reader refuses a missing list or a
+  feature it does not know, finished or not, and requires the record exactly
+  when it is listed. Ordinary runs still write version
   4, and this build reads versions 1 through 5. Versions 1 to 4 never report
   a record. Resuming a completed version 5 checkpoint checks the saved output
   against the record's digest and returns the record; output the record did

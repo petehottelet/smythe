@@ -767,9 +767,28 @@ def test_resume_refuses_strict_output_that_no_longer_matches_its_record(tmp_path
 def test_resume_refuses_a_completed_strict_checkpoint_without_its_record(tmp_path):
     store = FileCheckpointStore(tmp_path)
     _save(store, 5)
+    state = store.load("saved")
+    state["requires"] = ["delivery_acceptance"]
+    store.save("saved", state)
 
     with pytest.raises(ValueError, match="delivery_acceptance"):
         Swarm(provider=NoCallProvider(), model="test-model", checkpoint_store=store).resume("saved")
+
+
+@pytest.mark.parametrize("status", ["completed", "running"])
+def test_resume_refuses_a_checkpoint_that_requires_an_unknown_feature(tmp_path, status):
+    store = FileCheckpointStore(tmp_path)
+    record = (_acceptance("accepted") if status == "completed"
+              else DeliveryAcceptance("not_evaluated", "b" * 64))
+    _save(store, 5, status=status, acceptance=record)
+    state = store.load("saved")
+    state["requires"].append("attempt_allowance")
+    store.save("saved", state)
+    provider = NoCallProvider()
+
+    with pytest.raises(ValueError, match="attempt_allowance"):
+        Swarm(provider=provider, model="test-model", checkpoint_store=store).resume("saved")
+    assert provider.calls == 0
 
 
 @pytest.mark.parametrize("change", [
@@ -790,7 +809,7 @@ def test_resume_refuses_an_unreadable_acceptance_record(tmp_path, change):
 
 def test_resume_refuses_an_unfinished_strict_checkpoint_before_any_call(tmp_path):
     store = FileCheckpointStore(tmp_path)
-    _save(store, 5, status="running")
+    _save(store, 5, status="running", acceptance=DeliveryAcceptance("not_evaluated", "b" * 64))
     provider = NoCallProvider()
 
     with pytest.raises(ValueError, match="strict delivery acceptance"):

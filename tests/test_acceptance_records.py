@@ -572,17 +572,81 @@ def test_legacy_checkpoints_ignore_a_delivery_acceptance_block(version):
 def test_strict_checkpoint_carries_its_record():
     record = _record("needs_review")
     state = _checkpoint_state(5, acceptance=record)
+    assert state["requires"] == ["delivery_acceptance"]
     assert state["delivery_acceptance"] == record.to_dict()
     assert delivery_acceptance_from_state(state) == record
 
 
-def test_unfinished_strict_checkpoint_may_have_no_record_yet():
-    assert delivery_acceptance_from_state(_checkpoint_state(5, status="running")) is None
+def _pending_record() -> DeliveryAcceptance:
+    return DeliveryAcceptance("not_evaluated", POLICY_HASH)
 
 
-def test_completed_strict_checkpoint_requires_its_record():
+@pytest.mark.parametrize("status", ["running", "failed"])
+def test_unfinished_strict_checkpoint_carries_an_undecided_record(status):
+    record = _pending_record()
+    state = _checkpoint_state(5, status=status, acceptance=record)
+    assert state["requires"] == ["delivery_acceptance"]
+    assert delivery_acceptance_from_state(state) == record
+
+
+@pytest.mark.parametrize("status", ["completed", "running"])
+def test_version_5_without_requirements_has_no_record(status):
+    state = _checkpoint_state(5, status=status)
+    state["requires"] = []
+    assert delivery_acceptance_from_state(state) is None
+
+
+@pytest.mark.parametrize("status", ["completed", "running"])
+def test_version_5_must_list_its_requirements(status):
+    state = _checkpoint_state(5, status=status)
+    state.pop("requires", None)
+    with pytest.raises(ValueError, match="requires"):
+        delivery_acceptance_from_state(state)
+
+
+@pytest.mark.parametrize("requires", ["delivery_acceptance", [1], {"delivery_acceptance": 1}, None])
+def test_version_5_requirements_must_be_a_list_of_names(requires):
+    state = _checkpoint_state(5, acceptance=_record())
+    state["requires"] = requires
+    with pytest.raises(ValueError, match="requires"):
+        delivery_acceptance_from_state(state)
+
+
+@pytest.mark.parametrize("status", ["completed", "running", "failed"])
+def test_version_5_listing_an_unknown_requirement_is_refused(status):
+    record = _record() if status == "completed" else _pending_record()
+    state = _checkpoint_state(5, status=status, acceptance=record)
+    state["requires"] = ["delivery_acceptance", "attempt_allowance"]
+    with pytest.raises(ValueError, match="attempt_allowance"):
+        delivery_acceptance_from_state(state)
+
+
+@pytest.mark.parametrize("status", ["completed", "running"])
+def test_completed_strict_checkpoint_requires_its_record(status):
+    state = _checkpoint_state(5, status=status)
+    state["requires"] = ["delivery_acceptance"]
     with pytest.raises(ValueError, match="delivery_acceptance"):
-        delivery_acceptance_from_state(_checkpoint_state(5))
+        delivery_acceptance_from_state(state)
+
+
+def test_a_record_must_be_listed_as_required():
+    state = _checkpoint_state(5, acceptance=_record())
+    state["requires"] = []
+    with pytest.raises(ValueError, match="requires"):
+        delivery_acceptance_from_state(state)
+
+
+def test_completed_strict_checkpoint_record_holds_a_decision():
+    state = _checkpoint_state(5, acceptance=_record())
+    state["delivery_acceptance"] = _pending_record().to_dict()
+    with pytest.raises(ValueError, match="decision"):
+        delivery_acceptance_from_state(state)
+    with pytest.raises(ValueError, match="decision"):
+        build_state(
+            execution_id="run1", status="completed", model="m", graph=_graph(),
+            registry=Registry(), task=None, max_budget_usd=None, node_costs={}, output=OUTPUT,
+            delivery_acceptance=_pending_record(),
+        )
 
 
 @pytest.mark.parametrize("version", [0, 6, "5", None])
@@ -605,7 +669,9 @@ def test_build_state_writes_the_strict_version_only_with_a_record():
         delivery_acceptance=record,
     )
     assert plain["version"] == 4 and "delivery_acceptance" not in plain
+    assert "requires" not in plain
     assert strict["version"] == 5 and strict["delivery_acceptance"] == record.to_dict()
+    assert strict["requires"] == ["delivery_acceptance"]
 
 
 def test_build_state_refuses_a_record_for_other_output():

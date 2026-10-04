@@ -126,7 +126,7 @@ Notes:
 - A node that a revision added carries `"added_by_revision": true` in its `metadata` (from 0.8.2). `LLMSupervisor` counts these nodes against `max_total_added_nodes`, so resume does not reset the count ([what the cap limits](supervisor.md#safety)). Nodes added before 0.8.2 have no marker and are not counted.
 - `task.done_when` carries the acceptance criteria forward. A resumed run that had forgotten them could not hold its own output to them.
 - `timing` records how long each call that worked on the execution took; see [timing segments](#timing-segments).
-- A version 5 checkpoint adds a top-level `delivery_acceptance` record; see [delivery acceptance](#delivery-acceptance-version-5).
+- A version 5 checkpoint adds a top-level `requires` list and the state it names, such as a `delivery_acceptance` record; see [required state features](#required-state-features-version-5).
 
 ## Timing segments
 
@@ -167,13 +167,37 @@ removed. Costs and consumed regeneration allowances survive the reset.
 Detached snapshot values prevent later metadata mutations from changing a
 checkpoint already handed to a custom store.
 
+## Required state features (version 5)
+
+Version 5 is written only for a state that a build reading version 4 would
+misread. Every version 5 checkpoint carries a top-level `requires` list naming
+the state features its reader must understand:
+
+```json
+"requires": ["delivery_acceptance"]
+```
+
+This build knows one feature, `delivery_acceptance`. A reader refuses, with
+`ValueError` and before any provider call, a version 5 checkpoint whose
+`requires` is missing or is not a list of strings, or that lists a feature it
+does not know, whether the run finished or not. A later feature can therefore
+be added under version 5 without an older reader finishing or delivering a
+run it would misread. `smythe.checkpoint.checkpoint_requirements(state)`
+returns the list after these checks.
+
 ## Delivery acceptance (version 5)
 
 A state that carries a [delivery acceptance record](verifier.md#delivery-acceptance-records)
-is written as version 5, with the record in a top-level `delivery_acceptance`
-block. Ordinary runs make no record and keep writing version 4;
-`build_state(..., delivery_acceptance=record)` writes version 5 and refuses a
-record whose `output_sha256` does not match the state's `output`.
+is written as version 5, lists `delivery_acceptance` in `requires`, and keeps
+the record in a top-level `delivery_acceptance` block. Ordinary runs make no
+record and keep writing version 4; `build_state(..., delivery_acceptance=record)`
+writes version 5 and refuses a record whose `output_sha256` does not match the
+state's `output`, or a `completed` state whose record has no decision.
+
+The record is required exactly when it is listed: a version 5 state that
+lists `delivery_acceptance` without the block, or carries the block without
+listing it, is refused, and so is a `completed` state whose record is
+`not_evaluated`.
 
 ```json
 "delivery_acceptance": {
@@ -214,7 +238,7 @@ record whose `output_sha256` does not match the state's `output`.
 
 Versions 1 through 4 have no record, whatever keys they hold. Resuming one
 returns `acceptance` as `None`: a legacy run is never reported as accepted or
-as not yet evaluated. A completed version 5 checkpoint must carry its block.
+as not yet evaluated.
 
 Resuming a completed version 5 checkpoint first checks that `output` still
 matches `output_sha256`, and raises `ValueError` if it does not. The result's
@@ -259,7 +283,9 @@ resume. See [Cost guardrails](budgets.md).
 This build writes version `4` and reads versions `1` through `5`. It writes
 version `5` only for a state with a [delivery acceptance
 record](#delivery-acceptance-version-5), so builds that read only versions 1
-through 4 refuse it instead of delivering output they cannot check.
+through 4 refuse it instead of delivering output they cannot check. A version
+5 reader also refuses any [required state feature](#required-state-features-version-5)
+it does not know.
 Version 2 added `control` and `task.done_when`; version 1 loads their original
 defaults of zero revisions and no acceptance criteria.
 
