@@ -102,8 +102,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   decisions. A validator is local code with a `ValidatorIdentity` and a
   synchronous `validate(subject)` returning a `ValidationReport`;
   registration refuses providers, classes, coroutine functions, awaitables
-  and an async `validate`. Runs do not evaluate a policy, and `Swarm` takes
-  none. See [delivery acceptance records](docs/verifier.md#delivery-acceptance-records).
+  and an async `validate`, including an object whose `__call__` is async.
+  Runs do not evaluate a policy, and `Swarm` takes none. See
+  [delivery acceptance records](docs/verifier.md#delivery-acceptance-records).
 - `SwarmResult.acceptance` and `SwarmResult.rejected_output`, appended after
   `timing` so positional construction is unchanged, a read-only
   `SwarmResult.accepted` that is true only for an `accepted` record, and

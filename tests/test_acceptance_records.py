@@ -240,6 +240,33 @@ class _Awaitable:
         yield
 
 
+class _AsyncCall:
+    async def __call__(self, subject):
+        return ValidationReport("output")
+
+
+class _AsyncGeneratorCall:
+    async def __call__(self, subject):
+        yield ValidationReport("output")
+
+
+class _SyncCall:
+    def __call__(self, subject):
+        return ValidationReport("output")
+
+
+class _AsyncCallValidate:
+    """``validate`` is an object whose ``__call__`` is a coroutine function."""
+
+    identity = ValidatorIdentity.for_config("async-call", "1")
+    validate = _AsyncCall()
+
+
+class _AsyncGeneratorCallValidate:
+    identity = ValidatorIdentity.for_config("async-generator-call", "1")
+    validate = _AsyncGeneratorCall()
+
+
 class _NoIdentity:
     def validate(self, subject):
         return ValidationReport("output")
@@ -265,6 +292,8 @@ class _ProviderValidator(OfflineProvider):
     (_ProviderValidator(), "Provider"),
     (_async_function, "coroutine function"),
     (_AsyncValidate(), "synchronous"),
+    (_AsyncCallValidate(), "synchronous"),
+    (_AsyncGeneratorCallValidate(), "synchronous"),
     (_Awaitable(), "awaitable"),
     (RequiredHeading, "instance"),
     (_NoIdentity(), "identity"),
@@ -296,6 +325,22 @@ def test_registration_rejects_an_asyncio_future():
 
 def test_registration_returns_the_validator_identity():
     validator = RequiredHeading()
+    assert check_validator(validator) == validator.identity
+
+
+def test_registration_accepts_a_synchronous_callable_validate():
+    class CallableValidate:
+        identity = ValidatorIdentity.for_config("sync-call", "1")
+        validate = _SyncCall()
+
+    class AsyncCallableValidator(RequiredHeading):
+        """Only ``validate`` is called, so the validator's own ``__call__`` does not matter."""
+
+        async def __call__(self):
+            return None
+
+    assert check_validator(CallableValidate()) == CallableValidate.identity
+    validator = AsyncCallableValidator()
     assert check_validator(validator) == validator.identity
 
 

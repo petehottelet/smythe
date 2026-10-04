@@ -11,9 +11,10 @@ Validators are trusted local code registered in-process: an object with a
 :class:`~smythe.validation.ValidatorIdentity` and a synchronous
 ``validate(subject)`` that returns a
 :class:`~smythe.validation.ValidationReport`. Registration refuses providers,
-coroutine functions, awaitables and an ``async`` ``validate``. That check is a
-caller contract, not a sandbox: it cannot detect a synchronous validator that
-performs network I/O or paid calls, which such a validator must not do.
+coroutine functions, awaitables and an ``async`` ``validate``, including an
+object whose ``__call__`` is async. That check is a caller contract, not a
+sandbox: it cannot detect a synchronous validator that performs network I/O or
+paid calls, which such a validator must not do.
 Policies and records store only validator names, versions and configuration
 digests, never code.
 """
@@ -127,13 +128,19 @@ def _is_async(function: Any) -> bool:
     return inspect.iscoroutinefunction(function) or inspect.isasyncgenfunction(function)
 
 
+def _calls_async(function: Any) -> bool:
+    """Whether calling *function* is async, including an object through its ``__call__``."""
+    return _is_async(function) or _is_async(getattr(type(function), "__call__", None))
+
+
 def check_validator(validator: object) -> ValidatorIdentity:
     """Check that *validator* can be registered, and return its identity.
 
     Raises TypeError for a ``Provider``, a class, a coroutine function, an
     awaitable (a coroutine is closed first), an object without a synchronous
-    ``validate()`` or without a :class:`ValidatorIdentity`. This structural
-    check cannot detect a synchronous ``validate()`` that performs I/O.
+    ``validate()`` (an object whose ``__call__`` is async is not one) or
+    without a :class:`ValidatorIdentity`. This structural check cannot
+    detect a synchronous ``validate()`` that performs I/O.
     """
     from smythe.provider import Provider
 
@@ -156,7 +163,7 @@ def check_validator(validator: object) -> ValidatorIdentity:
     validate = getattr(validator, "validate", None)
     if not callable(validate):
         raise TypeError(f"validator {type(validator).__name__} has no validate() method")
-    if _is_async(validate):
+    if _calls_async(validate):
         raise TypeError(
             f"validator {type(validator).__name__} has an async validate(); it must be synchronous"
         )

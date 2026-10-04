@@ -244,10 +244,10 @@ from execution and cost. `smythe.acceptance` defines its types:
   `ValidationReport`, with `outcome="error"` when it cannot decide. `subject`
   is a `ValidationSubject`: the exact bytes, their `sha256` and `text()`.
   Registration refuses a `Provider`, a class, a coroutine function, an
-  awaitable and an `async def validate`. That structural check enforces a
-  caller contract; it is not a sandbox. It cannot see a synchronous
-  `validate()` that makes network requests or paid calls, which a validator
-  must not do.
+  awaitable and an `async def validate`, including a `validate` object whose
+  `__call__` is async. That structural check enforces a caller contract; it
+  is not a sandbox. It cannot see a synchronous `validate()` that makes
+  network requests or paid calls, which a validator must not do.
 
 ```python
 from smythe import AcceptancePolicy, ValidationReport, ValidatorIdentity
