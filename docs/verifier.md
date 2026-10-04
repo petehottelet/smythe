@@ -228,6 +228,13 @@ re-exports the same classes for image validation. A report's `outcome` is
   stated again from the new findings, and checks a stated outcome against
   them. A report read with `from_dict()` states the outcome its data records.
 
+`smythe.assets.validate_image(path, spec, ...)` reads the file once and checks
+that snapshot, so the bytes hashed for a finishing receipt are the bytes
+decoded. `validate_image_bytes(data, spec, ...)` does the same for bytes
+already in memory; it resolves a relative logo or font path only against an
+explicit `base_dir` and otherwise reports the master unavailable, where
+`validate_image` falls back to the working directory.
+
 `report.validator` optionally holds a `ValidatorIdentity`: the validator's
 name, version and `config_sha256`, the SHA-256 of its configuration as
 canonical JSON (`ValidatorIdentity.for_config(name, version, config)` computes

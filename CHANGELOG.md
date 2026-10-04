@@ -281,6 +281,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   bytes that are not UTF-8, and refuse an invalid specification with
   `ValueError`. See
   [built-in final validators](docs/verifier.md#built-in-final-validators).
+- `smythe.assets.validate_image_bytes(data, spec, ...)` validates one
+  in-memory snapshot of image bytes: the bytes hashed for a finishing receipt
+  are the bytes decoded. A relative logo or font path resolves only against
+  an explicit `base_dir`, never the working directory, and is otherwise
+  reported unavailable. See [validation reports](docs/verifier.md#validation-reports).
 
 ### Changed
 
@@ -569,6 +574,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   that records `prompt_assembly: 2` uses the new one, and a saved or
   configured version this release does not support is refused. See
   [the final step](docs/verifier.md#the-final-step).
+- `smythe.assets.validate_image` reads the file once and checks that snapshot.
+  It used to hash the file for a finishing receipt and then open it again to
+  decode it, so bytes replaced between the two reads could pass against a
+  receipt they did not match.
 
 ## [0.9.1] - 2026-09-29
 
