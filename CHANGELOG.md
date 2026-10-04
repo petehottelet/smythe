@@ -62,6 +62,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   [cost guardrails guide](docs/budgets.md#money-units) lists each ledger's
   unit and how amounts convert between them: exactly for confirmed charges,
   up for reservations and unknown exposure, and down for budgets.
+- `Sentinel.cost_contains_token_estimates` reports whether the total prices
+  any call's tokens at the blended `cost_per_token` rate, which
+  `cost_contains_estimates` does not cover. `Sentinel.restore()` accepts the
+  matching `token_estimate_nodes`. Existing flags keep their meaning.
 
 ### Changed
 

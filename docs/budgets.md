@@ -89,7 +89,10 @@ saved responses locally. Its returned accounting separates confirmed charges
 from reserved and unknown exposure. Native prices are dated list prices.
 
 Ordinary text calls without an explicit provider cost still use the configured
-blended token estimate. The [Astra cost campaign](../benchmarks/astra_benchmark_plan.md)
+blended token estimate, `cost_per_token`.
+`Sentinel.cost_contains_token_estimates` reports whether a total includes such
+a call; `cost_contains_estimates` still covers only provider estimates and
+conservative ceilings. The [Astra cost campaign](../benchmarks/astra_benchmark_plan.md)
 requires new records from the complete-workflow path.
 
 [Architecture](architecture.md) · [Checkpoint format](checkpoint-format.md) ·

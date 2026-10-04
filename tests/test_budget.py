@@ -330,6 +330,57 @@ def test_partial_output_estimate_is_retained_but_total_is_incomplete():
     assert tracker.cost_contains_estimates
 
 
+def test_blended_token_cost_is_reported_as_a_token_estimate():
+    tracker = Sentinel(max_budget_usd=1.0, cost_per_token=0.000003)
+    assert not tracker.cost_contains_token_estimates
+
+    tracker.add_cost("draft", CompletionResult(text="hi", prompt_tokens=100, completion_tokens=50))
+
+    assert tracker.cost_contains_token_estimates
+    # The existing flags keep their meaning: no provider estimate or ceiling
+    # was recorded, and every call had a cost.
+    assert not tracker.cost_contains_estimates
+    assert tracker.cost_is_complete
+
+
+def test_zero_blended_rate_is_still_a_token_estimate():
+    tracker = Sentinel(cost_per_token=0.0)
+    tracker.record("draft", CompletionResult(text="hi", prompt_tokens=10, completion_tokens=5))
+    assert tracker.total_cost_usd == 0.0
+    assert tracker.cost_contains_token_estimates
+
+
+@pytest.mark.parametrize("result", [
+    pytest.param(CompletionResult(text="exact", prompt_tokens=10, cost_usd=0.02), id="explicit"),
+    pytest.param(CompletionResult(text="ceiling", cost_usd=0.06, cost_usd_is_estimate=True),
+                 id="provider-estimate"),
+    pytest.param(CompletionResult(text="unknown", prompt_tokens=10, cost_usd_unknown=True),
+                 id="unknown"),
+])
+def test_costs_not_priced_from_tokens_are_not_token_estimates(result):
+    tracker = Sentinel(max_budget_usd=None)
+    tracker.add_cost("node", result)
+    assert not tracker.cost_contains_token_estimates
+
+
+def test_token_estimate_flag_is_unchanged_by_rejected_usage():
+    tracker = Sentinel()
+    result = CompletionResult(text="hi", prompt_tokens=1)
+    result.prompt_tokens = -1  # A custom provider mutated it after construction.
+    with pytest.raises(BudgetValidationError):
+        tracker.add_cost("draft", result)
+    assert not tracker.cost_contains_token_estimates
+
+
+def test_restore_carries_token_estimate_nodes_and_the_flag_is_read_only():
+    tracker = Sentinel()
+    tracker.restore({"draft": 0.5}, token_estimate_nodes={"draft"})
+    assert tracker.cost_contains_token_estimates
+    assert not Sentinel().cost_contains_token_estimates
+    with pytest.raises(AttributeError):
+        tracker.cost_contains_token_estimates = False
+
+
 def test_reservation_rejects_negative_and_duplicate_estimates():
     tracker = Sentinel(max_budget_usd=1.0)
     with pytest.raises(ValueError, match="non-negative"):
