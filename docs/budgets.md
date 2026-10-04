@@ -96,7 +96,9 @@ Ordinary text calls without an explicit provider cost still use the configured
 blended token estimate, `cost_per_token`.
 `Sentinel.cost_contains_token_estimates` reports whether a total includes such
 a call; `cost_contains_estimates` still covers only provider estimates and
-conservative ceilings. The [Astra cost campaign](../benchmarks/astra_benchmark_plan.md)
+conservative ceilings. `Sentinel.token_estimate_nodes` names those calls'
+nodes, and ordinary checkpoints record them, so a resumed run keeps the flag
+([checkpoint format](checkpoint-format.md#schema)). The [Astra cost campaign](../benchmarks/astra_benchmark_plan.md)
 requires new records from the complete-workflow path.
 
 `AnthropicProvider`, `OpenAIProvider` and `GeminiProvider` count a reply

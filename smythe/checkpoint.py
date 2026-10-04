@@ -22,7 +22,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from smythe.acceptance import DeliveryAcceptance, text_sha256
 from smythe.agent import Agent, AgentProfile
@@ -298,6 +298,7 @@ def build_state(
     control: dict[str, Any] | None = None,
     timing: dict[str, Any] | None = None,
     delivery_acceptance: DeliveryAcceptance | None = None,
+    token_estimate_nodes: Iterable[str] | None = None,
 ) -> dict[str, Any]:
     """Assemble a checkpoint state document.
 
@@ -308,6 +309,10 @@ def build_state(
 
     ``timing`` is an informational block of per-process timing segments.
     It is additive within version 4: readers ignore keys they do not use.
+
+    ``token_estimate_nodes`` names the nodes whose recorded cost prices
+    tokens at the blended rate. It is stored, sorted, as
+    ``budget.token_estimate_nodes``, which is also additive within version 4.
 
     ``delivery_acceptance`` makes the state version 5 and stores the record
     under that key. A record that binds an output digest needs the matching
@@ -337,6 +342,8 @@ def build_state(
         "output": output,
         "control": dict(control or {"revisions_used": 0}),
     }
+    if token_estimate_nodes is not None:
+        state["budget"]["token_estimate_nodes"] = sorted(token_estimate_nodes)
     if timing is not None:
         state["timing"] = deepcopy(timing)
     if delivery_acceptance is not None:

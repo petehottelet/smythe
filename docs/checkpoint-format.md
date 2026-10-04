@@ -93,7 +93,8 @@ and recovery controls.
   ],
   "budget": {
     "max_budget_usd": 0.5,
-    "node_costs": {"research": 0.0003}
+    "node_costs": {"research": 0.0003},
+    "token_estimate_nodes": ["research"]
   },
   "output": "…final synthesized output, null until the run completes…",
   "timing": {
@@ -120,6 +121,7 @@ Notes:
   handoff. Both are `null` for a caller-built graph that carries no task.
 - Node `result` values that aren't JSON-serializable are stored as their `str()` form.
 - `budget.max_budget_usd` is the cap the execution started with; resume honors it, not whatever the resuming Swarm was constructed with.
+- `budget.token_estimate_nodes` lists the nodes, including `__synthesis__` for an `LLM_MERGE` synthesis, whose recorded cost prices tokens at the blended `cost_per_token` rate. Resume restores them, so `Sentinel.cost_contains_token_estimates` still reports costs priced before the checkpoint. A value other than a list of node IDs stops resume with `BudgetValidationError`.
 - `control.revisions_used` is how much of the supervisor's `max_revisions` allowance the run has already spent. Resume seeds the executor from it, so the cap bounds the **run**, not each attempt: a crash-resume cycle cannot refill the allowance and revise past the limit the caller set.
 - A node that a revision added carries `"added_by_revision": true` in its `metadata` (from 0.8.2). `LLMSupervisor` counts these nodes against `max_total_added_nodes`, so resume does not reset the count ([what the cap limits](supervisor.md#safety)). Nodes added before 0.8.2 have no marker and are not counted.
 - `task.done_when` carries the acceptance criteria forward. A resumed run that had forgotten them could not hold its own output to them.
@@ -254,6 +256,10 @@ defaults of zero revisions and no acceptance criteria.
 The top-level `timing` block is optional and keeps version `4`. Earlier
 builds ignore the key when they resume and leave it out of the checkpoints
 they write; this build resumes checkpoints that lack it.
+
+`budget.token_estimate_nodes` is optional in the same way. A checkpoint
+without it restores no token estimates, as before the key existed, so
+`cost_contains_token_estimates` then reports only calls made after resume.
 
 Version 4 adds no field. It records that every MCP server listed under
 `agents` came from developer configuration: from 0.8.1 on, a model-generated

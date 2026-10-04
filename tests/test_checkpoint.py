@@ -5,7 +5,9 @@ import json
 
 import pytest
 
+import smythe.swarm as swarm_module
 from smythe.acceptance import AcceptanceSource, DeliveryAcceptance, text_sha256
+from smythe.budget import BudgetValidationError, Sentinel
 from smythe.checkpoint import (
     FileCheckpointStore,
     build_state,
@@ -247,6 +249,105 @@ def test_resume_restores_budget_accounting(tmp_path):
     assert set(final_costs) == {"a", "b", "c"}
     assert result.total_cost_usd == pytest.approx(sum(final_costs.values()))
     assert result.total_cost_usd > cost_after_crash
+
+
+class PricedProvider(Provider):
+    """Reports each call's own USD cost, so the ledger prices no tokens."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        self.calls += 1
+        return CompletionResult(text="priced", prompt_tokens=10, completion_tokens=10, cost_usd=0.01)
+
+
+def _record_budgets(monkeypatch) -> list[Sentinel]:
+    """Collect every Sentinel a Swarm creates from here on."""
+    budgets: list[Sentinel] = []
+
+    class RecordingSentinel(Sentinel):
+        def __init__(self, *args, **kwargs) -> None:
+            super().__init__(*args, **kwargs)
+            budgets.append(self)
+
+    monkeypatch.setattr(swarm_module, "Sentinel", RecordingSentinel)
+    return budgets
+
+
+def _run_budget(budgets: list[Sentinel]) -> Sentinel:
+    [budget] = [item for item in budgets if set(item.breakdown()) == {"a", "b", "c"}]
+    return budget
+
+
+def _crash_after_a_token_priced_node(store) -> str:
+    # Node "a" reports tokens and no USD cost, so the ledger prices them at
+    # the blended rate; node "b" then fails.
+    swarm = Swarm(provider=ScriptedProvider(fail_labels={"B"}), model="test-model",
+                  checkpoint_store=store)
+    with pytest.raises(RuntimeError, match="boom: B"):
+        swarm.execute(_serial_graph())
+    [execution_id] = store.list_ids()
+    return execution_id
+
+
+def test_resume_keeps_the_token_estimates_recorded_before_the_crash(tmp_path, monkeypatch):
+    """Regression: a resumed run forgot which restored costs were token estimates."""
+    store = FileCheckpointStore(tmp_path)
+    execution_id = _crash_after_a_token_priced_node(store)
+
+    budgets = _record_budgets(monkeypatch)
+    result = Swarm(provider=PricedProvider(), model="test-model",
+                   checkpoint_store=store).resume(execution_id)
+    # The resumed calls report their own cost, so only the restored node
+    # can make the total a token estimate.
+    budget = _run_budget(budgets)
+    assert budget.cost_contains_token_estimates
+    assert result.cost_is_complete and not result.cost_contains_estimates
+    assert budget.token_estimate_nodes == {"a"}
+    assert store.load(execution_id)["budget"]["token_estimate_nodes"] == ["a"]
+
+    # Returning the stored result of the finished run restores them too.
+    budgets.clear()
+    provider = PricedProvider()
+    Swarm(provider=provider, model="test-model", checkpoint_store=store).resume(execution_id)
+    assert _run_budget(budgets).cost_contains_token_estimates and provider.calls == 0
+
+
+def test_a_checkpoint_without_token_estimates_resumes_as_before(tmp_path, monkeypatch):
+    store = FileCheckpointStore(tmp_path)
+    execution_id = _crash_after_a_token_priced_node(store)
+    state = store.load(execution_id)
+    del state["budget"]["token_estimate_nodes"]  # written before the key existed
+    store.save(execution_id, state)
+
+    budgets = _record_budgets(monkeypatch)
+    Swarm(provider=PricedProvider(), model="test-model", checkpoint_store=store).resume(execution_id)
+    assert not _run_budget(budgets).cost_contains_token_estimates
+    assert store.load(execution_id)["budget"]["token_estimate_nodes"] == []
+
+
+def test_checkpoint_records_a_token_priced_merge_with_its_nodes(tmp_path):
+    store = FileCheckpointStore(tmp_path)
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[Node(id="a", label="A")])
+    result = Swarm(provider=ScriptedProvider(), model="test-model", checkpoint_store=store,
+                   synthesizer=Synthesizer(strategy=SynthesisStrategy.LLM_MERGE)).execute(graph)
+    budget = store.load(result.execution_id)["budget"]
+    assert budget["token_estimate_nodes"] == ["__synthesis__", "a"]
+
+
+@pytest.mark.parametrize("value", ["a", ["a", 1], {"a": True}, None])
+def test_resume_refuses_unreadable_token_estimates_before_any_call(tmp_path, value):
+    store = FileCheckpointStore(tmp_path)
+    execution_id = _crash_after_a_token_priced_node(store)
+    state = store.load(execution_id)
+    state["budget"]["token_estimate_nodes"] = value
+    store.save(execution_id, state)
+
+    provider = PricedProvider()
+    with pytest.raises(BudgetValidationError, match="token_estimate_nodes"):
+        Swarm(provider=provider, model="test-model", checkpoint_store=store).resume(execution_id)
+    assert provider.calls == 0
 
 
 def test_resume_of_completed_execution_returns_stored_result(tmp_path):

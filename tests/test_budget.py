@@ -381,6 +381,19 @@ def test_restore_carries_token_estimate_nodes_and_the_flag_is_read_only():
         tracker.cost_contains_token_estimates = False
 
 
+def test_token_estimate_nodes_names_token_priced_nodes_in_a_snapshot():
+    tracker = Sentinel()
+    tracker.add_cost("draft", CompletionResult(text="hi", prompt_tokens=1))
+    tracker.add_cost("image", CompletionResult(text="img", cost_usd=0.04))
+    nodes = tracker.token_estimate_nodes
+    assert nodes == frozenset({"draft"})
+    # A later restore adds to the set without changing the earlier snapshot.
+    tracker.restore({"earlier": 0.1}, token_estimate_nodes={"earlier"})
+    assert nodes == {"draft"} and tracker.token_estimate_nodes == {"draft", "earlier"}
+    with pytest.raises(AttributeError):
+        tracker.token_estimate_nodes = frozenset()
+
+
 def test_reservation_rejects_negative_and_duplicate_estimates():
     tracker = Sentinel(max_budget_usd=1.0)
     with pytest.raises(ValueError, match="non-negative"):

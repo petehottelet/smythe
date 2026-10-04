@@ -217,6 +217,14 @@ class Sentinel:
         """
         return bool(self._token_estimate_nodes)
 
+    @property
+    def token_estimate_nodes(self) -> frozenset[str]:
+        """IDs of the nodes whose cost prices tokens at ``cost_per_token``.
+
+        ``restore()`` takes the same IDs, and ordinary checkpoints record them.
+        """
+        return frozenset(self._token_estimate_nodes)
+
     def mark_unknown(self, node_id: str) -> None:
         """Mark unresolved billing without inventing usage or releasing exposure."""
         self._unknown_cost_nodes.add(node_id)
@@ -413,9 +421,10 @@ class Sentinel:
         """Seed per-node costs from a checkpoint so a resumed execution
         keeps counting against the same budget.
 
-        Ordinary checkpoints do not record which costs were priced from
-        tokens, so ``cost_contains_token_estimates`` counts a restored cost
-        only when ``token_estimate_nodes`` names its node.
+        ``cost_contains_token_estimates`` counts a restored cost only when
+        ``token_estimate_nodes`` names its node. Ordinary checkpoints record
+        those nodes under ``budget.token_estimate_nodes``; one written before
+        that key existed names none.
         """
         if not isinstance(node_costs, Mapping):
             raise BudgetValidationError("Checkpoint costs must be a mapping of node IDs to USD")

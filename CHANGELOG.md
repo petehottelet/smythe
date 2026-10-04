@@ -64,8 +64,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   up for reservations and unknown exposure, and down for budgets.
 - `Sentinel.cost_contains_token_estimates` reports whether the total prices
   any call's tokens at the blended `cost_per_token` rate, which
-  `cost_contains_estimates` does not cover. `Sentinel.restore()` accepts the
-  matching `token_estimate_nodes`. Existing flags keep their meaning.
+  `cost_contains_estimates` does not cover. `Sentinel.token_estimate_nodes`
+  names those calls' nodes and `Sentinel.restore()` accepts them. Ordinary
+  checkpoints record them under `budget.token_estimate_nodes`, still at
+  version 4, so a resumed run keeps the flag; a checkpoint without the key
+  restores none, and one whose value is not a list of node IDs stops resume
+  with `BudgetValidationError`. Existing flags keep their meaning.
 - `AnthropicProvider`, `OpenAIProvider` and `GeminiProvider` accept
   `missing_usage="unknown"`. A reply without usage, or with an unset token
   count, then marks its cost unknown (`cost_usd_unknown`) instead of counting

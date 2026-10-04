@@ -682,6 +682,7 @@ class Swarm:
                 output=output,
                 created_at=created_at,
                 timing=timing.checkpoint_block(),
+                token_estimate_nodes=budget.token_estimate_nodes,
             )
             if accounting_error is not None:
                 state["budget"]["accounting_error"] = accounting_error
@@ -792,6 +793,12 @@ class Swarm:
         budget_state = state.get("budget", {})
         if not isinstance(budget_state, dict):
             raise BudgetValidationError("Checkpoint budget must be an object")
+        # Checkpoints written before this list existed name no token estimates.
+        token_estimate_nodes = budget_state.get("token_estimate_nodes", [])
+        if not isinstance(token_estimate_nodes, list) or not all(
+            isinstance(node_id, str) for node_id in token_estimate_nodes
+        ):
+            raise BudgetValidationError("Checkpoint token_estimate_nodes must be a list of node IDs")
         budget = Sentinel(budget_state.get("max_budget_usd"))
         budget.restore(
             budget_state.get("node_costs", {}),
@@ -803,6 +810,7 @@ class Swarm:
                 node.id for node in graph.nodes
                 if node.metadata.get("cost_usd_is_estimate")
             },
+            token_estimate_nodes=set(token_estimate_nodes),
         )
         invalid_nodes = [node.id for node in graph.nodes if node.metadata.get("accounting_invalid")]
         if invalid_nodes or "accounting_error" in budget_state:
