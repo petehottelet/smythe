@@ -608,6 +608,20 @@ def test_verdict_passed_must_be_exactly_true(passed, sync):
     assert event["label"] == f"verdict 'passed' must be a bool, got {passed!r}: judge said no"
 
 
+@pytest.mark.parametrize("sync", [False, True])
+@pytest.mark.parametrize("reason", [None, ["missing heading"]])
+def test_failed_verdict_without_a_text_reason_still_regenerates(reason, sync):
+    """A custom verifier's missing or non-text reason sends work back, not the run down."""
+    graph = _gated_graph(max_regenerations=2)
+    provider = ScriptedProvider({"draft": ["v1", "v2"], "judge": ["anything"]})
+    verifier = _QueuedVerifier(Verdict(passed=False, reason=reason), Verdict(passed=True, reason="fine"))
+    _run(graph, provider, verifier=verifier, sync=sync)
+
+    assert provider.runs["draft"] == 2
+    assert graph.nodes[0].result == "v2"
+    assert graph.nodes[1].metadata["verification_receipt"]["passed"] is True
+
+
 def test_sync_executor_regenerates():
     graph = _gated_graph()
     provider = ScriptedProvider({

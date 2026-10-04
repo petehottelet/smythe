@@ -563,10 +563,16 @@ def rejection_reason(verdict: Verdict) -> str:
     """Why a verdict that is not exactly ``passed=True`` fails its gate.
 
     ``passed`` must be a bool.  A custom verifier's truthy ``"false"`` or
-    ``1`` is a failed verdict, never a pass, and its reason says so.
+    ``1`` is a failed verdict, never a pass, and its reason says so.  The
+    reason is always text: a missing reason is empty and any other value is
+    shown by type, so a regeneration intent can always be saved.
     """
     if verdict.passed is False:
-        return verdict.reason
+        if isinstance(verdict.reason, str):
+            return verdict.reason
+        if verdict.reason is None:
+            return ""
+        return _clip(f"verdict reason must be text, got {_shown(verdict.reason)}")
     reason = f"verdict 'passed' must be a bool, got {_shown(verdict.passed)}"
     if isinstance(verdict.reason, str) and verdict.reason:
         reason += f": {verdict.reason}"
