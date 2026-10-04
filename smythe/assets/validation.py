@@ -1,10 +1,12 @@
-"""Deterministic validation gates for finished image assets."""
+"""Deterministic validation gates for finished image assets.
+
+The finding and report types live in :mod:`smythe.validation`, which needs no
+image library; they are re-exported here unchanged.
+"""
 
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
-from enum import StrEnum
 from pathlib import Path
 from typing import Iterable
 
@@ -16,93 +18,13 @@ from smythe.assets.models import (
     BrandSpec,
     TextPolicy,
 )
-
-
-class FindingSeverity(StrEnum):
-    """Whether a finding can fail deterministic acceptance."""
-
-    HARD = "hard"
-    ADVISORY = "advisory"
-
-
-@dataclass(frozen=True, slots=True)
-class ValidationFinding:
-    """One stable, machine-readable validation observation."""
-
-    code: str
-    message: str
-    severity: FindingSeverity = FindingSeverity.HARD
-    expected: object | None = None
-    observed: object | None = None
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.code, str) or not self.code.strip():
-            raise ValueError("finding code must be a non-empty string")
-        if not isinstance(self.message, str) or not self.message.strip():
-            raise ValueError("finding message must be a non-empty string")
-        object.__setattr__(self, "code", self.code.strip())
-        object.__setattr__(self, "message", self.message.strip())
-        try:
-            severity = FindingSeverity(self.severity)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(f"unknown finding severity: {self.severity!r}") from exc
-        object.__setattr__(self, "severity", severity)
-
-
-@dataclass(frozen=True, slots=True)
-class ValidationReport:
-    """A report whose pass state is controlled only by hard findings."""
-
-    path: str
-    findings: tuple[ValidationFinding, ...] = ()
-
-    @property
-    def hard_findings(self) -> tuple[ValidationFinding, ...]:
-        return tuple(
-            finding for finding in self.findings if finding.severity == FindingSeverity.HARD
-        )
-
-    @property
-    def advisories(self) -> tuple[ValidationFinding, ...]:
-        return tuple(
-            finding for finding in self.findings if finding.severity == FindingSeverity.ADVISORY
-        )
-
-    @property
-    def passed(self) -> bool:
-        return not self.hard_findings
-
-
-def hard_finding(
-    code: str,
-    message: str,
-    *,
-    expected: object | None = None,
-    observed: object | None = None,
-) -> ValidationFinding:
-    return ValidationFinding(
-        code=code,
-        message=message,
-        severity=FindingSeverity.HARD,
-        expected=expected,
-        observed=observed,
-    )
-
-
-def advisory_finding(
-    code: str,
-    message: str,
-    *,
-    expected: object | None = None,
-    observed: object | None = None,
-) -> ValidationFinding:
-    return ValidationFinding(
-        code=code,
-        message=message,
-        severity=FindingSeverity.ADVISORY,
-        expected=expected,
-        observed=observed,
-    )
+from smythe.validation import (
+    FindingSeverity,
+    ValidationFinding,
+    ValidationReport,
+    advisory_finding,
+    hard_finding,
+)
 
 
 def _resolve(path: str | os.PathLike[str], base_dir: Path) -> Path:

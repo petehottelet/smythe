@@ -585,3 +585,31 @@ def test_receipt_can_be_required_as_a_hard_gate(tmp_path):
     report = validate_image(image, spec, require_receipt=True)
     assert not report.passed
     assert [finding.code for finding in report.hard_findings] == ["receipt_missing"]
+
+
+def test_validation_types_are_reexported_from_their_image_free_module():
+    import smythe.assets
+    import smythe.assets.validation
+    import smythe.validation
+
+    for name in ("FindingSeverity", "ValidationFinding", "ValidationReport",
+                 "advisory_finding", "hard_finding"):
+        shared = getattr(smythe.validation, name)
+        assert getattr(smythe.assets, name) is shared
+        assert getattr(smythe.assets.validation, name) is shared
+        assert name in smythe.assets.__all__
+        assert name in smythe.assets.validation.__all__
+
+
+def test_image_validation_reports_derive_their_outcome(tmp_path):
+    from smythe.validation import ValidationReport
+
+    image = _image(tmp_path / "hero.png", size=(100, 100))
+    passing = validate_image(image, AssetSpec(id="hero", prompt="x", width=100, height=100))
+    failing = validate_image(image, AssetSpec(id="hero", prompt="x", width=50, height=50))
+
+    assert (passing.outcome, passing.passed, passing.validator) == ("passed", True, None)
+    assert (failing.outcome, failing.passed) == ("rejected", False)
+    data = failing.to_dict()
+    assert data["findings"][0]["expected"] == [50, 50]  # tuples become JSON arrays
+    assert ValidationReport.from_dict(data).to_dict() == data

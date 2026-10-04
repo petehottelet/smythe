@@ -74,6 +74,16 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `cost_is_complete=False`. The default, `"zero"`, keeps the current
   behavior. A Gemini image's per-call ceiling or per-image cost is never
   affected.
+- `smythe.validation` holds `ValidationReport`, `ValidationFinding`,
+  `FindingSeverity` and their `hard_finding`/`advisory_finding` helpers
+  without importing Pillow; `smythe.assets` re-exports the same classes. A
+  report has an `outcome` of `passed`, `rejected` or `error`, derived from its
+  hard findings unless the validator states it, and an `error` report never
+  passes. A report can name its `validator` with a `ValidatorIdentity`: name,
+  version and the SHA-256 of the validator's canonical JSON configuration.
+  Reports, findings and identities convert with `to_dict()` and `from_dict()`.
+  A report's findings must be `ValidationFinding` values and are kept as a
+  tuple. See [validation reports](docs/verifier.md#validation-reports).
 
 ### Changed
 

@@ -178,9 +178,9 @@ The function decides the gate only through an explicit bool. It may return:
 - a `Verdict(passed=..., reason=...)` whose `passed` is a bool, when you want
   the reason recorded in the trace; or
 - an object with a bool `passed` attribute, such as a
-  `smythe.assets.ValidationReport`. Its `reason` or `summary` string becomes
-  the verdict's reason; a failing report without either lists up to four of
-  its hard findings as `code: message`.
+  [`ValidationReport`](#validation-reports). Its `reason` or `summary` string
+  becomes the verdict's reason; a failing report without either lists up to
+  four of its hard findings as `code: message`.
 
 Anything else **fails** the gate, with a reason that names the returned type
 (`verifier returned str`). The string `"FAIL"`, a non-empty list of
@@ -193,6 +193,27 @@ The executor holds every `Verifier` to the same rule: a verdict passes only
 when its `passed` is exactly `True`. A custom verifier's
 `Verdict(passed="false")` or `Verdict(passed=1)` is a failed verdict, and the
 regeneration span records `verdict 'passed' must be a bool`.
+
+### Validation reports
+
+`smythe.validation` defines `ValidationReport`, `ValidationFinding` and
+`FindingSeverity` without importing an image library; `smythe.assets`
+re-exports the same classes for image validation. A report's `outcome` is
+`passed`, `rejected` or `error`:
+
+- Without a stated outcome, a report with no hard findings is `passed` and
+  one with any hard finding is `rejected`. Advisory findings never decide it.
+- A validator that could not decide states `outcome="error"`. An `error`
+  report never passes, so as a gate result it fails.
+- A stated outcome must agree with the findings: a `passed` report has no
+  hard findings and a `rejected` report has at least one.
+
+`report.validator` optionally holds a `ValidatorIdentity`: the validator's
+name, version and `config_sha256`, the SHA-256 of its configuration as
+canonical JSON (`ValidatorIdentity.for_config(name, version, config)` computes
+it). `to_dict()` and `from_dict()` convert reports, findings and identities to
+and from JSON data; a tuple in a finding's `expected` or `observed` value
+becomes a JSON array, and `from_dict()` rejects unknown keys and outcomes.
 
 ## Gating from YAML and from a generated plan
 
