@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
 from smythe._errors import PicklableError
+from smythe.acceptance import AcceptanceMode, AcceptancePolicy
 from smythe.agent import Agent
 from smythe.budget import (
     BudgetEstimateRequired,
@@ -33,8 +34,8 @@ from smythe.task import render_task, snapshot_task
 from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
 from smythe.tracer import Tracer
 from smythe.verifier import (
-    TokenVerifier, Verifier, VerificationRecoveryError, node_generation, rejection_reason,
-    verification_integer, validate_verification_receipt,
+    ADVISORY_VERDICT_KEY, TokenVerifier, Verifier, VerificationRecoveryError, node_generation,
+    read_verdict, rejection_reason, verification_integer, validate_verification_receipt,
 )
 from smythe.workflow_store import WorkflowError
 
@@ -210,6 +211,12 @@ class ExecutorBase:
     Provides constructor, prompt building, dependency lookup, the
     tool-calling loop, and node-by-id helpers.  Subclasses implement
     ``run()`` and drive ``acall_node()`` (sync or async).
+
+    With a strict ``acceptance`` policy, every gate's final verdict is read
+    and recorded for delivery acceptance: an exhausted gate's last verdict, a
+    gate without regenerations under ``advisory_verdict``, and a verdict that
+    cannot be read or a verifier that raises as an undecided outcome that
+    ends the gate without regeneration. Without one, gates behave as before.
     """
 
     def __init__(
@@ -231,7 +238,14 @@ class ExecutorBase:
         on_control_update: Callable[[], None] | None = None,
         provider_call_factory: Callable[[Node, str, int, int], Provider] | None = None,
         on_supervision_update: Callable[[Node, bool], None] | None = None,
+        *,
+        acceptance: AcceptancePolicy | None = None,
     ) -> None:
+        if acceptance is not None and not isinstance(acceptance, AcceptancePolicy):
+            raise TypeError(
+                f"acceptance must be an AcceptancePolicy or None, not {type(acceptance).__name__}"
+            )
+        self._strict = acceptance is not None and acceptance.mode is AcceptanceMode.STRICT
         self._provider = provider
         self._provider_call_factory = provider_call_factory
         self._workflow_managed = (
@@ -373,7 +387,7 @@ class ExecutorBase:
     def begin_verification(self, node: Node, graph: ExecutionGraph) -> None:
         """Bind the judge's request to the version of its target it observes."""
         node_generation(node)
-        if node.verifies and node.max_regenerations > 0:
+        if node.verifies and (node.max_regenerations > 0 or self._strict):
             target = self._cached_node_by_id(node.verifies, graph)
             node.metadata["verification_target_generation"] = (
                 node_generation(target) if target is not None else None
@@ -415,7 +429,11 @@ class ExecutorBase:
         if existing is not None:
             self._validate_regeneration(node, graph, existing)
             return existing
-        if node.status is not NodeStatus.COMPLETED or not node.verifies or node.max_regenerations <= 0:
+        if node.status is not NodeStatus.COMPLETED or not node.verifies:
+            return None
+        if node.max_regenerations <= 0:
+            if self._strict:
+                self._record_advisory_verdict(node, graph)
             return None
         receipt = node.metadata.get("verification_receipt")
         # Completed legacy/manual nodes are not silently rejudged.
@@ -433,16 +451,21 @@ class ExecutorBase:
             raise VerificationRecoveryError(f"Verifier {node.id!r} observed an obsolete target")
         if receipt.get("target_id") != node.verifies:
             raise VerificationRecoveryError(f"Verifier {node.id!r} target identity changed")
-        if not valid_target or used >= node.max_regenerations:
-            node.metadata["verification_receipt"] = dict(receipt, state="consumed", reason="unavailable or exhausted")
-            self.notify_control_update(node)
-            return None
-        verdict = self._verifier.verdict(node, target)
-        # Only an exact True passes; a truthy "false" from a custom verifier fails.
-        if verdict.passed is True:
-            node.metadata["verification_receipt"] = dict(receipt, state="consumed", passed=True, reason=verdict.reason)
-            self.notify_control_update(node)
-            return None
+        if self._strict:
+            verdict = self._read_final_verdict(node, receipt, target if valid_target else None, used)
+            if verdict is None:
+                return None
+        else:
+            if not valid_target or used >= node.max_regenerations:
+                node.metadata["verification_receipt"] = dict(receipt, state="consumed", reason="unavailable or exhausted")
+                self.notify_control_update(node)
+                return None
+            verdict = self._verifier.verdict(node, target)
+            # Only an exact True passes; a truthy "false" from a custom verifier fails.
+            if verdict.passed is True:
+                node.metadata["verification_receipt"] = dict(receipt, state="consumed", passed=True, reason=verdict.reason)
+                self.notify_control_update(node)
+                return None
         intent = {
             "version": 1, "target_id": target.id, "target_generation": node_generation(target),
             "judge_generation": node_generation(node), "reason": rejection_reason(verdict),
@@ -453,6 +476,63 @@ class ExecutorBase:
         node.metadata["regeneration_intent"] = intent
         self.notify_control_update(node)
         return intent
+
+    def _judge(self, node: Node, target: Node) -> tuple[str, str, Any]:
+        """Strict mode: the verdict's outcome, reason and the verdict itself.
+
+        A verifier that raises gives an ``error`` outcome rather than
+        stopping the run, so the gate ends undecided.
+        """
+        try:
+            verdict = self._verifier.verdict(node, target)
+        except Exception as exc:
+            return "error", f"verifier raised {type(exc).__name__}", None
+        outcome, reason = read_verdict(verdict)
+        return outcome, reason, verdict
+
+    def _read_final_verdict(
+        self, node: Node, receipt: dict, target: Node | None, used: int,
+    ) -> Any:
+        """Strict mode: consume the receipt unless a rejection may still regenerate.
+
+        Returns the rejecting verdict while regenerations remain. Otherwise
+        the receipt records the outcome: a pass, an exhausted gate's failing
+        final verdict, or an ``error`` (an unavailable target, an unreadable
+        verdict or a raising verifier), which consumes no regeneration.
+        """
+        if target is None:
+            outcome, reason = "error", "verification target unavailable"
+        else:
+            outcome, reason, verdict = self._judge(node, target)
+            if outcome == "rejected" and used < node.max_regenerations:
+                return verdict
+        fields: dict[str, Any] = {"outcome": outcome, "passed": outcome == "passed", "reason": reason}
+        if outcome == "rejected":
+            fields["exhausted"] = True
+        node.metadata["verification_receipt"] = dict(receipt, state="consumed", **fields)
+        self.notify_control_update(node)
+        return None
+
+    def _record_advisory_verdict(self, node: Node, graph: ExecutionGraph) -> None:
+        """Strict mode: read a gate without regenerations once and record its verdict."""
+        generation = node_generation(node)
+        recorded = node.metadata.get(ADVISORY_VERDICT_KEY)
+        if (isinstance(recorded, dict) and type(recorded.get("judge_generation")) is int
+                and recorded["judge_generation"] == generation):
+            return
+        target = self._cached_node_by_id(node.verifies, graph)
+        if target is None or target.status is not NodeStatus.COMPLETED:
+            outcome, reason = "error", "verification target unavailable"
+        elif node.metadata.get("verification_target_generation") != node_generation(target):
+            outcome, reason = "error", "the judge observed an obsolete target"
+        else:
+            outcome, reason, _ = self._judge(node, target)
+        node.metadata[ADVISORY_VERDICT_KEY] = {
+            "version": 1, "judge_generation": generation, "target_id": node.verifies,
+            "target_generation": node_generation(target) if target is not None else None,
+            "outcome": outcome, "passed": outcome == "passed", "reason": reason,
+        }
+        self.notify_control_update(node)
 
     def _validate_regeneration(self, node: Node, graph: ExecutionGraph, intent: dict) -> None:
         if (not isinstance(intent, dict) or type(intent.get("version")) is not int
@@ -497,7 +577,8 @@ class ExecutorBase:
             candidate.status = NodeStatus.PENDING
             candidate.result = None
             candidate.metadata["execution_generation"] = intent["affected_generations"][candidate.id] + 1
-            for key in ("artifacts", "artifacts_discarded", "verification_receipt", "verification_target_generation"):
+            for key in ("artifacts", "artifacts_discarded", "verification_receipt",
+                        "verification_target_generation", ADVISORY_VERDICT_KEY):
                 candidate.metadata.pop(key, None)
         node.metadata.pop("regeneration_intent", None)
         self.notify_control_update(node)

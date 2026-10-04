@@ -187,7 +187,8 @@ is that of its final attempt.
 resuming call's spans and elapsed time, with `resumed` true and
 `latency_complete` false. Each record also keeps the result's
 `cost_is_complete` and `cost_contains_estimates` flags, and `acceptance` is
-`not_evaluated`: delivery acceptance is not evaluated yet. Records written
+the decision of a [strict acceptance policy](verifier.md#strict-delivery-acceptance),
+or `not_evaluated` for a run without one. Records written
 before these fields existed recall with them `null`, meaning not recorded, and
 recall skips rows where they are malformed. Planner prompts still show only the
 summed node time.

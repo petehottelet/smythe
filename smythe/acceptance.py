@@ -28,7 +28,7 @@ import inspect
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from smythe.task import Task, task_to_dict
 from smythe.validation import (
@@ -39,6 +39,10 @@ from smythe.validation import (
     _require_keys,
     _require_sha256,
 )
+from smythe.verifier import gate_disposition, node_generation
+
+if TYPE_CHECKING:
+    from smythe.graph import ExecutionGraph, Node
 
 DELIVERY_ACCEPTANCE_VERSION = 1
 SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS = (1,)
@@ -452,6 +456,133 @@ def _unique(values: list[str], what: str) -> None:
         raise ValueError(f"delivery acceptance has duplicate {what}: {duplicates}")
 
 
+def _clip(text: str) -> str:
+    return text[:300]
+
+
+def _final_check(
+    validator: Validator, identity: ValidatorIdentity, subject: ValidationSubject,
+) -> tuple[ValidationOutcome, str]:
+    """Run one final validator on *subject*; anything but a valid report is ``error``."""
+    name = f"final validator {identity.name!r}"
+    try:
+        report = validator.validate(subject)
+    except Exception as exc:
+        return ValidationOutcome.ERROR, f"{name} raised {type(exc).__name__}"
+    if inspect.isawaitable(report):
+        if inspect.iscoroutine(report):
+            report.close()
+        return ValidationOutcome.ERROR, f"{name} returned an awaitable; validate() must be synchronous"
+    if not isinstance(report, ValidationReport):
+        return ValidationOutcome.ERROR, (
+            f"{name} returned {type(report).__name__}, not a ValidationReport"
+        )
+    if report.validator is not None and report.validator != identity:
+        return ValidationOutcome.ERROR, f"{name} returned a report for another validator"
+    if report.outcome is ValidationOutcome.PASSED:
+        return ValidationOutcome.PASSED, ""
+    findings = "; ".join(f"{item.code}: {item.message}" for item in report.findings[:4])
+    findings = f": {findings}" if findings else ""
+    if report.outcome is ValidationOutcome.REJECTED:
+        return ValidationOutcome.REJECTED, f"{name} rejected the output{findings}"
+    return ValidationOutcome.ERROR, f"{name} could not decide{findings}"
+
+
+def evaluate_delivery(
+    policy: AcceptancePolicy,
+    graph: ExecutionGraph,
+    output: str,
+    *,
+    strategy: str,
+    sources: Sequence[Node],
+    used_fallback: bool = False,
+    task: Task | None = None,
+) -> DeliveryAcceptance:
+    """Decide delivery acceptance for exactly *output* under a strict *policy*.
+
+    *output* is the synthesized text as delivered; *strategy* names the
+    synthesis that produced it (``custom`` for a synthesizer other than
+    ``Synthesizer``), and *sources* are the nodes it came from. Every final
+    validator runs, with no provider call, on the UTF-8 bytes of *output*,
+    and every gate in *graph* is read from its recorded final verdict.
+
+    The decision is ``rejected`` when a final validator rejects the output,
+    then ``policy.on_exhausted`` when a gate's final verdict fails, then
+    ``policy.on_invalid`` when a validator or gate could not decide or a
+    source delivered files whose bytes are not hashed. Otherwise the output
+    is ``accepted`` when it has final validators, all passed, or when the
+    policy allows gate acceptance and it is, byte for byte, the result of the
+    single ``deliverable`` source a passed gate judged at its current
+    generation. Any other output is covered by no check: ``policy.on_invalid``.
+    """
+    if not isinstance(policy, AcceptancePolicy) or policy.mode is not AcceptanceMode.STRICT:
+        raise ValueError("evaluate_delivery needs a strict AcceptancePolicy")
+    if not isinstance(output, str):
+        raise TypeError(
+            f"strict delivery acceptance checks text output, not {type(output).__name__}"
+        )
+    subject = ValidationSubject.from_text(output)
+    rejected: list[str] = []
+    exhausted: list[str] = []
+    invalid: list[str] = []
+    results: list[ValidatorResult] = []
+    for validator, identity in zip(policy.final_validators, policy.validator_identities):
+        outcome, reason = _final_check(validator, identity, subject)
+        results.append(ValidatorResult(identity, outcome))
+        if outcome is ValidationOutcome.REJECTED:
+            rejected.append(reason)
+        elif outcome is ValidationOutcome.ERROR:
+            invalid.append(reason)
+    passed_targets: set[str] = set()
+    for node in graph.nodes:
+        if not node.verifies:
+            continue
+        outcome, reason = gate_disposition(node, graph)
+        if outcome == "passed":
+            passed_targets.add(node.verifies)
+        elif outcome == "rejected":
+            exhausted.append(reason)
+        else:
+            invalid.append(reason)
+    for node in sources:
+        if node.metadata.get("artifacts"):
+            invalid.append(
+                f"node {node.id!r} delivered files whose bytes are not hashed; strict "
+                "acceptance supports text deliverables only"
+            )
+    if rejected:
+        decision, reasons = AcceptanceDecision.REJECTED, rejected + exhausted + invalid
+    elif exhausted:
+        decision, reasons = policy.on_exhausted, exhausted + invalid
+    elif invalid:
+        decision, reasons = policy.on_invalid, invalid
+    elif results:
+        decision, reasons = AcceptanceDecision.ACCEPTED, ["every final validator passed"]
+    elif (policy.allow_gate_acceptance and strategy == "deliverable" and not used_fallback
+          and len(sources) == 1 and sources[0].result == output
+          and sources[0].id in passed_targets):
+        decision = AcceptanceDecision.ACCEPTED
+        reasons = [f"a passed gate judged {sources[0].id!r}, whose result is the delivered output"]
+    else:
+        decision = policy.on_invalid
+        if strategy != "deliverable" or used_fallback:
+            shown = "the deliverable fallback" if strategy == "deliverable" else f"{strategy} synthesis"
+            reasons = [f"{shown} needs a final validator; no final validator checked the output"]
+        else:
+            reasons = ["no final validator or passed gate covers the delivered output"]
+    return DeliveryAcceptance(
+        decision=decision,
+        policy_sha256=policy.sha256,
+        output_sha256=subject.sha256,
+        strategy=strategy,
+        sources=tuple(AcceptanceSource(node.id, node_generation(node)) for node in sources),
+        used_fallback=used_fallback,
+        task_sha256=task_sha256(task),
+        validators=tuple(results),
+        reasons=tuple(_clip(reason) for reason in reasons),
+    )
+
+
 __all__ = [
     "ACCEPTANCE_POLICY_VERSION",
     "DELIVERY_ACCEPTANCE_VERSION",
@@ -465,6 +596,7 @@ __all__ = [
     "Validator",
     "ValidatorResult",
     "check_validator",
+    "evaluate_delivery",
     "task_sha256",
     "text_sha256",
 ]

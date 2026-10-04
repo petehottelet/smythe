@@ -11,11 +11,18 @@ from pathlib import Path
 from typing import Any, Callable
 from uuid import uuid4
 
-from smythe.acceptance import DeliveryAcceptance, text_sha256
+from smythe.acceptance import (
+    AcceptanceDecision,
+    AcceptanceMode,
+    AcceptancePolicy,
+    DeliveryAcceptance,
+    evaluate_delivery,
+    task_sha256,
+    text_sha256,
+)
 from smythe.budget import BudgetValidationError, Sentinel
 from smythe.checkpoint import (
     CHECKPOINT_VERSION,
-    STRICT_CHECKPOINT_VERSION,
     SUPPORTED_CHECKPOINT_VERSIONS,
     CheckpointStore,
     agents_from_list,
@@ -37,7 +44,7 @@ from smythe.executor_base import (
     validate_max_revisions,
     validate_retry_backoff_s,
 )
-from smythe.graph import ExecutionGraph
+from smythe.graph import ExecutionGraph, NodeStatus
 from smythe.memory import PlannerMemory
 from smythe.tools import ToolRuntime
 from smythe.planner import Architect, LLMArchitect, SimpleArchitect
@@ -53,10 +60,15 @@ from smythe.provider import (
 )
 from smythe.registry import Registry
 from smythe.supervisor import Supervisor
-from smythe.synthesizer import Synthesizer
+from smythe.synthesizer import SynthesisStrategy, Synthesizer, deliverable_sources
 from smythe.task import Task, snapshot_task, task_snapshots_equal, task_to_dict
 from smythe.tracer import Tracer
-from smythe.verifier import Verifier, validate_verification_checkpoint, verification_pending
+from smythe.verifier import (
+    Verifier,
+    node_generation,
+    validate_verification_checkpoint,
+    verification_pending,
+)
 from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_policy import WorkflowGraphPolicy, snapshot_graph_policy
 from smythe.workflow_store import SQLiteWorkflowStore
@@ -85,8 +97,9 @@ class SwarmResult:
         timing: Where the call's time went: elapsed time, phase totals and
             waits, with one segment per call that worked on the execution.
             None for a result built by hand.
-        acceptance: The delivery acceptance record that decided the output,
-            or None when no record exists, as for advisory and legacy runs.
+        acceptance: The delivery acceptance record a strict policy made for
+            the output, or None when no record exists, as for advisory and
+            legacy runs.
         rejected_output: The delivered text when a record exists but did not
             accept it; ``output`` is then ``""``. None otherwise.
     """
@@ -201,6 +214,13 @@ def _delivered(output: Any, acceptance: DeliveryAcceptance | None) -> tuple[Any,
     return "", output
 
 
+def _synthesis_strategy(synthesizer: Any) -> str:
+    """The strategy a run's synthesizer applies, or ``custom`` for any other synthesizer."""
+    if type(synthesizer) is Synthesizer and type(synthesizer.strategy) is SynthesisStrategy:
+        return synthesizer.strategy.value
+    return "custom"
+
+
 def _auto_detect_provider(model: str) -> Provider:
     """Infer the right provider from the model name."""
     lower = model.lower()
@@ -222,6 +242,12 @@ class Swarm:
     """Entry point for submitting tasks.
 
     Coordinates the full lifecycle: plan -> assign -> execute -> synthesize.
+
+    ``acceptance`` takes an :class:`~smythe.acceptance.AcceptancePolicy`. A
+    strict policy decides delivery acceptance after synthesis, on exactly the
+    delivered output, and records the decision with the completed
+    checkpoint; output it does not accept is returned as ``rejected_output``.
+    None, the default, and an advisory policy keep legacy behavior.
     """
 
     def __init__(
@@ -250,10 +276,23 @@ class Swarm:
         verifier: Verifier | None = None,
         run_store: SQLiteWorkflowStore | None = None,
         graph_policy: WorkflowGraphPolicy | None = None,
+        acceptance: AcceptancePolicy | None = None,
     ) -> None:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
         if graph_policy is not None and run_store is None:
             raise WorkflowBindingError("graph_policy requires a durable run_store")
+        if acceptance is not None and not isinstance(acceptance, AcceptancePolicy):
+            raise TypeError(
+                f"acceptance must be an AcceptancePolicy or None, not {type(acceptance).__name__}"
+            )
+        if run_store is not None and acceptance is not None and acceptance.mode is AcceptanceMode.STRICT:
+            raise WorkflowBindingError(
+                "A strict acceptance policy needs an ordinary run: a durable run_store "
+                "does not decide delivery acceptance"
+            )
+        self._acceptance = acceptance
+        # The undecided record a strict run's unfinished checkpoints carry.
+        self._pending_record: tuple[Task | None, DeliveryAcceptance] | None = None
         # An ordinary run builds its executor only after routing and planning,
         # so check the executor's limits now. A durable run checks its own,
         # stricter limits before routing or planning on every entry point.
@@ -292,6 +331,7 @@ class Swarm:
         self._memory = memory
         self._registry = registry or Registry()
         self._synthesizer = synthesizer or Synthesizer()
+        self._check_acceptance_support()
         self._yaml_graph: ExecutionGraph | None = None
         self._router = router
         # Each execute or resume call measures its time with a new tracer.
@@ -309,6 +349,177 @@ class Swarm:
                 planning_model=planning_model or model,
                 memory=memory,
                 registry=self._registry,
+            )
+
+    @property
+    def acceptance(self) -> AcceptancePolicy | None:
+        """The delivery acceptance policy this Swarm's runs follow, if any."""
+        return self._acceptance
+
+    def _strict_policy(self) -> AcceptancePolicy | None:
+        policy = self._acceptance
+        return policy if policy is not None and policy.mode is AcceptanceMode.STRICT else None
+
+    def _check_acceptance_support(self) -> None:
+        """Reject a strict policy that this Swarm's synthesis could never satisfy.
+
+        Without final validators only a passed gate can accept, and only
+        output that is one gated node's exact result, which only
+        ``DELIVERABLE`` synthesis returns.
+        """
+        policy = self._strict_policy()
+        if policy is None or policy.final_validators:
+            return
+        strategy = _synthesis_strategy(self._synthesizer)
+        if strategy != SynthesisStrategy.DELIVERABLE.value:
+            raise ValueError(
+                f"A strict acceptance policy without a final validator can accept only "
+                f"DELIVERABLE output that a passed gate judged; {strategy} synthesis needs "
+                "a final validator"
+            )
+
+    def _pending_acceptance(self, task: Task | None) -> DeliveryAcceptance | None:
+        """The undecided record a strict run's unfinished checkpoints carry."""
+        policy = self._strict_policy()
+        if policy is None:
+            return None
+        cached = self._pending_record
+        if cached is not None and cached[0] is task and cached[1].policy_sha256 == policy.sha256:
+            return cached[1]
+        record = DeliveryAcceptance(
+            AcceptanceDecision.NOT_EVALUATED, policy.sha256, task_sha256=task_sha256(task),
+        )
+        self._pending_record = (task, record)
+        return record
+
+    def _decide(
+        self, graph: ExecutionGraph, output: Any, task: Task | None, tracer: Tracer,
+    ) -> DeliveryAcceptance | None:
+        """Decide delivery acceptance for exactly *output*; None without a strict policy.
+
+        Final validators run here, after synthesis, with no provider call. A
+        final rejection is terminal: nothing is regenerated.
+        """
+        policy = self._strict_policy()
+        if policy is None:
+            return None
+        strategy = _synthesis_strategy(self._synthesizer)
+        if strategy == SynthesisStrategy.DELIVERABLE.value:
+            sources, used_fallback = deliverable_sources(graph)
+        else:
+            sources = [n for n in graph.nodes
+                       if n.status is NodeStatus.COMPLETED and n.result is not None]
+            used_fallback = False
+        with tracer.phase("verification"):
+            record = evaluate_delivery(
+                policy, graph, output, strategy=strategy, sources=sources,
+                used_fallback=used_fallback, task=task,
+            )
+        tracer.on_acceptance(record)
+        return record
+
+    def _finish(
+        self,
+        execution_id: str,
+        graph: ExecutionGraph,
+        budget: Sentinel,
+        task: Task | None,
+        created_at: float,
+        timing: _RunTiming,
+        output: Any,
+        acceptance: DeliveryAcceptance | None,
+    ) -> SwarmResult:
+        """Save a finished run with its decision and build its result.
+
+        Every execute and resume path ends here. Output a strict policy did
+        not accept is saved and returned as ``rejected_output``, never as
+        ``output``.
+        """
+        self._save_checkpoint(
+            execution_id, "completed", graph, budget, task, created_at, timing,
+            output=output, acceptance=acceptance,
+        )
+        delivered, rejected_output = _delivered(output, acceptance)
+        result = SwarmResult(
+            output=delivered,
+            graph=graph,
+            trace=timing.tracer.summary(),
+            total_cost_usd=budget.total_cost_usd,
+            cost_is_complete=budget.cost_is_complete,
+            cost_contains_estimates=budget.cost_contains_estimates,
+            execution_id=execution_id,
+            timing=timing.result(),
+            acceptance=acceptance,
+            rejected_output=rejected_output,
+        )
+        if self._memory is not None and task is not None:
+            self._memory.record(task, graph, result)
+        return result
+
+    def _reverified(
+        self, record: DeliveryAcceptance, output: Any, graph: ExecutionGraph, task: Task | None,
+    ) -> DeliveryAcceptance:
+        """Check a completed run's decision against what its checkpoint holds now.
+
+        The saved output must still match the record's digest, the task and
+        source generations it binds must be unchanged, and a strict policy on
+        this Swarm must be the one that decided. A mismatch gives an
+        ``indeterminate`` record for the saved output, never acceptance.
+        """
+        if not isinstance(output, str):
+            raise ValueError("Checkpoint output does not match its delivery acceptance record")
+        problems = []
+        if text_sha256(output) != record.output_sha256:
+            problems.append("the saved output does not match the digest its record bound")
+        if record.task_sha256 != task_sha256(task):
+            problems.append("the saved task does not match the task its record bound")
+        nodes = {node.id: node for node in graph.nodes}
+        for source in record.sources:
+            node = nodes.get(source.node_id)
+            if (node is None or node.status is not NodeStatus.COMPLETED
+                    or node_generation(node) != source.execution_generation):
+                problems.append(
+                    f"node {source.node_id!r} no longer holds the generation its record bound"
+                )
+        policy = self._strict_policy()
+        if policy is not None and policy.sha256 != record.policy_sha256:
+            problems.append(
+                "this Swarm's acceptance policy did not make the saved decision, which "
+                "therefore does not carry over"
+            )
+        if not problems:
+            return record
+        return DeliveryAcceptance(
+            decision=AcceptanceDecision.INDETERMINATE,
+            policy_sha256=record.policy_sha256 if policy is None else policy.sha256,
+            output_sha256=text_sha256(output), strategy=record.strategy,
+            sources=record.sources, used_fallback=record.used_fallback,
+            task_sha256=task_sha256(task), reasons=tuple(problems),
+        )
+
+    def _check_resume_policy(
+        self, execution_id: str, saved: DeliveryAcceptance | None, task: Task | None,
+    ) -> None:
+        """Refuse to finish a run under a delivery acceptance policy other than its own."""
+        policy = self._strict_policy()
+        if saved is None:
+            if policy is not None:
+                raise ValueError(
+                    f"Checkpoint {execution_id!r} was written without strict delivery "
+                    "acceptance, so this Swarm's strict policy cannot finish it. Resume it "
+                    "without a strict policy, or re-run the task."
+                )
+            return
+        if policy is None or policy.sha256 != saved.policy_sha256:
+            raise ValueError(
+                f"Checkpoint {execution_id!r} belongs to an unfinished run with strict delivery "
+                f"acceptance under policy {saved.policy_sha256[:12]}; resume it with a Swarm "
+                "whose AcceptancePolicy has that sha256, or re-run the task."
+            )
+        if saved.task_sha256 != task_sha256(task):
+            raise ValueError(
+                f"Checkpoint {execution_id!r} holds a task that its strict delivery acceptance "
+                "record does not bind"
             )
 
     def plan(self, task: Task) -> ExecutionGraph:
@@ -529,6 +740,7 @@ class Swarm:
             on_control_update=self._control_checkpointer(
                 execution_id, graph, budget, task, created_at, timing,
             ),
+            acceptance=self._acceptance,
         )
         self._active_executor = executor
         try:
@@ -542,6 +754,7 @@ class Swarm:
                     budget=budget,
                     tracer=tracer,
                 )
+            acceptance = self._decide(graph, output, task, tracer)
         except BaseException as exc:
             self._save_checkpoint(
                 execution_id, "failed", graph, budget, task, created_at, timing,
@@ -550,26 +763,9 @@ class Swarm:
             )
             raise
 
-        self._save_checkpoint(
-            execution_id, "completed", graph, budget, task, created_at, timing,
-            output=output,
+        return self._finish(
+            execution_id, graph, budget, task, created_at, timing, output, acceptance,
         )
-
-        result = SwarmResult(
-            output=output,
-            graph=graph,
-            trace=tracer.summary(),
-            total_cost_usd=budget.total_cost_usd,
-            cost_is_complete=budget.cost_is_complete,
-            cost_contains_estimates=budget.cost_contains_estimates,
-            execution_id=execution_id,
-            timing=timing.result(),
-        )
-
-        if self._memory is not None and task is not None:
-            self._memory.record(task, graph, result)
-
-        return result
 
     def _execute_sync(self, task_or_graph: Task | ExecutionGraph) -> SwarmResult:
         """Serial execution using the standard Executor."""
@@ -607,6 +803,7 @@ class Swarm:
             on_control_update=self._control_checkpointer(
                 execution_id, graph, budget, task, created_at, timing,
             ),
+            acceptance=self._acceptance,
         )
         self._active_executor = executor
         try:
@@ -620,6 +817,7 @@ class Swarm:
                     budget=budget,
                     tracer=tracer,
                 )
+            acceptance = self._decide(graph, output, task, tracer)
         except BaseException as exc:
             self._save_checkpoint(
                 execution_id, "failed", graph, budget, task, created_at, timing,
@@ -628,26 +826,9 @@ class Swarm:
             )
             raise
 
-        self._save_checkpoint(
-            execution_id, "completed", graph, budget, task, created_at, timing,
-            output=output,
+        return self._finish(
+            execution_id, graph, budget, task, created_at, timing, output, acceptance,
         )
-
-        result = SwarmResult(
-            output=output,
-            graph=graph,
-            trace=tracer.summary(),
-            total_cost_usd=budget.total_cost_usd,
-            cost_is_complete=budget.cost_is_complete,
-            cost_contains_estimates=budget.cost_contains_estimates,
-            execution_id=execution_id,
-            timing=timing.result(),
-        )
-
-        if self._memory is not None and task is not None:
-            self._memory.record(task, graph, result)
-
-        return result
 
     def _save_checkpoint(
         self,
@@ -661,11 +842,19 @@ class Swarm:
         output: str | None = None,
         accounting_error: str | None = None,
         response_error: dict | None = None,
+        acceptance: DeliveryAcceptance | None = None,
     ) -> None:
-        """Persist full execution state, if a checkpoint store is configured."""
+        """Persist full execution state, if a checkpoint store is configured.
+
+        A strict run's states are version 5: they carry *acceptance*, the
+        decision, or until there is one an undecided record that binds the
+        run's policy and task.
+        """
         if self._checkpoint_store is None:
             return
         with timing.tracer.phase("checkpoint"):
+            if acceptance is None:
+                acceptance = self._pending_acceptance(task)
             state = build_state(
                 control={
                     "revisions_used": getattr(
@@ -684,6 +873,7 @@ class Swarm:
                 created_at=created_at,
                 timing=timing.checkpoint_block(),
                 token_estimate_nodes=budget.token_estimate_nodes,
+                delivery_acceptance=acceptance,
             )
             if accounting_error is not None:
                 state["budget"]["accounting_error"] = accounting_error
@@ -748,9 +938,12 @@ class Swarm:
         and re-run. Cost accounting continues against the budget policy
         recorded in the checkpoint.  If the checkpointed execution
         already finished, its stored result is returned without
-        re-executing anything; a version 5 checkpoint's result carries its
-        delivery acceptance record, and an unfinished version 5 checkpoint
-        is refused.  Resumed work runs one node at a time
+        re-executing anything; a strict run's result carries its delivery
+        acceptance record after the saved output, task, sources and policy
+        are checked against it, and any mismatch makes it ``indeterminate``.
+        An unfinished strict run resumes only under the same strict policy,
+        and a strict policy never finishes a run that began without one.
+        Resumed work runs one node at a time
         unless this Swarm has ``parallel=True``; a durable ``run_store``
         run keeps the concurrency its first execution recorded.
         """
@@ -831,6 +1024,8 @@ class Swarm:
         validate_verification_checkpoint(graph, version=version, completed=completed)
         timing = _RunTiming(tracer, resumed=True, previous=_saved_segments(state))
         if completed and not verification_pending(graph):
+            if acceptance is not None:
+                acceptance = self._reverified(acceptance, state["output"], graph, task)
             output, rejected_output = _delivered(state["output"], acceptance)
             tracer.add_phase("recovery", tracer.since(recovery_started))
             return SwarmResult(
@@ -845,14 +1040,9 @@ class Swarm:
                 acceptance=acceptance,
                 rejected_output=rejected_output,
             )
-        if version >= STRICT_CHECKPOINT_VERSION:
-            # Finishing the run would deliver output its acceptance policy
-            # never decided, so an unfinished strict run is not resumed here.
-            raise ValueError(
-                f"Checkpoint {execution_id!r} belongs to an unfinished run with strict "
-                "delivery acceptance, which this build cannot resume. Re-run the task "
-                "instead of resuming."
-            )
+        # Finishing a run under another policy would decide its output
+        # differently, so only the policy it began with may finish it.
+        self._check_resume_policy(execution_id, acceptance, task)
 
         from smythe.async_executor import AsyncExecutor
 
@@ -893,6 +1083,7 @@ class Swarm:
             on_control_update=self._control_checkpointer(
                 execution_id, graph, budget, task, created_at, timing,
             ),
+            acceptance=self._acceptance,
         )
         self._active_executor = executor
         tracer.add_phase("recovery", tracer.since(recovery_started))
@@ -907,6 +1098,7 @@ class Swarm:
                     budget=budget,
                     tracer=tracer,
                 )
+            acceptance = self._decide(graph, output, task, tracer)
         except BaseException as exc:
             self._save_checkpoint(
                 execution_id, "failed", graph, budget, task, created_at, timing,
@@ -915,26 +1107,9 @@ class Swarm:
             )
             raise
 
-        self._save_checkpoint(
-            execution_id, "completed", graph, budget, task, created_at, timing,
-            output=output,
+        return self._finish(
+            execution_id, graph, budget, task, created_at, timing, output, acceptance,
         )
-
-        result = SwarmResult(
-            output=output,
-            graph=graph,
-            trace=tracer.summary(),
-            total_cost_usd=budget.total_cost_usd,
-            cost_is_complete=budget.cost_is_complete,
-            cost_contains_estimates=budget.cost_contains_estimates,
-            execution_id=execution_id,
-            timing=timing.result(),
-        )
-
-        if self._memory is not None and task is not None:
-            self._memory.record(task, graph, result)
-
-        return result
 
     def _resolve_input(
         self, task_or_graph: Task | ExecutionGraph | None,
@@ -960,12 +1135,14 @@ class Swarm:
         parallel: bool = False,
         run_store: SQLiteWorkflowStore | None = None,
         graph_policy: WorkflowGraphPolicy | None = None,
+        acceptance: AcceptancePolicy | None = None,
     ) -> Swarm:
         """Create a Swarm pre-loaded with a YAML-defined execution graph.
 
         The returned Swarm's internal registry is populated with agents
         defined in the YAML file.  Call execute() with the loaded graph
-        to run it.
+        to run it.  A delivery acceptance policy comes only from the
+        ``acceptance`` argument, never from the file.
         """
         from smythe.loader import load_graph
 
@@ -979,6 +1156,7 @@ class Swarm:
             parallel=parallel,
             run_store=run_store,
             graph_policy=graph_policy,
+            acceptance=acceptance,
         )
         if instance._graph_policy is not None:
             instance._graph_policy.validate(graph, default_model=instance.model)

@@ -106,13 +106,15 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   and an async `validate`, including an object whose `__call__` is async.
   Runs do not evaluate a policy, and `Swarm` takes none. See
   [delivery acceptance records](docs/verifier.md#delivery-acceptance-records).
+  and an async `validate`. See [delivery acceptance records](docs/verifier.md#delivery-acceptance-records).
 - `SwarmResult.acceptance` and `SwarmResult.rejected_output`, appended after
   `timing` so positional construction is unchanged, a read-only
   `SwarmResult.accepted` that is true only for an `accepted` record, and
   `SwarmResult.to_dict()`, which returns the result as JSON data with the
-  record under `delivery_acceptance`. Every run made by this release returns
-  `acceptance=None` and its output as before. `PlannerMemory` records a
-  result's decision as `acceptance`, and `"not_evaluated"` without a record.
+  record under `delivery_acceptance`. A run without a strict acceptance
+  policy returns `acceptance=None` and its output as before. `PlannerMemory`
+  records a result's decision as `acceptance`, and `"not_evaluated"` without
+  a record.
 - Checkpoint version 5: a state with a delivery acceptance record keeps it in
   a top-level `delivery_acceptance` block, and `build_state(...,
   delivery_acceptance=record)` writes it. Every version 5 checkpoint names
@@ -167,6 +169,35 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   recorded statuses and `accepted` flags are unchanged. The HTML report shows
   it in a Delivery column. See
   [delivery eligibility](docs/jobs.md#delivery-eligibility).
+  not accept is returned as `rejected_output` with an empty `output`. See
+  [delivery acceptance](docs/checkpoint-format.md#delivery-acceptance-version-5).
+- Strict delivery acceptance on ordinary runs. `Swarm(acceptance=...)` and
+  `Swarm.from_yaml(..., acceptance=...)` take an `AcceptancePolicy`; the
+  default `None` and an advisory policy keep current behavior. A strict
+  policy decides after synthesis, on exactly the delivered text: every final
+  validator runs once on its bytes with no provider call, every gate's final
+  verdict is read, and the record binds the output digest, synthesis
+  strategy, source nodes and generations, fallback flag, task and policy
+  hashes and validator outcomes. A final rejection is terminal. Without final
+  validators a passed gate accepts only `DELIVERABLE` output that is exactly
+  the node it judged; other synthesis strategies, the deliverable fallback
+  and steps after a gate need a final validator, and artifact deliverables
+  are not accepted. Under a strict policy an exhausted gate's last verdict is
+  read and recorded (`rejected` by default), a gate with
+  `max_regenerations=0` records its verdict under `advisory_verdict`, and an
+  unreadable or non-bool verdict, a raising verifier, or a skipped or failed
+  judge leaves acceptance `indeterminate` by default without spending a
+  regeneration or stopping the run. A result that is not accepted returns
+  `output=""` with the text in `rejected_output`. Every checkpoint of a strict
+  run is version 5 with its record, an unfinished one resumes only under the
+  same policy, and resuming a completed one rechecks the output digest, task,
+  source generations and policy, giving `indeterminate` on any mismatch. The
+  trace gains an `acceptance:delivery` span. `Verdict.invalid` marks a
+  verdict that could not be read, `smythe.acceptance.evaluate_delivery()`
+  makes the decision outside a run, `smythe.synthesizer.deliverable_sources()`
+  names the nodes `DELIVERABLE` synthesis returns, and executors take a
+  keyword-only `acceptance`. See
+  [strict delivery acceptance](docs/verifier.md#strict-delivery-acceptance).
 
 ### Changed
 

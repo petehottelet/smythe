@@ -67,6 +67,13 @@ the top-level field; conflicting task copies stop recovery before dispatch.
 The task is restored even when resume returns a stored completed result.
 See [Checkpoint format](checkpoint-format.md).
 
+`done_when` tells planners and nodes what the work must achieve; it does not
+decide whether the output is delivered. A [strict acceptance
+policy](verifier.md#strict-delivery-acceptance) does that with final
+validators and gates, and its record binds the SHA-256 of the task snapshot
+(`smythe.acceptance.task_sha256`). Resuming a strict run whose saved task no
+longer matches that digest never returns accepted output.
+
 When `PlannerMemory` is configured, successful inspected-graph runs record the
 same task as direct runs. New outcome records include context and acceptance
 criteria, and recall searches those fields. Older history records remain

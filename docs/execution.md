@@ -134,7 +134,7 @@ distort them, and durations from different processes are never compared.
 | `planning` | Architect planning, when `execute(Task)` planned the graph in the same call |
 | `recovery` | Loading, checking and restoring the checkpoint on resume |
 | `execution` | Attempts of work nodes |
-| `verification` | Attempts of judge nodes, plus applying saved verdicts and regeneration resets |
+| `verification` | Attempts of judge nodes, plus applying saved verdicts and regeneration resets, and a strict policy's final validators |
 | `supervision` | Supervisor reviews |
 | `synthesis` | Producing the output from the finished graph |
 | `checkpoint` | Building and writing checkpoints |
@@ -194,6 +194,19 @@ nodes and their costs, resets failed or interrupted nodes, and continues the
 pending graph. Invalid-accounting markers require reconciliation first.
 Unfinished [verification transitions](verifier.md#recovery-and-concurrent-work)
 are recovered before new work or cached-output return.
+
+## Execution and acceptance
+
+A run that completes has executed; whether its output is accepted is a
+separate question that only a [strict acceptance
+policy](verifier.md#strict-delivery-acceptance) (`Swarm(acceptance=...)`)
+answers. Under one, a completed run whose output is rejected, needs review or
+is undecided still returns normally, with `output=""`, the text in
+`rejected_output` and the decision in `acceptance`; cost is reported as for
+any other run. A gate verifier that raises does not stop a strict run: the
+gate ends undecided and so does acceptance. Without a strict policy such a
+verifier stops the run as a terminal failure, and results carry no decision.
+An unfinished strict run resumes only under the policy it began with.
 
 ## Provider connections
 

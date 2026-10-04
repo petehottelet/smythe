@@ -199,6 +199,7 @@
     "tests/test_skills.py",
     "tests/test_skills_registry.py",
     "tests/test_sqlite_initialization.py",
+    "tests/test_strict_acceptance.py",
     "tests/test_supervisor.py",
     "tests/test_support_matrix.py",
     "tests/test_support_matrix_docs.py",

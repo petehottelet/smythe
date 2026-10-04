@@ -160,6 +160,15 @@ Node metadata carries the generation and disposition of each gating verdict:
   rejection reason, absolute `regenerations_used` count, and an
   `affected_generations` map from node IDs to their old generations.
 
+Under a [strict acceptance policy](verifier.md#strict-delivery-acceptance),
+which writes version 5, a consumed receipt also records the final verdict:
+`outcome` (`passed`, `rejected` or `error`), `passed`, `reason`, and
+`exhausted: true` for a failing verdict after the last regeneration. A gate
+with `max_regenerations=0` records its verdict under `advisory_verdict` in the
+judge's metadata, with version `1`, `judge_generation`, `target_id`,
+`target_generation`, `outcome`, `passed` and `reason`; such a judge also
+records `verification_target_generation`.
+
 The intent is saved before cancellation. After affected workers settle, a
 second forced save records the reset: results and stale artifact references
 are cleared, affected generations advance exactly once, and the intent is
@@ -189,10 +198,14 @@ returns the list after these checks.
 
 A state that carries a [delivery acceptance record](verifier.md#delivery-acceptance-records)
 is written as version 5, lists `delivery_acceptance` in `requires`, and keeps
-the record in a top-level `delivery_acceptance` block. Ordinary runs make no
-record and keep writing version 4; `build_state(..., delivery_acceptance=record)`
-writes version 5 and refuses a record whose `output_sha256` does not match the
-state's `output`, or a `completed` state whose record has no decision.
+the record in a top-level `delivery_acceptance` block. A run under a
+[strict acceptance policy](verifier.md#strict-delivery-acceptance) writes
+every checkpoint this way: while it is unfinished the record is
+`not_evaluated` and binds the policy and task, and the completed checkpoint
+holds the decision. Other runs make no record and keep writing version 4;
+`build_state(..., delivery_acceptance=record)` writes version 5 and refuses a
+record whose `output_sha256` does not match the state's `output`, or a
+`completed` state whose record has no decision.
 
 The record is required exactly when it is listed: a version 5 state that
 lists `delivery_acceptance` without the block, or carries the block without
@@ -240,33 +253,33 @@ Versions 1 through 4 have no record, whatever keys they hold. Resuming one
 returns `acceptance` as `None`: a legacy run is never reported as accepted or
 as not yet evaluated.
 
-Resuming a completed version 5 checkpoint first checks that `output` still
-matches `output_sha256`, and raises `ValueError` if it does not. The result's
-`acceptance` is the record. An `accepted` record delivers the stored output;
-for any other decision `output` is `""` and the text is in `rejected_output`.
-An unfinished version 5 checkpoint is refused with `ValueError` before any
-provider call, because finishing it here would deliver output its acceptance
-policy never decided.
+Resuming a completed version 5 checkpoint checks that `output` still matches
+`output_sha256`, that the task and every source node's generation are the ones
+the record binds, and, when the resuming `Swarm` has a strict policy, that its
+`sha256` is `policy_sha256`. The result's `acceptance` is the record, or, after
+any mismatch, an `indeterminate` record for the saved output that names the
+mismatch: changed output is never accepted. An `accepted` record delivers the
+stored output; for any other decision `output` is `""` and the text is in
+`rejected_output`. An unfinished version 5 checkpoint resumes only under a
+strict policy whose `sha256` is its record's `policy_sha256`, and is refused
+with `ValueError` before any provider call otherwise, because finishing it
+under another policy would decide its output differently. A strict policy
+likewise refuses an unfinished checkpoint written without one.
 
-A completed checkpoint whose record is `not_evaluated` was saved before its
-policy decided the output, and resuming it never delivers that output either.
-The result has `output` `""`, the stored text in `rejected_output`, and the
-`not_evaluated` record as `acceptance`, so `accepted` is false. Resume makes
-no provider call, does not evaluate the record again and leaves the
-checkpoint unchanged. When the record binds `output_sha256`, the stored text
-must still match it. A `not_evaluated` record may bind no digest; the stored
-text is then returned in `rejected_output` as saved, without a check, and is
-still never delivered.
+A completed checkpoint must hold a decided record: `build_state` refuses to
+write a completed state whose record is `not_evaluated`, and resume refuses
+such a state with `ValueError` before any provider call, leaving the
+checkpoint unchanged. Its output is neither delivered nor returned.
 
 ## Resume semantics
 
 `swarm.resume(execution_id)` (or `await swarm.aresume(...)`):
 
 1. Loads the state and rejects unknown ids (`KeyError`) and unreadable versions (`ValueError`).
-2. Restores the complete task, validates saved budget policy, charges, and verification state. Conflicting task copies, unresolved accounting markers, or ambiguous verification decisions stop recovery. A completed snapshot with output and no pending verification work returns its validated stored result and task; a version 5 snapshot returns its [delivery acceptance record](#delivery-acceptance-version-5) too, and an unfinished one stops here.
+2. Restores the complete task, validates saved budget policy, charges, and verification state. Conflicting task copies, unresolved accounting markers, or ambiguous verification decisions stop recovery. A completed snapshot with output and no pending verification work returns its validated stored result and task; a version 5 snapshot returns its checked [delivery acceptance record](#delivery-acceptance-version-5) too. An unfinished version 5 snapshot stops here unless the resuming `Swarm` has the strict policy it began with.
 3. Otherwise restores the graph, re-registers the recorded agents, and resets `running` / `failed` nodes to `pending`. It finishes saved regeneration intents and consumes pending verdicts before dispatch. A rejected generation invalidates affected `completed` and `skipped` results too; other finished nodes keep their recorded results.
 4. Restores per-node costs into the budget so the resumed run keeps counting against the original cap.
-5. Executes the remaining nodes on the async executor, one at a time unless the resuming Swarm has `parallel=True` (then up to `max_concurrency`), synthesizes over the full graph, and writes the final checkpoint.
+5. Executes the remaining nodes on the async executor, one at a time unless the resuming Swarm has `parallel=True` (then up to `max_concurrency`), synthesizes over the full graph, decides delivery acceptance under a strict policy, and writes the final checkpoint.
 
 The trace on a resumed `SwarmResult` covers only the resumed portion; spans from before the crash are not reconstructed. Its `timing` likewise measures the resuming call, with `resumed` set and `latency_complete` false, and lists the earlier calls' saved segments before its own.
 

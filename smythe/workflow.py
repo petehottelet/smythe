@@ -24,7 +24,8 @@ from smythe.provider import ProviderResponseError
 from smythe.task import Task, snapshot_task, task_from_dict, task_to_dict
 from smythe.tracer import Tracer
 from smythe.verifier import (
-    TokenVerifier, node_generation, validate_verification_checkpoint, verification_pending,
+    ADVISORY_VERDICT_KEY, TokenVerifier, node_generation, validate_verification_checkpoint,
+    verification_pending,
 )
 from smythe.workflow_binding import (
     CallScope, ComponentBinding, WorkflowBindingError, bind_component, describe_component,
@@ -432,7 +433,7 @@ class WorkflowRuntime:
                 "execution_generation", "regenerations_used", "verification_receipt",
                 "regeneration_intent", "workflow_supervision", "native_receipts", "response_error",
                 "accounting_invalid", "accounting_error", "workflow_accounting_invalid", "cost_usd",
-                "cost_usd_unknown", "cost_usd_is_estimate",
+                "cost_usd_unknown", "cost_usd_is_estimate", ADVISORY_VERDICT_KEY,
             )):
                 raise WorkflowBindingError("A new workflow cannot inherit execution or accounting history")
             for name in ("max_retries", "max_regenerations"):

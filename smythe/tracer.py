@@ -260,6 +260,27 @@ class Tracer:
             attempt, limit, verifier_node.id, target.id, reason or "no reason given",
         )
 
+    def on_acceptance(self, record: Any) -> None:
+        """Record the delivery acceptance decision made on the synthesized output.
+
+        The span's status is ``acceptance_<decision>`` and its label the first
+        reason; the record itself stays in the span's metadata, so
+        ``summary()`` keeps its keys.
+        """
+        now = self._wall_clock()
+        decision = record.decision.value
+        span = Span(
+            node_id="acceptance:delivery",
+            label=record.reasons[0] if record.reasons else f"delivery {decision}",
+            agent_id=None,
+            start_time=now,
+            end_time=now,
+            status=f"acceptance_{decision}",
+        )
+        span.metadata["acceptance"] = record.to_dict()
+        self.spans.append(span)
+        logger.info("Delivery acceptance: %s — %s", decision, span.label)
+
     def on_node_error(self, node: Node, exc: Exception) -> None:
         span = self._active.get(node.id)
         if span:

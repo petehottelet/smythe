@@ -24,6 +24,7 @@ from smythe.verifier import VerificationRecoveryError
 from smythe.workflow_store import WorkflowError
 
 if TYPE_CHECKING:
+    from smythe.acceptance import AcceptancePolicy
     from smythe.supervisor import Supervisor
     from smythe.task import Task
     from smythe.verifier import Verifier
@@ -71,6 +72,8 @@ class AsyncExecutor(ExecutorBase):
         on_control_update: Callable[[], None] | None = None,
         provider_call_factory: Callable[[Node, str, int, int], Provider] | None = None,
         on_supervision_update: Callable[[Node, bool], None] | None = None,
+        *,
+        acceptance: AcceptancePolicy | None = None,
     ) -> None:
         super().__init__(
             provider=provider, registry=registry, tracer=tracer, budget=budget,
@@ -82,6 +85,7 @@ class AsyncExecutor(ExecutorBase):
             on_control_update=on_control_update,
             provider_call_factory=provider_call_factory,
             on_supervision_update=on_supervision_update,
+            acceptance=acceptance,
         )
         self._estimated_tokens_per_node = validate_token_count(
             estimated_tokens_per_node, "estimated_tokens_per_node",

@@ -39,7 +39,9 @@ keeping `draft` among its dependencies, or rewires another step so that
 add a step after `draft`. The gate does not judge that step, and under
 `DELIVERABLE` synthesis a step that depends on `draft` becomes the returned
 output instead of `draft`
-([steps added after a gate](supervisor.md#steps-added-after-a-gate)).
+([steps added after a gate](supervisor.md#steps-added-after-a-gate)). A
+[strict acceptance policy](#strict-delivery-acceptance) accepts such output
+only through a final validator.
 
 ## Recovery and concurrent work
 
@@ -156,7 +158,17 @@ triggers at most `max_regenerations` send-backs; after that, the run
 finishes with the last output rather than stopping. A gate with
 `max_regenerations=0` is advisory and its verdict is never read. Ask the
 judge for JSON, or for a single PASS or FAIL on its own line, so that a
-readable verdict is the norm.
+readable verdict is the norm. Under a [strict acceptance
+policy](#strict-delivery-acceptance) the final verdict is read and recorded
+in both cases.
+
+A verdict that fails because no verdict could be read, rather than because
+the reply states FAIL, is marked `invalid` (`Verdict.invalid`): an empty,
+overlong or unreadable reply, an invalid or contradictory JSON verdict,
+disagreeing verdicts, or a reply with no standalone verdict. Only a JSON
+`"passed": false` or a stated FAIL with no PASS beside it is a valid
+rejection. The mark changes nothing for an ordinary gate and does not take
+part in comparing verdicts.
 
 ## Gating without a model
 
@@ -191,7 +203,8 @@ Anything else **fails** the gate, with a reason that names the returned type
 findings, `None`, `1`, a NumPy boolean, and a `passed` that is not a bool are
 not verdicts, so return `bool(...)` when a check produces another type. The
 function is called synchronously: an `async def` function's coroutine is
-closed without running, and the gate fails.
+closed without running, and the gate fails. These results, and a report
+whose `outcome` is `error`, give a verdict marked `invalid`.
 
 The executor holds every `Verifier` to the same rule: a verdict passes only
 when its `passed` is exactly `True`. A custom verifier's
@@ -280,13 +293,103 @@ policy = AcceptancePolicy(mode="strict", final_validators=[RequiredSection("## S
 `SwarmResult.accepted` is true only for an `accepted` record. When a record
 exists and does not accept, `output` is `""` and the text is in
 `rejected_output`. `SwarmResult.to_dict()` returns the result as JSON data
-with the record under `delivery_acceptance`. `Swarm` takes no policy and runs
-evaluate none, so every advisory result has `acceptance=None`; only a result
-resumed from a completed [version 5 checkpoint](checkpoint-format.md#delivery-acceptance-version-5)
-carries a record. `PlannerMemory` stores the record's decision as
+with the record under `delivery_acceptance`. Advisory and legacy runs have
+`acceptance=None`; a run under a [strict policy](#strict-delivery-acceptance)
+always has a record. `PlannerMemory` stores the record's decision as
 `acceptance`, or `not_evaluated` without one. Jobs run the same validator
 objects on artifact bytes when a manifest names them; see
 [registered validators](jobs.md#registered-validators).
+
+## Strict delivery acceptance
+
+```python
+from smythe import AcceptancePolicy, Swarm
+
+policy = AcceptancePolicy(mode="strict", final_validators=[RequiredSection("## Sources")])
+swarm = Swarm(acceptance=policy, ...)
+result = swarm.execute(task)
+if result.accepted:
+    publish(result.output)
+else:
+    print(result.acceptance.decision, result.acceptance.reasons)
+```
+
+`Swarm(acceptance=...)` and `Swarm.from_yaml(..., acceptance=...)` take the
+policy. It comes only from that argument: a YAML file, a graph, a `Task`, a
+generated plan or a supervisor revision cannot set or weaken it. `None`, the
+default, and `AcceptancePolicy()` keep the behavior described above. Strict
+acceptance runs on ordinary runs; a `Swarm` with a durable `run_store` refuses
+a strict policy with `WorkflowBindingError`.
+
+**The delivered output decides.** After synthesis, the run decides on exactly
+the text it delivers, as UTF-8 bytes. Every final validator runs once on those
+bytes as local code, with no provider call and no graph node, and every gate
+in the graph is read from its recorded final verdict. The decision is:
+
+1. `rejected` when a final validator rejects the output. A final rejection is
+   terminal: nothing is regenerated.
+2. Otherwise `on_exhausted` when a gate's final verdict fails.
+3. Otherwise `on_invalid` when a final validator or a gate could not decide,
+   or a delivered node wrote files.
+4. Otherwise `accepted` when every final validator passed, or, without final
+   validators and with `allow_gate_acceptance`, when the output is byte for
+   byte the result of the one node `DELIVERABLE` synthesis returned and a
+   gate passed that node at its current generation.
+5. Otherwise `on_invalid`: no check covers the delivered output.
+
+A gate therefore accepts only the node it judged. A later step, including one
+a supervisor adds after the gated node, two deliverable nodes, the
+`DELIVERABLE` fallback to every completed node, and `CONCATENATE`,
+`STRUCTURED`, `LLM_MERGE` or a custom synthesizer all need a final validator.
+A `Swarm` whose strict policy has none raises `ValueError` when it is built
+with a synthesis other than `DELIVERABLE`.
+
+A final validator that raises, returns an awaitable or anything other than a
+`ValidationReport`, reports `outcome="error"`, or returns a report naming
+another validator has outcome `error`. Artifact deliverables are not supported
+yet: artifact records hold no hash of their files, so when a delivered node
+wrote files the decision is `on_invalid` whatever the validators report.
+
+**Gates under a strict policy.** A valid rejection before exhaustion
+regenerates as usual. The judge's last verdict is then read, without another
+call, and recorded in its consumed receipt with `outcome` (`passed`,
+`rejected` or `error`), `passed`, `reason` and, for an exhausted failing
+verdict, `exhausted: true`; that verdict decides `on_exhausted` (`rejected`
+by default, or `needs_review`). A verdict marked `invalid`, a `passed` that is
+not a bool, a result that is not a `Verdict`, and a verifier that raises have
+outcome `error`: the receipt is consumed at once, no regeneration is spent,
+the run continues, and the decision is `on_invalid` (`indeterminate` by
+default, or `needs_review`). A gate with `max_regenerations=0` is read once
+when its judge completes and its verdict recorded under `advisory_verdict`
+in the judge's metadata; a failing verdict counts as exhausted. A judge that
+was skipped or failed, or whose target was unavailable, leaves the gate
+undecided. Each recorded verdict names the judge's and its target's
+generations, and regeneration clears it. Without a strict policy none of this
+changes: an exhausted or advisory gate's verdict is never read and a
+verifier that raises stops the run.
+
+**Results and recovery.** A strict result always carries its record: an
+accepted result has the exact text in `output`; any other decision returns
+normally with `output=""` and the text in `rejected_output`. Every checkpoint
+of a strict run is [version 5](checkpoint-format.md#delivery-acceptance-version-5)
+and carries the record, `not_evaluated` until the run finishes. An unfinished
+strict run resumes only under a policy with the same `sha256`, and is refused
+before any provider call otherwise; a strict `Swarm` refuses an unfinished
+checkpoint written without one. Resuming a completed strict run checks the
+saved output against the record's digest, and the task, source generations
+and, when the resuming `Swarm` has a strict policy, its `sha256` against the
+record; any mismatch returns an `indeterminate` record for the saved output,
+never acceptance. A completed checkpoint without a record returns
+`acceptance=None` whatever the resuming policy.
+
+The trace gains one span with `node_id` `acceptance:delivery`, status
+`acceptance_<decision>` and the first reason as its label; `Tracer.summary()`
+keys are unchanged, and the validators' time counts as verification in
+[`SwarmResult.timing`](execution.md#timing).
+`smythe.acceptance.evaluate_delivery(policy, graph, output, strategy=...,
+sources=...)` makes the same decision outside a run, and
+`smythe.synthesizer.deliverable_sources(graph)` returns the nodes
+`DELIVERABLE` synthesis delivers and whether it fell back.
 
 ## Gating from YAML and from a generated plan
 
