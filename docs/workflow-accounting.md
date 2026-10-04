@@ -288,9 +288,10 @@ immutable late evidence for its exact dispatch, but cannot advance the run.
 Recovery settles available late evidence before admitting new work.
 Each plan, execute or resume entry audits the whole journal once when it
 starts. A checkpoint saved during the run reads only the calls it consumes
-and, once a node has been regenerated, the keys of settled and reserved calls,
-so its cost does not grow with the run's events, evidence or earlier
-checkpoints.
+and, once a node has been regenerated, the keys of settled and reserved calls;
+the completed checkpoint also reads the keys of reserved calls to release
+them. Its cost therefore does not grow with the run's events, evidence or
+earlier checkpoints.
 
 A 0.8.0 journal holds every saved 4xx error response as unknown exposure. On
 resume, 0.8.1 settles a saved response that meets the zero-cost conditions
