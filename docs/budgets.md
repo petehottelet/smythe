@@ -48,6 +48,29 @@ runs before routing or planning, as it does for an `LLM_MERGE` synthesis.
 Other graphs are checked node by node before the first node call. See
 [provider checks](execution.md#provider-checks-before-any-call).
 
+## Money units
+
+Each ledger keeps money in one unit:
+
+| Ledger | Unit |
+|---|---|
+| Ordinary runs: `Sentinel`, `CompletionResult.cost_usd`, `SwarmResult.total_cost_usd` | Float USD |
+| [Durable text workflows](workflow-accounting.md#money-units) and native receipts | Integer nanoUSD |
+| [Jobs](jobs.md) and the [Autotune ledger](optimize.md) | Integer micro-USD |
+
+Conversions between units use integer arithmetic, so the caller's `decimal`
+context cannot round them. Each has a fixed direction: a confirmed charge
+converts exactly or is refused, a reservation or unknown exposure rounds up,
+and a budget rounds down. A float is read as the decimal its `repr` shows, so
+`0.3` is 300,000,000 nanoUSD. Jobs refuses a provider cost finer than one
+micro-USD as invalid accounting instead of rounding it. Unknown cost has no
+amount to convert and never becomes zero.
+
+Durable results and Jobs snapshots name the unit of their integer amounts: a
+durable result's `workflow_accounting["unit"]` is `"nanoUSD"`, and a Jobs
+snapshot's `cost["unit"]` is `"microUSD"`. Stored rows and receipts carry no
+unit field, so their bytes do not change.
+
 ## Current scope
 
 The ordinary Swarm ledger covers execution and synthesis. Model-based routing,

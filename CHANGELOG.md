@@ -55,6 +55,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `LLMArchitect` plans the run; and every unfinished node's model, image
   inputs and ceiling before the first node call, including on resume.
   `Synthesizer.check_merge_support()` performs the synthesis check.
+- Accounting results name the unit of their integer amounts. A durable
+  result's `workflow_accounting` has `"unit": "nanoUSD"`, and the `cost`
+  block of Jobs snapshots, run lists and inspection output has
+  `"unit": "microUSD"`. Stored rows and receipts are unchanged. The
+  [cost guardrails guide](docs/budgets.md#money-units) lists each ledger's
+  unit and how amounts convert between them: exactly for confirmed charges,
+  up for reservations and unknown exposure, and down for budgets.
 
 ### Changed
 

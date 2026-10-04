@@ -13,18 +13,28 @@ import json
 import math
 import random
 import sqlite3
+import uuid
 
 import pytest
 
+from fakes import LOST_RESPONSE, NativeTransport
 from smythe import OfflineProvider, SQLiteWorkflowStore, Swarm, Task
 from smythe import pricing, pricing_anthropic
 from smythe._money import (
     CEILING, EXACT, FLOOR, MICROUSD, NANOUSD, USD, MoneyUnitError, convert, from_units, to_units,
 )
+from smythe.budget import Sentinel
+from smythe.graph import ExecutionGraph, Node, Topology
+from smythe.jobs import JobManifestV1, make_approval, preflight_job
 from smythe.jobs.models import (
     MAX_SIGNED_MICRO_USD, ManifestValidationError, micros_to_usd, normalize_usd, usd_string,
     usd_to_micros,
 )
+from smythe.jobs.store import SQLiteRunStore
+from smythe.optimize.contracts import Candidate, ExperimentContract, MetricObjective, ObjectiveDirection
+from smythe.optimize.ledger import ExperimentLedger
+from smythe.provider import CompletionResult, ProviderAccountingError
+from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.workflow import _nanousd
 from smythe.workflow_store import WorkflowValidationError
 
@@ -425,3 +435,141 @@ def test_durable_offline_receipts_keep_the_string_zero(tmp_path):
     assert result.total_cost_usd == 0 and result.workflow_accounting["confirmed_nanousd"] == 0
     assert stored and all(json.loads(receipt)["cost_nanousd"] == "0" for receipt in stored)
     assert all(json.loads(receipt)["cost_usd"] == "0" for receipt in stored)
+
+
+# ---------------------------------------------------------------------------
+# Unit tags in projections, and the cross-ledger fixture: journal, Jobs, Autotune
+# ---------------------------------------------------------------------------
+
+
+def _jobs_run(store, root, ceiling_usd):
+    manifest = JobManifestV1.from_dict({
+        "version": 1, "name": "money-units",
+        "profiles": [{"name": "image", "provider": "openai_image", "model": "gpt-image-1",
+                      "max_cost_per_call_usd": ceiling_usd}],
+        "operations": [{"key": "item", "count": 2, "prompt": "Draw", "profile": "image"}],
+        "execution": {"max_concurrency": 1, "max_attempts": 1, "max_budget_usd": "1",
+                      "output_directory": "outputs"},
+    })
+    plan = preflight_job(manifest, manifest_root=root)
+    run_id = store.create_run(plan, make_approval(plan), manifest_root=root)
+    calls = []
+    for operation in store.pending_operations(run_id):
+        attempt = store.begin_attempt(run_id, operation["operation_id"])
+        permit = store.prepare_call(attempt["attempt_id"], usd_to_micros(normalize_usd(
+            ceiling_usd, field_name="ceiling")))
+        store.mark_call_dispatched(permit.call_id)
+        calls.append(permit.call_id)
+    return run_id, calls
+
+
+def _autotune_trials(ledger, ceiling_microusd):
+    contract = ExperimentContract(
+        name="money_units", objectives=(MetricObjective(
+            name="quality", direction=ObjectiveDirection.MAXIMIZE, primary=True, hard_min=0),),
+        mutable_fields=("prompt.logo",), development_repetitions=1, confirmation_repetitions=3,
+        holdout_repetitions=3, max_candidates=1, max_parallel_candidates=1, max_trials=10,
+        max_wall_seconds=600, max_budget_microusd=10 * ceiling_microusd,
+        per_trial_reservation_microusd=ceiling_microusd, confidence=0.95, min_improvement=0.25,
+        base_seed=100,
+    )
+    candidate = Candidate(contract=contract, policy={"prompt.logo": "plain"}, hypothesis="Baseline")
+    campaign = ledger.create_campaign(contract, candidate.candidate_id, (candidate,),
+                                      plan_hash="sha256:" + "a" * 64)
+    ledger.register_candidate(campaign, candidate)
+    lease = ledger.acquire_campaign_lease(campaign, uuid.uuid4().hex, ttl_s=3600)
+    trials = []
+    for seed in (100, 101):
+        trial = ledger.prepare_trial(campaign, candidate.candidate_id, "development", "evaluate",
+                                     seed, lease=lease, evaluator_hash="sha256:" + "e" * 64,
+                                     ceiling_microusd=ceiling_microusd)
+        ledger.mark_trial_dispatched(trial, lease=lease)
+        trials.append(trial)
+    return campaign, lease, trials
+
+
+def test_one_charge_reconciles_exactly_across_the_journal_jobs_and_autotune(tmp_path, monkeypatch):
+    transport = NativeTransport().install(monkeypatch)
+    graph = ExecutionGraph([Topology.SERIAL], [Node(id="draft", label="Draft")])
+    with SQLiteWorkflowStore(tmp_path / "runs.db") as store:
+        result = Swarm(model="gpt-6-astra", max_budget_usd=1, run_store=store,
+                       provider=OpenAIResponsesProvider(api_key="test-key", max_output_tokens=100),
+                       ).execute(graph)
+        calls = store.inspect_run(result.execution_id)["calls"]
+    accounting = result.workflow_accounting
+    assert accounting["unit"] == NANOUSD and not accounting["unknown_nanousd"]
+    # One known charge: 100 input and 10 output tokens on gpt-6-astra.
+    nanousd = accounting["confirmed_nanousd"]
+    assert nanousd == 1_500_000 * len(transport.requests) == sum(call["cost_nanousd"] for call in calls)
+    microusd = convert(nanousd, NANOUSD, MICROUSD)
+
+    with SQLiteRunStore(tmp_path / "jobs.db") as jobs:
+        run_id, (charged, _) = _jobs_run(jobs, tmp_path, "0.10")
+        jobs.complete_call(charged, cost_microusd=microusd, cost_is_complete=True,
+                           cost_is_estimate=False, artifacts=[], result_text="drawn")
+        jobs_cost = jobs.snapshot(run_id)["cost"]
+    with ExperimentLedger(tmp_path / "autotune.db") as ledger:
+        campaign, lease, (completed, _) = _autotune_trials(ledger, 100_000)
+        ledger.complete_trial(completed, lease=lease, metrics={"quality": 1.0}, gates={},
+                              actual_cost_microusd=microusd, duration_ms=1.0)
+        autotune_cost = ledger.snapshot(campaign)["cost"]
+
+    assert jobs_cost["unit"] == MICROUSD
+    exact = {from_units(nanousd, NANOUSD), from_units(jobs_cost["confirmed_microusd"], MICROUSD),
+             from_units(autotune_cost["confirmed_microusd"], MICROUSD)}
+    assert exact == {Decimal("0.0015") * len(transport.requests)}
+    # The float projections read back to the same exact amount.
+    assert to_units(result.total_cost_usd, NANOUSD) == nanousd
+    assert to_units(float(next(iter(exact))), MICROUSD) == microusd
+
+
+def test_unknown_exposure_is_never_zero_in_any_ledger(tmp_path, monkeypatch):
+    transport = NativeTransport().install(monkeypatch)
+    transport.schedule("execution", 0, LOST_RESPONSE)
+    graph = ExecutionGraph([Topology.SERIAL], [Node(id="draft", label="Draft")])
+    with SQLiteWorkflowStore(tmp_path / "runs.db") as store:
+        with pytest.raises(ProviderAccountingError, match="unresolved billing"):
+            Swarm(model="gpt-6-astra", max_budget_usd=1, run_store=store,
+                  provider=OpenAIResponsesProvider(api_key="test-key", max_output_tokens=100),
+                  ).execute(graph)
+        state = store.inspect_run(store.list_runs()[0]["run_id"])
+    (unknown_call,) = [call for call in state["calls"] if call["billing_state"] == "unknown"]
+    held = state["unknown_nanousd"]
+    assert held == unknown_call["ceiling_nanousd"] > 0 and state["unknown_calls"] == 1
+    # Exposure moves into micro-USD ledgers rounded up, never down.
+    reservation = convert(held, NANOUSD, MICROUSD, CEILING)
+    assert from_units(reservation, MICROUSD) >= from_units(held, NANOUSD) > 0
+
+    with SQLiteRunStore(tmp_path / "jobs.db") as jobs:
+        ceiling = str(from_units(reservation, MICROUSD))
+        run_id, (lost, _) = _jobs_run(jobs, tmp_path, ceiling)
+        jobs.mark_unknown_outcome(lost, "provider connection lost")
+        jobs_cost = jobs.snapshot(run_id)["cost"]
+    assert jobs_cost["exposure_microusd"] == reservation and not jobs_cost["cost_is_complete"]
+    with ExperimentLedger(tmp_path / "autotune.db") as ledger:
+        campaign, lease, (lost_trial, _) = _autotune_trials(ledger, reservation)
+        ledger.mark_trial_unknown(lost_trial, "provider connection lost", lease=lease)
+        assert ledger.snapshot(campaign)["cost"]["unknown_exposure_microusd"] == reservation
+
+    # The float ledger: a charge the provider could not report stays unknown.
+    sentinel = Sentinel()
+    sentinel.add_cost("draft", CompletionResult(text="", cost_usd_unknown=True))
+    assert not sentinel.cost_is_complete
+    with pytest.raises(MoneyUnitError):
+        to_units(None, MICROUSD, CEILING)
+
+
+def test_projections_tag_units_that_stored_records_do_not_carry(tmp_path):
+    result, stored = _offline_durable_run(tmp_path / "runs.db")
+    assert result.workflow_accounting["unit"] == NANOUSD == "nanoUSD"
+    assert stored and not any('"unit"' in receipt for receipt in stored)
+
+    with SQLiteRunStore(tmp_path / "jobs.db") as jobs:
+        run_id, _ = _jobs_run(jobs, tmp_path, "0.10")
+        snapshot = jobs.snapshot(run_id)
+        assert snapshot["cost"]["unit"] == MICROUSD == "microUSD"
+        assert jobs.list_runs()[0]["cost"] == snapshot["cost"]
+        assert jobs.inspection_snapshot(run_id)["cost"] == snapshot["cost"]
+    with closing(sqlite3.connect(tmp_path / "jobs.db")) as db:
+        columns = {row[1] for table in ("runs", "calls") for row in db.execute(f"PRAGMA table_info({table})")}
+    assert "unit" not in columns

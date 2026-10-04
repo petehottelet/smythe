@@ -733,9 +733,11 @@ class WorkflowRuntime:
             total_cost_usd=accounting["confirmed_nanousd"] / 1e9,
             cost_is_complete=not accounting["unknown_calls"] and not accounting["reserved_nanousd"],
             cost_contains_estimates=False, cost_scope="complete_text_workflow",
+            # The unit tag names the *_nanousd amounts' unit; stored rows
+            # and receipts do not carry it.
             workflow_accounting={key: accounting[key] for key in (
                 "confirmed_nanousd", "reserved_nanousd", "unknown_nanousd", "unknown_calls", "call_count",
-            )},
+            )} | {"unit": NANOUSD},
             timing=self._timing(),
         )
 

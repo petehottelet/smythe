@@ -196,6 +196,16 @@ all recorded phases and failed attempts, using the adapter's dated published
 token prices. It does not represent a reconciled account invoice or hardware,
 human, and external service costs. No historical benchmark is repriced.
 
+### Money units
+
+The journal stores each amount as the decimal text of a whole number of
+nanoUSD. Stored receipts keep the form they were written in: an offline
+receipt records its zero cost as the string `"0"`. `max_budget_usd` is rounded
+down to whole nanoUSD. `workflow_accounting["unit"]` is `"nanoUSD"`, the unit
+of its amounts; stored rows and receipts carry no unit field. See
+[money units](budgets.md#money-units) for how these amounts compare with the
+float USD and micro-USD ledgers.
+
 ## Price versions
 
 Each native call records the price version it was admitted under, and its

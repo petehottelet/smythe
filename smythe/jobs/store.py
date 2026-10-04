@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterator
 from uuid import uuid4
 
+from smythe._money import MICROUSD
 from smythe._sqlite import enable_wal
 from smythe.jobs.artifact_io import MAX_ARTIFACT_BYTES, MAX_IMAGE_PIXELS
 from smythe.jobs.preflight import ApprovalError, JobApprovalV1, JobPlanV1, verify_approval
@@ -1021,6 +1022,7 @@ class SQLiteRunStore:
                                  "exposure_microusd", "reserved_microusd")} | {
                             "cost_is_complete": run["exposure_microusd"] == 0,
                             "cost_contains_estimates": bool(detail["cost_contains_estimates"]),
+                            "unit": MICROUSD,
                         },
                     })
                 return {"runs": summaries, "limit": limit, "offset": offset,
@@ -1702,6 +1704,8 @@ class SQLiteRunStore:
                 "cost_contains_estimates": any(
                     row["cost_is_estimate"] for row in call_rows
                 ),
+                # The *_microusd amounts' unit; stored rows do not carry it.
+                "unit": MICROUSD,
             },
             "operations": [
                 {

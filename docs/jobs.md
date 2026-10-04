@@ -252,7 +252,9 @@ smythe jobs status RUN_ID --events --json
 Snapshots distinguish confirmed cost, reserved cost, and unresolved exposure.
 `cost_is_complete` is false while an unknown or incomplete provider charge
 remains exposed; `cost_contains_estimates` reports whether any recorded call
-used a conservative estimate.
+used a conservative estimate. The `*_microusd` amounts are whole micro-USD,
+which the cost block's `unit` field names: `"microUSD"`. See
+[money units](budgets.md#money-units).
 
 ## List and inspect runs
 
