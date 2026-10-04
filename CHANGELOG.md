@@ -164,9 +164,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   segment per lease session, the call's elapsed time, the wall time since the
   run was created, and whether a session ended without releasing its lease.
   `SQLiteWorkflowStore.lease_sessions()` returns the same session bounds.
-
-### Changed
-
 - A durable run's `WorkflowBindingError` names the argument it refuses:
   `run_store` and `verifier`, with the type that was passed, `memory`,
   `tool_runtime` or `checkpoint_store`. One message used to cover memory,
