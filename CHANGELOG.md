@@ -95,6 +95,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   version. A store open for writing raises `WorkflowCorruptionError` and
   writes nothing once another release changes the journal's version. See
   [journal upgrades](docs/workflow-accounting.md#journal-upgrades).
+- A Jobs approval token creates one run. `jobs run` with a token that already
+  created a run in the same database exits with code 4 and names that run
+  instead of starting another run with the full ceiling. `--new-run`, or
+  `allow_approval_reuse=True` on `SQLiteRunStore.create_run` and
+  `JobRunner.start`, starts another run on purpose, and that run's
+  `run_created` event records the earlier run IDs under `approval_reuse`.
+  Token derivation, plan hashes and the Jobs schema are unchanged.
 
 ### Fixed
 

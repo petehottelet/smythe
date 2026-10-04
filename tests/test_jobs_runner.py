@@ -11,7 +11,7 @@ from contextlib import ExitStack
 import pytest
 import smythe.jobs.runner as runner_module
 
-from smythe.jobs import JobManifestV1, make_approval, preflight_job
+from smythe.jobs import ApprovalError, JobManifestV1, make_approval, preflight_job
 from smythe.jobs.models import (
     DEFAULT_CALL_TIMEOUT_S,
     DEFAULT_MAX_WALL_SECONDS,
@@ -215,6 +215,32 @@ def test_selective_reroll_replaces_only_rejected_operation(tmp_path, store_facto
     assert second["counts"] == {OperationStatus.SUCCEEDED.value: 1}
     assert second["operations"][0]["attempt_count"] == 2
     assert len(second["attempts"]) == 2
+
+
+def test_start_refuses_a_used_approval_before_any_provider_call(tmp_path, store_factory):
+    plan = preflight_job(_manifest(count=1, attempts=2), manifest_root=tmp_path)
+    approval = make_approval(plan)
+    store = store_factory(tmp_path / "jobs.db")
+    provider = _SequenceProvider()
+    runner = JobRunner(store, provider_pool=_FixedPool(provider))
+    first = asyncio.run(runner.start(plan, approval, manifest_root=tmp_path, run_id="first"))
+    calls, before = provider.calls, list(store._connection.iterdump())
+
+    with pytest.raises(ApprovalError, match="run 'first'.*smythe jobs resume first"):
+        asyncio.run(runner.start(plan, approval, manifest_root=tmp_path))
+    with pytest.raises(TypeError, match="allow_approval_reuse must be a boolean"):
+        asyncio.run(runner.start(plan, approval, manifest_root=tmp_path, allow_approval_reuse=1))
+    assert provider.calls == calls
+    assert list(store._connection.iterdump()) == before
+
+    second = asyncio.run(runner.start(
+        plan, approval, manifest_root=tmp_path, run_id="second", allow_approval_reuse=True,
+    ))
+    assert first["run_id"] == "first" and second["run_id"] == "second"
+    assert provider.calls > calls
+    created = store.snapshot("second", include_events=True)["events"][0]
+    assert created["event_type"] == "run_created"
+    assert created["payload"]["approval_reuse"] == {"prior_run_ids": ["first"]}
 
 
 class _AmbiguousProvider(Provider):

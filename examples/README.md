@@ -35,6 +35,10 @@ smythe jobs list
 smythe jobs inspect RUN_ID --out job-report.html
 ```
 
+Each approval token creates one run: repeating `jobs run` with the same token
+is refused with exit code 4. Use `jobs resume RUN_ID` to continue the run, or
+add `--new-run` to start another one.
+
 For long jobs on supported hosts, add `--detach` to `run` or `resume` so the launcher can exit,
 follow with `jobs attach`,
 and use `jobs stop` to save a pause request while admitted calls drain.

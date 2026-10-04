@@ -13,7 +13,7 @@ from smythe.jobs.store import (
 )
 
 
-def create_run(store, root, run_id="run", *, name="inspection-job", count=2):
+def create_run(store, root, run_id="run", *, name="inspection-job", count=2, allow_approval_reuse=False):
     manifest = JobManifestV1.from_dict({
         "version": 1, "name": name,
         "profiles": [{"name": "test", "provider": "offline", "model": "offline-image",
@@ -23,7 +23,8 @@ def create_run(store, root, run_id="run", *, name="inspection-job", count=2):
                       "max_budget_usd": "0", "output_directory": "PRIVATE OUTPUT PATH"},
     })
     plan = preflight_job(manifest, manifest_root=root)
-    store.create_run(plan, make_approval(plan), manifest_root=root, run_id=run_id)
+    store.create_run(plan, make_approval(plan), manifest_root=root, run_id=run_id,
+                     allow_approval_reuse=allow_approval_reuse)
     return run_id
 
 
@@ -238,7 +239,7 @@ def test_listing_does_not_load_prompts_results_or_artifact_rows(journal):
     assert "PRIVATE" not in json.dumps(summaries)
     assert not any("FROM artifacts" in sql or "spec_json" in sql or "result_text" in sql or "SELECT *" in sql for sql in statements)
     # A corrupt plan outside the selected page cannot force an unbounded parse.
-    create_run(journal, journal.path.parent, "older")
+    create_run(journal, journal.path.parent, "older", allow_approval_reuse=True)  # Same job on purpose.
     with closing(sqlite3.connect(journal.path)) as db, db:
         db.execute("UPDATE runs SET plan_json='bad JSON',created_at_ns=0 WHERE run_id='older'")
     assert journal.list_runs(limit=1)[0]["run_id"] == "run"

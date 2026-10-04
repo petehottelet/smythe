@@ -160,6 +160,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="must match the ceiling used by jobs plan",
     )
+    run.add_argument("--new-run", action="store_true",
+                     help="start another run with an approval already used by an earlier run")
     run.add_argument("--detach", action="store_true", help="start a worker independent of this terminal")
     run.add_argument("--startup-timeout-s", type=float, default=30.0,
                      help="detached worker readiness timeout (0.1-300 seconds; default: 30)")
@@ -924,7 +926,8 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
                 # Preserve start()'s local attachment/provider checks before
                 # creating the approved run. The worker revalidates on resume.
                 JobRunner(store)._validate_dispatch_inputs(plan, manifest_root)
-                run_id = store.create_run(plan, approval, manifest_root=manifest_root)
+                run_id = store.create_run(plan, approval, manifest_root=manifest_root,
+                                          allow_approval_reuse=args.new_run)
             launched = launch_worker(args.store, run_id, startup_timeout_s=args.startup_timeout_s)
             _emit(args, command, launched)
             return EXIT_OK
@@ -934,6 +937,7 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
                     plan,
                     approval,
                     manifest_root=manifest_root,
+                    allow_approval_reuse=args.new_run,
                 )
             )
         _emit(args, command, snapshot)

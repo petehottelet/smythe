@@ -188,6 +188,37 @@ def test_run_refuses_a_token_for_a_different_approval(tmp_path, capsys):
     assert error["error"]["type"] == "ApprovalError"
 
 
+def test_run_refuses_a_used_approval_unless_a_new_run_is_requested(tmp_path, capsys):
+    manifest = _manifest(tmp_path)
+    store = tmp_path / "jobs.sqlite3"
+    assert main(["jobs", "--json", "plan", str(manifest)]) == EXIT_OK
+    token = _json_output(capsys)["plan"]["approval"]["token"]
+    command = ["jobs", "run", str(manifest), "--approve", token, "--store", str(store), "--json"]
+
+    assert main(command) == EXIT_OK
+    first = _json_output(capsys)["run"]["run_id"]
+
+    assert main(command) == EXIT_APPROVAL
+    error = _json_output(capsys)
+    assert error["ok"] is False and error["command"] == "run"
+    assert error["error"]["type"] == "ApprovalError"
+    assert f"'{first}'" in error["error"]["message"]
+    assert f"smythe jobs resume {first}" in error["error"]["message"]
+
+    assert main([*command, "--new-run"]) == EXIT_OK
+    second = _json_output(capsys)["run"]
+    assert second["run_id"] != first and second["status"] == "completed"
+    assert main(["jobs", "status", second["run_id"], "--events", "--store", str(store), "--json"]) == EXIT_OK
+    created = _json_output(capsys)["status"]["events"][0]
+    assert created["event_type"] == "run_created"
+    assert created["payload"]["approval_reuse"] == {"prior_run_ids": [first]}
+
+    with pytest.raises(SystemExit):
+        main(["jobs", "run", "--help"])
+    help_text = " ".join(capsys.readouterr().out.split())
+    assert "--new-run start another run with an approval already used by an earlier run" in help_text
+
+
 def test_invalid_manifest_has_stable_nonzero_exit(tmp_path, capsys):
     manifest = tmp_path / "invalid.json"
     manifest.write_text('{"version": 99}', encoding="utf-8")

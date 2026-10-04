@@ -139,7 +139,11 @@ class JobRunner:
         *,
         manifest_root: str | Path,
         run_id: str | None = None,
+        allow_approval_reuse: bool = False,
     ) -> dict[str, Any]:
+        """Create and execute a run; a used approval needs ``allow_approval_reuse``."""
+        if type(allow_approval_reuse) is not bool:
+            raise TypeError("allow_approval_reuse must be a boolean")
         verify_approval(plan, approval)
         root = Path(manifest_root).resolve()
         if run_id is not None:
@@ -150,6 +154,7 @@ class JobRunner:
             approval,
             manifest_root=root,
             run_id=run_id,
+            allow_approval_reuse=allow_approval_reuse,
         )
         _validate_run_id(created_id)
         return await self._execute_with_lease(created_id, plan, root)

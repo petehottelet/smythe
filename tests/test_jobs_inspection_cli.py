@@ -125,8 +125,10 @@ def test_list_pagination_and_status_filter(job, capsys):
     manifest, root = load_manifest(job.manifest)
     plan = preflight_job(manifest, manifest_root=root)
     with SQLiteRunStore(job.path) as store:
-        store.create_run(plan, make_approval(plan), manifest_root=root, run_id="approved-a")
-        store.create_run(plan, make_approval(plan), manifest_root=root, run_id="approved-b")
+        # More runs of the seeded job's approval, created on purpose to page through.
+        for run_id in ("approved-a", "approved-b"):
+            store.create_run(plan, make_approval(plan), manifest_root=root, run_id=run_id,
+                             allow_approval_reuse=True)
     assert main(["jobs", "list", "--limit", "1", "--offset", "1", "--status", "approved",
                  "--store", str(job.path), "--json"]) == EXIT_OK
     listed = output(capsys)["list"]

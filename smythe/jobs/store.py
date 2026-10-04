@@ -20,7 +20,7 @@ from uuid import uuid4
 
 from smythe._sqlite import enable_wal
 from smythe.jobs.artifact_io import MAX_ARTIFACT_BYTES, MAX_IMAGE_PIXELS
-from smythe.jobs.preflight import JobApprovalV1, JobPlanV1, verify_approval
+from smythe.jobs.preflight import ApprovalError, JobApprovalV1, JobPlanV1, verify_approval
 
 
 STORE_VERSION = 4
@@ -598,20 +598,50 @@ class SQLiteRunStore:
         *,
         manifest_root: str | Path,
         run_id: str | None = None,
+        allow_approval_reuse: bool = False,
     ) -> str:
+        """Create an approved run; by default each approval token creates one.
+
+        The token is derived only from the plan and ceiling, so repeating an
+        approval repeats its token. A token that already created a run in this
+        journal raises ``ApprovalError`` unless ``allow_approval_reuse`` is
+        true; the new run's ``run_created`` event then records the earlier run
+        IDs. Resume and reroll continue an existing run and are unaffected.
+        """
+        if type(allow_approval_reuse) is not bool:
+            raise TypeError("allow_approval_reuse must be a boolean")
         verify_approval(plan, approval)
         approved_microusd = _microusd(
             approval.approved_max_cost_microusd,
             field="approved_max_cost_microusd",
         )
         run_id = _safe_run_id(uuid4().hex if run_id is None else run_id)
-        plan_json = json.dumps(plan.to_dict(), sort_keys=True, separators=(",", ":"))
+        created = plan.to_dict()
+        plan_json = json.dumps(created, sort_keys=True, separators=(",", ":"))
         approval_json = json.dumps(
             approval.to_dict(), sort_keys=True, separators=(",", ":")
         )
         artifact_identity = uuid4().hex
         with self._transaction() as cursor:
             now = self._clock_ns()
+            # Checked under the write lock, so concurrent creators serialize.
+            prior = [row["run_id"] for row in cursor.execute(
+                "SELECT run_id FROM runs WHERE approval_token = ? ORDER BY created_at_ns, run_id",
+                (approval.token,),
+            )]
+            if prior and not allow_approval_reuse:
+                shown = ", ".join(repr(item) for item in prior[-5:])
+                if len(prior) > 5:
+                    shown = f"{len(prior)} runs, most recently {shown}"
+                else:
+                    shown = ("runs " if len(prior) > 1 else "run ") + shown
+                raise ApprovalError(
+                    f"approval token already created {shown}; continue with "
+                    f"'smythe jobs resume {prior[-1]}', or acknowledge approval reuse "
+                    "(jobs run --new-run, allow_approval_reuse=True) to start another run"
+                )
+            if prior:
+                created = created | {"approval_reuse": {"prior_run_ids": prior}}
             cursor.execute(
                 """
                 INSERT INTO runs (
@@ -663,7 +693,7 @@ class SQLiteRunStore:
                 ],
             )
             cursor.execute("INSERT INTO run_controls(run_id) VALUES (?)", (run_id,))
-            self._event(cursor, run_id, None, "run_created", plan.to_dict(), now)
+            self._event(cursor, run_id, None, "run_created", created, now)
         return run_id
 
     def acquire_run_lease(

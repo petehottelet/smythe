@@ -174,6 +174,17 @@ Use the same `--max-spend-usd` value for `plan` and `run`. The token is an
 explicit plan-and-spend acknowledgment, not an authentication credential or a
 signature from a secret key.
 
+An approval token creates one run. The token is derived only from the plan and
+ceiling, so approving the same plan at the same ceiling again yields the same
+token. A Jobs database refuses a token that already created a run, before
+creating anything, with exit code 4 and an error that names the earlier run;
+continue that run with `smythe jobs resume RUN_ID`. To start another run with
+its own full ceiling on purpose, add `--new-run`. The new run's `run_created`
+event records the earlier run IDs as `approval_reuse.prior_run_ids`. A
+different ceiling produces a different token. Resume and reroll continue an
+existing run and need no new approval. The check covers one database, and the
+token remains an acknowledgment rather than a credential.
+
 ## The dispatch journal
 
 Each run is stored incrementally in SQLite using WAL mode. Before a provider
@@ -501,7 +512,7 @@ and output charge that one request can incur.
 | 1 | job finished `failed`, `partial`, `needs_attention`, or `budget_overrun` |
 | 2 | invalid manifest, preflight input, or command value |
 | 3 | provider configuration or optional dependency failure |
-| 4 | approval mismatch |
+| 4 | approval mismatch, or an already used approval without `--new-run` |
 | 5 | budget admission failure |
 | 6 | unknown run or invalid state transition |
 | 7 | local SQLite/filesystem failure, detached startup failure, or attachment detects a failed worker or expired lease |
@@ -530,6 +541,10 @@ with SQLiteRunStore("jobs.sqlite3") as store:
         JobRunner(store).start(plan, approval, manifest_root=root)
     )
 ```
+
+`JobRunner.start` and `SQLiteRunStore.create_run` raise `ApprovalError` for an
+approval that already created a run in the store. Pass
+`allow_approval_reuse=True` to start another run with it, as `--new-run` does.
 
 ## Current boundaries
 
