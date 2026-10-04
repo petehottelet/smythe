@@ -6,6 +6,7 @@ reconcile exactly across them, unknown cost must never read as zero, and a
 reservation must never shrink when it changes unit.
 """
 
+import asyncio
 from contextlib import closing
 from decimal import Decimal, DecimalException, Inexact, localcontext
 import hashlib
@@ -17,9 +18,11 @@ import uuid
 
 import pytest
 
-from fakes import LOST_RESPONSE, NativeTransport
-from smythe import OfflineProvider, SQLiteWorkflowStore, Swarm, Task
-from smythe import pricing, pricing_anthropic
+from fakes import LOST_RESPONSE, MessagesTransport, NativeTransport
+from smythe import (
+    AnthropicMessagesProvider, ChatMessage, OfflineProvider, SQLiteWorkflowStore, Swarm, Task,
+)
+from smythe import pricing, pricing_anthropic, provider_messages
 from smythe._money import (
     CEILING, EXACT, FLOOR, MICROUSD, NANOUSD, USD, MoneyUnitError, convert, from_units, to_units,
 )
@@ -373,6 +376,33 @@ def test_messages_receipt_amounts_do_not_depend_on_the_decimal_context():
         receipt = pricing_anthropic.price_messages_response(MESSAGES_RESPONSE)
         assert receipt.safe_summary() == expected
         assert str(receipt.cost_usd) == "0.002535000"
+
+
+def _messages_quote(monkeypatch, ceiling=None):
+    """Quote one Messages request on the wire fake, optionally at a fixed nanoUSD ceiling."""
+    MessagesTransport().install(monkeypatch)
+    if ceiling is not None:
+        monkeypatch.setattr(provider_messages, "messages_quote_nanousd", lambda *args: ceiling)
+    provider = AnthropicMessagesProvider(api_key="test-key")
+    prepared = provider.prepare("System", [ChatMessage("user", "Question")], pricing_anthropic.MODEL)
+    return asyncio.run(provider.quote(prepared))
+
+
+@pytest.mark.parametrize("count", NANO_COUNTS)
+def test_messages_quote_ceilings_are_unchanged(monkeypatch, count):
+    quote = _messages_quote(monkeypatch, count)
+    assert quote.ceiling_usd.as_tuple() == Decimal(count).scaleb(-9).as_tuple()
+
+
+def test_messages_quote_ceiling_does_not_depend_on_the_decimal_context(monkeypatch):
+    """Regression: a lower decimal precision rounded a Messages quote's ceiling_usd."""
+    expected = _messages_quote(monkeypatch)
+    # 170 input tokens and the default 8,192 output tokens on Fable.
+    assert str(expected.ceiling_usd) == "0.433820000"
+    with localcontext() as context:
+        context.prec = 5
+        quote = _messages_quote(monkeypatch)
+    assert quote.ceiling_usd.as_tuple() == expected.ceiling_usd.as_tuple()
 
 
 def _digest(summary):

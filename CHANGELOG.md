@@ -344,10 +344,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `9223372036854.775807` as unable to "fit exact microdollar precision" or
   raised `decimal.InvalidOperation`. Values and error messages under Python's
   default context are unchanged.
-- A native Messages receipt's `cost_usd` is exact whatever the caller's
-  `decimal` context. A lower precision rounded it, for example to `0.0025350`
-  instead of `0.002535000`, so settling the same saved response in two
-  contexts could produce receipts with different bytes. Receipts under the
+- A native Messages receipt's `cost_usd` and the `ceiling_usd` of an
+  `AnthropicMessagesProvider.quote()` are exact whatever the caller's
+  `decimal` context. A lower precision rounded them, for example a receipt to
+  `0.0025350` instead of `0.002535000` and a quote to `0.43382` instead of
+  `0.433820000`, so settling the same saved response in two contexts could
+  produce receipts with different bytes. Receipts and quotes under the
   default context are unchanged.
 - A durable run can complete after a call was reserved but never dispatched
   and the run did not send it again. Such a reservation, left by a process
