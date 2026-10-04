@@ -278,6 +278,21 @@ def test_phase_is_recorded_when_its_block_raises():
     assert tracer.timing()["phases_ms"]["planning"] == 2000
 
 
+def test_measurements_from_a_clock_stepping_backwards_are_zero():
+    readings = {"now": 10.0}
+    tracer = Tracer(clock=lambda: readings["now"])
+
+    started = tracer.now()
+    readings["now"] -= 3
+    assert tracer.since(started) == 0.0
+    with tracer.phase("synthesis"):
+        readings["now"] -= 1
+    readings["now"] += 6
+    assert tracer.since(started) == 2.0
+
+    assert tracer.timing()["phases_ms"]["synthesis"] == 0
+
+
 @pytest.mark.parametrize("call", [
     lambda tracer: tracer.add_phase("thinking", 1),
     lambda tracer: tracer.add_phase("waiting", 1),

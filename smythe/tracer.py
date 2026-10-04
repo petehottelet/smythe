@@ -107,6 +107,16 @@ class Tracer:
         """Read this tracer's wall clock, in seconds since the epoch."""
         return self._wall_clock()
 
+    def since(self, started: float) -> float:
+        """Monotonic seconds from ``started``, a reading of now(), to now.
+
+        A clock that steps backwards, or rounding in a derived reading, gives
+        0.0 rather than a negative duration, so a measurement taken while
+        work runs can always be recorded and never fails that work.
+        """
+        seconds = self._clock() - started
+        return seconds if math.isfinite(seconds) and seconds > 0 else 0.0
+
     def add_phase(self, name: str, seconds: float) -> None:
         """Add measured time to a phase; waits are recorded with on_wait()."""
         if name not in PHASES or name == "waiting":
@@ -120,7 +130,7 @@ class Tracer:
         try:
             yield
         finally:
-            self.add_phase(name, self._clock() - started)
+            self.add_phase(name, self.since(started))
 
     def on_wait(self, reason: str, seconds: float, node: Node | None = None) -> None:
         """Record time that ready work spent waiting, such as retry backoff."""

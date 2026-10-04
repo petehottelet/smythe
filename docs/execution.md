@@ -117,7 +117,9 @@ fields are on `Tracer.spans`; the keys of `Tracer.summary()` and
 `SwarmResult.trace` are unchanged. A tracer passed to an executor reports the
 same measurements through `Tracer.timing()`, whose `elapsed_ms` starts when the
 tracer is created. `Tracer(clock=..., wall_clock=...)` takes the monotonic and
-wall clocks to use, for example fixed clocks in tests.
+wall clocks to use, for example fixed clocks in tests. Measuring never fails a
+run: a phase or wait whose clock readings would give a negative duration, as
+with a clock that steps backwards, records zero.
 
 A durable [`run_store`](workflow-accounting.md) run can span several calls and
 processes, so its `timing` comes from the journal's wall-clock event times

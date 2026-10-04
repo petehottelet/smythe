@@ -54,7 +54,7 @@ class Executor(ExecutorBase):
                 started = self._tracer.now()
                 asyncio.run(self.maybe_revise(node, graph))
                 if held:
-                    self._tracer.on_wait("supervision", self._tracer.now() - started)
+                    self._tracer.on_wait("supervision", self._tracer.since(started))
         return graph
 
     def _walk(self, graph: ExecutionGraph) -> list[Node]:
@@ -86,7 +86,7 @@ class Executor(ExecutorBase):
             if delay:
                 started = self._tracer.now()
                 time.sleep(delay)
-                self._tracer.on_wait("retry_backoff", self._tracer.now() - started, node)
+                self._tracer.on_wait("retry_backoff", self._tracer.since(started), node)
             node.status = NodeStatus.RUNNING
             self.begin_verification(node, graph)
             self._tracer.on_node_start(node, attempt=attempt)

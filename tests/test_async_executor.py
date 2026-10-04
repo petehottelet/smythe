@@ -719,3 +719,72 @@ async def test_supervisor_review_that_holds_ready_work_is_a_supervision_wait():
     assert timing["phases_ms"]["supervision"] == 10000
     assert timing["waiting_ms"] == {"retry_backoff": 0, "admission": 0, "supervision": 5000}
     assert timing["elapsed_ms"] == 12000
+
+
+@pytest.mark.parametrize(("work_s", "review_s"), [(0.3, 0.6), (0.6, 1.1)])
+@pytest.mark.asyncio
+async def test_review_that_holds_a_node_never_makes_its_admission_wait_negative(
+    work_s, review_s,
+):
+    """B becomes ready at ``work_s`` and is held until the review ends.
+
+    Removing the review from B's admission wait must not leave a rounding
+    error below zero that fails the run.
+    """
+    clock, tracer = _manual_tracer()
+
+    class SlowReview(Supervisor):
+        async def review(self, graph, node, *, task, revisions_remaining):
+            clock.advance(review_s)
+            return None
+
+    executor = AsyncExecutor(
+        provider=ClockedProvider(clock, {"A": work_s, "B": 0.1}), registry=Registry(),
+        tracer=tracer, supervisor=SlowReview(), max_revisions=1,
+    )
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="a", label="A"), Node(id="b", label="B", depends_on=["a"]),
+    ])
+
+    await executor.run(graph)
+
+    assert [node.status for node in graph.nodes] == [NodeStatus.COMPLETED] * 2
+    assert tracer.timing()["waiting_ms"] == {
+        "retry_backoff": 0, "admission": 0, "supervision": review_s * 1000,
+    }
+
+
+class SteppingClock:
+    """A monotonic clock a test can step backwards, as a faulty clock might."""
+
+    def __init__(self) -> None:
+        self.value = 100.0
+
+    def __call__(self) -> float:
+        return self.value
+
+
+@pytest.mark.asyncio
+async def test_clock_stepping_backwards_during_a_review_does_not_fail_the_run():
+    clock = SteppingClock()
+
+    class BackwardsReview(Supervisor):
+        async def review(self, graph, node, *, task, revisions_remaining):
+            clock.value -= 5
+            return None
+
+    tracer = Tracer(clock=clock)
+    executor = AsyncExecutor(
+        provider=SlowMockProvider(delay=0.0), registry=Registry(), tracer=tracer,
+        supervisor=BackwardsReview(), max_revisions=1,
+    )
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="a", label="A"), Node(id="b", label="B", depends_on=["a"]),
+    ])
+
+    await executor.run(graph)
+
+    assert [node.status for node in graph.nodes] == [NodeStatus.COMPLETED] * 2
+    timing = tracer.timing()
+    assert timing["phases_ms"]["supervision"] == 0
+    assert timing["waiting_ms"] == {"retry_backoff": 0, "admission": 0, "supervision": 0}

@@ -270,7 +270,7 @@ class ExecutorBase:
             self.notify_supervision_update(node, False)
             return False
         finally:
-            self._tracer.add_phase("supervision", self._tracer.now() - started)
+            self._tracer.add_phase("supervision", self._tracer.since(started))
         if revision is None or revision.is_empty:
             self.notify_supervision_update(node, False)
             return False

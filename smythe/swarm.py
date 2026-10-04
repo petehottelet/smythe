@@ -270,7 +270,7 @@ class Swarm:
         started = tracer.now()
         architect = self._select_architect(snapshot_task(task))
         if self._router is not None:
-            tracer.add_phase("routing", tracer.now() - started)
+            tracer.add_phase("routing", tracer.since(started))
         with tracer.phase("planning"):
             graph, architect_registry = architect.plan(snapshot_task(task))
             return self._adopt_plan(graph, architect_registry, task)
@@ -288,7 +288,7 @@ class Swarm:
         started = tracer.now()
         architect = await self._aselect_architect(snapshot_task(task))
         if self._router is not None:
-            tracer.add_phase("routing", tracer.now() - started)
+            tracer.add_phase("routing", tracer.since(started))
         with tracer.phase("planning"):
             graph, architect_registry = await architect.aplan(snapshot_task(task))
             return self._adopt_plan(graph, architect_registry, task)
@@ -686,7 +686,7 @@ class Swarm:
         validate_verification_checkpoint(graph, version=version, completed=completed)
         timing = _RunTiming(tracer, resumed=True, previous=_saved_segments(state))
         if completed and not verification_pending(graph):
-            tracer.add_phase("recovery", tracer.now() - recovery_started)
+            tracer.add_phase("recovery", tracer.since(recovery_started))
             return SwarmResult(
                 output=state["output"],
                 graph=graph,
@@ -739,7 +739,7 @@ class Swarm:
             ),
         )
         self._active_executor = executor
-        tracer.add_phase("recovery", tracer.now() - recovery_started)
+        tracer.add_phase("recovery", tracer.since(recovery_started))
         try:
             graph = await executor.run(graph)
             with tracer.phase("synthesis"):

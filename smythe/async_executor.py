@@ -142,8 +142,10 @@ class AsyncExecutor(ExecutorBase):
         # None intentionally retains the documented unlimited mode.  With a
         # concrete cap, the active task set can never grow beyond that cap.
         concurrency = self._max_concurrency or max(1, len(pending))
-        # When each ready node became ready, for its admission wait.
+        # When each ready node became ready, and how long supervisor reviews
+        # then held it, for its admission wait.
         ready_at = dict.fromkeys((node.id for node in ready), self._tracer.now())
+        held_s: dict[str, float] = {}
 
         try:
             while ready or active:
@@ -162,8 +164,12 @@ class AsyncExecutor(ExecutorBase):
                         ready.appendleft(node)
                         admission_error = exc
                         break
-                    now = self._tracer.now()
-                    self._tracer.on_wait("admission", now - ready_at.pop(node.id, now), node)
+                    # Review time is a supervision wait, not part of this one.
+                    # since() keeps a rounding error from going below zero.
+                    waited = self._tracer.since(
+                        ready_at.pop(node.id, self._tracer.now()) + held_s.pop(node.id, 0.0),
+                    )
+                    self._tracer.on_wait("admission", waited, node)
                     task = asyncio.create_task(
                         self._execute_node(node, graph),
                         name=f"smythe-node-{node.id}",
@@ -210,7 +216,7 @@ class AsyncExecutor(ExecutorBase):
                             revised |= await self._regenerate_and_settle(node, graph, active)
                         if self._supervisor is not None:
                             revised |= await self._supervise(
-                                node, graph, ready, ready_at, concurrency - len(active),
+                                node, graph, ready, held_s, concurrency - len(active),
                             )
                     if revised:
                         (
@@ -242,19 +248,19 @@ class AsyncExecutor(ExecutorBase):
 
     async def _supervise(
         self, node: Node, graph: ExecutionGraph, ready: deque[Node],
-        ready_at: dict[str, float], free_slots: int,
+        held_s: dict[str, float], free_slots: int,
     ) -> bool:
         """Review after *node*; ready nodes that had a free slot wait for it."""
         held = list(islice(ready, max(0, free_slots)))
         started = self._tracer.now()
         revised = await self.maybe_revise(node, graph)
         if held:
-            stalled = self._tracer.now() - started
+            stalled = self._tracer.since(started)
             self._tracer.on_wait("supervision", stalled * len(held))
             # The review, not a full queue, held these nodes: keep that time
             # out of their admission waits.
             for waiting in held:
-                ready_at[waiting.id] = ready_at.get(waiting.id, started) + stalled
+                held_s[waiting.id] = held_s.get(waiting.id, 0.0) + stalled
         return revised
 
     def _reserve_node(self, node: Node) -> None:
@@ -334,7 +340,7 @@ class AsyncExecutor(ExecutorBase):
                 try:
                     await asyncio.sleep(delay)
                 finally:
-                    self._tracer.on_wait("retry_backoff", self._tracer.now() - started, node)
+                    self._tracer.on_wait("retry_backoff", self._tracer.since(started), node)
             node.status = NodeStatus.RUNNING
             self.begin_verification(node, graph)
             self._tracer.on_node_start(node, attempt=attempt)

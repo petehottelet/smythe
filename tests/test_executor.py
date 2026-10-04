@@ -163,6 +163,37 @@ def test_serial_supervisor_review_with_pending_work_is_a_supervision_wait():
     assert timing["elapsed_ms"] == 10000
 
 
+def test_clock_stepping_backwards_does_not_fail_a_serial_run(monkeypatch):
+    readings = {"now": 100.0}
+    tracer = Tracer(clock=lambda: readings["now"])
+
+    class BackwardsReview(Supervisor):
+        async def review(self, graph, node, *, task, revisions_remaining):
+            readings["now"] -= 5
+            return None
+
+    def backwards_sleep(seconds):
+        readings["now"] -= seconds
+
+    executor = Executor(
+        provider=FailingProvider(failures=1, fail_labels={"A"}), registry=Registry(),
+        tracer=tracer, supervisor=BackwardsReview(), max_revisions=1,
+    )
+    monkeypatch.setattr(executor, "retry_delay_s", lambda attempt: 2.0 * attempt)
+    monkeypatch.setattr(executor_module.time, "sleep", backwards_sleep)
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="a", label="A", failure_policy=FailurePolicy.RETRY, max_retries=1),
+        Node(id="b", label="B", depends_on=["a"]),
+    ])
+
+    executor.run(graph)
+
+    assert [node.status for node in graph.nodes] == [NodeStatus.COMPLETED] * 2
+    timing = tracer.timing()
+    assert timing["phases_ms"]["supervision"] == 0
+    assert timing["waiting_ms"] == {"retry_backoff": 0, "admission": 0, "supervision": 0}
+
+
 def test_serial_halts_downstream_of_failed():
     """When an upstream node fails with HALT, its dependent should not execute."""
     executor, _ = _make_executor(FailingProvider(failures=999, fail_labels={"Upstream"}))
