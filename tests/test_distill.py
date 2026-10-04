@@ -368,3 +368,10 @@ def test_refuses_a_gate_whose_target_is_not_in_the_graph():
     graph.nodes[1].verifies = "ghost"
     with pytest.raises(DistillationError, match="'check'.*'ghost'"):
         distill_template(graph, name="t", registry=registry)
+
+
+def test_refuses_a_gate_that_verifies_itself():
+    graph, registry = _completed_gated_graph()
+    graph.nodes[1].verifies = "check"
+    with pytest.raises(DistillationError, match="'check'.*itself"):
+        distill_template(graph, name="t", registry=registry)

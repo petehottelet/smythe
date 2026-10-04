@@ -122,6 +122,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   The executor tested truthiness, so a custom verifier's
   `Verdict(passed="false")` passed. Any other value is now a failed verdict,
   and its reason states that `passed` must be a bool.
+- A custom verifier whose failed `Verdict` has no text reason, such as
+  `Verdict(passed=False, reason=None)`, sends its target back for another
+  try. The run used to stop with `VerificationRecoveryError` because the
+  saved regeneration intent required a text reason; a missing reason is now
+  empty and any other value is described by its type.
 - A failed attempt's trace span now has status `failed` instead of `running`.
   Serial and parallel execution recorded every attempt that raised as still
   running, whether the node then retried, was skipped or stopped the run, and
@@ -162,7 +167,7 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   metadata `role`. Previously a distilled judge stopped gating, so its
   target was never regenerated and `DELIVERABLE` synthesis returned the
   verdict instead of the approved output. Distilling a graph in which a node
-  verifies a missing node raises `DistillationError`.
+  verifies a missing node or itself raises `DistillationError`.
 - Jobs preflight rejects an artifact the profile cannot produce, so
   `jobs validate`, `jobs plan` and `jobs run` fail before a run is created.
   An `offline` profile emits 1x1 PNGs and now requires `image/png` with no

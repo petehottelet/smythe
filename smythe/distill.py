@@ -108,6 +108,8 @@ def distill_template(
     # whichever node happens to carry that id.
     known_ids = {entry["id"] for entry in blueprint}
     for entry in blueprint:
+        if entry["verifies"] == entry["id"]:
+            raise DistillationError(f"cannot distill node {entry['id']!r}: it verifies itself")
         if entry["verifies"] is not None and entry["verifies"] not in known_ids:
             raise DistillationError(
                 f"cannot distill node {entry['id']!r}: it verifies unknown "
