@@ -317,3 +317,20 @@ def test_default_clocks_still_produce_wall_timestamps():
     assert span.start_time > 1_000_000_000
     assert span.monotonic_end >= span.monotonic_start
     assert tracer.timing()["elapsed_ms"] >= 0
+
+
+def test_revision_and_regeneration_markers_use_the_injected_wall_clock():
+    tracer = Tracer(clock=ManualClock().monotonic, wall_clock=lambda: 1234.5)
+    judge = Node(id="judge", label="judge")
+    draft = Node(id="draft", label="draft")
+
+    class _Revision:
+        reason = "add a summary"
+
+        def summary(self):
+            return "add"
+
+    tracer.on_revision(judge, _Revision(), applied=True)
+    tracer.on_regeneration(judge, draft, reason="too short", attempt=1, limit=2, reset_ids=["draft"])
+
+    assert [(span.start_time, span.end_time) for span in tracer.spans] == [(1234.5, 1234.5)] * 2

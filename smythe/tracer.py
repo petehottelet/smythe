@@ -203,7 +203,7 @@ class Tracer:
         invalid changes is a finding, and silently dropping those
         attempts would hide it.
         """
-        now = time.time()
+        now = self._wall_clock()
         span = Span(
             node_id=f"supervisor:{node.id}",
             label=getattr(revision, "reason", "") or "plan review",
@@ -238,7 +238,7 @@ class Tracer:
         reset_ids: list[str],
     ) -> None:
         """Record a failed verification sending work back for another try."""
-        now = time.time()
+        now = self._wall_clock()
         span = Span(
             node_id=f"verifier:{verifier_node.id}",
             label=reason or f"{target.id} failed verification",
