@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import hashlib
+from pathlib import Path
 
 import pytest
 
 from smythe import VerificationRecoveryError
+from smythe.acceptance import AcceptancePolicy
 from smythe.async_executor import AsyncExecutor
 from smythe.budget import Sentinel
 from smythe.checkpoint import (
@@ -19,7 +22,7 @@ from smythe.checkpoint import (
 )
 from smythe.executor import Executor
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
-from smythe.provider import CompletionResult, Provider
+from smythe.provider import Artifact, CompletionResult, Provider
 from smythe.registry import Registry
 from smythe.swarm import Swarm
 from smythe.verifier import CallableVerifier
@@ -319,6 +322,52 @@ def test_graph_snapshots_detach_nested_control_state():
     graph.nodes[1].metadata["verification_receipt"]["state"] = "consumed"
     assert snapshot["nodes"][1]["metadata"]["verification_receipt"]["state"] == "pending"
     assert restored.nodes[1].metadata["verification_receipt"]["state"] == "pending"
+
+
+class DrawingProvider(Provider):
+    """Each draft call returns new image bytes; the judge replies from a queue."""
+
+    def __init__(self, *verdicts):
+        self.verdicts = list(verdicts)
+        self.draws = 0
+
+    async def complete(self, system, prompt, model):
+        node_id = prompt.splitlines()[0]
+        if node_id == "judge":
+            return CompletionResult(text=self.verdicts.pop(0), cost_usd=0.1)
+        self.draws += 1
+        image = Artifact(data=f"image {self.draws}".encode(), mime_type="image/png")
+        return CompletionResult(text=f"{node_id} v{self.draws}", cost_usd=0.1, artifacts=[image])
+
+
+def _gated_drawing():
+    return ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="draft", label="draft"),
+        Node(id="judge", label="judge", depends_on=["draft"], verifies="draft", max_regenerations=1),
+    ])
+
+
+def test_strict_regeneration_keeps_the_rejected_files(tmp_path):
+    swarm = Swarm(provider=DrawingProvider("FAIL: too dark", "PASS"), model="test",
+                  artifact_dir=tmp_path, acceptance=AcceptancePolicy(mode="strict"))
+    result = swarm.execute(_gated_drawing())
+
+    run_dir = tmp_path / result.execution_id[:12]
+    assert (run_dir / "draft_00.png").read_bytes() == b"image 1"
+    assert (run_dir / "draft_g1_00.png").read_bytes() == b"image 2"
+    [record] = result.graph.nodes[0].metadata["artifacts"]
+    assert Path(record["path"]) == (run_dir / "draft_g1_00.png").resolve()
+    assert record["sha256"] == hashlib.sha256(b"image 2").hexdigest()
+
+
+def test_legacy_regeneration_still_writes_one_name_per_position(tmp_path):
+    swarm = Swarm(provider=DrawingProvider("FAIL: too dark", "PASS"), model="test",
+                  artifact_dir=tmp_path)
+    result = swarm.execute(_gated_drawing())
+
+    run_dir = tmp_path / result.execution_id[:12]
+    assert sorted(path.name for path in run_dir.iterdir()) == ["draft_00.png"]
+    assert (run_dir / "draft_00.png").read_bytes() == b"image 2"
 
 
 @pytest.mark.parametrize("version", [True, False, 3.0, "3", None])

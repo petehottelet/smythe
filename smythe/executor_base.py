@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
 from smythe._errors import PicklableError
+from smythe._publish import publish_unique
 from smythe.acceptance import AcceptanceMode, AcceptancePolicy, _unmet_obligations
 from smythe.agent import Agent
 from smythe.budget import (
@@ -1178,13 +1179,20 @@ class ExecutorBase:
         Artifact bytes never land on the node itself — checkpoints are
         plain JSON and planner memory is JSONL, so binary payloads would
         break or bloat both.  Files go under ``artifact_dir`` with a
-        filesystem-safe name; absolute paths are recorded in
+        filesystem-safe name; each file's absolute path, MIME type,
+        ``sha256`` and ``size_bytes`` are recorded in
         ``node.metadata["artifacts"]``, which ``gather_dep_results``
         surfaces to dependent nodes.  ``node.result`` stays the
         provider's text verbatim (downstream JSON parsers rely on it) —
         only when a node produced artifacts and no text does the result
         become a path listing.  With ``artifact_dir=None``, artifacts
         are dropped and counted in ``metadata["artifacts_discarded"]``.
+
+        Under a strict acceptance policy a regenerated node's files are
+        named for its generation (``draw_g1_00.png``; the first generation
+        keeps ``draw_00.png``) and published without replacing any file:
+        a taken name gets a numbered suffix. A rejected generation's files
+        therefore keep the bytes that were judged.
         """
         node.result = result.text
         artifacts = result.artifacts
@@ -1199,11 +1207,21 @@ class ExecutorBase:
             return
         self._artifact_dir.mkdir(parents=True, exist_ok=True)
         stem = _safe_filename_component(node.id)
+        generation = node_generation(node) if self._strict else 0
+        prefix = stem if generation == 0 else f"{stem}_g{generation}"
         records = []
         for i, art in enumerate(artifacts):
-            path = self._artifact_dir / f"{stem}_{i:02d}{art.suffix}"
-            self._atomic_write_bytes(path, art.data)
-            records.append({"path": str(path.resolve()), "mime_type": art.mime_type})
+            name = f"{prefix}_{i:02d}{art.suffix}"
+            data = bytes(art.data) if isinstance(art.data, (bytearray, memoryview)) else art.data
+            if self._strict:
+                path = publish_unique(self._artifact_dir, name, data)
+            else:
+                path = self._artifact_dir / name
+                self._atomic_write_bytes(path, data)
+            records.append({
+                "path": str(path.resolve()), "mime_type": art.mime_type,
+                "sha256": hashlib.sha256(data).hexdigest(), "size_bytes": len(data),
+            })
         node.metadata["artifacts"] = records
         if not result.text.strip():
             node.result = "Generated artifacts:\n" + "\n".join(

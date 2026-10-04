@@ -304,6 +304,59 @@ def test_finalize_persists_artifacts_and_records_paths(tmp_path):
     assert node.result == "done"
 
 
+def test_finalize_records_each_artifacts_digest_and_size(tmp_path):
+    base = _make_base_with_dir(tmp_path)
+    node = Node(label="make an image", id="hero")
+    base.finalize_node_result(node, _artifact_result(images=2))
+
+    import hashlib
+
+    for record in node.metadata["artifacts"]:
+        assert set(record) == {"path", "mime_type", "sha256", "size_bytes"}
+        assert record["sha256"] == hashlib.sha256(b"\x89PNG-bytes").hexdigest()
+        assert record["size_bytes"] == len(b"\x89PNG-bytes")
+
+
+def _strict_base(artifact_dir) -> ExecutorBase:
+    from smythe.acceptance import AcceptancePolicy
+
+    return ExecutorBase(provider=DummyProvider(), registry=Registry(), tracer=Tracer(),
+                        artifact_dir=artifact_dir, acceptance=AcceptancePolicy(mode="strict"))
+
+
+def test_strict_artifacts_name_their_generation_after_the_first(tmp_path):
+    base = _strict_base(tmp_path)
+    first = Node(label="make an image", id="hero")
+    base.finalize_node_result(first, _artifact_result(images=2))
+    later = Node(label="make an image", id="hero", metadata={"execution_generation": 2})
+    base.finalize_node_result(later, _artifact_result(images=1))
+
+    assert [Path(r["path"]).name for r in first.metadata["artifacts"]] == ["hero_00.png", "hero_01.png"]
+    assert [Path(r["path"]).name for r in later.metadata["artifacts"]] == ["hero_g2_00.png"]
+    # Legacy runs keep one name per position whatever the generation.
+    legacy = Node(label="make an image", id="hero", metadata={"execution_generation": 2})
+    _make_base_with_dir(tmp_path / "legacy").finalize_node_result(legacy, _artifact_result())
+    assert Path(legacy.metadata["artifacts"][0]["path"]).name == "hero_00.png"
+
+
+def test_strict_artifacts_never_replace_an_existing_file(tmp_path, monkeypatch):
+    def no_replace(*args):
+        pytest.fail("strict publication replaced a file")
+
+    monkeypatch.setattr("smythe.executor_base.os.replace", no_replace)
+    (tmp_path / "hero_00.png").write_bytes(b"earlier run")
+    (tmp_path / "hero_00-2.png").write_bytes(b"earlier crash")
+    node = Node(label="make an image", id="hero")
+    _strict_base(tmp_path).finalize_node_result(node, _artifact_result())
+
+    [record] = node.metadata["artifacts"]
+    assert Path(record["path"]).name == "hero_00-3.png"
+    assert Path(record["path"]).read_bytes() == b"\x89PNG-bytes"
+    assert (tmp_path / "hero_00.png").read_bytes() == b"earlier run"
+    assert (tmp_path / "hero_00-2.png").read_bytes() == b"earlier crash"
+    assert not list(tmp_path.glob(".*.tmp"))
+
+
 def test_finalize_replaces_artifact_atomically(tmp_path, monkeypatch):
     base = _make_base_with_dir(tmp_path)
     destination = tmp_path / "hero_00.png"

@@ -148,9 +148,12 @@ See [Verification](verifier.md#recovery-and-concurrent-work).
 
 Provider responses can include artifacts as well as text. Each execution
 writes artifact bytes atomically into its own directory under `artifact_dir`
-and records each file's absolute path and MIME type in the node's metadata.
-These records hold no content hashes; Jobs artifact records carry a SHA-256
-digest. Nodes can receive dependency images as native vision inputs.
+and records each file's absolute path, MIME type, SHA-256 digest and size in
+the node's metadata. Under a
+[strict acceptance policy](verifier.md#strict-delivery-acceptance), a
+regenerated node's files are named for its generation and never replace an
+existing file, so a rejected generation's files keep the bytes that were
+judged. Nodes can receive dependency images as native vision inputs.
 `OpenAIImageProvider` does not accept image inputs yet, so it raises
 `ValueError` for a request with attachments instead of generating without them.
 

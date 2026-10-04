@@ -286,6 +286,15 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   are the bytes decoded. A relative logo or font path resolves only against
   an explicit `base_dir`, never the working directory, and is otherwise
   reported unavailable. See [validation reports](docs/verifier.md#validation-reports).
+- Ordinary runs record each artifact file's `sha256` and `size_bytes` in
+  `node.metadata["artifacts"]` beside its path and MIME type. Under a strict
+  acceptance policy a regenerated node writes its files under names that
+  carry its generation (`draw_g1_00.png`; the first generation keeps
+  `draw_00.png`) and never replaces an existing file: a name that is taken,
+  for example after an interrupted run, gets a numbered suffix
+  (`draw_00-2.png`). Runs without a strict policy keep their file names and
+  still replace a regenerated node's files. See
+  [artifacts and jobs](docs/architecture.md#artifacts-and-jobs).
 
 ### Changed
 
