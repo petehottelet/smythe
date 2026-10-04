@@ -94,10 +94,23 @@ Each path keeps money in its own unit:
 - **Jobs** reserve and settle integer micro-USD against each profile's
   inclusive per-call ceiling. Offline profiles require a zero ceiling.
 
-On ordinary and durable runs, the node failure policy (`max_retries`,
-`retry_backoff_s`) decides whether a failed call is made again. Jobs never
-retry on their own: an operator reroll makes a new attempt, up to
-`max_attempts`. The last column lists retries an SDK makes inside one call,
+Who calls again after a failure depends on the path and the provider:
+
+- **Ordinary runs, other providers**: the node failure policy
+  (`max_retries`, `retry_backoff_s`) decides, including after a refused or
+  truncated reply.
+- **Ordinary runs, native providers**: once a request is attempted, no node
+  policy calls again. An HTTP error including a 429, a transport failure, a
+  refusal, a truncation or an unresolved bill raises `ProviderResponseError`
+  (`ProviderAccountingError` when the bill is unresolved) and stops the run.
+- **Durable text workflows**: a 401, 403, 404, 413 or 429 response settles at
+  zero cost, and the node failure policy decides whether to call again.
+  Other HTTP or transport failures leave the bill unknown and block the run;
+  a refusal or truncation is terminal.
+- **Jobs** never retry on their own: an operator reroll makes a new attempt,
+  up to `max_attempts`.
+
+The last column of the table lists retries an SDK makes inside one call,
 which Smythe neither sees nor records.
 
 Tests:
@@ -129,12 +142,22 @@ Tests:
 - Price ceilings for capped runs: `tests/test_provider.py::test_openai_image_hard_budget_requires_inclusive_call_ceiling`,
   `tests/test_provider.py::test_gemini_hard_budget_uses_only_inclusive_call_ceiling`,
   `tests/test_provider_responses.py::test_legacy_budget_requires_inclusive_explicit_ceiling`.
-- Retries: `tests/test_support_matrix.py::test_legacy_provider_clients_leave_retries_to_the_sdk_configuration`,
+- SDK retries: `tests/test_support_matrix.py::test_legacy_provider_clients_leave_retries_to_the_sdk_configuration`,
   `tests/test_support_matrix.py::test_native_providers_refuse_a_client_with_sdk_retries`,
-  `tests/test_jobs_runtime_support.py::test_durable_openai_pool_disables_sdk_retries_and_sets_timeout`,
-  `tests/test_execution_failure_policies.py::test_consumed_failure_policy_allows_later_work`,
-  `tests/test_workflow_native_runtime.py::test_rate_limited_worker_retries_under_retry_policy_with_exact_totals`,
-  `tests/test_jobs_runner.py::test_selective_reroll_replaces_only_rejected_operation`.
+  `tests/test_jobs_runtime_support.py::test_durable_openai_pool_disables_sdk_retries_and_sets_timeout`.
+- Ordinary runs, other providers: `tests/test_execution_failure_policies.py::test_consumed_failure_policy_allows_later_work`,
+  `tests/test_execution_failure_policies.py::test_truncated_output_is_a_billed_failure_under_the_node_policy`,
+  `tests/test_execution_failure_policies.py::test_refused_output_is_a_billed_failure_under_the_node_policy`.
+- Ordinary runs, native providers: `tests/test_support_matrix.py::test_native_provider_failure_on_an_ordinary_run_is_terminal_under_a_retry_policy`,
+  `tests/test_native_response_accounting.py::test_native_failure_is_terminal_and_preserves_exposure`.
+- Durable text workflows: `tests/test_workflow_native_runtime.py::test_rate_limited_worker_retries_under_retry_policy_with_exact_totals`,
+  `tests/test_native_messages.py::test_durable_swarm_retries_rate_limited_node_with_exact_totals`,
+  `tests/test_workflow_store.py::test_pre_generation_rejection_settles_at_zero_cost_and_keeps_admission_open`,
+  `tests/test_workflow_store.py::test_uncertain_http_outcomes_keep_unknown_exposure`,
+  `tests/test_native_messages.py::test_server_errors_including_overloaded_keep_unknown_exposure`,
+  `tests/test_native_messages.py::test_truncations_refusals_keep_their_known_charge`,
+  `tests/test_workflow_provider.py::test_known_bad_output_is_paid_terminal_and_replayed_locally`.
+- Jobs: `tests/test_jobs_runner.py::test_selective_reroll_replaces_only_rejected_operation`.
 
 ## Durable text workflow components
 

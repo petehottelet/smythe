@@ -35,7 +35,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   saw.
 - A [support matrix](docs/support-matrix.md) lists the providers, verifiers,
   tools, stores and Jobs profiles that ordinary runs, durable text workflows
-  and Jobs accept, and names the test behind each cell.
+  and Jobs accept, who calls again after a failure, and names the test
+  behind each cell.
   `tests/test_support_matrix.py` checks that every unsupported provider or
   component on a durable run, and every artifact a Jobs profile cannot
   produce, is refused before any provider call, and runs an ordinary `Swarm`

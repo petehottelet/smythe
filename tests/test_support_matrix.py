@@ -14,14 +14,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from fakes import MessagesTransport, NativeTransport
+from fakes import RATE_LIMITED, MessagesTransport, NativeTransport
 from smythe import (
     AnthropicMessagesProvider, AnthropicProvider, Artifact, CallableVerifier, ChatMessage,
-    CompletionResult, FileCheckpointStore, GeminiProvider, OfflineProvider, OpenAIImageProvider,
-    OpenAIProvider, OpenAIResponsesProvider, PlannerMemory, Provider, SimpleArchitect,
-    SQLiteWorkflowStore, Swarm, Task, TokenVerifier, ToolRuntime, ToolSpec, WorkflowBindingError,
+    CompletionResult, FailurePolicy, FileCheckpointStore, GeminiProvider, OfflineProvider,
+    OpenAIImageProvider, OpenAIProvider, OpenAIResponsesProvider, PlannerMemory, Provider,
+    ProviderAccountingError, ProviderResponseError, SimpleArchitect, SQLiteWorkflowStore, Swarm,
+    Task, TokenVerifier, ToolRuntime, ToolSpec, WorkflowBindingError,
 )
-from smythe.graph import ExecutionGraph, Node, Topology
+from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.jobs import JobManifestV1, make_approval, preflight_job
 from smythe.jobs.models import ManifestValidationError
 from smythe.jobs.providers import ProviderPreflightError, ProviderPreflightKind
@@ -237,6 +238,39 @@ def test_anthropic_messages_provider_runs_an_ordinary_swarm(monkeypatch):
     assert result.cost_scope == "execution_and_synthesis"
     assert result.total_cost_usd == pytest.approx(0.00507)
     assert result.cost_is_complete and not result.cost_contains_estimates
+
+
+@pytest.mark.parametrize("transport_class,provider_class,model,fault,error", [
+    pytest.param(MessagesTransport, AnthropicMessagesProvider, FABLE, RATE_LIMITED,
+                 ProviderAccountingError, id="messages-rate-limited"),
+    pytest.param(MessagesTransport, AnthropicMessagesProvider, FABLE, {"stop_reason": "refusal"},
+                 ProviderResponseError, id="messages-refused"),
+    pytest.param(NativeTransport, OpenAIResponsesProvider, "gpt-6-astra", RATE_LIMITED,
+                 ProviderAccountingError, id="responses-rate-limited"),
+    pytest.param(NativeTransport, OpenAIResponsesProvider, "gpt-6-astra", {"status": "incomplete"},
+                 ProviderResponseError, id="responses-truncated"),
+])
+def test_native_provider_failure_on_an_ordinary_run_is_terminal_under_a_retry_policy(
+    monkeypatch, transport_class, provider_class, model, fault, error,
+):
+    transport = transport_class().install(monkeypatch)
+    if isinstance(fault, dict):
+        transport.overrides["execution"] = fault
+    else:
+        transport.schedule("execution", 0, fault)
+    graph = ExecutionGraph([Topology.SERIAL], [
+        Node(id="draft", label="Draft", failure_policy=FailurePolicy.RETRY, max_retries=2),
+    ])
+    swarm = Swarm(model=model, artifact_dir=None, max_budget_usd=5,
+                  provider=provider_class(api_key="test-key", max_cost_per_call_usd=0.5))
+    with pytest.raises(error) as caught:
+        swarm.execute(graph)
+    # A rate limit leaves the bill unresolved; a refused or truncated reply
+    # has a known bill. Either way the node's retry policy never calls again.
+    assert type(caught.value) is error
+    outcome = "http_429" if fault is RATE_LIMITED else "delivered"
+    assert [(record.phase, record.outcome) for record in transport.log] == [("execution", outcome)]
+    assert graph.nodes[0].status is NodeStatus.FAILED
 
 
 @pytest.mark.parametrize("message,tools", [
