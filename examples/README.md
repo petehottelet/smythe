@@ -1,6 +1,6 @@
 # Smythe examples
 
-Examples 01–05, 08–14, and the acquisition-diligence example run offline
+Examples 01–05, 08–15, and the acquisition-diligence example run offline
 out of the box. A built-in `DemoProvider` returns deterministic responses so
 you can inspect planning, fan-out, budgets, recovery, and synthesis without an
 API key. Examples 06 and 07 are live MCP integration tours. These examples
@@ -12,8 +12,8 @@ pip install -e .            # from the repo root
 python examples/14_durable_text_workflow.py
 ```
 
-Example 14 explicitly selects fixture responses even when API keys are set.
-It demonstrates planning, execution and recovery with zero provider calls.
+Examples 14 and 15 explicitly select fixture responses even when API keys are set.
+Example 14 demonstrates planning, execution and recovery with zero provider calls.
 The [0.9.1 release guide](../docs/release-0.9.1.md) covers upgrading from 0.9.0,
 the [0.9.0 guide](../docs/release-0.9.0.md) upgrading from 0.8.2, the
 [0.8.2 guide](../docs/release-0.8.2.md) upgrading from 0.8.1, the
@@ -100,4 +100,5 @@ Use a new output filename for each export.
 | [12_jobs_manifest.yaml](12_jobs_manifest.yaml) | A zero-cost, four-operation artifact job for the installed `smythe jobs` validate, plan, run, list, inspect, status, attach, stop, resume, reroll, and export workflow. Lease epochs fence worker writes; inspect shows attempt history, costs, and artifact integrity in a self-contained HTML report. |
 | [13_adaptive_supervision.py](13_adaptive_supervision.py) | A plan that corrects itself: research surfaces a conflict, and the supervisor inserts a reconciliation step ahead of the write step instead of letting the contradiction reach the deliverable. |
 | [14_durable_text_workflow.py](14_durable_text_workflow.py) | Plan and execute one journaled text run, inspect exact API-cost balances, then recover its cached output. [Native Astra version, saved graph limits, and scope](../docs/workflow-accounting.md). |
+| [15_strict_acceptance.py](15_strict_acceptance.py) | A draft passes its gate, then a later step drops a required section. Without a policy the defective brief is the output; a [strict acceptance policy](../docs/verifier.md#strict-delivery-acceptance) checks the exact text returned with a local final validator, rejects it and keeps it as `rejected_output`. Without a final validator the strict run is refused before any provider call. |
 | [acquisition_diligence/](acquisition_diligence/) | **Complete acquisition-diligence example.** Task intake → generated `fork-join → adversarial → serial` topology → parallel specialists → red-team review → final memo, with committed expected artifacts (graph, trace, memo). |

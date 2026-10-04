@@ -262,6 +262,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `revision_rejected`, and the run continues on its plan. Runs without a
   strict policy are unchanged. See
   [acceptance obligations](docs/verifier.md#acceptance-obligations).
+- `examples/15_strict_acceptance.py` runs offline with scripted
+  `OfflineProvider` replies: a draft passes its gate, the final step drops a
+  required section, and a strict policy with a local final validator
+  rejects the returned text and keeps it as `rejected_output`. Without the
+  validator the same strict run is refused before any provider call.
 
 ### Changed
 

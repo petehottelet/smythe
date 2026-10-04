@@ -319,6 +319,10 @@ else:
     print(result.acceptance.decision, result.acceptance.reasons)
 ```
 
+[`examples/15_strict_acceptance.py`](../examples/15_strict_acceptance.py) runs
+this offline: a draft passes its gate, a later step drops the required
+section, and the strict run keeps the defective text as `rejected_output`.
+
 `Swarm(acceptance=...)` and `Swarm.from_yaml(..., acceptance=...)` take the
 policy. It comes only from that argument: a YAML file, a graph, a `Task`, a
 generated plan or a supervisor revision cannot set or weaken it. `None`, the
