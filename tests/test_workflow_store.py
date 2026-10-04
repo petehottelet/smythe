@@ -47,7 +47,7 @@ def journal(tmp_path):
 
 
 def prepare(store, lease, scope="worker", *, offline=False, output_cap=100, model="gpt-6-astra",
-            price_version=None):
+            price_version=None, key=None):
     provider = {"kind": "offline" if offline else "openai_responses",
                 "adapter_version": "test-v1", "decoder_version": "test-v1"}
     request = {"model": model, "service_tier": "default", "max_output_tokens": output_cap,
@@ -55,7 +55,7 @@ def prepare(store, lease, scope="worker", *, offline=False, output_cap=100, mode
                "truncation": "disabled", "input": [{"role": "user", "content": "PRIVATE REQUEST encrypted_content secret"}]}
     if price_version is None:
         price_version = OFFLINE_PRICE_VERSION if offline else PRICE_VERSION
-    return store.prepare_call(lease, CallKey("execution", scope), request_json=canonical(request),
+    return store.prepare_call(lease, key or CallKey("execution", scope), request_json=canonical(request),
                               provider=provider, price_version=price_version)
 
 
@@ -418,6 +418,91 @@ def test_release_before_dispatch_preserves_quote_but_never_releases_dispatched(j
     store.claim_dispatch(lease, call["call_id"], call["request_sha256"])
     with pytest.raises(WorkflowStateError):
         store.release_before_dispatch(lease, call["call_id"], "cancelled after send")
+
+
+def reserved(store, lease, key):
+    call = prepare(store, lease, key=key)
+    store.reserve_call(lease, call["call_id"], quote(store, lease, call)["quote_id"])
+    return call["call_id"]
+
+
+def released_events(store):
+    return [(event["call_id"], event["data"]) for event in store.inspect_run("run")["events"]
+            if event["type"] == "call_released"]
+
+
+def test_release_before_dispatch_records_the_released_amount_once(journal):
+    store, lease, _ = journal
+    call_id = reserved(store, lease, CallKey("execution", "worker"))
+    store.release_before_dispatch(lease, call_id, "cancelled before send")
+    store.release_before_dispatch(lease, call_id, "cancelled before send")
+    assert released_events(store) == [(call_id, {"reason": "cancelled before send", "released_nanousd": "6250000"})]
+
+
+def test_superseded_generations_release_only_reserved_calls_and_only_once(journal):
+    store, lease, _ = journal
+    old = reserved(store, lease, CallKey("execution", "node/a", 0))
+    old_judge = reserved(store, lease, CallKey("verification", "node/judge", 0))
+    current = reserved(store, lease, CallKey("execution", "node/a", 1))
+    unchanged = reserved(store, lease, CallKey("execution", "node/b", 0))
+    review = reserved(store, lease, CallKey("supervision", "workflow/supervisor", 0))
+    quoted = prepare(store, lease, key=CallKey("execution", "node/a", 0, attempt=1))
+    quote(store, lease, quoted)
+    sent = prepare(store, lease, key=CallKey("execution", "node/a", 0, attempt=2))
+    dispatch(store, lease, sent)
+    # Unpriced billing evidence leaves unknown exposure and closes admission.
+    lost = prepare(store, lease, key=CallKey("execution", "node/a", 0, attempt=3))
+    evidence_id = store.append_response(dispatch(store, lease, lost), envelope(lost, b"malformed"))
+    store.settle_call(lease, lost["call_id"], evidence_id)
+    generations = {"a": 1, "b": 0, "judge": 1}
+    before = store.audit("run")
+
+    assert store.release_superseded_calls(lease, {"a": 0, "b": 0}) == []
+    # The journal clock is fixed, so release order follows call IDs.
+    assert sorted(store.release_superseded_calls(lease, generations)) == sorted([old, old_judge])
+    assert store.release_superseded_calls(lease, generations) == []
+    states = {call["call_id"]: call["state"] for call in store.inspect_run("run")["calls"]}
+    assert [states[call_id] for call_id in (old, old_judge, current, unchanged, review)] == [
+        "released", "released", "reserved", "reserved", "reserved"]
+    # A claimed dispatch is never released, with or without a response.
+    assert (states[sent["call_id"]], states[lost["call_id"]], states[quoted["call_id"]]) == (
+        "dispatched", "unknown", "quoted")
+    after = store.audit("run")
+    assert after["reserved_nanousd"] == before["reserved_nanousd"] - 2 * 6_250_000
+    assert after["unknown_nanousd"] == before["unknown_nanousd"] == 6_250_000
+    assert sorted(released_events(store)) == sorted(
+        (call_id, {"reason": "superseded_generation", "released_nanousd": "6250000"})
+        for call_id in (old, old_judge))
+
+
+@pytest.mark.parametrize("generations", [[("a", 1)], {"a": -1}, {"a": True}])
+def test_superseded_release_rejects_malformed_generations(journal, generations):
+    store, lease, _ = journal
+    with pytest.raises(WorkflowValidationError):
+        store.release_superseded_calls(lease, generations)
+
+
+def test_release_reserved_calls_frees_every_undispatched_reservation(journal):
+    store, lease, clock = journal
+    first = reserved(store, lease, CallKey("execution", "node/a", 0))
+    review = reserved(store, lease, CallKey("supervision", "workflow/supervisor", 0))
+    sent = prepare(store, lease, "sent")
+    dispatch(store, lease, sent)
+    unquoted = prepare(store, lease, "unquoted")
+    assert sorted(store.release_reserved_calls(lease, "run_completed")) == sorted([first, review])
+    assert store.release_reserved_calls(lease, "run_completed") == []
+    states = {call["call_id"]: call["state"] for call in store.inspect_run("run")["calls"]}
+    assert [states[call_id] for call_id in (first, review, sent["call_id"], unquoted["call_id"])] == [
+        "released", "released", "dispatched", "prepared"]
+    assert store.audit("run")["reserved_nanousd"] == 6_250_000
+    assert [data for _, data in released_events(store)] == [
+        {"reason": "run_completed", "released_nanousd": "6250000"}] * 2
+    # The dispatched call still blocks completion.
+    with pytest.raises(WorkflowStateError):
+        store.save_checkpoint(lease, 0, {"status": "completed"})
+    clock.advance(31)
+    with pytest.raises(WorkflowLeaseError):
+        store.release_reserved_calls(lease, "run_completed")
 
 
 def test_paid_rejected_native_result_remains_rejected_after_checkpoint(journal):

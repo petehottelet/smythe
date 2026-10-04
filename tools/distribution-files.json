@@ -227,6 +227,7 @@
     "tests/test_workflow_policy.py",
     "tests/test_workflow_policy_recovery.py",
     "tests/test_workflow_provider.py",
+    "tests/test_workflow_reservation_recovery.py",
     "tests/test_workflow_runtime.py",
     "tests/test_workflow_runtime_control.py",
     "tests/test_workflow_runtime_regeneration.py",

@@ -345,6 +345,22 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   instead of `0.002535000`, so settling the same saved response in two
   contexts could produce receipts with different bytes. Receipts under the
   default context are unchanged.
+- A durable run can complete after a call was reserved but never dispatched
+  and the run did not send it again. Such a reservation, left by a process
+  killed between reserving a call and claiming its dispatch, or by a retried
+  attempt whose dispatch claim failed, was never released, so it held part
+  of the allowance and saving the completed checkpoint raised
+  `WorkflowStateError`. A resumed run whose regeneration moved that call's
+  node to a later generation could therefore never finish. The run now
+  releases such a call when a checkpoint records the regeneration that
+  supersedes its generation, including on resume, and releases any other
+  undispatched reservation when it completes. A reserved call of a node's
+  current generation is still sent under its reservation when the node runs
+  again, and a call whose dispatch was claimed is never released. Each
+  release returns the reservation to the allowance and records a
+  `call_released` event, which `release_before_dispatch` now records too.
+  The new `SQLiteWorkflowStore.release_superseded_calls` and
+  `release_reserved_calls` perform these releases.
 
 ## [0.9.1] - 2026-09-29
 

@@ -786,6 +786,13 @@ class SQLiteWorkflowStore:
             row = db.execute("SELECT * FROM workflow_calls WHERE run_id=? AND key_json=?", (run_id, _canonical(asdict(key)))).fetchone()
             return self._call_record(row) if row else None
 
+    @staticmethod
+    def _stored_key(key_json):
+        try:
+            return CallKey(**_loads(key_json, stored=True))
+        except (WorkflowValidationError, TypeError) as exc:
+            raise WorkflowCorruptionError("Call key is invalid") from exc
+
     def has_later_call(self, run_id, key):
         """Whether the journal holds a later attempt, or later turn, of key's invocation."""
         if not isinstance(key, CallKey):
@@ -793,15 +800,27 @@ class SQLiteWorkflowStore:
         with self._transaction(write=False) as db:
             self._run(db, run_id)
             for row in db.execute("SELECT key_json FROM workflow_calls WHERE run_id=?", (run_id,)):
-                try:
-                    other = CallKey(**_loads(row["key_json"], stored=True))
-                except (WorkflowValidationError, TypeError) as exc:
-                    raise WorkflowCorruptionError("Call key is invalid") from exc
+                other = self._stored_key(row["key_json"])
                 if ((other.phase, other.scope_id, other.generation, other.invocation)
                         == (key.phase, key.scope_id, key.generation, key.invocation)
                         and (other.attempt, other.turn) > (key.attempt, key.turn)):
                     return True
             return False
+
+    @staticmethod
+    def _node_generations(generations):
+        if not isinstance(generations, Mapping):
+            raise WorkflowValidationError("Node generations must be a mapping")
+        for generation in generations.values():
+            _integer(generation, "generation")
+        return generations
+
+    @staticmethod
+    def _superseded(key, generations):
+        """Whether key is an execution or verification call of an earlier node generation."""
+        node = key.scope_id.removeprefix("node/")
+        return (key.phase in ("execution", "verification") and key.scope_id.startswith("node/")
+                and node in generations and key.generation < generations[node])
 
     def superseded_node_calls(self, run_id, generations):
         """IDs of settled calls that earlier generations of graph nodes made.
@@ -813,27 +832,15 @@ class SQLiteWorkflowStore:
         nothing is read until a node has been regenerated, so a checkpoint
         need not audit the whole journal.
         """
-        if not isinstance(generations, Mapping):
-            raise WorkflowValidationError("Node generations must be a mapping")
-        for generation in generations.values():
-            _integer(generation, "generation")
-        if not any(generations.values()):
+        if not any(self._node_generations(generations).values()):
             return []
         with self._transaction(write=False) as db:
             self._run(db, run_id)
-            result = []
-            for row in db.execute("""SELECT call_id,key_json FROM workflow_calls WHERE run_id=? AND
-              billing_state='known' AND result_state IN ('accepted','rejected','applied')
-              ORDER BY created,call_id""", (run_id,)):
-                try:
-                    key = CallKey(**_loads(row["key_json"], stored=True))
-                except (WorkflowValidationError, TypeError) as exc:
-                    raise WorkflowCorruptionError("Call key is invalid") from exc
-                node = key.scope_id.removeprefix("node/")
-                if (key.phase in ("execution", "verification") and key.scope_id.startswith("node/")
-                        and node in generations and key.generation < generations[node]):
-                    result.append(row["call_id"])
-            return result
+            return [row["call_id"] for row in db.execute(
+                """SELECT call_id,key_json FROM workflow_calls WHERE run_id=? AND
+                billing_state='known' AND result_state IN ('accepted','rejected','applied')
+                ORDER BY created,call_id""", (run_id,))
+                if self._superseded(self._stored_key(row["key_json"]), generations)]
 
     @staticmethod
     def _call_record(row):
@@ -1220,17 +1227,67 @@ class SQLiteWorkflowStore:
                            (reason, self._clock_ns(), call_id))
             return self._call_record(self._call(db, call_id))
 
+    def _release(self, db, call, reason):
+        """Return a never-dispatched call's reservation to its run's allowance."""
+        if call["state"] not in ("prepared", "quoted", "reserved") or call["dispatch_token_sha"]:
+            raise WorkflowStateError("A dispatched call cannot release its reservation")
+        held, now = _amount(call["reserved"]), self._clock_ns()
+        _, reserved, _ = self._balances(self._run(db, call["run_id"]))
+        db.execute("UPDATE workflow_runs SET reserved=?,updated=? WHERE run_id=?",
+                   (_money(reserved - held), now, call["run_id"]))
+        db.execute("UPDATE workflow_calls SET reserved='0',state='released',billing_state='released',error=?,updated=? WHERE call_id=?",
+                   (reason, now, call["call_id"]))
+        self._event(db, call["run_id"], "call_released", call_id=call["call_id"],
+                    payload={"reason": reason, "released_nanousd": str(held)})
+
     def release_before_dispatch(self, lease, call_id, reason):
         _text(reason, "reason")
         with self._transaction() as db:
-            run, call = self._owned_call(db, lease, call_id)
-            if call["state"] == "released":
-                return
-            if call["state"] not in ("prepared", "quoted", "reserved") or call["dispatch_token_sha"]:
-                raise WorkflowStateError("A dispatched call cannot release its reservation")
-            _, reserved, _ = self._balances(run)
-            db.execute("UPDATE workflow_runs SET reserved=? WHERE run_id=?", (_money(reserved - _amount(call["reserved"])), lease.run_id))
-            db.execute("UPDATE workflow_calls SET reserved='0',state='released',billing_state='released',error=? WHERE call_id=?", (reason, call_id))
+            _, call = self._owned_call(db, lease, call_id)
+            if call["state"] != "released":
+                self._release(db, call, reason)
+
+    def _release_reserved(self, db, lease, reason, selected):
+        released = []
+        for row in db.execute("SELECT call_id,key_json FROM workflow_calls WHERE run_id=? AND state='reserved' "
+                              "ORDER BY created,call_id", (lease.run_id,)).fetchall():
+            if selected(self._stored_key(row["key_json"])):
+                self._release(db, self._call(db, row["call_id"]), reason)
+                released.append(row["call_id"])
+        return released
+
+    def release_superseded_calls(self, lease, generations):
+        """Release reserved calls of node generations that a regeneration superseded.
+
+        ``generations`` maps node ids to their current generation, as for
+        ``superseded_node_calls``. A reserved execution or verification call
+        scoped ``node/<id>`` whose generation is lower than that node's was
+        never dispatched, and the runtime calls a node only at its current
+        generation, so it never will be. Each release returns the reservation
+        to the run's allowance and records a ``call_released`` event. A call
+        whose dispatch was claimed keeps its state. Nothing is read until a
+        node has been regenerated. Returns the released call IDs.
+        """
+        if not any(self._node_generations(generations).values()):
+            return []
+        with self._transaction() as db:
+            self._lease(db, lease)
+            return self._release_reserved(db, lease, "superseded_generation",
+                                          lambda key: self._superseded(key, generations))
+
+    def release_reserved_calls(self, lease, reason):
+        """Release every reserved call of the run that was never dispatched.
+
+        For a run that will make no further calls, such as one about to save
+        its completed checkpoint. Each release returns the reservation to the
+        run's allowance and records a ``call_released`` event with ``reason``.
+        A call whose dispatch was claimed keeps its state. Returns the
+        released call IDs.
+        """
+        _text(reason, "reason")
+        with self._transaction() as db:
+            self._lease(db, lease)
+            return self._release_reserved(db, lease, reason, lambda key: True)
 
     def load_evidence(self, call_id, evidence_id):
         with self._transaction(write=False) as db:

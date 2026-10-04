@@ -251,6 +251,26 @@ decoder version are immutable. A transaction grants dispatch permission once.
 After that point, missing response evidence stops automatic replay of the HTTP
 request, even if a connection failure leaves the remote outcome uncertain.
 
+A call that was reserved but never dispatched, as when a process is killed
+between the reservation and the dispatch claim, keeps its reservation while
+the run can still send it. When its node runs again at the same generation,
+resuming sends it under that reservation and its saved quote, without counting
+its input again. The run releases it once it can no longer be sent:
+
+- when a checkpoint records a regeneration that moved its node to a later
+  generation, including a regeneration that resuming applies, because a node
+  calls only at its current generation;
+- when the run completes, for a call that an interrupted attempt or review
+  left behind, such as an attempt whose dispatch claim failed before a retry.
+
+Each release returns the reservation to the run's allowance and records a
+`call_released` event with the released amount and its reason,
+`superseded_generation` or `run_completed`. `SQLiteWorkflowStore` exposes these
+releases as `release_superseded_calls()` and `release_reserved_calls()`;
+`release_before_dispatch()` releases one call and records the same event. A
+call whose dispatch was claimed is never released: without response evidence,
+recovery holds it as unknown exposure.
+
 Raw bytes are committed before billing validation and decoding. A crash after
 that commit resumes through local settlement and decoding. Accepted outputs
 are replayed locally until a graph checkpoint consumes them. Planning saves
@@ -268,8 +288,9 @@ immutable late evidence for its exact dispatch, but cannot advance the run.
 Recovery settles available late evidence before admitting new work.
 Each plan, execute or resume entry audits the whole journal once when it
 starts. A checkpoint saved during the run reads only the calls it consumes
-and, once a node has been regenerated, the keys of settled calls, so its cost
-does not grow with the run's events, evidence or earlier checkpoints.
+and, once a node has been regenerated, the keys of settled and reserved calls,
+so its cost does not grow with the run's events, evidence or earlier
+checkpoints.
 
 A 0.8.0 journal holds every saved 4xx error response as unknown exposure. On
 resume, 0.8.1 settles a saved response that meets the zero-cost conditions

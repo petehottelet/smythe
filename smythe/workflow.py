@@ -482,6 +482,16 @@ class WorkflowRuntime:
             return
         self._validate_graph_policy(self.graph)
         self.registry.workflow_description()
+        generations = {node.id: node_generation(node) for node in self.graph.nodes}
+        # A call claims its dispatch right after its reservation, without
+        # yielding, so a reserved call seen here was left by a killed process
+        # or a failed claim. Nodes call only at their current generation, so
+        # one of a superseded generation, including one that a regeneration
+        # applied on resume superseded, is never sent: release it. A completed
+        # run sends nothing more, so it releases every reservation left.
+        self.store.release_superseded_calls(self.context.lease, generations)
+        if status == "completed":
+            self.store.release_reserved_calls(self.context.lease, "run_completed")
         calls = []
         for node in self.graph.nodes:
             if node.status in {NodeStatus.COMPLETED, NodeStatus.FAILED, NodeStatus.SKIPPED}:
@@ -490,8 +500,7 @@ class WorkflowRuntime:
         # after the previous batched snapshot. Consume that settled call with
         # the checkpoint that durably advances its node generation. The query
         # reads only those calls, so a save's cost does not grow with history.
-        calls.extend(self.store.superseded_node_calls(
-            self.run_id, {node.id: node_generation(node) for node in self.graph.nodes}))
+        calls.extend(self.store.superseded_node_calls(self.run_id, generations))
         checkpoint = {
             "version": 1, "status": status, "graph": graph_to_dict(self.graph),
             "registry": self.registry.workflow_description(), "output": output,
