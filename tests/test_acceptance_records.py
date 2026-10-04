@@ -188,8 +188,18 @@ def test_policy_hash_ignores_validator_order_but_tracks_every_setting():
                          on_invalid="needs_review"),
         AcceptancePolicy(mode="strict", final_validators=(heading, sources),
                          allow_gate_acceptance=False),
+        AcceptancePolicy(mode="strict", final_validators=(heading, sources),
+                         allow_generated_gates=True),
     ]
     assert len({base.sha256, *(policy.sha256 for policy in changed)}) == len(changed) + 1
+
+
+def test_counting_generated_gates_is_off_and_omitted_by_default():
+    policy = AcceptancePolicy(mode="strict")
+    assert policy.allow_generated_gates is False
+    assert "allow_generated_gates" not in policy.to_dict()
+    allowed = AcceptancePolicy(mode="strict", allow_generated_gates=True)
+    assert allowed.to_dict() == {**policy.to_dict(), "allow_generated_gates": True}
 
 
 def test_policy_snapshots_validator_identities_at_construction():
@@ -210,6 +220,10 @@ def test_policy_snapshots_validator_identities_at_construction():
     ({"final_validators": (RequiredHeading(),)}, "advisory"),
     ({"on_exhausted": "needs_review"}, "advisory"),
     ({"allow_gate_acceptance": False}, "advisory"),
+    ({"allow_generated_gates": True}, "advisory"),
+    ({"mode": "strict", "allow_generated_gates": 1}, "allow_generated_gates"),
+    ({"mode": "strict", "final_validators": (RequiredHeading(),), "allow_gate_acceptance": False,
+      "allow_generated_gates": True}, "allow_gate_acceptance"),
     ({"mode": "strict", "final_validators": (RequiredHeading(), RequiredHeading("## Other"))},
      "duplicate"),
 ])

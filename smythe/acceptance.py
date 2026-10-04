@@ -28,8 +28,9 @@ import inspect
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import Any, Protocol
 
+from smythe.graph import REVISION_ADDED_KEY, ExecutionGraph, Node
 from smythe.task import Task, task_to_dict
 from smythe.validation import (
     ValidationOutcome,
@@ -41,15 +42,18 @@ from smythe.validation import (
 )
 from smythe.verifier import gate_disposition, node_generation
 
-if TYPE_CHECKING:
-    from smythe.graph import ExecutionGraph, Node
-
 DELIVERY_ACCEPTANCE_VERSION = 1
 SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS = (1,)
 ACCEPTANCE_POLICY_VERSION = 1
 
 # What a record's decision covers: the synthesized text output.
 _SCOPES = frozenset({"output"})
+
+# Node metadata a strict Swarm sets on each gate of a plan that an architect
+# generated rather than built from developer code. Acceptance criteria are
+# controlled inputs, so such a gate, like one a supervisor revision added
+# (``added_by_revision``), does not accept output on its own.
+GENERATED_GATE_KEY = "generated_gate"
 
 
 class AcceptanceMode(StrEnum):
@@ -195,10 +199,12 @@ class AcceptancePolicy:
     delivery acceptance record is made. ``strict`` decides delivery:
     ``final_validators`` check the exact delivered bytes, and with
     ``allow_gate_acceptance`` a passed gate may accept output that is
-    byte-for-byte the gated node's result. An exhausted gate whose final
-    verdict fails gives ``on_exhausted`` (``rejected`` or ``needs_review``); a
-    missing, malformed or erroring verdict gives ``on_invalid``
-    (``indeterminate`` or ``needs_review``).
+    byte-for-byte the gated node's result. Only a gate the developer
+    supplied counts for that, unless ``allow_generated_gates`` also counts
+    one that a generated plan or a supervisor revision added. An exhausted
+    gate whose final verdict fails gives ``on_exhausted`` (``rejected`` or
+    ``needs_review``); a missing, malformed or erroring verdict gives
+    ``on_invalid`` (``indeterminate`` or ``needs_review``).
 
     Validators are checked by :func:`check_validator` when the policy is
     built, and their identities are captured then. :meth:`to_dict` lists those
@@ -210,6 +216,7 @@ class AcceptancePolicy:
     on_exhausted: AcceptanceDecision = AcceptanceDecision.REJECTED
     on_invalid: AcceptanceDecision = AcceptanceDecision.INDETERMINATE
     allow_gate_acceptance: bool = True
+    allow_generated_gates: bool = False
     validator_identities: tuple[ValidatorIdentity, ...] = field(init=False)
 
     def __post_init__(self) -> None:
@@ -228,12 +235,13 @@ class AcceptancePolicy:
         on_invalid = _choice(AcceptanceDecision, self.on_invalid, "on_invalid decision")
         if on_invalid not in (AcceptanceDecision.INDETERMINATE, AcceptanceDecision.NEEDS_REVIEW):
             raise ValueError("on_invalid must be 'indeterminate' or 'needs_review'")
-        if type(self.allow_gate_acceptance) is not bool:
-            raise ValueError("allow_gate_acceptance must be a bool")
+        for name in ("allow_gate_acceptance", "allow_generated_gates"):
+            if type(getattr(self, name)) is not bool:
+                raise ValueError(f"{name} must be a bool")
         if mode is AcceptanceMode.ADVISORY and (
             validators or on_exhausted is not AcceptanceDecision.REJECTED
             or on_invalid is not AcceptanceDecision.INDETERMINATE
-            or not self.allow_gate_acceptance
+            or not self.allow_gate_acceptance or self.allow_generated_gates
         ):
             raise ValueError(
                 "an advisory policy records no delivery decision, so it takes no final "
@@ -243,6 +251,8 @@ class AcceptancePolicy:
             raise ValueError(
                 "a strict policy without final validators or gate acceptance could never accept"
             )
+        if self.allow_generated_gates and not self.allow_gate_acceptance:
+            raise ValueError("allow_generated_gates needs allow_gate_acceptance")
         object.__setattr__(self, "mode", mode)
         object.__setattr__(self, "final_validators", validators)
         object.__setattr__(self, "on_exhausted", on_exhausted)
@@ -250,8 +260,12 @@ class AcceptancePolicy:
         object.__setattr__(self, "validator_identities", identities)
 
     def to_dict(self) -> dict[str, Any]:
-        """The policy as canonical JSON data, with validator identities sorted by name."""
-        return {
+        """The policy as canonical JSON data, with validator identities sorted by name.
+
+        ``allow_generated_gates`` appears only when set, so a policy without
+        it keeps the same :attr:`sha256`.
+        """
+        data = {
             "version": ACCEPTANCE_POLICY_VERSION,
             "mode": self.mode.value,
             "final_validators": [
@@ -262,6 +276,20 @@ class AcceptancePolicy:
             "on_invalid": self.on_invalid.value,
             "allow_gate_acceptance": self.allow_gate_acceptance,
         }
+        if self.allow_generated_gates:
+            data["allow_generated_gates"] = True
+        return data
+
+    def counts_gate(self, node: Node) -> bool:
+        """Whether a passed verdict of gate *node* may accept output under this policy.
+
+        A gate the developer supplied counts. One that a generated plan
+        (:data:`GENERATED_GATE_KEY`) or a supervisor revision
+        (``added_by_revision``) added counts only with ``allow_generated_gates``.
+        """
+        return self.allow_generated_gates or not (
+            node.metadata.get(GENERATED_GATE_KEY) or node.metadata.get(REVISION_ADDED_KEY)
+        )
 
     @property
     def sha256(self) -> str:
@@ -513,7 +541,8 @@ def evaluate_delivery(
     is ``accepted`` when it has final validators, all passed, or when the
     policy allows gate acceptance and it is, byte for byte, the result of the
     single ``deliverable`` source a passed gate judged at its current
-    generation. Any other output is covered by no check: ``policy.on_invalid``.
+    generation, where the policy counts that gate (:meth:`AcceptancePolicy.counts_gate`).
+    Any other output is covered by no check: ``policy.on_invalid``.
     """
     if not isinstance(policy, AcceptancePolicy) or policy.mode is not AcceptanceMode.STRICT:
         raise ValueError("evaluate_delivery needs a strict AcceptancePolicy")
@@ -534,12 +563,13 @@ def evaluate_delivery(
         elif outcome is ValidationOutcome.ERROR:
             invalid.append(reason)
     passed_targets: set[str] = set()
+    uncounted_targets: set[str] = set()
     for node in graph.nodes:
         if not node.verifies:
             continue
         outcome, reason = gate_disposition(node, graph)
         if outcome == "passed":
-            passed_targets.add(node.verifies)
+            (passed_targets if policy.counts_gate(node) else uncounted_targets).add(node.verifies)
         elif outcome == "rejected":
             exhausted.append(reason)
         else:
@@ -568,6 +598,12 @@ def evaluate_delivery(
         if strategy != "deliverable" or used_fallback:
             shown = "the deliverable fallback" if strategy == "deliverable" else f"{strategy} synthesis"
             reasons = [f"{shown} needs a final validator; no final validator checked the output"]
+        elif len(sources) == 1 and sources[0].id in uncounted_targets - passed_targets:
+            reasons = [
+                f"only a gate that a generated plan or a supervisor revision added passed "
+                f"{sources[0].id!r}; without a final validator such a gate accepts only "
+                "under allow_generated_gates"
+            ]
         else:
             reasons = ["no final validator or passed gate covers the delivered output"]
     return DeliveryAcceptance(
@@ -586,6 +622,7 @@ def evaluate_delivery(
 __all__ = [
     "ACCEPTANCE_POLICY_VERSION",
     "DELIVERY_ACCEPTANCE_VERSION",
+    "GENERATED_GATE_KEY",
     "SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS",
     "AcceptanceDecision",
     "AcceptanceMode",

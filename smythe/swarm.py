@@ -12,6 +12,7 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from smythe.acceptance import (
+    GENERATED_GATE_KEY,
     AcceptanceDecision,
     AcceptanceMode,
     AcceptancePolicy,
@@ -47,7 +48,8 @@ from smythe.executor_base import (
 from smythe.graph import ExecutionGraph, NodeStatus
 from smythe.memory import PlannerMemory
 from smythe.tools import ToolRuntime
-from smythe.planner import Architect, LLMArchitect, SimpleArchitect
+from smythe.planner import Architect, DeterministicArchitect, LLMArchitect, SimpleArchitect
+from smythe.constrained_planner import ConstrainedArchitect
 from smythe.router import WhiteRabbit
 from smythe.provider import (
     AnthropicProvider,
@@ -220,6 +222,16 @@ def _synthesis_strategy(synthesizer: Any) -> str:
     if type(synthesizer) is Synthesizer and type(synthesizer.strategy) is SynthesisStrategy:
         return synthesizer.strategy.value
     return "custom"
+
+
+def _builds_developer_gates(architect: Architect) -> bool:
+    """Whether *architect*'s gates come from developer code rather than a model.
+
+    A ``DeterministicArchitect`` builds its graph in Python, and a
+    ``ConstrainedArchitect`` composes developer templates. Any other
+    architect, such as ``LLMArchitect``, may generate its gates.
+    """
+    return isinstance(architect, (DeterministicArchitect, ConstrainedArchitect))
 
 
 def _auto_detect_provider(model: str) -> Provider:
@@ -658,7 +670,7 @@ class Swarm:
             tracer.add_phase("routing", tracer.since(started))
         with tracer.phase("planning"):
             graph, architect_registry = architect.plan(snapshot_task(task))
-            return self._adopt_plan(graph, architect_registry, task)
+            return self._adopt_plan(graph, architect_registry, task, architect)
 
     async def aplan(self, task: Task) -> ExecutionGraph:
         """Async variant of plan() — safe to call from a running event loop."""
@@ -677,10 +689,17 @@ class Swarm:
             tracer.add_phase("routing", tracer.since(started))
         with tracer.phase("planning"):
             graph, architect_registry = await architect.aplan(snapshot_task(task))
-            return self._adopt_plan(graph, architect_registry, task)
+            return self._adopt_plan(graph, architect_registry, task, architect)
 
-    def _adopt_plan(self, graph: ExecutionGraph, architect_registry: Registry, task: Task) -> ExecutionGraph:
-        """Register the plan's agents and stamp its nodes for execution."""
+    def _adopt_plan(
+        self, graph: ExecutionGraph, architect_registry: Registry, task: Task, architect: Architect,
+    ) -> ExecutionGraph:
+        """Register the plan's agents and stamp its nodes for execution.
+
+        Under a strict policy, each gate of a plan that *architect* generated
+        rather than built from developer code is marked with
+        ``GENERATED_GATE_KEY``, so that gate does not accept output on its own.
+        """
         for agent in architect_registry.list_agents():
             self._registry.register(agent)
 
@@ -688,6 +707,10 @@ class Swarm:
         graph.task = task
         self._stamp_model(graph)
         self._stamp_task_context(graph, task)
+        if self._strict_policy() is not None and not _builds_developer_gates(architect):
+            for node in graph.nodes:
+                if node.verifies:
+                    node.metadata[GENERATED_GATE_KEY] = True
         return graph
 
     @staticmethod

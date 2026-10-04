@@ -180,7 +180,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   strategy, source nodes and generations, fallback flag, task and policy
   hashes and validator outcomes. A final rejection is terminal. Without final
   validators a passed gate accepts only `DELIVERABLE` output that is exactly
-  the node it judged; other synthesis strategies, the deliverable fallback
+  the node it judged, and only a gate you supplied counts: a strict `Swarm`
+  marks each gate of a plan that an architect other than a
+  `DeterministicArchitect` or `ConstrainedArchitect` generates with
+  `generated_gate`, and such a gate, like one a supervisor revision added,
+  accepts only with `AcceptancePolicy(allow_generated_gates=True)`, which is
+  off by default and part of the policy hash only when set; other synthesis
+  strategies, the deliverable fallback
   and steps after a gate need a final validator, and artifact deliverables
   are not accepted. Under a strict policy an exhausted gate's last verdict is
   read and recorded (`rejected` by default), a gate with

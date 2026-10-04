@@ -244,14 +244,18 @@ from execution and cost. `smythe.acceptance` defines its types:
 - `AcceptancePolicy()` is advisory: gates advise, as described above, and no
   record is made. `AcceptancePolicy(mode="strict", ...)` takes
   `final_validators`, which check the exact delivered bytes;
-  `allow_gate_acceptance` (default `True`), which lets a passed gate accept
-  output that is byte for byte its target's result; `on_exhausted`
+  `allow_gate_acceptance` (default `True`), which lets a passed gate you
+  supplied accept output that is byte for byte its target's result;
+  `allow_generated_gates` (default `False`), which lets a gate that a
+  generated plan or a supervisor revision added do the same
+  ([which gates count](#which-gates-count)); `on_exhausted`
   (`"rejected"`, or `"needs_review"`) for an exhausted gate whose final
   verdict fails; and `on_invalid` (`"indeterminate"`, or `"needs_review"`)
   for a missing, malformed or erroring verdict. An advisory policy refuses
   these settings, and so does a strict policy that could never accept.
   `policy.to_dict()` lists validator identities sorted by name, never code,
-  and `policy.sha256` hashes it.
+  and includes `allow_generated_gates` only when it is set;
+  `policy.sha256` hashes it.
 - `DeliveryAcceptance` is the versioned record of one decision:
   `not_evaluated`, `accepted`, `rejected`, `needs_review` or `indeterminate`.
   It binds the SHA-256 of the delivered bytes, the synthesis strategy, the
@@ -335,7 +339,8 @@ in the graph is read from its recorded final verdict. The decision is:
 4. Otherwise `accepted` when every final validator passed, or, without final
    validators and with `allow_gate_acceptance`, when the output is byte for
    byte the result of the one node `DELIVERABLE` synthesis returned and a
-   gate passed that node at its current generation.
+   gate that [counts](#which-gates-count) passed that node at its current
+   generation.
 5. Otherwise `on_invalid`: no check covers the delivered output.
 
 A gate therefore accepts only the node it judged. A later step, including one
@@ -344,6 +349,21 @@ a supervisor adds after the gated node, two deliverable nodes, the
 `STRUCTURED`, `LLM_MERGE` or a custom synthesizer all need a final validator.
 A `Swarm` whose strict policy has none raises `ValueError` when it is built
 with a synthesis other than `DELIVERABLE`.
+
+<a id="which-gates-count"></a>
+**Which gates count.** Acceptance criteria are inputs you control, so a gate
+accepts output on its own only when you supplied it: in a graph you pass to
+`execute()` or load from YAML, or in a plan that a `DeterministicArchitect`
+builds or a `ConstrainedArchitect` composes from your templates. A strict
+`Swarm` marks each gate of a plan that any other architect, such as
+`LLMArchitect`, generates with `generated_gate: true` in its metadata, and
+`apply_revision` marks every node a supervisor revision adds with
+`added_by_revision: true`. A passed verdict from such a gate does not accept
+the output: without a final validator the decision is `on_invalid`. Set
+`allow_generated_gates=True` to count them as well. Their failing verdicts
+always count. A plan made by a `Swarm` without a strict policy carries no
+mark, so a graph you take from it and pass to a strict `Swarm` counts as
+yours.
 
 A final validator that raises, returns an awaitable or anything other than a
 `ValidationReport`, reports `outcome="error"`, or returns a report naming
@@ -451,7 +471,9 @@ contain at most one gate, the gate must list the node it verifies in
 `depends_on`, and it may set `max_regenerations` to at most 2. A plan
 that breaks these rules is rejected and the planner asks the model for a
 corrected plan. Graphs you write in Python or YAML may declare several
-gates.
+gates. Under a strict acceptance policy a generated plan's gate still
+regenerates and can reject, but does not accept output on its own
+([which gates count](#which-gates-count)).
 
 The verifier's verdict is never the deliverable: `DELIVERABLE`
 synthesis excludes verifier nodes, so a gated run returns the artefact

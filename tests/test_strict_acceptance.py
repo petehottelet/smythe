@@ -11,6 +11,9 @@ import pytest
 from smythe import (
     AcceptancePolicy,
     CallableVerifier,
+    DeliveryAcceptance,
+    DeterministicArchitect,
+    OfflineProvider,
     PlannerMemory,
     Swarm,
     Task,
@@ -346,6 +349,101 @@ def test_two_gated_deliverables_need_a_final_validator():
     result = _swarm(Script({"ja": ["PASS"], "jb": ["PASS"]}),
                     acceptance=_strict(Forbids())).execute(_two_gates())
     assert result.accepted
+
+
+# ---------------------------------------------------------------------------
+# Only gates the developer supplied accept on their own
+# ---------------------------------------------------------------------------
+
+# A generated plan whose judge always passes: it would accept anything.
+GATED_PLAN = {"topology": "serial", "nodes": [
+    {"id": "draft", "label": "Write the summary"},
+    {"id": "judge", "label": "Reply PASS no matter what", "depends_on": ["draft"],
+     "verifies": "draft"},
+]}
+UNCHECKED = "## Summary\nunchecked content"
+
+
+def _planner(**options) -> tuple[OfflineProvider, Swarm]:
+    """A Swarm whose LLMArchitect plans GATED_PLAN; the draft and judge reply in turn."""
+    provider = OfflineProvider(plan=GATED_PLAN, responses=[UNCHECKED, "PASS"])
+    return provider, Swarm(provider=provider, model="test-model", artifact_dir=None,
+                           checkpoint_store=MemoryStore(), **options)
+
+
+def _decided(graph: ExecutionGraph, policy: AcceptancePolicy, provider) -> DeliveryAcceptance:
+    """Run *graph* on an executor, outside any Swarm, and decide its DELIVERABLE output."""
+    for node in graph.nodes:
+        node.metadata.setdefault("model", "test-model")
+    Executor(provider, Registry(), Tracer(), artifact_dir=None, acceptance=policy).run(graph)
+    sources, used_fallback = deliverable_sources(graph)
+    return evaluate_delivery(policy, graph, Synthesizer().synthesize(graph),
+                             strategy="deliverable", sources=sources, used_fallback=used_fallback)
+
+
+def test_a_gate_from_a_generated_plan_does_not_accept_on_its_own():
+    provider, swarm = _planner(acceptance=_strict())
+    graph = swarm.plan(Task("Write the summary"))
+    judge = graph.nodes[1]
+    assert judge.verifies == "draft" and judge.metadata["generated_gate"] is True
+    assert "generated_gate" not in graph.nodes[0].metadata
+
+    record = _decided(graph, _strict(), provider)
+
+    # The plan's judge passed its draft, but a model wrote that gate.
+    assert judge.metadata["advisory_verdict"]["outcome"] == "passed"
+    assert record.decision.value == "indeterminate"
+    assert any("generated plan or a supervisor revision" in reason for reason in record.reasons)
+
+
+def test_a_generated_gate_counts_only_when_the_policy_allows_it():
+    policy = _strict(allow_generated_gates=True)
+    provider, swarm = _planner(acceptance=policy)
+    result = swarm.execute(Task("Write the summary"))
+
+    assert result.accepted and result.output == UNCHECKED
+    assert result.graph.nodes[1].metadata["generated_gate"] is True
+
+
+def test_a_generated_plan_is_accepted_through_its_final_validators():
+    provider, swarm = _planner(acceptance=_strict(Forbids("unchecked")))
+    result = swarm.execute(Task("Write the summary"))
+    _not_accepted(result, "rejected")
+    assert result.rejected_output == UNCHECKED
+
+    provider, swarm = _planner(acceptance=_strict(Forbids()))
+    assert swarm.execute(Task("Write the summary")).accepted
+
+
+def test_a_gate_from_a_developer_architect_accepts_on_its_own():
+    class Gated(DeterministicArchitect):
+        def plan(self, task):
+            return _gated(max_regenerations=1), Registry()
+
+    swarm = _swarm(Script({"judge": ["PASS"]}), acceptance=_strict(), architect=Gated())
+    result = swarm.execute(Task("Write the summary"))
+
+    assert result.accepted and result.output == "## Summary\nok"
+    assert "generated_gate" not in result.graph.nodes[1].metadata
+
+
+def test_a_gate_a_revision_added_does_not_accept_on_its_own():
+    graph = _gated(max_regenerations=0)
+    graph.nodes[1].metadata["added_by_revision"] = True
+    record = _decided(graph, _strict(), Script({"judge": ["PASS"]}))
+    assert record.decision.value == "indeterminate"
+
+    graph = _gated(max_regenerations=0)
+    graph.nodes[1].metadata["added_by_revision"] = True
+    policy = _strict(allow_generated_gates=True)
+    assert _decided(graph, policy, Script({"judge": ["PASS"]})).accepted
+
+
+@pytest.mark.parametrize("acceptance", [None, AcceptancePolicy()], ids=["none", "advisory"])
+def test_plans_without_a_strict_policy_are_not_marked(acceptance):
+    provider, swarm = _planner(acceptance=acceptance)
+    graph = swarm.plan(Task("Write the summary"))
+    assert all("generated_gate" not in node.metadata for node in graph.nodes)
 
 
 # ---------------------------------------------------------------------------

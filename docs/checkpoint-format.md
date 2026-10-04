@@ -169,7 +169,10 @@ judge's metadata, with version `1`, `judge_generation`, `target_id`,
 `target_generation`, `outcome`, `passed` and `reason`; such a judge also
 records `verification_target_generation`. Each attempt of the judge drops the
 previous `advisory_verdict` when it starts, so a resumed run keeps the record
-only for a judge that completed before the crash.
+only for a judge that completed before the crash. A gate that a strict run's
+generated plan contains carries `generated_gate: true`, and the saved mark
+keeps it from [accepting output on its own](verifier.md#which-gates-count)
+after resume.
 
 The intent is saved before cancellation. After affected workers settle, a
 second forced save records the reset: results and stale artifact references
