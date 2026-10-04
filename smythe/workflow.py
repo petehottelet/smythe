@@ -17,7 +17,7 @@ from smythe.budget import BudgetValidationError, Sentinel, validate_completion_u
 from smythe.checkpoint import (
     graph_from_dict, graph_to_dict, node_from_dict, node_to_dict, reset_incomplete_nodes,
 )
-from smythe.executor_base import SUPPORTED_PROMPT_ASSEMBLY_VERSIONS, ExecutorBase
+from smythe.executor_base import REJECTED_GENERATIONS_KEY, SUPPORTED_PROMPT_ASSEMBLY_VERSIONS, ExecutorBase
 from smythe.graph import ExecutionGraph, NodeStatus, Revision, snapshot_run_ref
 from smythe.registry import Registry
 from smythe.provider import ProviderResponseError
@@ -460,6 +460,7 @@ class WorkflowRuntime:
                 "regeneration_intent", "workflow_supervision", "native_receipts", "response_error",
                 "accounting_invalid", "accounting_error", "workflow_accounting_invalid", "cost_usd",
                 "cost_usd_unknown", "cost_usd_is_estimate", ADVISORY_VERDICT_KEY,
+                REJECTED_GENERATIONS_KEY,
             )):
                 raise WorkflowBindingError("A new workflow cannot inherit execution or accounting history")
             for name in ("max_retries", "max_regenerations"):

@@ -277,6 +277,7 @@ def test_runtime_preflight_snapshot_is_not_mutated_by_later_provider_edit(store)
     {"execution_generation": 1}, {"regenerations_used": 2},
     {"workflow_supervision": {"state": "applied", "generation": 0}},
     {"native_receipts": []}, {"response_error": {}}, {"cost_usd": 0},
+    {"rejected_generations": [{"version": 1, "generation": 0}]},
 ])
 def test_new_graph_cannot_import_prior_execution_history(store, metadata):
     source = graph()

@@ -295,6 +295,16 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   (`draw_00-2.png`). Runs without a strict policy keep their file names and
   still replace a regenerated node's files. See
   [artifacts and jobs](docs/architecture.md#artifacts-and-jobs).
+- Under a strict acceptance policy a regeneration keeps a bounded record of
+  each generation it discards in the node's `rejected_generations` metadata:
+  the generation, status, judge and reason, the result's SHA-256 and size, an
+  excerpt of at most 1,024 bytes, a sidecar file holding a longer result in
+  full when the run has an `artifact_dir`, and the generation's artifact
+  records. All records add at most 64 KiB to a checkpoint
+  (`REJECTED_GENERATIONS_MAX_BYTES`); past that a record drops its excerpt,
+  and then it is not kept. Runs without a strict policy still clear rejected
+  generations, and a new durable workflow refuses a graph that carries these
+  records. See [rejected generations](docs/verifier.md#rejected-generations).
 
 ### Changed
 

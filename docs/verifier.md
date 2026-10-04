@@ -30,7 +30,8 @@ When `check` fails `draft`, the executor records the rejection, cancels and
 awaits affected active work, then resets `draft` **and everything downstream
 of it** to pending. Regeneration starts after that reset is saved. Completed
 charges remain recorded; outputs and artifact references from the rejected
-generation are cleared.
+generation are cleared. Under a [strict acceptance policy](#rejected-generations)
+a bounded record of each cleared generation is kept instead.
 
 A [supervisor](supervisor.md#what-a-revision-may-change) cannot revise a gate
 away: a revision that drops `check` or `draft`, rewires `check` without
@@ -554,6 +555,28 @@ summary = JSONValidator({"checks": [
     {"id": "sources", "kind": "citations", "path": ["sources"], "allowed": ["doc-1", "doc-2"]},
 ]})
 ```
+
+### Rejected generations
+
+Under a strict policy a regeneration keeps a record of what it discards. Each
+reset node that had produced a result or files gains an entry in the
+`rejected_generations` list in its metadata: the generation, its status, the
+judge and its reason, the SHA-256 and UTF-8 size of the result, an `excerpt`
+of its first 1,024 bytes, and the generation's artifact records with their
+digests. A longer result is written in full to a `sidecar` file beside the
+run's artifacts, such as `draft_g0_rejected.txt`, when the run has an
+`artifact_dir`. A regenerated node's files are named for its generation and
+never replace a file ([artifacts](architecture.md#artifacts-and-jobs)), so a
+record's paths still hold the bytes that were judged.
+
+Ordinary checkpoints rewrite the whole graph on every save, so the records of
+all nodes together add at most 64 KiB to a checkpoint
+(`smythe.executor_base.REJECTED_GENERATIONS_MAX_BYTES`). Past that a record
+keeps no excerpt, and one that still does not fit is not kept; the
+regeneration span in the trace still names its node. Without a strict policy
+a regeneration clears rejected results and artifact references as before. The
+[checkpoint format](checkpoint-format.md#verification-state) lists the record's
+fields.
 
 ## Gating from YAML and from a generated plan
 

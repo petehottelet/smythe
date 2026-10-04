@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import math
 import os
 import random
@@ -216,6 +217,34 @@ SUPPORTED_PROMPT_ASSEMBLY_VERSIONS = (1, 2)
 # the terminal note above would ask the model to carry it into the
 # deliverable.
 SKIPPED_DEPENDENCY_RESULT = "[skipped: this step did not complete]"
+
+# Under a strict acceptance policy, a regeneration moves each discarded
+# generation's result and artifact records into a list under this node
+# metadata key instead of dropping them.
+REJECTED_GENERATIONS_KEY = "rejected_generations"
+# A record keeps at most this many bytes of the result's UTF-8 text inline;
+# with an artifact_dir, a sidecar file holds a longer result in full.
+REJECTED_EXCERPT_BYTES = 1024
+# Ordinary checkpoints rewrite the whole graph on every save, so the records
+# of all nodes together may add at most this many bytes to one checkpoint.
+REJECTED_GENERATIONS_MAX_BYTES = 64 * 1024
+
+
+def _checkpoint_bytes(record: Any) -> int:
+    """At least the bytes *record* adds to a checkpoint ``FileCheckpointStore`` writes.
+
+    That store indents JSON by two spaces and escapes non-ASCII text. A record
+    sits six levels deep, so each line gains twelve spaces and, on Windows, a
+    carriage return; 64 bytes cover the separators and the node's list key.
+    """
+    text = json.dumps(record, indent=2, default=str)
+    return len(text) + 16 * (text.count("\n") + 1) + 64
+
+
+def _retained_bytes(graph: ExecutionGraph) -> int:
+    records = (node.metadata.get(REJECTED_GENERATIONS_KEY) for node in graph.nodes)
+    return sum(_checkpoint_bytes(record) for listed in records if isinstance(listed, list)
+               for record in listed)
 
 
 class ExecutorBase:
@@ -632,7 +661,11 @@ class ExecutorBase:
             raise VerificationRecoveryError("Regeneration source identity is inconsistent")
 
     def apply_regeneration(self, node: Node, graph: ExecutionGraph, intent: dict) -> None:
-        """Commit an idempotent reset after every affected worker has settled."""
+        """Commit an idempotent reset after every affected worker has settled.
+
+        Under a strict policy each discarded generation is first recorded
+        under ``rejected_generations`` (see :meth:`_rejected_records`).
+        """
         self._validate_regeneration(node, graph, intent)
         target = self._cached_node_by_id(intent["target_id"], graph)
         reset = [n for n in graph.nodes if n.id in intent["affected_generations"]]
@@ -640,6 +673,7 @@ class ExecutorBase:
             raise BudgetValidationError("Cannot regenerate unresolved provider accounting")
         if any("response_error" in n.metadata for n in reset):
             raise ProviderResponseError("Cannot regenerate an unresolved native response failure")
+        retained = self._rejected_records(node, reset, intent, graph) if self._strict else {}
         for candidate in reset:
             candidate.status = NodeStatus.PENDING
             candidate.result = None
@@ -647,6 +681,11 @@ class ExecutorBase:
             for key in ("artifacts", "artifacts_discarded", "verification_receipt",
                         "verification_target_generation", ADVISORY_VERDICT_KEY):
                 candidate.metadata.pop(key, None)
+            if candidate.id in retained:
+                listed = candidate.metadata.get(REJECTED_GENERATIONS_KEY)
+                candidate.metadata[REJECTED_GENERATIONS_KEY] = [
+                    *(listed if isinstance(listed, list) else ()), retained[candidate.id],
+                ]
         node.metadata.pop("regeneration_intent", None)
         self.notify_control_update(node)
         self._tracer.on_regeneration(
@@ -655,6 +694,79 @@ class ExecutorBase:
         )
         for candidate in reset:
             self.notify_update(candidate)
+
+    def _rejected_records(
+        self, judge: Node, reset: list[Node], intent: dict, graph: ExecutionGraph,
+    ) -> dict[str, dict]:
+        """Strict mode: a record of each generation this reset discards, by node id.
+
+        A record names the generation, its status, the judge and its reason,
+        the result's SHA-256 and UTF-8 size, an ``excerpt`` of at most
+        ``REJECTED_EXCERPT_BYTES``, a ``sidecar`` file holding a longer
+        result in full when there is an ``artifact_dir``, and the
+        generation's artifact records, whose files strict publication keeps.
+        Once the graph's records would pass ``REJECTED_GENERATIONS_MAX_BYTES``
+        a record keeps no excerpt, and one that still does not fit is not
+        kept. A generation that a replayed reset already discarded, or that
+        produced nothing, gets no record. Sidecars are written before any
+        node changes, so a failed write leaves the graph as it was.
+        """
+        used = _retained_bytes(graph)
+        records: dict[str, dict] = {}
+        written: list[Path] = []
+        try:
+            for candidate in reset:
+                generation = intent["affected_generations"][candidate.id]
+                listed = candidate.metadata.get(REJECTED_GENERATIONS_KEY)
+                if (node_generation(candidate) != generation
+                        or (candidate.result is None and not candidate.metadata.get("artifacts")
+                            and "artifacts_discarded" not in candidate.metadata)
+                        or isinstance(listed, list) and any(
+                            isinstance(item, dict) and item.get("generation") == generation
+                            for item in listed)):
+                    continue
+                record, data = self._rejected_record(candidate, judge, intent["reason"], generation)
+                if len(data) > REJECTED_EXCERPT_BYTES and self._artifact_dir is not None:
+                    name = f"{_safe_filename_component(candidate.id)}_g{generation}_rejected.txt"
+                    written.append(publish_unique(self._artifact_dir, name, data))
+                    record["sidecar"] = str(written[-1].resolve())
+                size = _checkpoint_bytes(record)
+                if used + size > REJECTED_GENERATIONS_MAX_BYTES:
+                    del record["excerpt"]
+                    size = _checkpoint_bytes(record)
+                if used + size > REJECTED_GENERATIONS_MAX_BYTES:
+                    if "sidecar" in record:
+                        written.pop().unlink(missing_ok=True)
+                    continue
+                used += size
+                records[candidate.id] = record
+        except OSError as exc:
+            for path in written:
+                path.unlink(missing_ok=True)
+            raise VerificationRecoveryError("Could not retain a rejected generation") from exc
+        return records
+
+    @staticmethod
+    def _rejected_record(
+        candidate: Node, judge: Node, reason: str, generation: int,
+    ) -> tuple[dict, bytes]:
+        """The record of *candidate*'s discarded generation and its result's bytes."""
+        result = candidate.result
+        text = None if result is None else result if isinstance(result, str) else str(result)
+        data = b"" if text is None else text.encode("utf-8", "surrogatepass")
+        record: dict[str, Any] = {
+            "version": 1, "generation": generation, "status": candidate.status.value,
+            "judge_id": judge.id, "reason": reason[:300],
+            "result_sha256": None if text is None else hashlib.sha256(data).hexdigest(),
+            "result_bytes": len(data),
+            "excerpt": data[:REJECTED_EXCERPT_BYTES].decode("utf-8", "ignore"),
+        }
+        artifacts = candidate.metadata.get("artifacts")
+        if isinstance(artifacts, list) and artifacts:
+            record["artifacts"] = json.loads(json.dumps(artifacts, default=str))
+        if "artifacts_discarded" in candidate.metadata:
+            record["artifacts_discarded"] = candidate.metadata["artifacts_discarded"]
+        return record, data
 
     def recover_verification(self, graph: ExecutionGraph) -> None:
         """Finish saved control transitions before initial scheduling."""
