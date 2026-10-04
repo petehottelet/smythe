@@ -87,9 +87,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `validator error` and any findings it carries. A report can name its
   `validator` with a `ValidatorIdentity`: name, version and the SHA-256 of
   the validator's canonical JSON configuration. Reports, findings and
-  identities convert with `to_dict()` and `from_dict()`.
-  A report's findings must be `ValidationFinding` values and are kept as a
-  tuple. See [validation reports](docs/verifier.md#validation-reports).
+  identities convert with `to_dict()` and `from_dict()`. See
+  [validation reports](docs/verifier.md#validation-reports).
 - Delivery acceptance types in `smythe.acceptance`, reported apart from
   execution and cost. `AcceptancePolicy` is advisory by default; a strict
   policy names its final validators, whether a passed gate may accept output
@@ -209,6 +208,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `run_created` event records how many earlier runs used the token and the
   five most recent run IDs under `approval_reuse`.
   Token derivation, plan hashes and the Jobs schema are unchanged.
+- `ValidationReport` raises `TypeError` when it is constructed with a finding
+  that is not a `ValidationFinding`, and keeps its findings as a tuple. It
+  used to accept any value, failing only when `passed`, `hard_findings` or
+  `advisories` read the finding, and kept a list of findings as a list, so a
+  report built from a list did not equal one built from the same tuple.
 
 ### Fixed
 
