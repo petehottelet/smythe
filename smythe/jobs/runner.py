@@ -10,6 +10,7 @@ import math
 import os
 import re
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -29,6 +30,8 @@ from smythe.jobs.delivery import (
     RESPONSE_PATH,
     artifact_spec_identity,
     delivery_record,
+    run_validator,
+    validator_registry,
     validator_result,
 )
 from smythe.jobs.models import (
@@ -45,6 +48,7 @@ from smythe.jobs.preflight import (
     JobApprovalV1,
     JobPlanV1,
     PlannedOperationV1,
+    PreflightError,
     preflight_job,
     verify_approval,
 )
@@ -59,9 +63,10 @@ from smythe.jobs.store import (
     RunPauseRequested,
     SQLiteRunStore,
 )
+from smythe.acceptance import ValidationSubject
 from smythe.provider import Artifact, CompletionResult
 from smythe.tools import ChatMessage
-from smythe.validation import ValidationFinding, ValidationReport, hard_finding
+from smythe.validation import ValidationFinding, ValidationReport, ValidatorIdentity, hard_finding
 
 
 _SAFE_COMPONENT = re.compile(r"[^A-Za-z0-9._-]+")
@@ -98,7 +103,14 @@ class _ArtifactCheck:
 
 
 class JobRunner:
-    """Execute only planned calls, with a durable boundary before dispatch."""
+    """Execute only planned calls, with a durable boundary before dispatch.
+
+    ``validators`` registers the trusted local validators that a plan's
+    artifact specs name. Each runs, after the built-in artifact check, on
+    the exact bytes of every decodable artifact. A plan that names a
+    validator this runner has not registered with the same identity is
+    refused before a run is created or resumed.
+    """
 
     def __init__(
         self,
@@ -109,7 +121,9 @@ class JobRunner:
         lease_heartbeat_s: float | None = None,
         call_timeout_s: float | None = None,
         max_wall_seconds: float | None = None,
+        validators: Sequence[Any] = (),
     ) -> None:
+        self._validators = validator_registry(validators)
         if (
             isinstance(lease_ttl_s, bool)
             or not isinstance(lease_ttl_s, (int, float))
@@ -203,7 +217,7 @@ class JobRunner:
         record = self.store.manifest_record(run_id)
         root = Path(record["manifest_root"])
         manifest = JobManifestV1.from_json(record["manifest_json"])
-        plan = preflight_job(manifest, manifest_root=root)
+        plan = self._preflight(manifest, root)
         approval = JobApprovalV1.from_dict(record["approval"])
         verify_approval(plan, approval)
         self._validate_dispatch_inputs(plan, root)
@@ -223,7 +237,7 @@ class JobRunner:
         record = self.store.manifest_record(run_id)
         root = Path(record["manifest_root"])
         manifest = JobManifestV1.from_json(record["manifest_json"])
-        plan = preflight_job(manifest, manifest_root=root)
+        plan = self._preflight(manifest, root)
         approval = JobApprovalV1.from_dict(record["approval"])
         verify_approval(plan, approval)
         self._validate_dispatch_inputs(plan, root)
@@ -235,11 +249,24 @@ class JobRunner:
             reroll=(operation_keys, reason, acknowledge_unknown),
         )
 
+    def _preflight(self, manifest: JobManifestV1, root: Path) -> JobPlanV1:
+        """Rebuild a stored run's plan with this runner's registered validators."""
+        validators = [validator for _identity, validator in self._validators.values()]
+        return preflight_job(manifest, manifest_root=root, validators=validators)
+
     def _validate_dispatch_inputs(self, plan: JobPlanV1, root: Path) -> None:
         fingerprints = {item.relative_path: item for item in plan.attachments}
         for fingerprint in fingerprints.values():
             _read_bound_attachment(fingerprint, root)
         for operation in plan.operations:
+            for identity in operation.validators:
+                registered = self._validators.get(identity.name)
+                if registered is None or registered[0] != identity:
+                    raise PreflightError(
+                        f"operation {operation.operation_key!r} needs validator "
+                        f"{identity.name!r} version {identity.version!r}, which this runner "
+                        "has not registered with the same identity"
+                    )
             self.providers.preflight(operation)
             self.providers.get(operation)
 
@@ -556,6 +583,7 @@ class JobRunner:
                 operation,
                 attempt_id=attempt["attempt_id"],
                 attempt_number=attempt["attempt_number"],
+                validators=[self._validators[identity.name] for identity in operation.validators],
                 run_root=_validated_run_root(
                     root,
                     output_directory=plan.output_directory,
@@ -691,16 +719,29 @@ class JobRunner:
         attempt_id: str,
         attempt_number: int,
         run_root: Path,
+        validators: Sequence[tuple[ValidatorIdentity, Any]] = (),
     ) -> _ArtifactCheck:
         """Check a response's artifacts, then publish every decodable one.
 
         The built-in artifact check reports each finding with its code.
         Undecodable or over-limit bytes are hard findings and are never
         written; rejected bytes that decode are published for review with
-        ``accepted=0``. Artifact data that is not bytes breaks the provider
-        contract and raises instead.
+        ``accepted=0``. Registered ``validators`` then check each decodable
+        artifact's exact bytes; one that fails to decide never makes the call
+        an unknown outcome. Artifact data that is not bytes breaks the
+        provider contract and raises instead.
         """
         builtin = artifact_spec_identity(operation.artifact)
+        checked: dict[str, list[ValidationReport]] = {
+            identity.name: [] for identity, _validator in validators
+        }
+
+        def results(builtin_reports: list[ValidationReport]) -> list[dict[str, Any]]:
+            return [validator_result(builtin, builtin_reports)] + [
+                validator_result(identity, checked[identity.name])
+                for identity, _validator in validators
+            ]
+
         artifacts = list(result.artifacts or ())
         if any(not isinstance(artifact.data, bytes) for artifact in artifacts):
             raise TypeError("provider artifact data must be bytes")
@@ -723,7 +764,7 @@ class JobRunner:
         if refused is not None:
             report = ValidationReport(RESPONSE_PATH, (refused,), validator=builtin)
             return _ArtifactCheck([], [refused.message], delivery_record(
-                attempt_id, [], [validator_result(builtin, [report])], [refused.message],
+                attempt_id, [], results([report]), [refused.message],
             ))
         safe_key = _SAFE_COMPONENT.sub("_", operation.operation_key).strip("._")
         records: list[dict[str, Any]] = []
@@ -746,6 +787,14 @@ class JobRunner:
             })
             if inspection is None:
                 continue
+            if validators:
+                subject = ValidationSubject(artifact.data)
+                for identity, validator in validators:
+                    report, reasons = run_validator(
+                        identity, validator, subject, relative.as_posix(), filename,
+                    )
+                    checked[identity.name].append(report)
+                    errors.extend(reasons)
             destination = run_root / relative
             _prepare_confined_parent(destination, run_root)
             records.append(
@@ -762,8 +811,8 @@ class JobRunner:
             pending_writes.append((destination, artifact.data))
         for destination, data in pending_writes:
             atomic_publish_bytes(destination, data)
-        results = [validator_result(builtin, reports)]
-        return _ArtifactCheck(records, errors, delivery_record(attempt_id, subjects, results, errors))
+        return _ArtifactCheck(records, errors,
+                              delivery_record(attempt_id, subjects, results(reports), errors))
 
 
 def _positive_finite_timeout(value: object, field: str) -> float:

@@ -11,7 +11,7 @@ from contextlib import ExitStack
 import pytest
 import smythe.jobs.runner as runner_module
 
-from smythe.jobs import ApprovalError, JobManifestV1, make_approval, preflight_job
+from smythe.jobs import ApprovalError, JobManifestV1, PreflightError, make_approval, preflight_job
 from smythe.jobs.models import (
     DEFAULT_CALL_TIMEOUT_S,
     DEFAULT_MAX_WALL_SECONDS,
@@ -873,6 +873,153 @@ def test_invalid_accounting_keeps_undecodable_bytes_an_unknown_outcome(tmp_path,
     assert result["operations"][0]["error"].startswith("invalid provider accounting: ")
     assert result["cost"]["exposure_microusd"] == 100_000
     assert _events(store, result["run_id"], "artifact_rejected") == []
+
+
+class _PaletteValidator:
+    """A registered validator whose verdict a test supplies."""
+
+    def __init__(self, verdict=None, *, version="1", colors=("#ff0000",)):
+        from smythe.validation import ValidatorIdentity
+
+        self.identity = ValidatorIdentity.for_config("brand-palette", version,
+                                                     {"colors": list(colors)})
+        self.verdict = verdict
+        self.subjects = []
+
+    def validate(self, subject):
+        from smythe.validation import ValidationReport
+
+        self.subjects.append(subject)
+        if self.verdict is not None:
+            return self.verdict(self, subject)
+        return ValidationReport("any path", validator=self.identity)
+
+
+def _validated_manifest(*, count=1, attempts=2):
+    data = _manifest(count=count, attempts=attempts).to_dict()
+    data["operations"][0]["artifact"]["validators"] = [{"name": "brand-palette", "version": "1"}]
+    return JobManifestV1.from_dict(data)
+
+
+def _validated_run(tmp_path, store, validator, provider=None):
+    plan = preflight_job(_validated_manifest(), manifest_root=tmp_path, validators=[validator])
+    pool = _FixedPool(provider or _ImmediateArtifactProvider())
+    runner = JobRunner(store, provider_pool=pool, validators=[validator])
+    result = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path))
+    [event] = (_events(store, result["run_id"], "call_completed")
+               + _events(store, result["run_id"], "artifact_rejected"))
+    return runner, result, event["payload"]["delivery_acceptance"]
+
+
+def test_registered_validator_checks_the_published_bytes_and_is_recorded(tmp_path, store_factory):
+    validator = _PaletteValidator()
+    _, result, record = _validated_run(tmp_path, store_factory(tmp_path / "jobs.db"), validator)
+
+    assert result["counts"] == {OperationStatus.SUCCEEDED.value: 1}
+    [artifact] = result["artifacts"]
+    [subject] = validator.subjects
+    assert subject.data == PNG_1X1 and subject.sha256 == artifact["sha256"]
+    assert record["decision"] == "accepted"
+    builtin, palette = record["validators"]
+    assert builtin["validator"]["name"] == "smythe.jobs.artifact-spec"
+    assert palette == {"validator": validator.identity.to_dict(), "outcome": "passed", "reports": [
+        {"path": artifact["relative_path"], "outcome": "passed", "findings": [],
+         "validator": validator.identity.to_dict()}]}
+
+
+def test_registered_validator_rejection_rejects_the_attempt(tmp_path, store_factory):
+    from smythe.validation import ValidationReport, advisory_finding, hard_finding
+
+    def off_palette(validator, subject):
+        findings = [advisory_finding(f"note-{index}", "close to the edge") for index in range(40)]
+        findings.append(hard_finding("off_palette", "uses #00ff00", expected=["#ff0000"],
+                                     observed=["#00ff00"]))
+        return ValidationReport("tile", tuple(findings), validator=validator.identity)
+
+    validator = _PaletteValidator(off_palette)
+    _, result, record = _validated_run(tmp_path, store_factory(tmp_path / "jobs.db"), validator)
+
+    assert result["counts"] == {OperationStatus.REJECTED.value: 1}
+    assert record["decision"] == "rejected"
+    [artifact] = result["artifacts"]
+    assert artifact["accepted"] == 0
+    assert "artifact-01.png: brand-palette: uses #00ff00" in result["operations"][0]["error"]
+    [report] = record["validators"][1]["reports"]
+    assert report["outcome"] == "rejected" and report["path"] == artifact["relative_path"]
+    # Hard findings are kept first, and at most 32 findings are recorded.
+    assert len(report["findings"]) == 32
+    assert report["findings"][0]["code"] == "off_palette"
+
+
+class _Unserializable:
+    pass
+
+
+@pytest.mark.parametrize("verdict,problem", [
+    (lambda validator, subject: (_ for _ in ()).throw(RuntimeError("secret detail")),
+     "raised RuntimeError"),
+    (lambda validator, subject: True, "returned bool, not a ValidationReport"),
+    (lambda validator, subject: _coroutine(), "returned coroutine, not a ValidationReport"),
+    (lambda validator, subject: _report(_PaletteValidator(version="9").identity),
+     "returned a report for another validator"),
+    (lambda validator, subject: _report(validator.identity, observed=_Unserializable()),
+     "returned findings that are not JSON data"),
+    (lambda validator, subject: _report(validator.identity, outcome="error"), "could not decide"),
+], ids=["raises", "bool", "coroutine", "other-identity", "not-json", "error-report"])
+def test_validator_errors_are_indeterminate_and_never_unknown_outcomes(
+    tmp_path, store_factory, verdict, problem,
+):
+    validator = _PaletteValidator(verdict)
+    store = store_factory(tmp_path / "jobs.db")
+    runner, result, record = _validated_run(tmp_path, store, validator)
+
+    assert result["counts"] == {OperationStatus.REJECTED.value: 1}
+    assert result["cost"]["exposure_microusd"] == 0 and result["cost"]["cost_is_complete"]
+    assert record["decision"] == "indeterminate"
+    assert [item["outcome"] for item in record["validators"]] == ["passed", "error"]
+    error = result["operations"][0]["error"]
+    assert f"validator 'brand-palette' {problem}" in error and "secret detail" not in error
+    # No duplicate-spend acknowledgement is needed to try again.
+    key = result["operations"][0]["operation_key"]
+    validator.verdict = None
+    second = asyncio.run(runner.reroll(result["run_id"], [key], reason="validator fixed"))
+    assert second["counts"] == {OperationStatus.SUCCEEDED.value: 1}
+
+
+async def _coroutine():
+    return None
+
+
+def _report(identity, *, observed=None, outcome=None):
+    from smythe.validation import ValidationReport, advisory_finding
+
+    findings = () if observed is None else (advisory_finding("note", "a note", observed=observed),)
+    return ValidationReport("tile", findings, outcome, identity)
+
+
+def test_runs_refuse_validators_the_runner_has_not_registered(tmp_path, store_factory):
+    validator = _PaletteValidator()
+    plan = preflight_job(_validated_manifest(), manifest_root=tmp_path, validators=[validator])
+    store = store_factory(tmp_path / "jobs.db")
+    provider = _PricedArtifactProvider([Artifact(PNG_1X1, "image/png")], cost_usd=None)
+    pool = _FixedPool(provider)
+
+    for registered in ([], [_PaletteValidator(colors=("#0000ff",))]):
+        with pytest.raises(PreflightError, match="brand-palette"):
+            asyncio.run(JobRunner(store, provider_pool=pool, validators=registered).start(
+                plan, make_approval(plan), manifest_root=tmp_path))
+    assert store.list_runs() == []
+
+    run_id = store.create_run(plan, make_approval(plan), manifest_root=tmp_path)
+    with pytest.raises(PreflightError, match="'brand-palette'.*not registered"):
+        asyncio.run(JobRunner(store, provider_pool=pool).resume(run_id))
+    with pytest.raises(ApprovalError, match="plan hash"):
+        asyncio.run(JobRunner(store, provider_pool=pool, validators=[
+            _PaletteValidator(colors=("#0000ff",))]).resume(run_id))
+    assert provider.calls == 0
+    assert store.snapshot(run_id)["counts"] == {OperationStatus.PENDING.value: 1}
+    resumed = asyncio.run(JobRunner(store, provider_pool=pool, validators=[validator]).resume(run_id))
+    assert resumed["counts"] == {OperationStatus.SUCCEEDED.value: 1}
 
 
 def test_slow_artifact_finalizer_does_not_starve_lease_heartbeat(

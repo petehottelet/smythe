@@ -8,12 +8,13 @@ import json
 import mimetypes
 import os
 import stat
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from smythe.jobs.delivery import Registry, validator_registry
 from smythe.jobs.models import (
     ArtifactSpecV1,
     FrozenJSONValue,
@@ -36,6 +37,7 @@ from smythe.jobs.models import (
     usd_string,
     usd_to_micros,
 )
+from smythe.validation import ValidatorIdentity
 
 
 class PreflightError(ValueError):
@@ -95,8 +97,15 @@ class PlannedOperationV1:
     max_attempts: int
     max_cost_per_call_usd: Decimal
     worst_case_cost_usd: Decimal
+    # The registered validators the artifact spec names, resolved to their
+    # identities so the plan hash binds each validator's configuration.
+    validators: tuple[ValidatorIdentity, ...] = ()
 
     def __post_init__(self) -> None:
+        validators = tuple(self.validators)
+        if any(not isinstance(item, ValidatorIdentity) for item in validators):
+            raise ManifestValidationError("planned operation validators must be identities")
+        object.__setattr__(self, "validators", validators)
         frozen_options = freeze_json(
             self.options,
             context=f"planned operation {self.operation_id}.options",
@@ -120,7 +129,7 @@ class PlannedOperationV1:
         return f"{self.template_key}[{self.ordinal}]"
 
     def to_dict(self) -> dict[str, JSONValue]:
-        return {
+        result: dict[str, JSONValue] = {
             "operation_id": self.operation_id,
             "template_key": self.template_key,
             "ordinal": self.ordinal,
@@ -138,6 +147,10 @@ class PlannedOperationV1:
             "max_cost_per_call_usd": usd_string(self.max_cost_per_call_usd),
             "worst_case_cost_usd": usd_string(self.worst_case_cost_usd),
         }
+        # Omitted when empty, so plans without validators keep their hashes.
+        if self.validators:
+            result["validators"] = [identity.to_dict() for identity in self.validators]
+        return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -446,6 +459,7 @@ def _canonical_plan_size_upper_bound(
     manifest_hash: str,
     output_directory: str,
     total_micros: int,
+    validators: dict[str, tuple[ValidatorIdentity, ...]],
 ) -> int:
     """Bound expanded canonical JSON without materializing repeated operations."""
     attachment_payload = [
@@ -494,6 +508,10 @@ def _canonical_plan_size_upper_bound(
             "max_cost_per_call_usd": usd_string(profile.max_cost_per_call_usd),
             "worst_case_cost_usd": usd_string(micros_to_usd(operation_costs[template.key])),
         }
+        if validators[template.key]:
+            representative["validators"] = [
+                identity.to_dict() for identity in validators[template.key]
+            ]
         total_bytes += len(canonical_json_bytes(representative)) * template.count
         operation_count += template.count
         if total_bytes > MAX_CANONICAL_PLAN_BYTES:
@@ -503,10 +521,48 @@ def _canonical_plan_size_upper_bound(
     return total_bytes
 
 
-def preflight_job(manifest: JobManifestV1, *, manifest_root: str | Path) -> JobPlanV1:
-    """Expand a manifest and prove its complete worst-case spend before work."""
+def _resolve_validators(
+    templates: list[Any], registry: Registry,
+) -> dict[str, tuple[ValidatorIdentity, ...]]:
+    """Resolve every validator a template names against the in-process registry."""
+    resolved: dict[str, tuple[ValidatorIdentity, ...]] = {}
+    for template in templates:
+        identities = []
+        for reference in template.artifact.validators:
+            if reference.name not in registry:
+                raise PreflightError(
+                    f"operation {template.key!r} names validator {reference.name!r}, "
+                    "which is not registered; pass it in validators="
+                )
+            identity = registry[reference.name][0]
+            if identity.version != reference.version:
+                raise PreflightError(
+                    f"operation {template.key!r} names validator {reference.name!r} "
+                    f"version {reference.version!r}, but version {identity.version!r} "
+                    "is registered"
+                )
+            identities.append(identity)
+        resolved[template.key] = tuple(identities)
+    return resolved
+
+
+def preflight_job(
+    manifest: JobManifestV1,
+    *,
+    manifest_root: str | Path,
+    validators: Sequence[Any] = (),
+) -> JobPlanV1:
+    """Expand a manifest and prove its complete worst-case spend before work.
+
+    ``validators`` registers the trusted local validators that artifact specs
+    may name. Every named validator must be registered at the named version;
+    otherwise ``PreflightError`` is raised before any run exists. The plan
+    binds each resolved validator identity, including its configuration
+    digest, so changing a validator invalidates the approval.
+    """
     if not isinstance(manifest, JobManifestV1):
         raise TypeError("manifest must be a JobManifestV1")
+    registry = validator_registry(validators)
     root = Path(manifest_root)
     if not root.is_dir():
         raise PreflightError(f"manifest_root is not a directory: {root}")
@@ -577,6 +633,7 @@ def preflight_job(manifest: JobManifestV1, *, manifest_root: str | Path) -> JobP
             f"${usd_string(micros_to_usd(total_micros))} exceeds execution budget "
             f"${usd_string(manifest.execution.max_budget_usd)}"
         )
+    resolved_validators = _resolve_validators(templates, registry)
 
     referenced_attachments = sorted(
         {path for template in manifest.operations for path in template.attachments}
@@ -615,6 +672,7 @@ def preflight_job(manifest: JobManifestV1, *, manifest_root: str | Path) -> JobP
         manifest_hash=manifest_hash,
         output_directory=output_directory,
         total_micros=total_micros,
+        validators=resolved_validators,
     )
     if plan_size_upper_bound > MAX_CANONICAL_PLAN_BYTES:
         limit_mib = MAX_CANONICAL_PLAN_BYTES // (1024 * 1024)
@@ -662,6 +720,7 @@ def preflight_job(manifest: JobManifestV1, *, manifest_root: str | Path) -> JobP
                     max_attempts=manifest.execution.max_attempts,
                     max_cost_per_call_usd=profile.max_cost_per_call_usd,
                     worst_case_cost_usd=micros_to_usd(operation_cost_micros),
+                    validators=resolved_validators[template.key],
                 )
             )
 

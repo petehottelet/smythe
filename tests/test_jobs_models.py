@@ -381,3 +381,41 @@ def test_manifest_schema_is_versioned_and_closed():
     assert execution["call_timeout_s"]["maximum"] == MAX_CALL_TIMEOUT_S
     assert execution["max_wall_seconds"]["default"] == DEFAULT_MAX_WALL_SECONDS
     assert execution["max_wall_seconds"]["maximum"] == MAX_WALL_SECONDS
+
+
+def test_artifact_validators_are_names_and_versions_omitted_when_empty():
+    from smythe.jobs import ValidatorReferenceV1
+
+    data = manifest_data()
+    assert "validators" not in JobManifestV1.from_dict(data).to_dict()["operations"][0]["artifact"]
+    references = [{"name": "brand-palette", "version": "1"}, {"name": "acme.ocr", "version": "2.1"}]
+    data["operations"][0]["artifact"]["validators"] = references
+    manifest = JobManifestV1.from_dict(data)
+
+    artifact = manifest.operations[0].artifact
+    assert artifact.validators == (ValidatorReferenceV1("brand-palette", "1"),
+                                   ValidatorReferenceV1("acme.ocr", "2.1"))
+    assert manifest.to_dict()["operations"][0]["artifact"]["validators"] == references
+    assert JobManifestV1.from_json(manifest.to_json()) == manifest
+    schema = (JOB_MANIFEST_V1_JSON_SCHEMA["properties"]["operations"]["items"]["properties"]
+              ["artifact"]["properties"]["validators"])
+    assert schema["items"]["required"] == ["name", "version"]
+    assert schema["items"]["additionalProperties"] is False
+
+
+@pytest.mark.parametrize("validators,match", [
+    ({"name": "brand-palette", "version": "1"}, "must be an array"),
+    ([{"name": "brand-palette"}], "missing required fields"),
+    ([{"name": "brand-palette", "version": "1", "module": "x.y"}], "unknown fields"),
+    ([{"name": "brand-palette", "version": 1}], "version must be"),
+    ([{"name": "brand-palette", "version": " 1"}], "version must be"),
+    ([{"name": "smythe.jobs.artifact-spec", "version": "1"}], "reserved"),
+    ([{"name": "../palette", "version": "1"}], "name must match"),
+    ([{"name": "palette", "version": "1"}, {"name": "palette", "version": "2"}], "more than once"),
+    ([{"name": f"check-{index}", "version": "1"} for index in range(17)], "exceeds 16"),
+])
+def test_artifact_validator_references_are_strict(validators, match):
+    data = manifest_data()
+    data["operations"][0]["artifact"]["validators"] = validators
+    with pytest.raises(ManifestValidationError, match=match):
+        JobManifestV1.from_dict(data)

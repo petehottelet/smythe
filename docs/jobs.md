@@ -83,8 +83,9 @@ The contract has four sections:
   provider options, and an inclusive maximum cost for one call. Billable
   profiles require a positive ceiling; offline profiles require exactly zero.
 - `operations` define a stable key, prompt, provider profile, optional count,
-  relative attachments, and the expected artifact MIME type, dimensions, and
-  filename. A count of 16 expands to `tile[0]` through `tile[15]`.
+  relative attachments, and the expected artifact MIME type, dimensions,
+  filename, and optional [registered validators](#registered-validators). A
+  count of 16 expands to `tile[0]` through `tile[15]`.
 - `execution.max_concurrency` bounds active calls. `max_attempts` bounds the
   complete attempt lineage, including later rerolls.
 - `execution.call_timeout_s` bounds each provider attempt (default 300 seconds,
@@ -304,14 +305,60 @@ in the transaction that settles the call's cost:
 }
 ```
 
-`decision` is `accepted` or `rejected`. `subjects` lists each artifact's
-recorded path, SHA-256 and size; `published` is false for bytes that were not
-written. Findings about the whole response are reported for the path
-`response`. The check's `config_sha256` hashes the MIME type and dimensions it
-compared. The attempt error keeps the finding messages, and the operation's
-status and recorded `accepted` flags mean what they did before. Calls recorded
-by earlier releases have no `delivery_acceptance` block. The Jobs database
-schema is unchanged.
+`decision` is `accepted`, `rejected`, or `indeterminate`. `subjects` lists
+each artifact's recorded path, SHA-256 and size; `published` is false for
+bytes that were not written. Findings about the whole response are reported
+for the path `response`. The check's `config_sha256` hashes the MIME type and
+dimensions it compared. The attempt error keeps the finding messages, and the
+operation's status and recorded `accepted` flags mean what they did before.
+Calls recorded by earlier releases have no `delivery_acceptance` block. The
+Jobs database schema is unchanged.
+
+### Registered validators
+
+An operation's `artifact.validators` names further checks by name and
+version:
+
+```yaml
+    artifact:
+      mime_type: image/png
+      validators:
+        - name: brand-palette
+          version: "1"
+```
+
+A manifest never contains or imports validator code. A validator is trusted
+local code registered in-process, the same object the
+[delivery acceptance types](verifier.md#delivery-acceptance-records) describe:
+an `identity` (`ValidatorIdentity`) and a synchronous `validate(subject)` that
+returns a `ValidationReport`. Pass validators to both `preflight_job(...,
+validators=[...])` and `JobRunner(..., validators=[...])`; the CLI registers
+none, so it refuses a manifest that names one. Registration refuses a
+`Provider`, a class, a coroutine function, an awaitable, an `async def
+validate`, duplicate names, and names starting with `smythe.`. That check is a
+caller contract, not a sandbox: a validator must make no network requests or
+provider calls.
+
+Preflight refuses a name that is not registered, or registered at another
+version, before any run exists. The plan records each resolved identity,
+including its `config_sha256`, so a changed validator changes the plan hash:
+its approval no longer matches, and `resume` and `reroll` of a run approved
+under the old validator are refused before any provider call. A runner that
+lacks a validator the plan names, or has it with another identity, refuses
+to start the run. Manifests without validators keep their manifest hash, plan
+hash, operation IDs and approval tokens.
+
+Each registered validator runs after the built-in check on the exact
+in-memory bytes of every decodable artifact, as a `ValidationSubject`, and
+its reports are recorded beside the built-in check's, at most 32 findings
+each with hard findings first. A hard finding rejects the attempt. A
+validator that raises, returns anything but its own JSON-serializable
+`ValidationReport`, or reports `error` could not decide: its outcome is
+`error` and the decision is `indeterminate`, unless another check rejected
+the bytes. The call still settles at its reported cost, the operation becomes
+`rejected` and can be rerolled without a duplicate-spend acknowledgment; it
+never becomes an unknown outcome. The attempt error names the validator and
+the exception type, never the exception's message.
 
 ## List and inspect runs
 
@@ -610,11 +657,36 @@ with SQLiteRunStore("jobs.sqlite3") as store:
 approval that already created a run in the store. Pass
 `allow_approval_reuse=True` to start another run with it, as `--new-run` does.
 
+A manifest that names [registered validators](#registered-validators) runs
+with the same validator objects passed to preflight and to every runner that
+starts, resumes or rerolls it:
+
+```python
+from smythe.validation import ValidationReport, ValidatorIdentity, hard_finding
+
+class MaxBytes:
+    def __init__(self, limit):
+        self.limit = limit
+        self.identity = ValidatorIdentity.for_config("max-bytes", "1", {"limit": limit})
+
+    def validate(self, subject):
+        if len(subject.data) <= self.limit:
+            return ValidationReport("artifact", validator=self.identity)
+        finding = hard_finding("too_large", f"{len(subject.data)} bytes",
+                               expected=self.limit, observed=len(subject.data))
+        return ValidationReport("artifact", (finding,), validator=self.identity)
+
+validators = [MaxBytes(2_000_000)]
+plan = preflight_job(manifest, manifest_root=root, validators=validators)
+runner = JobRunner(store, validators=validators)
+```
+
 ## Current boundaries
 
 - Jobs v1 is a local SQLite worker, not a distributed queue or hosted service.
 - Built-in artifact acceptance checks MIME type and optional pixel dimensions.
-  The public `smythe.assets` package adds typed brand modes, deterministic
+  Registered validators add developer-written checks by name and version. The
+  public `smythe.assets` package adds typed brand modes, deterministic
   finishing, hash-bound receipts, and richer image validation for custom
   pipelines; those policies are not automatically inferred from a generic job
   manifest.

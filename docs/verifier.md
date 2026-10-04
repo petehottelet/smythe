@@ -284,7 +284,9 @@ with the record under `delivery_acceptance`. `Swarm` takes no policy and runs
 evaluate none, so every advisory result has `acceptance=None`; only a result
 resumed from a completed [version 5 checkpoint](checkpoint-format.md#delivery-acceptance-version-5)
 carries a record. `PlannerMemory` stores the record's decision as
-`acceptance`, or `not_evaluated` without one.
+`acceptance`, or `not_evaluated` without one. Jobs run the same validator
+objects on artifact bytes when a manifest names them; see
+[registered validators](jobs.md#registered-validators).
 
 ## Gating from YAML and from a generated plan
 

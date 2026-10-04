@@ -22,6 +22,7 @@ from smythe.jobs.models import (
     MAX_TOTAL_OPERATIONS,
     MAX_UNIQUE_ATTACHMENTS,
 )
+from smythe.validation import ValidationReport, ValidatorIdentity
 
 
 def manifest_data(*, provider: str = "openai_image") -> dict:
@@ -335,6 +336,107 @@ def test_approval_is_bound_to_hashes_and_exact_ceiling(tmp_path):
         verify_approval(plan, replace(approval, token=approval.token[:-1] + "0"))
     with pytest.raises(ApprovalError, match="plan hash"):
         verify_approval(plan, replace(approval, plan_hash="sha256:" + "0" * 64))
+
+
+def test_existing_manifests_keep_their_hashes_operation_ids_and_approval_tokens(tmp_path):
+    """Manifests without validators keep the identities earlier releases computed."""
+    data = {
+        "version": 1, "name": "hash-stability",
+        "profiles": [{"name": "image", "provider": "openai_image", "model": "gpt-image-1.5",
+                      "max_cost_per_call_usd": "0.08", "options": {"quality": "medium"}}],
+        "operations": [
+            {"key": "hero", "count": 2, "prompt": "Create the campaign hero", "profile": "image",
+             "artifact": {"mime_type": "image/png", "width": 1200, "height": 630,
+                          "filename": "hero.png"}},
+            {"key": "square", "prompt": "Create a square", "profile": "image"},
+        ],
+        "execution": {"max_concurrency": 4, "max_attempts": 3, "max_budget_usd": "0.72",
+                      "output_directory": "output/campaign"},
+    }
+    plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
+
+    assert plan.manifest_hash == (
+        "sha256:bd10391af6212b9ecee21b6d3f5187f2296cd9025a53614fb8b9f3aa2cde37c6")
+    assert plan.plan_hash == (
+        "sha256:5ad8c44330e5800fc504f11c9e59c66f4cebf5d1938ec74bd8e4ae1108ea94d0")
+    assert [operation.operation_id for operation in plan.operations] == [
+        "op_42263f62dcbc6b69423027a5baa2a9ed",
+        "op_1d089d7e588ea177462b8cb794f63660",
+        "op_cdd0a41200177a9b8d7e74ede2d0b08d",
+    ]
+    assert make_approval(plan).token == (
+        "approve_v1_eef58c019ef36d23d8c96918db30888ab56eec8c0ad366286a7dc47178104490")
+    assert all("validators" not in operation.to_dict()
+               and "validators" not in operation.to_dict()["artifact"]
+               for operation in plan.operations)
+
+
+class PaletteValidator:
+    def __init__(self, *, name="brand-palette", version="1", colors=("#000000",)):
+        self.identity = ValidatorIdentity.for_config(name, version, {"colors": list(colors)})
+
+    def validate(self, subject):
+        return ValidationReport("artifact", validator=self.identity)
+
+
+def validator_manifest(version="1"):
+    data = manifest_data()
+    data["operations"][0]["artifact"]["validators"] = [{"name": "brand-palette", "version": version}]
+    return JobManifestV1.from_dict(data)
+
+
+def test_validators_a_manifest_names_must_be_registered_before_any_run(tmp_path):
+    write_logo(tmp_path)
+    with pytest.raises(PreflightError, match="'brand-palette'.*not registered"):
+        preflight_job(validator_manifest(), manifest_root=tmp_path)
+    with pytest.raises(PreflightError, match="version '1'.*version '2' is registered"):
+        preflight_job(validator_manifest(), manifest_root=tmp_path,
+                      validators=[PaletteValidator(version="2")])
+
+    validator = PaletteValidator()
+    plan = preflight_job(validator_manifest(), manifest_root=tmp_path, validators=[validator])
+    unchecked = preflight_job(JobManifestV1.from_dict(manifest_data()), manifest_root=tmp_path)
+
+    assert all(operation.validators == (validator.identity,) for operation in plan.operations)
+    assert plan.to_dict()["operations"][0]["validators"] == [validator.identity.to_dict()]
+    assert plan.to_dict()["operations"][0]["artifact"]["validators"] == [
+        {"name": "brand-palette", "version": "1"}]
+    assert plan.plan_hash != unchecked.plan_hash
+    assert {op.operation_id for op in plan.operations}.isdisjoint(
+        op.operation_id for op in unchecked.operations)
+    verify_approval(plan, make_approval(plan))
+
+
+def test_a_validator_configuration_change_invalidates_the_approval(tmp_path):
+    write_logo(tmp_path)
+    first = preflight_job(validator_manifest(), manifest_root=tmp_path,
+                          validators=[PaletteValidator()])
+    changed = preflight_job(validator_manifest(), manifest_root=tmp_path,
+                            validators=[PaletteValidator(colors=("#ffffff",))])
+
+    assert [op.operation_id for op in first.operations] == [op.operation_id for op in changed.operations]
+    assert first.manifest_hash == changed.manifest_hash
+    assert first.plan_hash != changed.plan_hash
+    with pytest.raises(ApprovalError, match="plan hash"):
+        verify_approval(changed, make_approval(first))
+
+
+def test_validator_registration_refuses_providers_duplicates_and_reserved_names(tmp_path):
+    from smythe.provider import OfflineProvider
+
+    write_logo(tmp_path)
+    manifest = JobManifestV1.from_dict(manifest_data())
+    with pytest.raises(TypeError, match="Provider cannot be a validator"):
+        preflight_job(manifest, manifest_root=tmp_path, validators=[OfflineProvider()])
+    with pytest.raises(ValueError, match="more than one validator named 'brand-palette'"):
+        preflight_job(manifest, manifest_root=tmp_path,
+                      validators=[PaletteValidator(), PaletteValidator(version="2")])
+    with pytest.raises(ValueError, match="reserved"):
+        preflight_job(manifest, manifest_root=tmp_path,
+                      validators=[PaletteValidator(name="smythe.jobs.artifact-spec")])
+    with pytest.raises(TypeError, match="list or tuple"):
+        preflight_job(manifest, manifest_root=tmp_path,
+                      validators={"brand-palette": PaletteValidator()})
 
 
 @pytest.mark.parametrize(

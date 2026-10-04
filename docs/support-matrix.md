@@ -277,7 +277,8 @@ profile before a run is created and before any provider call.
 | `offline` artifact | `image/png`, with no dimensions or 1x1 | Any other MIME type or size |
 | `openai_image` artifact | The MIME type of `output_format`; the dimensions of `size` unless it is `auto` | Mismatches, attachments and `base_url` |
 | `gemini_image` artifact | PNG, JPEG, GIF or WebP; reference images | Other MIME types; `response_modalities` without `IMAGE` |
-| Validators, tools, memory | None | Manifest fields for them are unknown fields |
+| Validators | Names and versions in an operation's `artifact.validators`, registered in-process with `preflight_job` and `JobRunner` | Unregistered names or versions, before any run; validator fields elsewhere; the CLI registers none |
+| Tools, memory | None | Manifest fields for them are unknown fields |
 
 A Gemini image's dimensions are checked when it arrives; a mismatch rejects
 that attempt.
@@ -300,6 +301,10 @@ Tests:
   `tests/test_jobs_runtime_support.py::test_openai_reference_inputs_fail_before_provider_construction`,
   `tests/test_jobs_runtime_support.py::test_job_manifest_cannot_redirect_openai_credentials`,
   `tests/test_jobs_runtime_support.py::test_gemini_image_profile_requires_image_modality`.
+- Registered validators: `tests/test_jobs_preflight.py::test_validators_a_manifest_names_must_be_registered_before_any_run`,
+  `tests/test_jobs_runner.py::test_runs_refuse_validators_the_runner_has_not_registered`,
+  `tests/test_jobs_runner.py::test_registered_validator_checks_the_published_bytes_and_is_recorded`,
+  `tests/test_jobs_runner.py::test_validator_errors_are_indeterminate_and_never_unknown_outcomes`.
 
 [Documentation map](index.md) · [Architecture](architecture.md) ·
 [Roadmap](../ROADMAP.md)

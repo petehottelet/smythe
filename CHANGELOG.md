@@ -135,6 +135,21 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   that disagrees with `accepted`, names another attempt or omits an artifact.
   Attempt errors, operation statuses and the Jobs schema are unchanged. See
   [delivery acceptance](docs/jobs.md#delivery-acceptance).
+- Jobs manifests can name registered validators in an operation's
+  `artifact.validators`, by name and version only (`ValidatorReferenceV1`).
+  `preflight_job(..., validators=[...])` and `JobRunner(..., validators=[...])`
+  register trusted local validator objects; preflight refuses a name that is
+  not registered at that version before any run exists, and a runner refuses
+  a plan that names a validator it lacks. The plan records each resolved
+  identity, so a changed validator configuration invalidates the approval
+  and refuses resume. Each validator runs after the built-in check on every
+  decodable artifact's exact bytes and its reports are recorded with the
+  decision. A validator that raises or returns anything but its own
+  `ValidationReport` has outcome `error` and makes the decision
+  `indeterminate`: the call settles at its cost and the operation is
+  `rejected`, never an unknown outcome. Manifests without validators keep
+  their manifest hash, plan hash, operation IDs and approval tokens. See
+  [registered validators](docs/jobs.md#registered-validators).
 
 ### Changed
 
