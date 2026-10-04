@@ -360,6 +360,37 @@ the bytes. The call still settles at its reported cost, the operation becomes
 never becomes an unknown outcome. The attempt error names the validator and
 the exception type, never the exception's message.
 
+### Delivery eligibility
+
+`jobs inspect` adds each attempt's recorded `delivery_acceptance`, and to each
+operation a projected `delivery_acceptance` and a derived
+`delivery_eligibility`. The projection describes the accepted attempt, or the
+latest completed one: its `source`, `attempt_id`, `decision`, the recorded
+`accepted` flag, each validator's identity and outcome, and the reasons. An
+attempt completed by an earlier release has no record and is projected with
+`source: "legacy_built_in"`, `decision: null` and `validators: null`: a
+legacy built-in decision whose validator is unrecorded. It is never reported
+as `accepted` or as `not_evaluated`, and it keeps the recorded flag as
+provenance.
+
+`delivery_eligibility` is `{"eligible": true, "reasons": []}` only when the
+recorded decision is `accepted`, the recorded validators are exactly the ones
+the operation's plan requires now, and every accepted artifact is `verified`
+on disk with the recorded SHA-256. Otherwise `reasons` lists codes:
+`no_decision`, `not_accepted`, `validator_unrecorded`, `validator_changed`,
+`record_invalid`, `record_mismatch`, or `artifact_` followed by the integrity
+status (`artifact_changed`, `artifact_missing`, `artifact_unsafe`,
+`artifact_unreadable`, `artifact_not_checked`). Eligibility is derived on
+every read and never written back; recorded statuses and `accepted` flags are
+unchanged. The HTML report shows it in a Delivery column, with the decision
+and validator results beside each attempt.
+
+`resume` and `reroll` recheck the SHA-256 of every accepted artifact in the run
+after execution, without the 64 MiB inspection limit, and return the same
+fields with an `artifact_integrity` summary. A changed or missing accepted file
+is reported there and makes its operation ineligible; the run's status and
+the operation's recorded acceptance stay as they were.
+
 ## List and inspect runs
 
 Find a run, inspect its attempts, or write a local report:
@@ -395,7 +426,8 @@ the ledger snapshot. Inspection compares size and SHA-256, reading at most
 64 MiB per invocation and 32 MiB per file. Missing, changed, unreadable, and
 unchecked files are labeled. Unsafe paths, symbolic links, and junctions are
 not followed. These checks preserve the recorded acceptance decision and do
-not repeat image decoding or quality evaluation.
+not repeat image decoding or quality evaluation. They feed each operation's
+[delivery eligibility](#delivery-eligibility).
 
 `list`, `inspect`, `status`, `attach`, and `export` open the existing Jobs database in
 read-only mode, without provider initialization or schema migration. Missing,
@@ -508,7 +540,9 @@ marked dispatched can still reach or finish at the provider after ownership
 expires. Its uncommitted outcome remains unknown until investigated; the lease
 does not cancel an external request or make it safe to repeat automatically.
 
-A completed run starts zero new operations. Safe pre-dispatch interruptions
+A completed run starts zero new operations, and resume rechecks the bytes of
+its accepted artifacts before reporting their
+[delivery eligibility](#delivery-eligibility). Safe pre-dispatch interruptions
 return to pending. Dispatched-but-uncommitted calls remain `unknown_outcome`,
 and the run becomes `needs_attention`.
 

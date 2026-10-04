@@ -48,6 +48,8 @@ _FENCING_COLUMNS = {"runs": {"lease_epoch"}, "attempts": {"lease_owner_id", "lea
 _ARTIFACT_COLUMNS = {"artifact_namespace", "artifact_owner_id"}
 # Events whose text ``reason`` explains the next attempt of their operation.
 _QUEUED_REASON_EVENTS = ("reroll_queued",)
+# Completion events, which carry a call's delivery decision when one was recorded.
+_COMPLETION_EVENTS = ("call_completed", "artifact_rejected")
 _DELIVERY_DECISIONS = frozenset({"accepted", "rejected", "indeterminate"})
 _IDENTITY_RE = re.compile(r"[0-9a-f]{32}\Z")
 _CONTROL_TABLE_SQL = """CREATE TABLE IF NOT EXISTS run_controls (
@@ -1855,6 +1857,9 @@ class SQLiteRunStore:
                                                    schema_version=schema_version, control=control)
                 for call in calls:
                     _validate_read_row(call, "calls")
+                records = self._delivery_records(cursor, run_id, ids)
+                for attempt in result["attempts"]:
+                    attempt["delivery_acceptance"] = records.get(attempt["attempt_id"])
                 result.update(counts=counts, calls=[dict(row) for row in calls], lease=lease,
                               observed_at_ns=observed_at_ns, operation_filter=operation,
                               pagination={"limit": limit, "offset": offset, "total": total,
@@ -1864,6 +1869,40 @@ class SQLiteRunStore:
                 return result
         except sqlite3.Error as exc:
             raise RunStoreError("Cannot read Jobs inspection snapshot") from exc
+
+    def delivery_records(self, run_id: str) -> dict[str, Any]:
+        """Return each attempt's recorded delivery decision, keyed by attempt ID.
+
+        Decisions are read from completion events. Attempts completed by
+        releases that recorded none are absent.
+        """
+        with self._read_transaction() as cursor:
+            if cursor.execute("SELECT 1 FROM runs WHERE run_id = ?", (run_id,)).fetchone() is None:
+                raise JobNotFoundError(run_id)
+            return self._delivery_records(cursor, run_id)
+
+    @staticmethod
+    def _delivery_records(cursor: sqlite3.Cursor, run_id: str,
+                          operation_ids: Sequence[str] | None = None) -> dict[str, Any]:
+        where, parameters = "run_id = ?", [run_id]
+        if operation_ids is not None:
+            if not operation_ids:
+                return {}
+            where += f" AND operation_id IN ({','.join('?' for _ in operation_ids)})"
+            parameters.extend(operation_ids)
+        attempts = {row["call_id"]: row["attempt_id"] for row in cursor.execute(
+            f"SELECT call_id, attempt_id FROM calls WHERE {where}", parameters)}
+        kinds = ",".join("?" for _ in _COMPLETION_EVENTS)
+        records: dict[str, Any] = {}
+        for row in cursor.execute(
+            f"""SELECT payload_json FROM events WHERE {where} AND event_type IN ({kinds})
+                ORDER BY sequence""", (*parameters, *_COMPLETION_EVENTS),
+        ):
+            payload = _read_json_object(row["payload_json"], "events.payload_json")
+            attempt_id = attempts.get(payload.get("call_id"))
+            if attempt_id is not None and "delivery_acceptance" in payload:
+                records[attempt_id] = payload["delivery_acceptance"]
+        return records
 
     def manifest_record(self, run_id: str) -> dict[str, Any]:
         run = self.get_run(run_id)

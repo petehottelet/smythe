@@ -240,6 +240,60 @@ def test_disk_integrity_never_relabels_original_acceptance(status, label):
     assert sample["artifacts"][0]["accepted"] == 1
 
 
+def _with_delivery(sample, *, source="recorded", eligibility=None):
+    identity = {"name": "smythe.jobs.artifact-spec", "version": "1", "config_sha256": "d" * 64}
+    record = {"version": 1, "scope": "artifacts", "attempt_id": "attempt-b", "decision": "accepted",
+              "reasons": [], "subjects": [], "validators": [
+                  {"validator": identity, "outcome": "passed", "reports": []}]}
+    sample["attempts"][1]["delivery_acceptance"] = record if source == "recorded" else None
+    sample["operations"][0]["delivery_acceptance"] = {
+        "source": source, "attempt_id": "attempt-b",
+        "decision": "accepted" if source == "recorded" else None, "accepted": True,
+        "validators": ([{"validator": identity, "outcome": "passed"}]
+                       if source == "recorded" else None), "reasons": [],
+    }
+    sample["operations"][0]["delivery_eligibility"] = eligibility or {
+        "eligible": False, "reasons": ["artifact_changed"]}
+    return sample
+
+
+def test_delivery_decision_and_eligibility_are_shown_beside_recorded_acceptance():
+    html = render_job_report(_with_delivery(payload()))
+    document = Document(html)
+    for expected in ("Delivery", "Not eligible", "Accepted artifact changed on disk",
+                     "Delivery decision", "Accepted", "Validator results",
+                     "smythe.jobs.artifact-spec"):
+        assert expected in document.content
+    assert sum(tag == "caption" for tag, _ in document.tags) == 6
+
+    eligible = Document(render_job_report(_with_delivery(
+        payload(), eligibility={"eligible": True, "reasons": []})))
+    assert "Eligible" in eligible.content and "Not eligible" not in eligible.content
+
+
+def test_legacy_decisions_are_labeled_and_missing_projections_are_not_recorded():
+    legacy = Document(render_job_report(_with_delivery(
+        payload(), source="legacy_built_in",
+        eligibility={"eligible": False, "reasons": ["validator_unrecorded"]})))
+    assert "Legacy built-in decision; validator unrecorded" in legacy.content
+    assert "not_evaluated" not in legacy.content and "Not evaluated" not in legacy.content
+
+    older = Document(render_job_report(payload()))
+    assert "Delivery" in older.content and "Not recorded" in older.content
+
+
+def test_delivery_fields_from_the_ledger_are_inert():
+    attack = '<script>alert(1)</script><img src=x onerror="alert(2)">'
+    sample = _with_delivery(payload(), eligibility={"eligible": False, "reasons": [attack]})
+    sample["operations"][0]["delivery_acceptance"]["decision"] = attack
+    sample["attempts"][1]["delivery_acceptance"]["validators"][0]["validator"]["name"] = attack
+    html = render_job_report(sample)
+    document = Document(html)
+    assert attack in document.content
+    assert not {tag for tag, _ in document.tags} & {"script", "img"}
+    assert "&lt;script&gt;" in html
+
+
 def test_renderer_is_deterministic_and_does_not_mutate_input():
     sample = payload()
     original = deepcopy(sample)

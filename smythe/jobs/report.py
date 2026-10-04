@@ -108,6 +108,22 @@ _LABELS = {
     "prepared": "Prepared", "dispatched": "Dispatched", "verified": "Verified",
     "missing": "Missing", "changed": "Changed", "unsafe": "Unsafe path",
     "unreadable": "Unreadable", "not_checked": "Not checked",
+    "accepted": "Accepted", "indeterminate": "Indeterminate", "passed": "Passed",
+    "error": "Error", "eligible": "Eligible", "not_eligible": "Not eligible",
+}
+_LEGACY_DECISION = "Legacy built-in decision; validator unrecorded"
+_ELIGIBILITY_REASONS = {
+    "no_decision": "No completed attempt has a decision",
+    "not_accepted": "The decision did not accept the output",
+    "validator_unrecorded": _LEGACY_DECISION,
+    "validator_changed": "Recorded validators differ from the operation's current validators",
+    "record_invalid": "The recorded decision is malformed",
+    "record_mismatch": "An accepted artifact differs from the recorded decision",
+    "artifact_changed": "Accepted artifact changed on disk",
+    "artifact_missing": "Accepted artifact is missing",
+    "artifact_unsafe": "Accepted artifact path is unsafe",
+    "artifact_unreadable": "Accepted artifact is unreadable",
+    "artifact_not_checked": "Accepted artifact was not checked",
 }
 
 
@@ -142,7 +158,8 @@ def _flag(value: Any) -> str:
 
 def _state(value: Any) -> str:
     label = _LABELS.get(value, value) if isinstance(value, str) else value
-    attention = value in {"failed", "rejected", "unknown_outcome", "needs_attention", "budget_overrun"} \
+    attention = value in {"failed", "rejected", "unknown_outcome", "needs_attention", "budget_overrun",
+                          "indeterminate", "error", "not_eligible"} \
         if isinstance(value, str) else False
     return f'<span class="state{" attention" if attention else ""}">{_text(label)}</span>'
 
@@ -214,13 +231,40 @@ def _definitions(items: list[tuple[str, str]]) -> str:
     return "<dl>" + "".join(f"<dt>{escape(label)}</dt><dd>{value}</dd>" for label, value in items) + "</dl>"
 
 
+def _decision(acceptance: Any) -> str:
+    """The projected delivery decision, never relabeled as accepted or not evaluated."""
+    if type(acceptance) is not dict:
+        return "Not recorded"
+    if acceptance.get("source") == "legacy_built_in":
+        return escape(_LEGACY_DECISION)
+    if acceptance.get("decision") is None:
+        return "Not recorded"
+    return _state(acceptance.get("decision"))
+
+
+def _eligibility(eligibility: Any) -> tuple[str, str]:
+    """A short delivery state and its reasons, or Not recorded for older views."""
+    if type(eligibility) is not dict or type(eligibility.get("eligible")) is not bool:
+        return "Not recorded", "Not recorded"
+    if eligibility["eligible"]:
+        return _state("eligible"), "Eligible"
+    reasons = eligibility.get("reasons")
+    reasons = reasons if type(reasons) is list else []
+    text = "; ".join(_ELIGIBILITY_REASONS.get(reason, str(reason)) if isinstance(reason, str)
+                     else str(reason) for reason in reasons)
+    return _state("not_eligible"), escape(text or "Not recorded")
+
+
 def _operation_rows(operations: list[dict]) -> list[list[str]]:
     rows = []
     for operation in operations:
         identity = operation.get("operation_id")
+        delivery, reasons = _eligibility(operation.get("delivery_eligibility"))
         detail = _definitions([
             ("Operation ID", _code(identity)),
             ("Accepted attempt", _code(operation.get("accepted_attempt_id"))),
+            ("Delivery decision", _decision(operation.get("delivery_acceptance"))),
+            ("Delivery eligibility", reasons),
         ])
         specification = _object(operation.get("spec"), "Operation specification")
         detail += _details("Prompt", specification.get("prompt"))
@@ -231,6 +275,7 @@ def _operation_rows(operations: list[dict]) -> list[list[str]]:
         rows.append([
             _code(operation.get("operation_key", identity)), _state(operation.get("status")),
             f'{_number(operation.get("attempt_count"))} / {_number(operation.get("max_attempts"))}',
+            delivery,
             f"<details><summary>Inspect operation</summary>{detail}</details>",
         ])
     return rows
@@ -296,7 +341,8 @@ def render_job_report(payload: dict) -> str:
         parts.append(f'<p class="note">Operation filter: {_code(payload["operation_filter"])}</p>')
     if page.get("has_more") is True:
         parts.append('<p class="note">More operations are available in the next inspection page.</p>')
-    parts.append(_table("Operations in this page", ["Operation", "State", "Attempts / limit", "Record"],
+    parts.append(_table("Operations in this page",
+                        ["Operation", "State", "Attempts / limit", "Delivery", "Record"],
                         _operation_rows(operations), wide="wide") if operations
                  else '<p class="empty">No operations match this inspection page.</p>')
     parts.append('<h3>Attempts</h3><p class="note">Attempt history includes rerolls and parent attempts.</p>')
@@ -313,6 +359,10 @@ def render_job_report(payload: dict) -> str:
         ]) + _details("Attempt response", attempt.get("result_text"))
         if attempt.get("error") is not None:
             detail += _details("Attempt error / acceptance finding", attempt["error"], opened=True)
+        record = attempt.get("delivery_acceptance")
+        if type(record) is dict:
+            detail += _definitions([("Delivery decision", _state(record.get("decision")))])
+            detail += _details("Validator results", record.get("validators"), structured=True)
         rows.append([
             f'Attempt {_number(attempt.get("attempt_number"))}',
             _code(operation_keys.get(attempt.get("operation_id"), attempt.get("operation_id"))),

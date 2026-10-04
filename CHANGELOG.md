@@ -150,6 +150,19 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `rejected`, never an unknown outcome. Manifests without validators keep
   their manifest hash, plan hash, operation IDs and approval tokens. See
   [registered validators](docs/jobs.md#registered-validators).
+- `jobs inspect` reports each attempt's recorded delivery decision, and for
+  each operation a projected `delivery_acceptance` and a derived
+  `delivery_eligibility`: eligible only with an `accepted` record, the
+  validators the plan requires now, and every accepted artifact verified on
+  disk; otherwise it lists reasons such as `artifact_changed` or
+  `validator_changed`. Attempts recorded by earlier releases are projected as
+  a legacy built-in decision with the validator unrecorded, never as accepted
+  or not evaluated. `JobRunner.resume` and `reroll` recheck the SHA-256 of
+  every accepted artifact and return the same fields, so a corrupted accepted
+  file is reported and ineligible. Eligibility is never written back, and
+  recorded statuses and `accepted` flags are unchanged. The HTML report shows
+  it in a Delivery column. See
+  [delivery eligibility](docs/jobs.md#delivery-eligibility).
 
 ### Changed
 

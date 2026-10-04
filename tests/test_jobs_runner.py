@@ -1022,6 +1022,37 @@ def test_runs_refuse_validators_the_runner_has_not_registered(tmp_path, store_fa
     assert resumed["counts"] == {OperationStatus.SUCCEEDED.value: 1}
 
 
+def test_resume_rechecks_accepted_bytes_and_reports_a_corrupted_file(tmp_path, store_factory):
+    plan = preflight_job(_manifest(count=2), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    first = asyncio.run(JobRunner(store).start(plan, make_approval(plan), manifest_root=tmp_path))
+    corrupted, intact = first["artifacts"]
+    path = tmp_path / "outputs" / first["artifact_directory"] / corrupted["relative_path"]
+    path.write_bytes(b"\x00" * corrupted["size_bytes"])
+    before = store.snapshot(first["run_id"], include_events=True)
+    provider = _PricedArtifactProvider([Artifact(PNG_1X1, "image/png")], cost_usd=None)
+
+    resumed = asyncio.run(JobRunner(store, provider_pool=_FixedPool(provider)).resume(first["run_id"]))
+
+    assert provider.calls == 0
+    assert resumed["status"] == RunStatus.COMPLETED.value
+    assert resumed["counts"] == {OperationStatus.SUCCEEDED.value: 2}
+    by_attempt = {op["accepted_attempt_id"]: op for op in resumed["operations"]}
+    assert by_attempt[corrupted["attempt_id"]]["delivery_eligibility"] == {
+        "eligible": False, "reasons": ["artifact_changed"]}
+    assert by_attempt[intact["attempt_id"]]["delivery_eligibility"] == {
+        "eligible": True, "reasons": []}
+    assert resumed["artifact_integrity"]["counts"] == {"changed": 1, "verified": 1}
+    integrity = {item["artifact_id"]: item["integrity"]["status"] for item in resumed["artifacts"]}
+    assert integrity == {corrupted["artifact_id"]: "changed", intact["artifact_id"]: "verified"}
+    # The finding is reported, never written back: recorded acceptance is unchanged.
+    after = store.snapshot(first["run_id"], include_events=True)
+    assert [item["accepted"] for item in after["artifacts"]] == [1, 1]
+    assert after["operations"] == before["operations"] and after["artifacts"] == before["artifacts"]
+    assert not {"call_completed", "artifact_rejected"} & {
+        event["event_type"] for event in after["events"][len(before["events"]):]}
+
+
 def test_slow_artifact_finalizer_does_not_starve_lease_heartbeat(
     tmp_path, monkeypatch
 ):

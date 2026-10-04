@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from smythe.acceptance import ValidationSubject
 from smythe.budget import BudgetValidationError, validate_completion_usage
 from smythe.jobs.artifact_io import (
     MAX_ARTIFACT_BYTES,
@@ -28,12 +29,14 @@ from smythe.jobs.artifact_io import (
 )
 from smythe.jobs.delivery import (
     RESPONSE_PATH,
+    annotate_delivery,
     artifact_spec_identity,
     delivery_record,
     run_validator,
     validator_registry,
     validator_result,
 )
+from smythe.jobs.inspection import check_artifact_integrity
 from smythe.jobs.models import (
     ArtifactSpecV1,
     DEFAULT_CALL_TIMEOUT_S,
@@ -63,7 +66,6 @@ from smythe.jobs.store import (
     RunPauseRequested,
     SQLiteRunStore,
 )
-from smythe.acceptance import ValidationSubject
 from smythe.provider import Artifact, CompletionResult
 from smythe.tools import ChatMessage
 from smythe.validation import ValidationFinding, ValidationReport, ValidatorIdentity, hard_finding
@@ -221,9 +223,10 @@ class JobRunner:
         approval = JobApprovalV1.from_dict(record["approval"])
         verify_approval(plan, approval)
         self._validate_dispatch_inputs(plan, root)
-        return await self._execute_with_lease(
+        result = await self._execute_with_lease(
             run_id, plan, root, recover=True, pause_generation=observed_pause,
         )
+        return await asyncio.to_thread(self._delivery_view, result)
 
     async def reroll(
         self,
@@ -241,13 +244,29 @@ class JobRunner:
         approval = JobApprovalV1.from_dict(record["approval"])
         verify_approval(plan, approval)
         self._validate_dispatch_inputs(plan, root)
-        return await self._execute_with_lease(
+        result = await self._execute_with_lease(
             run_id,
             plan,
             root,
             recover=True,
             reroll=(operation_keys, reason, acknowledge_unknown),
         )
+        return await asyncio.to_thread(self._delivery_view, result)
+
+    def _delivery_view(self, snapshot: dict[str, Any]) -> dict[str, Any]:
+        """Recheck every accepted artifact's bytes and derive delivery eligibility.
+
+        A resumed run's earlier outputs are delivered only if their bytes still
+        match the recorded SHA-256. A changed, missing or unreadable file is
+        reported in ``artifact_integrity`` and makes its operation ineligible;
+        recorded statuses and acceptance flags are never changed.
+        """
+        accepted = [artifact for artifact in snapshot["artifacts"] if artifact["accepted"]]
+        summary = check_artifact_integrity(snapshot, accepted, byte_limit=None)
+        snapshot["artifact_integrity"] = summary | {
+            "scope": "accepted artifact bytes after resume; acceptance is unchanged",
+        }
+        return annotate_delivery(snapshot, self.store.delivery_records(snapshot["run_id"]))
 
     def _preflight(self, manifest: JobManifestV1, root: Path) -> JobPlanV1:
         """Rebuild a stored run's plan with this runner's registered validators."""
