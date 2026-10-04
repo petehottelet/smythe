@@ -369,7 +369,9 @@ journal; it is created with your default file permissions.
   leaves a version 1 journal.
 - Stop workers from earlier releases first. Those workers check the version
   only when they open the journal, so while any run holds an unexpired lease
-  the upgrade raises `WorkflowLeaseError` and changes nothing. A released or
+  the upgrade raises `WorkflowLeaseError` and leaves the journal at version 1
+  with its rows unchanged; the file may already have switched to SQLite's WAL
+  journal mode, which earlier releases also read. A released or
   expired lease, such as one a killed process left, does not block it.
 - A store open for writing checks the version before each write. If another
   release changes the version while the store is open, its next write raises
