@@ -9,7 +9,7 @@ from helpers import FailingProvider
 from smythe.async_executor import AsyncExecutor
 from smythe.budget import Sentinel, SentinelAlert
 from smythe.executor_base import NodeFinalizationError
-from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
+from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Revision, Topology
 from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
 from smythe.supervisor import Supervisor
@@ -752,6 +752,101 @@ async def test_review_that_holds_a_node_never_makes_its_admission_wait_negative(
     assert tracer.timing()["waiting_ms"] == {
         "retry_backoff": 0, "admission": 0, "supervision": review_s * 1000,
     }
+
+
+@pytest.mark.asyncio
+async def test_node_blocked_again_by_a_regeneration_records_no_admission_wait():
+    """The consumer is ready once the judge first answers, then waits on the rerun.
+
+    Slots are free throughout, so the time it spends blocked on the
+    regenerated draft and judge is dependency time, not an admission wait.
+    """
+    clock, tracer = _manual_tracer()
+    calls: list[str] = []
+
+    class FailOnceJudge(ClockedProvider):
+        async def complete(self, system, prompt, model):
+            result = await super().complete(system, prompt, model)
+            label = prompt.split("\n")[0]
+            calls.append(label)
+            if label == "judge":
+                verdict = "FAIL" if calls.count("judge") == 1 else "PASS"
+                return CompletionResult(text=verdict, prompt_tokens=1, completion_tokens=1)
+            return result
+
+    executor = AsyncExecutor(
+        provider=FailOnceJudge(clock, {"draft": 2, "judge": 1, "consumer": 0.5}),
+        registry=Registry(), tracer=tracer, max_concurrency=4,
+    )
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="draft", label="draft"),
+        Node(id="judge", label="judge", depends_on=["draft"], verifies="draft",
+             max_regenerations=1),
+        Node(id="consumer", label="consumer", depends_on=["draft", "judge"]),
+    ])
+
+    await executor.run(graph)
+
+    assert calls == ["draft", "judge", "draft", "judge", "consumer"]
+    timing = tracer.timing()
+    assert timing["elapsed_ms"] == timing["summed_node_ms"] == 6500
+    assert timing["waiting_ms"] == {"retry_backoff": 0, "admission": 0, "supervision": 0}
+    assert timing["phases_ms"]["waiting"] == 0
+
+
+@pytest.mark.asyncio
+async def test_node_rewired_behind_an_inserted_step_records_no_admission_wait():
+    """B is ready after A, then a revision makes it wait for an inserted fix."""
+    clock, tracer = _manual_tracer()
+
+    class InsertFix(Supervisor):
+        async def review(self, graph, node, *, task, revisions_remaining):
+            return Revision(
+                add_nodes=(Node(id="fix", label="Fix", depends_on=["a"]),),
+                rewire={"b": ("fix",)},
+            )
+
+    executor = AsyncExecutor(
+        provider=ClockedProvider(clock, {"A": 1, "Fix": 4, "B": 1}), registry=Registry(),
+        tracer=tracer, supervisor=InsertFix(), max_revisions=1, max_concurrency=4,
+    )
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="a", label="A"), Node(id="b", label="B", depends_on=["a"]),
+    ])
+
+    await executor.run(graph)
+
+    assert [span.node_id for span in tracer.spans if span.phase] == ["a", "fix", "b"]
+    timing = tracer.timing()
+    assert timing["elapsed_ms"] == timing["summed_node_ms"] == 6000
+    assert timing["waiting_ms"] == {"retry_backoff": 0, "admission": 0, "supervision": 0}
+    assert timing["phases_ms"]["waiting"] == 0
+
+
+@pytest.mark.asyncio
+async def test_node_still_ready_after_a_revision_keeps_its_admission_wait():
+    """C waits for the single slot from the start; a revision does not reset that wait."""
+    clock, tracer = _manual_tracer()
+
+    class AddExtra(Supervisor):
+        async def review(self, graph, node, *, task, revisions_remaining):
+            return Revision(add_nodes=(Node(id="extra", label="Extra", depends_on=["a"]),))
+
+    executor = AsyncExecutor(
+        provider=ClockedProvider(clock, {"A": 1, "C": 2, "Extra": 1}), registry=Registry(),
+        tracer=tracer, supervisor=AddExtra(), max_revisions=1, max_concurrency=1,
+    )
+    graph = ExecutionGraph(topology=[Topology.FORK_JOIN], nodes=[
+        Node(id="a", label="A"), Node(id="c", label="C"),
+    ])
+
+    await executor.run(graph)
+
+    assert [span.node_id for span in tracer.spans if span.phase] == ["a", "c", "extra"]
+    timing = tracer.timing()
+    # C waits 1s behind A; Extra, ready at 1s, waits 2s behind C.
+    assert timing["waiting_ms"] == {"retry_backoff": 0, "admission": 3000, "supervision": 0}
+    assert timing["elapsed_ms"] == 4000
 
 
 class SteppingClock:

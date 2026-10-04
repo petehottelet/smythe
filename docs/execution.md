@@ -101,7 +101,7 @@ by hand, reports planning as not measured.
 | Wait | Time measured |
 |---|---|
 | `retry_backoff` | Sleeping before a retry attempt (`retry_backoff_s`) |
-| `admission` | A ready node waiting for a free concurrency slot in the async executor, which runs every parallel run and `execute_async()`, `resume()` and `aresume()`; serial `execute()` has no admission queue |
+| `admission` | A ready node waiting for a free concurrency slot in the async executor, which runs every parallel run and `execute_async()`, `resume()` and `aresume()`; serial `execute()` has no admission queue. When a regeneration or supervisor revision leaves a ready node waiting on new work, its wait starts again when it is next ready |
 | `supervision` | Ready work that a supervisor review kept from starting: in the async executor, ready nodes with a free slot; in serial execution, the next pending node |
 
 Phases and waits are totals. In a parallel run nodes overlap, and checkpoint

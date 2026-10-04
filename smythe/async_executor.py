@@ -222,6 +222,13 @@ class AsyncExecutor(ExecutorBase):
                         (
                             pending, resolved, dependents, unresolved, ready, order,
                         ) = self._schedule_state(graph, active)
+                        # A node the change made unready again was blocked on
+                        # new work, not on a slot: its wait restarts when it
+                        # is next ready. Nodes still ready keep theirs.
+                        ready_ids = {waiting.id for waiting in ready}
+                        for stale in (ready_at.keys() | held_s.keys()) - ready_ids:
+                            ready_at.pop(stale, None)
+                            held_s.pop(stale, None)
                         now = self._tracer.now()
                         for waiting in ready:
                             ready_at.setdefault(waiting.id, now)
