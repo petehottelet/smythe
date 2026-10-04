@@ -240,7 +240,7 @@ def test_start_refuses_a_used_approval_before_any_provider_call(tmp_path, store_
     assert provider.calls > calls
     created = store.snapshot("second", include_events=True)["events"][0]
     assert created["event_type"] == "run_created"
-    assert created["payload"]["approval_reuse"] == {"prior_run_ids": ["first"]}
+    assert created["payload"]["approval_reuse"] == {"prior_run_count": 1, "prior_run_ids": ["first"]}
 
 
 def test_reroll_records_its_reason_on_the_new_attempt(tmp_path, store_factory):

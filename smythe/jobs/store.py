@@ -639,11 +639,15 @@ class SQLiteRunStore:
                     shown = ("runs " if len(prior) > 1 else "run ") + shown
                 raise ApprovalError(
                     f"approval token already created {shown}; continue with "
-                    f"'smythe jobs resume {prior[-1]}', or acknowledge approval reuse "
+                    f"'smythe jobs resume {prior[-1]}' on this Jobs database (the same "
+                    "--store), or acknowledge approval reuse "
                     "(jobs run --new-run, allow_approval_reuse=True) to start another run"
                 )
             if prior:
-                created = created | {"approval_reuse": {"prior_run_ids": prior}}
+                # Bounded, so repeated acknowledged reuse does not grow each event.
+                created = created | {"approval_reuse": {
+                    "prior_run_count": len(prior), "prior_run_ids": prior[-5:],
+                }}
             cursor.execute(
                 """
                 INSERT INTO runs (

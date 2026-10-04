@@ -127,11 +127,25 @@ def test_acknowledged_approval_reuse_records_the_earlier_runs(tmp_path, store_fa
 
     first = _created_payload(store, "first")
     assert "approval_reuse" not in first
-    assert _created_payload(store, "second")["approval_reuse"] == {"prior_run_ids": ["first"]}
+    assert _created_payload(store, "second")["approval_reuse"] == {
+        "prior_run_count": 1, "prior_run_ids": ["first"],
+    }
     third = _created_payload(store, "third")
-    assert third.pop("approval_reuse") == {"prior_run_ids": ["first", "second"]}
+    assert third.pop("approval_reuse") == {"prior_run_count": 2, "prior_run_ids": ["first", "second"]}
     assert third == first
     assert sorted(run["run_id"] for run in store.list_runs()) == ["first", "second", "third"]
+
+
+def test_reuse_record_keeps_the_five_latest_earlier_runs_and_a_count(tmp_path, store_factory):
+    plan, approval = _plan(tmp_path, provider="offline")
+    store = store_factory(tmp_path / "jobs.db")
+    run_ids = [f"run-{index}" for index in range(8)]
+    for run_id in run_ids:
+        store.create_run(plan, approval, manifest_root=tmp_path, run_id=run_id, allow_approval_reuse=True)
+
+    assert _created_payload(store, "run-7")["approval_reuse"] == {
+        "prior_run_count": 7, "prior_run_ids": run_ids[2:7],
+    }
 
 
 def test_refusal_names_at_most_the_five_latest_runs(tmp_path, store_factory):

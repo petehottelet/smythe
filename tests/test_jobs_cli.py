@@ -211,7 +211,7 @@ def test_run_refuses_a_used_approval_unless_a_new_run_is_requested(tmp_path, cap
     assert main(["jobs", "status", second["run_id"], "--events", "--store", str(store), "--json"]) == EXIT_OK
     created = _json_output(capsys)["status"]["events"][0]
     assert created["event_type"] == "run_created"
-    assert created["payload"]["approval_reuse"] == {"prior_run_ids": [first]}
+    assert created["payload"]["approval_reuse"] == {"prior_run_count": 1, "prior_run_ids": [first]}
 
     with pytest.raises(SystemExit):
         main(["jobs", "run", "--help"])

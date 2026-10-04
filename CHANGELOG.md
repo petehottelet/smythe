@@ -100,7 +100,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   instead of starting another run with the full ceiling. `--new-run`, or
   `allow_approval_reuse=True` on `SQLiteRunStore.create_run` and
   `JobRunner.start`, starts another run on purpose, and that run's
-  `run_created` event records the earlier run IDs under `approval_reuse`.
+  `run_created` event records how many earlier runs used the token and the
+  five most recent run IDs under `approval_reuse`.
   Token derivation, plan hashes and the Jobs schema are unchanged.
 
 ### Fixed
