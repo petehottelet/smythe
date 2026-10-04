@@ -314,11 +314,16 @@ class Swarm:
         """Generate and assign an execution graph without running it.
 
         Returns the graph so you can inspect the architect's decisions
-        before committing to execution.
+        before committing to execution. Under ``max_budget_usd``, a provider
+        without the per-call ceiling it requires for the nodes' model does
+        not stop planning: set each node's ``metadata["estimated_cost_usd"]``
+        before ``execute(graph)``, which checks every node before its first
+        call. An ``LLM_MERGE`` synthesis, which no node estimate covers, is
+        still refused before planning.
         """
         if self._run_store is not None:
             return asyncio.run(self._workflow_runtime().plan(task))
-        return self._plan(task, Tracer())
+        return self._plan(task, Tracer(), executing=False)
 
     def _plan_for_execution(self, task: Task, tracer: Tracer) -> ExecutionGraph:
         """Plan *task* for execute(); a subclass's plan() stays authoritative."""
@@ -355,13 +360,17 @@ class Swarm:
         if check is not None:
             check(provider=self._provider, model=self.model, max_budget_usd=max_budget_usd)
 
-    def _check_planning_support(self) -> None:
+    def _check_planning_support(self, *, executing: bool) -> None:
         """Reject, before routing or planning, a run its provider cannot serve.
 
         A model-generated plan cannot set a node's model or cost estimate, so
         when every plan comes from ``LLMArchitect`` the run's model is every
         node's model and is checked now. Other architects build nodes in code
         and may set both, so their nodes are checked once the plan exists.
+
+        The run's missing cost ceiling is refused only when *executing*: a
+        caller of plan() can still set each returned node's estimate, which
+        the node check before the first call accepts in its place.
         """
         self._check_run_support()
         if self._router is None:
@@ -372,7 +381,7 @@ class Swarm:
             architects = ()
         if architects and all(type(item) is LLMArchitect for item in architects):
             check_provider_support(self._provider, str(self.model), node_id=None,
-                                   max_budget_usd=self.max_budget_usd)
+                                   max_budget_usd=self.max_budget_usd if executing else None)
 
     def _check_dispatch_support(self, graph: ExecutionGraph, budget: Sentinel) -> None:
         """Reject, before any node runs, nodes or a synthesis the provider cannot serve."""
@@ -380,10 +389,13 @@ class Swarm:
                             tools=self._tool_runtime is not None)
         self._check_synthesis_support(budget.max_budget_usd)
 
-    def _plan(self, task: Task, tracer: Tracer) -> ExecutionGraph:
-        """Plan *task*, measuring routing and planning on *tracer*."""
+    def _plan(self, task: Task, tracer: Tracer, *, executing: bool = True) -> ExecutionGraph:
+        """Plan *task*, measuring routing and planning on *tracer*.
+
+        *executing* is False for plan(), whose caller sees the graph first.
+        """
         Sentinel(self.max_budget_usd)
-        self._check_planning_support()
+        self._check_planning_support(executing=executing)
         task = snapshot_task(task)
         started = tracer.now()
         architect = self._select_architect(snapshot_task(task))
@@ -397,12 +409,12 @@ class Swarm:
         """Async variant of plan() — safe to call from a running event loop."""
         if self._run_store is not None:
             return await self._workflow_runtime().plan(task)
-        return await self._aplan(task, Tracer())
+        return await self._aplan(task, Tracer(), executing=False)
 
-    async def _aplan(self, task: Task, tracer: Tracer) -> ExecutionGraph:
+    async def _aplan(self, task: Task, tracer: Tracer, *, executing: bool = True) -> ExecutionGraph:
         """Async _plan()."""
         Sentinel(self.max_budget_usd)
-        self._check_planning_support()
+        self._check_planning_support(executing=executing)
         task = snapshot_task(task)
         started = tracer.now()
         architect = await self._aselect_architect(snapshot_task(task))

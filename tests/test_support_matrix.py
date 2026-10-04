@@ -474,10 +474,14 @@ def enter(swarm, entry, graph):
         return asyncio.run(swarm.aplan(Task("Report")))
     if entry == "graph":
         return swarm.execute(graph)
+    if entry == "execute-async":
+        return asyncio.run(swarm.execute_async(Task("Report")))
     return swarm.execute(Task("Report"))
 
 
 ENTRIES = ["plan", "aplan", "execute", "execute-parallel", "graph"]
+# The entries that run what they plan; plan() and aplan() return the graph first.
+RUN_ENTRIES = ["execute", "execute-async", "execute-parallel", "graph"]
 
 
 def two_step_graph(**review):
@@ -488,7 +492,7 @@ def two_step_graph(**review):
     ])
 
 
-@pytest.mark.parametrize("entry", ENTRIES)
+@pytest.mark.parametrize("entry", RUN_ENTRIES)
 @pytest.mark.parametrize("make_provider,model", [
     pytest.param(lambda: OpenAIImageProvider(api_key="test-key"), "gpt-image-1", id="openai-image"),
     pytest.param(lambda: GeminiProvider(api_key="test-key"), "gemini-3.1-flash-image", id="gemini-image"),
@@ -510,6 +514,38 @@ def test_ordinary_run_rejects_a_missing_cost_ceiling_before_any_call(monkeypatch
         assert caught.value.node_id == "review"
     else:
         assert caught.value.node_id is None and "generated plan" in str(caught.value)
+        assert "estimated_cost_usd" in str(caught.value)
+
+
+@pytest.mark.parametrize("entry", ["plan", "aplan"])
+def test_plan_returns_a_graph_whose_node_estimates_stand_in_for_a_missing_ceiling(monkeypatch, entry):
+    transport = MessagesTransport().install(monkeypatch)
+    swarm = Swarm(model=FABLE, provider=AnthropicMessagesProvider(api_key="test-key"), max_budget_usd=1,
+                  artifact_dir=None)
+    # Planning and running in one call gives no chance to set estimates, so
+    # it is refused before any request.
+    with pytest.raises(BudgetEstimateRequired) as caught:
+        swarm.execute(Task("Report"))
+    assert caught.value.node_id is None and transport.log == [] and transport.clients == []
+
+    graph = enter(swarm, entry, None)
+    assert [record.phase for record in transport.log] == ["planning"]
+    # Each node is checked before the first node call, and the refusal names
+    # the remedy.
+    with pytest.raises(BudgetEstimateRequired, match="estimated_cost_usd") as caught:
+        swarm.execute(graph)
+    assert caught.value.node_id == graph.nodes[0].id
+    assert [record.phase for record in transport.log] == ["planning"]
+
+    for node in graph.nodes:
+        node.metadata["estimated_cost_usd"] = 0.5
+    result = swarm.execute(graph) if entry == "plan" else asyncio.run(swarm.execute_async(graph))
+    assert result.output == "Draft accepted output."
+    assert [(record.phase, record.outcome) for record in transport.log] == [
+        ("planning", "delivered"), ("execution", "delivered"), ("execution", "delivered"),
+    ]
+    assert result.total_cost_usd == pytest.approx(0.00507)
+    assert result.cost_is_complete and not result.cost_contains_estimates
 
 
 def test_ordinary_run_checks_a_routed_plan_before_the_classifier_call(monkeypatch):
@@ -642,15 +678,16 @@ def test_a_plan_refused_before_its_nodes_resumes_without_planning_again(tmp_path
     assert planner.calls == 1 and worker.calls == [FABLE, FABLE] and calls == []
 
 
-@pytest.mark.parametrize("entry", ["planned", "graph"])
+@pytest.mark.parametrize("entry", ["planned", "plan", "graph"])
 def test_ordinary_run_rejects_a_model_its_provider_does_not_support_before_any_call(monkeypatch, entry):
     planner = PlanOnly({"topology": ["serial"], "nodes": [{"id": "draft", "label": "Draft"}]})
     calls = forbid_provider_calls(monkeypatch)
     provider = OpenAIResponsesProvider(api_key="test-key", max_cost_per_call_usd=0.5)
-    if entry == "planned":
+    if entry in ("planned", "plan"):
+        # plan() refuses it too: no estimate on the returned graph could fix it.
         swarm = Swarm(model="gpt-4o", provider=provider, planning_provider=planner, artifact_dir=None)
         with pytest.raises(ValueError, match="does not support model 'gpt-4o'"):
-            swarm.execute(Task("Report"))
+            swarm.execute(Task("Report")) if entry == "planned" else swarm.plan(Task("Report"))
     else:
         swarm = Swarm(model="gpt-6-astra", provider=provider, artifact_dir=None)
         graph = two_step_graph(metadata={"model": "gpt-4o"})

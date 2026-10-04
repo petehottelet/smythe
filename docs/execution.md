@@ -80,7 +80,19 @@ router or architect is called:
 - When every plan comes from `LLMArchitect`, directly or through a
   `WhiteRabbit` whose tiers are all `LLMArchitect`, every planned node uses
   the run's model, because a generated plan cannot set a node's model or
-  estimate. That model then needs the same ceiling and support.
+  estimate. That model then needs the provider's support and, for
+  `execute(Task)` and `execute_async(Task)`, the same ceiling.
+
+`plan()` and `aplan()` refuse before planning only what no estimate on the
+returned graph can fix: a tool runtime, which every node is offered, an
+`LLM_MERGE` synthesis, whose ceiling can come only from the provider, and,
+when `LLMArchitect` plans, a run model the provider does not accept. A
+missing ceiling for the run's model is not refused there. Set
+`metadata["estimated_cost_usd"]` on each node of the returned graph and call
+`execute(graph)`, which accepts a node's estimate in place of the provider's
+ceiling. `execute(Task)` and `execute_async(Task)` plan and run in one call,
+leaving no chance to set estimates, so they refuse the missing ceiling before
+routing or planning.
 
 Before the first node call, `execute()`, `execute_async()` and `resume()`
 check each node that has not completed or been skipped: its model, its
@@ -92,7 +104,8 @@ checkpoint like any other failure, so a Swarm with a suitable provider can
 resume a paid plan without planning again.
 
 A missing ceiling raises `BudgetEstimateRequired`. Its `node_id` is `None`
-when a generated plan's model was refused before planning,
+when `execute(Task)` or `execute_async(Task)` refused a generated plan's
+model before planning,
 `"__synthesis__"` (`smythe.graph.SYNTHESIS_NODE_ID`) when an `LLM_MERGE`
 synthesis was refused, and otherwise the refused node's id. Other
 mismatches raise `ValueError`. Only a feature declared unsupported is

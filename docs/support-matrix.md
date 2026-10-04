@@ -118,9 +118,10 @@ Each path keeps money in its own unit:
   `AnthropicMessagesProvider` and image-model `GeminiProvider` calls need
   `max_cost_per_call_usd`, or a node's own `estimated_cost_usd`. Without
   either, the run raises `BudgetEstimateRequired` before any provider call:
-  before routing or planning when `LLMArchitect` plans the run or an
-  `LLM_MERGE` synthesis needs the ceiling, and before the first node call
-  otherwise. See [cost guardrails](budgets.md).
+  before routing or planning when `execute(Task)` has `LLMArchitect` plan
+  the run or an `LLM_MERGE` synthesis needs the ceiling, and before the
+  first node call otherwise. `plan()` returns a generated plan whose nodes
+  can then be given estimates. See [cost guardrails](budgets.md).
   The native providers, `OpenAIResponsesProvider` and
   `AnthropicMessagesProvider`, record an unresolved bill as unknown and keep
   its reservation. The other providers' token-priced costs lose their
@@ -194,7 +195,9 @@ Tests:
   refused before any provider call, planning included,
   `tests/test_support_matrix.py::test_ordinary_run_rejects_a_missing_cost_ceiling_before_any_call`,
   `tests/test_support_matrix.py::test_ordinary_run_checks_a_routed_plan_before_the_classifier_call`
-  and `tests/test_support_matrix.py::test_ordinary_run_rejects_an_llm_merge_it_cannot_budget_before_any_call`.
+  and `tests/test_support_matrix.py::test_ordinary_run_rejects_an_llm_merge_it_cannot_budget_before_any_call`;
+  planned first and run with node estimates,
+  `tests/test_support_matrix.py::test_plan_returns_a_graph_whose_node_estimates_stand_in_for_a_missing_ceiling`.
 - SDK retries: `tests/test_support_matrix.py::test_legacy_provider_clients_leave_retries_to_the_sdk_configuration`,
   `tests/test_support_matrix.py::test_native_providers_refuse_a_client_with_sdk_retries`,
   `tests/test_jobs_runtime_support.py::test_durable_openai_pool_disables_sdk_retries_and_sets_timeout`.

@@ -87,9 +87,10 @@ class BudgetEstimateRequired(PicklableError, ValueError):
     execution fails closed until the caller supplies an inclusive per-call
     ceiling on the provider or node.  ``node_id`` is None when a generated
     plan's model is rejected before planning: its nodes all use the run's
-    model and cannot carry their own estimate.  A rejected ``LLM_MERGE``
-    synthesis, including one rejected before planning, has
-    ``SYNTHESIS_NODE_ID``; any other rejection names its node.
+    model, and a plan gets no estimates unless the caller plans first and
+    sets them.  A rejected ``LLM_MERGE`` synthesis, including one rejected
+    before planning, has ``SYNTHESIS_NODE_ID``; any other rejection names
+    its node.
     """
 
     def __init__(self, node_id: str | None, model: str, provider: str) -> None:
@@ -100,7 +101,8 @@ class BudgetEstimateRequired(PicklableError, ValueError):
             super().__init__(
                 f"Cannot enforce max_budget_usd for a generated plan: {provider} has no "
                 f"inclusive cost ceiling for model {model!r}. Configure "
-                "max_cost_per_call_usd on the provider."
+                "max_cost_per_call_usd on the provider, or call plan(), set "
+                "node.metadata['estimated_cost_usd'] on each node and execute the graph."
             )
             return
         super().__init__(

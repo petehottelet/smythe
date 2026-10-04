@@ -42,10 +42,14 @@ inclusive `max_cost_per_call_usd` on the provider, or a node's own
 `requires_explicit_budget_estimate()`.
 
 An ordinary Swarm checks this before it pays for anything and raises
-`BudgetEstimateRequired`. When `LLMArchitect` plans the run, every generated
-node uses the run's model and cannot carry its own estimate, so the check
-runs before routing or planning, as it does for an `LLM_MERGE` synthesis.
-Other graphs are checked node by node before the first node call. See
+`BudgetEstimateRequired`. A generated plan cannot give a node its own
+estimate, so when `execute(Task)` or `execute_async(Task)` has
+`LLMArchitect` plan the run, the check runs before routing or planning, as
+it does for an `LLM_MERGE` synthesis, whose ceiling only the provider can
+supply. `plan()` and `aplan()` still return a generated plan: planning is
+outside the ledger, and you can set `metadata["estimated_cost_usd"]` on each
+node of the returned graph before calling `execute(graph)`. Every graph is
+checked node by node before the first node call. See
 [provider checks](execution.md#provider-checks-before-any-call).
 
 ## Money units
