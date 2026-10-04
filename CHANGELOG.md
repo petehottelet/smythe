@@ -42,6 +42,41 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   produce, is refused before any provider call, and runs an ordinary `Swarm`
   with `AnthropicMessagesProvider`. A repository test checks that every test
   the page cites exists.
+- `Provider.feature_support(model)` returns a `ProviderFeatures` declaring
+  whether the provider accepts a model, writes text, calls tools, takes image
+  attachments, returns images and needs a per-call cost ceiling under
+  `max_budget_usd`. Each built-in provider declares its features; the native
+  providers take their models from `workflow_descriptor()`. A custom
+  provider, or a subclass that replaces a built-in provider's `chat()`,
+  declares nothing unless it overrides the method, and runs as before. An
+  ordinary `Swarm` checks the declaration before any provider call: a
+  `tool_runtime` its provider cannot serve and an `LLM_MERGE` synthesis
+  before routing or planning; the run's model too, before planning, when
+  `LLMArchitect` plans the run; and every unfinished node's model, image
+  inputs and ceiling before the first node call, including on resume.
+  `Synthesizer.check_merge_support()` performs the synthesis check.
+
+### Changed
+
+- An ordinary `Swarm` without a per-call cost ceiling that its provider
+  requires under `max_budget_usd` raises `BudgetEstimateRequired` before
+  routing or planning when `LLMArchitect` plans the run or an `LLM_MERGE`
+  synthesis needs the ceiling, and otherwise before the first node call. It
+  used to be raised when a node or the synthesis reserved its budget, after
+  planning and any earlier nodes had been paid for. Raised before planning,
+  its `node_id` is `None`.
+- An ordinary `Swarm` raises `ValueError` before any provider call for a
+  `tool_runtime` with `OfflineProvider`, `OpenAIImageProvider` or
+  `AnthropicMessagesProvider`, for `attach_dep_artifacts` on
+  `OpenAIImageProvider`, `OpenAIResponsesProvider` or
+  `AnthropicMessagesProvider`, and for a node model those providers do not
+  accept. These failed when a node made its call, after planning and earlier
+  nodes. Such a run used to succeed when no node was offered a tool or no
+  dependency produced an image; it is now refused.
+- A durable run's `WorkflowBindingError` names the argument it refuses:
+  `run_store` and `verifier`, with the type that was passed, `memory`,
+  `tool_runtime` or `checkpoint_store`. One message used to cover memory,
+  tools and the checkpoint store. The exception is still a `ValueError`.
 - Elapsed-time records for ordinary runs. `SwarmResult.timing` reports a
   call's elapsed time on a monotonic clock beside its summed node time, the
   time spent in routing, planning, recovery, execution, verification,

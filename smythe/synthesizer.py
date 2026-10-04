@@ -11,6 +11,7 @@ from typing import Any
 from smythe.budget import (
     BudgetEstimateRequired, BudgetValidationError, Sentinel, validate_completion_usage,
 )
+from smythe.executor_base import check_provider_support
 from smythe.graph import SYNTHESIS_NODE_ID, ExecutionGraph, Node, NodeStatus
 from smythe.provider import (
     Provider, ProviderResponseError, _native_receipt, _native_response_errors,
@@ -99,6 +100,30 @@ class Synthesizer:
             value is not None for value in (provider, model, budget, tracer)
         ):
             raise WorkflowBindingError("Bound synthesis does not accept call-time runtime overrides")
+
+    def check_merge_support(
+        self,
+        *,
+        provider: Provider | None = None,
+        model: str | None = None,
+        max_budget_usd: float | None = None,
+    ) -> None:
+        """Raise now what an ``LLM_MERGE`` call would raise for this configuration.
+
+        Resolves the provider and model as the merge does. With
+        *max_budget_usd* set, a provider that requires an inclusive per-call
+        ceiling and has none raises ``BudgetEstimateRequired``; a model the
+        provider declares unsupported raises ``ValueError``. Other strategies
+        make no call and never raise. An ordinary ``Swarm`` calls this before
+        planning and before its first node call.
+        """
+        resolved_provider = provider or self._provider
+        if (self._strategy is not SynthesisStrategy.LLM_MERGE or self._run_binding is not None
+                or resolved_provider is None):
+            return
+        resolved_model = model if model is not None else self._model
+        check_provider_support(resolved_provider, resolved_model or "", node_id=SYNTHESIS_NODE_ID,
+                               max_budget_usd=max_budget_usd)
 
     def synthesize(
         self,

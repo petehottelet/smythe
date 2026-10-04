@@ -27,6 +27,8 @@ from smythe.executor import Executor
 from smythe.executor_base import (
     DEFAULT_MAX_TOOL_ITERATIONS,
     ExecutorBase,
+    check_pending_nodes,
+    check_provider_support,
     validate_max_concurrency,
     validate_max_revisions,
     validate_retry_backoff_s,
@@ -266,6 +268,9 @@ class Swarm:
     def _plan_for_execution(self, task: Task, tracer: Tracer) -> ExecutionGraph:
         """Plan *task* for execute(); a subclass's plan() stays authoritative."""
         if type(self).plan is not Swarm.plan:
+            # How the subclass plans is its own; its nodes are checked once
+            # the plan exists.
+            self._check_run_support()
             with tracer.phase("planning"):
                 return self.plan(task)
         return self._plan(task, tracer)
@@ -273,13 +278,57 @@ class Swarm:
     async def _aplan_for_execution(self, task: Task, tracer: Tracer) -> ExecutionGraph:
         """Async _plan_for_execution(); a subclass's aplan() stays authoritative."""
         if type(self).aplan is not Swarm.aplan:
+            self._check_run_support()
             with tracer.phase("planning"):
                 return await self.aplan(task)
         return await self._aplan(task, tracer)
 
+    def _check_run_support(self) -> None:
+        """Reject a run its provider cannot serve, whatever its plan will contain.
+
+        A tool runtime offers tools to every node, and an ``LLM_MERGE``
+        synthesis calls the run's model, so both are known before any plan.
+        """
+        if self._tool_runtime is not None:
+            check_provider_support(self._provider, str(self.model), node_id=None,
+                                   check_model=False, tools=True)
+        self._check_synthesis_support(self.max_budget_usd)
+
+    def _check_synthesis_support(self, max_budget_usd: float | None) -> None:
+        # A synthesizer that is not a Synthesizer has no merge to check.
+        check = getattr(self._synthesizer, "check_merge_support", None)
+        if check is not None:
+            check(provider=self._provider, model=self.model, max_budget_usd=max_budget_usd)
+
+    def _check_planning_support(self) -> None:
+        """Reject, before routing or planning, a run its provider cannot serve.
+
+        A model-generated plan cannot set a node's model or cost estimate, so
+        when every plan comes from ``LLMArchitect`` the run's model is every
+        node's model and is checked now. Other architects build nodes in code
+        and may set both, so their nodes are checked once the plan exists.
+        """
+        self._check_run_support()
+        if self._router is None:
+            architects = (self._architect,)
+        elif type(self._router) is WhiteRabbit:
+            architects = self._router._architects()
+        else:
+            architects = ()
+        if architects and all(type(item) is LLMArchitect for item in architects):
+            check_provider_support(self._provider, str(self.model), node_id=None,
+                                   max_budget_usd=self.max_budget_usd)
+
+    def _check_dispatch_support(self, graph: ExecutionGraph, budget: Sentinel) -> None:
+        """Reject, before any node runs, nodes or a synthesis the provider cannot serve."""
+        check_pending_nodes(self._provider, graph, max_budget_usd=budget.max_budget_usd,
+                            tools=self._tool_runtime is not None)
+        self._check_synthesis_support(budget.max_budget_usd)
+
     def _plan(self, task: Task, tracer: Tracer) -> ExecutionGraph:
         """Plan *task*, measuring routing and planning on *tracer*."""
         Sentinel(self.max_budget_usd)
+        self._check_planning_support()
         task = snapshot_task(task)
         started = tracer.now()
         architect = self._select_architect(snapshot_task(task))
@@ -298,6 +347,7 @@ class Swarm:
     async def _aplan(self, task: Task, tracer: Tracer) -> ExecutionGraph:
         """Async _plan()."""
         Sentinel(self.max_budget_usd)
+        self._check_planning_support()
         task = snapshot_task(task)
         started = tracer.now()
         architect = await self._aselect_architect(snapshot_task(task))
@@ -414,6 +464,7 @@ class Swarm:
         )
         self._active_executor = executor
         try:
+            self._check_dispatch_support(graph, budget)
             graph = await executor.run(graph)
             with tracer.phase("synthesis"):
                 output = await self._synthesizer.asynthesize(
@@ -491,6 +542,7 @@ class Swarm:
         )
         self._active_executor = executor
         try:
+            self._check_dispatch_support(graph, budget)
             graph = executor.run(graph)
             with tracer.phase("synthesis"):
                 output = self._synthesizer.synthesize(
@@ -755,6 +807,7 @@ class Swarm:
         self._active_executor = executor
         tracer.add_phase("recovery", tracer.since(recovery_started))
         try:
+            self._check_dispatch_support(graph, budget)
             graph = await executor.run(graph)
             with tracer.phase("synthesis"):
                 output = await self._synthesizer.asynthesize(

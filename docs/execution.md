@@ -66,6 +66,37 @@ when it is constructed and raises `ValueError`. A durable Swarm applies the
 durable run's stricter rules, which also require an integer concurrency cap, at
 each `plan`, `execute`, or `resume` call and raises `WorkflowBindingError`.
 
+## Provider checks before any call
+
+An ordinary Swarm also checks what its provider declares through
+`Provider.feature_support(model)` before it pays for anything. `plan()`,
+`aplan()`, `execute()` and `execute_async()` make these checks before the
+router or architect is called:
+
+- A `tool_runtime` needs a provider that can call tools.
+- An `LLM_MERGE` synthesizer, which calls the run's model after every node
+  finishes, needs the per-call ceiling a capped call to that model requires
+  and a model the provider accepts.
+- When every plan comes from `LLMArchitect`, directly or through a
+  `WhiteRabbit` whose tiers are all `LLMArchitect`, every planned node uses
+  the run's model, because a generated plan cannot set a node's model or
+  estimate. That model then needs the same ceiling and support.
+
+Before the first node call, `execute()`, `execute_async()` and `resume()`
+check each node that has not completed or been skipped: its model, its
+`attach_dep_artifacts` against a provider that cannot take image inputs, and
+its ceiling. This covers caller-built and YAML graphs, plans that other
+architects or an overridden `plan()` produce, and generated plans that ask
+for image inputs. With a `checkpoint_store`, a rejection here saves a failed
+checkpoint like any other failure, so a Swarm with a suitable provider can
+resume a paid plan without planning again.
+
+A missing ceiling raises `BudgetEstimateRequired`; its `node_id` is `None`
+when the run was refused before planning. Other mismatches raise
+`ValueError`. Only a feature declared unsupported is refused: custom
+providers declare nothing by default and run as before. See the
+[support matrix](support-matrix.md) for each provider's declaration.
+
 ## Timing
 
 `SwarmResult.timing` reports where a call's time went. Durations come from a

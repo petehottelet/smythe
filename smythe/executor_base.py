@@ -24,8 +24,9 @@ from smythe.budget import (
 )
 from smythe.graph import ExecutionGraph, Node, NodeStatus, RevisionError
 from smythe.provider import (
-    CompletionResult, Provider, ProviderResponseError, _native_receipt, _raise_if_incomplete,
-    _settle_response_error, _native_response_errors, _settle_response_group,
+    CompletionResult, Provider, ProviderResponseError, _declared_features, _missing_cost_ceiling,
+    _native_receipt, _raise_if_incomplete, _settle_response_error, _native_response_errors,
+    _settle_response_group,
 )
 from smythe.registry import Registry
 from smythe.task import render_task, snapshot_task
@@ -87,6 +88,53 @@ def validate_max_concurrency(value: int | None) -> int | None:
     if value is not None and value < 1:
         raise ValueError(f"max_concurrency must be >= 1, got {value}")
     return value
+
+
+def check_provider_support(
+    provider: Provider, model: str, *, node_id: str | None, max_budget_usd: float | None = None,
+    estimate: object = None, check_model: bool = True, tools: bool = False,
+    attachments: bool = False,
+) -> None:
+    """Raise, before any call, what calling *model* would raise for this configuration.
+
+    *node_id* names the node making the call, or is None for every node of
+    a generated plan. With *max_budget_usd* set and no *estimate*, a provider
+    that requires an inclusive per-call ceiling and has none raises
+    ``BudgetEstimateRequired``, as the executor would when it reserves the
+    node's budget. A model (when *check_model*), tool calling or image
+    attachments the provider declares unsupported raise ``ValueError``; a
+    feature it does not declare never raises.
+    """
+    name = type(provider).__name__
+    if max_budget_usd is not None and estimate is None and _missing_cost_ceiling(provider, model):
+        raise BudgetEstimateRequired(node_id, model, name)
+    features = _declared_features(provider, model)
+    if check_model and features.model_supported is False:
+        where = "a generated plan's nodes" if node_id is None else f"node {node_id!r}"
+        raise ValueError(f"{name} does not support model {model!r}, which {where} would use")
+    if tools and features.tools is False:
+        raise ValueError(
+            f"tool_runtime needs a provider that can call tools; {name} cannot with model {model!r}"
+        )
+    if attachments and features.attachments is False:
+        raise ValueError(
+            f"attach_dep_artifacts on node {node_id!r} needs a provider that accepts image "
+            f"attachments; {name} does not with model {model!r}"
+        )
+
+
+def check_pending_nodes(
+    provider: Provider, graph: ExecutionGraph, *, max_budget_usd: float | None, tools: bool,
+) -> None:
+    """Check every node that has not completed or been skipped, before any of them runs."""
+    for node in graph.nodes:
+        if node.status in (NodeStatus.COMPLETED, NodeStatus.SKIPPED):
+            continue
+        check_provider_support(
+            provider, str(node.metadata.get("model", "")), node_id=node.id,
+            max_budget_usd=max_budget_usd, estimate=node.metadata.get("estimated_cost_usd"),
+            tools=tools, attachments=node.attach_dep_artifacts,
+        )
 
 
 class NodeFinalizationError(PicklableError, RuntimeError):

@@ -85,13 +85,22 @@ class BudgetEstimateRequired(PicklableError, ValueError):
     Image APIs charge on dimensions, quality, inputs, and outputs.  A generic
     token estimate is not a defensible reservation for them, so hard-budget
     execution fails closed until the caller supplies an inclusive per-call
-    ceiling on the provider or node.
+    ceiling on the provider or node.  ``node_id`` is None when a run is
+    rejected before planning: a generated plan's nodes all use the run's
+    model and cannot carry their own estimate.
     """
 
-    def __init__(self, node_id: str, model: str, provider: str) -> None:
+    def __init__(self, node_id: str | None, model: str, provider: str) -> None:
         self.node_id = node_id
         self.model = model
         self.provider = provider
+        if node_id is None:
+            super().__init__(
+                f"Cannot enforce max_budget_usd for a generated plan: {provider} has no "
+                f"inclusive cost ceiling for model {model!r}. Configure "
+                "max_cost_per_call_usd on the provider."
+            )
+            return
         super().__init__(
             f"Cannot enforce max_budget_usd for node {node_id!r}: "
             f"{provider} has no inclusive cost ceiling for model {model!r}. "

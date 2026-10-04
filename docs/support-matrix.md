@@ -15,26 +15,55 @@ that exercises it, and each refusal names a test that shows when it happens.
 
 | Provider | Text | Tools | Image inputs | Image output |
 |---|---|---|---|---|
-| `OfflineProvider` | Yes | No | Acknowledged in the text only | 1x1 PNGs with `artifacts_per_call` |
+| `OfflineProvider` | Yes | Rejected before planning | Acknowledged in the text only | 1x1 PNGs with `artifacts_per_call` |
 | `AnthropicProvider` | Yes | Yes | Yes | No |
 | `OpenAIProvider` | Yes | Yes, non-strict | Yes, as data URLs | No |
-| `OpenAIImageProvider` | Prompts only | Rejected | Rejected | Yes |
+| `OpenAIImageProvider` | Prompts to `gpt-image-*` models only | Rejected before planning | Rejected before node calls | Yes |
 | `GeminiProvider` | Yes | Yes | Yes | Image models, or explicit `response_modalities` |
-| `OpenAIResponsesProvider` | `gpt-6-astra`, `gpt-5.6-sol` | Yes, non-strict | Rejected | No |
-| `AnthropicMessagesProvider` | `claude-fable-5-1` | Rejected | Rejected | No |
+| `OpenAIResponsesProvider` | `gpt-6-astra`, `gpt-5.6-sol` | Yes, non-strict | Rejected before node calls | No |
+| `AnthropicMessagesProvider` | `claude-fable-5-1` | Rejected before planning | Rejected before node calls | No |
 | Custom `Provider` | Yes, through `complete()` | Only if it overrides `chat()` | Only if it overrides `chat()` | If it returns `artifacts` |
 
 No provider supports structured output or streaming. Planners ask for JSON
 and parse it from the reply text. Test:
 `tests/test_support_matrix.py::test_no_provider_offers_structured_output_or_streaming`.
 
-Ordinary runs check these features when a node calls its provider, after
-planning, so a model-generated plan has already been paid for. "Rejected"
-means that call raises `ValueError` before sending a request. A provider
-without tool support raises `NotImplementedError` for a node with tools.
+Each built-in provider declares these features for a model through
+`Provider.feature_support(model)`, which returns a `ProviderFeatures`. An
+ordinary run reads the declaration before any provider call and raises
+`ValueError` for a feature declared unsupported:
+
+- A `tool_runtime` with a provider that cannot call tools is rejected
+  before routing or planning, even when no node would be offered a tool.
+- A model the provider does not accept, or a node with
+  `attach_dep_artifacts` on a provider that cannot take image inputs, is
+  rejected before the first node call. A caller-built graph is checked
+  before it runs and a generated plan as soon as it exists, since only the
+  plan says whether it wants image inputs. A generated plan's nodes all use
+  the run's model, so with `LLMArchitect` planning that model is checked
+  before the planning call.
+- A resumed run checks its unfinished nodes before calling any of them.
+
+A custom `Provider` declares nothing unless it overrides
+`feature_support()`, and neither does a subclass that replaces a built-in
+provider's `chat()`, so ordinary runs refuse nothing about them in advance.
+Their calls fail as before: a provider without tool support raises
+`NotImplementedError` for a node with tools.
 
 Tests:
 
+- Declared features: `tests/test_support_matrix.py::test_providers_declare_what_each_model_supports`.
+- Refused before any provider call, planning included:
+  `tests/test_support_matrix.py::test_ordinary_run_rejects_a_tool_runtime_its_provider_cannot_serve_before_any_call`,
+  `tests/test_support_matrix.py::test_tool_runtime_is_checked_before_an_overridden_plan_runs`,
+  `tests/test_support_matrix.py::test_ordinary_run_rejects_image_inputs_its_provider_cannot_take_before_any_call`,
+  `tests/test_support_matrix.py::test_ordinary_run_rejects_a_model_its_provider_does_not_support_before_any_call`
+  and `tests/test_support_matrix.py::test_resume_checks_pending_nodes_before_any_call`.
+- Refused after planning, before any node call, and resumed without
+  planning again: `tests/test_support_matrix.py::test_generated_plan_with_image_inputs_is_rejected_before_any_node_call`
+  and `tests/test_support_matrix.py::test_a_plan_refused_before_its_nodes_resumes_without_planning_again`.
+- Providers that declare nothing still run:
+  `tests/test_support_matrix.py::test_providers_that_declare_nothing_still_run_with_tools_image_inputs_and_a_budget`.
 - `OfflineProvider`: text `tests/test_offline_provider.py::test_full_swarm_pipeline_runs_offline`;
   image inputs `tests/test_provider.py::test_offline_provider_acknowledges_attachments`;
   image output `tests/test_provider.py::test_offline_provider_artifacts_per_call`.
@@ -87,8 +116,11 @@ Each path keeps money in its own unit:
   and successful supervision calls are outside it. With `max_budget_usd`
   set, `OpenAIImageProvider`, `OpenAIResponsesProvider`,
   `AnthropicMessagesProvider` and image-model `GeminiProvider` calls need
-  `max_cost_per_call_usd`; without it the node raises
-  `BudgetEstimateRequired` before its call. See [cost guardrails](budgets.md).
+  `max_cost_per_call_usd`, or a node's own `estimated_cost_usd`. Without
+  either, the run raises `BudgetEstimateRequired` before any provider call:
+  before routing or planning when `LLMArchitect` plans the run or an
+  `LLM_MERGE` synthesis needs the ceiling, and before the first node call
+  otherwise. See [cost guardrails](budgets.md).
   The native providers, `OpenAIResponsesProvider` and
   `AnthropicMessagesProvider`, record an unresolved bill as unknown and keep
   its reservation. The other providers' token-priced costs lose their
@@ -153,7 +185,11 @@ Tests:
   `tests/test_native_response_accounting.py::test_native_failure_is_terminal_and_preserves_exposure`.
 - Price ceilings for capped runs: `tests/test_provider.py::test_openai_image_hard_budget_requires_inclusive_call_ceiling`,
   `tests/test_provider.py::test_gemini_hard_budget_uses_only_inclusive_call_ceiling`,
-  `tests/test_provider_responses.py::test_legacy_budget_requires_inclusive_explicit_ceiling`.
+  `tests/test_provider_responses.py::test_legacy_budget_requires_inclusive_explicit_ceiling`;
+  refused before any provider call, planning included,
+  `tests/test_support_matrix.py::test_ordinary_run_rejects_a_missing_cost_ceiling_before_any_call`,
+  `tests/test_support_matrix.py::test_ordinary_run_checks_a_routed_plan_before_the_classifier_call`
+  and `tests/test_support_matrix.py::test_ordinary_run_rejects_an_llm_merge_it_cannot_budget_before_any_call`.
 - SDK retries: `tests/test_support_matrix.py::test_legacy_provider_clients_leave_retries_to_the_sdk_configuration`,
   `tests/test_support_matrix.py::test_native_providers_refuse_a_client_with_sdk_retries`,
   `tests/test_jobs_runtime_support.py::test_durable_openai_pool_disables_sdk_retries_and_sets_timeout`.

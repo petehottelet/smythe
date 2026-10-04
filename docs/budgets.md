@@ -32,6 +32,22 @@ Valid reported charges that exceed a reservation are different: the ledger
 records the actual charge, then raises `BudgetReconciliationError` and stops
 execution. It never clamps an incurred charge to make a budget appear satisfied.
 
+## Per-call ceilings
+
+Under `max_budget_usd`, calls to `OpenAIImageProvider`,
+`OpenAIResponsesProvider`, `AnthropicMessagesProvider` and image-model
+`GeminiProvider` cannot be reserved from a token estimate. Each needs an
+inclusive `max_cost_per_call_usd` on the provider, or a node's own
+`metadata["estimated_cost_usd"]`. A custom provider asks for the same with
+`requires_explicit_budget_estimate()`.
+
+An ordinary Swarm checks this before it pays for anything and raises
+`BudgetEstimateRequired`. When `LLMArchitect` plans the run, every generated
+node uses the run's model and cannot carry its own estimate, so the check
+runs before routing or planning, as it does for an `LLM_MERGE` synthesis.
+Other graphs are checked node by node before the first node call. See
+[provider checks](execution.md#provider-checks-before-any-call).
+
 ## Current scope
 
 The ordinary Swarm ledger covers execution and synthesis. Model-based routing,

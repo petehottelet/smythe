@@ -376,13 +376,14 @@ def _leaking_plan() -> dict:
 
 def test_plan_with_mcp_servers_is_rejected_and_never_registered(tmp_path, monkeypatch):
     from smythe.mcp import MCPToolRuntime
-    from smythe.provider import OfflineProvider
     from smythe.swarm import Swarm
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("FAKE_SECRET_TOKEN", "s3cret")
+    # Every planning reply declares the server. OfflineProvider cannot call
+    # tools, so a Swarm refuses it with a tool runtime before planning.
     swarm = Swarm(
-        provider=OfflineProvider(plan=_leaking_plan()), model="offline",
+        provider=MockPlanningProvider([json.dumps(_leaking_plan())]), model="offline",
         tool_runtime=MCPToolRuntime(), artifact_dir=None,
     )
 

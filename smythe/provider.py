@@ -20,7 +20,7 @@ import json
 import math
 import os
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from uuid import uuid4
 
 from smythe._errors import PicklableError
@@ -302,6 +302,70 @@ def _settle_response_error(error, *, budget, node_id, metadata, phase):
             metadata["cost_usd"] = budget.breakdown()[node_id]
 
 
+@dataclass(frozen=True)
+class ProviderFeatures:
+    """What a provider declares one model can do, for checks before any call.
+
+    Each field is ``True`` (supported), ``False`` (not supported: a call
+    that needs it is refused, or the output never appears) or ``None`` (not
+    declared). An ordinary ``Swarm`` rejects a run before planning, or
+    before its first node call, only for a feature declared ``False`` that
+    the run needs, so a provider that declares nothing runs as before.
+    """
+
+    model_supported: bool | None = None
+    """Whether the provider accepts this model name."""
+    text: bool | None = None
+    """Whether a reply carries text the model wrote."""
+    tools: bool | None = None
+    """Whether a request can offer the model tools to call."""
+    attachments: bool | None = None
+    """Whether a request can carry image attachments."""
+    image_output: bool | None = None
+    """Whether a reply can carry generated images as artifacts."""
+    cost_ceiling_required: bool | None = None
+    """Whether a call under ``max_budget_usd`` needs an inclusive per-call
+    ceiling, as ``requires_explicit_budget_estimate`` reports."""
+
+
+def _builtin_features(provider: Provider, owner: type, model: str, **features) -> ProviderFeatures:
+    """*owner*'s built-in declaration, or none once a subclass replaces its calls.
+
+    A subclass that overrides ``chat()`` or ``prepare()`` may serve more
+    than the built-in class, so it declares nothing until it overrides
+    ``feature_support()`` itself.
+    """
+    declared = Provider.feature_support(provider, model)
+    if any(getattr(type(provider), name, None) is not getattr(owner, name, None)
+           for name in ("chat", "prepare")):
+        return declared
+    return replace(declared, **features)
+
+
+def _declared_features(provider: Provider, model: str) -> ProviderFeatures:
+    """Read *provider*'s declaration for *model*; a provider without the hook declares nothing."""
+    declare = getattr(provider, "feature_support", None)
+    if declare is None:
+        return ProviderFeatures()
+    features = declare(model)
+    if not isinstance(features, ProviderFeatures):
+        raise TypeError(
+            f"{type(provider).__name__}.feature_support() must return ProviderFeatures, "
+            f"got {type(features).__name__}"
+        )
+    return features
+
+
+def _missing_cost_ceiling(provider: Provider, model: str) -> bool:
+    """Whether a capped call to *model* lacks the inclusive ceiling it requires.
+
+    The same test the executor applies when it reserves a node's budget,
+    before any node-level ``estimated_cost_usd``.
+    """
+    return (provider.requires_explicit_budget_estimate(model)
+            and provider.budget_estimate_usd(model) is None)
+
+
 class Provider(ABC):
     """Abstract base for LLM providers.
 
@@ -313,6 +377,18 @@ class Provider(ABC):
     @abstractmethod
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         """Send a prompt to the LLM and return text + token usage."""
+
+    def feature_support(self, model: str) -> ProviderFeatures:
+        """Declare what *model* can do on this provider, for checks before any call.
+
+        An ordinary ``Swarm`` reads this before planning and before its first
+        node call, and rejects a run that needs a feature declared ``False``.
+        The default declares only ``cost_ceiling_required``, from
+        ``requires_explicit_budget_estimate``, so a custom provider runs as
+        before. Override it to have unsupported runs rejected before they
+        are paid for.
+        """
+        return ProviderFeatures(cost_ceiling_required=self.requires_explicit_budget_estimate(model))
 
     def budget_estimate_usd(self, model: str) -> float | None:
         """Return a conservative per-call reservation, when one is known.
@@ -411,6 +487,11 @@ class OfflineProvider(Provider):
     def snapshot_for_workflow(self) -> OfflineProvider:
         """Detach a static offline configuration without resetting a script."""
         return OfflineProvider(**self.workflow_descriptor()["config"])
+
+    def feature_support(self, model: str) -> ProviderFeatures:
+        # Attachments are acknowledged in the text; tool calls are not served.
+        return _builtin_features(self, OfflineProvider, model, text=True, tools=False,
+                                 attachments=True, image_output=self._artifacts_per_call > 0)
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         from smythe.prompts import PLANNING_SYSTEM_PROMPT
@@ -580,6 +661,10 @@ class AnthropicProvider(Provider):
         if self._client is not None:
             return self._client
         return self._loop_clients.get(self._new_client)
+
+    def feature_support(self, model: str) -> ProviderFeatures:
+        return _builtin_features(self, AnthropicProvider, model, text=True, tools=True,
+                                 attachments=True, image_output=False)
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         return await self.chat(system, [ChatMessage(role="user", content=prompt)], model)
@@ -752,6 +837,10 @@ class OpenAIProvider(Provider):
         if self._client is not None:
             return self._client
         return self._loop_clients.get(self._new_client)
+
+    def feature_support(self, model: str) -> ProviderFeatures:
+        return _builtin_features(self, OpenAIProvider, model, text=True, tools=True,
+                                 attachments=True, image_output=False)
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         return await self.chat(system, [ChatMessage(role="user", content=prompt)], model)
@@ -1004,6 +1093,14 @@ class OpenAIImageProvider(OpenAIProvider):
     def requires_explicit_budget_estimate(self, model: str) -> bool:
         return True
 
+    def feature_support(self, model: str) -> ProviderFeatures:
+        # The prompt is sent as image instructions; the reply text only
+        # describes the generated images.
+        return _builtin_features(
+            self, OpenAIImageProvider, model, model_supported=model.lower().startswith("gpt-image-"),
+            text=False, tools=False, attachments=False, image_output=True,
+        )
+
     async def chat(
         self,
         system: str,
@@ -1154,9 +1251,17 @@ class GeminiProvider(Provider):
         return self._max_cost_per_call_usd
 
     def requires_explicit_budget_estimate(self, model: str) -> bool:
+        return self._requests_images(model)
+
+    def _requests_images(self, model: str) -> bool:
+        """Whether a request for *model* can return images."""
         if self._response_modalities is not None:
             return any(str(item).upper() == "IMAGE" for item in self._response_modalities)
         return any(hint in model.lower() for hint in ("image", "banana"))
+
+    def feature_support(self, model: str) -> ProviderFeatures:
+        return _builtin_features(self, GeminiProvider, model, text=True, tools=True,
+                                 attachments=True, image_output=self._requests_images(model))
 
     def _new_client(self):
         try:
