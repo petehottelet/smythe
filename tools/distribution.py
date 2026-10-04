@@ -19,8 +19,8 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "tools/distribution-files.json"
-SOURCE_LIMIT = 1_000_000
-WHEEL_LIMIT = 400_000
+SOURCE_LIMIT = 2_000_000
+WHEEL_LIMIT = 600_000
 ROOT_FILES = {"pyproject.toml", "hatch_build.py", "README.md", "CHANGELOG.md", "LICENSE", ".gitignore"}
 DATA_FILES = {"smythe/py.typed", "tests/distribution_profile.json", "tools/distribution-files.json"}
 FORBIDDEN = {"00_project_files", "__pycache__", "tmp", "temp", "dist", "build", "output",

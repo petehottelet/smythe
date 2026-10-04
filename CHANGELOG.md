@@ -42,13 +42,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   produce, is refused before any provider call, and runs an ordinary `Swarm`
   with `AnthropicMessagesProvider`. A repository test checks that every test
   the page cites exists.
-
-### Changed
-
-- A durable run's `WorkflowBindingError` names the argument it refuses:
-  `run_store` and `verifier`, with the type that was passed, `memory`,
-  `tool_runtime` or `checkpoint_store`. One message used to cover memory,
-  tools and the checkpoint store. The exception is still a `ValueError`.
 - Elapsed-time records for ordinary runs. `SwarmResult.timing` reports a
   call's elapsed time on a monotonic clock beside its summed node time, the
   time spent in routing, planning, recovery, execution, verification,
@@ -76,10 +69,18 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ### Changed
 
+- A durable run's `WorkflowBindingError` names the argument it refuses:
+  `run_store` and `verifier`, with the type that was passed, `memory`,
+  `tool_runtime` or `checkpoint_store`. One message used to cover memory,
+  tools and the checkpoint store. The exception is still a `ValueError`.
 - Trace span durations come from a monotonic clock, so a wall-clock
   adjustment during an attempt no longer distorts a span's `duration_ms` or
   `PlannerMemory`'s summed node time. `start_time` and `end_time` remain
   wall-clock seconds.
+- The package audit's size limits are 600,000 bytes for the wheel and
+  2,000,000 bytes for the compressed source archive, up from 400,000 and
+  1,000,000, to fit delivery acceptance, recorded tools and context, and
+  their tests.
 
 ### Fixed
 
