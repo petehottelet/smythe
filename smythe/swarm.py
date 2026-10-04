@@ -64,7 +64,6 @@ from smythe.synthesizer import SynthesisStrategy, Synthesizer, deliverable_sourc
 from smythe.task import Task, snapshot_task, task_snapshots_equal, task_to_dict
 from smythe.tracer import Tracer
 from smythe.verifier import (
-    ADVISORY_VERDICT_KEY,
     Verifier,
     node_generation,
     validate_verification_checkpoint,
@@ -248,8 +247,8 @@ class Swarm:
     strict policy decides delivery acceptance after synthesis, on exactly the
     delivered output, and records the decision with the completed
     checkpoint; output it does not accept is returned as ``rejected_output``.
-    It decides only on verdicts read in the run, so a fresh strict run refuses
-    a graph whose judge completed before it with a recorded verdict.
+    It decides only on verdicts produced in the run, so a fresh strict run
+    refuses a graph whose judge completed before it.
     None, the default, and an advisory policy keep legacy behavior.
     """
 
@@ -526,30 +525,26 @@ class Swarm:
             )
 
     def _check_inherited_verdicts(self, graph: ExecutionGraph) -> None:
-        """Refuse a strict run on a gate whose judge completed with a verdict before it.
+        """Refuse a strict run on a gate whose judge completed before it.
 
-        A strict decision rests only on verdicts read in the run it decides.
-        A pending judge replaces any record it carries when it runs, but a
-        completed judge does not run again, so its saved final verdict (a
-        consumed receipt, or ``advisory_verdict`` without regenerations)
-        would decide a run that never read it. A resumed run keeps its own
-        records and is not checked here.
+        A strict decision rests only on verdicts its own judges produced in
+        the run it decides. A pending judge replaces any record it carries
+        when it runs, but a completed judge does not run again: its saved
+        final verdict (a consumed receipt, or ``advisory_verdict`` without
+        regenerations) would decide a run that never read it, a pending
+        receipt or a bound target generation would have the run read a reply
+        written before it, and without either the gate could never decide.
+        A resumed run keeps its own records and is not checked here.
         """
         if self._strict_policy() is None:
             return
         for node in graph.nodes:
-            if not node.verifies or node.status is not NodeStatus.COMPLETED:
-                continue
-            if node.max_regenerations > 0:
-                receipt = node.metadata.get("verification_receipt")
-                recorded = isinstance(receipt, dict) and receipt.get("state") == "consumed"
-            else:
-                recorded = ADVISORY_VERDICT_KEY in node.metadata
-            if recorded:
+            if node.verifies and node.status is NodeStatus.COMPLETED:
                 raise ValueError(
-                    f"Judge {node.id!r} completed before this run with a recorded verdict, "
-                    "which a strict acceptance policy does not decide on. Resume the run's "
-                    "checkpoint, or set the judge back to pending so this run reads its verdict."
+                    f"Judge {node.id!r} completed before this run, so this run would not "
+                    "produce its verdict, and a strict acceptance policy decides only on "
+                    "verdicts produced in the run. Resume the run's checkpoint, or set the "
+                    "judge back to pending so it judges its target in this run."
                 )
 
     def plan(self, task: Task) -> ExecutionGraph:

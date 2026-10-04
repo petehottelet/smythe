@@ -188,8 +188,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `advisory_verdict`, and an unreadable or non-bool verdict, a raising
   verifier, or a skipped or failed judge leaves acceptance `indeterminate` by
   default without spending a regeneration or stopping the run. Only verdicts
-  read in the run decide it: a fresh strict run refuses a graph whose judge
-  completed before it with a recorded verdict. A result that is not accepted
+  the run's judges produce decide it: a fresh strict run refuses, before any
+  provider call, a graph in which a judge already completed, whatever record
+  or reply it holds. A result that is not accepted
   returns `output=""` with the text in `rejected_output`. Every checkpoint of
   a strict run is version 5 with its record, an unfinished one resumes only
   under the same policy, and resuming a completed one rechecks the output

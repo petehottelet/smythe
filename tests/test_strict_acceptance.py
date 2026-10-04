@@ -661,6 +661,39 @@ def test_a_fresh_strict_run_refuses_a_judge_that_completed_with_a_verdict(max_re
     assert provider.runs == {}
 
 
+def _completed_judge_without_a_verdict(kind: str) -> ExecutionGraph:
+    """A gate whose judge completed before the run with a reply but no recorded verdict."""
+    graph = _gated(max_regenerations=0 if kind == "bound-advisory" else 1)
+    draft, judge = graph.nodes
+    draft.status, draft.result = NodeStatus.COMPLETED, "## Summary\nDEFECTIVE"
+    judge.status, judge.result = NodeStatus.COMPLETED, "PASS"
+    if kind != "no-record":
+        judge.metadata["verification_target_generation"] = 0
+    if kind == "pending-receipt":
+        judge.metadata["verification_receipt"] = {
+            "version": 1, "state": "pending", "judge_generation": 0, "target_id": "draft",
+            "target_generation": 0,
+        }
+    return graph
+
+
+@pytest.mark.parametrize("kind", ["pending-receipt", "bound-advisory", "no-record"])
+@pytest.mark.parametrize("parallel", [False, True])
+def test_a_fresh_strict_run_refuses_a_judge_that_completed_without_a_verdict(kind, parallel):
+    # The run would read the judge's earlier reply, or none, instead of a verdict it produced.
+    provider = Script({})
+    store = MemoryStore()
+    swarm = _swarm(provider, acceptance=_strict(), store=store, parallel=parallel)
+    graph = _completed_judge_without_a_verdict(kind)
+
+    with pytest.raises(ValueError, match="'judge' completed before this run"):
+        swarm.execute(graph)
+
+    assert provider.runs == {} and store.saves == []
+    assert graph.nodes[1].metadata.get("verification_receipt", {}).get("state") in (None, "pending")
+    assert "advisory_verdict" not in graph.nodes[1].metadata
+
+
 @pytest.mark.parametrize("acceptance", [None, AcceptancePolicy()], ids=["none", "advisory"])
 def test_a_completed_gate_still_runs_without_a_strict_policy(acceptance):
     provider = Script({})

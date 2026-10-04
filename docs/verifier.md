@@ -366,13 +366,16 @@ was skipped or failed, or whose target was unavailable, leaves the gate
 undecided. Each recorded verdict names the judge's and its target's
 generations, and regeneration clears it.
 
-Only a verdict read in the run decides it. Each attempt of a judge replaces
-the verdict record it carries, so the record holds that attempt's verdict
-even when a graph is run again or a YAML file sets the metadata. A judge that completed
-before a fresh run does not run again, so a strict `Swarm` refuses with
-`ValueError`, before any provider call, a graph in which such a judge holds a
-consumed receipt or an `advisory_verdict`; resume the run's checkpoint, or
-set the judge back to pending. Without a strict policy none of this changes:
+Only a verdict the run's own judges produce decides it. Each attempt of a
+judge replaces the verdict record it carries, so the record holds that
+attempt's verdict even when a graph is run again or a YAML file sets the
+metadata. A judge that completed before a fresh run does not run again, so a
+strict `Swarm` refuses with `ValueError`, before any provider call, a graph in
+which any judge has already completed: whether it holds a consumed or pending
+receipt, an `advisory_verdict`, a bound `verification_target_generation` or
+only an earlier reply, the run would decide on a verdict it did not produce.
+Resume the run's checkpoint, or set the judge back to pending so it judges
+its target in the run. Without a strict policy none of this changes:
 an exhausted or advisory gate's verdict is never read and a verifier that
 raises stops the run.
 
