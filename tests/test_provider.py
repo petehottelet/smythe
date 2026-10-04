@@ -356,9 +356,26 @@ def test_parallel_run_keeps_the_reservation_of_a_call_without_usage():
     result = Swarm(model="claude-test", provider=provider, artifact_dir=None, parallel=True,
                    max_budget_usd=1).execute(graph)
     # The reservation made before the call stands in for its unknown cost,
-    # as for any provider that reports an unknown cost.
+    # as for any provider that reports an unknown cost, so the total stays
+    # complete.
     assert result.total_cost_usd > 0 and result.cost_contains_estimates
+    assert result.cost_is_complete
     assert graph.nodes[0].metadata["cost_usd_unknown"] is True
+
+
+def test_serial_node_estimate_stands_in_for_a_call_without_usage():
+    from smythe.graph import ExecutionGraph, Node, Topology
+
+    provider = _usage_less_text_provider("gemini", None, missing_usage="unknown")
+    graph = ExecutionGraph([Topology.SERIAL], [
+        Node(id="draft", label="Draft", metadata={"estimated_cost_usd": 0.02}),
+    ])
+    result = Swarm(model="gemini-test", provider=provider, artifact_dir=None,
+                   max_budget_usd=1).execute(graph)
+    # Serial execution reserves a node's own estimate, which then stands in
+    # for the unknown cost.
+    assert result.total_cost_usd == pytest.approx(0.02)
+    assert result.cost_contains_estimates and result.cost_is_complete
 
 
 # ---------------------------------------------------------------------------

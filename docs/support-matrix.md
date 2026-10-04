@@ -100,14 +100,14 @@ Tests:
 
 | Provider | Durable text workflows | Jobs profile | Cost recorded | Retries inside the SDK |
 |---|---|---|---|---|
-| `OfflineProvider` | Static plan and echo only | `offline` | Ordinary: unmarked blended token estimate. Durable and Jobs: zero | None |
-| `AnthropicProvider` | Rejected | None | Unmarked blended token estimate | The Anthropic SDK default |
-| `OpenAIProvider` | Rejected | None | Unmarked blended token estimate | The OpenAI SDK default, unless `max_retries` is set |
+| `OfflineProvider` | Static plan and echo only | `offline` | Ordinary: blended token estimate, flagged by `Sentinel.cost_contains_token_estimates`. Durable and Jobs: zero | None |
+| `AnthropicProvider` | Rejected | None | Blended token estimate, flagged by `Sentinel.cost_contains_token_estimates`; `cost_contains_estimates` stays `False` | The Anthropic SDK default |
+| `OpenAIProvider` | Rejected | None | Blended token estimate, flagged by `Sentinel.cost_contains_token_estimates`; `cost_contains_estimates` stays `False` | The OpenAI SDK default, unless `max_retries` is set |
 | `OpenAIImageProvider` | Rejected | `openai_image` | Per-call ceiling; without one, a per-image estimate marked incomplete, or unknown | The OpenAI SDK default, unless `max_retries` is set. Jobs sets 0 |
-| `GeminiProvider` | Rejected | `gemini_image` | Text: unmarked blended token estimate. Images: as for `OpenAIImageProvider` | None configured |
+| `GeminiProvider` | Rejected | `gemini_image` | Text: blended token estimate, flagged by `Sentinel.cost_contains_token_estimates`; `cost_contains_estimates` stays `False`. Images: as for `OpenAIImageProvider` | None configured |
 | `OpenAIResponsesProvider` | `gpt-6-astra`, `gpt-5.6-sol` | None | Exact native price | None; a client with retries is refused |
 | `AnthropicMessagesProvider` | `claude-fable-5-1` | None | Exact native price | None; a client with retries is refused |
-| Custom `Provider` | Rejected | None | Unmarked blended token estimate, or its own `cost_usd` | Its own |
+| Custom `Provider` | Rejected | None | Its own `cost_usd`, or a blended token estimate flagged by `Sentinel.cost_contains_token_estimates` | Its own |
 
 Each path keeps money in its own unit:
 
@@ -124,12 +124,18 @@ Each path keeps money in its own unit:
   can then be given estimates. See [cost guardrails](budgets.md).
   The native providers, `OpenAIResponsesProvider` and
   `AnthropicMessagesProvider`, record an unresolved bill as unknown and keep
-  its reservation. The other providers' token-priced costs lose their
-  uncertainty: a blended token estimate leaves `cost_contains_estimates`
-  `False`, though `Sentinel.cost_contains_token_estimates` reports it, and a
-  reply without usage counts as zero tokens and leaves `cost_is_complete`
-  `True` unless `AnthropicProvider`, `OpenAIProvider` or `GeminiProvider` was
-  built with `missing_usage="unknown"` (see [cost guardrails](budgets.md)). A
+  its reservation. The other providers' token-priced costs are blended
+  estimates: `Sentinel.cost_contains_token_estimates` reports them, and
+  `cost_contains_estimates` stays `False`. A reply without usage counts as
+  zero tokens, a known charge, unless `AnthropicProvider`, `OpenAIProvider`
+  or `GeminiProvider` was built with `missing_usage="unknown"`. Its cost is
+  then unknown. A reservation held for the call is kept as its estimated
+  charge, so `cost_contains_estimates` becomes `True` and `cost_is_complete`
+  stays `True`; only a call without one makes `cost_is_complete` `False`.
+  The async executor behind parallel runs, `execute_async()` and resume
+  reserves before each node's call, as does an `LLM_MERGE` synthesis and a
+  serial node whose own or provider estimate is set; a serial `execute()`
+  node without one reserves nothing (see [cost guardrails](budgets.md)). A
   call to one of them that raises or times out releases its reservation and
   records no cost.
 - **Durable text workflows** record integer nanoUSD in the journal for every
@@ -185,6 +191,8 @@ Tests:
 - Uncertain ordinary-run costs: `tests/test_support_matrix.py::test_ordinary_ledger_does_not_mark_uncertain_costs_from_other_providers`,
   `tests/test_budget.py::test_blended_token_cost_is_reported_as_a_token_estimate`,
   `tests/test_provider.py::test_run_with_missing_usage_reports_incomplete_cost_only_when_opted_in`,
+  `tests/test_provider.py::test_parallel_run_keeps_the_reservation_of_a_call_without_usage`,
+  `tests/test_provider.py::test_serial_node_estimate_stands_in_for_a_call_without_usage`,
   `tests/test_execution_failure_policies.py::test_terminal_failure_stops_queued_work_and_preserves_original_exception`,
   `tests/test_execution_failure_policies.py::test_timeout_obeys_failure_policy_and_settles_before_return`
   and, for the native providers,
