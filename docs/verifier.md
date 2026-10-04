@@ -396,8 +396,12 @@ started.
 A final validator that raises, returns an awaitable or anything other than a
 `ValidationReport`, reports `outcome="error"`, or returns a report naming
 another validator has outcome `error`. Artifact deliverables are not supported
-yet: artifact records hold no hash of their files, so when a delivered node
-wrote files the decision is `on_invalid` whatever the validators report.
+yet: artifact records hold no hash of their files, so output from a delivered
+node that wrote files is never accepted. The order above still applies: a
+final validator's rejection makes the decision `rejected`, and an exhausted
+gate's failing verdict makes it `on_exhausted`, because a valid negative
+decision stands whatever the files hold. Otherwise the decision is
+`on_invalid`, even when every check passed.
 
 **Gates under a strict policy.** A valid rejection before exhaustion
 regenerates as usual. The judge's last verdict is then read, without another

@@ -1156,6 +1156,29 @@ def test_artifact_deliverables_are_unsupported(tmp_path):
     assert any("not hashed" in reason for reason in result.acceptance.reasons)
 
 
+@pytest.mark.parametrize(("script", "settings", "decision"), [
+    pytest.param({"draft": ["## Summary\nDEFECT"], "judge": ["PASS"]}, {}, "rejected",
+                 id="validator-rejects"),
+    pytest.param({"judge": ["FAIL: thin"]}, {}, "rejected", id="gate-exhausted"),
+    pytest.param({"judge": ["FAIL: thin"]}, {"on_exhausted": "needs_review"}, "needs_review",
+                 id="gate-exhausted-review"),
+    pytest.param({"judge": ["PASS"]}, {}, "indeterminate", id="all-checks-pass"),
+    pytest.param({"judge": ["PASS"]}, {"on_invalid": "needs_review"}, "needs_review",
+                 id="all-checks-pass-review"),
+])
+def test_output_from_a_node_that_wrote_files_is_never_accepted(tmp_path, script, settings,
+                                                                decision):
+    # A valid rejection still decides; only when nothing rejects do the
+    # unhashed files make the decision on_invalid.
+    provider = Script(script, artifacts={"draft": [Artifact(data=b"\x89PNG", mime_type="image/png")]})
+    swarm = Swarm(provider=provider, model="test-model", artifact_dir=tmp_path,
+                  checkpoint_store=MemoryStore(), acceptance=_strict(Forbids(), **settings))
+    result = swarm.execute(_gated())
+
+    _not_accepted(result, decision)
+    assert any("not hashed" in reason for reason in result.acceptance.reasons)
+
+
 def test_trace_records_the_decision_without_new_summary_keys():
     result = _swarm(Script({"judge": ["FAIL"]}), acceptance=_strict()).execute(_gated())
     entries = [entry for entry in result.trace if entry["node_id"] == "acceptance:delivery"]
