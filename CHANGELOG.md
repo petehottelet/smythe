@@ -84,6 +84,38 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   Reports, findings and identities convert with `to_dict()` and `from_dict()`.
   A report's findings must be `ValidationFinding` values and are kept as a
   tuple. See [validation reports](docs/verifier.md#validation-reports).
+- Delivery acceptance types in `smythe.acceptance`, reported apart from
+  execution and cost. `AcceptancePolicy` is advisory by default; a strict
+  policy names its final validators, whether a passed gate may accept output
+  identical to its target's result, and the decisions for an exhausted gate
+  (`rejected` or `needs_review`) and an invalid verdict (`indeterminate` or
+  `needs_review`). Its `to_dict()` lists validator identities, never code,
+  and `sha256` identifies it. `DeliveryAcceptance` is a versioned record of
+  one decision (`not_evaluated`, `accepted`, `rejected`, `needs_review` or
+  `indeterminate`) bound to the SHA-256 of the delivered bytes, the synthesis
+  strategy, source nodes and generations, the task and policy hashes and each
+  validator's outcome; `from_dict()` rejects unknown record versions and
+  decisions. A validator is local code with a `ValidatorIdentity` and a
+  synchronous `validate(subject)` returning a `ValidationReport`;
+  registration refuses providers, classes, coroutine functions, awaitables
+  and an async `validate`. Runs do not evaluate a policy, and `Swarm` takes
+  none. See [delivery acceptance records](docs/verifier.md#delivery-acceptance-records).
+- `SwarmResult.acceptance` and `SwarmResult.rejected_output`, appended after
+  `timing` so positional construction is unchanged, a read-only
+  `SwarmResult.accepted` that is true only for an `accepted` record, and
+  `SwarmResult.to_dict()`, which returns the result as JSON data with the
+  record under `delivery_acceptance`. Every run made by this release returns
+  `acceptance=None` and its output as before. `PlannerMemory` records a
+  result's decision as `acceptance`, and `"not_evaluated"` without a record.
+- Checkpoint version 5: a state with a delivery acceptance record keeps it in
+  a top-level `delivery_acceptance` block, and `build_state(...,
+  delivery_acceptance=record)` writes it. Ordinary runs still write version
+  4, and this build reads versions 1 through 5. Versions 1 to 4 never report
+  a record. Resuming a completed version 5 checkpoint checks the saved output
+  against the record's digest and returns the record; output the record did
+  not accept is returned as `rejected_output` with an empty `output`. An
+  unfinished version 5 checkpoint is refused before any provider call. See
+  [delivery acceptance](docs/checkpoint-format.md#delivery-acceptance-version-5).
 
 ### Changed
 

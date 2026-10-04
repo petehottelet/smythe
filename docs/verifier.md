@@ -215,6 +215,70 @@ it). `to_dict()` and `from_dict()` convert reports, findings and identities to
 and from JSON data; a tuple in a finding's `expected` or `observed` value
 becomes a JSON array, and `from_dict()` rejects unknown keys and outcomes.
 
+## Delivery acceptance records
+
+A gate decides whether one node's output may move on. Delivery acceptance
+decides whether the run's delivered output is accepted, and is reported apart
+from execution and cost. `smythe.acceptance` defines its types:
+
+- `AcceptancePolicy()` is advisory: gates advise, as described above, and no
+  record is made. `AcceptancePolicy(mode="strict", ...)` takes
+  `final_validators`, which check the exact delivered bytes;
+  `allow_gate_acceptance` (default `True`), which lets a passed gate accept
+  output that is byte for byte its target's result; `on_exhausted`
+  (`"rejected"`, or `"needs_review"`) for an exhausted gate whose final
+  verdict fails; and `on_invalid` (`"indeterminate"`, or `"needs_review"`)
+  for a missing, malformed or erroring verdict. An advisory policy refuses
+  these settings, and so does a strict policy that could never accept.
+  `policy.to_dict()` lists validator identities sorted by name, never code,
+  and `policy.sha256` hashes it.
+- `DeliveryAcceptance` is the versioned record of one decision:
+  `not_evaluated`, `accepted`, `rejected`, `needs_review` or `indeterminate`.
+  It binds the SHA-256 of the delivered bytes, the synthesis strategy, the
+  source nodes and their generations, the task and policy hashes, and each
+  validator's outcome. Checkpoints and JSON keep it under
+  `delivery_acceptance`; the [checkpoint format](checkpoint-format.md#delivery-acceptance-version-5)
+  lists its fields.
+- A validator is trusted local code: an object with an `identity`
+  (`ValidatorIdentity`) and a synchronous `validate(subject)` that returns a
+  `ValidationReport`, with `outcome="error"` when it cannot decide. `subject`
+  is a `ValidationSubject`: the exact bytes, their `sha256` and `text()`.
+  Registration refuses a `Provider`, a class, a coroutine function, an
+  awaitable and an `async def validate`. That structural check enforces a
+  caller contract; it is not a sandbox. It cannot see a synchronous
+  `validate()` that makes network requests or paid calls, which a validator
+  must not do.
+
+```python
+from smythe import AcceptancePolicy, ValidationReport, ValidatorIdentity
+from smythe.validation import hard_finding
+
+class RequiredSection:
+    def __init__(self, heading):
+        self.heading = heading
+        self.identity = ValidatorIdentity.for_config(
+            "required-section", "1", {"heading": heading},
+        )
+
+    def validate(self, subject):
+        if self.heading in subject.text():
+            return ValidationReport("output", validator=self.identity)
+        missing = hard_finding("section_missing", f"no {self.heading!r} section")
+        return ValidationReport("output", (missing,), validator=self.identity)
+
+policy = AcceptancePolicy(mode="strict", final_validators=[RequiredSection("## Sources")])
+```
+
+`SwarmResult.acceptance` holds the record, or `None` when there is none.
+`SwarmResult.accepted` is true only for an `accepted` record. When a record
+exists and does not accept, `output` is `""` and the text is in
+`rejected_output`. `SwarmResult.to_dict()` returns the result as JSON data
+with the record under `delivery_acceptance`. `Swarm` takes no policy and runs
+evaluate none, so every advisory result has `acceptance=None`; only a result
+resumed from a completed [version 5 checkpoint](checkpoint-format.md#delivery-acceptance-version-5)
+carries a record. `PlannerMemory` stores the record's decision as
+`acceptance`, or `not_evaluated` without one.
+
 ## Gating from YAML and from a generated plan
 
 `verifies` and `max_regenerations` are ordinary node fields, so a YAML

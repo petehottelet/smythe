@@ -6,9 +6,9 @@ CheckpointStore.  A crashed or interrupted execution can then be picked
 up with ``swarm.resume(execution_id)``, re-running only the nodes that
 never completed.
 
-The state is a plain JSON document (version 4) so users can inspect or
-repair checkpoints by hand.  See docs/checkpoint-format.md for the full
-schema.
+The state is a plain JSON document (version 4, or 5 with a delivery
+acceptance record) so users can inspect or repair checkpoints by hand.  See
+docs/checkpoint-format.md for the full schema.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+from smythe.acceptance import DeliveryAcceptance, text_sha256
 from smythe.agent import Agent, AgentProfile
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology, snapshot_run_ref
 from smythe.registry import Registry
@@ -35,7 +36,11 @@ CHECKPOINT_VERSION = 4
 # it certifies that every agent MCP server it records came from developer
 # configuration, because builds that write v4 never take servers from model
 # output. Earlier versions may hold servers a model-generated plan declared.
-SUPPORTED_CHECKPOINT_VERSIONS = (1, 2, 3, 4)
+# v5 adds a top-level ``delivery_acceptance`` record. Only a state that carries
+# one is written as v5, so builds that cannot read the record refuse it
+# instead of delivering output it did not accept.
+STRICT_CHECKPOINT_VERSION = 5
+SUPPORTED_CHECKPOINT_VERSIONS = (1, 2, 3, 4, 5)
 MCP_TRUSTED_CHECKPOINT_VERSION = 4
 
 _EXECUTION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
@@ -292,6 +297,7 @@ def build_state(
     created_at: float | None = None,
     control: dict[str, Any] | None = None,
     timing: dict[str, Any] | None = None,
+    delivery_acceptance: DeliveryAcceptance | None = None,
 ) -> dict[str, Any]:
     """Assemble a checkpoint state document.
 
@@ -302,6 +308,10 @@ def build_state(
 
     ``timing`` is an informational block of per-process timing segments.
     It is additive within version 4: readers ignore keys they do not use.
+
+    ``delivery_acceptance`` makes the state version 5 and stores the record
+    under that key. A record that binds an output digest needs the matching
+    ``output``.
     """
     task_data = task_to_dict(task)
     graph_task_data = task_data if graph.task is task else task_to_dict(graph.task)
@@ -329,4 +339,39 @@ def build_state(
     }
     if timing is not None:
         state["timing"] = deepcopy(timing)
+    if delivery_acceptance is not None:
+        if not isinstance(delivery_acceptance, DeliveryAcceptance):
+            raise TypeError("delivery_acceptance must be a DeliveryAcceptance record")
+        bound = delivery_acceptance.output_sha256
+        if bound is not None and (not isinstance(output, str) or text_sha256(output) != bound):
+            raise ValueError("The delivery acceptance record does not match the checkpoint output")
+        state["version"] = STRICT_CHECKPOINT_VERSION
+        state["delivery_acceptance"] = delivery_acceptance.to_dict()
     return state
+
+
+def delivery_acceptance_from_state(state: dict[str, Any]) -> DeliveryAcceptance | None:
+    """The delivery acceptance record a checkpoint state carries, if any.
+
+    Versions 1-4 predate delivery acceptance, so they have no record whatever
+    keys they hold: a legacy run is never reported as accepted or as not yet
+    evaluated. A version 5 state keeps its record under
+    ``delivery_acceptance``; a completed one must have it. The record is read
+    as stored; comparing it with the saved output is left to the caller.
+    Raises ValueError for an unsupported version or an unreadable record.
+    """
+    version = state.get("version")
+    if type(version) is not int or version not in SUPPORTED_CHECKPOINT_VERSIONS:
+        raise ValueError(
+            f"Checkpoint version {version!r} is not one of {list(SUPPORTED_CHECKPOINT_VERSIONS)}"
+        )
+    if version < STRICT_CHECKPOINT_VERSION:
+        return None
+    block = state.get("delivery_acceptance")
+    if block is None:
+        if state.get("status") == "completed":
+            raise ValueError(
+                "A completed version 5 checkpoint must carry its delivery_acceptance record"
+            )
+        return None
+    return DeliveryAcceptance.from_dict(block)

@@ -1,5 +1,12 @@
 """Smythe: task-based personalized agent swarms with dynamic execution topology."""
 
+from smythe.acceptance import (
+    AcceptanceDecision,
+    AcceptancePolicy,
+    DeliveryAcceptance,
+    ValidationSubject,
+    Validator,
+)
 from smythe.budget import (
     BudgetEstimateRequired,
     BudgetReconciliationError,
@@ -68,8 +75,17 @@ from smythe.tools import (
     ToolSession,
     ToolSpec,
 )
+from smythe.validation import (
+    FindingSeverity,
+    ValidationFinding,
+    ValidationOutcome,
+    ValidationReport,
+    ValidatorIdentity,
+)
 
 __all__ = [
+    "AcceptanceDecision",
+    "AcceptancePolicy",
     "AnthropicProvider",
     "AnthropicMessagesProvider",
     "ArchitectError",
@@ -85,12 +101,14 @@ __all__ = [
     "CompletionResult",
     "ConstrainedArchitect",
     "DefaultCapabilityMapper",
+    "DeliveryAcceptance",
     "DesignSystem",
     "DeterministicArchitect",
     "DistillationError",
     "FailurePolicy",
     "FileCheckpointStore",
     "Finding",
+    "FindingSeverity",
     "GeminiProvider",
     "LLMArchitect",
     "LLMSupervisor",
@@ -139,6 +157,12 @@ __all__ = [
     "ToolSession",
     "TokenVerifier",
     "ToolSpec",
+    "ValidationFinding",
+    "ValidationOutcome",
+    "ValidationReport",
+    "ValidationSubject",
+    "Validator",
+    "ValidatorIdentity",
     "Verdict",
     "Verifier",
     "VerificationRecoveryError",

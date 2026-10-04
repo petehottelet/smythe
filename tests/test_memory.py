@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from fakes import Gate, ManualClock
+from smythe.acceptance import DeliveryAcceptance, text_sha256
 from smythe.checkpoint import FileCheckpointStore
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.memory import ExecutionOutcome, PlannerMemory
@@ -511,6 +512,50 @@ def test_record_without_timing_leaves_elapsed_time_unrecorded(tmp_path):
     assert (built.cost_is_complete, built.cost_contains_estimates) == (True, False)
     assert (bare.cost_is_complete, bare.cost_contains_estimates) == (None, None)
     assert built.acceptance == bare.acceptance == "not_evaluated"
+
+
+@pytest.mark.parametrize("decision", [
+    "accepted", "rejected", "needs_review", "indeterminate", "not_evaluated",
+])
+def test_record_writes_the_delivery_acceptance_decision(tmp_path, decision):
+    path = tmp_path / "history.jsonl"
+    task = Task("Research signal with a decision")
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="a", label="Research A", status=NodeStatus.COMPLETED, result="done"),
+    ])
+    decided = decision != "not_evaluated"
+    record = DeliveryAcceptance(
+        decision=decision, policy_sha256="c" * 64,
+        output_sha256=text_sha256("done") if decided else None,
+        strategy="deliverable" if decided else None,
+        reasons=() if decision in ("accepted", "not_evaluated") else ("validator rejected it",),
+    )
+    output = "done" if decision == "accepted" else ""
+
+    PlannerMemory(path).record(task, graph, SwarmResult(output, graph, acceptance=record))
+    [outcome] = PlannerMemory(path).recall(task)
+
+    assert outcome.acceptance == decision
+    # Delivery acceptance is recorded beside execution success, not folded into it.
+    assert outcome.success is True
+
+
+def test_record_reads_a_decision_only_from_an_acceptance_record(tmp_path):
+    path = tmp_path / "history.jsonl"
+    task = Task("Research signal by hand")
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="a", label="Research A", status=NodeStatus.COMPLETED),
+    ])
+
+    class LooseResult:
+        trace: list = []
+        total_cost_usd = 0.0
+        acceptance = "accepted"
+
+    PlannerMemory(path).record(task, graph, LooseResult())
+    [outcome] = PlannerMemory(path).recall(task)
+
+    assert outcome.acceptance == "not_evaluated"
 
 
 def test_legacy_rows_recall_with_outcome_fields_unrecorded(tmp_path):

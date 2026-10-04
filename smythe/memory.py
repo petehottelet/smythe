@@ -12,12 +12,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from smythe.acceptance import AcceptanceDecision, DeliveryAcceptance
 from smythe.task import Task, snapshot_task
 
 # Delivery acceptance decisions an outcome can record.
-_ACCEPTANCE_VALUES = frozenset({
-    "not_evaluated", "accepted", "rejected", "needs_review", "indeterminate",
-})
+_ACCEPTANCE_VALUES = frozenset(decision.value for decision in AcceptanceDecision)
 
 
 def _is_duration(value: Any) -> bool:
@@ -42,9 +41,10 @@ class ExecutionOutcome:
     ``elapsed_ms`` is the elapsed time of the call that recorded the outcome.
     ``latency_complete`` is False and ``resumed`` True when that call resumed
     a checkpoint, so ``elapsed_ms`` covers only part of the run. The cost
-    flags copy the result's. ``acceptance`` is ``"not_evaluated"`` for new
-    records. These fields are None when not recorded, as in history written
-    before they existed.
+    flags copy the result's. ``acceptance`` is the decision of the result's
+    delivery acceptance record, or ``"not_evaluated"`` when the result has
+    no record; ``success`` still means every node completed. These fields
+    are None when not recorded, as in history written before they existed.
     """
 
     task_goal: str
@@ -123,6 +123,12 @@ class PlannerMemory:
         timing = getattr(result, "timing", None)
         timing = timing if isinstance(timing, dict) else {}
         elapsed = timing.get("elapsed_ms")
+        # Only a record decides; a bare string on a duck-typed result does not.
+        record = getattr(result, "acceptance", None)
+        acceptance = (
+            record.decision.value if isinstance(record, DeliveryAcceptance)
+            else AcceptanceDecision.NOT_EVALUATED.value
+        )
 
         outcome = ExecutionOutcome(
             task_goal=saved_task.goal if hasattr(saved_task, "goal") else str(saved_task),
@@ -141,8 +147,7 @@ class PlannerMemory:
             resumed=_flag(timing.get("resumed")),
             cost_is_complete=_flag(getattr(result, "cost_is_complete", None)),
             cost_contains_estimates=_flag(getattr(result, "cost_contains_estimates", None)),
-            # No run evaluates delivery acceptance yet; None means not recorded.
-            acceptance="not_evaluated",
+            acceptance=acceptance,
         )
 
         line = (json.dumps(asdict(outcome)) + "\n").encode("utf-8")

@@ -11,15 +11,19 @@ from pathlib import Path
 from typing import Any, Callable
 from uuid import uuid4
 
+from smythe.acceptance import DeliveryAcceptance, text_sha256
 from smythe.budget import BudgetValidationError, Sentinel
 from smythe.checkpoint import (
     CHECKPOINT_VERSION,
+    STRICT_CHECKPOINT_VERSION,
     SUPPORTED_CHECKPOINT_VERSIONS,
     CheckpointStore,
     agents_from_list,
     build_state,
+    delivery_acceptance_from_state,
     drop_untrusted_mcp_servers,
     graph_from_dict,
+    graph_to_dict,
     reset_incomplete_nodes,
     task_from_dict,
 )
@@ -81,6 +85,10 @@ class SwarmResult:
         timing: Where the call's time went: elapsed time, phase totals and
             waits, with one segment per call that worked on the execution.
             None for a result built by hand.
+        acceptance: The delivery acceptance record that decided the output,
+            or None when no record exists, as for advisory and legacy runs.
+        rejected_output: The delivered text when a record exists but did not
+            accept it; ``output`` is then ``""``. None otherwise.
     """
 
     output: str
@@ -93,6 +101,34 @@ class SwarmResult:
     cost_scope: str = "execution_and_synthesis"
     workflow_accounting: dict[str, Any] | None = None
     timing: dict[str, Any] | None = None
+    acceptance: DeliveryAcceptance | None = None
+    rejected_output: str | None = None
+
+    @property
+    def accepted(self) -> bool:
+        """True only when the delivery acceptance record's decision is ``accepted``."""
+        return isinstance(self.acceptance, DeliveryAcceptance) and self.acceptance.accepted
+
+    def to_dict(self) -> dict[str, Any]:
+        """This result as detached JSON data.
+
+        The acceptance record appears under ``delivery_acceptance`` (None
+        without one) and the graph in its checkpoint form.
+        """
+        return json.loads(json.dumps({
+            "execution_id": self.execution_id,
+            "output": self.output,
+            "delivery_acceptance": None if self.acceptance is None else self.acceptance.to_dict(),
+            "rejected_output": self.rejected_output,
+            "total_cost_usd": self.total_cost_usd,
+            "cost_is_complete": self.cost_is_complete,
+            "cost_contains_estimates": self.cost_contains_estimates,
+            "cost_scope": self.cost_scope,
+            "workflow_accounting": self.workflow_accounting,
+            "timing": self.timing,
+            "trace": self.trace,
+            "graph": graph_to_dict(self.graph),
+        }, allow_nan=False))
 
 
 class _RunTiming:
@@ -143,6 +179,25 @@ def _saved_segments(state: dict[str, Any]) -> list[dict[str, Any]]:
         return json.loads(json.dumps(segments, allow_nan=False))
     except (TypeError, ValueError, RecursionError):
         return []
+
+
+def _delivered(output: Any, acceptance: DeliveryAcceptance | None) -> tuple[Any, str | None]:
+    """Split saved output into the delivered and the rejected slot.
+
+    Without a record the output is delivered as saved. With one, the output
+    must still match the record's digest, and only an accepted record
+    delivers it; otherwise ``output`` is empty and the text is kept as
+    ``rejected_output``.
+    """
+    if acceptance is None:
+        return output, None
+    if not isinstance(output, str) or (
+        acceptance.output_sha256 is not None and text_sha256(output) != acceptance.output_sha256
+    ):
+        raise ValueError("Checkpoint output does not match its delivery acceptance record")
+    if acceptance.accepted:
+        return output, None
+    return "", output
 
 
 def _auto_detect_provider(model: str) -> Provider:
@@ -679,7 +734,9 @@ class Swarm:
         and re-run. Cost accounting continues against the budget policy
         recorded in the checkpoint.  If the checkpointed execution
         already finished, its stored result is returned without
-        re-executing anything.  Resumed work runs one node at a time
+        re-executing anything; a version 5 checkpoint's result carries its
+        delivery acceptance record, and an unfinished version 5 checkpoint
+        is refused.  Resumed work runs one node at a time
         unless this Swarm has ``parallel=True``; a durable ``run_store``
         run keeps the concurrency its first execution recorded.
         """
@@ -705,6 +762,7 @@ class Swarm:
                 f"{list(SUPPORTED_CHECKPOINT_VERSIONS)}. Re-run the task "
                 f"instead of resuming."
             )
+        acceptance = delivery_acceptance_from_state(state)
 
         graph = graph_from_dict(state["graph"])
         if graph.run_ref is not None:
@@ -752,9 +810,10 @@ class Swarm:
         validate_verification_checkpoint(graph, version=version, completed=completed)
         timing = _RunTiming(tracer, resumed=True, previous=_saved_segments(state))
         if completed and not verification_pending(graph):
+            output, rejected_output = _delivered(state["output"], acceptance)
             tracer.add_phase("recovery", tracer.since(recovery_started))
             return SwarmResult(
-                output=state["output"],
+                output=output,
                 graph=graph,
                 trace=[],
                 total_cost_usd=budget.total_cost_usd,
@@ -762,6 +821,16 @@ class Swarm:
                 cost_contains_estimates=budget.cost_contains_estimates,
                 execution_id=execution_id,
                 timing=timing.result(),
+                acceptance=acceptance,
+                rejected_output=rejected_output,
+            )
+        if version >= STRICT_CHECKPOINT_VERSION:
+            # Finishing the run would deliver output its acceptance policy
+            # never decided, so an unfinished strict run is not resumed here.
+            raise ValueError(
+                f"Checkpoint {execution_id!r} belongs to an unfinished run with strict "
+                "delivery acceptance, which this build cannot resume. Re-run the task "
+                "instead of resuming."
             )
 
         from smythe.async_executor import AsyncExecutor
