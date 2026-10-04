@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import hashlib
 import json
+import pickle
 import subprocess
 
 import pytest
@@ -117,6 +119,66 @@ def test_how_an_outcome_was_set_is_not_part_of_a_reports_value():
     assert derived == stated and hash(derived) == hash(stated)
     assert repr(derived) == repr(stated)
     assert ValidationReport.from_dict(derived.to_dict()) == derived
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _ReleasedReport:
+    """``ValidationReport`` as the previous release defined it, before outcomes."""
+
+    path: str
+    findings: tuple = ()
+
+
+# Pickles name a class by module and qualified name. The previous release
+# defined the report in smythe.assets.validation, which now re-exports it.
+_ReleasedReport.__module__ = "smythe.assets.validation"
+_ReleasedReport.__qualname__ = "ValidationReport"
+
+
+def _released_pickle(monkeypatch, report: _ReleasedReport, protocol: int) -> bytes:
+    import smythe.assets.validation as released_module
+
+    with monkeypatch.context() as patch:
+        patch.setattr(released_module, "ValidationReport", _ReleasedReport)
+        return pickle.dumps(report, protocol=protocol)
+
+
+@pytest.mark.parametrize("protocol", range(pickle.HIGHEST_PROTOCOL + 1))
+def test_report_pickled_by_the_previous_release_loads_with_its_outcome(monkeypatch, protocol):
+    import smythe.assets.validation as released_module
+
+    hard = hard_finding("blank_image", "image is blank")
+    advisory = advisory_finding("palette_drift", "palette drifts")
+    rejected = _released_pickle(monkeypatch, _ReleasedReport("a.png", [advisory, hard]), protocol)
+    passing = _released_pickle(monkeypatch, _ReleasedReport("b.png", (advisory,)), protocol)
+    assert b"smythe.assets.validation" in rejected
+
+    loaded = pickle.loads(rejected)
+    assert type(loaded) is ValidationReport is released_module.ValidationReport
+    assert loaded == ValidationReport("a.png", (advisory, hard))
+    assert loaded.findings == (advisory, hard)
+    assert loaded.outcome is ValidationOutcome.REJECTED and loaded.passed is False
+    assert loaded.validator is None
+    assert loaded.to_dict() == ValidationReport("a.png", (advisory, hard)).to_dict()
+    # The loaded outcome was derived, so replacing the findings derives it again.
+    assert dataclasses.replace(loaded, findings=()).passed is True
+    assert pickle.loads(passing).outcome is ValidationOutcome.PASSED
+
+
+@pytest.mark.parametrize("protocol", range(pickle.HIGHEST_PROTOCOL + 1))
+def test_report_survives_pickle_and_copy(protocol):
+    hard = hard_finding("blank_image", "image is blank")
+    identity = ValidatorIdentity.for_config("blank", "1")
+    for report in (ValidationReport("a.png"), ValidationReport("a.png", (hard,), "error", identity)):
+        for restored in (pickle.loads(pickle.dumps(report, protocol=protocol)),
+                         copy.copy(report), copy.deepcopy(report)):
+            assert restored == report and restored.outcome is report.outcome
+            assert restored.validator == report.validator
+    derived = pickle.loads(pickle.dumps(ValidationReport("a.png"), protocol=protocol))
+    assert dataclasses.replace(derived, findings=(hard,)).outcome is ValidationOutcome.REJECTED
+    stated = pickle.loads(pickle.dumps(ValidationReport("a.png", outcome="passed"), protocol=protocol))
+    with pytest.raises(ValueError, match="passed report"):
+        dataclasses.replace(stated, findings=(hard,))
 
 
 def test_report_round_trips_through_json():

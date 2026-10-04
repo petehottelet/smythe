@@ -11,7 +11,7 @@ import hashlib
 import json
 import math
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from enum import StrEnum
 from typing import Any
 
@@ -228,6 +228,16 @@ class ValidationReport:
         object.__setattr__(self, "_derived_outcome", outcome if stated is None else None)
         if self.validator is not None and not isinstance(self.validator, ValidatorIdentity):
             raise TypeError("validator must be a ValidatorIdentity or None")
+
+    def __setstate__(self, state: Any) -> None:
+        names = [item.name for item in fields(self)]
+        if len(state) < len(names):
+            # Pickled by a release whose reports had fewer fields, such as only
+            # path and findings: build it as that release's arguments would.
+            report = type(self)(*state)
+            state = [getattr(report, name) for name in names]
+        for name, value in zip(names, state):
+            object.__setattr__(self, name, value)
 
     @property
     def hard_findings(self) -> tuple[ValidationFinding, ...]:
