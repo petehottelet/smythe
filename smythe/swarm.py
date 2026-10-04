@@ -101,7 +101,8 @@ class SwarmResult:
             the output, or None when no record exists, as for advisory and
             legacy runs.
         rejected_output: The delivered text when a record exists but did not
-            accept it; ``output`` is then ``""``. None otherwise.
+            accept it, or when a strict policy resumes a completed run that
+            has no record; ``output`` is then ``""``. None otherwise.
     """
 
     output: str
@@ -498,6 +499,23 @@ class Swarm:
             sources=record.sources, used_fallback=record.used_fallback,
             task_sha256=task_sha256(task), reasons=tuple(problems),
         )
+
+    @staticmethod
+    def _withheld(execution_id: str, output: Any) -> tuple[str, Any]:
+        """A strict Swarm's slots for a completed run that has no decision.
+
+        Nothing decided the saved output, so a strict policy does not deliver
+        it: ``output`` is empty and the text is ``rejected_output``, with no
+        record. The checkpoint is left as it was.
+        """
+        logger.warning(
+            "Checkpoint %r completed with no delivery acceptance record, so this Swarm's "
+            "strict policy withholds its output, which the result returns as "
+            "rejected_output. To decide it, re-run the task under this policy, or apply "
+            "smythe.acceptance.evaluate_delivery() to the saved output and graph.",
+            execution_id,
+        )
+        return "", output
 
     def _check_resume_policy(
         self, execution_id: str, saved: DeliveryAcceptance | None, task: Task | None,
@@ -966,6 +984,8 @@ class Swarm:
         re-executing anything; a strict run's result carries its delivery
         acceptance record after the saved output, task, sources and policy
         are checked against it, and any mismatch makes it ``indeterminate``.
+        A strict policy withholds the output of a completed run that has no
+        record, returning it as ``rejected_output`` with ``acceptance=None``.
         An unfinished strict run resumes only under the same strict policy,
         and a strict policy never finishes a run that began without one.
         Resumed work runs one node at a time
@@ -1052,6 +1072,8 @@ class Swarm:
             if acceptance is not None:
                 acceptance = self._reverified(acceptance, state["output"], graph, task)
             output, rejected_output = _delivered(state["output"], acceptance)
+            if acceptance is None and self._strict_policy() is not None:
+                output, rejected_output = self._withheld(execution_id, state["output"])
             tracer.add_phase("recovery", tracer.since(recovery_started))
             return SwarmResult(
                 output=output,

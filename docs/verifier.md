@@ -295,7 +295,8 @@ exists and does not accept, `output` is `""` and the text is in
 `rejected_output`. `SwarmResult.to_dict()` returns the result as JSON data
 with the record under `delivery_acceptance`. Advisory and legacy runs have
 `acceptance=None`; a run under a [strict policy](#strict-delivery-acceptance)
-always has a record. `PlannerMemory` stores the record's decision as
+always has a record, and a strict `Swarm` withholds the output of a completed
+run resumed without one. `PlannerMemory` stores the record's decision as
 `acceptance`, or `not_evaluated` without one. Jobs run the same validator
 objects on artifact bytes when a manifest names them; see
 [registered validators](jobs.md#registered-validators).
@@ -379,7 +380,7 @@ its target in the run. Without a strict policy none of this changes:
 an exhausted or advisory gate's verdict is never read and a verifier that
 raises stops the run.
 
-**Results and recovery.** A strict result always carries its record: an
+**Results and recovery.** A strict run's result always carries its record: an
 accepted result has the exact text in `output`; any other decision returns
 normally with `output=""` and the text in `rejected_output`. Every checkpoint
 of a strict run is [version 5](checkpoint-format.md#delivery-acceptance-version-5)
@@ -390,8 +391,17 @@ checkpoint written without one. Resuming a completed strict run checks the
 saved output against the record's digest, and the task, source generations
 and, when the resuming `Swarm` has a strict policy, its `sha256` against the
 record; any mismatch returns an `indeterminate` record for the saved output,
-never acceptance. A completed checkpoint without a record returns
-`acceptance=None` whatever the resuming policy.
+never acceptance.
+
+A completed checkpoint without a record (versions 1 to 4, or version 5
+without `delivery_acceptance` in `requires`) was never decided. A `Swarm`
+without a strict policy returns its text in `output`, as before. A strict
+`Swarm` withholds it: the result has `output=""`, the saved text in
+`rejected_output` and `acceptance=None`, and a warning on the `smythe.swarm`
+logger says how to obtain a decision. Re-run the task under the strict
+policy, or decide the saved output yourself with
+`evaluate_delivery(policy, result.graph, result.rejected_output, ...)`. The
+checkpoint is not changed.
 
 The trace gains one span with `node_id` `acceptance:delivery`, status
 `acceptance_<decision>` and the first reason as its label; `Tracer.summary()`

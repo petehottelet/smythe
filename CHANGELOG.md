@@ -195,7 +195,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   a strict run is version 5 with its record, an unfinished one resumes only
   under the same policy, and resuming a completed one rechecks the output
   digest, task, source generations and policy, giving `indeterminate` on any
-  mismatch. The trace gains an `acceptance:delivery` span. `Verdict.invalid`
+  mismatch. A strict `Swarm` resuming a completed checkpoint that has no
+  record returns its text only as `rejected_output`, with `acceptance=None`,
+  and logs how to obtain a decision. The trace gains an `acceptance:delivery` span. `Verdict.invalid`
   marks a verdict that could not be read,
   `smythe.acceptance.evaluate_delivery()` makes the decision outside a run,
   `smythe.synthesizer.deliverable_sources()` names the nodes `DELIVERABLE`

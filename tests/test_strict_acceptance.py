@@ -896,6 +896,35 @@ def test_a_different_policy_does_not_inherit_a_completed_decision():
     assert result.rejected_output == first.output
 
 
+@pytest.mark.parametrize("version", [1, 3, 4, 5])
+@pytest.mark.parametrize("acceptance", [_strict(), _strict(Forbids())], ids=["gate", "validator"])
+def test_a_strict_swarm_withholds_a_completed_run_without_a_record(version, acceptance, caplog):
+    store = MemoryStore()
+    provider = Script({"draft": ["## Summary\nDEFECT"], "judge": ["PASS"]})
+    first = _swarm(provider, store=store).execute(_gated())
+    state = store.states[first.execution_id]
+    assert (state["version"], first.output) == (4, "## Summary\nDEFECT")
+    # Version 5 without the requirement holds no record either.
+    state["version"] = version
+    if version == 5:
+        state["requires"] = []
+
+    with caplog.at_level("WARNING", logger="smythe.swarm"):
+        result = _swarm(provider, acceptance=acceptance, store=store).resume(first.execution_id)
+
+    assert (result.output, result.rejected_output) == ("", "## Summary\nDEFECT")
+    assert (result.acceptance, result.accepted) == (None, False)
+    assert provider.runs == {"draft": 1, "judge": 1}
+    assert "no delivery acceptance record" in caplog.text
+    assert "evaluate_delivery" in caplog.text and "re-run the task" in caplog.text
+    # The checkpoint is left as it was, and a Swarm without a strict policy
+    # still returns the stored text as the legacy run's output.
+    assert store.states[first.execution_id] == state
+    for legacy in (None, AcceptancePolicy()):
+        again = _swarm(provider, acceptance=legacy, store=store).resume(first.execution_id)
+        assert (again.output, again.rejected_output, again.acceptance) == (first.output, None, None)
+
+
 @pytest.mark.parametrize("change", ["task", "source"])
 def test_completed_resume_reverifies_the_bound_identities(change):
     store = MemoryStore()

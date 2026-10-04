@@ -253,7 +253,11 @@ listing it, is refused, and so is a `completed` state whose record is
 
 Versions 1 through 4 have no record, whatever keys they hold. Resuming one
 returns `acceptance` as `None`: a legacy run is never reported as accepted or
-as not yet evaluated.
+as not yet evaluated. A `Swarm` with a strict policy that resumes a completed
+checkpoint without a record, including a version 5 one that does not list
+`delivery_acceptance`, returns `output=""` with the saved text in
+`rejected_output`, because nothing decided it
+([strict delivery acceptance](verifier.md#strict-delivery-acceptance)).
 
 Resuming a completed version 5 checkpoint checks that `output` still matches
 `output_sha256`, that the task and every source node's generation are the ones
