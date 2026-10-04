@@ -779,8 +779,12 @@ class Swarm:
             return None
         return Path(self.artifact_dir) / execution_id[:12]
 
-    def _workflow_runtime(self):
-        """Pass explicit component dependencies into an isolated durable run."""
+    def _workflow_runtime(self, *, behavior_settings=None):
+        """Pass explicit component dependencies into an isolated durable run.
+
+        ``behavior_settings`` configures behavior versions that a new run
+        records (see ``smythe.workflow.RECIPE_BEHAVIOR_FIELDS``).
+        """
         from smythe.workflow import WorkflowRuntime
 
         return WorkflowRuntime(
@@ -793,5 +797,5 @@ class Swarm:
             checkpoint_every_n_nodes=self.checkpoint_every_n_nodes,
             retry_backoff_s=self.retry_backoff_s,
             max_concurrency=self.max_concurrency,
-            graph_policy=self._graph_policy,
+            graph_policy=self._graph_policy, behavior_settings=behavior_settings,
         )

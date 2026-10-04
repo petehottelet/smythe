@@ -16,6 +16,7 @@ from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.registry import Registry
 from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.workflow import WorkflowRuntime, _nanousd
+from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_store import CallKey, WorkflowConflictError, WorkflowCorruptionError
 
 
@@ -378,10 +379,57 @@ def test_behavior_version_fields_are_read_from_the_saved_recipe(store, monkeypat
     asyncio.run(later.resume(started, max_concurrency=1))
     assert later.behavior == {"prompt_assembly": 2}
     # A value configured explicitly must equal the saved one.
-    explicit = swarm(store)._workflow_runtime()
-    explicit.behavior_settings = {"prompt_assembly": 3}
+    explicit = swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": 3})
     with pytest.raises(WorkflowConflictError, match="prompt_assembly"):
         asyncio.run(explicit.resume(started, max_concurrency=1))
+    assert store.load_run(started)["config"]["prompt_assembly"] == 2
+
+
+def test_new_run_records_an_explicit_behavior_version_and_keeps_it(store, monkeypatch):
+    monkeypatch.setattr(workflow, "RECIPE_BEHAVIOR_FIELDS", MappingProxyType({"prompt_assembly": (1, 2)}))
+    runtime = swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": 3})
+    assert runtime.recipe["prompt_assembly"] == 3
+    planned = asyncio.run(runtime.plan(Task("Report"))).run_ref["run_id"]
+    assert store.load_run(planned)["config"]["prompt_assembly"] == 3
+    assert runtime.behavior == {"prompt_assembly": 3}
+    recipe = store.load_run(planned)["config_sha256"]
+    # Executing a Task creates its run the same way. A configured value equal
+    # to the one a recipe without the field means is not recorded.
+    unrecorded = swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": 1})
+    executed = asyncio.run(unrecorded.execute(Task("Report"), max_concurrency=1)).execution_id
+    assert "prompt_assembly" not in store.load_run(executed)["config"]
+    assert unrecorded.behavior == {"prompt_assembly": 1}
+    # A later release changes the default; each run keeps the value it recorded.
+    monkeypatch.setattr(workflow, "RECIPE_BEHAVIOR_FIELDS", MappingProxyType({"prompt_assembly": (1, 4)}))
+    later = swarm(store)._workflow_runtime()
+    result = asyncio.run(later.resume(planned, max_concurrency=1))
+    assert result.execution_id == planned and result.output
+    assert later.behavior == {"prompt_assembly": 3}
+    assert store.load_run(planned)["config_sha256"] == recipe
+    again = swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": 3})
+    asyncio.run(again.resume(planned, max_concurrency=1))
+    assert again.behavior == {"prompt_assembly": 3}
+    other = swarm(store)._workflow_runtime()
+    asyncio.run(other.resume(executed, max_concurrency=1))
+    assert other.behavior == {"prompt_assembly": 1}
+
+
+def test_behavior_settings_are_checked_and_fixed_when_the_runtime_is_built(store, monkeypatch):
+    with pytest.raises(WorkflowBindingError, match="prompt_assembly"):
+        swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": 3})
+    monkeypatch.setattr(workflow, "RECIPE_BEHAVIOR_FIELDS", MappingProxyType({"prompt_assembly": (1, 2)}))
+    with pytest.raises(WorkflowBindingError):
+        swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": float("nan")})
+    with pytest.raises(WorkflowBindingError, match="mapping"):
+        swarm(store)._workflow_runtime(behavior_settings=[("prompt_assembly", 3)])
+    runtime = swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": 3})
+    # The recipe is built once, so its settings cannot change afterwards.
+    with pytest.raises(AttributeError):
+        runtime.behavior_settings = {"prompt_assembly": 4}
+    with pytest.raises(TypeError):
+        runtime.behavior_settings["prompt_assembly"] = 4
+    assert runtime.recipe["prompt_assembly"] == 3
+    assert store.list_runs() == []
 
 
 def test_checkpoint_save_cost_does_not_grow_with_journal_history(tmp_path, monkeypatch):

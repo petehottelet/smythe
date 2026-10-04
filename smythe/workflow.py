@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from decimal import Decimal
@@ -54,11 +55,13 @@ MAX_NODE_ID_CHARS = 256
 # - Behavior-version fields, which select a versioned behavior such as a
 #   prompt-assembly version. This maps each field to (absent, default): the
 #   value a recipe without the field means, and the value a new run records
-#   unless the caller configures one. A recipe records the field only when its
-#   value differs from `absent`, so existing recipes keep their bytes. Resume
-#   reads the value from the saved recipe into WorkflowRuntime.behavior, so a
-#   changed default applies only to new runs; a value configured explicitly in
-#   behavior_settings must equal the saved one. No such field exists yet.
+#   unless WorkflowRuntime's behavior_settings argument configures another.
+#   A recipe records the field only when its value differs from `absent`, so
+#   existing recipes keep their bytes. Resume reads the value from the saved
+#   recipe into WorkflowRuntime.behavior, so a changed default applies only to
+#   new runs; a value configured explicitly must equal the saved one. The
+#   settings are read-only after construction, which builds the recipe a new
+#   run records from them. No such field exists yet.
 RECIPE_BEHAVIOR_FIELDS = MappingProxyType({})
 _PROVIDER_FIELDS = frozenset({"kind", "adapter_version", "decoder_version", "endpoint_scope",
                               "price_version", "supported_models", "config"})
@@ -87,6 +90,18 @@ def _without_pricing(value, *, saved=False):
         else:
             result[key] = _without_pricing(item, saved=saved)
     return result
+
+
+def _snapshot_behavior_settings(settings):
+    if settings is None:
+        settings = {}
+    if not isinstance(settings, Mapping):
+        raise WorkflowBindingError("behavior_settings must be a mapping")
+    settings = json_snapshot(dict(settings))
+    unknown = sorted(set(settings) - set(RECIPE_BEHAVIOR_FIELDS))
+    if unknown:
+        raise WorkflowBindingError("Unknown workflow behavior version: " + ", ".join(unknown))
+    return MappingProxyType(settings)
 
 
 def _hash(value):
@@ -171,7 +186,7 @@ class WorkflowRuntime:
     def __init__(self, *, store, model, max_budget_usd, provider, architect, registry,
                  router, synthesizer, supervisor, max_revisions, verifier, memory,
                  tool_runtime, checkpoint_store, checkpoint_every_n_nodes, retry_backoff_s,
-                 max_concurrency, graph_policy=None):
+                 max_concurrency, graph_policy=None, behavior_settings=None):
         if type(store) is not SQLiteWorkflowStore:
             raise WorkflowBindingError(
                 f"run_store must be SQLiteWorkflowStore itself, not {type(store).__name__}"
@@ -215,9 +230,10 @@ class WorkflowRuntime:
         self.retry_backoff_s = retry_backoff_s
         self.checkpoint_every_n_nodes = checkpoint_every_n_nodes
         self.graph_policy = snapshot_graph_policy(graph_policy)
-        # Explicitly configured behavior versions (see RECIPE_BEHAVIOR_FIELDS)
-        # and, once a run is bound, the versions that run uses.
-        self.behavior_settings = {}
+        # Explicitly configured behavior versions (see RECIPE_BEHAVIOR_FIELDS),
+        # which the recipe below records for a new run, and, once a run is
+        # bound, the versions that run uses.
+        self._behavior_settings = _snapshot_behavior_settings(behavior_settings)
         self.behavior = {}
         self.recipe = self._describe()
         self.graph = None
@@ -229,6 +245,11 @@ class WorkflowRuntime:
         self._pending_operations = set()
         self._updates = 0
         self.trace = Tracer()
+
+    @property
+    def behavior_settings(self):
+        """Read-only behavior versions configured for this runtime."""
+        return self._behavior_settings
 
     def _describe(self):
         validate_workflow_model(self.provider, self.model)
