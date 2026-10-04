@@ -81,6 +81,20 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   2,000,000 bytes for the compressed source archive, up from 400,000 and
   1,000,000, to fit delivery acceptance, recorded tools and context, and
   their tests.
+- **Durable workflow journals upgrade to format version 2, which Smythe
+  0.9.x and earlier cannot open, even read-only. Back up journals before
+  upgrading.** Version 2 adds the `tool` call phase to `CallKey` and
+  `CallScope`; its tables are unchanged. Opening a version 1 journal with
+  `SQLiteWorkflowStore(path)` upgrades it in one transaction that changes
+  only the recorded version, so every run, call, balance, reservation,
+  evidence row and the store identity are kept; an interrupted upgrade
+  rolls back. While any run holds an unexpired lease the upgrade raises
+  `WorkflowLeaseError`, so stop workers from earlier releases first.
+  `SQLiteWorkflowStore(path, read_only=True)` reads a version 1 journal
+  without upgrading it, and the new `store_version` property reports the
+  version. A store open for writing raises `WorkflowCorruptionError` and
+  writes nothing once another release changes the journal's version. See
+  [journal upgrades](docs/workflow-accounting.md#journal-upgrades).
 
 ### Fixed
 

@@ -78,8 +78,9 @@ class CallScope:
     turn: int = 0
 
     def __init__(self, component_id, phase, trigger, generation=0, attempt=0, turn=0):
+        # The journal's call phases (workflow_store._PHASES).
         if not isinstance(component_id, str) or not component_id or phase not in {
-            "routing", "planning", "execution", "verification", "supervision", "synthesis",
+            "routing", "planning", "execution", "verification", "supervision", "synthesis", "tool",
         }:
             raise WorkflowBindingError("Call scope requires a component ID and supported phase")
         for name, value in (("generation", generation), ("attempt", attempt), ("turn", turn)):

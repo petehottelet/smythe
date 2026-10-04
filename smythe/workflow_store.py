@@ -27,11 +27,14 @@ from uuid import uuid4
 from smythe import pricing, pricing_anthropic
 from smythe._sqlite import enable_wal
 
-STORE_VERSION = 1
+STORE_VERSION = 2
 STORE_KIND = "smythe.workflow"
 OFFLINE_PRICE_VERSION = "offline-zero-v1"
+# Version 1 journals open read-only as they are; a writable open migrates them.
+_READABLE_VERSIONS = (1, STORE_VERSION)
 _MONEY = re.compile(r"0|[1-9][0-9]*")
-_PHASES = {"routing", "planning", "execution", "verification", "supervision", "synthesis"}
+# Keep in step with CallScope in workflow_binding. Version 2 adds "tool".
+_PHASES = {"routing", "planning", "execution", "verification", "supervision", "synthesis", "tool"}
 _PRICED_KINDS = {"openai_responses": pricing, "anthropic_messages": pricing_anthropic}
 _OUTPUT_CAPS = {"openai_responses": "max_output_tokens", "anthropic_messages": "max_tokens"}
 # States of a call whose request has never been sent.
@@ -311,6 +314,7 @@ class SQLiteWorkflowStore:
         self.read_only = read_only
         self._clock_ns = clock_ns
         self._lock = threading.RLock()
+        self._version = None
         if not read_only:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             # The journal holds raw prompts and responses.
@@ -328,10 +332,13 @@ class SQLiteWorkflowStore:
                 enable_wal(self._db, validate_before_write=lambda: self._validate_schema(allow_empty=True))
                 self._db.execute("PRAGMA synchronous=FULL")
                 # Schema, metadata and persistent identity become visible
-                # together. A competing initializer's committed identity wins.
-                with self._transaction() as db:
+                # together. A competing initializer's committed identity wins,
+                # and so does its completed migration.
+                with self._transaction(upgrading=True) as db:
                     if self._validate_schema_db(db, allow_empty=True) is None:
                         self._create_schema(db)
+                    elif self._version < STORE_VERSION:
+                        self._migrate_schema(db)
                     self._store_id = self._validate_schema_db(db, allow_empty=False)
         except sqlite3.DatabaseError as exc:
             self._db.close()
@@ -355,12 +362,33 @@ class SQLiteWorkflowStore:
         if not required <= tables:
             raise WorkflowCorruptionError("Database is not a Smythe workflow journal")
         meta = db.execute("SELECT kind, version, store_id FROM workflow_meta").fetchall()
-        if len(meta) != 1 or tuple(meta[0])[:2] != (STORE_KIND, STORE_VERSION):
+        version = meta[0]["version"] if len(meta) == 1 else None
+        if (len(meta) != 1 or meta[0]["kind"] != STORE_KIND
+                or type(version) is not int or version not in _READABLE_VERSIONS):
             raise WorkflowCorruptionError("Unsupported workflow journal version")
         store_id = meta[0]["store_id"]
         if type(store_id) is not str or re.fullmatch("[0-9a-f]{32}", store_id) is None:
             raise WorkflowCorruptionError("Invalid persistent workflow store identity")
+        self._version = version
         return store_id
+
+    def _migrate_schema(self, db):
+        """Upgrade an earlier journal version inside the opener's write transaction.
+
+        Workers from earlier releases check the version only when they open
+        the journal, so a live lease on any run refuses the upgrade: stop
+        those workers first. An expired or released lease does not. Saved
+        rows are never rewritten. Read-only opens never reach this path.
+        """
+        if db.execute("SELECT version FROM workflow_meta").fetchone()[0] == STORE_VERSION:
+            return  # Another opener completed the same migration.
+        if db.execute("SELECT 1 FROM workflow_runs WHERE owner IS NOT NULL AND expires>? LIMIT 1",
+                      (self._clock_ns(),)).fetchone():
+            raise WorkflowLeaseError("Stop workflow workers from earlier releases before upgrading "
+                                     "a journal with a live lease")
+        # Version 2 adds the "tool" call phase. Its tables are those of
+        # version 1, and every version 1 row is a valid version 2 row.
+        db.execute("UPDATE workflow_meta SET version=?", (STORE_VERSION,))
 
     def __enter__(self):
         return self
@@ -368,6 +396,11 @@ class SQLiteWorkflowStore:
     @property
     def store_id(self):
         return self._store_id
+
+    @property
+    def store_version(self):
+        """The journal format version: 1 only for an earlier journal opened read-only."""
+        return self._version
 
     def __exit__(self, *_):
         self.close()
@@ -421,12 +454,18 @@ class SQLiteWorkflowStore:
         db.execute("INSERT INTO workflow_meta VALUES (?,?,?)", (STORE_KIND, STORE_VERSION, uuid4().hex))
 
     @contextmanager
-    def _transaction(self, *, write=True):
+    def _transaction(self, *, write=True, upgrading=False):
         if write and self.read_only:
             raise WorkflowStateError("Workflow store is read-only")
         with self._lock:
             self._db.execute("BEGIN IMMEDIATE" if write else "BEGIN")
             try:
+                # A writer opened before another release changed the journal
+                # version must not write rows that release would misread.
+                if write and not upgrading and [row[0] for row in self._db.execute(
+                        "SELECT version FROM workflow_meta")] != [STORE_VERSION]:
+                    raise WorkflowCorruptionError("Workflow journal version changed while open; "
+                                                  "close writers from other releases")
                 yield self._db
             except BaseException:
                 self._db.execute("ROLLBACK")

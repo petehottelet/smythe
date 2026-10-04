@@ -322,7 +322,8 @@ hashes, and events. `store.lease_sessions(execution_id)` returns the
 journal-clock bounds of each lease session, which a durable result reports as
 its [timing](execution.md#timing). `store.audit(execution_id)` verifies accounting and evidence
 bindings. Open `SQLiteWorkflowStore(path, read_only=True)` for inspection without
-schema changes or provider construction. Explicit `load_replay()` and
+schema changes or provider construction, including a journal from an earlier
+release ([journal upgrades](#journal-upgrades)). Explicit `load_replay()` and
 `load_evidence()` calls expose sensitive saved text and raw provider responses;
 protect the database and its SQLite sidecar files accordingly. Since 0.8.1, a
 new database file is created readable and writable by its owner only (mode
@@ -330,6 +331,54 @@ new database file is created readable and writable by its owner only (mode
 Opening an existing file never changes its permissions. API keys are
 excluded from stored provider descriptions. Ordinary summaries and traces do
 not include raw responses or encrypted reasoning.
+
+## Journal upgrades
+
+The journal records its format version, which `store.store_version` reports.
+This release writes version 2, which adds the `tool` call phase; its tables
+are the same as version 1's. Smythe 0.9.x and earlier write version 1 and
+cannot open a version 2 journal, even read-only: they raise
+`WorkflowCorruptionError("Unsupported workflow journal version")`.
+
+Back up each journal before this release opens it for writing, and keep the
+backup for as long as 0.9.x may need to read it. Copy the file, and any
+`-wal` file beside it, while no process has it open, or use SQLite's backup
+API, which includes changes still in the `-wal` file:
+
+```python
+import sqlite3
+
+source, backup = sqlite3.connect("smythe-runs.db"), sqlite3.connect("smythe-runs-v1.db")
+source.backup(backup)
+backup.close()
+source.close()
+```
+
+The backup holds the same raw prompts and responses, so protect it like the
+journal; it is created with your default file permissions.
+
+- `SQLiteWorkflowStore(path, read_only=True)` opens a version 1 journal
+  without changing it, and `store_version` is 1. Listing, inspection, audit
+  and replay work as before, including while an earlier release's worker holds
+  a run.
+- `SQLiteWorkflowStore(path)` upgrades a version 1 journal in the transaction
+  that opens it. The upgrade changes only the recorded version: every run,
+  call, balance, reservation, receipt, evidence row, checkpoint and event keeps
+  its bytes, and the store identity is unchanged. Concurrent openers upgrade
+  it once. An interrupted upgrade, including a killed process, rolls back and
+  leaves a version 1 journal.
+- Stop workers from earlier releases first. Those workers check the version
+  only when they open the journal, so while any run holds an unexpired lease
+  the upgrade raises `WorkflowLeaseError` and changes nothing. A released or
+  expired lease, such as one a killed process left, does not block it.
+- A store open for writing checks the version before each write. If another
+  release changes the version while the store is open, its next write raises
+  `WorkflowCorruptionError` and writes nothing.
+- A journal whose version is newer than this release supports is refused in
+  both modes, without changes.
+
+To return to 0.9.x, restore the backup; runs recorded after the upgrade are
+not in it.
 
 [Native provider](openai-responses.md) · [Cost guardrails](budgets.md) ·
 [Astra campaign protocol](../benchmarks/astra_benchmark_plan.md).
