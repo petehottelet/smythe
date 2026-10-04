@@ -199,7 +199,7 @@ memo. Its saved graph, trace, and expected output make the workflow inspectable.
 | Adapt the workflow to the task | Generated graphs, approved templates, and deterministic planning |
 | Control spending and parallel work | Request reservations and bounded concurrency |
 | Recover interrupted work | Checkpoints, native response replay, and durable job journals |
-| Check the deliverable | Output verification and artifact receipts |
+| Check the deliverable | Output verification, opt-in strict acceptance of the exact output returned, and artifact receipts |
 | Understand a run | Graph exports, traces, costs, and inspection reports |
 
 [Architecture](docs/architecture.md) · [Execution](docs/execution.md) ·

@@ -247,6 +247,21 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   attachment fingerprints. The digest is never stored: plan hashes, operation
   IDs, approval tokens, exports and the Jobs schema are unchanged. See
   [operation identity](docs/jobs.md#operation-identity-and-input-digest).
+- Strict runs check their acceptance obligations before they spend.
+  `smythe.acceptance.validate_acceptance_obligations(graph, policy)` lists
+  every reason a strict policy could not decide a graph's output: a gate
+  that verifies itself, a node not in the graph or a node it does not depend
+  on, a gate with `FailurePolicy.SKIP`, and, without final validators,
+  delivered output that is not exactly one node judged by a gate that
+  counts. A strict `Swarm` refuses such a graph with `ValueError` before any
+  provider call, and a generated plan before any node runs; without final
+  validators or `allow_generated_gates` it refuses before planning a run
+  whose architects all generate their gates. A supervisor revision that
+  would break an obligation the graph met, such as a step added after the
+  gated node with no final validator to check it, is refused and traced as
+  `revision_rejected`, and the run continues on its plan. Runs without a
+  strict policy are unchanged. See
+  [acceptance obligations](docs/verifier.md#acceptance-obligations).
 
 ### Changed
 

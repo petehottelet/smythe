@@ -20,6 +20,7 @@ from smythe.acceptance import (
     evaluate_delivery,
     task_sha256,
     text_sha256,
+    validate_acceptance_obligations,
 )
 from smythe.budget import BudgetValidationError, Sentinel
 from smythe.checkpoint import (
@@ -261,7 +262,10 @@ class Swarm:
     delivered output, and records the decision with the completed
     checkpoint; output it does not accept is returned as ``rejected_output``.
     It decides only on verdicts produced in the run, so a fresh strict run
-    refuses a graph whose judge completed before it.
+    refuses a graph whose judge completed before it. Before any node runs,
+    it refuses a graph whose delivered output it could not decide
+    (:func:`~smythe.acceptance.validate_acceptance_obligations`), and before
+    planning a run whose plan could not meet that check.
     None, the default, and an advisory policy keep legacy behavior.
     """
 
@@ -637,7 +641,9 @@ class Swarm:
 
         The run's missing cost ceiling is refused only when *executing*: a
         caller of plan() can still set each returned node's estimate, which
-        the node check before the first call accepts in its place.
+        the node check before the first call accepts in its place. So is a
+        strict policy without final validators when every architect that
+        could plan generates its gates, which that policy does not count.
         """
         self._check_run_support()
         if self._router is None:
@@ -649,6 +655,25 @@ class Swarm:
         if architects and all(type(item) is LLMArchitect for item in architects):
             check_provider_support(self._provider, str(self.model), node_id=None,
                                    max_budget_usd=self.max_budget_usd if executing else None)
+        policy = self._strict_policy()
+        if (executing and policy is not None and not policy.final_validators
+                and not policy.allow_generated_gates and architects
+                and not any(_builds_developer_gates(item) for item in architects)):
+            # The plan's gates will not count, so nothing could accept its output.
+            raise ValueError(
+                "A strict acceptance policy without a final validator accepts only output "
+                "that a gate you supplied judged, and this run's plan would come from an "
+                "architect that generates its gates. Add a final validator, set "
+                "allow_generated_gates=True, or execute a graph you build."
+            )
+
+    def _check_obligations(self, graph: ExecutionGraph) -> None:
+        """Refuse, before any node runs, a graph whose output a strict policy could not decide."""
+        policy = self._strict_policy()
+        if policy is not None:
+            validate_acceptance_obligations(
+                graph, policy, strategy=_synthesis_strategy(self._synthesizer),
+            )
 
     def _check_dispatch_support(self, graph: ExecutionGraph, budget: Sentinel) -> None:
         """Reject, before any node runs, nodes or a synthesis the provider cannot serve."""
@@ -781,6 +806,7 @@ class Swarm:
             graph = await self._aplan_for_execution(task_or_graph, tracer)
         else:
             graph = self._prepare_graph(task_or_graph)
+        self._check_obligations(graph)
         task = snapshot_task(graph.task) if graph.task is not None else None
 
         execution_id = uuid4().hex
@@ -844,6 +870,7 @@ class Swarm:
             graph = self._plan_for_execution(task_or_graph, tracer)
         else:
             graph = self._prepare_graph(task_or_graph)
+        self._check_obligations(graph)
         task = snapshot_task(graph.task) if graph.task is not None else None
 
         execution_id = uuid4().hex

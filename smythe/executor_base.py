@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
 from smythe._errors import PicklableError
-from smythe.acceptance import AcceptanceMode, AcceptancePolicy
+from smythe.acceptance import AcceptanceMode, AcceptancePolicy, _unmet_obligations
 from smythe.agent import Agent
 from smythe.budget import (
     BudgetEstimateRequired,
@@ -23,7 +23,9 @@ from smythe.budget import (
     validate_completion_usage,
     validate_token_count,
 )
-from smythe.graph import ExecutionGraph, Node, NodeStatus, RevisionError
+from smythe.graph import (
+    REVISION_ADDED_KEY, ExecutionGraph, Node, NodeStatus, Revision, RevisionError,
+)
 from smythe.provider import (
     CompletionResult, Provider, ProviderResponseError, _declared_features, _missing_cost_ceiling,
     _native_receipt, _raise_if_incomplete, _settle_response_error, _native_response_errors,
@@ -246,6 +248,7 @@ class ExecutorBase:
                 f"acceptance must be an AcceptancePolicy or None, not {type(acceptance).__name__}"
             )
         self._strict = acceptance is not None and acceptance.mode is AcceptanceMode.STRICT
+        self._acceptance = acceptance if self._strict else None
         self._provider = provider
         self._provider_call_factory = provider_call_factory
         self._workflow_managed = (
@@ -289,7 +292,9 @@ class ExecutorBase:
         any scheduling state it derived from it. Ordinary supervisor
         errors and invalid changes are contained and traced. Invalid
         provider accounting is terminal because continuing would spend
-        more while the supervisor's charge remains unresolved.
+        more while the supervisor's charge remains unresolved. Under a
+        strict acceptance policy, a revision that breaks a delivery
+        acceptance obligation is an invalid change too.
         """
         if self._supervisor is None or node.status is not NodeStatus.COMPLETED:
             return False
@@ -338,7 +343,7 @@ class ExecutorBase:
             return False
 
         try:
-            graph.apply_revision(revision)
+            self._apply_revision(graph, revision)
         except RevisionError as exc:
             self._tracer.on_revision(node, revision, applied=False, detail=str(exc))
             self.notify_supervision_update(node, False)
@@ -350,6 +355,34 @@ class ExecutorBase:
         self._tracer.on_revision(node, revision, applied=True)
         self.notify_supervision_update(node, True)
         return True
+
+    def _apply_revision(self, graph: ExecutionGraph, revision: Revision) -> None:
+        """Apply *revision*; under a strict policy, refuse one that breaks an obligation.
+
+        The revised graph must meet every delivery acceptance obligation the
+        graph met before it (see ``validate_acceptance_obligations``). Without
+        final validators, a step added after a gated node, another delivered
+        node, or a gate the revision adds itself would leave the delivered
+        output without a check that can accept it, so such a revision raises
+        RevisionError and the graph is left exactly as it was.
+        """
+        policy = self._acceptance
+        if policy is None:
+            graph.apply_revision(revision)
+            return
+        before = set(_unmet_obligations(graph, policy))
+        nodes, edges = list(graph.nodes), {n.id: n.depends_on for n in graph.nodes}
+        graph.apply_revision(revision)
+        broken = [problem for problem in _unmet_obligations(graph, policy) if problem not in before]
+        if broken:
+            graph.nodes = nodes
+            for kept in nodes:
+                kept.depends_on = edges[kept.id]
+            for added in revision.add_nodes:
+                added.metadata.pop(REVISION_ADDED_KEY, None)
+            raise RevisionError(
+                "a strict acceptance policy refuses this revision: " + "; ".join(broken)
+            )
 
     def notify_supervision_update(self, node: Node, revision_applied: bool) -> None:
         """Persist a consumed supervisor decision after its graph disposition."""

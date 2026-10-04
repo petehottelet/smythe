@@ -41,7 +41,7 @@ add a step after `draft`. The gate does not judge that step, and under
 output instead of `draft`
 ([steps added after a gate](supervisor.md#steps-added-after-a-gate)). A
 [strict acceptance policy](#strict-delivery-acceptance) accepts such output
-only through a final validator.
+only through a final validator, and without one refuses the revision.
 
 ## Recovery and concurrent work
 
@@ -348,7 +348,8 @@ a supervisor adds after the gated node, two deliverable nodes, the
 `DELIVERABLE` fallback to every completed node, and `CONCATENATE`,
 `STRUCTURED`, `LLM_MERGE` or a custom synthesizer all need a final validator.
 A `Swarm` whose strict policy has none raises `ValueError` when it is built
-with a synthesis other than `DELIVERABLE`.
+with a synthesis other than `DELIVERABLE`, and refuses the other cases
+[before any call](#acceptance-obligations).
 
 <a id="which-gates-count"></a>
 **Which gates count.** Acceptance criteria are inputs you control, so a gate
@@ -364,6 +365,33 @@ the output: without a final validator the decision is `on_invalid`. Set
 always count. A plan made by a `Swarm` without a strict policy carries no
 mark, so a graph you take from it and pass to a strict `Swarm` counts as
 yours.
+
+<a id="acceptance-obligations"></a>
+**Obligations checked before any call.** A strict run that could never
+decide its output is refused with `ValueError` before it spends anything.
+`smythe.acceptance.validate_acceptance_obligations(graph, policy,
+strategy="deliverable")` reads the graph's structure, not its results, and
+lists every unmet obligation:
+
+- a gate that verifies itself or a node that is not in the graph, or that
+  does not depend on the node it verifies, directly or through other nodes,
+  and so could judge it before it runs;
+- a gate with `FailurePolicy.SKIP`, which would leave it without a verdict
+  when its judge fails;
+- without final validators, a delivered output that no counted gate covers:
+  `DELIVERABLE` synthesis must deliver exactly one node, and a gate that
+  counts must judge it.
+
+A strict `Swarm` checks a graph you pass to `execute()` or load from YAML
+before any provider call, and a generated plan after planning, before any
+node runs. Without final validators or `allow_generated_gates`, it refuses
+before planning a run whose architects all generate their gates, such as the
+default `LLMArchitect`, because no gate of that plan could accept; `plan()`
+still returns the graph for inspection, and executing it is refused. A
+[supervisor revision](supervisor.md#steps-added-after-a-gate) that would
+break an obligation the graph met is refused like any invalid revision. A
+resumed run is not checked again: its graph met the obligations when it
+started.
 
 A final validator that raises, returns an awaitable or anything other than a
 `ValidationReport`, reports `outcome="error"`, or returns a report naming

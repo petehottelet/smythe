@@ -22,14 +22,20 @@ from smythe import (
     ValidatorIdentity,
     Verdict,
 )
-from smythe.acceptance import evaluate_delivery, task_sha256, text_sha256
+from smythe.acceptance import (
+    evaluate_delivery,
+    task_sha256,
+    text_sha256,
+    validate_acceptance_obligations,
+)
 from smythe.async_executor import AsyncExecutor
 from smythe.checkpoint import CheckpointStore
 from smythe.executor import Executor
 from smythe.executor_base import ExecutorBase
-from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
+from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Revision, Topology
 from smythe.provider import Artifact, CompletionResult, Provider
 from smythe.registry import Registry
+from smythe.supervisor import LLMSupervisor
 from smythe.synthesizer import (
     MERGE_SYSTEM_PROMPT,
     SynthesisStrategy,
@@ -40,6 +46,7 @@ from smythe.tracer import Tracer
 from smythe.validation import hard_finding
 from smythe.verifier import TokenVerifier, Verifier
 from smythe.workflow_binding import WorkflowBindingError
+from test_supervisor import GatedRunProvider, ScriptedSupervisor
 
 STRATEGIES = list(SynthesisStrategy)
 PATHS = ["sync", "async", "resume"]
@@ -183,6 +190,27 @@ def _not_accepted(result, decision: str) -> None:
     assert result.acceptance.output_sha256 == text_sha256(result.rejected_output)
 
 
+def _refuses(policy: AcceptancePolicy, graph: ExecutionGraph, *, match: str,
+             parallel: bool = False) -> None:
+    """A strict Swarm refuses *graph* before any provider call or checkpoint."""
+    provider, store = Script({}), MemoryStore()
+    with pytest.raises(ValueError, match=match):
+        _swarm(provider, acceptance=policy, store=store, parallel=parallel).execute(graph)
+    assert provider.runs == {} and store.saves == []
+
+
+def _decided(graph: ExecutionGraph, policy: AcceptancePolicy,
+             provider) -> tuple[DeliveryAcceptance, str]:
+    """Run *graph* on an executor, outside any Swarm, and decide its DELIVERABLE output."""
+    for node in graph.nodes:
+        node.metadata.setdefault("model", "test-model")
+    Executor(provider, Registry(), Tracer(), artifact_dir=None, acceptance=policy).run(graph)
+    sources, used_fallback = deliverable_sources(graph)
+    output = Synthesizer().synthesize(graph)
+    return evaluate_delivery(policy, graph, output, strategy="deliverable", sources=sources,
+                             used_fallback=used_fallback), output
+
+
 # ---------------------------------------------------------------------------
 # An intermediate draft passes its gate; the final output decides
 # ---------------------------------------------------------------------------
@@ -291,10 +319,12 @@ def test_a_passed_gate_accepts_its_exact_target(path):
 
 
 def test_a_passed_gate_does_not_accept_a_later_step():
+    # A Swarm refuses the run before any call; decided anyway, it is not accepted.
+    _refuses(_strict(), _gated(final=True), match="no gate judges 'final'")
     provider = Script(_final_script("## Summary\nA later step.", "sync"))
-    result = _swarm(provider, acceptance=_strict()).execute(_gated(final=True))
-    _not_accepted(result, "indeterminate")
-    assert result.rejected_output == "## Summary\nA later step."
+    record, output = _decided(_gated(final=True), _strict(), provider)
+    assert record.decision.value == "indeterminate"
+    assert output == "## Summary\nA later step."
 
 
 @pytest.mark.parametrize("strategy", [s for s in STRATEGIES if s is not SynthesisStrategy.DELIVERABLE])
@@ -317,21 +347,25 @@ def test_a_custom_synthesizer_needs_a_final_validator():
 
 
 def test_deliverable_fallback_needs_a_final_validator():
-    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
-        Node(id="draft", label="draft"),
-        Node(id="judge", label="judge", depends_on=["draft"], verifies="draft",
-             max_regenerations=1),
-        Node(id="final", label="final", depends_on=["draft"], failure_policy=FailurePolicy.SKIP),
-    ])
+    def graph() -> ExecutionGraph:
+        return ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+            Node(id="draft", label="draft"),
+            Node(id="judge", label="judge", depends_on=["draft"], verifies="draft",
+                 max_regenerations=1),
+            Node(id="final", label="final", depends_on=["draft"],
+                 failure_policy=FailurePolicy.SKIP),
+        ])
+
+    _refuses(_strict(), graph(), match="no gate judges 'final'")
     provider = Script({"draft": ["## Summary\nDraft."], "judge": ["PASS"],
                        "final": [RuntimeError("unavailable")]})
-    result = _swarm(provider, acceptance=_strict()).execute(graph)
+    executed = graph()
+    record, output = _decided(executed, _strict(), provider)
 
-    _not_accepted(result, "indeterminate")
-    assert result.acceptance.used_fallback is True
-    draft, judge = result.graph.nodes[:2]
-    assert deliverable_sources(result.graph) == ([draft, judge], True)
-    assert result.rejected_output == "## Summary\nDraft.\n\nPASS"
+    assert record.decision.value == "indeterminate" and record.used_fallback is True
+    draft, judge = executed.nodes[:2]
+    assert deliverable_sources(executed) == ([draft, judge], True)
+    assert output == "## Summary\nDraft.\n\nPASS"
 
 
 def _two_gates() -> ExecutionGraph:
@@ -343,9 +377,9 @@ def _two_gates() -> ExecutionGraph:
 
 
 def test_two_gated_deliverables_need_a_final_validator():
-    result = _swarm(Script({"ja": ["PASS"], "jb": ["PASS"]}),
-                    acceptance=_strict()).execute(_two_gates())
-    _not_accepted(result, "indeterminate")
+    _refuses(_strict(), _two_gates(), match=r"nodes \['a', 'b'\] are all delivered")
+    record, _ = _decided(_two_gates(), _strict(), Script({"ja": ["PASS"], "jb": ["PASS"]}))
+    assert record.decision.value == "indeterminate"
     result = _swarm(Script({"ja": ["PASS"], "jb": ["PASS"]}),
                     acceptance=_strict(Forbids())).execute(_two_gates())
     assert result.accepted
@@ -371,16 +405,6 @@ def _planner(**options) -> tuple[OfflineProvider, Swarm]:
                            checkpoint_store=MemoryStore(), **options)
 
 
-def _decided(graph: ExecutionGraph, policy: AcceptancePolicy, provider) -> DeliveryAcceptance:
-    """Run *graph* on an executor, outside any Swarm, and decide its DELIVERABLE output."""
-    for node in graph.nodes:
-        node.metadata.setdefault("model", "test-model")
-    Executor(provider, Registry(), Tracer(), artifact_dir=None, acceptance=policy).run(graph)
-    sources, used_fallback = deliverable_sources(graph)
-    return evaluate_delivery(policy, graph, Synthesizer().synthesize(graph),
-                             strategy="deliverable", sources=sources, used_fallback=used_fallback)
-
-
 def test_a_gate_from_a_generated_plan_does_not_accept_on_its_own():
     provider, swarm = _planner(acceptance=_strict())
     graph = swarm.plan(Task("Write the summary"))
@@ -388,7 +412,7 @@ def test_a_gate_from_a_generated_plan_does_not_accept_on_its_own():
     assert judge.verifies == "draft" and judge.metadata["generated_gate"] is True
     assert "generated_gate" not in graph.nodes[0].metadata
 
-    record = _decided(graph, _strict(), provider)
+    record, _ = _decided(graph, _strict(), provider)
 
     # The plan's judge passed its draft, but a model wrote that gate.
     assert judge.metadata["advisory_verdict"]["outcome"] == "passed"
@@ -430,13 +454,13 @@ def test_a_gate_from_a_developer_architect_accepts_on_its_own():
 def test_a_gate_a_revision_added_does_not_accept_on_its_own():
     graph = _gated(max_regenerations=0)
     graph.nodes[1].metadata["added_by_revision"] = True
-    record = _decided(graph, _strict(), Script({"judge": ["PASS"]}))
+    record, _ = _decided(graph, _strict(), Script({"judge": ["PASS"]}))
     assert record.decision.value == "indeterminate"
 
     graph = _gated(max_regenerations=0)
     graph.nodes[1].metadata["added_by_revision"] = True
     policy = _strict(allow_generated_gates=True)
-    assert _decided(graph, policy, Script({"judge": ["PASS"]})).accepted
+    assert _decided(graph, policy, Script({"judge": ["PASS"]}))[0].accepted
 
 
 @pytest.mark.parametrize("acceptance", [None, AcceptancePolicy()], ids=["none", "advisory"])
@@ -444,6 +468,324 @@ def test_plans_without_a_strict_policy_are_not_marked(acceptance):
     provider, swarm = _planner(acceptance=acceptance)
     graph = swarm.plan(Task("Write the summary"))
     assert all("generated_gate" not in node.metadata for node in graph.nodes)
+
+
+# ---------------------------------------------------------------------------
+# Obligations a strict run must meet before any call
+# ---------------------------------------------------------------------------
+
+
+def _with_judge(**judge) -> ExecutionGraph:
+    """A draft and one judge built from *judge*'s fields."""
+    return ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="draft", label="draft"),
+        Node(id="judge", label="judge", **{"depends_on": ["draft"], "verifies": "draft", **judge}),
+    ])
+
+
+BROKEN_GATES = {
+    "self": (_with_judge(verifies="judge"), "gate 'judge' verifies itself"),
+    "dangling": (_with_judge(verifies="ghost"),
+                 "gate 'judge' verifies 'ghost', which is not in the graph"),
+    "not-dependent": (_with_judge(depends_on=[]),
+                      "gate 'judge' does not depend on 'draft', the node it verifies"),
+    "skip": (_with_judge(failure_policy=FailurePolicy.SKIP),
+             "gate 'judge' has failure_policy SKIP"),
+}
+
+
+@pytest.mark.parametrize("case", sorted(BROKEN_GATES))
+def test_obligations_refuse_a_gate_that_cannot_judge_its_target(case):
+    graph, message = BROKEN_GATES[case]
+    # Final validators cover the output, so only the gate is at fault.
+    with pytest.raises(ValueError, match=message):
+        validate_acceptance_obligations(graph, _strict(Forbids()))
+
+
+def test_obligations_accept_a_gate_that_reaches_its_target_through_another_node():
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="draft", label="draft"),
+        Node(id="review", label="review", depends_on=["draft"], verifies="draft"),
+        Node(id="judge", label="judge", depends_on=["review"], verifies="draft",
+             max_regenerations=1),
+    ])
+    validate_acceptance_obligations(graph, _strict())
+    validate_acceptance_obligations(graph, _strict(Forbids()))
+
+
+@pytest.mark.parametrize(("graph", "message"), [
+    pytest.param(_gated(final=True), "no gate judges 'final', the delivered node", id="later-step"),
+    pytest.param(_two_gates(), r"nodes \['a', 'b'\] are all delivered", id="two-delivered"),
+    pytest.param(ExecutionGraph(topology=[Topology.SERIAL], nodes=[Node(id="draft", label="d")]),
+                 "no gate judges 'draft'", id="ungated"),
+])
+def test_obligations_need_a_check_that_covers_the_delivered_output(graph, message):
+    with pytest.raises(ValueError, match=message):
+        validate_acceptance_obligations(graph, _strict())
+    validate_acceptance_obligations(graph, _strict(Forbids()))
+
+
+def test_obligations_count_only_gates_the_developer_supplied():
+    graph = _gated()
+    graph.nodes[1].metadata["generated_gate"] = True
+    with pytest.raises(ValueError, match="only a gate that a generated plan or a supervisor"):
+        validate_acceptance_obligations(graph, _strict())
+    validate_acceptance_obligations(graph, _strict(allow_generated_gates=True))
+    validate_acceptance_obligations(graph, _strict(Forbids()))
+
+
+def test_obligations_need_a_final_validator_for_other_synthesis():
+    with pytest.raises(ValueError, match="llm_merge synthesis needs a final validator"):
+        validate_acceptance_obligations(_gated(), _strict(), strategy="llm_merge")
+    validate_acceptance_obligations(_gated(), _strict(Forbids()), strategy="llm_merge")
+
+
+def test_obligations_list_every_unmet_obligation():
+    graph = _gated(final=True, judge_policy=FailurePolicy.SKIP)
+    with pytest.raises(ValueError) as caught:
+        validate_acceptance_obligations(graph, _strict())
+    assert "failure_policy SKIP" in str(caught.value)
+    assert "no gate judges 'final'" in str(caught.value)
+
+
+@pytest.mark.parametrize("policy", [None, AcceptancePolicy()], ids=["none", "advisory"])
+def test_obligations_need_a_strict_policy(policy):
+    with pytest.raises(ValueError, match="needs a strict AcceptancePolicy"):
+        validate_acceptance_obligations(_gated(), policy)
+
+
+@pytest.mark.parametrize("case", sorted(BROKEN_GATES))
+@pytest.mark.parametrize("parallel", [False, True])
+def test_a_strict_swarm_refuses_a_broken_gate_before_any_call(case, parallel):
+    graph, message = BROKEN_GATES[case]
+    _refuses(_strict(Forbids()), graph, match=message, parallel=parallel)
+
+
+@pytest.mark.parametrize("acceptance", [None, AcceptancePolicy()], ids=["none", "advisory"])
+def test_graphs_a_strict_policy_refuses_still_run_without_one(acceptance):
+    for graph in (_gated(final=True), _two_gates(), _gated(judge_policy=FailurePolicy.SKIP)):
+        result = _swarm(Script({"judge": ["PASS"], "ja": ["PASS"], "jb": ["PASS"]}),
+                        acceptance=acceptance).execute(graph)
+        assert result.output and result.acceptance is None
+
+
+def test_a_strict_swarm_refuses_a_yaml_gate_that_may_be_skipped(tmp_path):
+    path = tmp_path / "skip.yaml"
+    path.write_text(
+        "topology: serial\nnodes:\n  - id: draft\n    label: draft\n"
+        "  - id: judge\n    label: judge\n    depends_on: [draft]\n    verifies: draft\n"
+        "    failure_policy: skip\n",
+        encoding="utf-8",
+    )
+    provider = Script({})
+    swarm = Swarm.from_yaml(str(path), model="test-model", provider=provider,
+                            acceptance=_strict(Forbids()))
+    with pytest.raises(ValueError, match="failure_policy SKIP"):
+        swarm.execute()
+    assert provider.runs == {}
+
+
+def test_a_strict_swarm_refuses_to_plan_when_no_gate_of_the_plan_could_accept():
+    provider, swarm = _planner(acceptance=_strict())
+    with pytest.raises(ValueError, match="architect that generates its gates"):
+        swarm.execute(Task("Write the summary"))
+    with pytest.raises(ValueError, match="architect that generates its gates"):
+        asyncio.run(swarm.execute_async(Task("Write the summary")))
+    assert provider.calls == []
+
+    # plan() still returns the graph to inspect; executing it is refused.
+    graph = swarm.plan(Task("Write the summary"))
+    assert len(provider.calls) == 1
+    with pytest.raises(ValueError, match="only a gate that a generated plan"):
+        swarm.execute(graph)
+    assert len(provider.calls) == 1
+
+
+def test_a_generated_plan_is_checked_before_any_node_runs():
+    plan = json.loads(json.dumps(GATED_PLAN))
+    plan["nodes"][1]["failure_policy"] = "skip"
+    provider = OfflineProvider(plan=plan, responses=[UNCHECKED, "PASS"])
+    swarm = Swarm(provider=provider, model="test-model", artifact_dir=None,
+                  checkpoint_store=MemoryStore(), acceptance=_strict(Forbids()))
+
+    with pytest.raises(ValueError, match="'judge' has failure_policy SKIP"):
+        swarm.execute(Task("Write the summary"))
+    assert len(provider.calls) == 1  # the planning call only
+
+
+# ---------------------------------------------------------------------------
+# Supervision cannot make unchecked output accepted
+# ---------------------------------------------------------------------------
+
+
+def _after_draft(*extra: Node, rewire=None) -> Revision:
+    """A revision that adds a ``final`` step after the gated draft, and *extra* nodes."""
+    final = Node(id="final", label="final", depends_on=["draft"])
+    return Revision(add_nodes=(final, *extra), rewire=rewire or {}, reason="add a final step")
+
+
+def _supervised(provider, revision, *, acceptance, parallel=False):
+    supervisor = ScriptedSupervisor(revision)
+    swarm = _swarm(provider, acceptance=acceptance, supervisor=supervisor, max_revisions=1,
+                   parallel=parallel)
+    return supervisor, swarm
+
+
+def _refused_revisions(result) -> list[dict]:
+    return [span for span in result.trace if span.get("status") == "revision_rejected"]
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_a_step_added_after_a_gate_is_refused_without_a_final_validator(parallel):
+    provider = Script({"draft": ["## Summary\nGated draft."], "judge": ["PASS"],
+                       "final": ["## Summary\nUnchecked."]})
+    supervisor, swarm = _supervised(provider, _after_draft(), acceptance=_strict(),
+                                    parallel=parallel)
+
+    result = swarm.execute(_gated())
+
+    # The run keeps its plan, so the gate still judges the delivered draft.
+    assert result.accepted and result.output == "## Summary\nGated draft."
+    assert [node.id for node in result.graph.nodes] == ["draft", "judge"]
+    assert "final" not in provider.runs and supervisor.reviews[0] == "draft"
+    (refused,) = _refused_revisions(result)
+    assert "strict acceptance policy refuses this revision" in refused["error"]
+    assert "no gate judges 'final'" in refused["error"]
+
+
+def test_a_refused_revision_leaves_no_mark_on_its_nodes():
+    final = Node(id="final", label="final", depends_on=["draft"])
+    revision = Revision(add_nodes=(final,), rewire={})
+    _supervised(Script({"judge": ["PASS"]}), revision, acceptance=_strict())[1].execute(_gated())
+    assert "added_by_revision" not in final.metadata
+
+
+@pytest.mark.parametrize("acceptance", [None, AcceptancePolicy()], ids=["none", "advisory"])
+def test_a_step_added_after_a_gate_still_applies_without_a_strict_policy(acceptance):
+    provider = Script({"judge": ["PASS"], "final": ["## Summary\nUnchecked."]})
+    result = _supervised(provider, _after_draft(), acceptance=acceptance)[1].execute(_gated())
+    assert result.output == "## Summary\nUnchecked." and not _refused_revisions(result)
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+@pytest.mark.parametrize(("final_text", "decision"), [("## Summary\nDEFECT added late.", "rejected"),
+                                                      ("## Summary\nClean.", "accepted")])
+def test_final_validators_decide_a_step_added_after_a_gate(final_text, decision, parallel):
+    provider = Script({"judge": ["PASS"], "final": [final_text]})
+    supervisor, swarm = _supervised(provider, _after_draft(), acceptance=_strict(Forbids()),
+                                    parallel=parallel)
+
+    result = swarm.execute(_gated())
+
+    assert [node.id for node in result.graph.nodes] == ["draft", "judge", "final"]
+    assert result.acceptance.decision.value == decision
+    assert final_text in (result.output, result.rejected_output)
+    assert result.acceptance.sources[0].node_id == "final"
+    receipt = result.graph.nodes[1].metadata["verification_receipt"]
+    assert receipt["outcome"] == "passed"  # the draft passed; the added step decides
+
+
+def test_a_gate_a_revision_adds_counts_only_when_the_policy_allows_it():
+    gate = Node(id="check", label="check", depends_on=["final"], verifies="final")
+    provider = Script({"judge": ["PASS"], "check": ["PASS"], "final": ["## Summary\nFinal."]})
+
+    result = _supervised(provider, _after_draft(gate), acceptance=_strict())[1].execute(_gated())
+    assert result.output == "## Summary\nok" and result.accepted
+    assert "only a gate that a generated plan" in _refused_revisions(result)[0]["error"]
+
+    policy = _strict(allow_generated_gates=True)
+    gate = Node(id="check", label="check", depends_on=["final"], verifies="final")
+    result = _supervised(provider, _after_draft(gate), acceptance=policy)[1].execute(_gated())
+    assert result.accepted and result.output == "## Summary\nFinal."
+    assert result.graph.nodes[-1].metadata["added_by_revision"] is True
+
+
+def test_a_revision_that_adds_a_second_delivered_node_is_refused():
+    revision = Revision(add_nodes=(Node(id="notes", label="notes"),), reason="extra notes")
+    result = _supervised(Script({"judge": ["PASS"]}), revision,
+                         acceptance=_strict())[1].execute(_gated())
+    assert result.accepted and [n.id for n in result.graph.nodes] == ["draft", "judge"]
+    assert "are all delivered" in _refused_revisions(result)[0]["error"]
+
+
+def test_a_revision_ahead_of_the_gated_node_still_applies():
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="research", label="research"),
+        Node(id="draft", label="draft", depends_on=["research"]),
+        Node(id="judge", label="judge", depends_on=["draft"], verifies="draft",
+             max_regenerations=1),
+    ])
+    revision = Revision(add_nodes=(Node(id="facts", label="facts", depends_on=["research"]),),
+                        rewire={"draft": ("research", "facts")}, reason="check facts first")
+    provider = Script({"judge": ["PASS"], "draft": ["## Summary\nDraft."]})
+    result = _supervised(provider, revision, acceptance=_strict())[1].execute(graph)
+
+    assert result.accepted and result.output == "## Summary\nDraft."
+    assert provider.runs["facts"] == 1 and not _refused_revisions(result)
+
+
+def test_a_revision_that_adds_a_gate_which_may_be_skipped_is_refused():
+    gate = Node(id="check", label="check", depends_on=["final"], verifies="final",
+                failure_policy=FailurePolicy.SKIP)
+    result = _supervised(Script({"judge": ["PASS"]}), _after_draft(gate),
+                         acceptance=_strict(Forbids()))[1].execute(_gated())
+    assert [n.id for n in result.graph.nodes] == ["draft", "judge"]
+    assert "'check' has failure_policy SKIP" in _refused_revisions(result)[0]["error"]
+
+
+def test_an_executor_refuses_only_obligations_a_revision_breaks():
+    # The graph already delivers an ungated step, so a strict run could not
+    # accept it; a revision that changes nothing about that still applies.
+    graph = _gated(final=True)
+    for node in graph.nodes:
+        node.metadata["model"] = "test-model"
+    revision = Revision(add_nodes=(Node(id="notes", label="notes", depends_on=["draft"]),),
+                        rewire={"final": ("draft", "judge", "notes")}, reason="notes first")
+    executor = Executor(Script({"judge": ["PASS"]}), Registry(), Tracer(), artifact_dir=None,
+                        supervisor=ScriptedSupervisor(revision), max_revisions=1,
+                        acceptance=_strict())
+    executor.run(graph)
+    assert executor.revisions_used == 1
+    assert [n.id for n in graph.nodes] == ["draft", "judge", "final", "notes"]
+
+
+class FinalReviewProvider(GatedRunProvider):
+    """The judge passes the draft; a final review adds a ``polish`` step with a defect."""
+
+    async def complete(self, system, prompt, model):
+        result = await super().complete(system, prompt, model)
+        label = prompt.splitlines()[0]
+        if label == "judge":
+            result.text = "PASS"
+        elif label == "polish":
+            result.text = "## Summary\nDEFECT added in the final review."
+        return result
+
+
+POLISH = {"change": True, "reason": "polish the deliverable",
+          "add": [{"id": "polish", "label": "polish", "depends_on": ["draft"]}]}
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_a_final_llm_review_cannot_make_unchecked_output_accepted(parallel):
+    provider = FinalReviewProvider(POLISH)
+    swarm = _swarm(provider, acceptance=_strict(), parallel=parallel,
+                   supervisor=LLMSupervisor(provider), max_revisions=1)
+
+    result = swarm.execute(_gated())
+
+    assert provider.calls == ["draft", "judge"]
+    assert result.accepted and result.output == "body"
+    assert "no gate judges 'polish'" in _refused_revisions(result)[0]["error"]
+
+    provider = FinalReviewProvider(POLISH)
+    swarm = _swarm(provider, acceptance=_strict(Forbids()), parallel=parallel,
+                   supervisor=LLMSupervisor(provider), max_revisions=1)
+    result = swarm.execute(_gated())
+
+    assert provider.calls == ["draft", "judge", "polish"]
+    _not_accepted(result, "rejected")
+    assert result.rejected_output == "## Summary\nDEFECT added in the final review."
 
 
 # ---------------------------------------------------------------------------
@@ -515,14 +857,17 @@ def test_invalid_verdict_decision_follows_the_policy():
 
 
 def test_a_skipped_judge_leaves_acceptance_indeterminate():
+    # A Swarm refuses a judge that may be skipped; one skipped anyway decides nothing.
+    _refuses(_strict(Forbids()), _gated(judge_policy=FailurePolicy.SKIP),
+             match="'judge' has failure_policy SKIP")
     provider = Script({"judge": [RuntimeError("judge unavailable")]})
     graph = _gated(judge_policy=FailurePolicy.SKIP)
-    result = _swarm(provider, acceptance=_strict(Forbids())).execute(graph)
+    record, _ = _decided(graph, _strict(Forbids()), provider)
 
-    assert result.graph.nodes[1].status is NodeStatus.SKIPPED
-    assert "verification_receipt" not in result.graph.nodes[1].metadata
-    _not_accepted(result, "indeterminate")
-    assert any("judge" in reason and "skipped" in reason for reason in result.acceptance.reasons)
+    assert graph.nodes[1].status is NodeStatus.SKIPPED
+    assert "verification_receipt" not in graph.nodes[1].metadata
+    assert record.decision.value == "indeterminate"
+    assert any("judge" in reason and "skipped" in reason for reason in record.reasons)
 
 
 def test_a_failed_judge_leaves_acceptance_indeterminate():

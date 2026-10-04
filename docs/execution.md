@@ -207,8 +207,11 @@ any other run. A gate verifier that raises does not stop a strict run: the
 gate ends undecided and so does acceptance. Without a strict policy such a
 verifier stops the run as a terminal failure, and results carry no decision.
 An unfinished strict run resumes only under the policy it began with, and a
-fresh strict run refuses a graph whose judge already completed with a recorded
-verdict, since only verdicts read in the run decide it.
+fresh strict run refuses a graph whose judge already completed, since only
+verdicts its judges produce in the run decide it. A strict run is also
+refused before any provider call when it could not decide its output, for
+example a later step that no gate or final validator checks
+([acceptance obligations](verifier.md#acceptance-obligations)).
 
 ## Provider connections
 

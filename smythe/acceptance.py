@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Protocol
 
-from smythe.graph import REVISION_ADDED_KEY, ExecutionGraph, Node
+from smythe.graph import REVISION_ADDED_KEY, ExecutionGraph, FailurePolicy, Node, _depends_on
 from smythe.task import Task, task_to_dict
 from smythe.validation import (
     ValidationOutcome,
@@ -516,6 +516,96 @@ def _final_check(
     return ValidationOutcome.ERROR, f"{name} could not decide{findings}"
 
 
+def _unmet_obligations(
+    graph: ExecutionGraph, policy: AcceptancePolicy, strategy: str = "deliverable",
+) -> list[str]:
+    """Every reason a strict *policy* could not decide *graph*'s output, read from its structure.
+
+    Statuses and results are not read, so the answer holds for the whole run.
+    """
+    ids = {node.id for node in graph.nodes}
+    edges = {node.id: node.depends_on for node in graph.nodes}
+    gates = [node for node in graph.nodes if node.verifies]
+    problems = []
+    for gate in gates:
+        if gate.verifies == gate.id:
+            problems.append(f"gate {gate.id!r} verifies itself")
+        elif gate.verifies not in ids:
+            problems.append(f"gate {gate.id!r} verifies {gate.verifies!r}, which is not in the graph")
+        elif not _depends_on(edges, gate.id, gate.verifies):
+            problems.append(
+                f"gate {gate.id!r} does not depend on {gate.verifies!r}, the node it verifies, "
+                "so it could judge it before it runs"
+            )
+        if gate.failure_policy is FailurePolicy.SKIP:
+            problems.append(
+                f"gate {gate.id!r} has failure_policy SKIP, so a judge that fails would leave "
+                "the gate without a verdict"
+            )
+    if policy.final_validators:
+        return problems
+    # Without final validators only a gate can accept, and only DELIVERABLE
+    # output that is one gated node's result: the nodes deliverable_sources()
+    # would return once every node completed.
+    if strategy != "deliverable":
+        problems.append(f"{strategy} synthesis needs a final validator")
+        return problems
+    judges = {gate.id for gate in gates}
+    depended_on = {dep for node in graph.nodes if node.id not in judges for dep in node.depends_on}
+    delivered = [node for node in graph.nodes if node.id not in depended_on | judges]
+    if len(delivered) != 1:
+        shown = f"nodes {[node.id for node in delivered]} are all" if delivered else "no node is"
+        problems.append(
+            f"{shown} delivered, and a gate accepts only output that is one node's result, "
+            "so the output needs a final validator"
+        )
+        return problems
+    (node,) = delivered
+    covering = [gate for gate in gates if gate.verifies == node.id]
+    if not covering:
+        problems.append(
+            f"no gate judges {node.id!r}, the delivered node, and no final validator checks "
+            "the output"
+        )
+    elif not any(policy.counts_gate(gate) for gate in covering):
+        problems.append(
+            f"only a gate that a generated plan or a supervisor revision added judges "
+            f"{node.id!r}, the delivered node, and such a gate accepts nothing on its own "
+            "without a final validator or allow_generated_gates"
+        )
+    return problems
+
+
+def validate_acceptance_obligations(
+    graph: ExecutionGraph, policy: AcceptancePolicy, *, strategy: str = "deliverable",
+) -> None:
+    """Raise ValueError unless a strict *policy* can decide *graph*'s delivered output.
+
+    Read from the graph's structure before any node runs, these are the
+    obligations a strict run must meet:
+
+    - every gate verifies another node that is in the graph and that the
+      gate depends on, directly or through other nodes, so it judges its
+      target only after the target ran;
+    - no gate has ``FailurePolicy.SKIP``, which would leave it without a
+      verdict when its judge fails;
+    - the delivered output is covered: by the policy's final validators, or
+      without them by ``DELIVERABLE`` synthesis (*strategy*) of exactly one
+      deliverable node that a gate the policy counts judges
+      (:meth:`AcceptancePolicy.counts_gate`).
+
+    The error lists every unmet obligation.
+    """
+    if not isinstance(policy, AcceptancePolicy) or policy.mode is not AcceptanceMode.STRICT:
+        raise ValueError("validate_acceptance_obligations needs a strict AcceptancePolicy")
+    problems = _unmet_obligations(graph, policy, strategy)
+    if problems:
+        raise ValueError(
+            "The graph does not meet its strict delivery acceptance obligations: "
+            + "; ".join(problems)
+        )
+
+
 def evaluate_delivery(
     policy: AcceptancePolicy,
     graph: ExecutionGraph,
@@ -636,4 +726,5 @@ __all__ = [
     "evaluate_delivery",
     "task_sha256",
     "text_sha256",
+    "validate_acceptance_obligations",
 ]

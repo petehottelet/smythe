@@ -70,6 +70,23 @@ pending. To keep the gated node's output as the run's output, run without
 revisions (`max_revisions=0`, the default) or use a `Supervisor` of your own
 that never proposes such a step.
 
+Under a [strict acceptance policy](verifier.md#strict-delivery-acceptance),
+such a step cannot make unchecked output accepted. With final validators,
+they check whatever the run delivers, including the new step's output, and
+decide it; the gate's earlier pass on the judged node accepts nothing. Without
+final validators, only a gate you supplied can accept, and only the node it
+judged, so the executor refuses a revision that would break an
+[acceptance obligation](verifier.md#acceptance-obligations) the graph met: a
+step after the gated node, another delivered node, a gate the revision adds
+itself (it does not count unless the policy sets
+`allow_generated_gates=True`), or a gate that does not depend on its target
+or may be skipped. The refusal is traced as `revision_rejected` with the
+unmet obligations, the graph keeps its plan, and the run continues, so the
+gate still judges the output the run delivers. A revision that leaves the
+gated node as the delivered output, such as a step inserted ahead of it,
+still applies. Such a revision is refused rather than applied because
+applying it could only end the run with output that nothing can accept.
+
 ## Safety
 
 Adaptive orchestration is an unbounded agent loop unless you bound it.

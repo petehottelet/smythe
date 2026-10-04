@@ -227,7 +227,12 @@ prompt mutation.
   node; a step it adds after that node is not judged by the gate. One
   `LLMSupervisor` revision may add at most `max_added_nodes` nodes (default 3),
   and a proposal that would leave more than `max_total_added_nodes` (default 8)
-  revision-added nodes in the graph is refused.
+  revision-added nodes in the graph is refused. Under a strict acceptance
+  policy, so is a revision that would leave the delivered output without a
+  check that can accept it ([acceptance obligations](verifier.md#acceptance-obligations)).
+- A strict acceptance policy refuses, before any provider call, a graph whose
+  delivered output it could not decide, and counts a passed gate toward
+  acceptance only when the developer supplied it.
 - A verifier may reset only its target and downstream dependents.
 - A resumed run keeps completed results, recorded spend, and consumed control allowances.
 
