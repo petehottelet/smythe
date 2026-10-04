@@ -224,6 +224,16 @@ An unfinished version 5 checkpoint is refused with `ValueError` before any
 provider call, because finishing it here would deliver output its acceptance
 policy never decided.
 
+A completed checkpoint whose record is `not_evaluated` was saved before its
+policy decided the output, and resuming it never delivers that output either.
+The result has `output` `""`, the stored text in `rejected_output`, and the
+`not_evaluated` record as `acceptance`, so `accepted` is false. Resume makes
+no provider call, does not evaluate the record again and leaves the
+checkpoint unchanged. When the record binds `output_sha256`, the stored text
+must still match it. A `not_evaluated` record may bind no digest; the stored
+text is then returned in `rejected_output` as saved, without a check, and is
+still never delivered.
+
 ## Resume semantics
 
 `swarm.resume(execution_id)` (or `await swarm.aresume(...)`):

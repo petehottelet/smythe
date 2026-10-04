@@ -6,7 +6,12 @@ import json
 import pytest
 
 import smythe.swarm as swarm_module
-from smythe.acceptance import AcceptanceSource, DeliveryAcceptance, text_sha256
+from smythe.acceptance import (
+    AcceptanceDecision,
+    AcceptanceSource,
+    DeliveryAcceptance,
+    text_sha256,
+)
 from smythe.budget import BudgetValidationError, Sentinel
 from smythe.checkpoint import (
     FileCheckpointStore,
@@ -694,6 +699,58 @@ def test_resume_of_an_unaccepted_strict_checkpoint_withholds_its_output(tmp_path
     assert result.output == ""
     assert result.rejected_output == _DELIVERED
     assert result.acceptance == record and result.accepted is False
+
+
+def _not_evaluated(output_sha256: str | None = None) -> DeliveryAcceptance:
+    return DeliveryAcceptance(
+        decision="not_evaluated", policy_sha256="b" * 64, output_sha256=output_sha256,
+    )
+
+
+@pytest.mark.parametrize("bound", [False, True], ids=["no-digest", "digest"])
+def test_resume_of_a_not_evaluated_strict_checkpoint_withholds_its_output(tmp_path, bound):
+    """A record that decided nothing never delivers the output; resume keeps it for inspection."""
+    store = FileCheckpointStore(tmp_path)
+    record = _not_evaluated(text_sha256(_DELIVERED) if bound else None)
+    _save(store, 5, acceptance=record)
+    saved = store.load("saved")
+    provider = NoCallProvider()
+
+    result = Swarm(provider=provider, model="test-model", checkpoint_store=store).resume("saved")
+
+    assert result.output == ""
+    assert result.rejected_output == _DELIVERED
+    assert result.acceptance == record and result.accepted is False
+    assert result.acceptance.decision is AcceptanceDecision.NOT_EVALUATED
+    assert result.to_dict()["delivery_acceptance"]["decision"] == "not_evaluated"
+    assert provider.calls == 0
+    assert store.load("saved") == saved
+
+
+def test_resume_of_a_not_evaluated_checkpoint_without_a_digest_never_delivers_edits(tmp_path):
+    """Without a digest there is nothing to compare, so edited text is withheld unchecked."""
+    store = FileCheckpointStore(tmp_path)
+    _save(store, 5, acceptance=_not_evaluated())
+    state = store.load("saved")
+    state["output"] = _DELIVERED + " edited"
+    store.save("saved", state)
+
+    result = Swarm(provider=NoCallProvider(), model="test-model",
+                   checkpoint_store=store).resume("saved")
+
+    assert result.output == "" and result.accepted is False
+    assert result.rejected_output == _DELIVERED + " edited"
+
+
+def test_resume_of_a_not_evaluated_checkpoint_checks_a_bound_digest(tmp_path):
+    store = FileCheckpointStore(tmp_path)
+    _save(store, 5, acceptance=_not_evaluated(text_sha256(_DELIVERED)))
+    state = store.load("saved")
+    state["output"] = _DELIVERED + " edited"
+    store.save("saved", state)
+
+    with pytest.raises(ValueError, match="does not match"):
+        Swarm(provider=NoCallProvider(), model="test-model", checkpoint_store=store).resume("saved")
 
 
 def test_resume_refuses_strict_output_that_no_longer_matches_its_record(tmp_path):

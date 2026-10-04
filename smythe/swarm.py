@@ -187,7 +187,8 @@ def _delivered(output: Any, acceptance: DeliveryAcceptance | None) -> tuple[Any,
     Without a record the output is delivered as saved. With one, the output
     must still match the record's digest, and only an accepted record
     delivers it; otherwise ``output`` is empty and the text is kept as
-    ``rejected_output``.
+    ``rejected_output``. A ``not_evaluated`` record decided nothing, so its
+    output is withheld too; one that binds no digest has none to check.
     """
     if acceptance is None:
         return output, None

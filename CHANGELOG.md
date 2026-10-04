@@ -119,8 +119,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   4, and this build reads versions 1 through 5. Versions 1 to 4 never report
   a record. Resuming a completed version 5 checkpoint checks the saved output
   against the record's digest and returns the record; output the record did
-  not accept is returned as `rejected_output` with an empty `output`. An
-  unfinished version 5 checkpoint is refused before any provider call. See
+  not accept is returned as `rejected_output` with an empty `output`. That
+  includes a `not_evaluated` record, whose output is checked only when the
+  record binds a digest and is never delivered. An unfinished version 5
+  checkpoint is refused before any provider call. See
   [delivery acceptance](docs/checkpoint-format.md#delivery-acceptance-version-5).
 
 ### Changed
