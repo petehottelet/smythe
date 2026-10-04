@@ -275,6 +275,18 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   reads nothing until a node has been regenerated. It consumes the same
   calls as before, and each plan, execute or resume entry still audits the
   journal once when it starts.
+- Jobs money amounts no longer depend on the caller's `decimal` context.
+  `normalize_usd`, `usd_to_micros`, `micros_to_usd` and the USD strings in
+  plans and approvals used the thread's context, so a lower precision, such
+  as `decimal.getcontext().prec = 10`, rejected a valid amount like
+  `9223372036854.775807` as unable to "fit exact microdollar precision" or
+  raised `decimal.InvalidOperation`. Values and error messages under Python's
+  default context are unchanged.
+- A native Messages receipt's `cost_usd` is exact whatever the caller's
+  `decimal` context. A lower precision rounded it, for example to `0.0025350`
+  instead of `0.002535000`, so settling the same saved response in two
+  contexts could produce receipts with different bytes. Receipts under the
+  default context are unchanged.
 
 ## [0.9.1] - 2026-09-29
 

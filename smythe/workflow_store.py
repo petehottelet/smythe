@@ -25,6 +25,7 @@ from typing import Any
 from uuid import uuid4
 
 from smythe import pricing, pricing_anthropic
+from smythe._money import NANOUSD, MoneyUnitError, to_units
 from smythe._sqlite import enable_wal
 
 STORE_VERSION = 2
@@ -983,12 +984,10 @@ class SQLiteWorkflowStore:
         else:
             quote = pricing.conservative_quote(count, request["max_output_tokens"], request["model"],
                                                price_version=call["price_version"])
-            digits = quote.as_tuple()
-            coefficient = int("".join(map(str, digits.digits)))
-            exponent = digits.exponent + 9
-            if exponent < 0:
-                raise WorkflowValidationError("Quote cannot be represented as nanoUSD")
-            ceiling = coefficient * 10 ** exponent
+            try:
+                ceiling = to_units(quote, NANOUSD)
+            except MoneyUnitError as exc:
+                raise WorkflowValidationError("Quote cannot be represented as nanoUSD") from exc
         return {"quote_id": evidence["evidence_id"], "call_id": call["call_id"], "input_tokens": count,
                 "ceiling_nanousd": ceiling, "price_version": call["price_version"],
                 "request_sha256": call["request_sha"]}

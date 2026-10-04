@@ -8,10 +8,14 @@ import re
 import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from decimal import Decimal, DecimalException
+from decimal import (
+    ROUND_HALF_EVEN, Context, Decimal, DecimalException, DivisionByZero, InvalidOperation, Overflow,
+)
 from enum import Enum
 from types import MappingProxyType
 from typing import Any, TypeAlias
+
+from smythe._money import MICROUSD, MoneyUnitError, from_units, to_units
 
 MANIFEST_VERSION = 1
 MICRODOLLAR = Decimal("0.000001")
@@ -21,6 +25,15 @@ MICRODOLLAR = Decimal("0.000001")
 # not provider recommendations; callers must split larger campaigns into jobs.
 MAX_SIGNED_MICRO_USD = (1 << 63) - 1
 MAX_USD = Decimal(MAX_SIGNED_MICRO_USD) * MICRODOLLAR
+# Version 1 reports amounts from here up, whose microdollar count needs more
+# than 28 digits, as unable to fit microdollar precision rather than as too
+# large. It is the bound of Python's default decimal precision, fixed here so
+# that a caller's own decimal context cannot move it.
+_UNREPRESENTABLE_USD = Decimal("9999999999999999999999.9999995")
+# Python's default decimal context, for formatting that a caller's context
+# must not change.
+_DEFAULT_CONTEXT = Context(prec=28, rounding=ROUND_HALF_EVEN, Emin=-999999, Emax=999999,
+                           traps=[InvalidOperation, DivisionByZero, Overflow])
 MAX_MANIFEST_BYTES = 2 * 1024 * 1024
 MAX_CANONICAL_PLAN_BYTES = 64 * 1024 * 1024
 MAX_PROFILES = 64
@@ -96,7 +109,10 @@ class ProviderKind(str, Enum):
 
 
 def normalize_usd(value: object, *, field_name: str) -> Decimal:
-    """Return a non-negative amount with exact microdollar precision."""
+    """Return a non-negative amount with exact microdollar precision.
+
+    The result does not depend on the caller's decimal context.
+    """
     if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
         raise ManifestValidationError(f"{field_name} must be a USD number")
     if isinstance(value, float) and not math.isfinite(value):
@@ -109,24 +125,21 @@ def normalize_usd(value: object, *, field_name: str) -> Decimal:
         raise ManifestValidationError(f"{field_name} must be finite")
     if amount < 0:
         raise ManifestValidationError(f"{field_name} must be non-negative")
+    if amount >= _UNREPRESENTABLE_USD:
+        raise ManifestValidationError(f"{field_name} must fit exact microdollar precision")
     try:
-        quantized = amount.quantize(MICRODOLLAR)
-    except (DecimalException, ValueError) as exc:
-        raise ManifestValidationError(f"{field_name} must fit exact microdollar precision") from exc
-    if quantized != amount:
-        raise ManifestValidationError(f"{field_name} supports at most six decimal places")
-    if quantized > MAX_USD:
+        micros = to_units(amount, MICROUSD)
+    except MoneyUnitError as exc:
+        raise ManifestValidationError(f"{field_name} supports at most six decimal places") from exc
+    if micros > MAX_SIGNED_MICRO_USD:
         raise ManifestValidationError(f"{field_name} exceeds signed 63-bit microdollar capacity")
-    return quantized
+    # A negative zero keeps its sign, as manifests and plans have recorded it.
+    return from_units(micros, MICROUSD).copy_sign(amount)
 
 
 def usd_to_micros(value: Decimal) -> int:
     """Convert a normalized USD Decimal to integer microdollars."""
-    normalized = normalize_usd(value, field_name="USD amount")
-    micros = int(normalized / MICRODOLLAR)
-    if micros > MAX_SIGNED_MICRO_USD:  # pragma: no cover - normalize guard
-        raise ManifestValidationError("USD amount exceeds signed 63-bit capacity")
-    return micros
+    return to_units(normalize_usd(value, field_name="USD amount"), MICROUSD)
 
 
 def micros_to_usd(value: int) -> Decimal:
@@ -140,11 +153,11 @@ def micros_to_usd(value: int) -> Decimal:
         raise ManifestValidationError(
             "microdollar amount must be a non-negative signed 63-bit integer"
         )
-    return (Decimal(value) * MICRODOLLAR).quantize(MICRODOLLAR)
+    return from_units(value, MICROUSD)
 
 
 def usd_string(value: Decimal) -> str:
-    return format(value.quantize(MICRODOLLAR), "f")
+    return format(value.quantize(MICRODOLLAR, context=_DEFAULT_CONTEXT), "f")
 
 
 def _strict_fields(

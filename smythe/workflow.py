@@ -6,13 +6,13 @@ import asyncio
 from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
-from decimal import Decimal
 import hashlib
 import json
 import math
 from types import MappingProxyType
 from uuid import uuid4
 
+from smythe._money import FLOOR, NANOUSD, to_units
 from smythe.budget import BudgetValidationError, Sentinel, validate_completion_usage
 from smythe.checkpoint import (
     graph_from_dict, graph_to_dict, node_from_dict, node_to_dict, reset_incomplete_nodes,
@@ -109,13 +109,8 @@ def _hash(value):
 
 
 def _nanousd(value):
-    # Decimal multiplication must not inherit the caller's rounding context.
-    if value is None:
-        return None
-    amount = Decimal(str(value)).as_tuple()
-    coefficient = int("".join(map(str, amount.digits)))
-    exponent = amount.exponent + 9
-    return coefficient * 10 ** exponent if exponent >= 0 else coefficient // 10 ** -exponent
+    # A budget floors to whole nanoUSD, whatever the caller's decimal context.
+    return None if value is None else to_units(value, NANOUSD, FLOOR)
 
 
 class WorkflowBudget:
