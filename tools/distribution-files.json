@@ -12,6 +12,7 @@
     "smythe/_errors.py",
     "smythe/_images.py",
     "smythe/_money.py",
+    "smythe/_publish.py",
     "smythe/_sqlite.py",
     "smythe/acceptance.py",
     "smythe/actions.py",

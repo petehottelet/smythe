@@ -13,6 +13,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 from smythe._images import NOT_ALLOWED_MESSAGE, gif_dimensions, open_image, webp_dimensions
+from smythe._publish import _fsync_directory, publish_new_bytes
 
 
 _SUPPORTED_IMAGE_MIME_BY_FORMAT = {
@@ -211,29 +212,18 @@ def atomic_write_bytes(path: Path, data: bytes) -> None:
 def atomic_publish_bytes(path: Path, data: bytes) -> None:
     """Durably publish new bytes, atomically refusing an existing destination.
 
-    The fully flushed temporary file is linked into place without replacement.
-    Filesystems without hard-link support fail closed; Jobs probes this before
-    admitting provider calls. Existing destinations, including identical bytes,
-    always remain untouched.
+    The bytes must fit the Jobs persistence limit; then
+    :func:`smythe._publish.publish_new_bytes` links the fully flushed
+    temporary file into place without replacement. Filesystems without
+    hard-link support fail closed; Jobs probes this before admitting provider
+    calls. Existing destinations, including identical bytes, always remain
+    untouched.
     """
     if not isinstance(data, bytes):
         raise TypeError("artifact data must be bytes")
     if len(data) > MAX_ARTIFACT_BYTES:
         raise ValueError(f"artifact exceeds the {MAX_ARTIFACT_BYTES}-byte persistence limit")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(mode="wb", dir=path.parent, prefix=f".{path.name}.",
-                                         suffix=".tmp", delete=False) as stream:
-            temporary = Path(stream.name)
-            stream.write(data)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.link(temporary, path)
-        _fsync_directory(path.parent)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
+    publish_new_bytes(path, data)
 
 
 def _regular_path(root: Path, relative: str) -> Path:
@@ -305,22 +295,6 @@ def claim_artifact_root(root: Path, owner_bytes: bytes, *, legacy: bool,
                 raise ValueError("Filesystem did not preserve an existing artifact")
         else:
             raise ValueError("Filesystem does not support exclusive artifact publication")
-
-
-def _fsync_directory(directory: Path) -> None:
-    """Persist the directory entry after replace where the OS supports it."""
-
-    if os.name == "nt":
-        # Windows does not support opening directories with ``os.open``. The
-        # file itself is flushed before replacement or exclusive publication;
-        # the standard library cannot separately flush the directory entry.
-        return
-    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-    descriptor = os.open(directory, flags)
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
 
 
 def _image_header(

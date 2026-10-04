@@ -205,6 +205,7 @@ def test_concurrent_output_creator_wins_without_replacement(tmp_path, monkeypatc
 
 @pytest.mark.parametrize("failure", ["file-sync", "directory-sync", "link"])
 def test_publication_failure_preserves_evidence_and_cleans_only_owned_temp(tmp_path, monkeypatch, capsys, failure):
+    import smythe._publish as publication
     import smythe.jobs.artifact_io as artifact_io
 
     path, out = tmp_path / "source.db", tmp_path / "report.html"
@@ -219,7 +220,7 @@ def test_publication_failure_preserves_evidence_and_cleans_only_owned_temp(tmp_p
     if failure == "file-sync":
         monkeypatch.setattr(artifact_io.os, "fsync", fail)
     elif failure == "directory-sync":
-        monkeypatch.setattr(artifact_io, "_fsync_directory", fail)
+        monkeypatch.setattr(publication, "_fsync_directory", fail)
     else:
         monkeypatch.setattr(artifact_io.os, "link", fail)
     assert invoke(path, out) == EXIT_OPTIMIZE_STATE
