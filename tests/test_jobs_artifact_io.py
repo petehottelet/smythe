@@ -82,8 +82,10 @@ def test_declared_png_bytes_never_reach_other_pillow_plugins(monkeypatch):
     assert calls == []
 
 
-def test_job_run_records_a_disallowed_provider_image_as_an_error(tmp_path, monkeypatch):
-    """End to end: the run records a clear error instead of decoding EPS."""
+def test_job_run_rejects_a_disallowed_provider_image_without_publishing_it(tmp_path, monkeypatch):
+    """End to end: EPS bytes are never decoded, written or left as an unknown
+    outcome. The response arrived with a known cost, so the attempt is a
+    settled rejection that names the refused bytes."""
     import asyncio
 
     from PIL import EpsImagePlugin
@@ -130,11 +132,26 @@ def test_job_run_records_a_disallowed_provider_image_as_an_error(tmp_path, monke
                 plan, make_approval(plan), manifest_root=tmp_path
             )
         )
+        events = store.snapshot(result["run_id"], include_events=True)["events"]
+        [call] = store._call_rows(result["run_id"])
 
-    assert "succeeded" not in result["counts"]
+    assert result["counts"] == {"rejected": 1}
+    assert result["status"] == "failed"
+    assert result["cost"]["exposure_microusd"] == 0 and result["cost"]["cost_is_complete"]
+    assert call["status"] == "rejected"
     assert result["artifacts"] == []
     [attempt] = result["attempts"]
+    assert attempt["status"] == "rejected"
     assert "not a recognizable PNG, JPEG, GIF, or WebP image" in attempt["error"]
+    [rejected] = [event for event in events if event["event_type"] == "artifact_rejected"]
+    record = rejected["payload"]["delivery_acceptance"]
+    assert record["decision"] == "rejected"
+    assert record["subjects"][0]["published"] is False
+    assert record["subjects"][0]["sha256"] == hashlib.sha256(eps).hexdigest()
+    [builtin] = record["validators"]
+    assert builtin["outcome"] == "rejected"
+    assert builtin["reports"][0]["findings"][0]["code"] == "artifact_undecodable"
+    assert not list((tmp_path / "outputs").rglob("*.png"))
     assert calls == []
 
 

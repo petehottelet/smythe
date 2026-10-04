@@ -124,6 +124,17 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   record binds a digest and is never delivered. An unfinished version 5
   checkpoint is refused before any provider call. See
   [delivery acceptance](docs/checkpoint-format.md#delivery-acceptance-version-5).
+- Jobs record each completed call's delivery decision. The built-in artifact
+  check, `smythe.jobs.artifact-spec` version 1, reports each finding with a
+  code such as `artifact_undecodable`, `mime_type_mismatch` or
+  `dimensions_mismatch` and its expected and observed values. The call's
+  `call_completed` or `artifact_rejected` event stores the decision, every
+  artifact's path, SHA-256 and size, and the check's reports under
+  `delivery_acceptance`, in the transaction that settles the call's cost.
+  `SQLiteRunStore.complete_call(delivery_acceptance=...)` refuses a decision
+  that disagrees with `accepted`, names another attempt or omits an artifact.
+  Attempt errors, operation statuses and the Jobs schema are unchanged. See
+  [delivery acceptance](docs/jobs.md#delivery-acceptance).
 
 ### Changed
 
@@ -215,6 +226,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   used to accept any value, failing only when `passed`, `hard_findings` or
   `advisories` read the finding, and kept a list of findings as a list, so a
   report built from a list did not equal one built from the same tuple.
+- A Jobs response whose artifact bytes cannot be decoded, or exceed the size,
+  pixel, frame or count limits, is a rejected attempt settled at the cost the
+  provider reported, and those bytes are not written. It used to become an
+  `unknown_outcome` that held the call's whole ceiling as unresolved exposure
+  and needed a duplicate-spend acknowledgment to reroll. Invalid provider
+  accounting still makes the call an unknown outcome, and attempts recorded
+  earlier are unchanged.
 
 ### Fixed
 

@@ -714,6 +714,167 @@ def test_estimated_provider_cost_remains_exposure_not_confirmed(tmp_path, store_
     assert result["cost"]["cost_contains_estimates"]
 
 
+_UNDECODABLE_PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16  # a PNG header with no image data
+
+
+def _png(size):
+    buffer = io.BytesIO()
+    Image.new("RGB", size, (0, 0, 255)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+class _PricedArtifactProvider(Provider):
+    """Return one queued artifact list per call, each with a known cost."""
+
+    def __init__(self, *responses, cost_usd=0.04):
+        self.responses = list(responses)
+        self.cost_usd = cost_usd
+        self.calls = 0
+
+    async def complete(self, system, prompt, model):
+        self.calls += 1
+        artifacts = self.responses[min(self.calls, len(self.responses)) - 1]
+        return CompletionResult(text=f"response {self.calls}", artifacts=list(artifacts),
+                                cost_usd=self.cost_usd)
+
+
+def _events(store, run_id, event_type):
+    events = store.snapshot(run_id, include_events=True)["events"]
+    return [event for event in events if event["event_type"] == event_type]
+
+
+def _findings(record):
+    return [finding["code"] for result in record["validators"] for report in result["reports"]
+            for finding in report["findings"]]
+
+
+def test_accepted_call_records_the_builtin_artifact_check(tmp_path, store_factory):
+    from smythe.validation import ValidatorIdentity
+
+    plan = preflight_job(_manifest(count=1), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    result = asyncio.run(JobRunner(store).start(plan, make_approval(plan), manifest_root=tmp_path))
+
+    [artifact] = result["artifacts"]
+    [completed] = _events(store, result["run_id"], "call_completed")
+    record = completed["payload"]["delivery_acceptance"]
+    assert (record["version"], record["scope"], record["decision"]) == (1, "artifacts", "accepted")
+    assert record["reasons"] == []
+    assert record["attempt_id"] == result["attempts"][0]["attempt_id"]
+    assert record["subjects"] == [{"path": artifact["relative_path"], "sha256": artifact["sha256"],
+                                   "size_bytes": artifact["size_bytes"], "published": True}]
+    identity = ValidatorIdentity.for_config(
+        "smythe.jobs.artifact-spec", "1", {"mime_type": "image/png", "width": 1, "height": 1},
+    ).to_dict()
+    assert record["validators"] == [{
+        "validator": identity, "outcome": "passed",
+        "reports": [{"path": artifact["relative_path"], "outcome": "passed", "findings": [],
+                     "validator": identity}],
+    }]
+    assert store.schema_version == 4
+
+
+def test_rejected_call_records_findings_with_expected_and_observed_values(tmp_path, store_factory):
+    plan = preflight_job(_manifest(count=1, attempts=2), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    provider = _PricedArtifactProvider([], [Artifact(_png((2, 3)), "image/png")], cost_usd=None)
+    runner = JobRunner(store, provider_pool=_FixedPool(provider))
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path))
+    key = first["operations"][0]["operation_key"]
+    second = asyncio.run(runner.reroll(first["run_id"], [key], reason="wrong size"))
+
+    empty, wrong_size = (event["payload"]["delivery_acceptance"]
+                         for event in _events(store, first["run_id"], "artifact_rejected"))
+    assert empty["decision"] == "rejected" and empty["subjects"] == []
+    assert empty["reasons"] == ["provider returned no artifacts"]
+    assert empty["validators"][0]["reports"][0]["path"] == "response"
+    assert _findings(empty) == ["no_artifacts"]
+    [artifact] = second["artifacts"]
+    assert artifact["accepted"] == 0  # Rejected bytes stay published for review.
+    [report] = wrong_size["validators"][0]["reports"]
+    assert report["path"] == artifact["relative_path"] and report["outcome"] == "rejected"
+    [finding] = report["findings"]
+    assert (finding["code"], finding["expected"], finding["observed"]) == (
+        "dimensions_mismatch", [1, 1], [2, 3])
+    assert wrong_size["reasons"] == [second["attempts"][1]["error"]]
+    assert "expected 1x1, observed 2x3" in second["attempts"][1]["error"]
+
+
+def test_undecodable_bytes_with_a_known_cost_are_a_settled_rejection(tmp_path, store_factory):
+    data = _priced_manifest().to_dict()
+    data["execution"].update(max_attempts=2, max_budget_usd="0.20")
+    plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    provider = _PricedArtifactProvider([Artifact(_UNDECODABLE_PNG, "image/png")],
+                                       [Artifact(PNG_1X1, "image/png")])
+    runner = JobRunner(store, provider_pool=_FixedPool(provider))
+
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path))
+
+    assert first["status"] == RunStatus.FAILED.value
+    assert first["counts"] == {OperationStatus.REJECTED.value: 1}
+    assert first["cost"]["confirmed_microusd"] == 40_000
+    assert first["cost"]["exposure_microusd"] == 0 and first["cost"]["cost_is_complete"]
+    assert first["artifacts"] == []
+    assert "could not be fully decoded" in first["operations"][0]["error"]
+    [call] = store._call_rows(first["run_id"])
+    assert (call["status"], call["confirmed_microusd"], call["exposure_microusd"]) == (
+        "rejected", 40_000, 0)
+    [rejected] = _events(store, first["run_id"], "artifact_rejected")
+    assert _findings(rejected["payload"]["delivery_acceptance"]) == ["artifact_undecodable"]
+    assert not list((tmp_path / "outputs").rglob("*.png"))
+
+    # A settled rejection is rerolled without a duplicate-spend acknowledgement.
+    key = first["operations"][0]["operation_key"]
+    second = asyncio.run(runner.reroll(first["run_id"], [key], reason="undecodable image"))
+    assert provider.calls == 2
+    assert second["counts"] == {OperationStatus.SUCCEEDED.value: 1}
+    assert second["cost"]["confirmed_microusd"] == 80_000
+
+
+@pytest.mark.parametrize("limit,code", [
+    ("MAX_ARTIFACT_BYTES", "artifact_too_large"),
+    ("MAX_TOTAL_ARTIFACT_BYTES_PER_CALL", "artifact_bytes_limit"),
+    ("MAX_ARTIFACTS_PER_CALL", "artifact_count_limit"),
+])
+def test_over_limit_artifacts_are_a_settled_rejection(tmp_path, store_factory, monkeypatch, limit, code):
+    monkeypatch.setattr(runner_module, limit, 1)
+    plan = preflight_job(_priced_manifest(), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    provider = _PricedArtifactProvider([Artifact(PNG_1X1, "image/png")] * 2)
+
+    result = asyncio.run(JobRunner(store, provider_pool=_FixedPool(provider)).start(
+        plan, make_approval(plan), manifest_root=tmp_path,
+    ))
+
+    assert result["counts"] == {OperationStatus.REJECTED.value: 1}
+    assert result["cost"]["confirmed_microusd"] == 40_000 and result["cost"]["exposure_microusd"] == 0
+    assert result["artifacts"] == []
+    [rejected] = _events(store, result["run_id"], "artifact_rejected")
+    assert set(_findings(rejected["payload"]["delivery_acceptance"])) == {code}
+    assert not list((tmp_path / "outputs").rglob("*.png"))
+
+
+def test_invalid_accounting_keeps_undecodable_bytes_an_unknown_outcome(tmp_path, store_factory):
+    class MutatedCostProvider(Provider):
+        async def complete(self, system, prompt, model):
+            result = CompletionResult(text="invalid", cost_usd=0.04,
+                                      artifacts=[Artifact(_UNDECODABLE_PNG, "image/png")])
+            result.cost_usd = float("nan")
+            return result
+
+    plan = preflight_job(_priced_manifest(), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    result = asyncio.run(JobRunner(store, provider_pool=_FixedPool(MutatedCostProvider())).start(
+        plan, make_approval(plan), manifest_root=tmp_path,
+    ))
+
+    assert result["counts"] == {OperationStatus.UNKNOWN_OUTCOME.value: 1}
+    assert result["operations"][0]["error"].startswith("invalid provider accounting: ")
+    assert result["cost"]["exposure_microusd"] == 100_000
+    assert _events(store, result["run_id"], "artifact_rejected") == []
+
+
 def test_slow_artifact_finalizer_does_not_starve_lease_heartbeat(
     tmp_path, monkeypatch
 ):

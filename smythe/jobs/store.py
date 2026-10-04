@@ -48,6 +48,7 @@ _FENCING_COLUMNS = {"runs": {"lease_epoch"}, "attempts": {"lease_owner_id", "lea
 _ARTIFACT_COLUMNS = {"artifact_namespace", "artifact_owner_id"}
 # Events whose text ``reason`` explains the next attempt of their operation.
 _QUEUED_REASON_EVENTS = ("reroll_queued",)
+_DELIVERY_DECISIONS = frozenset({"accepted", "rejected", "indeterminate"})
 _IDENTITY_RE = re.compile(r"[0-9a-f]{32}\Z")
 _CONTROL_TABLE_SQL = """CREATE TABLE IF NOT EXISTS run_controls (
     run_id TEXT PRIMARY KEY REFERENCES runs(run_id) ON DELETE CASCADE,
@@ -225,6 +226,28 @@ def _read_json_object(value: object, field: str) -> dict[str, Any]:
         return result
     except (ValueError, TypeError, RecursionError) as exc:
         raise RunStoreError("Invalid stored JSON in " + field) from exc
+
+
+def _delivery_decision(record: object, accepted: bool,
+                       artifacts: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """A detached JSON copy of a delivery decision that matches its settlement."""
+    try:
+        decision = json.loads(json.dumps(record, allow_nan=False))
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise ValueError("delivery_acceptance must be JSON data") from exc
+    if type(decision) is not dict:
+        raise ValueError("delivery_acceptance must be a JSON object")
+    if (decision.get("decision") not in _DELIVERY_DECISIONS
+            or (decision["decision"] == "accepted") is not bool(accepted)):
+        raise ValueError("delivery_acceptance decision does not match the call's acceptance")
+    subjects = decision.get("subjects")
+    published = {(item.get("path"), item.get("sha256")) for item in subjects
+                 if type(item) is dict and item.get("published") is True
+                 } if type(subjects) is list else set()
+    if any((artifact.get("relative_path"), artifact.get("sha256")) not in published
+           for artifact in artifacts):
+        raise ValueError("delivery_acceptance needs a published subject for every artifact")
+    return decision
 
 
 def _validate_read_row(row, table: str) -> None:
@@ -1234,8 +1257,16 @@ class SQLiteRunStore:
         result_text: str,
         accepted: bool = True,
         error: str | None = None,
+        delivery_acceptance: dict[str, Any] | None = None,
         lease: RunLease | None = None,
     ) -> None:
+        """Settle a dispatched call with its cost, artifacts and decision.
+
+        ``delivery_acceptance``, when given, is the call's structured delivery
+        decision. It is stored in the completion event of the same
+        transaction, so it must agree with ``accepted`` and name the attempt
+        and a published subject for every artifact.
+        """
         cost_microusd = _microusd(cost_microusd, field="cost_microusd")
         if not isinstance(cost_is_complete, bool):
             raise TypeError("cost_is_complete must be a boolean")
@@ -1268,12 +1299,16 @@ class SQLiteRunStore:
                     or width * height > MAX_IMAGE_PIXELS
                 ):
                     raise ValueError("artifact dimensions exceed the persistence limits")
+        decision = (None if delivery_acceptance is None
+                    else _delivery_decision(delivery_acceptance, accepted, artifacts))
         with self._transaction() as cursor:
             now = self._clock_ns()
             call = self._call(cursor, call_id)
             self._assert_call_owner(cursor, call, lease, now)
             if call["status"] != "dispatched":
                 raise InvalidTransitionError("only a dispatched call can complete")
+            if decision is not None and decision.get("attempt_id") != call["attempt_id"]:
+                raise ValueError("delivery_acceptance names a different attempt than the call")
             attempt = cursor.execute(
                 "SELECT * FROM attempts WHERE attempt_id = ?", (call["attempt_id"],)
             ).fetchone()
@@ -1402,6 +1437,7 @@ class SQLiteRunStore:
                     "call_id": call_id,
                     "cost_microusd": cost_microusd,
                     "cost_is_complete": cost_is_complete,
+                    **({} if decision is None else {"delivery_acceptance": decision}),
                 },
                 now,
             )

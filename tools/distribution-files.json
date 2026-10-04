@@ -31,6 +31,7 @@
     "smythe/graph.py",
     "smythe/jobs/__init__.py",
     "smythe/jobs/artifact_io.py",
+    "smythe/jobs/delivery.py",
     "smythe/jobs/inspection.py",
     "smythe/jobs/loading.py",
     "smythe/jobs/models.py",

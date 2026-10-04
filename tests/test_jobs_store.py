@@ -502,6 +502,49 @@ def test_reroll_changes_only_selected_failed_operation(tmp_path, store_factory):
     }
 
 
+def _delivery_record(attempt_id, decision, subjects):
+    return {"version": 1, "scope": "artifacts", "attempt_id": attempt_id, "decision": decision,
+            "reasons": [] if decision == "accepted" else ["wrong size"], "subjects": subjects,
+            "validators": []}
+
+
+def test_complete_call_records_a_delivery_decision_that_matches_the_settlement(tmp_path, store_factory):
+    plan, approval = _plan(tmp_path, provider="offline")
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+    operation = store.pending_operations(run_id)[0]
+    attempt = store.begin_attempt(run_id, operation["operation_id"])
+    permit = store.prepare_call(attempt["attempt_id"], 0)
+    store.mark_call_dispatched(permit.call_id)
+    artifact = {"relative_path": "artifacts/glyph.png", "mime_type": "image/png",
+                "sha256": "a" * 64, "size_bytes": 123}
+    subject = {"path": "artifacts/glyph.png", "sha256": "a" * 64, "size_bytes": 123,
+               "published": True}
+
+    def complete(record, accepted):
+        store.complete_call(permit.call_id, cost_microusd=0, cost_is_complete=True,
+                            cost_is_estimate=False, artifacts=[artifact], result_text="done",
+                            accepted=accepted, delivery_acceptance=record)
+
+    attempt_id = attempt["attempt_id"]
+    with pytest.raises(ValueError, match="decision"):
+        complete(_delivery_record(attempt_id, "rejected", [subject]), True)
+    with pytest.raises(ValueError, match="decision"):
+        complete(_delivery_record(attempt_id, "needs_review", [subject]), False)
+    with pytest.raises(ValueError, match="subject"):
+        complete(_delivery_record(attempt_id, "accepted", [dict(subject, sha256="b" * 64)]), True)
+    with pytest.raises(ValueError, match="attempt"):
+        complete(_delivery_record("other", "accepted", [subject]), True)
+    with pytest.raises(ValueError, match="JSON"):
+        complete(_delivery_record(attempt_id, "accepted", [subject]) | {"bad": float("nan")}, True)
+    complete(_delivery_record(attempt_id, "accepted", [subject]), True)
+
+    events = store.snapshot(run_id, include_events=True)["events"]
+    [completed] = [event for event in events if event["event_type"] == "call_completed"]
+    assert completed["payload"]["delivery_acceptance"] == _delivery_record(attempt_id, "accepted", [subject])
+    assert store.schema_version == 4
+
+
 def _settle_attempt(store, run_id, operation_id, outcome="rejected"):
     attempt = store.begin_attempt(run_id, operation_id)
     permit = store.prepare_call(attempt["attempt_id"], 0)

@@ -206,7 +206,10 @@ The distinction between `prepared` and `dispatched` controls recovery:
   MIME type, byte size, and observed dimensions. Image bytes are decoded only
   as PNG, JPEG, GIF, or WebP, whatever MIME type the provider declares; other
   formats are refused before any other Pillow decoder runs. Like undecodable
-  data, they become `unknown_outcome` with the reason in the attempt error.
+  data, they are never written: the attempt is `rejected` at the cost the
+  provider reported, with the reason in the attempt error, and a reroll needs
+  no duplicate-spend acknowledgment. Invalid provider accounting still makes
+  the call an unknown outcome. See [delivery acceptance](#delivery-acceptance).
 
 Inspection applies its own limits, whatever the manifest requests: 32 MiB per
 artifact, 67,108,864 pixels per image or animation frame, 256 frames, and
@@ -255,6 +258,60 @@ remains exposed; `cost_contains_estimates` reports whether any recorded call
 used a conservative estimate. The `*_microusd` amounts are whole micro-USD,
 which the cost block's `unit` field names: `"microUSD"`. See
 [money units](budgets.md#money-units).
+
+## Delivery acceptance
+
+Every completed call is decided by checks on the exact response bytes. The
+built-in artifact check, `smythe.jobs.artifact-spec` version 1, decodes each
+artifact within the limits above and compares it with the operation's
+`artifact` spec. Each finding has a stable code:
+
+| Code | Finding |
+|---|---|
+| `no_artifacts` | The response has no artifact |
+| `artifact_count_limit` | The response has more than 10 artifacts |
+| `artifact_bytes_limit` | The response's artifacts exceed 128 MiB together |
+| `artifact_too_large` | One artifact exceeds 32 MiB |
+| `artifact_undecodable` | The bytes cannot be decoded, use a refused format, or exceed a pixel or frame limit |
+| `mime_type_mismatch` | The decoded MIME type differs from `mime_type` |
+| `dimensions_mismatch` | The decoded size differs from `width` and `height` |
+
+Any finding rejects the attempt; the operation becomes `rejected` and can be
+rerolled. Bytes that decode are published either way, with `accepted=0` when
+rejected, so they can be reviewed. The call's `call_completed` or
+`artifact_rejected` event records the decision under `delivery_acceptance`,
+in the transaction that settles the call's cost:
+
+```json
+{
+  "version": 1,
+  "scope": "artifacts",
+  "attempt_id": "...",
+  "decision": "rejected",
+  "reasons": ["tile.png: expected 1x1, observed 2x3"],
+  "subjects": [{"path": "artifacts/tile_0/attempt-0001/tile.png",
+                "sha256": "...", "size_bytes": 78, "published": true}],
+  "validators": [{
+    "validator": {"name": "smythe.jobs.artifact-spec", "version": "1",
+                  "config_sha256": "..."},
+    "outcome": "rejected",
+    "reports": [{"path": "artifacts/tile_0/attempt-0001/tile.png",
+                 "outcome": "rejected", "validator": {"...": "..."},
+                 "findings": [{"code": "dimensions_mismatch", "severity": "hard",
+                               "message": "tile.png: expected 1x1, observed 2x3",
+                               "expected": [1, 1], "observed": [2, 3]}]}]
+  }]
+}
+```
+
+`decision` is `accepted` or `rejected`. `subjects` lists each artifact's
+recorded path, SHA-256 and size; `published` is false for bytes that were not
+written. Findings about the whole response are reported for the path
+`response`. The check's `config_sha256` hashes the MIME type and dimensions it
+compared. The attempt error keeps the finding messages, and the operation's
+status and recorded `accepted` flags mean what they did before. Calls recorded
+by earlier releases have no `delivery_acceptance` block. The Jobs database
+schema is unchanged.
 
 ## List and inspect runs
 
