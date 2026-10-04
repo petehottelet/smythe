@@ -85,9 +85,11 @@ class BudgetEstimateRequired(PicklableError, ValueError):
     Image APIs charge on dimensions, quality, inputs, and outputs.  A generic
     token estimate is not a defensible reservation for them, so hard-budget
     execution fails closed until the caller supplies an inclusive per-call
-    ceiling on the provider or node.  ``node_id`` is None when a run is
-    rejected before planning: a generated plan's nodes all use the run's
-    model and cannot carry their own estimate.
+    ceiling on the provider or node.  ``node_id`` is None when a generated
+    plan's model is rejected before planning: its nodes all use the run's
+    model and cannot carry their own estimate.  A rejected ``LLM_MERGE``
+    synthesis, including one rejected before planning, has
+    ``SYNTHESIS_NODE_ID``; any other rejection names its node.
     """
 
     def __init__(self, node_id: str | None, model: str, provider: str) -> None:

@@ -91,11 +91,13 @@ for image inputs. With a `checkpoint_store`, a rejection here saves a failed
 checkpoint like any other failure, so a Swarm with a suitable provider can
 resume a paid plan without planning again.
 
-A missing ceiling raises `BudgetEstimateRequired`; its `node_id` is `None`
-when the run was refused before planning. Other mismatches raise
-`ValueError`. Only a feature declared unsupported is refused: custom
-providers declare nothing by default and run as before. See the
-[support matrix](support-matrix.md) for each provider's declaration.
+A missing ceiling raises `BudgetEstimateRequired`. Its `node_id` is `None`
+when a generated plan's model was refused before planning,
+`"__synthesis__"` (`smythe.graph.SYNTHESIS_NODE_ID`) when an `LLM_MERGE`
+synthesis was refused, and otherwise the refused node's id. Other
+mismatches raise `ValueError`. Only a feature declared unsupported is
+refused: custom providers declare nothing by default and run as before. See
+the [support matrix](support-matrix.md) for each provider's declaration.
 
 ## Timing
 

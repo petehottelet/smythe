@@ -63,8 +63,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   routing or planning when `LLMArchitect` plans the run or an `LLM_MERGE`
   synthesis needs the ceiling, and otherwise before the first node call. It
   used to be raised when a node or the synthesis reserved its budget, after
-  planning and any earlier nodes had been paid for. Raised before planning,
-  its `node_id` is `None`.
+  planning and any earlier nodes had been paid for. Its `node_id` is `None`
+  when a generated plan's model is refused before planning and
+  `"__synthesis__"` (`smythe.graph.SYNTHESIS_NODE_ID`) when an `LLM_MERGE`
+  synthesis is refused.
 - An ordinary `Swarm` raises `ValueError` before any provider call for a
   `tool_runtime` with `OfflineProvider`, `OpenAIImageProvider` or
   `AnthropicMessagesProvider`, for `attach_dep_artifacts` on
