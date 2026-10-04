@@ -180,7 +180,11 @@ The function decides the gate only through an explicit bool. It may return:
 - an object with a bool `passed` attribute, such as a
   [`ValidationReport`](#validation-reports). Its `reason` or `summary` string
   becomes the verdict's reason; a failing report without either lists up to
-  four of its hard findings as `code: message`.
+  four of its hard findings as `code: message`. A report whose `outcome` is
+  `"error"` could not decide, so its reason is `validator error`, followed by
+  the report's validator name in parentheses and up to four of its findings
+  when it has them: `validator error (required-section): unreadable: output
+  is not UTF-8`.
 
 Anything else **fails** the gate, with a reason that names the returned type
 (`verifier returned str`). The string `"FAIL"`, a non-empty list of

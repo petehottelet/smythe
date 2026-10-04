@@ -542,21 +542,39 @@ def _shown(value: object) -> str:
     return _type_name(value)
 
 
-def _report_reason(result: object, passed: bool) -> str:
-    """The reason a report such as ``ValidationReport`` gives for its verdict."""
-    for name in ("reason", "summary"):
-        text = getattr(result, name, None)
-        if isinstance(text, str) and text:
-            return _clip(text)
-    findings = getattr(result, "hard_findings", None)
-    if passed or not isinstance(findings, (tuple, list)):
+def _findings_text(findings: object) -> str:
+    """Up to four findings as ``code: message``, separated by semicolons."""
+    if not isinstance(findings, (tuple, list)):
         return ""
     shown = []
     for finding in findings[:4]:
         code, message = getattr(finding, "code", None), getattr(finding, "message", None)
         if isinstance(message, str):
             shown.append(f"{code}: {message}" if isinstance(code, str) else message)
-    return _clip("; ".join(shown))
+    return "; ".join(shown)
+
+
+def _report_reason(result: object, passed: bool) -> str:
+    """The reason a report such as ``ValidationReport`` gives for its verdict.
+
+    A report's own ``reason`` or ``summary`` comes first. A failing report
+    whose ``outcome`` is ``"error"`` could not decide, so its reason says
+    ``validator error``, with the validator's name and the findings it has;
+    any other failing report lists its hard findings.
+    """
+    for name in ("reason", "summary"):
+        text = getattr(result, name, None)
+        if isinstance(text, str) and text:
+            return _clip(text)
+    if passed:
+        return ""
+    outcome = getattr(result, "outcome", None)
+    if isinstance(outcome, str) and outcome == "error":
+        validator = getattr(getattr(result, "validator", None), "name", None)
+        reason = f"validator error ({validator})" if isinstance(validator, str) else "validator error"
+        detail = _findings_text(getattr(result, "findings", None))
+        return _clip(f"{reason}: {detail}" if detail else reason)
+    return _clip(_findings_text(getattr(result, "hard_findings", None)))
 
 
 def rejection_reason(verdict: Verdict) -> str:
@@ -588,7 +606,8 @@ class CallableVerifier(Verifier):
     The function returns a bool, a :class:`Verdict`, or an object with a
     bool ``passed`` attribute such as ``smythe.assets.ValidationReport``,
     whose ``reason`` or ``summary`` (or, for a failing report, its hard
-    findings) becomes the verdict's reason.  Anything else **fails**,
+    findings) becomes the verdict's reason; a report whose ``outcome`` is
+    ``"error"`` fails with ``validator error``.  Anything else **fails**,
     naming the returned type: ``"FAIL"``, a list of findings, ``None``, and
     a ``passed`` that is not a bool are not verdicts.  The function is
     called synchronously; a coroutine from an ``async def`` function is

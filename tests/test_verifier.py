@@ -15,6 +15,7 @@ from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
 from smythe.tracer import Tracer
+from smythe.validation import ValidatorIdentity
 from smythe.verifier import CallableVerifier, TokenVerifier, Verdict, Verifier
 
 
@@ -417,6 +418,42 @@ def test_callable_verifier_maps_a_validation_report():
     assert _callable_verdict(advisory_only) == Verdict(passed=True)
 
 
+def test_callable_verifier_gives_a_validator_error_a_reason():
+    """A report that could not decide fails its gate and says why, even without hard findings."""
+    identity = ValidatorIdentity.for_config("required-heading", "1")
+    assert _callable_verdict(ValidationReport("output", outcome="error")) == Verdict(
+        passed=False, reason="validator error",
+    )
+    unreadable = ValidationReport("output", (
+        advisory_finding("unreadable", "output is not UTF-8"),
+    ), outcome="error", validator=identity)
+    assert _callable_verdict(unreadable) == Verdict(
+        passed=False, reason="validator error (required-heading): unreadable: output is not UTF-8",
+    )
+    timed_out = ValidationReport("output", (
+        hard_finding("timeout", "the check timed out"),
+    ), outcome="error")
+    assert _callable_verdict(timed_out) == Verdict(
+        passed=False, reason="validator error: timeout: the check timed out",
+    )
+
+
+@pytest.mark.parametrize("sync", [False, True])
+def test_validator_error_regenerates_with_its_reason(sync):
+    graph = _gated_graph(max_regenerations=1)
+    tracer = Tracer()
+    provider = ScriptedProvider({"draft": ["v1", "v2"], "judge": ["anything"]})
+    verifier = CallableVerifier(lambda v, target: ValidationReport(
+        "output", outcome="error" if target.result == "v1" else None,
+    ))
+    _run(graph, provider, tracer=tracer, verifier=verifier, sync=sync)
+
+    assert provider.runs["draft"] == 2
+    assert graph.nodes[0].result == "v2"
+    [event] = [s for s in tracer.summary() if "regeneration" in s]
+    assert event["label"] == "validator error"
+
+
 class _Report:
     def __init__(self, passed, **fields) -> None:
         self.passed = passed
@@ -429,6 +466,10 @@ class _Report:
     pytest.param(_Report(False, summary="1 hard finding"),
                  Verdict(passed=False, reason="1 hard finding"), id="summary"),
     pytest.param(_Report(True), Verdict(passed=True), id="pass"),
+    pytest.param(_Report(False, outcome="error"),
+                 Verdict(passed=False, reason="validator error"), id="error"),
+    pytest.param(_Report(False, outcome="error", reason="input file is missing"),
+                 Verdict(passed=False, reason="input file is missing"), id="error-reason"),
 ])
 def test_callable_verifier_reads_a_bool_passed_attribute(result, expected):
     assert _callable_verdict(result) == expected
