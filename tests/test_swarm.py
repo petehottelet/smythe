@@ -647,6 +647,28 @@ def test_router_time_is_reported_when_execute_routes_in_the_same_call():
 
 
 @pytest.mark.parametrize("parallel", [False, True])
+def test_execute_plans_a_task_through_an_overridden_plan_method(parallel):
+    class ReviewedSwarm(Swarm):
+        def plan(self, task):
+            self.planned.append(task.goal)
+            graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[Node(id="reviewed", label="Reviewed step")])
+            graph.task = task
+            return graph
+
+        async def aplan(self, task):
+            return self.plan(task)
+
+    swarm = ReviewedSwarm(model="m", provider=MockProvider(), parallel=parallel, artifact_dir=None)
+    swarm.planned = []
+
+    result = swarm.execute(Task(goal="Do the thing"))
+
+    assert swarm.planned == ["Do the thing"]
+    assert [node.id for node in result.graph.nodes] == ["reviewed"]
+    assert result.timing["phases_ms"]["planning"] is not None
+
+
+@pytest.mark.parametrize("parallel", [False, True])
 def test_a_graph_planned_in_another_call_reports_planning_as_not_measured(parallel):
     clock = ManualClock()
     swarm = _clocked(Swarm(model="m", provider=_ClockedProvider(clock), parallel=parallel,

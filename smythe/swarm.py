@@ -263,6 +263,20 @@ class Swarm:
             return asyncio.run(self._workflow_runtime().plan(task))
         return self._plan(task, Tracer())
 
+    def _plan_for_execution(self, task: Task, tracer: Tracer) -> ExecutionGraph:
+        """Plan *task* for execute(); a subclass's plan() stays authoritative."""
+        if type(self).plan is not Swarm.plan:
+            with tracer.phase("planning"):
+                return self.plan(task)
+        return self._plan(task, tracer)
+
+    async def _aplan_for_execution(self, task: Task, tracer: Tracer) -> ExecutionGraph:
+        """Async _plan_for_execution(); a subclass's aplan() stays authoritative."""
+        if type(self).aplan is not Swarm.aplan:
+            with tracer.phase("planning"):
+                return await self.aplan(task)
+        return await self._aplan(task, tracer)
+
     def _plan(self, task: Task, tracer: Tracer) -> ExecutionGraph:
         """Plan *task*, measuring routing and planning on *tracer*."""
         Sentinel(self.max_budget_usd)
@@ -369,7 +383,7 @@ class Swarm:
 
         self._active_executor = None
         if isinstance(task_or_graph, Task):
-            graph = await self._aplan(task_or_graph, tracer)
+            graph = await self._aplan_for_execution(task_or_graph, tracer)
         else:
             graph = self._prepare_graph(task_or_graph)
         task = snapshot_task(graph.task) if graph.task is not None else None
@@ -446,7 +460,7 @@ class Swarm:
 
         self._active_executor = None
         if isinstance(task_or_graph, Task):
-            graph = self._plan(task_or_graph, tracer)
+            graph = self._plan_for_execution(task_or_graph, tracer)
         else:
             graph = self._prepare_graph(task_or_graph)
         task = snapshot_task(graph.task) if graph.task is not None else None
