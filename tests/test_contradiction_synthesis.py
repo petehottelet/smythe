@@ -375,6 +375,27 @@ def test_a_judge_that_fails_the_draft_is_not_accepted(store, replies):
     assert json.dumps(CLOSURES.contradicting[0].quote) in prompt
 
 
+@pytest.mark.parametrize("durable", [False, True], ids=["ordinary", "durable"])
+def test_an_appended_section_without_a_final_validator_is_decided_by_on_invalid(
+        store, replies, durable):
+    script, calls = replies
+    script["Draft"] = [artifact(DROPPED)]
+    script["Judge"] = ["PASS"]
+    policy = AcceptancePolicy(mode="strict", on_invalid="needs_review")
+    # The gate's verdict covers the draft as delivered without the option.
+    plain = swarm(store if durable else None, Synthesizer(), acceptance=policy).execute(judged())
+    assert plain.accepted and plain.output == artifact(DROPPED)
+    # Whether a section is appended depends on results, so the run is not
+    # refused before its calls; the passed gate no longer covers the output.
+    del calls[:]
+    result = swarm(store if durable else None, acceptance=policy).execute(judged())
+    assert calls == ["Draft", "Judge"]
+    assert result.acceptance.decision is AcceptanceDecision.NEEDS_REVIEW and not result.accepted
+    assert result.acceptance.reasons == ("no final validator or passed gate covers the delivered "
+                                         "output",)
+    assert (result.output, result.rejected_output) == ("", artifact(DROPPED) + "\n" + SECTION)
+
+
 def test_an_instruction_bearing_source_changes_no_capability_budget_or_policy(store, replies):
     script, _ = replies
     script["Write"] = [artifact(DROPPED)]

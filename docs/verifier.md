@@ -415,12 +415,15 @@ in the graph is read from its recorded final verdict. The decision is:
 A gate therefore accepts only the node it judged. A later step, including one
 a supervisor adds after the gated node, two deliverable nodes, the
 `DELIVERABLE` fallback to every completed node, and `CONCATENATE`,
-`STRUCTURED`, `LLM_MERGE` or a custom synthesizer all need a final validator,
-and so does `DELIVERABLE` output to which `retain_contradictions` appends a
-[contradictions section](source-evidence.md#keep-contradictions-through-synthesis).
+`STRUCTURED`, `LLM_MERGE` or a custom synthesizer all need a final validator.
 A `Swarm` whose strict policy has none raises `ValueError` when it is built
 with a synthesis other than `DELIVERABLE`, and refuses the other cases
-[before any call](#acceptance-obligations).
+[before any call](#acceptance-obligations). `DELIVERABLE` output to which
+`retain_contradictions` appends a
+[contradictions section](source-evidence.md#keep-contradictions-through-synthesis)
+is not covered by the gate either. Whether the section is appended depends on
+results, so such a run is not refused up front: without a final validator it
+makes its calls and its output is decided by `on_invalid`.
 
 <a id="which-gates-count"></a>
 **Which gates count.** Acceptance criteria are inputs you control, so a gate
