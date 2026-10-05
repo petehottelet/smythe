@@ -765,11 +765,14 @@ and must carry forward everything the task asked for, not only its own
 contribution. Prompts follow the same rule as that synthesis. A judge is never
 told it is the final step, and its edge to the node it verifies does not count,
 so in a draft-to-judge graph the draft receives the instruction. A step that
-depends on the draft or on its judge is the final step instead. Executors take a keyword-only `prompt_assembly`; `1`
-restores the earlier placement, which counted the judge's edge and so told a
-judge that nothing depends on, rather than the draft, that it was the final
-step. [Durable text workflows](workflow-accounting.md#recovery-boundaries)
-keep the earlier placement unless the run's recipe records version 2.
+depends on the draft is the final step instead. A step that depends only on
+the judge leaves the draft deliverable, so both are final steps and
+`DELIVERABLE` synthesis returns both. Executors take a keyword-only
+`prompt_assembly`; `1` restores the earlier placement, which counted the
+judge's edge and so told a judge that nothing depends on, rather than the
+draft, that it was the final step.
+[Durable text workflows](workflow-accounting.md#recovery-boundaries) keep the
+earlier placement.
 
 ## Cost
 

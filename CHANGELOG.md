@@ -714,9 +714,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   results for gated graphs from before and after this change are not directly
   comparable. Executors take a keyword-only `prompt_assembly`, where `1`
   restores the earlier placement. Durable text workflows keep the earlier
-  placement, so runs in flight resume with the requests they saved; a recipe
-  that records `prompt_assembly: 2` uses the new one, and a saved or
-  configured version this release does not support is refused. See
+  placement, so runs in flight resume with the requests they saved; no public
+  setting opts them into the new one yet, and a saved recipe whose
+  `prompt_assembly` version this release does not support is refused. See
   [the final step](docs/verifier.md#the-final-step).
 - `smythe.assets.validate_image` reads the file once and checks that snapshot.
   It used to hash the file for a finishing receipt and then open it again to

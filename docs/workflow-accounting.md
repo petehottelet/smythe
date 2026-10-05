@@ -317,15 +317,15 @@ already progressing run must use `resume()`. A graph carrying durable
 provenance cannot enter the ordinary unjournaled execution path.
 
 Node prompts follow the prompt-assembly version that the run's recipe records.
-A recipe without `prompt_assembly`, which is what a new run records by
-default, keeps the placement of every earlier release: the instruction that a
-node is the final step goes to each node that no other node depends on,
-including a judge that nothing depends on, and not to the node that judge
-verifies. A recipe that records `prompt_assembly: 2` places it as
-[ordinary runs](verifier.md#the-final-step) do. Resume reads the version from
-the saved recipe, so a run in flight sends the requests it saved. A runtime
-configured with a different version raises `WorkflowConflictError`, and so does
-a saved recipe whose version this release does not support.
+Durable runs record none, which keeps the placement of every earlier release:
+the instruction that a node is the final step goes to each node that no other
+node depends on, including a judge that nothing depends on, and not to the
+node that judge verifies. [Ordinary runs](verifier.md#the-final-step) place it
+differently. No public setting opts a durable run into the ordinary placement
+yet; the recipe field `prompt_assembly` is reserved for that opt-in. Resume
+reads the version from the saved recipe, so a run in flight sends the requests
+it saved, and a saved recipe whose version this release does not support
+raises `WorkflowConflictError`.
 
 ## Strict delivery acceptance
 

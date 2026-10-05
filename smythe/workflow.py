@@ -73,11 +73,11 @@ MAX_NODE_ID_CHARS = 256
 #
 # prompt_assembly selects how node prompts are assembled (see
 # smythe.executor_base.PROMPT_ASSEMBLY_VERSION). Version 1, which recipes
-# without the field mean and new runs still record by default, tells every
-# node that no other node depends on that it is the final step, a judge
-# included. Version 2 tells the nodes DELIVERABLE synthesis returns, as
-# ordinary runs do. A run keeps its version, so its saved requests still match
-# when it resumes.
+# without the field mean and new runs use by default, tells every node that no
+# other node depends on that it is the final step, a judge included. Version 2
+# tells the nodes DELIVERABLE synthesis returns, as ordinary runs do; only
+# behavior_settings records it, and no public setting passes that yet. A run
+# keeps its version, so its saved requests still match when it resumes.
 RECIPE_BEHAVIOR_FIELDS = MappingProxyType({"prompt_assembly": (1, 1)})
 # The values this release supports for a behavior-version field. A configured
 # value outside them is refused, and so is a saved recipe that records one,

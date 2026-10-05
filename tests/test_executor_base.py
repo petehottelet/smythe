@@ -214,6 +214,20 @@ def test_a_swarm_gives_the_terminal_note_to_the_gated_draft_and_not_its_judge(pa
     assert result.accepted is strict
 
 
+def test_a_step_that_depends_only_on_the_judge_is_a_final_step_beside_the_draft():
+    from smythe.executor_base import TERMINAL_DELIVERABLE_NOTE
+    from smythe.synthesizer import deliverable_sources
+
+    graph = _draft_and_judge()
+    graph.nodes.append(Node(label="Publish", id="publish", depends_on=["judge"]))
+    prompts = _run(graph, parallel=False)
+
+    assert TERMINAL_DELIVERABLE_NOTE in prompts["Draft"]
+    assert TERMINAL_DELIVERABLE_NOTE in prompts["Publish"]
+    assert not any(TERMINAL_DELIVERABLE_NOTE in prompts[label] for label in ("Research", "Check"))
+    assert [node.id for node in deliverable_sources(graph)[0]] == ["draft", "publish"]
+
+
 @pytest.mark.parametrize("value", [0, 3, True, 2.0, "2", None])
 def test_executors_refuse_an_unknown_prompt_assembly_version(value):
     from smythe.async_executor import AsyncExecutor
