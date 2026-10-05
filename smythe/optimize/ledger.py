@@ -63,7 +63,9 @@ class HoldoutAlreadyUsedError(LedgerConflictError):
 
     Re-testing the same policy under the same holdout identity (see
     :func:`holdout_identity`) in the same ledger would draw a fresh holdout,
-    so the ledger refuses it.
+    so the ledger refuses it.  It is also raised for any campaign once a
+    declared ``max_holdout_draws`` cap on the identity's finite task pool is
+    reached.
     """
 
 
@@ -370,6 +372,41 @@ def _stored_holdout_identity(contract_json: object, evaluator_hash: str) -> str:
         ) from exc
 
 
+def _rows_with_identity(
+    cursor: sqlite3.Cursor, identity: str, query: str, values: Sequence[object] = ()
+) -> Iterator[sqlite3.Row]:
+    """Yield holdout rows whose stored contract and evaluator give *identity*."""
+
+    identities: dict[tuple[Any, Any], str] = {}
+    for row in cursor.execute(query, values).fetchall():
+        key = (row["contract_json"], row["evaluator_hash"])
+        if key not in identities:
+            identities[key] = _stored_holdout_identity(*key)
+        if identities[key] == identity:
+            yield row
+
+
+def _holdout_draws(cursor: sqlite3.Cursor, identity: str) -> tuple[str, ...]:
+    """Campaigns that prepared any holdout trial under *identity*, by first draw.
+
+    Incumbent rows count too: every holdout trial runs tasks from the
+    identity's holdout pool.
+    """
+
+    query = """
+        SELECT t.campaign_id AS campaign_id, t.evaluator_hash AS evaluator_hash,
+               c.contract_json AS contract_json,
+               MIN(t.prepared_at_ns) AS first_drawn_ns
+        FROM trials AS t
+        JOIN campaigns AS c ON c.campaign_id = t.campaign_id
+        WHERE t.split = 'holdout'
+        GROUP BY t.campaign_id, t.evaluator_hash
+        ORDER BY first_drawn_ns, t.campaign_id
+    """
+    rows = _rows_with_identity(cursor, identity, query)
+    return tuple(dict.fromkeys(row["campaign_id"] for row in rows))
+
+
 def _holdout_consumers(
     cursor: sqlite3.Cursor,
     identity: str,
@@ -405,16 +442,8 @@ def _holdout_consumers(
         GROUP BY k.policy_hash, t.campaign_id, t.evaluator_hash
         ORDER BY first_used_ns, t.campaign_id
     """
-    identities: dict[tuple[Any, Any], str] = {}
     consumers: dict[str, list[str]] = {}
-    for row in cursor.execute(query, values).fetchall():
-        key = (row["contract_json"], row["evaluator_hash"])
-        if key not in identities:
-            identities[key] = _stored_holdout_identity(
-                row["contract_json"], row["evaluator_hash"]
-            )
-        if identities[key] != identity:
-            continue
+    for row in _rows_with_identity(cursor, identity, query, values):
         campaigns = consumers.setdefault(row["policy_hash"], [])
         if row["campaign_id"] not in campaigns:
             campaigns.append(row["campaign_id"])
@@ -434,6 +463,19 @@ def _holdout_reuse_message(policy_hash: str, identity: str, campaign_id: str) ->
         "development or confirmation repetition count, or operational limit "
         f"does not change it. Inspect campaign {campaign_id!r} instead, or "
         "leave this policy out of the challenger set."
+    )
+
+
+def _holdout_pool_message(identity: str, campaigns: Sequence[str], limit: int) -> str:
+    """Explain why a draw beyond a finite holdout pool's cap is refused."""
+
+    return (
+        f"holdout identity {identity} allows {limit} campaign(s) to draw its "
+        f"finite holdout task pool and {len(campaigns)} already did, first "
+        f"campaign {campaigns[0]!r}; another draw would reuse held-out tasks, "
+        "so it is refused for every policy. The cap is not part of the "
+        "identity. Inspect those campaigns instead, or define a new holdout "
+        "evaluation, such as a new holdout task pack in the evaluator hash."
     )
 
 
@@ -1405,6 +1447,23 @@ class ExperimentLedger:
             finally:
                 cursor.close()
 
+    def holdout_draw_campaigns(self, identity: str) -> tuple[str, ...]:
+        """Return the campaigns that drew from a holdout identity's task pool.
+
+        A campaign draws when it prepares any holdout trial under
+        ``identity``, for its incumbent or a challenger.  Campaigns are in
+        first-draw order.  ``max_holdout_draws`` on :meth:`prepare_trial` and
+        the runner caps how many there may be.
+        """
+
+        normalized = _sha256(identity, "holdout identity")
+        with self._lock:
+            cursor = self._connection.cursor()
+            try:
+                return _holdout_draws(cursor, normalized)
+            finally:
+                cursor.close()
+
     @staticmethod
     def _validated_holdout_values(row: sqlite3.Row) -> tuple[bytes, str]:
         nonce = row["holdout_nonce"]
@@ -1543,7 +1602,16 @@ class ExperimentLedger:
         lease: CampaignLease,
         evaluator_hash: str,
         ceiling_microusd: int,
+        max_holdout_draws: int | None = None,
     ) -> str:
+        """Durably reserve one trial before any evaluator work.
+
+        With ``max_holdout_draws``, a new holdout trial is refused unless its
+        campaign already drew from the holdout identity's pool or fewer than
+        that many campaigns have; the check runs in the write transaction
+        that inserts the trial.
+        """
+
         identifier = _safe_id(campaign_id, "campaign_id")
         candidate = _safe_id(candidate_id, "candidate_id")
         split_name = _nonempty(split, "split", maximum=128)
@@ -1551,6 +1619,13 @@ class ExperimentLedger:
         normalized_seed = _seed(seed)
         evaluator = _sha256(evaluator_hash, "evaluator_hash")
         ceiling = _nonnegative_int(ceiling_microusd, "ceiling_microusd")
+        draw_cap = (
+            None
+            if max_holdout_draws is None
+            else _nonnegative_int(max_holdout_draws, "max_holdout_draws")
+        )
+        if draw_cap == 0:
+            raise ValueError("max_holdout_draws must be a positive integer")
         trial_key = self.make_trial_key(
             identifier, candidate, split_name, phase_name, normalized_seed
         )
@@ -1592,31 +1667,40 @@ class ExperimentLedger:
                 raise LedgerConflictError(
                     f"campaign {identifier!r} already has a terminal decision"
                 )
-            if (
-                split_name == "holdout"
-                and candidate != campaign["incumbent_candidate_id"]
-            ):
-                # The first holdout row for a challenger is its durable
-                # holdout-use record, written in this transaction before any
-                # holdout evaluation.  Use is keyed by the holdout identity of
-                # this campaign's stored contract and this trial's evaluator,
-                # plus the policy content: never hypothesis prose, campaign
-                # identity, the challenger set, or operational caps.
-                policy_hash = candidate_row["policy_hash"]
+            challenger = candidate != campaign["incumbent_candidate_id"]
+            if split_name == "holdout" and (challenger or draw_cap is not None):
                 identity = _stored_holdout_identity(
                     campaign["contract_json"], evaluator
                 )
-                prior = [
-                    item
-                    for item in _holdout_consumers(
-                        cursor, identity, policy_hash
-                    ).get(policy_hash, ())
-                    if item != identifier
-                ]
-                if prior:
-                    raise HoldoutAlreadyUsedError(
-                        _holdout_reuse_message(policy_hash, identity, prior[0])
-                    )
+                if challenger:
+                    # The first holdout row for a challenger is its durable
+                    # holdout-use record, written in this transaction before
+                    # any holdout evaluation.  Use is keyed by the holdout
+                    # identity of this campaign's stored contract and this
+                    # trial's evaluator, plus the policy content: never
+                    # hypothesis prose, campaign identity, the challenger set,
+                    # or operational caps.
+                    policy_hash = candidate_row["policy_hash"]
+                    prior = [
+                        item
+                        for item in _holdout_consumers(
+                            cursor, identity, policy_hash
+                        ).get(policy_hash, ())
+                        if item != identifier
+                    ]
+                    if prior:
+                        raise HoldoutAlreadyUsedError(
+                            _holdout_reuse_message(policy_hash, identity, prior[0])
+                        )
+                if draw_cap is not None:
+                    # The same transaction inserts this campaign's first
+                    # draw, so two campaigns racing for the last draw cannot
+                    # both take it.
+                    draws = _holdout_draws(cursor, identity)
+                    if identifier not in draws and len(draws) >= draw_cap:
+                        raise HoldoutAlreadyUsedError(
+                            _holdout_pool_message(identity, draws, draw_cap)
+                        )
             contract = json.loads(campaign["contract_json"])
             required_ceiling = contract["per_trial_reservation_microusd"]
             if ceiling != required_ceiling:

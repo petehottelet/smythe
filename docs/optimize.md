@@ -211,7 +211,9 @@ holdout trial's evaluator hash, so holdout trials recorded by 0.8.0, which
 kept no separate record, still count.
 `holdout_identity(contract, evaluator_hash)` in `smythe.optimize.ledger`
 returns an identity, and `ExperimentLedger.holdout_uses(identity)` maps each
-policy that used it to the campaigns that did, in first-use order.
+policy that used it to the campaigns that did, in first-use order. A holdout
+drawn from a finite task pack can also be limited across policies; see
+[finite task pools](#finite-task-pools).
 
 The runner evaluates every policy on development seeds, removes challengers
 that fail a gate, hard metric bound, primary mean-improvement threshold, or
@@ -304,8 +306,8 @@ promote the candidate. Rejection never emits a patch to apply.
 The optimization plan hash binds the contract, incumbent, ordered challenger
 set, policy hashes, evaluator hash, runner version, promotion method,
 descriptive bootstrap configuration, ledger durability, and required trial
-count, plus any declared [task pools](#finite-task-pools). When
-`--campaign-id` is omitted, the durable campaign identity is
+count, plus any declared [task pools and holdout draw cap](#finite-task-pools).
+When `--campaign-id` is omitted, the durable campaign identity is
 derived from that full plan. Repeating the same command reuses completed
 trials; changing a candidate, contract, evaluator, bootstrap, or durability
 setting creates a different automatic campaign. That campaign is refused if
@@ -511,15 +513,15 @@ runner = OptimizationRunner(
 ```
 
 Each `TrialContext` for a split with a pool then carries a `task_index` from
-0 to one less than that split's pool size; the evaluator runs that task. Within a split no two
-seeds share a task, and the incumbent and challenger trials on one seed run
-the same task, so every pair compares the two policies on one task. The
-indices are a deterministic shuffle of the split's seeds, so a resumed
-campaign draws the same tasks, development and confirmation repeat across
-campaigns with the same contract, and holdout tasks follow the campaign's
-sealed holdout seeds. Each split's pool is indexed on its own; give
-confirmation its own pack if it must not repeat development tasks. A split
-without a pool gets `task_index=None`, as before.
+0 to one less than that split's pool size; the evaluator runs that task.
+Within a split no two seeds share a task, and the incumbent and challenger
+trials on one seed run the same task, so every pair compares the two
+policies on one task. The indices are a deterministic shuffle keyed by the
+split's seeds: a resumed campaign draws the same tasks, development and
+confirmation draw the same tasks in every campaign under one contract, and
+holdout tasks follow the campaign's sealed holdout seeds. Each split's pool
+is indexed on its own; give confirmation its own pack if it must not repeat
+development tasks. A split without a pool gets `task_index=None`, as before.
 
 A plan whose repetitions for a split exceed that split's pool is refused with
 `OptimizationLimitError` before the campaign is created, since it would have
@@ -528,6 +530,39 @@ starts a different automatic campaign; a plan that declares none keeps its
 hash. Pool sizes are not part of the holdout identity. Requirements the
 engine does not model, such as a regression set whose results must not get
 worse, belong in the evaluator as required gates.
+
+Fresh holdout seeds do not make a finite holdout pack fresh: every campaign
+that reaches the holdout runs some of its tasks, whatever policy it tests.
+`max_holdout_draws` caps how many campaigns may draw from one holdout
+identity:
+
+```python
+runner = OptimizationRunner(
+    contract,
+    ledger,
+    evaluate,
+    evaluator_hash=manifest.evaluator_hash,
+    task_pools={"holdout": 12},
+    max_holdout_draws=1,
+)
+```
+
+A campaign draws when it prepares its first holdout trial, for the incumbent
+or a challenger, and every campaign that did so under the identity counts,
+including campaigns run without a cap. Once the cap is reached, a new
+campaign under the identity is refused with `HoldoutAlreadyUsedError` before
+it is created, even for a policy that never used the holdout; a campaign that
+already drew can still resume and replay. The ledger repeats the check in the
+write transaction that records a campaign's first holdout trial, so two
+campaigns racing for the last draw cannot both take it, and
+`ExperimentLedger.prepare_trial(..., max_holdout_draws=n)` applies the same
+rule to low-level callers. `ExperimentLedger.holdout_draw_campaigns(identity)`
+lists the campaigns that drew, in first-draw order.
+
+The cap is not part of the holdout identity, so raising or removing it never
+reopens a policy's used holdout. It joins the plan hash when set, like task
+pools. To test again after the pack is used up, author a new holdout pack:
+its manifest digest changes the evaluator hash and so defines a new holdout.
 
 <a id="campaign-ownership-unreleased"></a>
 

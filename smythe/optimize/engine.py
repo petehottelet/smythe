@@ -26,6 +26,7 @@ from smythe.optimize.contracts import (
 )
 from smythe.optimize.ledger import (
     _ENGINE_HOLDOUT_CAPABILITY,
+    _holdout_pool_message,
     _holdout_reuse_message,
     _lease_duration_ns,
     CampaignLease,
@@ -79,8 +80,8 @@ class OptimizationLimitError(OptimizationError):
 class TrialContext:
     """Immutable input supplied to one in-process evaluator invocation.
 
-    ``task_index`` names the task to evaluate, from 0 below the split's
-    declared task pool, or is None when the runner declares no pool for the
+    ``task_index`` is the task to evaluate, counted from 0 within the split's
+    declared task pool, or None when the runner declares no pool for the
     split.  Paired trials on one seed share it, and no two seeds of a split
     do.
     """
@@ -239,6 +240,7 @@ class OptimizationRunner:
         lease_ttl_s: float = 30.0,
         lease_heartbeat_s: float | None = None,
         task_pools: Mapping[str, int] | None = None,
+        max_holdout_draws: int | None = None,
     ) -> None:
         if not isinstance(contract, ExperimentContract):
             raise TypeError("contract must be an ExperimentContract")
@@ -275,6 +277,12 @@ class OptimizationRunner:
                 1 <= size <= _MAX_SIGNED_63
             ):
                 raise ValueError(f"task_pools[{split!r}] must be a positive integer")
+        if max_holdout_draws is not None and (
+            isinstance(max_holdout_draws, bool)
+            or not isinstance(max_holdout_draws, int)
+            or not 1 <= max_holdout_draws <= _MAX_SIGNED_63
+        ):
+            raise ValueError("max_holdout_draws must be a positive integer when provided")
 
         self.contract = contract
         self.ledger = ledger
@@ -290,6 +298,7 @@ class OptimizationRunner:
         self.lease_ttl_s = float(lease_ttl_s)
         self.lease_heartbeat_s = float(interval)
         self.task_pools = {split: pools[split] for split in _SPLITS if split in pools}
+        self.max_holdout_draws = max_holdout_draws
 
     async def run(
         self,
@@ -650,6 +659,8 @@ class OptimizationRunner:
         # declare none keep their hashes.
         if self.task_pools:
             plan_payload["task_pools"] = dict(self.task_pools)
+        if self.max_holdout_draws is not None:
+            plan_payload["max_holdout_draws"] = self.max_holdout_draws
         plan_hash = sha256_prefixed(plan_payload)
         campaign_id = self.campaign_id or (
             f"optimization_v{RUNNER_VERSION}_" + plan_hash.removeprefix("sha256:")
@@ -681,6 +692,11 @@ class OptimizationRunner:
         holdout for the same policy in this ledger.  Neither can upgrading the
         runner: holdouts used by earlier releases, which kept no separate
         record, still count.
+
+        With ``max_holdout_draws``, a new campaign is also refused, whatever
+        its policies, once that many campaigns drew holdout trials under the
+        identity.  The cap is not part of the identity, so changing it never
+        reopens a used holdout.
         """
 
         campaign_id: str = plan["campaign_id"]
@@ -695,6 +711,12 @@ class OptimizationRunner:
                         identity,
                         consumers[0],
                     )
+                )
+        if self.max_holdout_draws is not None:
+            draws = self.ledger.holdout_draw_campaigns(identity)
+            if campaign_id not in draws and len(draws) >= self.max_holdout_draws:
+                raise HoldoutAlreadyUsedError(
+                    _holdout_pool_message(identity, draws, self.max_holdout_draws)
                 )
 
     def _validate_executable_contract(self) -> None:
@@ -1171,6 +1193,7 @@ class OptimizationRunner:
                 evaluator_hash=self.evaluator_hash,
                 ceiling_microusd=self.contract.per_trial_reservation_microusd,
                 lease=lease,
+                max_holdout_draws=self.max_holdout_draws,
             )
         except UnknownTrialError as exc:
             raise OptimizationNeedsAttention(str(exc)) from exc

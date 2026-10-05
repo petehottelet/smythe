@@ -1119,7 +1119,7 @@ def test_runner_rejects_invalid_task_pools(tmp_path, pools, error):
             _runner(_contract(), ledger, _challengers_win, task_pools=pools)
 
 
-def test_task_pools_join_the_plan_hash_only_when_declared(tmp_path):
+def test_task_pools_and_draw_cap_join_the_plan_hash_only_when_declared(tmp_path):
     contract = _contract()
     incumbent, challenger = _candidates(contract)
 
@@ -1129,7 +1129,7 @@ def test_task_pools_join_the_plan_hash_only_when_declared(tmp_path):
             runner = _runner(contract, ledger, _challengers_win, **options)
             return runner._build_plan(incumbent, (challenger,))["plan_hash"]
 
-        # Plans that declare no task pool keep their earlier bytes.
+        # Plans that declare neither setting keep their earlier bytes.
         legacy = sha256_prefixed(
             {
                 "runner_version": 4,
@@ -1152,3 +1152,134 @@ def test_task_pools_join_the_plan_hash_only_when_declared(tmp_path):
         assert pooled != legacy
         assert plan_hash(task_pools={"holdout": 4}) != pooled
         assert plan_hash(task_pools={"holdout": 3, "development": 5}) != pooled
+
+        assert plan_hash(max_holdout_draws=None) == legacy
+        capped = plan_hash(max_holdout_draws=1)
+        assert capped not in {legacy, pooled}
+        assert plan_hash(max_holdout_draws=2) != capped
+
+
+@pytest.mark.parametrize("cap", [0, -1, True, 1.0, 2**63])
+def test_runner_rejects_an_invalid_holdout_draw_cap(tmp_path, cap):
+    with ExperimentLedger(tmp_path / "invalid-cap.sqlite3", durability="normal") as ledger:
+        with pytest.raises(ValueError, match="max_holdout_draws"):
+            _runner(_contract(), ledger, _challengers_win, max_holdout_draws=cap)
+
+
+def _second_policy(contract: ExperimentContract, incumbent: Candidate, strength: int) -> Candidate:
+    return Candidate(
+        contract=contract,
+        policy={"strength": strength},
+        hypothesis=f"strength {strength} helps",
+        parent=incumbent.candidate_id,
+    )
+
+
+@pytest.mark.asyncio
+async def test_holdout_draw_cap_refuses_another_campaign_even_for_a_different_policy(
+    tmp_path,
+):
+    contract = _contract()
+    incumbent, challenger = _candidates(contract)
+    second, third = (_second_policy(contract, incumbent, value) for value in (3, 4))
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+    calls: list[TrialContext] = []
+
+    async def evaluate(context: TrialContext) -> TrialOutcome:
+        calls.append(context)
+        return await _challengers_win(context)
+
+    with ExperimentLedger(tmp_path / "draws.sqlite3", durability="normal") as ledger:
+        # A draw made without a cap still counts against a later cap.
+        first = await _runner(contract, ledger, evaluate).run(incumbent, (challenger,))
+        assert first.holdout_assessment is not None
+        assert ledger.holdout_draw_campaigns(identity) == (first.campaign_id,)
+        evaluated = len(calls)
+
+        for campaign_id in (None, "fresh-campaign-id"):
+            runner = _runner(
+                contract, ledger, evaluate, campaign_id=campaign_id, max_holdout_draws=1
+            )
+            with pytest.raises(HoldoutAlreadyUsedError, match=first.campaign_id) as refused:
+                await runner.run(incumbent, (second,))
+            assert identity in str(refused.value)
+            assert "finite holdout task pool" in str(refused.value)
+        assert len(calls) == evaluated
+        campaigns = ledger._connection.execute("SELECT COUNT(*) FROM campaigns").fetchone()[0]
+        assert campaigns == 1
+
+        # A larger cap admits one more draw, and a campaign that drew still
+        # replays once the cap is reached.
+        admitted = await _runner(contract, ledger, evaluate, max_holdout_draws=2).run(
+            incumbent, (second,)
+        )
+        assert admitted.holdout_assessment is not None
+        assert ledger.holdout_draw_campaigns(identity) == (
+            first.campaign_id,
+            admitted.campaign_id,
+        )
+        evaluated = len(calls)
+        replay = await _runner(contract, ledger, evaluate, max_holdout_draws=2).run(
+            incumbent, (second,)
+        )
+        assert replay.decision_id == admitted.decision_id
+        assert len(calls) == evaluated
+        with pytest.raises(HoldoutAlreadyUsedError, match="finite holdout task pool"):
+            await _runner(contract, ledger, evaluate, max_holdout_draws=2).run(
+                incumbent, (third,)
+            )
+        assert len(calls) == evaluated
+
+
+@pytest.mark.asyncio
+async def test_racing_holdout_draw_is_refused_before_any_holdout_dispatch(
+    tmp_path, monkeypatch
+):
+    contract = _contract()
+    incumbent, challenger = _candidates(contract)
+    second = _second_policy(contract, incumbent, 3)
+
+    with ExperimentLedger(tmp_path / "draw-race.sqlite3", durability="normal") as ledger:
+        first = await _runner(contract, ledger, _challengers_win, max_holdout_draws=1).run(
+            incumbent, (challenger,)
+        )
+        # Simulate a campaign that passed the early check before the first
+        # campaign drew the last holdout.
+        monkeypatch.setattr(OptimizationRunner, "_require_unused_holdouts", lambda *_: None)
+        runner = _runner(contract, ledger, _challengers_win, max_holdout_draws=1)
+        with pytest.raises(HoldoutAlreadyUsedError, match=first.campaign_id):
+            await runner.run(incumbent, (second,))
+        campaign_id = runner._build_plan(incumbent, (second,))["campaign_id"]
+        trials = ledger.list_trials(campaign_id)
+        assert {trial.split for trial in trials} == {"development", "confirmation"}
+        assert all(trial.status is TrialStatus.COMPLETED for trial in trials)
+        assert ledger.snapshot(campaign_id)["decision_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_task_pools_and_draw_cap_leave_existing_holdout_uses_unchanged(tmp_path):
+    contract = _contract()
+    incumbent, challenger = _candidates(contract)
+    reworded = _rewording(contract, incumbent, "the same policy under a cap")
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+
+    with ExperimentLedger(tmp_path / "unchanged.sqlite3", durability="normal") as ledger:
+        first = await _runner(contract, ledger, _challengers_win).run(incumbent, (challenger,))
+        uses = ledger.holdout_uses(identity)
+        assert uses == {challenger.policy_hash: (first.campaign_id,)}
+
+        # Neither setting enters the holdout identity, so a used policy stays
+        # used: the policy refusal comes first, with its usual message.
+        for options in (
+            {"max_holdout_draws": 5},
+            {"task_pools": {"holdout": 5}},
+            {"task_pools": {"holdout": 5}, "max_holdout_draws": 5},
+        ):
+            with pytest.raises(HoldoutAlreadyUsedError, match=first.campaign_id) as refused:
+                await _runner(contract, ledger, _challengers_win, **options).run(
+                    incumbent, (reworded,)
+                )
+            assert challenger.policy_hash in str(refused.value)
+            assert "finite holdout task pool" not in str(refused.value)
+        assert ledger.holdout_uses(identity) == uses
+        assert ledger.holdout_draw_campaigns(identity) == (first.campaign_id,)

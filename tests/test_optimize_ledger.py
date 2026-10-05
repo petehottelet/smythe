@@ -9,11 +9,13 @@ import math
 import os
 import sqlite3
 import stat
+import time
 import uuid
 from threading import Barrier
 
 import pytest
 
+from smythe.optimize import ledger as ledger_module
 from smythe.optimize.contracts import (
     Candidate,
     ExperimentContract,
@@ -133,6 +135,7 @@ def _prepared(
     split: str = "development",
     phase: str = "evaluate",
     evaluator_hash: str = EVALUATOR_HASH,
+    **options: object,
 ) -> str:
     return ledger.prepare_trial(
         campaign_id,
@@ -142,6 +145,7 @@ def _prepared(
         seed,
         evaluator_hash=evaluator_hash,
         ceiling_microusd=1_000,
+        **options,  # type: ignore[arg-type]
     lease=_lease(ledger, campaign_id))
 
 
@@ -646,6 +650,136 @@ def test_holdout_rows_written_without_a_seal_record_count_as_prior_use(tmp_path)
         )
         with pytest.raises(HoldoutAlreadyUsedError, match="campaign 'legacy-first'"):
             _prepared(ledger, new, variant_challenger, seed=1, split="holdout")
+
+
+def test_holdout_draw_campaigns_lists_every_campaign_that_prepared_a_holdout_trial(tmp_path):
+    path = tmp_path / "draws.db"
+    contract = _contract()
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+    other_evaluator = "sha256:" + "f" * 64
+    incumbent = _candidate(contract, "incumbent")
+    first_challenger = _candidate(contract, "first")
+    second_challenger = _candidate(contract, "second")
+    with ExperimentLedger(path) as ledger:
+        first = _seal(ledger, contract, incumbent, first_challenger, campaign_id="first")
+        second = _seal(ledger, contract, incumbent, second_challenger, campaign_id="second")
+        third = _seal(ledger, contract, incumbent, campaign_id="third")
+        # Development trials draw nothing from the holdout pool.
+        _prepared(ledger, first, first_challenger, seed=1)
+        assert ledger.holdout_draw_campaigns(identity) == ()
+
+        # Every holdout trial draws, an incumbent's included, while holdout
+        # use stays per challenger policy.
+        _prepared(ledger, second, incumbent, seed=1, split="holdout")
+        _prepared(ledger, first, first_challenger, seed=1, split="holdout")
+        _prepared(ledger, second, second_challenger, seed=1, split="holdout")
+        _prepared(ledger, first, incumbent, seed=1, split="holdout")
+        assert ledger.holdout_draw_campaigns(identity) == ("second", "first")
+        assert ledger.holdout_uses(identity) == {
+            first_challenger.policy_hash: ("first",),
+            second_challenger.policy_hash: ("second",),
+        }
+
+        # Another evaluator is another holdout identity.
+        _prepared(
+            ledger, third, incumbent, seed=1, split="holdout", evaluator_hash=other_evaluator
+        )
+        assert ledger.holdout_draw_campaigns(identity) == ("second", "first")
+        assert ledger.holdout_draw_campaigns(
+            holdout_identity(contract, other_evaluator)
+        ) == ("third",)
+        with pytest.raises(ValueError, match="holdout identity"):
+            ledger.holdout_draw_campaigns("not-an-identity")
+
+    with ExperimentLedger(path, read_only=True) as reader:
+        assert reader.holdout_draw_campaigns(identity) == ("second", "first")
+
+
+def test_prepare_trial_refuses_a_holdout_draw_beyond_the_cap(tmp_path):
+    contract = _contract()
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+    incumbent = _candidate(contract, "incumbent")
+    challenger = _candidate(contract, "challenger")
+    with ExperimentLedger(tmp_path / "cap.db") as ledger:
+        first = _seal(ledger, contract, incumbent, challenger, campaign_id="first")
+        second = _seal(ledger, contract, incumbent, campaign_id="second")
+        _prepared(ledger, first, challenger, seed=1, split="holdout", max_holdout_draws=1)
+        # The campaign that drew keeps drawing its own holdout.
+        _prepared(ledger, first, incumbent, seed=1, split="holdout", max_holdout_draws=1)
+        _prepared(ledger, first, challenger, seed=2, split="holdout", max_holdout_draws=1)
+
+        # Any other campaign is refused, even for its incumbent.
+        with pytest.raises(HoldoutAlreadyUsedError, match="campaign 'first'") as refused:
+            _prepared(ledger, second, incumbent, seed=1, split="holdout", max_holdout_draws=1)
+        assert identity in str(refused.value)
+        assert ledger.list_trials(second) == []
+
+        # Other splits never draw, and a larger cap admits the draw.
+        _prepared(ledger, second, incumbent, seed=1, max_holdout_draws=1)
+        _prepared(ledger, second, incumbent, seed=1, split="holdout", max_holdout_draws=2)
+        assert ledger.holdout_draw_campaigns(identity) == ("first", "second")
+        for invalid in (0, -1, True, 1.0):
+            with pytest.raises(ValueError, match="max_holdout_draws"):
+                _prepared(
+                    ledger, first, challenger, seed=3, split="holdout", max_holdout_draws=invalid
+                )
+
+
+def test_two_connections_racing_for_the_last_holdout_draw_admit_exactly_one(
+    tmp_path, monkeypatch
+):
+    path = tmp_path / "race.db"
+    contract = _contract()
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+    incumbent = _candidate(contract, "incumbent")
+    challengers = {"campaign-a": _candidate(contract, "a"), "campaign-b": _candidate(contract, "b")}
+    with ExperimentLedger(path) as ledger:
+        leases = {}
+        for campaign_id, challenger in challengers.items():
+            _seal(ledger, contract, incumbent, challenger, campaign_id=campaign_id)
+            leases[campaign_id] = _lease(ledger, campaign_id)
+
+    # Keep each cap check open briefly: a check outside the write transaction
+    # would let the other connection read the same empty draw list meanwhile.
+    count_draws = ledger_module._holdout_draws
+
+    def slow_count(*args):
+        draws = count_draws(*args)
+        time.sleep(0.2)
+        return draws
+
+    monkeypatch.setattr(ledger_module, "_holdout_draws", slow_count)
+    barrier = Barrier(2)
+
+    def draw(campaign_id: str) -> str:
+        with ExperimentLedger(path) as connection:
+            barrier.wait()
+            try:
+                connection.prepare_trial(
+                    campaign_id,
+                    challengers[campaign_id].candidate_id,
+                    "holdout",
+                    "evaluate",
+                    1,
+                    evaluator_hash=EVALUATOR_HASH,
+                    ceiling_microusd=1_000,
+                    lease=leases[campaign_id],
+                    max_holdout_draws=1,
+                )
+            except HoldoutAlreadyUsedError:
+                return "refused"
+            return "drawn"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = dict(zip(challengers, pool.map(draw, challengers)))
+
+    assert sorted(results.values()) == ["drawn", "refused"]
+    with ExperimentLedger(path) as ledger:
+        drawn = next(campaign for campaign, result in results.items() if result == "drawn")
+        assert ledger.holdout_draw_campaigns(identity) == (drawn,)
+        assert [
+            campaign for campaign in challengers if ledger.list_trials(campaign)
+        ] == [drawn]
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")

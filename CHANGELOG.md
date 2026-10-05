@@ -395,6 +395,18 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   repetitions than a split's pool is refused before the campaign is created.
   Declared pools join the plan hash; plans that declare none keep theirs.
   See [finite task pools](docs/optimize.md#finite-task-pools).
+- `OptimizationRunner` takes `max_holdout_draws`, the number of campaigns
+  that may draw from one holdout identity's finite task pack, whatever
+  policy they test. Every campaign that prepared a holdout trial under the
+  identity counts, incumbent trials and uncapped campaigns included. Once
+  the cap is reached a new campaign is refused with `HoldoutAlreadyUsedError`
+  before it is created, and `ExperimentLedger.prepare_trial()` rechecks a
+  `max_holdout_draws` cap in the transaction that records a campaign's first
+  holdout trial, so racing campaigns cannot both take the last draw.
+  `ExperimentLedger.holdout_draw_campaigns()` lists the campaigns that drew.
+  The cap joins the plan hash only when set and is not part of the holdout
+  identity, so changing it never reopens a used holdout; the ledger schema is
+  unchanged.
 
 ### Changed
 
