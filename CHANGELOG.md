@@ -603,10 +603,16 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   else a jittered backoff, never longer than `backoff_max_s`, and stops at
   `deadline_s`, which a node's attempts and waits share: each attempt's
   timeout shrinks to the time left, and the node fails with
-  `RetryDeadlineError`, failure class `deadline`. A run under a policy
-  refuses, before routing, planning or any node call, a provider that does
-  not declare `ProviderFeatures.sdk_retries` as `0`, so no SDK retries a call
-  unseen. Built-in providers declare it, and `AnthropicProvider` takes
+  `RetryDeadlineError`, failure class `deadline`; the trace records that
+  refused attempt as a span with outcome `timed_out`, class `deadline` and no
+  call. A run under a policy refuses, before routing, planning or any node
+  call, every provider it can call that does not declare
+  `ProviderFeatures.sdk_retries` as `0`, so no SDK retries a call unseen:
+  its own, a `WhiteRabbit` classifier's, that of each `LLMArchitect` or
+  `ConstrainedArchitect` that could plan it, including one built from
+  `planning_provider`, and an `LLMSupervisor`'s when `max_revisions` lets it
+  review; `Executor` and `AsyncExecutor` check the supervisor's with their
+  own. Built-in providers declare it, and `AnthropicProvider` takes
   `max_retries`, passed to the SDK only when set. Durable runs refuse the
   policy, and checkpoints do not record it. Executors also take `sleep` and
   `rng`, which replace the retry wait and its jitter. Without a policy,
@@ -932,20 +938,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   whose bytes no longer match the `sha256` in its record now raises
   `smythe.executor_base.ArtifactIntegrityError` before the call. Records
   without a digest, written before digests were recorded, attach as before.
-- A run under a `RetryPolicy` refuses, before routing, planning or any node
-  call, every provider it can call whose SDK may send a failed call again,
-  not only its own: a `WhiteRabbit` classifier's, that of each `LLMArchitect`
-  or `ConstrainedArchitect` that could plan it, including one built from
-  `planning_provider`, and an `LLMSupervisor`'s when `max_revisions` lets it
-  review. `execute(graph)` and `resume()` check the run's provider and the
-  supervisor's even when only synthesis is left to run, and `Executor` and
-  `AsyncExecutor` run without a Swarm check the supervisor's with their own.
-  These calls used to go out with the SDK's own retries.
-- When a `RetryPolicy` deadline refuses a node's next retry, the trace
-  records that attempt: a span with its attempt number, outcome `timed_out`,
-  failure class `deadline` and the `RetryDeadlineError`, with no duration and
-  no call. The trace used to end at the last failed call without saying why
-  the node stopped.
 
 ## [0.9.1] - 2026-09-29
 
