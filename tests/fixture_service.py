@@ -10,6 +10,14 @@ commit it and then lose the acknowledgement, deliver it twice, or hold it at a
 ``Gate``; ``send`` and ``deliver`` reorder requests in flight. Sources are
 versioned records a workflow reads, changed with ``change_source``.
 
+A request may name a ``Target``, a tenant's collection. Its idempotency key
+and object then belong to that tenant: another tenant, or a caller naming
+none, can neither look them up nor update the object, and the same key from
+another tenant is a separate request. The request log and fault schedule stay
+keyed by request key alone. With ``send_notices`` the service puts a notice in
+its outbox for each acknowledged commit, as a webhook would; ``forge_notice``
+adds one the service never sent, and only ``snapshot()`` tells them apart.
+
 ``snapshot()`` returns the service's own state as detached JSON data, so a test
 can compare what happened in the service with what the caller observed. Every
 method is thread safe, and a held delivery blocks only its own thread.
@@ -68,12 +76,26 @@ class SourceRecord:
 
 
 @dataclass(frozen=True)
+class Target:
+    """Where a request writes: a tenant's collection."""
+
+    tenant: str
+    collection: str
+
+    def __post_init__(self) -> None:
+        for name in ("tenant", "collection"):
+            if type(getattr(self, name)) is not str or not getattr(self, name):
+                raise ValueError(f"A target {name} is a nonempty string")
+
+
+@dataclass(frozen=True)
 class ObjectRecord:
     object_id: str
     version: int
     value: Any
     request_key: str
     committed_at_ns: int
+    target: Target | None = None
 
 
 @dataclass(frozen=True)
@@ -85,6 +107,7 @@ class Receipt:
     object_version: int
     committed_at_ns: int
     deduplicated: bool = False  # Answered from an earlier commit of the same key.
+    target: Target | None = None
 
 
 @dataclass(frozen=True)
@@ -113,17 +136,42 @@ def _nanoseconds(seconds: float) -> int:
     return round(seconds * NS_PER_SECOND)
 
 
+def _tenant(target: Target | None) -> str | None:
+    return None if target is None else target.tenant
+
+
+def _target_of(item: Any) -> dict:
+    """``{"target": ...}`` for an item that names a target, else nothing."""
+    target = getattr(item, "target", None)
+    return {} if target is None else {"target": asdict(target)}
+
+
+def _public(record: Any) -> dict:
+    """A record as JSON data; a record without a target has no ``target`` key."""
+    return {**{name: value for name, value in asdict(record).items() if name != "target"},
+            **_target_of(record)}
+
+
+def _received(notice: dict) -> dict:
+    """A notice as its receiver sees it, without the service's ``forged`` mark."""
+    return _detached({name: value for name, value in notice.items() if name != "forged"})
+
+
 class Message:
     """A request on its way to the service; ``result()`` is the caller's answer."""
 
-    def __init__(self, request_key: str, value: Any, object_id: str | None) -> None:
+    def __init__(self, request_key: str, value: Any, object_id: str | None,
+                 target: Target | None = None) -> None:
         if type(request_key) is not str or not request_key:
             raise ValueError("A request key is a nonempty string")
         if object_id is not None and (type(object_id) is not str or not object_id):
             raise ValueError("An object ID is a nonempty string")
+        if target is not None and not isinstance(target, Target):
+            raise ValueError("A target is a Target")
         self.request_key = request_key
         self.value = _detached(value)
         self.object_id = object_id
+        self.target = target
         self.delivered = False
         self._outcome: Receipt | ServiceError | None = None
 
@@ -144,11 +192,13 @@ class FixtureService:
     lookup. ``lookup_by_key`` and ``lookup_by_object`` choose which lookups
     exist. ``visibility_delay_s`` makes commits visible to lookups only after
     that long on ``clock_ns``; ``snapshot()`` always shows every commit.
+    ``send_notices`` sends a notice for each acknowledged commit.
     """
 
     def __init__(self, *, clock_ns: Callable[[], int] = time.time_ns, dedupe: bool = True,
                  key_ttl_s: float | None = None, lookup_by_key: bool = True,
-                 lookup_by_object: bool = True, visibility_delay_s: float = 0) -> None:
+                 lookup_by_object: bool = True, visibility_delay_s: float = 0,
+                 send_notices: bool = False) -> None:
         if key_ttl_s is not None and not key_ttl_s > 0:
             raise ValueError("Key lifetime must be positive")
         if not visibility_delay_s >= 0:
@@ -158,6 +208,7 @@ class FixtureService:
         self.lookup_by_key = lookup_by_key
         self.lookup_by_object = lookup_by_object
         self.visibility_delay_s = visibility_delay_s
+        self.send_notices = send_notices
         self._clock_ns = clock_ns
         self._key_ttl_ns = None if key_ttl_s is None else _nanoseconds(key_ttl_s)
         self._delay_ns = _nanoseconds(visibility_delay_s)
@@ -165,11 +216,13 @@ class FixtureService:
         self._sources: dict[str, list[SourceRecord]] = {}
         self._source_reads: Counter[str] = Counter()
         self._objects: dict[str, list[ObjectRecord]] = {}
-        self._keys: dict[str, tuple[Receipt, int | None]] = {}  # receipt, expiry
+        # (tenant, request key) -> (receipt, expiry)
+        self._keys: dict[tuple[str | None, str], tuple[Receipt, int | None]] = {}
         self._counters: dict[str, Counter[str]] = {}
         self._deliveries: list[dict] = []
         self._faults: dict[tuple[str, int], Fault] = {}
         self._in_flight: list[Message] = []
+        self._notices: list[dict] = []
         self._active = 0
 
     # Sources
@@ -232,20 +285,24 @@ class FixtureService:
 
     # Requests
 
-    def submit(self, request_key: str, value: Any, *, object_id: str | None = None) -> Receipt:
+    def submit(self, request_key: str, value: Any, *, object_id: str | None = None,
+               target: Target | None = None) -> Receipt:
         """Deliver one request now and return the caller's answer.
 
-        Without ``object_id`` a commit creates a new object; with it, a commit
-        stores ``value`` as that object's next version. Raises the
-        ``ServiceError`` the caller would see.
+        Without ``object_id`` a commit creates a new object in ``target``; with
+        it, a commit stores ``value`` as that object's next version. An update
+        must name the object's own target: any other is refused with
+        ``NotFound``, as for an unknown object. Raises the ``ServiceError`` the
+        caller would see.
         """
-        message = Message(request_key, value, object_id)
+        message = Message(request_key, value, object_id, target)
         self._deliver(message)
         return message.result()
 
-    def send(self, request_key: str, value: Any, *, object_id: str | None = None) -> Message:
+    def send(self, request_key: str, value: Any, *, object_id: str | None = None,
+             target: Target | None = None) -> Message:
         """Put a request in flight without delivering it; see ``deliver``."""
-        message = Message(request_key, value, object_id)
+        message = Message(request_key, value, object_id, target)
         with self._condition:
             self._in_flight.append(message)
         return message
@@ -279,6 +336,7 @@ class FixtureService:
                      "sequence": counts["received"], "duplicate": duplicate,
                      "received_at_ns": self._clock_ns(), "outcome": "pending",
                      "object_id": None, "object_version": None, "acknowledged": None}
+            entry.update(_target_of(message))
             counts["received"] += 1
             self._deliveries.append(entry)
             self._active += 1
@@ -316,11 +374,14 @@ class FixtureService:
         with self._condition:
             counts["acknowledged"] += 1
             entry["acknowledged"] = True
+            if self.send_notices and entry["outcome"] == "committed":
+                self._notify(_public(receipt), forged=False)
         return receipt
 
     def _commit(self, message, entry, counts):
         now, key = self._clock_ns(), message.request_key
-        known = self._keys.get(key)
+        scoped_key = _tenant(message.target), key
+        known = self._keys.get(scoped_key)
         if self.dedupe and known is not None and (known[1] is None or now < known[1]):
             receipt = replace(known[0], deduplicated=True)
             counts["deduplicated"] += 1
@@ -330,15 +391,18 @@ class FixtureService:
         if message.object_id is None:
             object_id = f"obj_{len(self._objects) + 1}"
             history = self._objects.setdefault(object_id, [])
-        elif message.object_id in self._objects:
+        elif (message.object_id in self._objects
+              and self._objects[message.object_id][0].target == message.target):
             object_id = message.object_id
             history = self._objects[object_id]
         else:
+            # Another tenant's object, or one in another collection, is unknown here.
             raise NotFound(f"Unknown object {message.object_id!r}")
         version = len(history) + 1
-        history.append(ObjectRecord(object_id, version, message.value, key, now))
-        receipt = Receipt(key, object_id, version, now)
-        self._keys[key] = receipt, None if self._key_ttl_ns is None else now + self._key_ttl_ns
+        history.append(ObjectRecord(object_id, version, message.value, key, now, message.target))
+        receipt = Receipt(key, object_id, version, now, target=message.target)
+        self._keys[scoped_key] = (
+            receipt, None if self._key_ttl_ns is None else now + self._key_ttl_ns)
         counts["committed"] += 1
         entry.update(outcome="committed", object_id=object_id, object_version=version)
         return receipt
@@ -355,25 +419,52 @@ class FixtureService:
             entry["acknowledged"] = False
         return AcknowledgementLost("The acknowledgement was lost after the service committed")
 
+    # Notices
+
+    def _notify(self, payload: dict, *, forged: bool) -> dict:
+        notice = {"notice_id": f"ntc_{len(self._notices) + 1}", "sent_at_ns": self._clock_ns(),
+                  "payload": payload, "forged": forged}
+        self._notices.append(notice)
+        return _received(notice)
+
+    def notices(self) -> list[dict]:
+        """The outbox, oldest first, as its receiver sees it: a forged notice looks genuine.
+
+        Each notice is ``{"notice_id", "sent_at_ns", "payload"}``; a genuine
+        payload is the receipt of the commit it reports.
+        """
+        with self._condition:
+            return [_received(notice) for notice in self._notices]
+
+    def forge_notice(self, payload: dict) -> dict:
+        """Put a notice the service never sent in the outbox and return it; nothing commits."""
+        if type(payload) is not dict:
+            raise TypeError("A notice payload is a JSON object")
+        payload = _detached(payload)
+        with self._condition:
+            return self._notify(payload, forged=True)
+
     # Lookups and inspection
 
-    def lookup_request(self, request_key: str) -> Receipt | None:
-        """The receipt a live key committed, once visible; None otherwise."""
+    def lookup_request(self, request_key: str, tenant: str | None = None) -> Receipt | None:
+        """The receipt a live key of ``tenant`` committed, once visible; None otherwise."""
         if not self.lookup_by_key:
             raise LookupUnavailable("This service has no lookup by request key")
         with self._condition:
-            now, known = self._clock_ns(), self._keys.get(request_key)
+            now, known = self._clock_ns(), self._keys.get((tenant, request_key))
             if known is None or (known[1] is not None and now >= known[1]):
                 return None
             return known[0] if now >= known[0].committed_at_ns + self._delay_ns else None
 
-    def get_object(self, object_id: str) -> ObjectRecord | None:
-        """The latest visible version of an object; None if none is visible yet."""
+    def get_object(self, object_id: str, tenant: str | None = None) -> ObjectRecord | None:
+        """The latest visible version of ``tenant``'s object; None if none is visible yet."""
         if not self.lookup_by_object:
             raise LookupUnavailable("This service has no lookup by object ID")
         with self._condition:
-            now = self._clock_ns()
-            visible = [record for record in self._objects.get(object_id, ())
+            now, history = self._clock_ns(), self._objects.get(object_id, [])
+            if history and _tenant(history[0].target) != tenant:
+                history = []
+            visible = [record for record in history
                        if now >= record.committed_at_ns + self._delay_ns]
             return replace(visible[-1], value=_detached(visible[-1].value)) if visible else None
 
@@ -383,7 +474,12 @@ class FixtureService:
             return self._condition.wait_for(lambda: self._active == 0, timeout)
 
     def snapshot(self) -> dict:
-        """The service's complete state as detached JSON data, ignoring visibility delay."""
+        """The service's complete state as detached JSON data, ignoring visibility delay.
+
+        Targets, tenants' keys and notices appear only once a request names a
+        target or the outbox is in use, so a snapshot without them keeps its
+        original shape.
+        """
         with self._condition:
             requests = {}
             for key, counts in self._counters.items():
@@ -391,22 +487,27 @@ class FixtureService:
                              if entry["request_key"] == key and entry["outcome"] == "committed"]
                 requests[key] = {**{name: counts[name] for name in COUNTERS},
                                  "object_ids": list(dict.fromkeys(committed))}
+            keys: dict[str | None, dict] = {None: {}}  # tenant -> request key -> entry
+            for (tenant, key), (receipt, expires) in self._keys.items():
+                keys.setdefault(tenant, {})[key] = {
+                    "object_id": receipt.object_id, "object_version": receipt.object_version,
+                    "expires_at_ns": expires, **_target_of(receipt)}
             state = {
                 "now_ns": self._clock_ns(),
                 "config": {"dedupe": self.dedupe, "key_ttl_s": self.key_ttl_s,
                            "lookup_by_key": self.lookup_by_key,
                            "lookup_by_object": self.lookup_by_object,
-                           "visibility_delay_s": self.visibility_delay_s},
+                           "visibility_delay_s": self.visibility_delay_s,
+                           **({"send_notices": True} if self.send_notices else {})},
                 "totals": {name: sum(counts[name] for counts in self._counters.values())
                            for name in COUNTERS},
                 "requests": requests,
-                "idempotency_keys": {
-                    key: {"object_id": receipt.object_id, "object_version": receipt.object_version,
-                          "expires_at_ns": expires}
-                    for key, (receipt, expires) in self._keys.items()},
+                "idempotency_keys": keys.pop(None),
+                **({"tenant_idempotency_keys": keys} if keys else {}),
                 "objects": {
                     object_id: {"version": history[-1].version, "value": history[-1].value,
-                                "history": [asdict(record) for record in history]}
+                                "history": [_public(record) for record in history],
+                                **_target_of(history[0])}
                     for object_id, history in self._objects.items()},
                 "sources": {
                     source_id: {"version": history[-1].version, "content": history[-1].content,
@@ -416,8 +517,11 @@ class FixtureService:
                     for source_id, history in self._sources.items()},
                 "deliveries": [dict(entry) for entry in self._deliveries],
                 "in_flight": [{"request_key": message.request_key, "object_id": message.object_id,
-                               "value": message.value} for message in self._in_flight],
+                               "value": message.value, **_target_of(message)}
+                              for message in self._in_flight],
             }
+            if self.send_notices or self._notices:
+                state["notices"] = self._notices
             return _detached(state)
 
 
@@ -448,10 +552,12 @@ class _Handler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length) or b"null")
-            message = Message(body["request_key"], body.get("value"), body.get("object_id"))
+            target = body.get("target")
+            message = Message(body["request_key"], body.get("value"), body.get("object_id"),
+                              None if target is None else Target(**target))
         except (AttributeError, KeyError, TypeError, ValueError):
             return self._json(400, {"error": "bad_request"})
-        self.service._deliver(message, respond=lambda receipt: self._json(200, asdict(receipt)))
+        self.service._deliver(message, respond=lambda receipt: self._json(200, _public(receipt)))
         try:
             message.result()
         except AcknowledgementLost:
@@ -467,13 +573,15 @@ class _Handler(BaseHTTPRequestHandler):
         if len(segments) != 2 or not segments[1]:
             return self._json(404, {"error": "not_found"})
         kind, name = segments
+        query = parse_qs(parts.query)
+        tenant = query["tenant"][0] if "tenant" in query else None
         try:
             if kind == "requests":
-                found = self.service.lookup_request(name)
+                found = self.service.lookup_request(name, tenant)
             elif kind == "objects":
-                found = self.service.get_object(name)
+                found = self.service.get_object(name, tenant)
             elif kind == "sources":
-                version = parse_qs(parts.query).get("version")
+                version = query.get("version")
                 found = self.service.read_source(name, None if version is None else int(version[0]))
             else:
                 found = None
@@ -485,7 +593,7 @@ class _Handler(BaseHTTPRequestHandler):
             return self._json(400, {"error": "bad_request"})
         if found is None:
             return self._json(404, {"error": "not_found"})
-        self._json(200, asdict(found))
+        self._json(200, _public(found))
 
     def _json(self, status, payload):
         body = json.dumps(payload).encode()
@@ -504,12 +612,13 @@ class _Handler(BaseHTTPRequestHandler):
 def serve_http(service: FixtureService) -> Iterator[Endpoint]:
     """Serve ``service`` over HTTP on an ephemeral 127.0.0.1 port.
 
-    ``POST /requests`` takes ``{"request_key", "value", "object_id"?}`` and
-    answers 200 with the receipt, 503 for a refusal, 404 for an unknown object
-    or 400 for a malformed body. A lost acknowledgement closes the connection
-    without any response. ``GET /requests/<key>``, ``/objects/<id>`` and
-    ``/sources/<id>[?version=N]`` answer 200, 404, or 501 for an unavailable
-    lookup.
+    ``POST /requests`` takes ``{"request_key", "value", "object_id"?, "target"?}``,
+    where a target is ``{"tenant", "collection"}``, and answers 200 with the
+    receipt, 503 for a refusal, 404 for an unknown object or 400 for a
+    malformed body. A lost acknowledgement closes the connection without any
+    response. ``GET /requests/<key>`` and ``/objects/<id>``, each scoped by an
+    optional ``?tenant=``, and ``/sources/<id>[?version=N]`` answer 200, 404,
+    or 501 for an unavailable lookup.
     """
     handler = type("FixtureServiceHandler", (_Handler,), {"service": service})
     server = _Server(("127.0.0.1", 0), handler)

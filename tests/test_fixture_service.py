@@ -3,6 +3,7 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
+from dataclasses import replace
 import hashlib
 import http.client
 import json
@@ -19,7 +20,7 @@ from fakes import (
 )
 from fixture_service import (
     AcknowledgementLost, Fault, FixtureService, LookupUnavailable, NotFound, ServiceUnavailable,
-    serve_http,
+    Target, serve_http,
 )
 from smythe import Swarm, Task
 import smythe.workflow_store as workflow_store
@@ -220,6 +221,156 @@ def test_snapshot_is_a_detached_json_copy():
     with pytest.raises(TypeError):
         service.submit("invalid", {"value": object()})
     assert "invalid" not in service.snapshot()["requests"]
+
+
+# Tenants and notices
+
+
+ACME = Target("acme", "posts")
+GLOBEX = Target("globex", "posts")
+
+
+def test_snapshot_without_targets_or_notices_is_unchanged():
+    clock = ManualClock()
+    service = FixtureService(clock_ns=clock, key_ttl_s=60, visibility_delay_s=1)
+    service.add_source("brief", "Version one")
+    service.fail_before_commit("order")
+    service.commit_then_drop_ack("order", delivery=1)
+    service.deliver_duplicate("resize")
+    with pytest.raises(ServiceUnavailable):
+        service.submit("order", {"qty": 1})
+    clock.advance(1)
+    with pytest.raises(AcknowledgementLost):
+        service.submit("order", {"qty": 1})
+    service.submit("order", {"qty": 1})
+    service.submit("resize", {"qty": 2}, object_id="obj_1")
+    service.send("ship", {"status": "shipped"}, object_id="obj_1")
+    service.read_source("brief")
+    state = service.snapshot()
+    # Pinned: the exact bytes, key order included, of a snapshot taken before
+    # targets and notices existed.
+    assert hashlib.sha256(json.dumps(state).encode()).hexdigest() == (
+        "6e9510760e1ce542a4cf51c83b0d4e159fbb07f61c8ac6e1d71a18ccd7aa1ed0")
+    assert service.notices() == []
+
+
+def test_targets_scope_keys_and_objects_to_their_tenant():
+    clock = ManualClock()
+    service = FixtureService(clock_ns=clock)
+    created = service.submit("order", {"qty": 1}, target=ACME)
+    assert (created.object_id, created.target) == ("obj_1", ACME)
+    # Another tenant, or a caller naming none, finds neither the key nor the object.
+    for tenant in ("globex", None):
+        assert service.lookup_request("order", tenant=tenant) is None
+        assert service.get_object("obj_1", tenant=tenant) is None
+    assert service.lookup_request("order", tenant="acme") == created
+    assert service.get_object("obj_1", tenant="acme").target == ACME
+    # An update outside the object's own target is refused as an unknown object.
+    for target in (GLOBEX, None, Target("acme", "pages")):
+        with pytest.raises(NotFound):
+            service.submit("hijack", {"qty": 9}, object_id="obj_1", target=target)
+    assert counters(service, "hijack") == expected(received=3, refused=3)
+    updated = service.submit("resize", {"qty": 2}, object_id="obj_1", target=ACME)
+    assert (updated.object_version, updated.target) == (2, ACME)
+    # Keys belong to a tenant: the same key elsewhere is a new request.
+    other = service.submit("order", {"qty": 5}, target=GLOBEX)
+    assert not other.deduplicated and other.object_id == "obj_2"
+    again = service.submit("order", {"qty": 1}, target=ACME)
+    assert again.deduplicated and again == replace(created, deduplicated=True)
+    assert service.lookup_request("order", tenant="globex") == other
+    state = service.snapshot()
+    acme, globex = {"tenant": "acme", "collection": "posts"}, {"tenant": "globex", "collection": "posts"}
+    assert state["objects"]["obj_1"]["target"] == acme
+    assert [record["target"] for record in state["objects"]["obj_1"]["history"]] == [acme, acme]
+    assert state["idempotency_keys"] == {}
+    assert state["tenant_idempotency_keys"] == {
+        "acme": {
+            "order": {"object_id": "obj_1", "object_version": 1, "expires_at_ns": None,
+                      "target": acme},
+            "resize": {"object_id": "obj_1", "object_version": 2, "expires_at_ns": None,
+                       "target": acme},
+        },
+        "globex": {"order": {"object_id": "obj_2", "object_version": 1, "expires_at_ns": None,
+                             "target": globex}},
+    }
+    pages = {"tenant": "acme", "collection": "pages"}
+    assert [entry.get("target") for entry in state["deliveries"]] == [
+        acme, globex, None, pages, acme, globex, acme]
+    assert state["requests"]["order"]["object_ids"] == ["obj_1", "obj_2"]
+
+
+def test_targets_are_validated_and_shown_in_flight():
+    service = FixtureService()
+    for target in (("acme", "posts"), {"tenant": "acme", "collection": "posts"}):
+        with pytest.raises(ValueError):
+            service.submit("bad", 1, target=target)
+    for args in (("", "posts"), ("acme", ""), (None, "posts"), ("acme", 7)):
+        with pytest.raises(ValueError):
+            Target(*args)
+    assert "bad" not in service.snapshot()["requests"]
+    service.send("late", {"qty": 1}, target=ACME)
+    service.send("plain", {"qty": 2})
+    assert service.snapshot()["in_flight"] == [
+        {"request_key": "late", "object_id": None, "value": {"qty": 1},
+         "target": {"tenant": "acme", "collection": "posts"}},
+        {"request_key": "plain", "object_id": None, "value": {"qty": 2}},
+    ]
+
+
+def test_notices_report_each_acknowledged_commit_only():
+    clock = ManualClock()
+    service = FixtureService(clock_ns=clock, send_notices=True)
+    service.fail_before_commit("refused")
+    service.commit_then_drop_ack("dropped")
+    service.deliver_duplicate("twice")
+    first = service.submit("order", {"qty": 1}, target=ACME)
+    clock.advance(1)
+    with pytest.raises(ServiceUnavailable):
+        service.submit("refused", 1)
+    with pytest.raises(AcknowledgementLost):
+        service.submit("dropped", 1)
+    second = service.submit("twice", 2)  # Its network duplicate is deduplicated.
+    assert service.submit("order", {"qty": 1}, target=ACME).deduplicated
+    assert service.notices() == [
+        {"notice_id": "ntc_1", "sent_at_ns": first.committed_at_ns, "payload": {
+            "request_key": "order", "object_id": "obj_1", "object_version": 1,
+            "committed_at_ns": first.committed_at_ns, "deduplicated": False,
+            "target": {"tenant": "acme", "collection": "posts"}}},
+        {"notice_id": "ntc_2", "sent_at_ns": second.committed_at_ns, "payload": {
+            "request_key": "twice", "object_id": "obj_3", "object_version": 1,
+            "committed_at_ns": second.committed_at_ns, "deduplicated": False}},
+    ]
+    state = service.snapshot()
+    assert state["config"]["send_notices"] is True
+    assert [notice["forged"] for notice in state["notices"]] == [False, False]
+    # The outbox is detached from the caller's copies.
+    service.notices()[0]["payload"]["object_id"] = "changed"
+    assert service.notices()[0]["payload"]["object_id"] == "obj_1"
+
+
+def test_a_forged_notice_is_recorded_without_any_commit():
+    clock = ManualClock()
+    service = FixtureService(clock_ns=clock)
+    service.submit("order", {"qty": 1}, target=ACME)
+    assert service.notices() == [] and "notices" not in service.snapshot()
+    before = service.snapshot()
+    payload = {"request_key": "order", "object_id": "obj_9", "object_version": 1,
+               "target": {"tenant": "acme", "collection": "posts"}}
+    forged = service.forge_notice(payload)
+    payload["object_id"] = "changed by caller"
+    assert forged == {"notice_id": "ntc_1", "sent_at_ns": clock.now_ns, "payload": {
+        "request_key": "order", "object_id": "obj_9", "object_version": 1,
+        "target": {"tenant": "acme", "collection": "posts"}}}
+    # A reader of the outbox cannot tell the forgery apart; the service can.
+    assert service.notices() == [forged]
+    after = service.snapshot()
+    assert after["notices"] == [{**forged, "forged": True}]
+    assert {name: value for name, value in after.items() if name != "notices"} == before
+    assert service.get_object("obj_9", tenant="acme") is None
+    for invalid in (["not", "an", "object"], {"value": object()}):
+        with pytest.raises(TypeError):
+            service.forge_notice(invalid)
+    assert len(service.notices()) == 1
 
 
 def call_http(port, method, path, body=None):
