@@ -373,3 +373,7 @@ from smythe import FileCheckpointStore
 store = FileCheckpointStore()
 print(store.list_ids())
 ```
+
+`smythe runs list` lists the same ids from the command line with each run's
+state, delivery decision and next action, and `smythe runs inspect <id>` shows
+one checkpoint without changing it; see [Inspect saved runs](runs.md).

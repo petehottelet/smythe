@@ -213,6 +213,11 @@ refused before any provider call when it could not decide its output, for
 example a later step that no gate or final validator checks
 ([acceptance obligations](verifier.md#acceptance-obligations)).
 
+For a saved run, `smythe runs inspect` reports execution, acceptance and cost
+as separate blocks without changing the checkpoint or journal, and exits with
+10 when a completed run's output was rejected or needs review and 11 when no
+valid decision covers it. See [Inspect saved runs](runs.md).
+
 ## Provider connections
 
 Serial execution runs each node under its own `asyncio.run()`, as do

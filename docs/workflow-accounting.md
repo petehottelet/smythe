@@ -366,7 +366,10 @@ journal-clock bounds of each lease session, which a durable result reports as
 its [timing](execution.md#timing). `store.audit(execution_id)` verifies accounting and evidence
 bindings. Open `SQLiteWorkflowStore(path, read_only=True)` for inspection without
 schema changes or provider construction, including a journal from an earlier
-release ([journal upgrades](#journal-upgrades)). Explicit `load_replay()` and
+release ([journal upgrades](#journal-upgrades)). From the command line,
+`smythe runs --journal <path> inspect <run id>` reports the same balances,
+the run's state and its next action through a read-only open; see
+[Inspect saved runs](runs.md). Explicit `load_replay()` and
 `load_evidence()` calls expose sensitive saved text and raw provider responses;
 protect the database and its SQLite sidecar files accordingly. Since 0.8.1, a
 new database file is created readable and writable by its owner only (mode

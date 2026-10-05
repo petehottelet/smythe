@@ -26,7 +26,6 @@ from smythe import (
 )
 from smythe.acceptance import (
     AcceptanceArtifact,
-    DeliveryAcceptance,
     evaluate_delivery,
     task_sha256,
     text_sha256,

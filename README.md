@@ -200,7 +200,7 @@ memo. Its saved graph, trace, and expected output make the workflow inspectable.
 | Control spending and parallel work | Request reservations and bounded concurrency |
 | Recover interrupted work | Checkpoints, native response replay, and durable job journals |
 | Check the deliverable | Output verification, opt-in strict acceptance of the exact output returned, and artifact receipts |
-| Understand a run | Graph exports, traces, costs, and inspection reports |
+| Understand a run | Graph exports, traces, costs, inspection reports, and [read-only run inspection](docs/runs.md) that reports execution, acceptance and cost separately |
 
 [Architecture](docs/architecture.md) · [Execution](docs/execution.md) ·
 [Jobs](docs/jobs.md) · [Verification](docs/verifier.md) · [MCP tools](docs/mcp.md).

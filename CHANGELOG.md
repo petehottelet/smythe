@@ -328,6 +328,23 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   the palette, dimensions, `include_advisory`, `require_artifacts` and the
   detector thresholds. See
   [gating without a model](docs/verifier.md#gating-without-a-model).
+- `smythe runs inspect` and `smythe runs list` read saved runs without
+  changing them: ordinary checkpoints from a `FileCheckpointStore` directory
+  (`--checkpoints`, default `~/.smythe/checkpoints`), or durable runs from a
+  workflow journal opened read-only (`--journal`), so a version 1 journal is
+  never upgraded. No provider is constructed. `inspect` reports execution
+  state, the delivery acceptance decision with its reasons, output digest and
+  validator identities and outcomes, the digest and size of withheld output
+  (never its text), cost completeness and unknown exposure, timing, and the
+  next action; `--json` prints one JSON document. A decided record whose saved
+  output, task or source generations no longer match is reported as
+  `indeterminate`, as resume would return it. `inspect` exits with 10 when a
+  completed run's output was `rejected` or `needs_review` and 11 when the
+  decision is `indeterminate`; an accepted run, or one without a record such
+  as a version 4 checkpoint, exits 0. An unknown run exits 6 and an unreadable
+  store or run 7. `SwarmResult.to_dict()` adds the same `execution`,
+  `delivery`, `unknown_exposure` and `next_action` blocks. See
+  [Inspect saved runs](docs/runs.md).
 
 ### Changed
 

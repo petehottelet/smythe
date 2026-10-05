@@ -1,0 +1,447 @@
+"""Read-only views of saved runs, and the status projection results share.
+
+``smythe runs`` reads an ordinary run's checkpoint through a
+:class:`~smythe.checkpoint.FileCheckpointStore`, or a durable run from a
+:class:`~smythe.workflow_store.SQLiteWorkflowStore` opened read-only, and
+reports execution, delivery acceptance, cost, timing and the next action as
+separate JSON blocks. :meth:`smythe.swarm.SwarmResult.to_dict` builds its
+execution, delivery, unknown-exposure and next-action blocks with the same
+functions. Nothing here constructs a provider, migrates a journal or writes a
+file.
+"""
+
+from __future__ import annotations
+
+import math
+from pathlib import Path
+from typing import Any
+
+from smythe._money import NANOUSD
+from smythe.acceptance import (
+    _OUTPUT_CHANGED,
+    AcceptanceDecision,
+    DeliveryAcceptance,
+    _delivery_problems,
+    text_sha256,
+)
+from smythe.budget import Sentinel
+from smythe.checkpoint import (
+    _EXECUTION_ID_RE,
+    FileCheckpointStore,
+    checkpoint_requirements,
+    delivery_acceptance_from_state,
+    graph_from_dict,
+    task_from_dict,
+    timing_segments,
+)
+from smythe.graph import ExecutionGraph
+from smythe.workflow_store import (
+    SQLiteWorkflowStore,
+    WorkflowError,
+    WorkflowNotFoundError,
+)
+
+MAX_LIST_RUNS = 500
+# Decisions that withhold a completed run's output after a valid decision.
+NOT_ACCEPTED = frozenset({AcceptanceDecision.REJECTED.value, AcceptanceDecision.NEEDS_REVIEW.value})
+
+
+class RunInspectionError(Exception):
+    """A saved run, or the store that holds it, cannot be read."""
+
+
+class RunNotFoundError(LookupError):
+    """The store holds no run with the requested id."""
+
+
+def node_counts(graph: ExecutionGraph | None) -> dict[str, int]:
+    """How many of the graph's nodes are in each status."""
+    counts: dict[str, int] = {}
+    for node in graph.nodes if graph is not None else ():
+        counts[node.status.value] = counts.get(node.status.value, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def delivery_view(
+    record: DeliveryAcceptance | None, text: Any, *, field: str, completed: bool,
+    problems: list[str] | tuple[str, ...] = (),
+) -> dict[str, Any]:
+    """How a run's output stands under its delivery acceptance record.
+
+    *text* is the output the run saved, kept under *field*. *problems* are
+    what no longer matches a decided record; any problem makes the decision
+    ``indeterminate``, as resuming the run would. Output is delivered when
+    a completed run has no record, or when the decision is ``accepted``;
+    otherwise it is withheld and only referenced by digest and size.
+    """
+    if record is None:
+        return {"recorded": False, "decision": None, "reasons": [], "integrity": None,
+                "output_delivered": completed and isinstance(text, str),
+                "rejected_output": None, "record": None}
+    decision, reasons = record.decision.value, list(record.reasons)
+    integrity = None
+    if record.decision is not AcceptanceDecision.NOT_EVALUATED:
+        integrity = "mismatch" if problems else "verified"
+        if problems:
+            decision, reasons = AcceptanceDecision.INDETERMINATE.value, list(problems)
+    delivered = decision == AcceptanceDecision.ACCEPTED.value
+    withheld = None
+    if not delivered and isinstance(text, str):
+        withheld = {"field": field, "sha256": text_sha256(text), "bytes": len(text.encode("utf-8"))}
+    return {"recorded": True, "decision": decision, "reasons": reasons, "integrity": integrity,
+            "output_delivered": delivered, "rejected_output": withheld, "record": record.to_dict()}
+
+
+def unknown_exposure(workflow_accounting: dict[str, Any] | None) -> dict[str, Any] | None:
+    """A durable run's unknown exposure; None where the path does not track it."""
+    if not isinstance(workflow_accounting, dict):
+        return None
+    return {"unit": workflow_accounting.get("unit"),
+            "amount": workflow_accounting.get("unknown_nanousd"),
+            "calls": workflow_accounting.get("unknown_calls")}
+
+
+def _action(action: str, detail: str) -> dict[str, str]:
+    return {"action": action, "detail": detail}
+
+
+def next_action(
+    state: str, delivery: dict[str, Any], *, cost_is_complete: bool,
+    unresolved: list[str] | tuple[str, ...] = (), blocked_reason: str | None = None,
+    resume: str = "",
+) -> dict[str, str]:
+    """The first thing a saved run needs, as a code and a sentence.
+
+    Unresolved accounting comes first, because resume refuses it; then an
+    unfinished run's resume (*resume* says how); then a completed run's
+    withheld output, then its unknown cost.
+    """
+    if blocked_reason == "budget_overrun":
+        return _action("rerun", "Spending passed the run's budget, so it admits no more calls; "
+                                "run the task again as a new run.")
+    if unresolved:
+        return _action("reconcile_accounting",
+                       "Reconcile provider charges before the run can continue: "
+                       + "; ".join(unresolved) + ".")
+    if state != "completed":
+        return _action("resume", resume)
+    decision = delivery["decision"]
+    if decision in NOT_ACCEPTED:
+        return _action("review_output", f"The decision is {decision}, so the output is withheld; "
+                                        "review it before using it, or run the task again.")
+    if decision == AcceptanceDecision.INDETERMINATE.value:
+        return _action("resolve_indeterminate",
+                       "No valid acceptance decision covers the output, which is withheld: "
+                       + delivery["reasons"][0])
+    if not cost_is_complete:
+        return _action("reconcile_accounting", "The run finished, but part of its cost is "
+                                               "unknown; reconcile it with the provider's billing.")
+    if decision == AcceptanceDecision.ACCEPTED.value:
+        return _action("none", "The run finished and its output was accepted.")
+    return _action("none", "The run finished and delivered its output; no acceptance "
+                           "decision was recorded.")
+
+
+def result_view(result: Any) -> dict[str, Any]:
+    """The execution, delivery, unknown-exposure and next-action blocks of a finished SwarmResult."""
+    record = result.acceptance
+    if record is not None and not record.accepted:
+        text, field = result.rejected_output, "rejected_output"
+    else:
+        text, field = result.output, "output"
+    problems = []
+    if record is not None and record.decision is not AcceptanceDecision.NOT_EVALUATED and (
+            not isinstance(text, str) or text_sha256(text) != record.output_sha256):
+        problems.append(_OUTPUT_CHANGED)
+    delivery = delivery_view(record, text, field=field, completed=True, problems=problems)
+    return {
+        "execution": {"state": "completed", "nodes": node_counts(result.graph)},
+        "delivery": delivery,
+        "unknown_exposure": unknown_exposure(result.workflow_accounting),
+        "next_action": next_action("completed", delivery, cost_is_complete=result.cost_is_complete),
+    }
+
+
+def _number(value: Any) -> float | None:
+    if type(value) in (int, float) and math.isfinite(value):
+        return value
+    return None
+
+
+def _total(values: list[Any]) -> float | None:
+    present = [number for number in map(_number, values) if number is not None]
+    return round(sum(present), 1) if present else None
+
+
+def _summed(segments: list[dict[str, Any]], key: str) -> dict[str, float | None]:
+    names: dict[str, list[Any]] = {}
+    for segment in segments:
+        block = segment.get(key)
+        for name, value in (block.items() if isinstance(block, dict) else ()):
+            names.setdefault(str(name), []).append(value)
+    return {name: _total(values) for name, values in names.items()}
+
+
+def checkpoint_timing(state: dict[str, Any]) -> dict[str, Any] | None:
+    """Totals over an ordinary checkpoint's timing segments; None without any.
+
+    Each segment's durations come from its own process's monotonic clock and
+    are added, never subtracted; ``started_at`` and ``ended_at`` are the first
+    and last segments' wall-clock bounds.
+    """
+    segments = timing_segments(state)
+    if not segments:
+        return None
+    return {
+        "clock": "monotonic", "segments": len(segments), "interrupted_segments": None,
+        "elapsed_ms": _total([segment.get("elapsed_ms") for segment in segments]),
+        "summed_node_ms": _total([segment.get("summed_node_ms") for segment in segments]),
+        "phases_ms": _summed(segments, "phases_ms"),
+        "waiting_ms": _summed(segments, "waiting_ms"),
+        "started_at": _number(segments[0].get("started_at")),
+        "ended_at": _number(segments[-1].get("ended_at")),
+    }
+
+
+def journal_timing(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
+    """Totals over a durable run's lease sessions, from journal wall-clock times."""
+    record = store.lease_sessions(run_id)
+    sessions = record["sessions"]
+    return {
+        "clock": "wall", "segments": len(sessions),
+        "interrupted_segments": sum(1 for session in sessions if session["interrupted"]),
+        "elapsed_ms": round(sum(session["ended_ns"] - session["started_ns"]
+                                for session in sessions) / 1e6, 1),
+        "summed_node_ms": None, "phases_ms": None, "waiting_ms": None,
+        "started_at": record["created_ns"] / 1e9,
+        "ended_at": sessions[-1]["ended_ns"] / 1e9 if sessions else None,
+    }
+
+
+def open_checkpoints(directory: str | Path) -> FileCheckpointStore:
+    """A FileCheckpointStore over an existing directory, which is never created."""
+    path = Path(directory)
+    if not path.is_dir():
+        raise RunInspectionError(f"Checkpoint directory does not exist: {path}")
+    return FileCheckpointStore(path)
+
+
+def open_journal(path: str | Path) -> SQLiteWorkflowStore:
+    """An existing workflow journal opened read-only, so it is never migrated."""
+    path = Path(path)
+    if not path.is_file():
+        raise RunInspectionError(f"Workflow journal does not exist: {path}")
+    try:
+        return SQLiteWorkflowStore(path, read_only=True)
+    except WorkflowError as exc:
+        raise RunInspectionError(f"Cannot read the workflow journal: {exc}") from exc
+
+
+def _checkpoint_accounting(state: dict[str, Any], graph: ExecutionGraph) -> dict[str, Any]:
+    """Restore the saved costs as resume does, and name what resume would refuse."""
+    budget = state.get("budget", {})
+    if not isinstance(budget, dict):
+        raise ValueError("Checkpoint budget must be an object")
+    token_estimates = budget.get("token_estimate_nodes", [])
+    if not isinstance(token_estimates, list) or not all(isinstance(item, str) for item in token_estimates):
+        raise ValueError("Checkpoint token_estimate_nodes must be a list of node IDs")
+    unknown = sorted(node.id for node in graph.nodes if node.metadata.get("cost_usd_unknown"))
+    sentinel = Sentinel(budget.get("max_budget_usd"))
+    sentinel.restore(
+        budget.get("node_costs", {}), unknown_cost_nodes=set(unknown),
+        estimated_cost_nodes={node.id for node in graph.nodes if node.metadata.get("cost_usd_is_estimate")},
+        token_estimate_nodes=set(token_estimates),
+    )
+    unresolved = []
+    invalid = [node.id for node in graph.nodes if node.metadata.get("accounting_invalid")]
+    if invalid:
+        unresolved.append(f"invalid accounting on nodes {invalid!r}")
+    if "accounting_error" in budget:
+        unresolved.append("the budget records an accounting error")
+    control = state.get("control", {})
+    if ((isinstance(control, dict) and "response_error" in control)
+            or any("response_error" in node.metadata for node in graph.nodes)):
+        unresolved.append("a native response failure is unresolved")
+    return {
+        "cost_scope": "execution_and_synthesis",
+        "total_cost_usd": sentinel.total_cost_usd,
+        "max_budget_usd": sentinel.max_budget_usd,
+        "cost_is_complete": sentinel.cost_is_complete,
+        "cost_contains_estimates": sentinel.cost_contains_estimates,
+        "cost_contains_token_estimates": sentinel.cost_contains_token_estimates,
+        "unknown_cost_nodes": unknown,
+        "workflow_accounting": None,
+        "unknown_exposure": None,
+        "unresolved": unresolved,
+    }
+
+
+def _checkpoint_view(execution_id: str, state: Any) -> dict[str, Any]:
+    if not isinstance(state, dict):
+        raise RunInspectionError(f"Checkpoint {execution_id!r} is not a JSON object")
+    record = delivery_acceptance_from_state(state)
+    status = state.get("status")
+    if status not in ("running", "failed", "completed"):
+        raise ValueError(f"unknown checkpoint status {status!r}")
+    graph = graph_from_dict(state["graph"])
+    saved_task = task_from_dict(state.get("task"))
+    task = graph.task if graph.task is not None else saved_task
+    output = state.get("output")
+    problems = []
+    if record is not None and record.decision is not AcceptanceDecision.NOT_EVALUATED:
+        problems = _delivery_problems(record, output, graph, task)
+    delivery = delivery_view(record, output, field="output", completed=status == "completed",
+                             problems=problems)
+    accounting = _checkpoint_accounting(state, graph)
+    resume = "Resume it with Swarm.resume(execution_id) from a Swarm with this checkpoint store"
+    if record is not None:
+        resume += f" and the strict acceptance policy whose sha256 is {record.policy_sha256}"
+    return {
+        "run_id": execution_id,
+        "store": "checkpoints",
+        "format": {"checkpoint_version": state["version"],
+                   "requires": list(checkpoint_requirements(state))},
+        "execution": {"state": status, "blocked_reason": None, "nodes": node_counts(graph)},
+        "delivery": delivery,
+        "accounting": accounting,
+        "timing": checkpoint_timing(state),
+        "next_action": next_action(
+            status, delivery, cost_is_complete=accounting["cost_is_complete"],
+            unresolved=accounting["unresolved"],
+            resume=resume + ", once no process is running it.",
+        ),
+    }
+
+
+def inspect_checkpoint(store: FileCheckpointStore, execution_id: str) -> dict[str, Any]:
+    """Project one ordinary run's checkpoint without changing it."""
+    if not isinstance(execution_id, str) or not _EXECUTION_ID_RE.match(execution_id):
+        raise ValueError(f"Invalid execution id {execution_id!r}")
+    try:
+        state = store.load(execution_id)
+    except ValueError as exc:
+        raise RunInspectionError(f"Checkpoint {execution_id!r} is not readable JSON") from exc
+    if state is None:
+        raise RunNotFoundError(f"No checkpoint for run {execution_id!r}")
+    try:
+        return _checkpoint_view(execution_id, state)
+    except (ValueError, TypeError, KeyError, AttributeError) as exc:
+        raise RunInspectionError(f"Checkpoint {execution_id!r} cannot be inspected: {exc}") from exc
+
+
+def _journal_acceptance(checkpoint: dict[str, Any] | None) -> DeliveryAcceptance | None:
+    """The delivery decision a durable checkpoint holds.
+
+    Durable runs record no decision yet, so a version 1 checkpoint never has
+    one and its run is shown as not recorded, never as accepted.
+    """
+    return None
+
+
+def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
+    inspected = store.inspect_run(run_id)
+    saved = store.get_checkpoint(run_id)
+    checkpoint = saved["checkpoint"] if saved is not None else None
+    if checkpoint is not None and (type(checkpoint.get("version")) is not int
+                                   or checkpoint["version"] != 1):
+        raise RunInspectionError(
+            f"Durable run {run_id!r} has checkpoint version {checkpoint.get('version')!r}, which "
+            "this build of smythe cannot read; it reads version 1"
+        )
+    record = _journal_acceptance(checkpoint)
+    graph = graph_from_dict(checkpoint["graph"]) if checkpoint is not None else None
+    status, blocked = inspected["status"], inspected["blocked_reason"]
+    checkpoint_status = checkpoint.get("status") if checkpoint is not None else None
+    if status in ("blocked", "completed"):
+        state = status
+    else:
+        state = checkpoint_status if checkpoint_status in ("planned", "running", "failed") else "running"
+    delivery = delivery_view(record, checkpoint.get("output") if checkpoint is not None else None,
+                             field="output", completed=state == "completed")
+    accounting_keys = ("confirmed_nanousd", "reserved_nanousd", "unknown_nanousd", "unknown_calls",
+                       "call_count")
+    workflow_accounting = {key: inspected[key] for key in accounting_keys} | {"unit": NANOUSD}
+    budget = inspected["budget_nanousd"]
+    accounting = {
+        "cost_scope": "complete_text_workflow",
+        "total_cost_usd": inspected["confirmed_nanousd"] / 1e9,
+        "max_budget_usd": None if budget is None else budget / 1e9,
+        "cost_is_complete": not inspected["unknown_calls"] and not inspected["reserved_nanousd"],
+        "cost_contains_estimates": False,
+        "cost_contains_token_estimates": False,
+        "unknown_cost_nodes": None,
+        "workflow_accounting": workflow_accounting,
+        "unknown_exposure": unknown_exposure(workflow_accounting),
+        "unresolved": [f"admission is closed by {blocked}"] if blocked else [],
+    }
+    return {
+        "run_id": run_id,
+        "store": "journal",
+        "format": {"journal_version": store.store_version,
+                   "checkpoint_version": None if checkpoint is None else checkpoint["version"],
+                   "revision": inspected["revision"]},
+        "execution": {"state": state, "blocked_reason": blocked, "nodes": node_counts(graph),
+                      "run_status": status, "checkpoint_status": checkpoint_status},
+        "delivery": delivery,
+        "accounting": accounting,
+        "timing": journal_timing(store, run_id),
+        "next_action": next_action(
+            state, delivery, cost_is_complete=accounting["cost_is_complete"],
+            unresolved=accounting["unresolved"], blocked_reason=blocked,
+            resume="Resume it with Swarm(run_store=...).resume(run_id) and the configuration "
+                   "it started with, once no worker holds its lease.",
+        ),
+    }
+
+
+def inspect_journal(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
+    """Project one durable run from a journal opened read-only."""
+    try:
+        return _journal_view(store, run_id)
+    except WorkflowNotFoundError as exc:
+        raise RunNotFoundError(f"No durable run {run_id!r} in this journal") from exc
+    except (WorkflowError, ValueError, TypeError, KeyError, AttributeError) as exc:
+        raise RunInspectionError(f"Durable run {run_id!r} cannot be inspected: {exc}") from exc
+
+
+def inspect_run(store: FileCheckpointStore | SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
+    """Project one run from either kind of store."""
+    if isinstance(store, SQLiteWorkflowStore):
+        return inspect_journal(store, run_id)
+    return inspect_checkpoint(store, run_id)
+
+
+def list_runs(
+    store: FileCheckpointStore | SQLiteWorkflowStore, *, limit: int = 50, offset: int = 0,
+) -> dict[str, Any]:
+    """One page of saved runs with their state, decision and next action.
+
+    A run that cannot be read is listed with its error instead of stopping
+    the listing.
+    """
+    if type(limit) is not int or not 1 <= limit <= MAX_LIST_RUNS:
+        raise ValueError(f"limit must be an integer from 1 to {MAX_LIST_RUNS}")
+    if type(offset) is not int or offset < 0:
+        raise ValueError("offset must be a non-negative integer")
+    if isinstance(store, SQLiteWorkflowStore):
+        try:
+            ids = [run["run_id"] for run in store.list_runs()]
+        except WorkflowError as exc:
+            raise RunInspectionError(f"Cannot list the workflow journal: {exc}") from exc
+    else:
+        ids = store.list_ids()
+    page = ids[offset:offset + limit]
+    runs = []
+    for run_id in page:
+        try:
+            view = inspect_run(store, run_id)
+        except (RunInspectionError, RunNotFoundError, ValueError) as exc:
+            runs.append({"run_id": run_id, "state": None, "decision": None, "next_action": None,
+                         "error": str(exc)})
+            continue
+        runs.append({"run_id": run_id, "state": view["execution"]["state"],
+                     "decision": view["delivery"]["decision"],
+                     "next_action": view["next_action"]["action"], "error": None})
+    return {"store": "journal" if isinstance(store, SQLiteWorkflowStore) else "checkpoints",
+            "total": len(ids), "offset": offset, "limit": limit, "returned": len(runs),
+            "has_more": offset + len(page) < len(ids), "runs": runs}

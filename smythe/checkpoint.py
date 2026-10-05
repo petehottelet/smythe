@@ -365,6 +365,23 @@ def build_state(
     return state
 
 
+def timing_segments(state: dict[str, Any]) -> list[dict[str, Any]]:
+    """Timing segments earlier calls saved; none if the block is unreadable.
+
+    Timing is informational, so an unreadable block never stops a resume.
+    """
+    block = state.get("timing")
+    if not isinstance(block, dict) or type(block.get("version")) is not int or block["version"] != 1:
+        return []
+    segments = block.get("segments")
+    if not isinstance(segments, list) or not all(isinstance(item, dict) for item in segments):
+        return []
+    try:
+        return json.loads(json.dumps(segments, allow_nan=False))
+    except (TypeError, ValueError, RecursionError):
+        return []
+
+
 def checkpoint_requirements(state: dict[str, Any]) -> tuple[str, ...]:
     """The state features a checkpoint requires its reader to understand.
 

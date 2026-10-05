@@ -319,7 +319,10 @@ sections, length bounds and JSON paths without a class of your own.
 `SwarmResult.accepted` is true only for an `accepted` record. When a record
 exists and does not accept, `output` is `""` and the text is in
 `rejected_output`. `SwarmResult.to_dict()` returns the result as JSON data
-with the record under `delivery_acceptance`. Advisory and legacy runs have
+with the record under `delivery_acceptance`, and the `execution`, `delivery`,
+`unknown_exposure` and `next_action` blocks that
+[`smythe runs inspect`](runs.md) reports for a saved run. Advisory and legacy
+runs have
 `acceptance=None`; a run under a [strict policy](#strict-delivery-acceptance)
 always has a record, and a strict `Swarm` withholds the output of a completed
 run resumed without one. `PlannerMemory` stores the record's decision as

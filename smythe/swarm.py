@@ -11,14 +11,14 @@ from pathlib import Path
 from typing import Any, Callable
 from uuid import uuid4
 
+from smythe._run_inspection import result_view
 from smythe.acceptance import (
-    AcceptanceArtifact,
     GENERATED_GATE_KEY,
     AcceptanceDecision,
     AcceptanceMode,
     AcceptancePolicy,
     DeliveryAcceptance,
-    delivered_artifacts,
+    _delivery_problems,
     evaluate_delivery,
     task_sha256,
     text_sha256,
@@ -37,6 +37,7 @@ from smythe.checkpoint import (
     graph_to_dict,
     reset_incomplete_nodes,
     task_from_dict,
+    timing_segments,
 )
 from smythe.executor import Executor
 from smythe.executor_base import (
@@ -70,7 +71,6 @@ from smythe.task import Task, snapshot_task, task_snapshots_equal, task_to_dict
 from smythe.tracer import Tracer
 from smythe.verifier import (
     Verifier,
-    node_generation,
     validate_verification_checkpoint,
     verification_pending,
 )
@@ -132,7 +132,9 @@ class SwarmResult:
         """This result as detached JSON data.
 
         The acceptance record appears under ``delivery_acceptance`` (None
-        without one) and the graph in its checkpoint form.
+        without one) and the graph in its checkpoint form. ``execution``,
+        ``delivery``, ``unknown_exposure`` and ``next_action`` are the
+        blocks ``smythe runs inspect`` reports for a saved run.
         """
         return json.loads(json.dumps({
             "execution_id": self.execution_id,
@@ -147,6 +149,7 @@ class SwarmResult:
             "timing": self.timing,
             "trace": self.trace,
             "graph": graph_to_dict(self.graph),
+            **result_view(self),
         }, allow_nan=False))
 
 
@@ -181,23 +184,6 @@ class _RunTiming:
         timing = self.tracer.timing()
         return {**timing, "latency_complete": not self.resumed, "resumed": self.resumed,
                 "segments": self._segments(timing)}
-
-
-def _saved_segments(state: dict[str, Any]) -> list[dict[str, Any]]:
-    """Timing segments an earlier call saved; none if the block is unreadable.
-
-    Timing is informational, so an unreadable block never stops a resume.
-    """
-    block = state.get("timing")
-    if not isinstance(block, dict) or type(block.get("version")) is not int or block["version"] != 1:
-        return []
-    segments = block.get("segments")
-    if not isinstance(segments, list) or not all(isinstance(item, dict) for item in segments):
-        return []
-    try:
-        return json.loads(json.dumps(segments, allow_nan=False))
-    except (TypeError, ValueError, RecursionError):
-        return []
 
 
 def _delivered(output: Any, acceptance: DeliveryAcceptance | None) -> tuple[Any, str | None]:
@@ -490,29 +476,7 @@ class Swarm:
         """
         if not isinstance(output, str):
             raise ValueError("Checkpoint output does not match its delivery acceptance record")
-        problems = []
-        if text_sha256(output) != record.output_sha256:
-            problems.append("the saved output does not match the digest its record bound")
-        if record.task_sha256 != task_sha256(task):
-            problems.append("the saved task does not match the task its record bound")
-        nodes = {node.id: node for node in graph.nodes}
-        for source in record.sources:
-            node = nodes.get(source.node_id)
-            if (node is None or node.status is not NodeStatus.COMPLETED
-                    or node_generation(node) != source.execution_generation):
-                problems.append(
-                    f"node {source.node_id!r} no longer holds the generation its record bound"
-                )
-        files: dict[str, tuple[AcceptanceArtifact, ...]] = {}
-        for artifact in record.artifacts:
-            node = nodes.get(artifact.node_id)
-            if node is not None and node.id not in files:
-                files[node.id] = delivered_artifacts(node)[0]
-            if artifact not in files.get(artifact.node_id, ()):
-                problems.append(
-                    f"file {artifact.name!r} of node {artifact.node_id!r} no longer holds the "
-                    "bytes its record bound"
-                )
+        problems = _delivery_problems(record, output, graph, task)
         policy = self._strict_policy()
         if policy is not None and policy.sha256 != record.policy_sha256:
             problems.append(
@@ -1130,7 +1094,7 @@ class Swarm:
 
         completed = state.get("status") == "completed" and state.get("output") is not None
         validate_verification_checkpoint(graph, version=version, completed=completed)
-        timing = _RunTiming(tracer, resumed=True, previous=_saved_segments(state))
+        timing = _RunTiming(tracer, resumed=True, previous=timing_segments(state))
         if completed and not verification_pending(graph):
             if acceptance is not None:
                 acceptance = self._reverified(acceptance, state["output"], graph, task)

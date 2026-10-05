@@ -29,7 +29,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import Any, Protocol
 
 from smythe.graph import REVISION_ADDED_KEY, ExecutionGraph, FailurePolicy, Node, _depends_on
 from smythe.task import Task, task_to_dict
@@ -584,6 +584,47 @@ def _unique(values: list[str], what: str) -> None:
     duplicates = sorted({value for value in values if values.count(value) > 1})
     if duplicates:
         raise ValueError(f"delivery acceptance has duplicate {what}: {duplicates}")
+
+
+_OUTPUT_CHANGED = "the saved output does not match the digest its record bound"
+
+
+def _delivery_problems(
+    record: DeliveryAcceptance, output: Any, graph: ExecutionGraph, task: Task | None,
+) -> list[str]:
+    """What no longer matches a decided record, one reason per mismatch.
+
+    The saved *output* must still have the digest the record bound, the task
+    must be the one it bound, every source node must still be completed at
+    the generation it bound, and every file the record bound must still hold
+    its bytes. An empty list means the record still holds.
+    """
+    from smythe.graph import NodeStatus
+
+    problems = []
+    if not isinstance(output, str) or text_sha256(output) != record.output_sha256:
+        problems.append(_OUTPUT_CHANGED)
+    if record.task_sha256 != task_sha256(task):
+        problems.append("the saved task does not match the task its record bound")
+    nodes = {node.id: node for node in graph.nodes}
+    for source in record.sources:
+        node = nodes.get(source.node_id)
+        if (node is None or node.status is not NodeStatus.COMPLETED
+                or node_generation(node) != source.execution_generation):
+            problems.append(
+                f"node {source.node_id!r} no longer holds the generation its record bound"
+            )
+    files: dict[str, tuple[AcceptanceArtifact, ...]] = {}
+    for artifact in record.artifacts:
+        node = nodes.get(artifact.node_id)
+        if node is not None and node.id not in files:
+            files[node.id] = delivered_artifacts(node)[0]
+        if artifact not in files.get(artifact.node_id, ()):
+            problems.append(
+                f"file {artifact.name!r} of node {artifact.node_id!r} no longer holds the "
+                "bytes its record bound"
+            )
+    return problems
 
 
 def _clip(text: str) -> str:
