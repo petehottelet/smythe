@@ -463,6 +463,47 @@ def test_output_that_is_not_strict_json_is_rejected(text):
     assert len(report.findings[0].message) <= 200
 
 
+EQUALS_ROOT = JSONValidator({"checks": [{"id": "eq", "kind": "equals", "path": [], "expected": 1}]})
+
+
+def nested(depth: int) -> str:
+    return "[" * depth + "]" * depth
+
+
+def _parser_limit() -> int:
+    """The least nesting depth this interpreter's parser refuses, from this stack."""
+    low, high = 1, 200_000
+    while low < high:
+        middle = (low + high) // 2
+        if codes(check(JSONValidator(), nested(middle))) == ["json_invalid"]:
+            high = middle
+        else:
+            low = middle + 1
+    return low
+
+
+def test_nesting_just_inside_the_parser_limit_is_rejected_not_an_error():
+    """Python 3.11 counts the frames above the parser against one recursion
+    limit, so a document at a depth it could parse could not be compared by an
+    equals check: RecursionError gave outcome error instead of a rejection."""
+    limit = _parser_limit()
+    for depth in range(max(1, limit - 64), limit + 2):
+        report = check(EQUALS_ROOT, nested(depth))
+        assert report.outcome is ValidationOutcome.REJECTED, depth
+        assert codes(report) in (["json_check_failed"], ["json_invalid"]), depth
+
+
+def test_a_document_too_deep_to_check_is_rejected_as_too_deeply_nested(monkeypatch):
+    def too_deep(value):
+        raise RecursionError("maximum recursion depth exceeded")
+
+    monkeypatch.setattr(smythe.validators, "_canonical", too_deep)
+    report = check(EQUALS_ROOT, nested(3))
+    assert report.outcome is ValidationOutcome.REJECTED
+    assert codes(report) == ["json_invalid"]
+    assert report.findings[0].message == "output is not strict JSON: nesting is too deep"
+
+
 def test_output_larger_than_max_bytes_is_rejected_before_parsing():
     validator = JSONValidator({"max_bytes": 10})
     assert check(validator, '"123456"').passed

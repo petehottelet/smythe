@@ -296,6 +296,9 @@ def _check(check: Any) -> dict[str, Any]:
     return data
 
 
+_TOO_DEEP = "nesting is too deep"
+
+
 def _canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
 
@@ -373,7 +376,8 @@ class JSONValidator:
     The specification is a JSON object with ``checks`` (default ``[]``), a
     list of check objects, and ``max_bytes`` (default 1,048,576), the largest
     output it parses. Output that is not UTF-8, is larger, or is not strict
-    JSON (a repeated object key or a non-finite number is not) is rejected.
+    JSON (a repeated object key or a non-finite number is not) is rejected,
+    and so is nesting too deep for the interpreter to parse or compare.
     Each check has an ``id`` (2 to 64 lowercase letters, digits or hyphens,
     starting with a letter), a ``kind`` and a ``path``: a list of object keys
     and array indexes from the document root, ``[]`` for the root itself. A
@@ -430,9 +434,7 @@ class JSONValidator:
         try:
             document = _strict_json(text)
         except (ValueError, RecursionError) as exc:
-            message = str(exc) if isinstance(exc, ValueError) else "nesting is too deep"
-            return _report(self._identity, [hard_finding(
-                "json_invalid", f"output is not strict JSON: {message}"[:200])])
+            return self._invalid(str(exc) if isinstance(exc, ValueError) else _TOO_DEEP)
         findings = []
         for check in self._spec["checks"]:
             shown = "$" + "".join(f"[{part!r}]" for part in check["path"])
@@ -447,12 +449,20 @@ class JSONValidator:
                 passed = _passes(check, actual)
             except (TypeError, ValueError, OverflowError):
                 passed = False
+            except RecursionError:
+                # Python 3.11 counts the frames above the parser against the
+                # same limit, so a value it parsed can be too deep to compare.
+                return self._invalid(_TOO_DEEP)
             if not passed:
                 expected = {key: value for key, value in check.items() if key not in ("id", "path")}
                 findings.append(hard_finding(
                     "json_check_failed", f"check {check['id']!r} ({check['kind']}) failed at {shown}",
                     expected=expected, observed=_observed(actual)))
         return _report(self._identity, findings)
+
+    def _invalid(self, message: str) -> ValidationReport:
+        return _report(self._identity, [hard_finding(
+            "json_invalid", f"output is not strict JSON: {message}"[:200])])
 
 
 __all__ = [

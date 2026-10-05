@@ -591,9 +591,11 @@ is `rejected`, `output` is `""` and the increment is in `rejected_output`.
 
 **JSON.** `JSONValidator(spec)`, named `smythe.json-spec`, requires the whole
 output to be strict JSON: a code fence around it, a repeated object key,
-`NaN`, `Infinity` or a number too large for a float fails with
-`json_invalid`, and output larger than `max_bytes` (default 1,048,576) with
-`json_too_large`. Its `checks` (default `[]`) each have an `id` (2 to 64
+`NaN`, `Infinity`, a number too large for a float, or nesting too deep for
+the interpreter to parse or compare fails with `json_invalid`, and output
+larger than `max_bytes` (default 1,048,576) with `json_too_large`. The
+nesting depth that counts as too deep depends on the Python version and the
+caller's stack; such output is rejected either way. Its `checks` (default `[]`) each have an `id` (2 to 64
 lowercase letters, digits or hyphens, starting with a letter), a `kind` and a
 `path`: a list of object keys and array indexes from the document root, `[]`
 for the root itself. A path that does not resolve fails with
