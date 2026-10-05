@@ -57,7 +57,7 @@ from smythe.executor_base import (
     validate_max_revisions,
     validate_retry_backoff_s,
 )
-from smythe.graph import ExecutionGraph, NodeStatus
+from smythe.graph import SYNTHESIS_NODE_ID, ExecutionGraph, NodeStatus
 from smythe.lineage import LineagePolicy, snapshot_lineage_policy
 from smythe.memory import PlannerMemory
 from smythe.tools import ToolRuntime
@@ -394,6 +394,15 @@ class Swarm:
     ``run_store`` and a strict ``acceptance`` policy, and is refused without
     them when the Swarm is built. The run's recipe records it, so the run
     resumes only under the same scope and reuse mode.
+
+    ``reserve_for_checks=True`` holds, under ``max_budget_usd`` and before
+    any node runs, the estimate that each pending verifier and an
+    ``LLM_MERGE`` synthesis will reserve (``Sentinel.hold``), so other nodes
+    cannot spend that allowance: a node whose reservation would reach into
+    it is refused with ``SentinelAlert`` before its call. Each verifier and the
+    merge converts its own hold, a regeneration holds again for the
+    verifiers it resets, and holds are never spend. Holds are not saved;
+    resume holds again. Durable runs refuse it.
     """
 
     def __init__(
@@ -428,8 +437,14 @@ class Swarm:
         renderer: MarkdownRenderer | LocalOnly | None = None,
         retry_policy: RetryPolicy | None = None,
         lineage: LineagePolicy | None = None,
+        reserve_for_checks: bool = False,
     ) -> None:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
+        if type(reserve_for_checks) is not bool:
+            raise TypeError(
+                f"reserve_for_checks must be True or False, not {type(reserve_for_checks).__name__}"
+            )
+        self.reserve_for_checks = reserve_for_checks
         if renderer is not None and run_store is None:
             raise WorkflowBindingError("renderer requires a durable run_store")
         if renderer is not None and artifact_dir is None:
@@ -881,6 +896,25 @@ class Swarm:
         self._check_synthesis_support(budget.max_budget_usd)
         self._check_retry_owners(graph)
 
+    def _hold_check_budget(
+        self, executor: ExecutorBase, graph: ExecutionGraph, budget: Sentinel,
+    ) -> None:
+        """With ``reserve_for_checks``, hold what pending verifiers and a merge will reserve."""
+        if not self.reserve_for_checks or budget.max_budget_usd is None:
+            return
+        executor.hold_verifier_budget(graph)
+        estimate = getattr(self._synthesizer, "merge_estimate_usd", None)
+        amount = None if estimate is None else estimate(budget, provider=self._provider,
+                                                        model=self.model)
+        if amount is not None:
+            budget.hold(SYNTHESIS_NODE_ID, amount)
+
+    @staticmethod
+    def _release_holds(budget: Sentinel) -> None:
+        """Free allowance no call will use: after synthesis, or when a run fails."""
+        for key in budget.holds:
+            budget.release_hold(key)
+
     def _plan(self, task: Task, tracer: Tracer, *, executing: bool = True) -> ExecutionGraph:
         """Plan *task*, measuring routing and planning on *tracer*.
 
@@ -1048,6 +1082,7 @@ class Swarm:
         self._active_executor = executor
         try:
             self._check_dispatch_support(graph, budget)
+            self._hold_check_budget(executor, graph, budget)
             graph = await executor.run(graph)
             with tracer.phase("synthesis"):
                 output = await self._synthesizer.asynthesize(
@@ -1065,6 +1100,8 @@ class Swarm:
                 response_error=_response_error_marker(exc),
             )
             raise
+        finally:
+            self._release_holds(budget)
 
         return self._finish(
             execution_id, graph, budget, task, created_at, timing, output, acceptance,
@@ -1113,6 +1150,7 @@ class Swarm:
         self._active_executor = executor
         try:
             self._check_dispatch_support(graph, budget)
+            self._hold_check_budget(executor, graph, budget)
             graph = executor.run(graph)
             with tracer.phase("synthesis"):
                 output = self._synthesizer.synthesize(
@@ -1130,6 +1168,8 @@ class Swarm:
                 response_error=_response_error_marker(exc),
             )
             raise
+        finally:
+            self._release_holds(budget)
 
         return self._finish(
             execution_id, graph, budget, task, created_at, timing, output, acceptance,
@@ -1590,6 +1630,8 @@ class Swarm:
         tracer.add_phase("recovery", tracer.since(recovery_started))
         try:
             self._check_dispatch_support(graph, budget)
+            # Holds are not saved, so a resumed run holds again.
+            self._hold_check_budget(executor, graph, budget)
             graph = await executor.run(graph)
             with tracer.phase("synthesis"):
                 output = await self._synthesizer.asynthesize(
@@ -1607,6 +1649,8 @@ class Swarm:
                 response_error=_response_error_marker(exc),
             )
             raise
+        finally:
+            self._release_holds(budget)
 
         return self._finish(
             execution_id, graph, budget, task, created_at, timing, output, acceptance,
@@ -1742,4 +1786,5 @@ class Swarm:
             context_sources=self._context_sources, renderer=self._renderer,
             artifact_dir=self.artifact_dir, retry_policy=self.retry_policy,
             lineage=self._lineage,
+            reserve_for_checks=self.reserve_for_checks,
         )

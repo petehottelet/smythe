@@ -565,7 +565,8 @@ class WorkflowRuntime:
                  tool_runtime, checkpoint_store, checkpoint_every_n_nodes, retry_backoff_s,
                  max_concurrency, graph_policy=None, behavior_settings=None, acceptance=None,
                  read_tools=(), context_sources=None, renderer=None, artifact_dir=None,
-                 retry_policy=None, lineage=None):
+                 retry_policy=None, lineage=None,
+                 reserve_for_checks=False):
         if type(store) is not SQLiteWorkflowStore:
             raise WorkflowBindingError(
                 f"run_store must be SQLiteWorkflowStore itself, not {type(store).__name__}"
@@ -576,6 +577,11 @@ class WorkflowRuntime:
             raise WorkflowBindingError(
                 "retry_policy is not supported by durable text workflows, whose journal "
                 "settles rejected calls; use node failure policies and retry_backoff_s"
+            )
+        if reserve_for_checks:
+            raise WorkflowBindingError(
+                "reserve_for_checks is not supported by durable text workflows, whose journal "
+                "admits each call against the run's budget when it is made"
             )
         if memory is not None:
             raise WorkflowBindingError(

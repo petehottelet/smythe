@@ -804,6 +804,8 @@ class ExecutorBase:
         )
         for candidate in reset:
             self.notify_update(candidate)
+        # Before the reset work runs again, so it cannot spend its checks' allowance.
+        self._hold_pending_verifiers(reset)
 
     def _rejected_records(
         self, judge: Node, reset: list[Node], intent: dict, graph: ExecutionGraph,
@@ -1073,6 +1075,23 @@ class ExecutorBase:
         """Reserve this executor's pre-call estimate for one node."""
         self.reserve_node_budget(node)
 
+    def _node_estimate(
+        self, node: Node, default_estimated_tokens: int | None,
+    ) -> tuple[float | None, bool]:
+        """The node's pre-call estimate, and whether its provider requires an explicit one."""
+        estimate = node.metadata.get("estimated_cost_usd")
+        model = str(node.metadata.get("model", ""))
+        requires_explicit = self._provider.requires_explicit_budget_estimate(model)
+        if estimate is None:
+            estimate = self._provider.budget_estimate_usd(model)
+        if estimate is None and not requires_explicit and default_estimated_tokens is not None:
+            tokens = validate_token_count(default_estimated_tokens, "default_estimated_tokens")
+            try:
+                estimate = tokens * self._budget.cost_per_token
+            except OverflowError as exc:
+                raise BudgetValidationError("Token-derived estimate must remain finite") from exc
+        return estimate, requires_explicit
+
     def reserve_node_budget(
         self,
         node: Node,
@@ -1085,47 +1104,65 @@ class ExecutorBase:
         generic token fallback is allowed only for providers that declare it
         safe.  Serial execution passes no fallback to preserve its historical
         pre-call behavior for ordinary text providers while still reserving
-        image calls.
+        image calls. A node with a budget hold (see
+        :meth:`hold_verifier_budget`) converts it into its reservation, and
+        without an estimate of its own reserves the held amount.
         """
         if self._budget is None or self._workflow_managed:
             return
 
-        estimate = node.metadata.get("estimated_cost_usd")
-        model = str(node.metadata.get("model", ""))
-        requires_explicit = self._provider.requires_explicit_budget_estimate(model)
-        if estimate is None:
-            estimate = self._provider.budget_estimate_usd(model)
-
+        estimate, requires_explicit = self._node_estimate(node, default_estimated_tokens)
         if estimate is None and requires_explicit:
             if self._budget.max_budget_usd is not None:
                 raise BudgetEstimateRequired(
-                    node.id, model, type(self._provider).__name__,
+                    node.id, str(node.metadata.get("model", "")), type(self._provider).__name__,
                 )
             # Unlimited execution may proceed without a price, but must not
             # consume a fake text-token reservation and report it as complete.
             # The provider result will mark its USD cost unknown.
             return
 
-        if estimate is not None:
-            self._budget.reserve(
-                node.id,
-                estimate,
-                hard_ceiling=requires_explicit,
-            )
-            self._reserved_node_ids.add(node.id)
-        elif default_estimated_tokens is not None:
-            tokens = validate_token_count(default_estimated_tokens, "default_estimated_tokens")
-            try:
-                estimate = tokens * self._budget.cost_per_token
-            except OverflowError as exc:
-                raise BudgetValidationError("Token-derived estimate must remain finite") from exc
-            self._budget.reserve(
-                node.id,
-                estimate,
-            )
-            self._reserved_node_ids.add(node.id)
-        else:
+        holds = self._budget.holds
+        if estimate is None:
+            estimate = holds.get(node.id)
+        if estimate is None:
             self._budget.check(node.id)
+            return
+        self._budget.reserve(
+            node.id, estimate, hard_ceiling=requires_explicit, from_hold=node.id in holds,
+        )
+        self._reserved_node_ids.add(node.id)
+
+    # The token estimate a verifier's hold falls back on when neither the
+    # node nor its provider gives one; AsyncExecutor's estimated_tokens_per_node
+    # replaces it. hold_verifier_budget() turns on holding for regenerations.
+    _estimated_tokens_per_node = 2000
+    _hold_verifiers = False
+
+    def hold_verifier_budget(self, graph: ExecutionGraph) -> None:
+        """Hold each pending verifier's estimate so that other nodes cannot spend it.
+
+        A hold is what the async executor would reserve for the verifier, and
+        the verifier converts it into its reservation when it is admitted.
+        From then on, a regeneration holds the estimate of each verifier it
+        makes pending again, so a rerun converts a hold as well. Raises
+        ``SentinelAlert`` when the budget cannot cover a hold. Durable runs,
+        whose journal admits each call, hold nothing.
+        """
+        if self._budget is None or self._workflow_managed:
+            return
+        self._hold_verifiers = True
+        self._hold_pending_verifiers(graph.nodes)
+
+    def _hold_pending_verifiers(self, nodes: list[Node]) -> None:
+        if not self._hold_verifiers:
+            return
+        held = self._budget.holds
+        for node in nodes:
+            if node.verifies and node.status is NodeStatus.PENDING and node.id not in held:
+                estimate = self._node_estimate(node, self._estimated_tokens_per_node)[0]
+                if estimate is not None:
+                    self._budget.hold(node.id, estimate)
 
     def notify_update(self, node: Node) -> None:
         """Invoke the node-update hook (used for checkpointing) if one is set.

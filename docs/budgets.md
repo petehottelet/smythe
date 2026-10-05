@@ -52,6 +52,50 @@ node of the returned graph before calling `execute(graph)`. Every graph is
 checked node by node before the first node call. See
 [provider checks](execution.md#provider-checks-before-any-call).
 
+## Held allowance for checks
+
+Without a hold, every node competes for the same remaining allowance, so a
+wide fan-out can spend what its verifiers or its `LLM_MERGE` synthesis need:
+the run pays for the work and is then refused at the check or the merge.
+`Swarm(reserve_for_checks=True)` sets that allowance aside. Under
+`max_budget_usd`, before any node runs, the run holds what each pending
+verifier and the merge will reserve: the node's `estimated_cost_usd`, else
+the provider's estimate, else 2,000 tokens at `cost_per_token`. A budget
+that cannot cover the holds stops the run with `SentinelAlert` before any
+node call.
+
+A hold counts toward every other node's admission. A node whose reservation
+would reach into held allowance is refused with `SentinelAlert` before its
+call, so a check or merge is never the step that finds its allowance spent.
+Each verifier, and the merge, converts its own hold into its reservation
+when it is admitted, so nothing is counted twice. A regeneration holds again
+for each verifier it resets before the reset work runs; when the budget
+cannot cover that hold, the run stops before the rerun.
+
+Holds are never spend: `total_cost_usd`, `breakdown()`, run results and
+checkpoints leave them out. A verifier or merge that fails releases its
+reservation as before, and a run releases any hold still left after
+synthesis or when it fails. Holds are not saved: `resume()` holds again from
+its configuration, and checkpoints stay at version 4.
+
+Holds narrow what other nodes may reserve, and a refused admission stops the
+run; nothing is deferred. They bound reservations, not charges: a call that
+costs more than its estimate can still reach into a hold, and so can a
+serial `execute()` node without an estimate, which is only checked
+(`Sentinel.check()` treats held allowance as spent). Set node estimates, or
+run in parallel, where every node reserves before its call. A held verifier
+without an estimate reserves its hold in serial runs too. A verifier that a
+supervisor revision adds reserves when it is admitted, like any other node.
+The option is off by default, and durable text workflows refuse it by name,
+because their journal admits each call against the run's budget.
+
+Code that drives a `Sentinel` directly can use the same allowance:
+`hold(key, amount)` sets it aside, `release_hold(key)` frees it, `holds`
+lists it, and `reserve(key, ..., from_hold=True)` converts a hold into the
+key's reservation; a key with a hold must convert it.
+`ExecutorBase.hold_verifier_budget(graph)` holds for a graph's pending
+verifiers.
+
 ## Money units
 
 Each ledger keeps money in one unit:

@@ -35,7 +35,7 @@ verification, trace, artifact, and recovery controls.
 - [Checkpoint format](checkpoint-format.md) — flushed atomic publication, saved state, and resume semantics
 - [Inspect saved runs](runs.md) — read-only `smythe runs inspect` and `list` over checkpoints and durable journals: execution, delivery acceptance and its decision history, a research run's context, reads, evidence and open issues, cost, timing, next action, and exit codes 10 and 11 for withheld output
 - [Source-to-artifact example](../examples/16_source_to_artifact.py) — offline and keyless: plan, journaled reads of bundled sources, an interruption, resume, and inspection of the accepted document and its evidence
-- [Cost guardrails](budgets.md) — strict usage validation, reservations, per-call ceilings, and failed-accounting recovery
+- [Cost guardrails](budgets.md) — strict usage validation, reservations, an opt-in allowance held for verification and synthesis, per-call ceilings, and failed-accounting recovery
 - [Jobs](jobs.md) — preflight, approval, detached workers and host limits, durable pause/resume, fenced ownership, artifact namespaces, delivery acceptance with registered validators and delivery eligibility, database upgrades, inspection, rerolls, and exports
 - [Optimization](optimize.md) — bounded concurrency experiments, reference arms, evidence ledgers, and campaign ownership, schema-v4 migration, and read-only HTML comparison reports
 - [Concurrent journal initialization checks](../tests/test_jobs_workflow_initialization.py) — WAL contention and atomic schema fixes, with regression evidence

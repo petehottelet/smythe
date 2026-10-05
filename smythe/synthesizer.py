@@ -154,6 +154,33 @@ class Synthesizer:
         check_provider_support(resolved_provider, resolved_model or "", node_id=SYNTHESIS_NODE_ID,
                                max_budget_usd=max_budget_usd)
 
+    def merge_estimate_usd(
+        self, budget: Sentinel, *, provider: Provider | None = None, model: str | None = None,
+    ) -> float | None:
+        """What an ``LLM_MERGE`` synthesis would reserve under *budget*, or None.
+
+        The provider's estimate for the model, else
+        ``DEFAULT_SYNTHESIS_ESTIMATED_TOKENS`` at the budget's
+        ``cost_per_token``. None for another strategy, without a provider, or
+        when the provider requires an explicit ceiling and has none.
+        """
+        resolved_provider = provider or self._provider
+        if self._strategy is not SynthesisStrategy.LLM_MERGE or resolved_provider is None:
+            return None
+        return self._merge_estimate(resolved_provider, model if model is not None else self._model,
+                                    budget)[0]
+
+    @staticmethod
+    def _merge_estimate(
+        provider: Provider, model: str | None, budget: Sentinel,
+    ) -> tuple[float | None, bool]:
+        """The merge's estimate and whether its provider requires an explicit one."""
+        requires_explicit = provider.requires_explicit_budget_estimate(model or "")
+        estimate = provider.budget_estimate_usd(model or "")
+        if estimate is None and not requires_explicit:
+            estimate = DEFAULT_SYNTHESIS_ESTIMATED_TOKENS * budget.cost_per_token
+        return estimate, requires_explicit
+
     def synthesize(
         self,
         graph: ExecutionGraph,
@@ -296,26 +323,22 @@ class Synthesizer:
         prompt = "\n\n---\n\n".join(parts)
 
         if resolved_budget:
-            requires_explicit = resolved_provider.requires_explicit_budget_estimate(
-                resolved_model or ""
+            estimate, requires_explicit = self._merge_estimate(
+                resolved_provider, resolved_model, resolved_budget,
             )
-            estimate = resolved_provider.budget_estimate_usd(resolved_model or "")
-            if estimate is None and requires_explicit:
+            if estimate is None:
                 if resolved_budget.max_budget_usd is not None:
                     raise BudgetEstimateRequired(
                         SYNTHESIS_NODE_ID,
                         resolved_model or "",
                         type(resolved_provider).__name__,
                     )
-            elif estimate is not None:
+            else:
+                # Allowance held for the merge (Swarm reserve_for_checks)
+                # becomes its reservation.
                 resolved_budget.reserve(
                     SYNTHESIS_NODE_ID, estimate, hard_ceiling=requires_explicit,
-                )
-            else:
-                resolved_budget.reserve(
-                    SYNTHESIS_NODE_ID,
-                    DEFAULT_SYNTHESIS_ESTIMATED_TOKENS
-                    * resolved_budget.cost_per_token,
+                    from_hold=SYNTHESIS_NODE_ID in resolved_budget.holds,
                 )
 
         synth_node = Node(label="Synthesis merge", id=SYNTHESIS_NODE_ID)

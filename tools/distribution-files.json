@@ -124,6 +124,7 @@
     "tests/test_benchmark_usage.py",
     "tests/test_benchmarks.py",
     "tests/test_budget.py",
+    "tests/test_budget_holds.py",
     "tests/test_budget_validation.py",
     "tests/test_checkpoint.py",
     "tests/test_checkpoint_atomic.py",

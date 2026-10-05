@@ -137,7 +137,10 @@ Each path keeps money in its own unit:
   serial node whose own or provider estimate is set; a serial `execute()`
   node without one reserves nothing (see [cost guardrails](budgets.md)). A
   call to one of them that raises or times out releases its reservation and
-  records no cost.
+  records no cost. With `reserve_for_checks=True`, the run first holds what
+  its pending verifiers and an `LLM_MERGE` synthesis will reserve, and other
+  nodes cannot reserve that allowance (see
+  [held allowance](budgets.md#held-allowance-for-checks)).
 - **Durable text workflows** record integer nanoUSD in the journal for every
   phase (`cost_scope="complete_text_workflow"`), from request-bound quotes.
 - **Jobs** reserve and settle integer micro-USD against each profile's
@@ -241,6 +244,12 @@ Tests:
   and `tests/test_support_matrix.py::test_ordinary_run_rejects_an_llm_merge_it_cannot_budget_before_any_call`;
   planned first and run with node estimates,
   `tests/test_support_matrix.py::test_plan_returns_a_graph_whose_node_estimates_stand_in_for_a_missing_ceiling`.
+- Held allowance for checks: `tests/test_budget_holds.py::test_with_holds_a_wide_fan_out_cannot_starve_llm_merge_synthesis`,
+  `tests/test_budget_holds.py::test_a_regenerated_verifier_converts_a_hold_placed_again`,
+  `tests/test_budget_holds.py::test_a_regeneration_rerun_cannot_spend_its_verifiers_allowance`,
+  `tests/test_budget_holds.py::test_holds_are_never_reported_as_spend`
+  and `tests/test_budget_holds.py::test_holds_are_released_when_a_run_fails`; unchanged without
+  holds `tests/test_budget_holds.py::test_without_holds_a_wide_fan_out_spends_the_synthesis_allowance`.
 - SDK retries: `tests/test_support_matrix.py::test_legacy_provider_clients_leave_retries_to_the_sdk_configuration`,
   `tests/test_support_matrix.py::test_native_providers_refuse_a_client_with_sdk_retries`,
   `tests/test_jobs_runtime_support.py::test_durable_openai_pool_disables_sdk_retries_and_sets_timeout`.
@@ -302,9 +311,9 @@ Tests:
 
 A durable run checks its provider and components each time `plan()`,
 `execute()` or `resume()` starts, before routing or planning. A rejected
-`run_store`, `verifier`, `memory`, `tool_runtime`, `checkpoint_store` or
-`retry_policy` raises `WorkflowBindingError`, a `ValueError` whose message
-starts with the argument's name.
+`run_store`, `verifier`, `memory`, `tool_runtime`, `checkpoint_store`,
+`retry_policy` or `reserve_for_checks` raises `WorkflowBindingError`, a
+`ValueError` whose message starts with the argument's name.
 
 | Component | Accepted | Rejected |
 |---|---|---|
@@ -317,6 +326,7 @@ starts with the argument's name.
 | `checkpoint_store` | `None`; the journal holds checkpoints | Any checkpoint store |
 | `renderer` | `None`, `MarkdownRenderer`, or a renderer declared with `LocalOnly(..., role="renderer")` whose `render()` is synchronous; it [publishes the delivered document](workflow-accounting.md#published-documents) into `artifact_dir` | Other objects and other `LocalOnly` roles; `renderer` without `run_store` or `artifact_dir`; a strict policy without final validators; an `async` `render()` or an invalid `filename` or `media_type`; a run directory that another run owns or that holds files the run does not own |
 | `retry_policy` | `None`; the node failure policy decides each retry | Any `RetryPolicy` |
+| `reserve_for_checks` | `False`; the journal admits each call against the run's budget | `True` |
 | Architects and other components | Built-in components and `LocalOnly` factories | Subclasses and unjournaled dependencies |
 | Node inputs | Plain text | `attach_dep_artifacts`, `attachments` and `artifacts` |
 | Resume | The saved recipe: components, models, budget, `retry_backoff_s`, concurrency, gate validator, acceptance policy, read profiles and renderer | Any change raises `WorkflowConflictError` |
@@ -341,7 +351,8 @@ Tests:
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[tool-runtime]`,
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[checkpoint-store]`,
   `tests/test_workflow_acceptance.py::test_durable_runs_refuse_unregistered_verifier_code_before_any_call`,
-  `tests/test_retry_policy.py::test_durable_runs_refuse_a_retry_policy_by_name_before_any_call`.
+  `tests/test_retry_policy.py::test_durable_runs_refuse_a_retry_policy_by_name_before_any_call`,
+  `tests/test_budget_holds.py::test_durable_runs_refuse_reserve_for_checks_by_name_before_any_call`.
 - Gate validators: `tests/test_workflow_acceptance.py::test_registered_validator_judges_durable_gates_from_the_exact_target_text`,
   `tests/test_workflow_acceptance.py::test_a_changed_validator_configuration_or_version_refuses_resume_before_any_call`,
   `tests/test_workflow_acceptance.py::test_a_validator_that_cannot_decide_ends_its_gate_without_regeneration`,

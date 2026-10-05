@@ -742,6 +742,20 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   versions and digests, with no source text; its reader rejects unknown
   versions and keys. Runs do not write lineage records yet. See
   [artifact lineage](docs/lineage.md).
+- `Swarm(reserve_for_checks=True)` holds allowance for a run's verifiers and
+  its `LLM_MERGE` synthesis so other nodes cannot spend it. Under
+  `max_budget_usd`, before any node runs, the run holds what each pending
+  verifier and the merge will reserve; another node whose reservation would
+  reach into that allowance is refused with `SentinelAlert` before its call.
+  Each verifier and the merge converts its own hold into its reservation, a
+  regeneration holds again for the verifiers it resets before their work
+  reruns, and a run releases leftover holds after synthesis or when it fails.
+  Holds never count as spend and are not saved: resume holds again, and
+  checkpoints stay at version 4. `Sentinel.hold()`, `release_hold()`,
+  `holds` and `reserve(..., from_hold=True)` expose the same allowance, and
+  `Sentinel.check()` treats held allowance as spent. Durable runs refuse the
+  option. Without it, reservations are unchanged. See
+  [held allowance](docs/budgets.md#held-allowance-for-checks).
 
 ### Changed
 
