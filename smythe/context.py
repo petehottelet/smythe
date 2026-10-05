@@ -34,8 +34,8 @@ from smythe.validation import _require_keys, _require_sha256
 __all__ = [
     "CONTEXT_ASSEMBLY_VERSION", "CONTEXT_SNAPSHOT_KEY", "SUPPORTED_CONTEXT_ASSEMBLY_VERSIONS",
     "UNTRUSTED", "UNTRUSTED_DATA_NOTE", "ContextSnapshot", "ContextSource", "DependencyDigest",
-    "context_key", "load_context_snapshot", "load_context_sources", "snapshot_sources",
-    "sources_key", "sources_sha256", "text_sha256", "untrusted_block",
+    "SourceRemovedError", "context_key", "load_context_snapshot", "load_context_sources",
+    "snapshot_sources", "sources_key", "sources_sha256", "text_sha256", "untrusted_block",
 ]
 
 # The context-assembly version a new run records when it opts in.
@@ -324,12 +324,35 @@ def sources_key(revision: int) -> str:
     return f"context-sources/{revision}"
 
 
+class SourceRemovedError(LookupError):
+    """A durable run's record holds the text of a source that was removed from the run.
+
+    The journal still holds the record, but a removed source's text is never
+    read from it again; the run's tombstone
+    (:func:`smythe.evidence.load_source_tombstones`) says why it was removed.
+    """
+
+
+def _refuse_removed(store: Any, run_id: str, sources: tuple[ContextSource, ...]) -> None:
+    from smythe.evidence import _removed_sources
+
+    removed = _removed_sources(store, run_id)
+    for source in sources:
+        tombstone = removed.get((source.source_id, source.sha256))
+        if tombstone is not None:
+            raise SourceRemovedError(
+                f"source {source.source_id!r} was removed from this run ({tombstone.tombstone}); "
+                "its text is not read again"
+            )
+
+
 def load_context_snapshot(store: Any, run_id: str, node_id: str,
                           generation: int = 0) -> ContextSnapshot | None:
     """The snapshot a durable run recorded for a node's generation, or None.
 
     Raises ValueError when the journal holds a record that is not a valid
-    snapshot of that node and generation.
+    snapshot of that node and generation, and :class:`SourceRemovedError`
+    when the snapshot holds a source removed from the run.
     """
     operation = store.load_operation(run_id, context_key(node_id, generation))
     if operation is None:
@@ -339,16 +362,23 @@ def load_context_snapshot(store: Any, run_id: str, node_id: str,
             != (node_id, generation)):
         raise ValueError(f"journal operation {context_key(node_id, generation)!r} is not this "
                          "node's context snapshot")
+    _refuse_removed(store, run_id, snapshot.sources)
     return snapshot
 
 
 def load_context_sources(store: Any, run_id: str,
                          revision: int = 0) -> tuple[ContextSource, ...] | None:
-    """A durable run's source set at *revision*, or None if it never recorded one."""
+    """A durable run's source set at *revision*, or None if it never recorded one.
+
+    Raises :class:`SourceRemovedError` when the set holds a source removed
+    from the run.
+    """
     operation = store.load_operation(run_id, sources_key(revision))
     if operation is None:
         return None
-    return sources_from_operation(operation, revision)
+    sources = sources_from_operation(operation, revision)
+    _refuse_removed(store, run_id, sources)
+    return sources
 
 
 def sources_from_operation(operation: Mapping[str, Any], revision: int) -> tuple[ContextSource, ...]:

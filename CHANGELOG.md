@@ -632,6 +632,22 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   [stop and resume](docs/jobs.md#stop-and-resume-safely);
   the guide's [current boundaries](docs/jobs.md#current-boundaries) now state
   that Jobs do not read a response's `stop_reason`.
+- A durable run with context assembly can remove a source.
+  `Swarm.remove_source(execution_id, source_id, reason)` and
+  `aremove_source()` journal its tombstone, a `SourceRecord` that keeps the
+  source's id, version and SHA-256, the reason and the time and none of its
+  text, as a `source_tombstone` operation keyed `source-tombstone/<sha256>`
+  that a new checkpoint applies, with no call. The run then never uses the
+  text again, and nothing rebuilds it from the journal's copy:
+  `load_context_sources` and `load_context_snapshot` raise the new
+  `smythe.context.SourceRemovedError` for a record that holds it,
+  `load_source_evidence` marks the source `removed` and returns no text for
+  it, an unfinished run resumes only after `refresh_context` gives it other
+  sources, and a completed run's earlier decision becomes `indeterminate`
+  until `reevaluate` decides again under a source evidence validator that
+  holds the tombstone. `smythe.evidence.load_source_tombstones` reads a
+  run's tombstones. Earlier journal records and published documents keep
+  what they hold. See [remove a source](docs/tasks.md#remove-a-source).
 
 ### Changed
 

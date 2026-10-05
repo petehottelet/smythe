@@ -342,7 +342,12 @@ version from the saved recipe, so a `Swarm` without `context_sources` resumes
 such a run with the sources it recorded, and one with `context_sources`
 cannot resume a run whose recipe has no `context_assembly`. Such a run keys
 synthesis by node generation, like a strict run, so a refresh of its sources
-never replays an earlier synthesis.
+never replays an earlier synthesis. `Swarm.remove_source` journals a
+`source_tombstone` operation for a source that must no longer be used; the
+run then never sends or returns its text, an unfinished run resumes only
+with other sources, and a completed run's earlier decision becomes
+`indeterminate` until it is re-evaluated
+([remove a source](tasks.md#remove-a-source)).
 
 ## Strict delivery acceptance
 
@@ -374,7 +379,9 @@ journals the decision:
   `source-evidence/<sha256>` first records the
   [source evidence](source-evidence.md#durable-runs) the output carries,
   bound to its digest and the run's source set, and the same checkpoint
-  consumes it.
+  consumes it. A `SourceEvidenceValidator` built from other sources than
+  the run's current source set does not run, and the decision is
+  `indeterminate` by default.
 - A process lost after synthesis and before the decision commits decides
   again on resume, on the same saved output. A process lost after the
   decision commits replays it, and one lost after the completed checkpoint

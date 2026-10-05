@@ -6,6 +6,7 @@ import asyncio
 from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
+from datetime import datetime, timezone
 import hashlib
 import json
 import math
@@ -30,7 +31,9 @@ from smythe.context import (
     sources_key, sources_sha256, text_sha256 as output_sha256,
 )
 from smythe.evidence import (
-    SOURCE_EVIDENCE_OPERATION, source_evidence_inputs, source_evidence_key, source_evidence_result,
+    SOURCE_EVIDENCE_OPERATION, SOURCE_TOMBSTONE_OPERATION, SourceRecord, _removed_sources,
+    _tombstone_operations, source_evidence_inputs, source_evidence_key, source_evidence_result,
+    source_tombstone_key,
 )
 from smythe.executor_base import REJECTED_GENERATIONS_KEY, SUPPORTED_PROMPT_ASSEMBLY_VERSIONS, ExecutorBase
 from smythe.graph import ExecutionGraph, NodeStatus, Revision, snapshot_run_ref
@@ -379,15 +382,42 @@ def _held_record(record, output, problems, task_digest):
     )
 
 
-def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha256):
+def _removal_problems(store, run_id, decided_at):
+    """The sources a completed run delivered from that were removed after its decision.
+
+    *decided_at* is the revision of the checkpoint that applied the decision,
+    or None without one. A tombstone that a later checkpoint applied, or that
+    none has applied yet, came after the decision. One reason each; only
+    reads are made.
+    """
+    saved = store.get_checkpoint(run_id)
+    binding = None if saved is None else saved["checkpoint"].get("context_sources")
+    if not isinstance(binding, dict) or type(binding.get("revision")) is not int:
+        return []
+    operation = store.load_operation(run_id, sources_key(binding["revision"]))
+    if operation is None:
+        return []
+    delivered = {(source.source_id, source.sha256)
+                 for source in sources_from_operation(operation, binding["revision"])}
+    return [f"source {record.source_id!r} was removed from the run after this decision "
+            f"({record.tombstone}); re-evaluate the run"
+            for record, applied in _tombstone_operations(store, run_id)
+            if (record.source_id, record.sha256) in delivered
+            and (applied is None or decided_at is None or applied > decided_at)]
+
+
+def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha256,
+                       removed=True):
     """What no longer matches a completed run's decided *record*, one reason each.
 
     The saved *output* must match the record's digest, the run's *task* and
     the source generations must be those it binds, and the record must be
     the journal's :func:`current_decision`, made under the run's policy
-    (*policy_sha256*) or, for a re-evaluation, the policy it names. An empty
-    list means the record holds. Only reads are made, so a store opened
-    read-only will do.
+    (*policy_sha256*) or, for a re-evaluation, the policy it names. With
+    *removed*, a source the run delivered from that was removed after the
+    decision (:meth:`WorkflowRuntime.remove_source`) is a problem too. An
+    empty list means the record holds. Only reads are made, so a store
+    opened read-only will do.
     """
     problems = _delivery_problems(record, output, graph, task)
     decision = current_decision(store, run_id)
@@ -404,6 +434,8 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
                  and decision["operation_key"] == _decision_key(inputs))
     if not holds:
         problems.append("the journal holds no applied decision matching the saved record")
+    if removed:
+        problems += _removal_problems(store, run_id, None if decision is None else decision["revision"])
     return problems
 
 
@@ -1393,6 +1425,7 @@ class WorkflowRuntime:
                 )
             if sources == self.context_sources:
                 return self.context_revision
+            self._refuse_removed(sources, "give the run other text for it")
             for node in self.graph.nodes:
                 self._clear_resolved_native_error(node)
                 if (any(key in node.metadata for key in ("response_error", "workflow_accounting_invalid"))
@@ -1419,6 +1452,82 @@ class WorkflowRuntime:
             self.execution_concurrency = state.get("max_concurrency")
             self._save(status)
             return revision
+
+    async def remove_source(self, run_id, source_id, reason, *, removed_at=None):
+        """Remove one of a durable run's current sources; return its tombstone.
+
+        The tombstone, a :class:`~smythe.evidence.SourceRecord`, keeps the
+        source's id, version and digest, *reason* and *removed_at* (by
+        default the current UTC time), and nothing of its text. It is
+        journaled as a ``source_tombstone`` operation keyed
+        :func:`~smythe.evidence.source_tombstone_key`, which a new checkpoint
+        applies; nothing is called. From then on the run never uses the
+        source's text again, and reading it from a cache is not a substitute:
+
+        - ``load_context_sources`` and ``load_context_snapshot`` raise
+          ``SourceRemovedError`` for a record that holds it, and
+          ``load_source_evidence`` marks it ``removed`` and never returns it;
+        - an unfinished run does not resume until :meth:`refresh_context`
+          gives it other sources, which may not include the removed text;
+        - a completed run's decision, made before the removal, no longer
+          holds: resuming or inspecting the run gives ``indeterminate``, and
+          :meth:`reevaluate` decides again, under a source evidence
+          validator that holds the tombstone rather than the text.
+
+        Earlier records keep what they hold: the journal's requests, read
+        responses, snapshots and outputs, and a published document. Removing
+        them is not supported yet. Removing a removed source again returns
+        its first tombstone.
+
+        Raises ``WorkflowBindingError`` for a reason that is not 1-500
+        characters without control characters, and ``WorkflowStateError`` for
+        a run without context assembly, a run that has recorded no sources,
+        and an id that is not one of the run's current sources.
+        """
+        if (type(reason) is not str or not reason.strip() or len(reason) > 500
+                or any(ord(char) < 32 or ord(char) == 127 for char in reason)):
+            raise WorkflowBindingError(
+                "reason must be 1-500 characters of text without control characters")
+        async with self._session(self.store.load_run(run_id)):
+            if not self._context_version:
+                raise WorkflowStateError("Workflow does not use context assembly; it has no sources")
+            state = self._restore()
+            if state is None:
+                raise WorkflowStateError("Workflow has recorded no sources yet")
+            source = next((item for item in self.context_sources if item.source_id == source_id),
+                          None)
+            if source is None:
+                raise WorkflowStateError(f"Source {source_id!r} is not one of the run's current sources")
+            key = source_tombstone_key(source.source_id, source.sha256)
+            operation = self.store.load_operation(self.run_id, key)
+            if operation is None:
+                stamp = removed_at or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                tombstone = SourceRecord.from_context_source(source).tombstoned(reason, removed_at=stamp)
+                operation = self.store.begin_operation(self.context.lease, key, SOURCE_TOMBSTONE_OPERATION,
+                                                       {"tombstone": tombstone.to_dict()})
+            if operation["state"] == "started":
+                # A removal that stopped before completing is finished as it began.
+                operation = self.store.complete_operation(self.context.lease, key, operation["inputs"])
+            tombstone = SourceRecord.from_dict(operation["result"]["tombstone"])
+            if operation["state"] != "applied":
+                self._pending_operations.add(operation["operation_id"])
+                self.execution_concurrency = state.get("max_concurrency")
+                if state["status"] == "completed":
+                    self._save("completed", output=state["output"], acceptance=self.saved_acceptance)
+                else:
+                    self._save(state["status"])
+            return tombstone
+
+    def _refuse_removed(self, sources, advice):
+        """Refuse *sources* that hold the text of a source removed from the run."""
+        removed = _removed_sources(self.store, self.run_id)
+        for source in sources:
+            tombstone = removed.get((source.source_id, source.sha256))
+            if tombstone is not None:
+                raise WorkflowStateError(
+                    f"Source {source.source_id!r} was removed from this run "
+                    f"({tombstone.tombstone}); {advice}"
+                )
 
     async def reevaluate(self, run_id):
         """Record a new delivery decision for a completed run's saved output.
@@ -1468,9 +1577,11 @@ class WorkflowRuntime:
             output, record = state["output"], self.saved_acceptance
             if not isinstance(output, str):
                 raise WorkflowStateError("Completed workflow output is not text")
+            # A source removed after the decision is why a run is re-evaluated.
             problems = _decision_problems(
                 self.store, self.run_id, self.graph, output, record,
                 task=task_from_dict(self.run["task"]), policy_sha256=self.run_policy_sha256,
+                removed=False,
             )
             sources, used_fallback = _delivery_sources(self.graph, record.strategy)
             if ([AcceptanceSource(node.id, node_generation(node)) for node in sources]
@@ -1513,6 +1624,10 @@ class WorkflowRuntime:
         if state and state["status"] == "completed":
             self._check_completed()
             return self._result(state["output"], self._reverified(state["output"]))
+        if self._context_version and self.context_revision is not None:
+            # A removed source's text is never sent again, from a snapshot or the sources.
+            self._refuse_removed(self.context_sources, "give the run other sources with "
+                                 "refresh_context before resuming it")
         # A verdict's forced checkpoint can precede its ordinary node callback.
         # Resolve proven native replay markers before consuming that control.
         for node in self.graph.nodes:
@@ -1744,17 +1859,19 @@ class WorkflowRuntime:
         """Why each source evidence validator of the strict policy cannot check this run, by identity.
 
         Such a validator must check exactly the run's current source set:
-        the same source ids, each with the same version and digest. One that
-        checks other sources, such as the sources of an earlier revision,
-        could accept evidence for sources the run's nodes were never given,
-        so its outcome is ``error`` and the run is never accepted. A run
-        without context assembly records no source set, and its validators
-        check the sources they were given.
+        the same source ids, each with the same version and digest, and no
+        text for a source removed from the run. One that checks other
+        sources, such as the sources of an earlier revision, could accept
+        evidence for sources the run's nodes were never given, so its
+        outcome is ``error`` and the run is never accepted. A run without
+        context assembly records no source set, and its validators check the
+        sources they were given.
         """
         if not self._context_version:
             return {}
         current = {source.source_id: (source.version, source.sha256)
                    for source in self.context_sources}
+        removed = _removed_sources(self.store, self.run_id)
         unusable = {}
         for validator, identity in zip(self.acceptance.final_validators,
                                        self.acceptance.validator_identities):
@@ -1768,7 +1885,9 @@ class WorkflowRuntime:
                 else f"source {source_id!r} has another version or digest"
                 for source_id in sorted(current.keys() | checked.keys())
                 if current.get(source_id) != checked.get(source_id)
-            ]
+            ] + [f"it holds the text of the removed source {record.source_id!r}"
+                 for record in validator.sources
+                 if record.text is not None and (record.source_id, record.sha256) in removed]
             if differences:
                 unusable[identity] = (
                     f"final validator {identity.name!r} checks other sources than the run's "

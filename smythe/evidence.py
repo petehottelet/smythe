@@ -23,6 +23,12 @@ A durable text workflow whose strict acceptance policy has such a validator
 journals the evidence its delivered output carries as a ``source_evidence``
 operation (:func:`source_evidence_key`), and :func:`load_source_evidence`
 reads it back, without source text unless the caller asks for it.
+
+Removing a source from a durable run
+(:meth:`~smythe.workflow.WorkflowRuntime.remove_source`) journals its
+tombstone as a ``source_tombstone`` operation
+(:func:`source_tombstone_key`), which :func:`load_source_tombstones` reads
+back. From then on the run's records never yield the source's text.
 """
 
 from __future__ import annotations
@@ -35,14 +41,17 @@ from typing import Any
 
 from smythe._canonical import sha256_hex
 from smythe._redact import redact_account_identifiers
-from smythe.context import ContextSource, _identifier, load_context_sources, text_sha256
+from smythe.context import (
+    ContextSource, _identifier, sources_from_operation, sources_key, text_sha256,
+)
 from smythe.validation import _require_keys, _require_sha256
 
 __all__ = [
-    "EVIDENCE_BLOCK", "SOURCE_EVIDENCE_OPERATION", "SOURCE_EVIDENCE_VERSION", "ClaimPassage",
-    "ClaimRecord", "SourceEvidence", "SourceRecord", "load_source_evidence",
-    "read_source_evidence", "render_source_evidence", "source_evidence_inputs",
-    "source_evidence_key", "source_evidence_result",
+    "EVIDENCE_BLOCK", "SOURCE_EVIDENCE_OPERATION", "SOURCE_EVIDENCE_VERSION",
+    "SOURCE_TOMBSTONE_OPERATION", "ClaimPassage", "ClaimRecord", "SourceEvidence",
+    "SourceRecord", "load_source_evidence", "load_source_tombstones", "read_source_evidence",
+    "render_source_evidence", "source_evidence_inputs", "source_evidence_key",
+    "source_evidence_result", "source_tombstone_key",
 ]
 
 # The record version every source, claim and evidence record carries.
@@ -51,6 +60,8 @@ SOURCE_EVIDENCE_VERSION = 1
 EVIDENCE_BLOCK = "source-evidence"
 # The durable journal operation kind that records a delivered output's evidence.
 SOURCE_EVIDENCE_OPERATION = "source_evidence"
+# The durable journal operation kind that records a source removed from a run.
+SOURCE_TOMBSTONE_OPERATION = "source_tombstone"
 RETAINED, REFERENCE, TOMBSTONED = "retained", "reference", "tombstoned"
 
 _LINE = re.compile(r"[^\r\n]*")
@@ -456,6 +467,52 @@ def source_evidence_result(output: str) -> dict[str, Any]:
     return {"source_evidence": evidence.to_dict(), "problem": None}
 
 
+def source_tombstone_key(source_id: str, sha256: str) -> str:
+    """The journal key of a removed source's tombstone: ``source-tombstone/<sha256>``.
+
+    The digest is of the source's id and the SHA-256 of its text as
+    canonical JSON, so one text removed from a run has one tombstone.
+    """
+    return "source-tombstone/" + sha256_hex({"source_id": source_id, "sha256": sha256})
+
+
+def _tombstone_operations(store: Any, run_id: str) -> list[tuple[SourceRecord, int | None]]:
+    """Each tombstone a durable run committed, with the revision of the checkpoint that applied it.
+
+    The revision is None for a tombstone that no checkpoint has applied yet.
+    """
+    found = []
+    for operation in store.list_operations(run_id, SOURCE_TOMBSTONE_OPERATION):
+        if operation["state"] == "started":
+            continue
+        key, result = operation["operation_key"], operation["result"]
+        try:
+            record = SourceRecord.from_dict(result.get("tombstone"))
+            if (record.state != TOMBSTONED or result.keys() != {"tombstone"}
+                    or operation["inputs"] != {"tombstone": record.to_dict()}
+                    or key != source_tombstone_key(record.source_id, record.sha256)):
+                raise ValueError("the record does not match its operation")
+        except (AttributeError, TypeError, ValueError) as error:
+            raise ValueError(f"journal operation {key!r} is not a source tombstone") from error
+        found.append((record, operation["applied_revision"]))
+    return found
+
+
+def load_source_tombstones(store: Any, run_id: str) -> tuple[SourceRecord, ...]:
+    """The tombstones of the sources removed from a durable run, in the order they were applied.
+
+    Each keeps the source's id, version and digest, why it was removed and
+    when, and nothing of its text. Only reads are made. Raises ValueError for
+    a record under a tombstone's kind that is not one.
+    """
+    return tuple(record for record, _ in _tombstone_operations(store, run_id))
+
+
+def _removed_sources(store: Any, run_id: str) -> dict[tuple[str, str], SourceRecord]:
+    """A durable run's tombstones, by the ``(source_id, sha256)`` of the text each removed."""
+    return {(record.source_id, record.sha256): record for record in load_source_tombstones(store, run_id)}
+
+
 def load_source_evidence(store: Any, run_id: str, *, include_text: bool = False) -> dict | None:
     """The source evidence a completed durable run delivered, or None if it recorded none.
 
@@ -464,9 +521,11 @@ def load_source_evidence(store: Any, run_id: str, *, include_text: bool = False)
     no readable evidence, the claim records, and each source record's
     :meth:`~SourceRecord.summary` with ``available``: whether its text is
     retained, in the record or in the run's recorded sources with the same
-    id, version and digest. A tombstoned record is never available. Source
-    text is left out unless *include_text* is True, which adds each
-    available source's ``text`` (None for one that is not).
+    id, version and digest, and ``removed``: the reason and time of the
+    tombstone of a source removed from the run, or None. A tombstoned or
+    removed source is never available. Source text is left out unless
+    *include_text* is True, which adds each available source's ``text``
+    (None for one that is not).
 
     Raises ValueError when the journal's record under that key is not this
     run's source evidence.
@@ -489,18 +548,28 @@ def load_source_evidence(store: Any, run_id: str, *, include_text: bool = False)
                 else SourceEvidence.from_dict(result["source_evidence"]))
     held: dict[str, ContextSource] = {}
     if isinstance(binding, dict) and type(binding.get("revision")) is int:
-        held = {source.source_id: source
-                for source in load_context_sources(store, run_id, binding["revision"]) or ()}
+        recorded = store.load_operation(run_id, sources_key(binding["revision"]))
+        if recorded is not None:
+            held = {source.source_id: source
+                    for source in sources_from_operation(recorded, binding["revision"])}
+    removed = _removed_sources(store, run_id)
     sources = []
     for record in evidence.sources:
         source = held.get(record.source_id)
-        text = record.text
-        if (text is None and record.state == REFERENCE and source is not None
-                and record.sha256 in (None, source.sha256)
+        digest = record.sha256
+        if digest is None and source is not None and record.source_version in (None, source.version):
+            digest = source.sha256
+        # A removed source's text is never read again, from the record or the run.
+        tombstone = removed.get((record.source_id, digest))
+        text = None if tombstone is not None else record.text
+        if (text is None and tombstone is None and record.state == REFERENCE
+                and source is not None and record.sha256 in (None, source.sha256)
                 and record.source_version in (None, source.version)):
             text = source.text
         item = record.summary()
         item["available"] = text is not None
+        item["removed"] = None if tombstone is None else {"reason": tombstone.tombstone,
+                                                          "removed_at": tombstone.removed_at}
         if include_text:
             item["text"] = text
         sources.append(item)

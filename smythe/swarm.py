@@ -29,6 +29,7 @@ from smythe.acceptance import (
 )
 from smythe.budget import BudgetValidationError, Sentinel
 from smythe.context import ContextSource, snapshot_sources
+from smythe.evidence import SourceRecord
 from smythe.checkpoint import (
     CHECKPOINT_VERSION,
     SUPPORTED_CHECKPOINT_VERSIONS,
@@ -1205,6 +1206,28 @@ class Swarm:
         if self._run_store is None:
             raise ValueError("republish needs a durable run_store")
         return await self._workflow_runtime().republish(execution_id)
+
+    def remove_source(self, execution_id: str, source_id: str, reason: str, *,
+                      removed_at: str | None = None) -> SourceRecord:
+        """Remove a durable run's source.  Sync wrapper around aremove_source()."""
+        return asyncio.run(self.aremove_source(execution_id, source_id, reason,
+                                               removed_at=removed_at))
+
+    async def aremove_source(self, execution_id: str, source_id: str, reason: str, *,
+                             removed_at: str | None = None) -> SourceRecord:
+        """Remove one of a durable run's current sources; return its tombstone.
+
+        The tombstone keeps the source's id, version and digest, why and when
+        it was removed, and none of its text, which the run never uses or
+        returns again: an unfinished run needs :meth:`refresh_context` before
+        it resumes, and a completed run's earlier decision becomes
+        ``indeterminate`` until :meth:`reevaluate` decides again. Nothing is
+        called. See ``smythe.workflow.WorkflowRuntime.remove_source``.
+        """
+        if self._run_store is None:
+            raise ValueError("remove_source needs a durable run_store")
+        return await self._workflow_runtime().remove_source(
+            execution_id, source_id, reason, removed_at=removed_at)
 
     def _load_checkpoint(self, execution_id: str) -> dict[str, Any]:
         """The saved state of *execution_id*, at a checkpoint version this build reads."""

@@ -159,3 +159,42 @@ Sources reach node calls, not planning. A recipe without `context_assembly`,
 which every run without `context_sources` records, keeps the prompts and
 journal records of earlier releases byte for byte. Durable runs still refuse
 planner memory.
+
+### Remove a source
+
+When a source must no longer be used, for example because its owner withdrew
+it, remove it from the run:
+
+```python
+tombstone = swarm.remove_source(run_id, "handbook", "withdrawn by its owner")
+```
+
+`remove_source` takes one of the run's current sources and a reason of 1-500
+characters, and returns its tombstone: a
+[`SourceRecord`](source-evidence.md#records) with the source's id, version
+and SHA-256, the reason and `removed_at` (the current UTC time unless given),
+and none of its text. The tombstone is journaled as a `source_tombstone`
+operation keyed `source-tombstone/<sha256>` and applied by a new checkpoint;
+nothing is called, and removing the source again returns the first
+tombstone. `smythe.evidence.load_source_tombstones` reads a run's tombstones.
+From then on the run never uses the removed text, and nothing rebuilds it
+from the journal's copy:
+
+- `load_context_sources` and `load_context_snapshot` raise
+  `smythe.context.SourceRemovedError` for a record that holds it, and
+  [`load_source_evidence`](source-evidence.md#inspect-evidence) marks the
+  source `removed` and never returns its text;
+- an unfinished run does not resume until `refresh_context` gives it other
+  sources, and a refresh that includes the removed text is refused;
+- a completed run's decision, made before the removal, no longer holds:
+  resuming or [inspecting](runs.md) the run gives `indeterminate` with the
+  removal as its reason, until [`reevaluate`](verifier.md#re-evaluation)
+  decides again under a source evidence validator that holds the tombstone.
+  Passages quoted from the removed source then cannot be checked, so the run
+  is accepted only when its evidence does not rest on them.
+
+This is a tombstone, not an erasure: the journal's earlier records keep what
+they hold, including saved requests, read responses, snapshots and outputs,
+and so does a published document. Protect or delete the journal itself when
+those copies must go. A run without context assembly has no sources to
+remove and raises `WorkflowStateError`.
