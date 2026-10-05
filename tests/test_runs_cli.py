@@ -312,6 +312,40 @@ def test_corrupt_json_is_a_local_error(tmp_path, capsys):
     assert output(capsys)["error"]["type"] == "RunInspectionError"
 
 
+def unreadable_entries(directory: Path) -> None:
+    """A directory named like a checkpoint, and a checkpoint nested too deeply to parse."""
+    (directory / "folder.json").mkdir()
+    (directory / "deep.json").write_text("[" * 100_000 + "]" * 100_000, encoding="utf-8")
+
+
+def test_entries_that_cannot_be_opened_or_parsed_are_local_errors(tmp_path, capsys):
+    """An entry that raised OSError, or JSON deep enough to raise RecursionError,
+    escaped as that exception rather than a report that the run is unreadable."""
+    unreadable_entries(tmp_path)
+    for run_id in ("folder", "deep"):
+        assert main(["runs", "--checkpoints", str(tmp_path), "--json", "inspect", run_id]) == EXIT_LOCAL_ERROR
+        error = output(capsys)["error"]
+        assert error["type"] == "RunInspectionError"
+        assert f"Checkpoint {run_id!r} is not readable" in error["message"]
+
+
+def test_list_reports_entries_it_cannot_open_and_continues(tmp_path, capsys):
+    """Listing used to stop at the first entry that raised OSError or RecursionError."""
+    run_id = run(tmp_path).execution_id
+    unreadable_entries(tmp_path)
+
+    assert main(["runs", "--checkpoints", str(tmp_path), "--json", "list"]) == EXIT_OK
+    rows = {row["run_id"]: row for row in output(capsys)["list"]["runs"]}
+    assert sorted(rows) == sorted(["deep", "folder", run_id])
+    assert (rows[run_id]["state"], rows[run_id]["error"]) == ("completed", None)
+    for unreadable in ("deep", "folder"):
+        assert rows[unreadable]["state"] is None
+        assert f"Checkpoint {unreadable!r} is not readable" in rows[unreadable]["error"]
+    assert main(["runs", "--checkpoints", str(tmp_path), "list"]) == EXIT_OK
+    text = capsys.readouterr().out
+    assert "Runs: 3 of 3" in text and "folder  unreadable:" in text and "deep  unreadable:" in text
+
+
 def test_unknown_and_invalid_run_ids(tmp_path, capsys):
     run(tmp_path)
     assert main(["runs", "--checkpoints", str(tmp_path), "--json", "inspect", "missing"]) == EXIT_JOB_STATE
@@ -427,6 +461,24 @@ def test_durable_run_in_a_version_1_journal_is_read_without_migrating(tmp_path, 
     assert value["timing"]["clock"] == "wall" and value["timing"]["segments"] >= 1
     assert value["timing"]["phases_ms"] is None
     assert value["next_action"]["action"] == "none"
+
+
+def test_reading_a_wal_journal_leaves_its_database_file_unchanged(tmp_path, capsys):
+    path = tmp_path / "runs.db"
+    with SQLiteWorkflowStore(path) as store:
+        swarm = Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+                      run_store=store, max_budget_usd=1)
+        run_id = swarm.execute(graph()).execution_id
+    with closing(CONNECT(path)) as db:
+        assert db.execute("PRAGMA journal_mode").fetchone() == ("wal",)
+    version = recorded_version(path)
+    before = path.read_bytes()
+
+    assert main(["runs", "--journal", str(path), "--json", "inspect", run_id]) == EXIT_OK
+    assert output(capsys)["inspect"]["execution"]["state"] == "completed"
+    # SQLite may leave its WAL sidecars; the database itself is not written.
+    assert {item.name for item in tmp_path.iterdir()} <= {"runs.db", "runs.db-wal", "runs.db-shm"}
+    assert path.read_bytes() == before and recorded_version(path) == version
 
 
 def test_blocked_durable_runs_name_the_action_they_need(tmp_path, capsys, monkeypatch):

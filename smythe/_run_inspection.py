@@ -321,13 +321,17 @@ def inspect_checkpoint(store: FileCheckpointStore, execution_id: str) -> dict[st
         raise ValueError(f"Invalid execution id {execution_id!r}")
     try:
         state = store.load(execution_id)
-    except ValueError as exc:
+    except (ValueError, RecursionError) as exc:
+        # RecursionError: nesting deeper than the JSON parser accepts.
         raise RunInspectionError(f"Checkpoint {execution_id!r} is not readable JSON") from exc
+    except OSError as exc:
+        # FileNotFoundError is not raised: load() reports a missing file as None.
+        raise RunInspectionError(f"Checkpoint {execution_id!r} is not readable: {exc}") from exc
     if state is None:
         raise RunNotFoundError(f"No checkpoint for run {execution_id!r}")
     try:
         return _checkpoint_view(execution_id, state)
-    except (ValueError, TypeError, KeyError, AttributeError) as exc:
+    except (ValueError, TypeError, KeyError, AttributeError, RecursionError) as exc:
         raise RunInspectionError(f"Checkpoint {execution_id!r} cannot be inspected: {exc}") from exc
 
 
@@ -434,7 +438,7 @@ def inspect_journal(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
         return _journal_view(store, run_id)
     except WorkflowNotFoundError as exc:
         raise RunNotFoundError(f"No durable run {run_id!r} in this journal") from exc
-    except (WorkflowError, ValueError, TypeError, KeyError, AttributeError) as exc:
+    except (WorkflowError, ValueError, TypeError, KeyError, AttributeError, RecursionError) as exc:
         raise RunInspectionError(f"Durable run {run_id!r} cannot be inspected: {exc}") from exc
 
 

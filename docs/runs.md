@@ -19,8 +19,9 @@ smythe runs --journal smythe-runs.db --json inspect 3f9c2d0e8b4a
 compact JSON document, `{"ok": true, "command": "inspect", "inspect": {...}}`,
 with structured errors in the same shape. Options may follow the subcommand.
 `list` takes `--limit` (1-500, default 50) and `--offset`, and lists each
-run's id, execution state, decision and next action; a run it cannot read is
-listed with its error.
+run's id, execution state, decision and next action; a run it cannot read,
+such as a checkpoint entry it cannot open or JSON nested too deeply to parse,
+is listed with its error and the listing continues.
 
 ## Read-only
 
@@ -30,6 +31,12 @@ version 1 journal is [never upgraded](workflow-accounting.md#journal-upgrades)
 and inspection works while a worker holds a run. Checkpoint files are only
 read. Saved output is never printed: withheld output is identified by its
 SHA-256 and size, and the text stays in the store.
+
+`SQLiteWorkflowStore` keeps its journal in SQLite's WAL mode. Reading a WAL
+journal, even read-only, can create its `-wal` and `-shm` sidecar files, and
+they may stay beside the journal afterwards: SQLite uses them to read the
+journal consistently while a worker writes it. The journal's database file,
+its runs and its recorded version do not change.
 
 ## What `inspect` reports
 

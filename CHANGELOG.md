@@ -350,7 +350,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   completed run's output was `rejected` or `needs_review` and 11 when the
   decision is `indeterminate`; an accepted run, or one without a record such
   as a version 4 checkpoint, exits 0. An unknown run exits 6 and an unreadable
-  store or run 7. `SwarmResult.to_dict()` adds the same `execution`,
+  store or run 7; `list` reports each run it cannot read, such as an entry it
+  cannot open or JSON nested too deeply, with its error and continues.
+  `SwarmResult.to_dict()` adds the same `execution`,
   `delivery`, `unknown_exposure` and `next_action` blocks. See
   [Inspect saved runs](docs/runs.md).
 - Gate validators in durable text workflows. `LocalOnly(factory, identity,
