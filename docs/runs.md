@@ -129,7 +129,7 @@ accessor resume uses:
 |---|---|
 | `publication` | The `PublishedArtifact` record: `sequence`, `directory`, `name`, `sha256`, `size_bytes`, `media_type`, the `renderer` description, and the `synthesis` it rendered with that text's `output_sha256` |
 | `path` | Where the published file is |
-| `decision` | The delivery decision that covers it, or null |
+| `decision` | The delivery decision that covers it: the run's current decision, a re-evaluation's after one; or null |
 | `integrity` | `status` and `detail` from rechecking the file's size and SHA-256: `verified`, `missing`, `changed`, `unsafe` or `unreadable` |
 | `delivery_eligibility` | `eligible`, and `reasons` for every unmet condition: `no_decision`, `not_accepted`, `record_mismatch`, `artifact_missing`, `artifact_changed`, `artifact_unsafe`, `artifact_unreadable` |
 

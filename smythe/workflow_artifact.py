@@ -341,11 +341,12 @@ def _current_decision(store: Any, run_id: str) -> DeliveryAcceptance | None:
     """The delivery decision that covers a durable run's delivered output now, or None.
 
     A run without a strict policy, or one that has not completed, has none.
-    A completed run's decision is the record its checkpoint holds, checked as
-    resuming the run checks it: the saved output, task and source
-    generations must be those it binds, and the journal must hold the same
-    decision, applied, which a re-evaluation may have made under another
-    policy. A record that no longer holds gives ``indeterminate`` with the
+    A completed run's decision is the record its checkpoint holds, made under
+    the run's policy or, after a re-evaluation, under the policy that
+    re-evaluation used. It is checked as resuming the run checks it: the
+    saved output, task and source generations must be those it binds, and
+    the journal must hold the same decision, applied. A record that no
+    longer holds gives ``indeterminate`` under the record's policy, with the
     mismatches as its reasons. Only reads are made.
     """
     from smythe.checkpoint import graph_from_dict

@@ -16,9 +16,10 @@ import pytest
 from fakes import Crash, crash_when
 from smythe import (
     AcceptanceDecision, AcceptancePolicy, ClaimPassage, ClaimRecord, ContextSource,
-    DeliveryAcceptance, OfflineProvider, SimpleArchitect, SourceEvidence, SourceEvidenceValidator,
-    SourceRecord, SQLiteWorkflowStore, Swarm, Task,
+    DeliveryAcceptance, MarkdownRenderer, OfflineProvider, SimpleArchitect, SourceEvidence,
+    SourceEvidenceValidator, SourceRecord, SQLiteWorkflowStore, Swarm, Task,
 )
+from smythe.cli import EXIT_OK, main
 from smythe.context import SourceRemovedError, load_context_snapshot, load_context_sources
 from smythe.evidence import (
     SOURCE_TOMBSTONE_OPERATION, load_source_evidence, load_source_tombstones, source_tombstone_key,
@@ -27,6 +28,7 @@ from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.provider import CompletionResult
 from smythe.validation import ValidationOutcome
 from smythe.workflow import current_decision
+from smythe.workflow_artifact import current_artifact
 from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_store import WorkflowStateError
 from test_source_evidence import CLAIM, KEPT, MISLEADING, SOURCES, STRONG, artifact
@@ -214,6 +216,44 @@ def test_a_new_decision_that_holds_the_tombstone_stands(store, replies):
     assert again.accepted
     # The re-evaluation came after the removal, so resuming keeps it.
     assert durable(store).resume(run_id).acceptance == again.acceptance
+
+
+def test_a_published_document_is_delivered_under_a_decision_that_holds_the_tombstone(
+    tmp_path, replies, capsys,
+):
+    replies["Write"] = artifact("# Billing\n\nA 2019 poll favoured annual billing.\n\n", POLL_ONLY)
+    journal = tmp_path / "runs.db"
+    publishing = {"renderer": MarkdownRenderer(), "artifact_dir": tmp_path / "artifacts"}
+    with SQLiteWorkflowStore(journal) as store:
+        result = durable(store, **publishing).execute(single())
+        run_id = result.execution_id
+        assert result.accepted
+        remove(store, run_id, **publishing)
+        assert current_artifact(store, run_id).reasons == ("not_accepted",)
+
+        held = policy(MISLEADING, tombstone_of(STRONG))
+        again = durable(store, **publishing).reevaluate(run_id, acceptance=held)
+        assert again.accepted and again.output == result.output
+        # The accessor, resume and inspection all deliver the document under the new decision.
+        current = current_artifact(store, run_id)
+        assert current.decision == again.acceptance and current.eligible
+        resumed = durable(store, **publishing).resume(run_id)
+        assert resumed.acceptance == again.acceptance and resumed.output == result.output
+    code = main(["runs", "--journal", str(journal), "--json", "inspect", run_id])
+    value = json.loads(capsys.readouterr().out)["inspect"]
+    assert code == EXIT_OK and value["delivery"]["decision"] == "accepted"
+    assert value["decisions"]["current"] == 1
+    assert value["artifact"]["delivery_eligibility"] == {"eligible": True, "reasons": []}
+
+    # A later removal leaves the new decision indeterminate, under the policy that made it.
+    with SQLiteWorkflowStore(journal) as store:
+        remove(store, run_id, MISLEADING, **publishing)
+        current = current_artifact(store, run_id)
+        resumed = durable(store, **publishing).resume(run_id)
+    assert current.decision.decision is AcceptanceDecision.INDETERMINATE
+    assert current.decision == resumed.acceptance
+    assert current.decision.policy_sha256 == again.acceptance.policy_sha256
+    assert current.reasons == ("not_accepted",)
 
 
 def stop_reevaluation(monkeypatch, store, run_id, acceptance) -> str:

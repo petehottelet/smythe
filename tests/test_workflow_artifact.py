@@ -421,6 +421,36 @@ def test_a_damaged_document_is_never_reevaluated_until_it_is_published_again(
     assert current_artifact(store, run_id).eligible
 
 
+def test_a_reevaluated_decision_covers_the_published_document(journal, tmp_path, capsys):
+    with SQLiteWorkflowStore(journal) as store:
+        result = durable(store, tmp_path, acceptance=strict("absent")).execute(graph())
+        run_id, document = result.execution_id, result.rejected_output
+        assert result.acceptance.decision is AcceptanceDecision.REJECTED
+        # Another policy decides the same published bytes again.
+        again = durable(store, tmp_path, acceptance=strict("absent")).reevaluate(
+            run_id, acceptance=strict())
+        assert again.accepted and again.output == document
+
+        # The accessor, resume and inspection all read the new decision.
+        current = current_artifact(store, run_id)
+        assert current.decision == again.acceptance and current.eligible
+        resumed = durable(store, tmp_path, acceptance=strict("absent")).resume(run_id)
+        assert resumed.acceptance == again.acceptance and resumed.output == document
+    code, value = inspect(capsys, journal, run_id)
+    assert code == EXIT_OK and value["delivery"]["decision"] == "accepted"
+    assert value["decisions"]["current"] == 1
+    assert value["artifact"]["delivery_eligibility"] == {"eligible": True, "reasons": []}
+
+    # A missing file is published again under the new decision.
+    damage(current.publication.path, "missing")
+    with SQLiteWorkflowStore(journal) as store:
+        swarm = durable(store, tmp_path, acceptance=strict("absent"))
+        assert swarm.republish(run_id).sequence == 1
+        current = current_artifact(store, run_id)
+        assert current.decision == again.acceptance and current.eligible
+        assert swarm.resume(run_id).acceptance == again.acceptance
+
+
 # ---------------------------------------------------------------------------
 # Interrupted publication
 # ---------------------------------------------------------------------------

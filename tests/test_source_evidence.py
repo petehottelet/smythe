@@ -11,11 +11,12 @@ import pytest
 from fakes import Crash, crash_when
 from smythe import (
     AcceptanceDecision, AcceptancePolicy, ClaimPassage, ClaimRecord, ContextSnapshot,
-    ContextSource, OfflineProvider, SimpleArchitect, SourceEvidence, SourceEvidenceValidator,
-    SourceRecord, SQLiteWorkflowStore, Swarm, Task,
+    ContextSource, MarkdownRenderer, OfflineProvider, SimpleArchitect, SourceEvidence,
+    SourceEvidenceValidator, SourceRecord, SQLiteWorkflowStore, Swarm, Task,
 )
 import smythe.workflow
 from smythe.acceptance import ValidationSubject, check_validator, evaluate_delivery
+from smythe.cli import EXIT_OK, main
 from smythe.context import sources_sha256, text_sha256
 from smythe.evidence import (
     EVIDENCE_BLOCK, SOURCE_EVIDENCE_OPERATION, load_source_evidence, read_source_evidence,
@@ -26,6 +27,7 @@ from smythe.provider import CompletionResult
 from smythe.synthesizer import MERGE_SYSTEM_PROMPT
 from smythe.validation import FindingSeverity, ValidationOutcome
 from smythe.validators import SOURCE_EVIDENCE_CHECKS, SOURCE_EVIDENCE_VALIDATOR_VERSION
+from smythe.workflow_artifact import current_artifact
 
 # A misleading source and a stronger one that contradicts it.
 MISLEADING = ContextSource(
@@ -651,6 +653,34 @@ def test_a_run_given_new_sources_needs_a_validator_for_them(store, replies):
     again = durable(store).reevaluate(run_id, acceptance=policy)
     assert again.acceptance.decision is AcceptanceDecision.REJECTED
     assert "source_version_mismatch" in again.acceptance.reasons[0]
+
+
+def test_a_published_document_reevaluated_for_new_sources_is_delivered(tmp_path, replies, capsys):
+    script, _ = replies
+    script["Write"] = [artifact(KEPT, REVISED_EVIDENCE)]
+    journal = tmp_path / "runs.db"
+    publishing = {"renderer": MarkdownRenderer(), "artifact_dir": tmp_path / "artifacts"}
+    with SQLiteWorkflowStore(journal) as store:
+        run_id = durable(store, **publishing).plan(Task("Write")).run_ref["run_id"]
+        assert durable(store, **publishing).refresh_context(run_id, (MISLEADING, REVISED)) == 1
+        result = durable(store, **publishing).resume(run_id)
+        assert result.acceptance.decision is AcceptanceDecision.INDETERMINATE
+        assert current_artifact(store, run_id).reasons == ("not_accepted",)
+
+        current = SourceEvidenceValidator((MISLEADING, REVISED))
+        again = durable(store, **publishing).reevaluate(
+            run_id, acceptance=AcceptancePolicy(mode="strict", final_validators=[current]))
+        assert again.accepted and again.output == result.rejected_output
+        # The accessor, resume and inspection all deliver the document under the new decision.
+        published = current_artifact(store, run_id)
+        assert published.decision == again.acceptance and published.eligible
+        resumed = durable(store, **publishing).resume(run_id)
+        assert resumed.acceptance == again.acceptance and resumed.output == again.output
+    code = main(["runs", "--journal", str(journal), "--json", "inspect", run_id])
+    value = json.loads(capsys.readouterr().out)["inspect"]
+    assert code == EXIT_OK and value["delivery"]["decision"] == "accepted"
+    assert value["decisions"]["current"] == 1
+    assert value["artifact"]["delivery_eligibility"] == {"eligible": True, "reasons": []}
 
 
 def test_reevaluating_under_a_validator_for_other_sources_is_never_accepted(store, replies):

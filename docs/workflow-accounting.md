@@ -482,7 +482,10 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
 `smythe.workflow_artifact.current_artifact(store, run_id)` is the one accessor
 for a run's current publication: the one with the highest sequence that a
 checkpoint applied, the delivery decision that covers it, and whether it is
-eligible for delivery now. Its `reasons` name every condition that is not met:
+eligible for delivery now. The decision is the run's current one, checked as
+resume checks it, so after a [re-evaluation](verifier.md#re-evaluation) it is
+the re-evaluation's, under the policy that made it. Its `reasons` name every
+condition that is not met:
 `no_decision` (the run has no strict policy or has not completed),
 `not_accepted`, `record_mismatch` (the decision binds other bytes), and
 `artifact_missing`, `artifact_changed`, `artifact_unsafe` (a symbolic link,
