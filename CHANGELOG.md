@@ -779,6 +779,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   It used to hash the file for a finishing receipt and then open it again to
   decode it, so bytes replaced between the two reads could pass against a
   receipt they did not match.
+- A node with `attach_dep_artifacts` reads each dependency image from its
+  path when it calls, and used to send whatever the file held then, so an
+  image replaced after it was recorded, for example while a run was paused,
+  reached the model in place of the bytes the dependency wrote. An image
+  whose bytes no longer match the `sha256` in its record now raises
+  `smythe.executor_base.ArtifactIntegrityError` before the call. Records
+  without a digest, written before digests were recorded, attach as before.
 
 ## [0.9.1] - 2026-09-29
 

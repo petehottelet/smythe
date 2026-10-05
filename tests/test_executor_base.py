@@ -742,3 +742,46 @@ def test_attachment_count_is_capped(tmp_path):
     judge = Node(label="judge", id="j", depends_on=["dep"], attach_dep_artifacts=True)
     graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[dep, judge])
     assert len(base.load_dep_image_artifacts(judge, graph)) == base.MAX_ATTACHED_IMAGES
+
+
+def _graph_with_recorded_image(tmp_path, data=b"\x89PNG-recorded"):
+    """A dependency whose image record carries the digest written with the file."""
+    import hashlib
+
+    image = tmp_path / "cand_00.png"
+    image.write_bytes(data)
+    graph, judge = _graph_with_image_dep(tmp_path, attach=True, image_bytes=data)
+    graph.nodes[0].metadata["artifacts"] = [{
+        "path": str(image), "mime_type": "image/png",
+        "sha256": hashlib.sha256(data).hexdigest(), "size_bytes": len(data),
+    }]
+    return graph, judge, image
+
+
+def test_dependency_image_is_attached_only_with_its_recorded_bytes(tmp_path):
+    from smythe.executor_base import ArtifactIntegrityError
+
+    base = _make_base_with_dir(None)
+    graph, judge, image = _graph_with_recorded_image(tmp_path)
+    assert [item.data for item in base.load_dep_image_artifacts(judge, graph)] == [b"\x89PNG-recorded"]
+    # The file is replaced after its record was written, for example while
+    # the run was paused. The judge must not see bytes the record never bound.
+    image.write_bytes(b"\x89PNG-replaced")
+    with pytest.raises(ArtifactIntegrityError, match="'cand_00.png' of node 'cand' changed"):
+        base.load_dep_image_artifacts(judge, graph)
+    # A record without a digest, as written before digests were recorded,
+    # still attaches what it reads.
+    del graph.nodes[0].metadata["artifacts"][0]["sha256"]
+    assert [item.data for item in base.load_dep_image_artifacts(judge, graph)] == [b"\x89PNG-replaced"]
+
+
+def test_judge_fails_before_calling_on_a_changed_dependency_image(tmp_path):
+    from smythe.executor_base import ArtifactIntegrityError
+
+    graph, judge, image = _graph_with_recorded_image(tmp_path)
+    image.write_bytes(b"\x89PNG-replaced")
+    provider = AttachmentCapturingProvider()
+    with pytest.raises(ArtifactIntegrityError):
+        Executor(provider=provider, registry=Registry(), tracer=Tracer(), artifact_dir=None).run(graph)
+    assert judge.status is NodeStatus.FAILED
+    assert provider.seen_attachments == []

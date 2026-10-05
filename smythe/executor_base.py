@@ -157,6 +157,15 @@ class NodeFinalizationError(PicklableError, RuntimeError):
         super().__init__(f"Node {node_id!r} finalization failed: {cause}")
 
 
+class ArtifactIntegrityError(ValueError):
+    """A dependency's artifact file no longer holds the bytes its record bound.
+
+    Raised before the provider call of a node that attaches its dependencies'
+    images, so it never sends bytes that differ from the ``sha256`` recorded
+    when the file was written.
+    """
+
+
 def _safe_filename_component(raw: str) -> str:
     """Make an arbitrary node id safe as a filename component.
 
@@ -1426,7 +1435,10 @@ class ExecutorBase:
         dependencies generated, not just their paths.  Missing or
         oversized files are skipped (the path listing in the prompt
         still names them); count is capped so a wide fan-in can't blow
-        the context window.
+        the context window.  A file whose bytes no longer match the
+        ``sha256`` its record carries raises ``ArtifactIntegrityError``;
+        a record without one, written before digests were recorded, is
+        attached as read.
         """
         from smythe.provider import Artifact
 
@@ -1445,6 +1457,12 @@ class ExecutorBase:
                     data = Path(record["path"]).read_bytes()
                 except OSError:
                     continue
+                recorded = record.get("sha256")
+                if isinstance(recorded, str) and hashlib.sha256(data).hexdigest() != recorded:
+                    raise ArtifactIntegrityError(
+                        f"Artifact {Path(record['path']).name!r} of node {dep.id!r} changed after "
+                        "it was recorded; its bytes no longer match the recorded sha256"
+                    )
                 if len(data) > self.MAX_ATTACHMENT_BYTES:
                     continue
                 attachments.append(Artifact(data=data, mime_type=mime))
