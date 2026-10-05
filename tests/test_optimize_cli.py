@@ -152,7 +152,7 @@ def test_default_campaign_is_offline_resume_safe_and_fully_evidenced(
 
     first = _run(ledger_path, capsys)
 
-    assert first["campaign_id"].startswith("optimization_v3_")
+    assert first["campaign_id"].startswith("optimization_v4_")
     assert first["optimization_plan_hash"].startswith("sha256:")
     assert first["evaluator_hash"].startswith("sha256:")
     assert first["contract_hash"].startswith("sha256:")
@@ -385,6 +385,65 @@ def test_new_decisions_record_and_report_the_paired_t_rule(tmp_path, capsys):
     html = out.read_text(encoding="utf-8")
     assert html.count("Paired Student-t lower bound") == 6
     assert "Descriptive bootstrap interval (not used for promotion)" in html
+
+
+def test_run_json_reports_the_three_way_verdict_with_unchanged_exit_codes(
+    tmp_path, capsys
+):
+    two_challengers = (*_SMALL_CAMPAIGN[:1], "4,8", *_SMALL_CAMPAIGN[2:])
+    promoted = _run(tmp_path / "verdict.sqlite3", capsys, *two_challengers)
+    assert promoted["campaign_id"].startswith("optimization_v4_")
+    assert (promoted["promoted"], promoted["verdict"]) == (True, "improved")
+    assert "verdict" not in promoted["evidence"]
+    for stage in ("confirmation_assessment", "holdout_assessment"):
+        assert promoted["evidence"][stage]["verdict"] == "improved"
+    assessment = promoted["ledger_snapshot"]["decisions"][0]["assessment"]
+    assert assessment["verdict"] == "improved"
+    assert assessment["runner_version"] == 4
+    assert [
+        score["policy_hash"] for score in assessment["development_scores"]
+    ] == [score["policy_hash"] for score in promoted["evidence"]["development_scores"]]
+    assert len(assessment["development_scores"]) == 2
+
+    # A campaign that stops in development has no paired interval; it still
+    # exits successfully with an inconclusive verdict.
+    stopped = _run(
+        tmp_path / "stopped.sqlite3",
+        capsys,
+        *_SMALL_CAMPAIGN,
+        "--max-p95-latency-ms",
+        "1",
+    )
+    assert stopped["promoted"] is False
+    assert stopped["selected_candidate"] is None
+    assert stopped["verdict"] == "inconclusive"
+
+
+def test_explicit_campaign_id_from_runner_version_3_exits_with_binding_drift(
+    tmp_path, capsys, monkeypatch
+):
+    ledger_path = tmp_path / "upgrade.sqlite3"
+    command = [
+        "optimize",
+        "concurrency",
+        "--ledger",
+        str(ledger_path),
+        "--json",
+        "--campaign-id",
+        "explicit-campaign",
+        *_SMALL_CAMPAIGN,
+    ]
+    with monkeypatch.context() as earlier_release:
+        earlier_release.setattr("smythe.optimize.engine.RUNNER_VERSION", 3)
+        assert main(command) == EXIT_OK
+        legacy = _json_output(capsys)["concurrency"]
+    assert legacy["campaign_id"] == "explicit-campaign"
+
+    assert main(command) == EXIT_OPTIMIZE_STATE
+    error = _json_output(capsys)["error"]
+    assert error["type"] == "OptimizationError"
+    assert "campaign binding drift" in error["message"]
+    assert _campaign_count(ledger_path) == 1
 
 
 def test_changing_campaign_id_cannot_reroll_a_used_holdout(tmp_path, capsys):

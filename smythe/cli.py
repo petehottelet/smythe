@@ -807,6 +807,7 @@ async def _run_optimize_concurrency(args: argparse.Namespace) -> dict[str, Any]:
             "optimization_plan_hash",
             "selected_candidate_id",
             "promoted",
+            "verdict",
         }
     }
     payload: dict[str, Any] = {
@@ -816,6 +817,7 @@ async def _run_optimize_concurrency(args: argparse.Namespace) -> dict[str, Any]:
         "contract_hash": contract.contract_hash,
         "ledger_durability": args.ledger_durability,
         "promoted": result.promoted,
+        "verdict": result.verdict,
         "selected_candidate": selected.to_dict() if selected is not None else None,
         "evidence": evidence,
         "ledger_snapshot": ledger_snapshot,

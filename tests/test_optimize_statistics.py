@@ -18,6 +18,7 @@ from smythe.optimize.statistics import (
     bootstrap_confidence_interval,
     bootstrap_lower_bound,
     compare_metric,
+    improvement_verdict,
     paired_improvements,
     paired_t_confidence_interval,
     paired_t_lower_bound,
@@ -519,3 +520,103 @@ def test_null_false_promotion_rate_is_near_nominal(sample_count):
         promoted += assessment.promote
     rate = promoted / simulations
     assert 0.015 <= rate <= 0.035, rate
+
+
+def _assess_quality(candidate, *, min_improvement, gates=None):
+    count = len(candidate)
+    seeds = tuple(range(1, count + 1))
+    return assess_promotion(
+        (_primary(),),
+        {"quality": (0.0,) * count},
+        {"quality": tuple(candidate)},
+        baseline_seeds=seeds,
+        candidate_seeds=seeds,
+        gates={} if gates is None else gates,
+        min_improvement=min_improvement,
+        confidence=0.95,
+        bootstrap_resamples=10,
+        bootstrap_seed=3,
+    )
+
+
+@pytest.mark.parametrize(
+    ("interval", "minimum", "verdict"),
+    [
+        ((0.5000001, 2.0), 0.5, "improved"),
+        # A lower endpoint exactly at the minimum is not an improvement.
+        ((0.5, 2.0), 0.5, "inconclusive"),
+        ((-1.0, 2.0), 0.5, "inconclusive"),
+        ((0.25, 0.75), 0.5, "inconclusive"),
+        # An upper endpoint at zero does not establish harm.
+        ((-2.0, 0.0), 0.0, "inconclusive"),
+        ((-2.0, -1e-12), 0.0, "worse"),
+        ((-2.0, -1.0), 0.5, "worse"),
+        ((0.0, 0.0), 0.0, "inconclusive"),
+    ],
+)
+def test_improvement_verdict_reads_both_interval_endpoints(interval, minimum, verdict):
+    assert improvement_verdict(interval, minimum) == verdict
+
+
+@pytest.mark.parametrize(
+    ("interval", "minimum", "error"),
+    [
+        ((2.0, 1.0), 0.0, ValueError),
+        ((1.0,), 0.0, ValueError),
+        ((float("nan"), 1.0), 0.0, ValueError),
+        ((0.0, 1.0), -0.5, ValueError),
+        ((0.0, 1.0), True, TypeError),
+    ],
+)
+def test_improvement_verdict_rejects_invalid_inputs(interval, minimum, error):
+    with pytest.raises(error):
+        improvement_verdict(interval, minimum)
+
+
+def test_assessment_verdict_follows_the_primary_interval_not_promotion():
+    improved = _assess_quality((1.0, 2.0, 3.0, 2.0, 2.0), min_improvement=0.5)
+    assert improved.primary.lower_confidence_bound > 0.5
+    assert (improved.verdict, improved.promote) == ("improved", True)
+
+    # A lower bound exactly equal to the minimum stays inconclusive and is not
+    # promoted.
+    at_minimum = _assess_quality((0.5,) * 5, min_improvement=0.5)
+    assert at_minimum.primary.lower_confidence_bound == 0.5
+    assert (at_minimum.verdict, at_minimum.promote) == ("inconclusive", False)
+
+    worse = _assess_quality((-3.0, -2.9, -3.1), min_improvement=0.0)
+    assert worse.primary.confidence_interval[1] < 0
+    assert (worse.verdict, worse.promote) == ("worse", False)
+
+    straddling = _assess_quality((-1.0, 0.5, 2.0), min_improvement=0.0)
+    low, high = straddling.primary.confidence_interval
+    assert low < 0 < high
+    assert straddling.verdict == "inconclusive"
+
+    # A failed gate blocks promotion but does not change what the primary
+    # interval shows.
+    gated = _assess_quality((1.0, 2.0, 3.0, 2.0, 2.0), min_improvement=0.5,
+                            gates={"safe": False})
+    assert (gated.verdict, gated.promote) == ("improved", False)
+
+
+@pytest.mark.parametrize(
+    ("delta", "verdict", "promote"),
+    [(1.0, "improved", True), (0.5, "inconclusive", False), (-1.0, "worse", False)],
+)
+def test_identical_deltas_at_three_pairs_give_a_degenerate_interval_verdict(
+    delta, verdict, promote
+):
+    # Identical paired deltas have zero standard error, so the interval
+    # collapses to their mean even at the three-pair minimum.
+    assessment = _assess_quality((delta,) * 3, min_improvement=0.5)
+    assert assessment.primary.sample_count == 3
+    assert assessment.primary.standard_error == 0.0
+    assert assessment.primary.confidence_interval == (delta, delta)
+    assert (assessment.verdict, assessment.promote) == (verdict, promote)
+
+
+def test_manually_built_assessment_defaults_to_inconclusive():
+    built = _assess_quality((1.0,) * 3, min_improvement=0.5)
+    fields = {name: getattr(built, name) for name in built.__slots__ if name != "verdict"}
+    assert type(built)(**fields).verdict == "inconclusive"

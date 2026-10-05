@@ -52,7 +52,7 @@ from smythe.optimize.statistics import (
 )
 
 
-RUNNER_VERSION = 3
+RUNNER_VERSION = 4
 DEFAULT_BOOTSTRAP_RESAMPLES = 2_000
 _HASH_RE = re.compile(r"sha256:[0-9a-f]{64}")
 _MAX_SIGNED_63 = (1 << 63) - 1
@@ -184,6 +184,17 @@ class OptimizationResult:
         object.__setattr__(self, "development_scores", tuple(scores))
         object.__setattr__(self, "ledger_snapshot", snapshot)
 
+    @property
+    def verdict(self) -> str:
+        """Three-way verdict of the last paired assessment.
+
+        That is the holdout when it ran, otherwise confirmation. A campaign
+        that stopped in development formed no paired interval, so its
+        verdict is ``"inconclusive"``.
+        """
+
+        return _final_verdict(self.confirmation_assessment, self.holdout_assessment)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "campaign_id": self.campaign_id,
@@ -192,6 +203,7 @@ class OptimizationResult:
             "incumbent_candidate_id": self.incumbent_candidate_id,
             "selected_candidate_id": self.selected_candidate_id,
             "promoted": self.promoted,
+            "verdict": self.verdict,
             "reason": self.reason,
             "decision_id": self.decision_id,
             "development_scores": _json_copy(list(self.development_scores)),
@@ -519,8 +531,10 @@ class OptimizationRunner:
                 "ledger_durability": self.ledger.durability,
                 "holdout_seed_commitment": holdout_seed_commitment,
                 "development": selected_score,
+                "development_scores": list(scores),
                 "confirmation": _assessment_dict(confirmation),
                 "holdout": _assessment_dict(holdout),
+                "verdict": _final_verdict(confirmation, holdout),
             },
         )
         decision_id = self.ledger.append_decision(decision, lease=lease)
@@ -607,7 +621,7 @@ class OptimizationRunner:
         }
         plan_hash = sha256_prefixed(plan_payload)
         campaign_id = self.campaign_id or (
-            "optimization_v3_" + plan_hash.removeprefix("sha256:")
+            f"optimization_v{RUNNER_VERSION}_" + plan_hash.removeprefix("sha256:")
         )
         return {
             "incumbent": incumbent,
@@ -1558,7 +1572,16 @@ def _assessment_dict(assessment: PromotionAssessment | None) -> dict[str, Any] |
         ),
         "min_improvement": assessment.min_improvement,
         "reasons": list(assessment.reasons),
+        "verdict": assessment.verdict,
     }
+
+
+def _final_verdict(
+    confirmation: PromotionAssessment | None,
+    holdout: PromotionAssessment | None,
+) -> str:
+    final = holdout if holdout is not None else confirmation
+    return "inconclusive" if final is None else final.verdict
 
 
 __all__ = [

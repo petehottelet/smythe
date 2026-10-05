@@ -200,6 +200,18 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `smythe.synthesizer.deliverable_sources()` names the nodes `DELIVERABLE`
   synthesis returns, and executors take a keyword-only `acceptance`. See
   [strict delivery acceptance](docs/verifier.md#strict-delivery-acceptance).
+- Autotune assessments state a three-way verdict read from both endpoints of
+  the primary paired interval: `improved` when the lower endpoint exceeds
+  `min_improvement`, `worse` when the upper endpoint is below zero, and
+  `inconclusive` otherwise. `PromotionAssessment.verdict`,
+  `OptimizationResult.verdict` and
+  `smythe.optimize.statistics.improvement_verdict()` expose it; decisions
+  record it for each paired stage and the campaign; and
+  `smythe optimize concurrency --json` reports it beside `promoted`, with
+  unchanged exit codes. Promotion is unchanged. HTML reports show each verdict,
+  and decisions recorded earlier show one derived from their saved interval
+  endpoints, labeled as derived. See the
+  [three-way verdict](docs/optimize.md#confirmation-and-holdout-protocol).
 
 ### Changed
 
@@ -298,6 +310,15 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   and needed a duplicate-spend acknowledgment to reroll. Invalid provider
   accounting still makes the call an unknown outcome, and attempts recorded
   earlier are unchanged.
+- The Autotune runner is version 4. A decision made after confirmation keeps
+  every challenger's development score under `development_scores`, not only
+  the selected one, and the HTML report shows them all. The runner version is
+  part of the plan hash, so plan hashes and automatic campaign IDs
+  (`optimization_v4_…`) change: the same command without `--campaign-id`
+  starts a new campaign, and an explicit `--campaign-id` created by an earlier
+  release exits with code 8 (campaign binding drift). Holdout identities
+  exclude the runner version, so a used holdout stays used; contracts, contract
+  hashes and the ledger schema are unchanged.
 
 ### Fixed
 

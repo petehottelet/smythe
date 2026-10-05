@@ -24,7 +24,7 @@ ambiguous after a connection failure.
 |---|---|
 | `smythe.optimize.contracts` | Versioned contracts, objectives, allowlisted candidate patches, canonical JSON, and content-derived identities |
 | `smythe.optimize.concurrency` | Deterministic offline concurrency simulator and evaluator fingerprint |
-| `smythe.optimize.statistics` | Direction-normalized paired comparisons, paired Student-t promotion bounds, descriptive bootstrap intervals, and promotion policy |
+| `smythe.optimize.statistics` | Direction-normalized paired comparisons, paired Student-t promotion bounds, three-way verdicts, descriptive bootstrap intervals, and promotion policy |
 | `smythe.optimize.ledger` | Durable campaign, candidate, trial-event, cost-exposure, and decision history |
 | `smythe.optimize.engine` | Bounded development, confirmation, and holdout orchestration with conservative recovery |
 | `smythe.optimize.inspection` and `smythe.optimize.report` | Read-only evidence collection and standalone HTML reports |
@@ -136,6 +136,26 @@ degrees of freedom, standard error, and critical value. The reported
 `confidence_interval` is the matching two-sided t interval, so its lower
 endpoint is the promotion bound.
 
+Each assessment also records a three-way `verdict` read from both endpoints
+of the primary interval:
+
+| Verdict | Primary interval |
+|---|---|
+| `improved` | Lower endpoint strictly greater than `min_improvement` |
+| `worse` | Upper endpoint strictly below zero |
+| `inconclusive` | Anything else, including an interval that touches either threshold |
+
+The verdict describes the primary evidence only. An `improved` candidate is
+still rejected when a gate, hard bound, or secondary allowance fails, and an
+`inconclusive` verdict claims neither an improvement nor a regression. A
+campaign's verdict is its holdout verdict when the holdout ran and its
+confirmation verdict otherwise; a campaign that stops in development forms no
+paired interval, so its verdict is `inconclusive`. Identical paired
+improvements form a zero-width interval, so even three pairs give a definite
+verdict; that reflects the data, not measured precision.
+`improvement_verdict(interval, min_improvement)` in
+`smythe.optimize.statistics` applies the same rule.
+
 Comparisons also save a seeded percentile bootstrap interval as
 `descriptive_bootstrap_interval`. It is description only and never decides
 promotion: with the small samples Autotune uses, that bootstrap bound admitted
@@ -198,14 +218,21 @@ that fail a gate, hard metric bound, primary mean-improvement threshold, or
 secondary non-regression limit, and deterministically selects the viable
 challenger with the best primary mean. It then evaluates that challenger and
 the incumbent on matching confirmation seeds. Holdout runs only if
-confirmation passes, and promotion requires both assessments to pass.
+confirmation passes, and promotion requires both assessments to pass. Every
+terminal decision this release records keeps each challenger's development
+score, in challenger order, under `development_scores`, beside the selected
+challenger's score under `development`.
 
 Do not repeatedly tune against the holdout set: once it influences a proposal,
 it is no longer held out. The ledger refuses a second holdout for the same
 policy and holdout identity, but it cannot stop a changed evaluation or a
-fresh ledger from drawing another. The current policy also does not correct
-for repeatedly testing many candidates, so the independent one-time holdout is
-an important guard against selection bias.
+fresh ledger from drawing another. There is no multiple-comparison correction
+across development challengers: development compares each challenger's mean
+with the incumbent's without an interval, and only the one selected challenger
+is tested on confirmation and holdout at the contract confidence. Screening
+many challengers therefore favors one that was lucky in development, and the
+independent one-time holdout is an important guard against that selection
+bias.
 
 ## Deterministic offline concurrency campaign
 
@@ -267,11 +294,12 @@ override the default `~/.smythe/optimize.sqlite3`. The CLI defaults to
 host power loss rather than only a process crash.
 
 Output includes the contract, evaluator, optimization-plan, and public holdout
-commitment identities; development and paired statistical evidence; the
-selected candidate (or null when none is development-viable); and a ledger
-snapshot. The secret holdout material is never emitted. `recommended_patch`
-appears only when confirmation and holdout both promote the candidate.
-Rejection never emits a patch to apply.
+commitment identities; the campaign's three-way `verdict` beside `promoted`;
+development and paired statistical evidence; the selected candidate (or null
+when none is development-viable); and a ledger snapshot. A completed campaign
+exits with code 0 whatever its verdict. The secret holdout material is never
+emitted. `recommended_patch` appears only when confirmation and holdout both
+promote the candidate. Rejection never emits a patch to apply.
 
 The optimization plan hash binds the contract, incumbent, ordered challenger
 set, policy hashes, evaluator hash, runner version, promotion method,
@@ -295,6 +323,15 @@ The method is not part of the holdout identity. If the earlier campaign
 reached its holdout, that challenger policy's holdout is already used and the
 new campaign is refused; inspect the earlier campaign's recorded decision
 instead.
+
+The runner version is part of the plan as well. This release uses runner
+version 4, which records the three-way verdict and every development score in
+terminal decisions, so its plan hashes and automatic campaign IDs
+(`optimization_v4_…`) differ from those of earlier releases. The same command
+without `--campaign-id` derives a new campaign; re-running an explicit
+`--campaign-id` created by an earlier release exits with code 8 (campaign
+binding drift). The runner version is not part of the holdout identity either,
+so a holdout an earlier release used stays used.
 
 `smythe optimize` exits with code 8 for campaign state errors (an unknown
 campaign, a plan that conflicts with a saved campaign, a used holdout, work that
@@ -344,11 +381,20 @@ secondary mean-regression rules remain distinct from the primary confidence
 threshold. Metric names are preserved; the contract does not declare physical
 units.
 
+The decision summary and each confirmation and holdout section show the
+three-way verdict. A decision recorded before verdicts were saved shows one
+derived from the saved primary interval endpoints and minimum improvement,
+labeled as derived, or "Not recorded" when either is missing. A recorded verdict
+that is not one of the three values, or that disagrees with its saved interval
+or with the decision's final stage, stops export.
+
 Export does not rerun an evaluator, recompute statistics, rank candidates, or
-change a decision. Campaigns that advanced beyond development retain only the
-selected development score; the report shows that saved evidence. Custom
-assessments without recognized comparisons remain available as text. Malformed
-plot values or inconsistent retained decision evidence stop export.
+change a decision. Every retained development score is shown, and the
+challenger selected for confirmation is marked. Decisions recorded by earlier
+releases kept only the selected score once a campaign advanced beyond
+development; the report says so. Custom assessments without recognized
+comparisons remain available as text. Malformed plot values or inconsistent
+retained decision evidence stop export.
 
 The first 500 trial records appear in detail, with the returned and total counts
 shown explicitly. Whole-campaign balances, counts, policies, and saved decisions
@@ -397,8 +443,9 @@ campaign's monotonic deadline, and must return a `TrialOutcome` containing
 exactly the contract's metrics and gate inventory, signed-63-bit integer
 micro-USD cost, and optional SHA-256 artifact hashes.
 `OptimizationResult` carries the plan identity, development scores,
-confirmation and holdout assessments, decision and trial keys, and ledger
-snapshot.
+confirmation and holdout assessments, the campaign's three-way `verdict`,
+decision and trial keys, and ledger snapshot. Each `PromotionAssessment` has its
+own `verdict`.
 
 <a id="campaign-ownership-unreleased"></a>
 
@@ -583,7 +630,8 @@ The following pieces remain future work:
   current deterministic concurrency grid;
 - CLI adapters for general or provider-backed evaluators with conservative
   per-trial price ceilings;
-- calibrated sample-size guidance and repeated-comparison controls; and
+- calibrated sample-size guidance and a multiple-comparison correction across
+  development challengers; and
 - cross-campaign comparison and human-approval surfaces.
 
 The installed concurrency campaign is intentionally offline. Custom in-process

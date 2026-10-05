@@ -2,7 +2,9 @@
 
 Promotion uses a one-sided paired Student-t lower bound on the mean paired
 improvement.  A seeded percentile bootstrap interval is still recorded, but
-only as descriptive evidence; it never decides promotion.
+only as descriptive evidence; it never decides promotion.  Each assessment
+also states a three-way verdict read from both endpoints of the primary
+interval.
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from smythe.optimize.contracts import MetricObjective, ObjectiveDirection
 MIN_PAIRED_SAMPLES = 3
 MAX_BOOTSTRAP_RESAMPLES = 1_000_000
 PROMOTION_METHOD = "paired_student_t"
+VERDICTS = ("improved", "inconclusive", "worse")
 _MAX_SEED = (1 << 63) - 1
 _DEADLINE_CHECK_INTERVAL = 1_024
 _DEADLINE_DRAW_CHECK_INTERVAL = 4_096
@@ -68,7 +71,12 @@ class ComparisonResult:
 
 @dataclass(frozen=True, slots=True)
 class PromotionAssessment:
-    """Complete, immutable evidence for a promote-or-reject decision."""
+    """Complete, immutable evidence for a promote-or-reject decision.
+
+    ``verdict`` is :func:`improvement_verdict` of the primary interval.  It
+    describes that evidence only; ``promote`` also requires every gate, hard
+    bound, and secondary allowance.
+    """
 
     promote: bool
     primary: ComparisonResult
@@ -79,6 +87,7 @@ class PromotionAssessment:
     secondary_non_regression_passed: bool
     min_improvement: float
     reasons: tuple[str, ...]
+    verdict: str = "inconclusive"
 
     @property
     def comparisons(self) -> tuple[ComparisonResult, ...]:
@@ -721,6 +730,36 @@ def compare_metric(
     )
 
 
+def improvement_verdict(
+    confidence_interval: Sequence[float],
+    min_improvement: float,
+) -> str:
+    """Return the three-way verdict for a direction-normalized interval.
+
+    ``"improved"`` when the lower endpoint is strictly greater than
+    ``min_improvement``; ``"worse"`` when the upper endpoint is strictly below
+    zero; otherwise ``"inconclusive"``.  An interval that straddles either
+    threshold, or touches it, stays inconclusive.
+    """
+
+    if isinstance(confidence_interval, (str, bytes)) or len(confidence_interval) != 2:
+        raise ValueError("confidence_interval must have two endpoints")
+    low, high = (
+        _finite_number(value, name="confidence interval endpoint")
+        for value in confidence_interval
+    )
+    if low > high:
+        raise ValueError("confidence interval endpoints are reversed")
+    minimum = _finite_number(min_improvement, name="min_improvement")
+    if minimum < 0:
+        raise ValueError("min_improvement must be non-negative")
+    if low > minimum:
+        return "improved"
+    if high < 0:
+        return "worse"
+    return "inconclusive"
+
+
 def assess_promotion(
     objectives: Sequence[MetricObjective],
     baseline_metrics: Mapping[str, Sequence[float]],
@@ -831,6 +870,7 @@ def assess_promotion(
         secondary_non_regression_passed=secondary_non_regression_passed,
         min_improvement=minimum,
         reasons=tuple(reasons),
+        verdict=improvement_verdict(primary.confidence_interval, minimum),
     )
 
 
@@ -838,6 +878,7 @@ __all__ = [
     "MAX_BOOTSTRAP_RESAMPLES",
     "MIN_PAIRED_SAMPLES",
     "PROMOTION_METHOD",
+    "VERDICTS",
     "ComparisonResult",
     "PromotionAssessment",
     "aggregate_mean",
@@ -846,6 +887,7 @@ __all__ = [
     "bootstrap_lower_bound",
     "compare_metric",
     "hard_thresholds_pass",
+    "improvement_verdict",
     "paired_improvements",
     "paired_t_confidence_interval",
     "paired_t_lower_bound",
