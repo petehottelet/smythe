@@ -50,6 +50,36 @@ A node timeout follows its failure policy. Invalid accounting, budget
 admission or reconciliation failures, and failures persisting a billed result
 are terminal regardless of that policy. See [Cost guardrails](budgets.md).
 
+## Failure classes
+
+Every exception a node attempt raises has one failure class. The attempt's
+trace span records it as `metadata["failure_class"]` on `Tracer.spans`; the
+keys of `Tracer.summary()` and `SwarmResult.trace` are unchanged, and
+checkpoints do not store it. A class describes a failure and does not change
+what is retried: the exceptions marked terminal stop the run whatever the
+node's failure policy, and that policy decides every other one.
+
+| Class | Exceptions | Terminal |
+|---|---|---|
+| `input_error` | HTTP 404 or 413 `ProviderRequestRejectedError`; any other 4xx status error not listed below; `WorkflowBindingError`, `BudgetEstimateRequired` and `ArtifactIntegrityError` | No |
+| `authority_denied` | HTTP 401 or 403 `ProviderRequestRejectedError` or status error | No |
+| `transient` | HTTP 429 `ProviderRequestRejectedError`; 408, 409, 429, 499 and 5xx status errors; timeouts; any exception this table does not list | No |
+| `provider_rejected` | `ProviderResponseError`: the provider answered and the charge is known, but the response cannot be used. Also `OutputTruncatedError`, `OutputRefusedError` and `ReadToolError` | `ProviderResponseError` only |
+| `quality_defect` | `ToolLoopLimitError` | No |
+| `unknown_outcome` | `ProviderAccountingError`: a native call's charge is unresolved | Yes |
+| `terminal_accounting` | `BudgetValidationError`, `SentinelAlert` and `BudgetReconciliationError` | Yes |
+| `persistence` | `NodeFinalizationError` and `VerificationRecoveryError` | Yes |
+| `workflow` | `WorkflowError` and its subclasses, such as `WorkflowQuoteError` | Yes |
+| `validator_error` | None: the class of a validator outcome `error` | |
+| `security_stop` | None yet: reserved for an explicit security stop | |
+
+A status error is any exception that carries an HTTP status in `status_code`
+or `response.status_code`, as the OpenAI and Anthropic SDK status errors do.
+A durable rejection's read-only `ProviderRequestRejectedError.failure_class`
+gives its class from its status code. A `VerificationRecoveryError` leaves its
+attempt's span open, so no recorded span carries its class. The [support
+matrix](support-matrix.md) lists who calls again after a failure on each path.
+
 ## Concurrency
 
 `Swarm(parallel=False)`, the default, runs one node at a time on every path.

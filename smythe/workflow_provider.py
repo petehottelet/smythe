@@ -15,6 +15,7 @@ import json
 from typing import TYPE_CHECKING
 
 from smythe._errors import PicklableError
+from smythe._failures import PROVIDER_REJECTED, status_failure_class
 from smythe.provider import (
     CompletionResult, OfflineProvider, Provider, ProviderAccountingCancelledError,
     ProviderAccountingError, ProviderResponseError,
@@ -46,6 +47,16 @@ class ProviderRequestRejectedError(PicklableError, RuntimeError):
         self.status_code = status_code
         self.envelope = envelope
         self.receipt = receipt
+
+    @property
+    def failure_class(self) -> str:
+        """The failure class ``status_code`` gives this rejection; read-only.
+
+        ``authority_denied`` for 401 or 403, ``input_error`` for 404 or 413,
+        and ``transient`` for 429, as for any HTTP status error. It describes
+        the rejection; the node's failure policy still decides what follows.
+        """
+        return status_failure_class(self.status_code) or PROVIDER_REJECTED
 
 
 class WorkflowQuoteError(ResponseQuoteError, WorkflowError):

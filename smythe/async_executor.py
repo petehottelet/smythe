@@ -8,7 +8,8 @@ from itertools import islice
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
-from smythe.budget import BudgetValidationError, Sentinel, SentinelAlert, validate_token_count
+from smythe._failures import is_terminal
+from smythe.budget import BudgetValidationError, Sentinel, validate_token_count
 from smythe.executor_base import (
     DEFAULT_MAX_TOOL_ITERATIONS,
     PROMPT_ASSEMBLY_VERSION,
@@ -17,12 +18,11 @@ from smythe.executor_base import (
     validate_max_concurrency,
 )
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
-from smythe.provider import Provider, ProviderResponseError
+from smythe.provider import Provider
 from smythe.registry import Registry
 from smythe.tools import ToolRuntime
 from smythe.tracer import Tracer
 from smythe.verifier import VerificationRecoveryError
-from smythe.workflow_store import WorkflowError
 
 if TYPE_CHECKING:
     from smythe.acceptance import AcceptancePolicy
@@ -336,10 +336,7 @@ class AsyncExecutor(ExecutorBase):
             active, set(intent["affected_generations"]),
         )
         for error in errors:
-            if isinstance(error, (
-                BudgetValidationError, NodeFinalizationError, SentinelAlert,
-                VerificationRecoveryError, ProviderResponseError, WorkflowError,
-            )):
+            if is_terminal(error):
                 # Retain the intent and all accounting: recovery must not hide
                 # an unusable bill or buy a replacement for a failed write.
                 raise error
@@ -394,30 +391,31 @@ class AsyncExecutor(ExecutorBase):
                 return
             except VerificationRecoveryError:
                 raise
-            except (BudgetValidationError, NodeFinalizationError, SentinelAlert,
-                    ProviderResponseError, WorkflowError) as exc:
-                # A reconciliation alert or post-billing persistence failure
-                # is non-retryable here: another provider call would compound
-                # the spend rather than repair the local failure. Invalid
-                # accounting also retains its reservation until reconciled.
-                if isinstance(exc, BudgetValidationError):
-                    self.mark_accounting_invalid(node, exc)
-                node.status = NodeStatus.FAILED
-                node.result = str(exc)
+            except Exception as exc:
+                # ProviderAccountingCancelledError is an Exception as well as a
+                # cancellation: it takes this terminal path, not the one below.
+                if is_terminal(exc):
+                    # A reconciliation alert or post-billing persistence failure
+                    # is non-retryable here: another provider call would compound
+                    # the spend rather than repair the local failure. Invalid
+                    # accounting also retains its reservation until reconciled.
+                    if isinstance(exc, BudgetValidationError):
+                        self.mark_accounting_invalid(node, exc)
+                    node.status = NodeStatus.FAILED
+                    node.result = str(exc)
+                    self._tracer.on_node_error(node, exc)
+                    self._tracer.on_node_end(node)
+                    self.notify_update(node)
+                    raise
+                last_exc = exc
                 self._tracer.on_node_error(node, exc)
-                self._tracer.on_node_end(node)
-                self.notify_update(node)
-                raise
+                self._end_failed_attempt(node)
             except asyncio.CancelledError:
                 self.release_node_budget(node)
                 node.status = NodeStatus.PENDING
                 node.result = None
                 self._tracer.on_node_end(node)
                 raise
-            except Exception as exc:
-                last_exc = exc
-                self._tracer.on_node_error(node, exc)
-                self._end_failed_attempt(node)
 
         self.release_node_budget(node)
 

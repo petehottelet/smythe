@@ -522,6 +522,19 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   operation keyed `source-evidence/<sha256>`, and
   `smythe.evidence.load_source_evidence` reads it back without source text
   unless `include_text=True`. See [source evidence](docs/source-evidence.md).
+- Failure classes. Every exception a node attempt raises has one class:
+  `input_error`, `authority_denied`, `quality_defect`, `provider_rejected`,
+  `transient`, `unknown_outcome`, `terminal_accounting`, `persistence` or
+  `workflow`; `validator_error` and `security_stop` are named, but no
+  exception has them. Each failed attempt's trace span records its class as
+  `metadata["failure_class"]`, which `Tracer.summary()` leaves out and
+  checkpoints do not store. The read-only
+  `ProviderRequestRejectedError.failure_class` is `authority_denied` for HTTP
+  401 or 403, `input_error` for 404 or 413 and `transient` for 429. Both
+  executors decide which failures stop a run, whatever the node's failure
+  policy, through one shared classifier, and they retry, skip and stop on
+  exactly the failures they did before. See
+  [failure classes](docs/execution.md#failure-classes).
 
 ### Changed
 

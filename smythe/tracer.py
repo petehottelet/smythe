@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any
 
+from smythe._failures import classify_failure
 from smythe.graph import Node, NodeStatus
 
 logger = logging.getLogger("smythe.tracer")
@@ -45,7 +46,8 @@ class Span:
     wall-clock adjustment during the attempt cannot distort it. ``attempt``
     is the 0-based attempt index, ``phase`` is ``execution``,
     ``verification`` or ``synthesis``, and ``outcome`` is ``completed``,
-    ``failed``, ``timed_out``, ``skipped`` or ``cancelled``.
+    ``failed``, ``timed_out``, ``skipped`` or ``cancelled``. A failed
+    attempt's ``metadata["failure_class"]`` names how it failed.
     """
 
     node_id: str
@@ -282,10 +284,16 @@ class Tracer:
         logger.info("Delivery acceptance: %s — %s", decision, span.label)
 
     def on_node_error(self, node: Node, exc: Exception) -> None:
+        """Record a failed attempt's error and failure class on its active span.
+
+        The class is in ``span.metadata["failure_class"]``, which
+        ``summary()`` leaves out, so the summary keeps its keys.
+        """
         span = self._active.get(node.id)
         if span:
             span.error = str(exc)
             span.outcome = "timed_out" if isinstance(exc, TimeoutError) else "failed"
+            span.metadata["failure_class"] = classify_failure(exc)
         logger.warning("Node error: %s (%s) — %s", node.id, node.label, exc)
 
     def timing(self) -> dict[str, Any]:

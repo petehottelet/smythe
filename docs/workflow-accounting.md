@@ -148,8 +148,12 @@ generation response qualifies only when all of these hold:
 
 The node raises `ProviderRequestRejectedError`, with the status code and raw
 evidence attached, and its failure policy decides what happens next: `RETRY`
-makes a new journaled call, `SKIP` skips the node, and `HALT` fails it. A
-rejected supervisor review counts as no change, like other supervisor errors.
+makes a new journaled call, `SKIP` skips the node, and `HALT` fails it. Its
+read-only `failure_class` is `authority_denied` for 401 or 403, `input_error`
+for 404 or 413 and `transient` for 429 (see [failure
+classes](execution.md#failure-classes)); it does not change what the failure
+policy does. A rejected supervisor review counts as no change, like other
+supervisor errors.
 Every other unsuccessful response holds unknown exposure, because the provider
 may have processed and billed the request:
 

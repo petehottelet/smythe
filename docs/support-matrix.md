@@ -168,6 +168,12 @@ Who calls again after a failure depends on the path and the provider:
 The last column of the table lists retries an SDK makes inside one call,
 which Smythe neither sees nor records.
 
+Every failed node attempt on ordinary runs and durable text workflows also
+records its [failure class](execution.md#failure-classes) on its trace span.
+Classes describe a failure and do not change who calls again: a durable 401
+or 403 rejection is `authority_denied`, a 404 or 413 `input_error` and a 429
+`transient`, and the node failure policy decides each of them alike.
+
 Tests:
 
 - Durable providers: `tests/test_workflow_runtime.py::test_plan_execute_resume_preserves_task_run_and_local_cost_scope`
@@ -230,6 +236,11 @@ Tests:
 - Durable read steps: `tests/test_workflow_read_tool.py::test_a_failed_read_follows_its_node_failure_policy`,
   `tests/test_workflow_read_tool.py::test_reads_settle_by_their_declared_charge_and_outcome`.
 - Jobs: `tests/test_jobs_runner.py::test_selective_reroll_replaces_only_rejected_operation`.
+- Failure classes: `tests/test_failure_classes.py::test_each_exception_has_one_class_and_the_terminal_flag_it_always_had`,
+  `tests/test_failure_classes.py::test_a_journaled_rejection_derives_its_read_only_class_from_its_status`;
+  unchanged retries and stops in both executors
+  `tests/test_failure_classes.py::test_both_executors_retry_skip_and_stop_on_the_same_failures_as_before`
+  and `tests/test_failure_classes.py::test_regeneration_settlement_stops_on_the_same_failures_as_before`.
 
 ## Durable text workflow components
 
