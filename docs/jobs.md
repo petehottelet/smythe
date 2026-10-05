@@ -555,7 +555,10 @@ provider and records it as `unknown_outcome`, keeping its full per-call
 ceiling as exposure; the run then becomes `needs_attention`. A call whose
 response has arrived settles normally. The deadline counts from the request,
 and the worker checks for it at least once a second; a worker from an earlier
-release ignores it and waits for every call. The request's `pause_requested`
+release ignores it and waits for every call. A check that cannot read the
+database, for example while it is locked, changes nothing: the run continues,
+any deadline the worker has already read still applies, and the next check
+reads again. The request's `pause_requested`
 event and the JSON `stop_request` record it as `drain_deadline_ns`; the Jobs
 schema is unchanged. A later stop can bring the deadline forward but not
 extend it, and resume clears it with the pause. Investigate abandoned calls as

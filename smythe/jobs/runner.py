@@ -9,6 +9,7 @@ import json
 import math
 import os
 import re
+import sqlite3
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -64,6 +65,7 @@ from smythe.jobs.store import (
     RunLease,
     RunLeaseError,
     RunPauseRequested,
+    RunStoreError,
     SQLiteRunStore,
 )
 from smythe.provider import Artifact, CompletionResult
@@ -481,11 +483,16 @@ class JobRunner:
 
         async def watch_drain() -> None:
             # Admission cannot see a pause while every worker awaits a provider,
-            # so poll for a drain deadline until the workers finish.
+            # so poll for a drain deadline until the workers finish. A failed
+            # read, such as of a locked database, keeps any deadline already
+            # read and never stops the run; the next poll reads again.
             loop = asyncio.get_running_loop()
             poll_s = min(_DRAIN_POLL_S, self.lease_heartbeat_s)
             while (await asyncio.wait(workers, timeout=poll_s))[1]:
-                remaining = self.store.drain_time_remaining(run_id)
+                try:
+                    remaining = self.store.drain_time_remaining(run_id)
+                except (sqlite3.Error, RunStoreError):
+                    continue
                 if remaining is not None:
                     drain.tighten(loop.time() + remaining)
 

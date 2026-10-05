@@ -616,9 +616,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `SQLiteRunStore.request_pause()` and `stop_job()` take `drain_timeout_s`
   (0-3600), the earliest deadline of an open request holds until resume
   clears it, and `SQLiteRunStore.drain_time_remaining()` reads it. The
-  `pause_requested` event records it as `drain_deadline_ns`, so the Jobs
-  schema stays at version 4. Without it, a pause waits for every admitted
-  call as before. See [stop and resume](docs/jobs.md#stop-and-resume-safely);
+  worker reads it at least once a second while calls run; a read that fails,
+  for example on a locked database, leaves the run and any deadline already
+  read unchanged. The `pause_requested` event records it as
+  `drain_deadline_ns`, so the Jobs schema stays at version 4. Without it, a
+  pause waits for every admitted call as before. See
+  [stop and resume](docs/jobs.md#stop-and-resume-safely);
   the guide's [current boundaries](docs/jobs.md#current-boundaries) now state
   that Jobs do not read a response's `stop_reason`.
 
