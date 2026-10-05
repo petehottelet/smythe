@@ -52,8 +52,12 @@ digest.
 
 Parameters must be JSON data. NaN, infinity, bytes, tuples, sets, non-string
 keys and cycles raise `ValueError`. `ActionIntent.from_dict()` reads
-`to_dict()` data and raises `ValueError` for an unknown contract version and
-for a missing or unknown key at any level.
+`to_dict()` data and raises `ValueError` for an unknown contract version, for
+a missing or unknown key at any level, and for `parameters` that are not an
+object, `null` included: `to_dict()` always writes an object.
+
+Intents compare equal exactly when their canonical forms match, parameters
+included, and equal intents hash alike.
 
 ## Action keys
 
@@ -142,11 +146,22 @@ version. `verify(assertion, intent_sha256, now_ns)` returns the `Principal`
 digest, or raises `ApprovalRejected`. `still_authorized(principal, intent,
 now_ns)` reports whether that principal may still approve the intent.
 
-`check_connector()` and `check_verifier()` refuse a `Provider`, a class, a
-coroutine function, an awaitable and any async method, and return the
-connector's profile or the verifier's identity. That check is structural, a
-caller contract rather than a sandbox: it cannot detect synchronous host code
-that misbehaves.
+`check_connector()` returns the connector's profile and `check_verifier()`
+the verifier's identity. Both refuse a `Provider`, a class, a coroutine
+function and an awaitable, closing a coroutine first, and check only the
+protocol's methods for async code, counting an object whose `__call__` is
+async as an async method:
+
+- `check_connector()` refuses an async `submit()`, and an async `lookup()` or
+  `read()` wherever one is present. `profile` must be a `ConnectorProfile`,
+  so an async property is refused and its coroutine closed.
+- `check_verifier()` refuses an async `verify()` or `still_authorized()`.
+  `identity` must be a nonempty string of at most 512 characters without
+  control characters, as other names are.
+
+Other methods, such as an async `close()`, are not checked. The check is
+structural, a caller contract rather than a sandbox: it cannot detect
+synchronous host code that misbehaves.
 
 ## Action states
 

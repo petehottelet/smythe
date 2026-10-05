@@ -200,6 +200,9 @@ class ActionIntent:
             "connector_version"}))
         if data["contract_version"] not in _CONTRACT_VERSIONS:
             raise ValueError(f"Unknown action contract version {data['contract_version']!r}")
+        if type(data["parameters"]) is not dict:
+            # to_dict() always writes an object; only the constructor reads None as {}.
+            raise ValueError("action parameters must be a JSON object")
         content = data["content"]
         return cls(
             data["operation"], ActionTarget.from_dict(data["target"]),
@@ -415,13 +418,18 @@ class ApprovalVerifier(Protocol):
     def still_authorized(self, principal: Principal, intent: ActionIntent, now_ns: int) -> bool: ...
 
 
+def _close(value: object) -> None:
+    """Close a refused coroutine, so it is never reported as unawaited."""
+    if inspect.iscoroutine(value):
+        value.close()
+
+
 def _check_host_code(value: object, role: str, methods: dict[str, bool]) -> None:
     """Refuse what cannot be synchronous host code; ``methods`` maps names to whether required."""
     if isinstance(value, Provider):
         raise TypeError(f"a Provider cannot be {role}")
     if inspect.isawaitable(value):
-        if inspect.iscoroutine(value):
-            value.close()
+        _close(value)
         raise TypeError(f"an awaitable ({type(value).__name__}) cannot be {role}")
     if isinstance(value, type):
         raise TypeError(f"{role} must be an instance, not the class {value.__name__}")
@@ -440,12 +448,17 @@ def _check_host_code(value: object, role: str, methods: dict[str, bool]) -> None
 def check_connector(connector: object) -> ConnectorProfile:
     """Check that *connector* is synchronous host code, and return its profile.
 
-    ``lookup()`` is required when the profile declares ``lookup_by_key`` and
-    ``read()`` when it declares ``lookup_by_object``. Raises TypeError.
+    ``profile`` must be a :class:`ConnectorProfile`, so an async property is
+    refused (its coroutine is closed). ``submit()`` must be synchronous, and
+    so must ``lookup()`` and ``read()`` where present; ``lookup()`` is
+    required when the profile declares ``lookup_by_key`` and ``read()`` when
+    it declares ``lookup_by_object``. Other methods are not checked. Raises
+    TypeError.
     """
     _check_host_code(connector, "a connector", {})
     profile = getattr(connector, "profile", None)
     if not isinstance(profile, ConnectorProfile):
+        _close(profile)
         raise TypeError(
             f"connector profile must be a ConnectorProfile, not {type(profile).__name__}"
         )
@@ -456,12 +469,22 @@ def check_connector(connector: object) -> ConnectorProfile:
 
 
 def check_verifier(verifier: object) -> str:
-    """Check that *verifier* is synchronous host code, and return its identity. Raises TypeError."""
+    """Check that *verifier* is synchronous host code, and return its identity.
+
+    ``verify()`` and ``still_authorized()`` must be synchronous; other methods
+    are not checked. ``identity`` must be a string naming the verifier like
+    any other name: nonempty, without control characters and at most 512
+    characters. Raises TypeError.
+    """
     _check_host_code(verifier, "an approval verifier", {"verify": True, "still_authorized": True})
     identity = getattr(verifier, "identity", None)
     if type(identity) is not str or not identity.strip():
+        _close(identity)
         raise TypeError("approval verifier identity must be a non-empty string")
-    return identity
+    try:
+        return _text(identity, "approval verifier identity")
+    except ValueError as exc:
+        raise TypeError(str(exc)) from exc
 
 
 __all__ = [

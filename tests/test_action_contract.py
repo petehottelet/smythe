@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import gc
 import hashlib
 import inspect
 import json
@@ -10,6 +11,7 @@ import math
 import pickle
 import subprocess
 import typing
+import warnings
 
 import pytest
 
@@ -172,6 +174,16 @@ def test_intent_copies_its_parameters():
         "content-media-type", "no-content", "connector", "connector-version"])
 def test_changing_any_intent_field_changes_the_digest(changes):
     assert _intent(**changes).digest() != _intent().digest()
+    assert _intent(**changes) != _intent()
+
+
+def test_intents_that_differ_only_in_parameters_are_unequal_and_hash_differently():
+    first = _intent(parameters={"title": "Launch notes"})
+    second = _intent(parameters={"title": "Launch notes!"})
+
+    assert first != second and first.digest() != second.digest()
+    assert hash(first) != hash(second)
+    assert len({first, second, _intent(parameters={"title": "Launch notes"})}) == 2
 
 
 def test_object_ids_name_different_intents():
@@ -229,6 +241,8 @@ def _without(data, key):
     (lambda data: {**data, "target": {**data["target"], "region": "eu"}}, "unknown keys"),
     (lambda data: {**data, "content": {**data["content"], "encoding": "gzip"}}, "unknown keys"),
     (lambda data: {**data, "parameters": [1]}, "JSON object"),
+    # to_dict() always writes an object, so null is not its form.
+    (lambda data: {**data, "parameters": None}, "JSON object"),
     (lambda data: ["not", "an", "object"], "JSON object"),
 ])
 def test_intent_from_dict_rejects_unknown_versions_and_keys(edit, match):
@@ -574,6 +588,36 @@ def test_connector_check_closes_a_rejected_coroutine():
     assert coroutine.cr_frame is None  # closed, so it never warns as unawaited
 
 
+class _AsyncProfile(_Connector):
+    @property
+    async def profile(self):
+        return PROFILE
+
+
+def test_connector_check_closes_the_coroutine_an_async_profile_returns(monkeypatch):
+    """The refused coroutine used to be dropped unawaited, which warns."""
+    returned = []
+
+    class Recorded(_Connector):
+        @property
+        def profile(self):
+            returned.append(_async_function())
+            return returned[-1]
+
+    with pytest.raises(TypeError, match="ConnectorProfile, not coroutine"):
+        check_connector(Recorded())
+    assert returned[0].cr_frame is None
+
+
+def test_an_async_profile_property_does_not_warn_as_never_awaited():
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        with pytest.raises(TypeError, match="ConnectorProfile"):
+            check_connector(_AsyncProfile())
+        gc.collect()
+    assert not [warning for warning in caught if "never awaited" in str(warning.message)]
+
+
 class _Verifier:
     identity = "example-hmac/1"
 
@@ -632,6 +676,28 @@ def test_verifier_check_closes_a_rejected_coroutine_and_returns_the_identity():
         check_verifier(coroutine)
     assert coroutine.cr_frame is None
     assert check_verifier(_Verifier()) == "example-hmac/1"
+
+
+@pytest.mark.parametrize("identity", ["example-hmac/1\n", "example\x00hmac", "\tx", "x" * 513],
+                         ids=["newline", "nul", "tab", "too-long"])
+def test_verifier_identity_is_refused_like_other_names(identity):
+    """An identity with control characters used to pass, unlike every other name."""
+    with pytest.raises(TypeError, match="identity"):
+        check_verifier(type("_Odd", (_Verifier,), {"identity": identity})())
+
+
+def test_verifier_check_closes_the_coroutine_an_async_identity_returns():
+    returned = []
+
+    class Recorded(_Verifier):
+        @property
+        def identity(self):
+            returned.append(_async_function())
+            return returned[-1]
+
+    with pytest.raises(TypeError, match="identity"):
+        check_verifier(Recorded())
+    assert returned[0].cr_frame is None
 
 
 # ---------------------------------------------------------------------------

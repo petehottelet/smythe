@@ -241,7 +241,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `WriteConnector` and `ApprovalVerifier` are synchronous host protocols with
   `ConnectorReceipt`, `ObservedObject`, `Principal`, `ConnectorRefused`,
   `ConnectorAmbiguous` and `ApprovalRejected`; `check_connector()` and
-  `check_verifier()` refuse providers, awaitables and async methods. Nothing
+  `check_verifier()` refuse providers, classes, coroutine functions and
+  awaitables, and async protocol methods: `submit()`, `lookup()` and `read()`
+  on a connector, whose `profile` must be a `ConnectorProfile`, and `verify()`
+  and `still_authorized()` on a verifier, whose `identity` must be a name
+  without control characters. Other methods are not checked. Nothing
   stores or dispatches actions yet. See [external actions](docs/actions.md).
 - Jobs operations have a semantic input digest.
   `smythe.jobs.operation_input_digest()` hashes the provider kind and its
