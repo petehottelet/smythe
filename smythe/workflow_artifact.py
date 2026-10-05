@@ -35,7 +35,7 @@ from smythe._publish import (
     MAX_ARTIFACT_BYTES, _regular_path, atomic_publish_bytes, claim_artifact_root,
 )
 from smythe.acceptance import (
-    AcceptanceDecision, DeliveryAcceptance, _file_sha256, task_sha256, text_sha256,
+    DeliveryAcceptance, _file_sha256, task_sha256, text_sha256,
 )
 from smythe.task import Task
 from smythe.validation import _require_keys, _require_sha256
@@ -344,13 +344,14 @@ def _current_decision(store: Any, run_id: str) -> DeliveryAcceptance | None:
     A completed run's decision is the record its checkpoint holds, checked as
     resuming the run checks it: the saved output, task and source
     generations must be those it binds, and the journal must hold the same
-    decision, applied. A record that no longer holds gives ``indeterminate``
-    with the mismatches as its reasons. Only reads are made.
+    decision, applied, which a re-evaluation may have made under another
+    policy. A record that no longer holds gives ``indeterminate`` with the
+    mismatches as its reasons. Only reads are made.
     """
     from smythe.checkpoint import graph_from_dict
     from smythe.task import task_from_dict
     from smythe.validation import _json_sha256
-    from smythe.workflow import _decision_problems, _saved_record
+    from smythe.workflow import _decision_problems, _held_record, _read_saved_record
 
     run = store.load_run(run_id)
     policy = run["config"].get("acceptance")
@@ -359,20 +360,13 @@ def _current_decision(store: Any, run_id: str) -> DeliveryAcceptance | None:
         return None
     state, task = saved["checkpoint"], task_from_dict(run["task"])
     policy_sha256 = _json_sha256(policy, "acceptance policy")
-    record = _saved_record(state, policy_sha256, task_sha256(task))
+    record = _read_saved_record(store, run_id, state, policy_sha256, task_sha256(task))
     output = state.get("output")
     if not isinstance(output, str):
         raise WorkflowStateError("Completed workflow output is not text")
     problems = _decision_problems(store, run_id, graph_from_dict(state["graph"]), output, record,
                                   task=task, policy_sha256=policy_sha256)
-    if not problems:
-        return record
-    return DeliveryAcceptance(
-        decision=AcceptanceDecision.INDETERMINATE, policy_sha256=policy_sha256,
-        output_sha256=text_sha256(output), strategy=record.strategy, sources=record.sources,
-        used_fallback=record.used_fallback, task_sha256=record.task_sha256,
-        reasons=tuple(problems),
-    )
+    return _held_record(record, output, problems, record.task_sha256)
 
 
 @dataclass(frozen=True, slots=True)

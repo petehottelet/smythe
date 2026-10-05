@@ -763,7 +763,9 @@ policy, and records the decision in its journal:
   the run's current decision, and `decision_history(store, run_id)` every
   decision a checkpoint applied, by sequence; resume, re-evaluation and
   `smythe runs inspect` read the decision there. Resuming under a changed
-  policy is still refused with `WorkflowConflictError`.
+  policy is still refused with `WorkflowConflictError`. A run with a renderer
+  is re-evaluated only while its published document is intact; when the
+  file is missing or changed, `republish()` publishes it again first.
 - **Synthesis keys.** Such a run journals its synthesis under `synthesis`
   while every node is at generation 0, and otherwise under
   `synthesis/<digest>`, the first 16 hex digits of the SHA-256 of every node

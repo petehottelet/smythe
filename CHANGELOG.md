@@ -591,7 +591,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `artifact` block, exits with code 11 and names the next action
   `republish`. `Swarm.republish()` publishes the saved document again under
   a free name, which becomes current, with no provider call and the same
-  decision. See [published documents](docs/workflow-accounting.md#published-documents).
+  decision; re-evaluation needs an intact document, so it is refused until
+  then. See [published documents](docs/workflow-accounting.md#published-documents).
 - An opt-in `RetryPolicy` makes the executor the only retry owner of an
   ordinary run's node calls; `Swarm(retry_policy=...)` and both executors
   take one. A `RETRY` node then calls again only after a failure whose class

@@ -362,6 +362,66 @@ def test_republish_needs_a_completed_run_with_a_renderer(store, tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Re-evaluation
+# ---------------------------------------------------------------------------
+
+
+def test_a_reevaluated_document_keeps_its_decision_on_resume_inspect_and_republish(
+    journal, tmp_path, capsys,
+):
+    with SQLiteWorkflowStore(journal) as store:
+        original = durable(store, tmp_path, acceptance=strict("absent")).execute(graph())
+        run_id, document = original.execution_id, original.rejected_output
+        assert original.acceptance.decision is AcceptanceDecision.REJECTED
+
+        # The document's heading names the brief, so this policy accepts it.
+        reevaluated = durable(store, tmp_path).reevaluate(run_id, acceptance=strict("brief"))
+        assert reevaluated.accepted and reevaluated.output == document
+
+        current = current_artifact(store, run_id)
+        assert current.decision == reevaluated.acceptance and current.eligible
+        # Under the policy its recipe records, the run returns its current decision.
+        resumed = durable(store, tmp_path, acceptance=strict("absent")).resume(run_id)
+        assert resumed.acceptance == reevaluated.acceptance and resumed.output == document
+
+    code, value = inspect(capsys, journal, run_id)
+    assert code == EXIT_OK
+    assert value["delivery"]["decision"] == "accepted"
+    assert value["artifact"]["delivery_eligibility"] == {"eligible": True, "reasons": []}
+
+    damage(current.publication.path, "missing")
+    with SQLiteWorkflowStore(journal) as store:
+        record = durable(store, tmp_path, acceptance=strict("absent")).republish(run_id)
+        assert record.sequence == current.publication.sequence + 1
+        current = current_artifact(store, run_id)
+        assert current.decision == reevaluated.acceptance and current.eligible
+
+
+@pytest.mark.parametrize("how", ["changed", "missing"])
+def test_a_damaged_document_is_never_reevaluated_until_it_is_published_again(
+    store, tmp_path, how,
+):
+    swarm = durable(store, tmp_path, acceptance=strict())
+    result = swarm.execute(graph())
+    run_id, document = result.execution_id, result.output
+    damage(run_directory(tmp_path, run_id) / "document.md", how)
+    before, revision = operations(store, run_id), store.load_run(run_id)["revision"]
+    Mentions.checked = []
+
+    with pytest.raises(WorkflowStateError, match="cannot be re-evaluated.*republish"):
+        swarm.reevaluate(run_id)
+    # Nothing was validated or written.
+    assert Mentions.checked == []
+    assert operations(store, run_id) == before
+    assert store.load_run(run_id)["revision"] == revision
+
+    swarm.republish(run_id)
+    reevaluated = swarm.reevaluate(run_id)
+    assert reevaluated.accepted and reevaluated.output == document
+    assert current_artifact(store, run_id).eligible
+
+
+# ---------------------------------------------------------------------------
 # Interrupted publication
 # ---------------------------------------------------------------------------
 

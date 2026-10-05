@@ -379,15 +379,14 @@ def _journal_acceptance(
     decision, and for a run with a renderer against its current published
     *artifact*. The history lists every decision the journal applied.
     """
-    from smythe.workflow import _decision_problems, _saved_record, decision_history
+    from smythe.workflow import _decision_problems, _read_saved_record, decision_history
 
     if checkpoint["version"] == 1:
         return None, [], decisions_view(None)
     task = task_from_dict(run["task"])
     history = (decision_history(store, run["run_id"])
                if policy_sha256 is not None and checkpoint.get("status") == "completed" else [])
-    record = _saved_record(checkpoint, policy_sha256, task_sha256(task),
-                           {item["record"].policy_sha256 for item in history if item["sequence"]})
+    record = _read_saved_record(store, run["run_id"], checkpoint, policy_sha256, task_sha256(task))
     decisions = decisions_view(history[-1]["sequence"] if history else None,
                                [(item["sequence"], item["record"]) for item in history[:-1]])
     if record is None or record.decision is AcceptanceDecision.NOT_EVALUATED:

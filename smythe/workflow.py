@@ -356,6 +356,29 @@ def _reevaluation_policies(store, run_id):
             if decision["sequence"]}
 
 
+def _read_saved_record(store, run_id, state, policy_sha256, task_digest):
+    """A checkpoint's record (see :func:`_saved_record`), as every reader of a run reads it.
+
+    A completed run's decision may be one that a re-evaluation made under
+    its own policy, so resume, re-evaluation, republication, the current
+    artifact and ``smythe runs inspect`` all accept those policies here.
+    """
+    reevaluated = (_reevaluation_policies(store, run_id)
+                   if policy_sha256 is not None and state.get("status") == "completed" else ())
+    return _saved_record(state, policy_sha256, task_digest, reevaluated)
+
+
+def _held_record(record, output, problems, task_digest):
+    """*record* when there are no *problems*, else ``indeterminate`` for *output* with them."""
+    if not problems:
+        return record
+    return DeliveryAcceptance(
+        decision=AcceptanceDecision.INDETERMINATE, policy_sha256=record.policy_sha256,
+        output_sha256=text_sha256(output), strategy=record.strategy, sources=record.sources,
+        used_fallback=record.used_fallback, task_sha256=task_digest, reasons=tuple(problems),
+    )
+
+
 def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha256):
     """What no longer matches a completed run's decided *record*, one reason each.
 
@@ -1326,9 +1349,8 @@ class WorkflowRuntime:
         """
         if self.run_policy_sha256 is None:
             return _saved_record(state, None, None)
-        reevaluated = (_reevaluation_policies(self.store, self.run_id)
-                       if state.get("status") == "completed" else ())
-        return _saved_record(state, self.run_policy_sha256, self.undecided.task_sha256, reevaluated)
+        return _read_saved_record(self.store, self.run_id, state, self.run_policy_sha256,
+                                  self.undecided.task_sha256)
 
     async def resume(self, run_id, *, max_concurrency):
         async with self._session(self.store.load_run(run_id)):
@@ -1421,7 +1443,9 @@ class WorkflowRuntime:
         ``WorkflowStateError`` for a run whose recipe has no strict policy, an
         unfinished run, unresolved accounting, or a saved output, task, source
         generation or record that no longer matches the journal, so changed
-        output is never accepted; and ``WorkflowConflictError`` for a recipe
+        output is never accepted, and for a run with a renderer whose published
+        document is missing or changed (:meth:`republish` publishes it again
+        first); and ``WorkflowConflictError`` for a recipe
         that differs in anything else.
         """
         from smythe.swarm import _delivery_sources
@@ -1454,6 +1478,14 @@ class WorkflowRuntime:
                 problems.append("the saved graph no longer delivers the sources its record bound")
             if problems:
                 raise WorkflowStateError("Workflow cannot be re-evaluated: " + "; ".join(problems))
+            if self.renderer is not None:
+                # A decision covers the document only while its published file holds it.
+                damaged = artifact_problems(current_artifact(self.store, self.run_id), output)
+                if damaged:
+                    raise WorkflowStateError(
+                        "Workflow cannot be re-evaluated: " + "; ".join(damaged)
+                        + "; publish its document again with republish() first"
+                    )
             decided = await self._decide(self._synthesis_key(), output, reevaluation=True)
             self.execution_concurrency = state.get("max_concurrency")
             self._save("completed", output=output, acceptance=decided)
@@ -1798,14 +1830,7 @@ class WorkflowRuntime:
 
     def _held(self, record, output, problems):
         """*record* when nothing is wrong, else ``indeterminate`` for *output* with *problems*."""
-        if not problems:
-            return record
-        return DeliveryAcceptance(
-            decision=AcceptanceDecision.INDETERMINATE, policy_sha256=record.policy_sha256,
-            output_sha256=text_sha256(output), strategy=record.strategy, sources=record.sources,
-            used_fallback=record.used_fallback, task_sha256=self.undecided.task_sha256,
-            reasons=tuple(problems),
-        )
+        return _held_record(record, output, problems, self.undecided.task_sha256)
 
     def _supervision_update(self, node, applied):
         disposition = node.metadata.get("workflow_supervision")
