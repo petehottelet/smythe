@@ -124,6 +124,15 @@ class _Drain:
                     wait.reschedule(when)
 
 
+def _drain_bound(drain: _Drain) -> asyncio.Timeout:
+    """A timeout for one provider wait that expires at the drain deadline.
+
+    ``drain.when`` is an event-loop time, so a wait that starts after the
+    deadline is set must take it as an absolute time, not a delay.
+    """
+    return asyncio.timeout_at(drain.when)
+
+
 class JobRunner:
     """Execute only planned calls, with a durable boundary before dispatch.
 
@@ -577,7 +586,7 @@ class JobRunner:
         try:
             # A pause's drain deadline bounds only the wait for the provider;
             # a response that has arrived settles normally.
-            async with asyncio.timeout(drain.when) as bound:
+            async with _drain_bound(drain) as bound:
                 drain.waits.add(bound)
                 try:
                     result = await asyncio.wait_for(

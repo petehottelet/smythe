@@ -466,3 +466,29 @@ def test_v3_reader_capability_follows_upgrade_and_live_v3_lease_blocks_it(tmp_pa
             assert upgraded.get_control("run")["pause_generation"] == 0
             assert reader.snapshot("run")["version"] == 4
             assert reader.inspection_snapshot("run")["control"]["pause_supported"]
+
+
+def test_a_call_that_starts_after_a_drain_deadline_is_set_is_still_bounded():
+    from smythe.jobs.runner import _Drain, _drain_bound
+
+    async def scenario():
+        loop = asyncio.get_running_loop()
+        drain = _Drain(when=loop.time() + 0.05)
+        started = loop.time()
+        with pytest.raises(TimeoutError):
+            async with _drain_bound(drain):
+                await asyncio.wait_for(asyncio.sleep(5), 2)
+        assert loop.time() - started < 1
+
+    asyncio.run(scenario())
+
+
+def test_a_drain_bound_without_a_deadline_never_expires_on_its_own():
+    from smythe.jobs.runner import _Drain, _drain_bound
+
+    async def scenario():
+        async with _drain_bound(_Drain()) as bound:
+            await asyncio.sleep(0)
+        assert not bound.expired()
+
+    asyncio.run(scenario())
