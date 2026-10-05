@@ -379,6 +379,14 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   unread. Recipes and checkpoints without a strict policy or gate validator
   are unchanged, including `"verifier": "token-v1"`. See
   [strict acceptance in durable workflows](docs/verifier.md#strict-acceptance-in-durable-workflows).
+- `smythe.optimize.EvaluatorManifest` derives an Autotune `evaluator_hash`
+  from the evaluator's code digest, the task-pack manifest digest of each
+  split, validator identities, judge configuration and price snapshot
+  version. Key and validator order do not change the hash and empty fields
+  are left out. Because the holdout identity includes the evaluator hash, a
+  changed held-out task pack or validator defines a new holdout. Runners still
+  accept a raw evaluator hash. See
+  [evaluator manifests](docs/optimize.md#evaluator-manifests).
 
 ### Changed
 

@@ -13,6 +13,7 @@ import pytest
 
 from smythe.optimize.contracts import (
     Candidate,
+    EvaluatorManifest,
     ExperimentContract,
     MetricObjective,
     MutableFieldRule,
@@ -944,3 +945,55 @@ async def test_campaign_from_runner_version_3_is_refused_as_binding_drift(
         assert len(calls) == evaluated
         assert ledger.holdout_uses(identity) == {challenger.policy_hash: ("explicit",)}
         assert ledger.snapshot("explicit")["decision_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_changed_task_pack_in_the_evaluator_manifest_draws_a_new_holdout(tmp_path):
+    contract = _contract()
+    incumbent, challenger = _candidates(contract)
+    packs = {
+        "development": "sha256:" + "1" * 64,
+        "confirmation": "sha256:" + "2" * 64,
+        "holdout": "sha256:" + "3" * 64,
+    }
+    manifest = EvaluatorManifest(code_digest=EVALUATOR_HASH, split_manifests=packs)
+    respelled = EvaluatorManifest(
+        code_digest=EVALUATOR_HASH, split_manifests=dict(reversed(packs.items()))
+    )
+    new_pack = EvaluatorManifest(
+        code_digest=EVALUATOR_HASH,
+        split_manifests={**packs, "holdout": "sha256:" + "4" * 64},
+    )
+
+    def runner(ledger: ExperimentLedger, evaluator_hash: str) -> OptimizationRunner:
+        return OptimizationRunner(
+            contract,
+            ledger,
+            _challengers_win,
+            evaluator_hash=evaluator_hash,
+            bootstrap_resamples=100,
+        )
+
+    identity = holdout_identity(contract, manifest.evaluator_hash)
+    with ExperimentLedger(tmp_path / "manifest.sqlite3", durability="normal") as ledger:
+        first = await runner(ledger, manifest.evaluator_hash).run(incumbent, (challenger,))
+        assert first.holdout_assessment is not None
+        assert {
+            trial.evaluator_hash for trial in ledger.list_trials(first.campaign_id)
+        } == {manifest.evaluator_hash}
+
+        # The same manifest spelled in another key order is the same evaluator.
+        assert respelled.evaluator_hash == manifest.evaluator_hash
+        replay = await runner(ledger, respelled.evaluator_hash).run(incumbent, (challenger,))
+        assert replay.decision_id == first.decision_id
+
+        # A changed holdout task pack is a different evaluation.
+        new_identity = holdout_identity(contract, new_pack.evaluator_hash)
+        assert new_identity != identity
+        second = await runner(ledger, new_pack.evaluator_hash).run(incumbent, (challenger,))
+        assert second.campaign_id != first.campaign_id
+        assert second.holdout_assessment is not None
+        assert ledger.holdout_uses(identity) == {challenger.policy_hash: (first.campaign_id,)}
+        assert ledger.holdout_uses(new_identity) == {
+            challenger.policy_hash: (second.campaign_id,)
+        }

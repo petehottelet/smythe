@@ -22,7 +22,7 @@ ambiguous after a connection failure.
 
 | Module | Responsibility |
 |---|---|
-| `smythe.optimize.contracts` | Versioned contracts, objectives, allowlisted candidate patches, canonical JSON, and content-derived identities |
+| `smythe.optimize.contracts` | Versioned contracts, objectives, allowlisted candidate patches, evaluator manifests, canonical JSON, and content-derived identities |
 | `smythe.optimize.concurrency` | Deterministic offline concurrency simulator and evaluator fingerprint |
 | `smythe.optimize.statistics` | Direction-normalized paired comparisons, paired Student-t promotion bounds, three-way verdicts, descriptive bootstrap intervals, and promotion policy |
 | `smythe.optimize.ledger` | Durable campaign, candidate, trial-event, cost-exposure, and decision history |
@@ -446,6 +446,51 @@ micro-USD cost, and optional SHA-256 artifact hashes.
 confirmation and holdout assessments, the campaign's three-way `verdict`,
 decision and trial keys, and ledger snapshot. Each `PromotionAssessment` has its
 own `verdict`.
+
+### Evaluator manifests
+
+`evaluator_hash` must change whenever what the evaluator measures changes.
+`EvaluatorManifest` builds it from the parts that define an evaluation:
+
+```python
+from smythe.optimize import EvaluatorManifest
+from smythe.validation import ValidatorIdentity
+
+manifest = EvaluatorManifest(
+    code_digest="sha256:<evaluator code>",
+    split_manifests={
+        "development": "sha256:<development task-pack manifest>",
+        "confirmation": "sha256:<confirmation task-pack manifest>",
+        "holdout": "sha256:<holdout task-pack manifest>",
+    },
+    validators=(ValidatorIdentity.for_config("required-sections", "1", {"min": 3}),),
+    judge={"model": "judge-model", "rubric_version": "2"},
+    price_snapshot_version="2026-10-01",
+)
+runner = OptimizationRunner(
+    contract, ledger, evaluate, evaluator_hash=manifest.evaluator_hash
+)
+```
+
+`code_digest` identifies the evaluator code. `split_manifests` binds the task
+pack each split draws from, so development and held-out tasks are separate,
+named task families rather than repeated runs of one prompt. `validators`
+lists acceptance validator identities (name, version and configuration
+digest), `judge` is any judge's JSON configuration, and
+`price_snapshot_version` names the prices used for cost. Every digest uses
+the `sha256:<64 lowercase hex>` form; a task pack whose manifest records a
+plain hex SHA-256 is written with the `sha256:` prefix.
+
+`evaluator_hash` is the `sha256:` digest of the manifest's canonical JSON
+(`to_dict()`). Object key order and validator order do not change it, and
+empty fields are left out, so a manifest that leaves the judge unset hashes
+the same as one with an empty judge. Changing any part changes the hash. The
+holdout identity includes the evaluator hash, so a changed holdout task pack,
+validator, judge, or price snapshot defines a new holdout evaluation.
+`EvaluatorManifest.from_dict()` reads the JSON form back and refuses unknown
+fields. Runners still accept any raw `sha256:` evaluator hash; the manifest is
+a convenience for computing one. Keep a held-out pack's tasks away from
+whoever proposes candidates: the manifest records only its digest.
 
 <a id="campaign-ownership-unreleased"></a>
 

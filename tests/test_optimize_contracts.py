@@ -10,6 +10,7 @@ import pytest
 from smythe.optimize import (
     Candidate,
     ContractValidationError,
+    EvaluatorManifest,
     ExperimentContract,
     MetricObjective,
     MutableFieldRule,
@@ -18,6 +19,7 @@ from smythe.optimize import (
     canonical_json_bytes,
     sha256_prefixed,
 )
+from smythe.validation import ValidatorIdentity
 
 
 def _objectives():
@@ -483,6 +485,163 @@ def test_package_exports_the_programmatic_campaign_surface():
 
     assert optimize.ExperimentContract is ExperimentContract
     assert optimize.Candidate is Candidate
+    assert optimize.EvaluatorManifest is EvaluatorManifest
+    assert "EvaluatorManifest" in optimize.__all__
     assert callable(optimize.OptimizationRunner)
     assert callable(optimize.ExperimentLedger)
     assert callable(optimize.simulate_concurrency)
+
+
+CODE_DIGEST = "sha256:" + "c" * 64
+TASK_PACKS = {
+    "development": "sha256:" + "1" * 64,
+    "confirmation": "sha256:" + "2" * 64,
+    "holdout": "sha256:" + "3" * 64,
+}
+
+
+def _manifest(**overrides):
+    values = {
+        "code_digest": CODE_DIGEST,
+        "split_manifests": dict(TASK_PACKS),
+        "validators": (
+            ValidatorIdentity.for_config("required-sections", "1", {"sections": ["Summary"]}),
+            ValidatorIdentity.for_config("citations", "2"),
+        ),
+        "judge": {"model": "judge-model", "rubric": {"scale": 5, "anchors": ["poor", "good"]}},
+        "price_snapshot_version": "2026-10-01",
+    }
+    values.update(overrides)
+    return EvaluatorManifest(**values)
+
+
+def test_evaluator_manifest_hash_is_stable_across_key_and_validator_order():
+    manifest = _manifest()
+    reordered = _manifest(
+        split_manifests=dict(reversed(TASK_PACKS.items())),
+        validators=tuple(
+            item.to_dict() for item in reversed(_manifest().validators)
+        ),
+        judge={"rubric": {"anchors": ["poor", "good"], "scale": 5}, "model": "judge-model"},
+    )
+
+    assert reordered.evaluator_hash == manifest.evaluator_hash
+    assert manifest.evaluator_hash == sha256_prefixed(manifest.to_dict())
+    assert [item.name for item in manifest.validators] == ["citations", "required-sections"]
+    restored = EvaluatorManifest.from_dict(manifest.to_dict())
+    assert restored.to_dict() == manifest.to_dict()
+    assert restored.evaluator_hash == manifest.evaluator_hash
+    with pytest.raises(FrozenInstanceError):
+        manifest.code_digest = "sha256:" + "d" * 64
+    with pytest.raises(TypeError):
+        manifest.judge["model"] = "another-model"
+    with pytest.raises(TypeError):
+        manifest.split_manifests["holdout"] = CODE_DIGEST
+
+
+def test_evaluator_manifest_leaves_empty_fields_out_of_its_canonical_form():
+    minimal = EvaluatorManifest(code_digest=CODE_DIGEST)
+    expected = b'{"code_digest":"sha256:' + b"c" * 64 + b'","version":1}'
+
+    assert canonical_json_bytes(minimal.to_dict()) == expected
+    assert minimal.evaluator_hash == "sha256:" + hashlib.sha256(expected).hexdigest()
+    explicit_empty = EvaluatorManifest(
+        code_digest=CODE_DIGEST,
+        split_manifests={},
+        validators=(),
+        judge={},
+        price_snapshot_version=None,
+    )
+    assert explicit_empty.evaluator_hash == minimal.evaluator_hash
+    holdout_only = EvaluatorManifest(
+        code_digest=CODE_DIGEST, split_manifests={"holdout": TASK_PACKS["holdout"]}
+    )
+    assert holdout_only.to_dict() == {
+        "version": 1,
+        "code_digest": CODE_DIGEST,
+        "split_manifests": {"holdout": TASK_PACKS["holdout"]},
+    }
+    assert EvaluatorManifest.from_dict(minimal.to_dict()) == minimal
+
+
+@pytest.mark.parametrize(
+    "replacement",
+    [
+        ValidatorIdentity.for_config("citations", "3"),
+        ValidatorIdentity.for_config("citations-strict", "2"),
+        ValidatorIdentity.for_config("citations", "2", {"minimum": 2}),
+    ],
+    ids=["version", "name", "config"],
+)
+def test_evaluator_manifest_hash_changes_with_any_validator_identity(replacement):
+    manifest = _manifest()
+    sections, _citations = sorted(
+        manifest.validators, key=lambda item: item.name, reverse=True
+    )
+    changed = _manifest(validators=(sections, replacement))
+
+    assert changed.evaluator_hash != manifest.evaluator_hash
+    assert _manifest(validators=(sections,)).evaluator_hash != manifest.evaluator_hash
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"code_digest": "sha256:" + "d" * 64},
+        {"split_manifests": {**TASK_PACKS, "holdout": "sha256:" + "4" * 64}},
+        {"split_manifests": {"development": TASK_PACKS["development"]}},
+        {"judge": {"model": "another-model"}},
+        {"judge": {}},
+        {"price_snapshot_version": "2026-11-01"},
+        {"price_snapshot_version": None},
+    ],
+    ids=[
+        "code",
+        "holdout-pack",
+        "fewer-packs",
+        "judge",
+        "no-judge",
+        "prices",
+        "no-prices",
+    ],
+)
+def test_evaluator_manifest_hash_changes_with_every_part(overrides):
+    assert _manifest(**overrides).evaluator_hash != _manifest().evaluator_hash
+
+
+@pytest.mark.parametrize(
+    ("overrides", "match"),
+    [
+        ({"code_digest": "c" * 64}, "code_digest"),
+        ({"code_digest": "sha256:" + "C" * 64}, "code_digest"),
+        ({"split_manifests": {"regression": CODE_DIGEST}}, "unknown splits"),
+        ({"split_manifests": {"holdout": "3" * 64}}, "split_manifests.holdout"),
+        ({"split_manifests": ["holdout"]}, "split_manifests"),
+        ({"validators": ({"name": "citations", "version": "2"},)}, r"validators\[0\]"),
+        ({"validators": ({"name": "x", "version": "1", "config_sha256": "z"},)}, r"validators\[0\]"),
+        (
+            {"validators": (ValidatorIdentity.for_config("a", "1"),) * 2},
+            "duplicate",
+        ),
+        ({"validators": ValidatorIdentity.for_config("a", "1")}, "validators"),
+        ({"judge": {"temperature": float("nan")}}, "judge"),
+        ({"judge": ["not", "an", "object"]}, "judge"),
+        ({"price_snapshot_version": ""}, "price_snapshot_version"),
+        ({"price_snapshot_version": " 2026-10-01"}, "price_snapshot_version"),
+        ({"price_snapshot_version": "2026\n10"}, "price_snapshot_version"),
+        ({"price_snapshot_version": 20261001}, "price_snapshot_version"),
+    ],
+)
+def test_evaluator_manifest_rejects_invalid_parts(overrides, match):
+    with pytest.raises(ContractValidationError, match=match):
+        _manifest(**overrides)
+
+
+def test_evaluator_manifest_wire_format_is_strict_and_versioned():
+    payload = _manifest().to_dict()
+    with pytest.raises(ContractValidationError, match="unknown fields"):
+        EvaluatorManifest.from_dict({**payload, "surprise": True})
+    with pytest.raises(ContractValidationError, match="missing required fields"):
+        EvaluatorManifest.from_dict({"version": 1})
+    with pytest.raises(ContractValidationError, match="unsupported evaluator manifest version"):
+        EvaluatorManifest.from_dict({**payload, "version": 2})
