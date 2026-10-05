@@ -25,12 +25,15 @@ from typing import Any
 from uuid import uuid4
 
 from smythe import pricing, pricing_anthropic
-from smythe._money import NANOUSD, MoneyUnitError, to_units
+from smythe._money import NANOUSD, MoneyUnitError, from_units, to_units
 from smythe._sqlite import enable_wal
 
 STORE_VERSION = 2
 STORE_KIND = "smythe.workflow"
 OFFLINE_PRICE_VERSION = "offline-zero-v1"
+# Read-tool calls are priced by their profile's declaration: a free read costs
+# nothing and a metered one its declared per-call price.
+READ_PRICE_VERSION = "declared-read-v1"
 # Version 1 journals open read-only as they are; a writable open migrates them.
 _READABLE_VERSIONS = (1, STORE_VERSION)
 _MONEY = re.compile(r"0|[1-9][0-9]*")
@@ -172,6 +175,8 @@ def _registered_price_version(kind, price_version):
     """
     if kind == "offline":
         return price_version == OFFLINE_PRICE_VERSION
+    if kind == "read_tool":
+        return price_version == READ_PRICE_VERSION
     try:
         _price_table(kind if type(kind) is str else "", price_version)
     except ValueError:
@@ -245,6 +250,49 @@ def _is_http_rejection(record):
     return (record is not None and record["billing_state"] == "known"
             and record["result_state"] == "rejected" and record["cost_nanousd"] == 0
             and type(receipt) is dict and receipt.get("pricing_scope") == _HTTP_REJECTION_SCOPE)
+
+
+def _repeatable_free_read(provider):
+    """Whether a read-tool call's profile declares it free and safe to send again."""
+    return (type(provider) is dict and provider.get("kind") == "read_tool"
+            and provider.get("metered") is False and provider.get("repeat_safe") is True
+            and provider.get("ceiling_nanousd") == 0)
+
+
+def _read_receipt(provider, cost, status, error, *, lost=False):
+    """A read's receipt: its declared pricing, the HTTP status and any failure name."""
+    metered = provider.get("metered") is not False
+    usd = None if cost is None else "0" if cost == 0 else format(from_units(cost, NANOUSD), "f")
+    return {"version": 1, "provider_kind": "read_tool", "price_version": READ_PRICE_VERSION,
+            "pricing_scope": "declared_per_call_price" if metered else "declared_free_read",
+            "cost_nanousd": cost, "cost_usd": usd, "cost_is_complete": cost is not None,
+            "http_status": status, "transport_error": error, "response_lost": lost}
+
+
+def _read_settlement(provider, evidence):
+    """Settle a read's saved response; return its cost, receipt and any rejection reason.
+
+    A free read costs nothing, with one exception: when no response arrived
+    and the profile does not declare the read safe to send again, its outcome
+    is uncertain and stays unknown, which closes admission. A metered read is
+    charged its declared price for a 200 response; any other outcome may
+    still have been charged, so it stays unknown at that price. A response
+    that is not a usable 200 is rejected once its cost is known. The reason
+    names only the status and the failure, never response content.
+    """
+    status, error = evidence["status_code"], evidence["transport_error"]
+    responded, usable = type(status) is int, status == 200 and error is None
+    if provider.get("metered") is not False:
+        cost = provider.get("ceiling_nanousd") if usable else None
+        cost = cost if type(cost) is int and cost > 0 else None
+    else:
+        cost = 0 if usable or responded or _repeatable_free_read(provider) else None
+    reason = None
+    if cost is not None and not usable:
+        reason = (f"HTTP {status} read response" if responded and error is None
+                  else f"read response refused: {error}" if responded
+                  else f"no read response: {error or 'no HTTP status'}")
+    return cost, _read_receipt(provider, cost, status, error), reason
 
 
 def _create_private_file(path):
@@ -637,7 +685,7 @@ class SQLiteWorkflowStore:
         if _canonical(request) != request_json or _canonical(names) != tool_names_json:
             raise WorkflowValidationError("Prepared request must use canonical JSON")
         kind = provider.get("kind")
-        if type(kind) is not str or kind not in {"openai_responses", "anthropic_messages", "offline"}:
+        if type(kind) is not str or kind not in {"openai_responses", "anthropic_messages", "offline", "read_tool"}:
             raise WorkflowValidationError("Unsupported durable provider kind")
         for version in ("adapter_version", "decoder_version"):
             _text(provider.get(version), version)
@@ -660,7 +708,7 @@ class SQLiteWorkflowStore:
             row["request_json"], row["tool_names_json"], provider, row["price_version"])
         if not _registered_price_version(kind, row["price_version"]):
             raise WorkflowValidationError("Call price version is not registered")
-        if kind != "offline":
+        if kind in _PRICED_KINDS:
             cap = request.get(_OUTPUT_CAPS[kind])
             if (not _price_table(kind, row["price_version"]).prices(request.get("model"))
                     or type(cap) is not int or cap < 1):
@@ -692,7 +740,7 @@ class SQLiteWorkflowStore:
         model from that day, by the journal clock in UTC.
         """
         request, names, kind, _ = self._binding(request_json, tool_names_json, provider, price_version)
-        table = None if kind == "offline" else _price_table(kind)
+        table = _price_table(kind) if kind in _PRICED_KINDS else None
         if kind == "openai_responses":
             if price_version != table.price_version:
                 raise WorkflowValidationError("Unsupported native price version")
@@ -727,6 +775,16 @@ class SQLiteWorkflowStore:
                 AnthropicMessagesProvider._validate_prepared(PreparedRequest(request_json, tool_names_json))
             except (TypeError, ValueError, KeyError) as exc:
                 raise WorkflowValidationError("Unsupported durable Messages request") from exc
+        elif kind == "read_tool":
+            # The profile's pure check: the request is exactly what the
+            # recorded profile builds from its input, and the profile is valid.
+            from smythe.workflow_tools import check_read_request
+            if price_version != READ_PRICE_VERSION or names:
+                raise WorkflowValidationError("Read calls require the declared read price version")
+            try:
+                check_read_request(request, provider)
+            except (TypeError, ValueError) as exc:
+                raise WorkflowValidationError("Read request is outside its declared profile") from exc
         elif price_version != OFFLINE_PRICE_VERSION:
             raise WorkflowValidationError("Offline calls require the explicit zero-cost price version")
         self._admit_model(kind, request.get("model"))
@@ -817,16 +875,16 @@ class SQLiteWorkflowStore:
 
     @staticmethod
     def _superseded(key, generations):
-        """Whether key is an execution or verification call of an earlier node generation."""
+        """Whether key is an execution, verification or read call of an earlier node generation."""
         node = key.scope_id.removeprefix("node/")
-        return (key.phase in ("execution", "verification") and key.scope_id.startswith("node/")
+        return (key.phase in ("execution", "verification", "tool") and key.scope_id.startswith("node/")
                 and node in generations and key.generation < generations[node])
 
     def superseded_node_calls(self, run_id, generations):
         """IDs of settled calls that earlier generations of graph nodes made.
 
-        ``generations`` maps node ids to their current generation. An execution
-        or verification call scoped ``node/<id>`` qualifies when its generation
+        ``generations`` maps node ids to their current generation. An execution,
+        verification or read (``tool``) call scoped ``node/<id>`` qualifies when its generation
         is lower than that node's, its billing is known and its result was
         accepted, rejected or applied. Only settled calls' keys are read, and
         nothing is read until a node has been regenerated, so a checkpoint
@@ -878,11 +936,17 @@ class SQLiteWorkflowStore:
                 or held != (ceiling if billing == "reserved" else 0)
                 or unknown != (ceiling if billing == "unknown" else 0)):
             raise WorkflowCorruptionError("Call balances disagree with its state")
+        receipt = None if row["receipt_json"] is None else _loads(row["receipt_json"], stored=True)
+        # Recovery settles a free, repeat-safe read whose response was lost
+        # without evidence; nothing else settles without a saved response.
+        lost_read = (provider.get("kind") == "read_tool" and result_state == "rejected"
+                     and type(receipt) is dict and receipt.get("response_lost") is True)
         dispatched = state in ("dispatched", "response_saved", "settled", "unknown")
         if (dispatched != (row["dispatch_token_sha"] is not None)
                 or dispatched and (type(row["dispatch_epoch"]) is not int or row["dispatch_epoch"] < 1)
                 or row["evidence_id"] is not None and not dispatched
-                or state in ("response_saved", "settled") and row["evidence_id"] is None):
+                or state == "response_saved" and row["evidence_id"] is None
+                or state == "settled" and row["evidence_id"] is None and not lost_read):
             raise WorkflowCorruptionError("Call dispatch evidence is inconsistent")
         if (result_state != "pending" and billing != "known"
                 or (result_state in ("accepted", "applied")) != (row["result_json"] is not None)):
@@ -897,7 +961,7 @@ class SQLiteWorkflowStore:
             "ceiling_nanousd": None if row["ceiling"] is None else _amount(row["ceiling"]),
             "cost_nanousd": None if row["cost"] is None else _amount(row["cost"]),
             "reserved_nanousd": _amount(row["reserved"]), "unknown_nanousd": _amount(row["unknown"]),
-            "receipt": None if row["receipt_json"] is None else _loads(row["receipt_json"], stored=True),
+            "receipt": receipt,
             "decoded_result": None if row["result_json"] is None else _loads(row["result_json"], stored=True),
             "decoder_version": row["decoder_version"] or provider["decoder_version"], "error": row["error"],
         }
@@ -978,6 +1042,15 @@ class SQLiteWorkflowStore:
             raise WorkflowValidationError("Input count body must be an object")
         provider = _loads(call["provider_json"], stored=True)
         request = _loads(call["request_json"], stored=True)
+        if provider["kind"] == "read_tool":
+            # A read is quoted at its profile's declared per-call ceiling.
+            ceiling = provider.get("ceiling_nanousd")
+            if (type(ceiling) is not int or ceiling < 0 or _canonical(raw) != _canonical(
+                    {"provider_kind": "read_tool", "version": 1, "ceiling_nanousd": ceiling})):
+                raise WorkflowValidationError("Invalid declared read quote evidence")
+            return {"quote_id": evidence["evidence_id"], "call_id": call["call_id"], "input_tokens": 0,
+                    "ceiling_nanousd": ceiling, "price_version": call["price_version"],
+                    "request_sha256": call["request_sha"]}
         count = _integer(raw.get("input_tokens"), "input_tokens")
         # A quote uses the rates of the price version the call recorded.
         if provider["kind"] == "offline":
@@ -1106,6 +1179,27 @@ class SQLiteWorkflowStore:
             run, call = self._owned_call(db, lease, call_id)
             self._unknown(db, run, call, reason)
 
+    def _settle_lost_read(self, db, call):
+        """Settle a free, repeat-safe read dispatched without a saved response.
+
+        Its profile declares that it costs nothing, so its charge is known to
+        be zero even though its response was lost, and admission stays open.
+        It is rejected, without evidence, so its node reads again as a new call.
+        """
+        provider, now = _loads(call["provider_json"], stored=True), self._clock_ns()
+        receipt = _read_receipt(provider, 0, None, None, lost=True)
+        receipt.update(request_sha256=call["request_sha"], response_sha256=None, evidence_id=None,
+                       call_id=call["call_id"], run_id=call["run_id"], request_id=None, response_id=None)
+        receipt_json = _canonical(receipt)
+        _, reserved, _ = self._balances(self._run(db, call["run_id"]))
+        db.execute("UPDATE workflow_runs SET reserved=?,updated=? WHERE run_id=?",
+                   (_money(reserved - _amount(call["reserved"])), now, call["run_id"]))
+        db.execute("""UPDATE workflow_calls SET state='settled',billing_state='known',cost='0',reserved='0',
+          unknown='0',receipt_json=?,receipt_sha=?,result_state='rejected',error=?,updated=? WHERE call_id=?""",
+                   (receipt_json, _sha(receipt_json), "read response lost after dispatch", now, call["call_id"]))
+        self._event(db, call["run_id"], "read_response_lost", call_id=call["call_id"],
+                    payload={"cost_nanousd": "0"})
+
     def settle_call(self, lease, call_id, evidence_id):
         with self._transaction() as db:
             run, call = self._owned_call(db, lease, call_id)
@@ -1116,12 +1210,17 @@ class SQLiteWorkflowStore:
                 raise WorkflowStateError("Call has no dispatched response to settle")
             provider = _loads(call["provider_json"], stored=True)
             request = _loads(call["request_json"], stored=True)
-            try:
-                raw = _loads(evidence["body"])
-            except WorkflowValidationError:
-                raw = None
-            rejection = None
-            if provider["kind"] == "offline":
+            read = provider["kind"] == "read_tool"
+            rejection = read_rejection = raw = None
+            if not read:
+                try:
+                    raw = _loads(evidence["body"])
+                except WorkflowValidationError:
+                    raw = None
+            if read:
+                # A read's body is its source's content; its status settles it.
+                cost, receipt, read_rejection = _read_settlement(provider, evidence)
+            elif provider["kind"] == "offline":
                 valid = (type(raw) is dict and raw.get("provider_kind") == "offline"
                          and type(raw.get("version")) is int and raw["version"] == 1 and type(raw.get("text")) is str
                          and not evidence["transport_error"] and evidence["status_code"] in (None, 200))
@@ -1162,7 +1261,7 @@ class SQLiteWorkflowStore:
                 if call["receipt_json"] != receipt_json or _amount(call["cost"]) != cost:
                     raise WorkflowConflictError("Known settlement differs from saved billing")
             elif cost is None:
-                self._unknown(db, run, call, "unpriced_response")
+                self._unknown(db, run, call, "uncertain_read" if read else "unpriced_response")
                 db.execute("UPDATE workflow_calls SET receipt_json=?,receipt_sha=? WHERE call_id=?", (receipt_json, _sha(receipt_json), call_id))
             else:
                 confirmed, reserved, unknown = self._balances(run)
@@ -1176,12 +1275,16 @@ class SQLiteWorkflowStore:
                     # the call's first and only semantic disposition.
                     db.execute("UPDATE workflow_calls SET result_state='rejected',error=? WHERE call_id=?",
                                (f"HTTP {rejection['http_status']} provider rejection", call_id))
+                elif read_rejection is not None:
+                    db.execute("UPDATE workflow_calls SET result_state='rejected',error=? WHERE call_id=?",
+                               (read_rejection, call_id))
                 if call["billing_state"] == "unknown":
                     # Late or reclassified evidence, e.g. a 4xx that 0.8.0 held
                     # as unknown exposure, releases that exposure exactly once.
                     self._event(db, lease.run_id, "unknown_exposure_resolved", call_id=call_id, payload={
                         "released_unknown_nanousd": str(_amount(call["unknown"])), "cost_nanousd": str(cost),
-                        "basis": "http_rejection" if rejection is not None else "priced_response"})
+                        "basis": "http_rejection" if rejection is not None
+                        else "read_response" if read else "priced_response"})
                 if cost > _amount(call["ceiling"]):
                     db.execute("UPDATE workflow_runs SET status='blocked',blocked_reason='budget_overrun' WHERE run_id=? AND blocked_reason IN ('unknown_exposure','budget_overrun')",
                                (lease.run_id,))
@@ -1260,7 +1363,7 @@ class SQLiteWorkflowStore:
         """Release reserved calls of node generations that a regeneration superseded.
 
         ``generations`` maps node ids to their current generation, as for
-        ``superseded_node_calls``. A reserved execution or verification call
+        ``superseded_node_calls``. A reserved execution, verification or read call
         scoped ``node/<id>`` whose generation is lower than that node's was
         never dispatched, and the runtime calls a node only at its current
         generation, so it never will be. Each release returns the reservation
@@ -1589,7 +1692,10 @@ class SQLiteWorkflowStore:
             calls = db.execute("SELECT * FROM workflow_calls WHERE run_id=? ORDER BY created,call_id", (lease.run_id,)).fetchall()
             for call in calls:
                 if call["state"] == "dispatched" and call["evidence_id"] is None:
-                    self._unknown(db, self._run(db, lease.run_id), call, "recovered_after_dispatch")
+                    if _repeatable_free_read(_loads(call["provider_json"], stored=True)):
+                        self._settle_lost_read(db, call)
+                    else:
+                        self._unknown(db, self._run(db, lease.run_id), call, "recovered_after_dispatch")
             plan = {"undispatched": [], "settle": [], "decode": [], "apply": [], "unknown": [], "applied": []}
             for call in db.execute("SELECT * FROM workflow_calls WHERE run_id=? ORDER BY created,call_id", (lease.run_id,)):
                 if call["state"] in ("prepared", "quoted", "reserved", "released"):
