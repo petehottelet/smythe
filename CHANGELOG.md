@@ -289,7 +289,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   in-memory snapshot of image bytes: the bytes hashed for a finishing receipt
   are the bytes decoded. A relative logo or font path resolves only against
   an explicit `base_dir`, never the working directory, and is otherwise
-  reported unavailable. See [validation reports](docs/verifier.md#validation-reports).
+  reported unavailable. See
+  [validation reports](docs/verifier.md#validation-reports).
 - Ordinary runs record each artifact file's `sha256` and `size_bytes` in
   `node.metadata["artifacts"]` beside its path and MIME type. Under a strict
   acceptance policy a regenerated node writes its files under names that

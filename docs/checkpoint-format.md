@@ -178,6 +178,8 @@ The intent is saved before cancellation. After affected workers settle, a
 second forced save records the reset: results and stale artifact references
 are cleared, affected generations advance exactly once, and the intent is
 removed. Costs and consumed regeneration allowances survive the reset.
+Detached snapshot values prevent later metadata mutations from changing a
+checkpoint already handed to a custom store.
 
 Under a strict acceptance policy the reset first adds a record of each
 discarded generation to the node's `rejected_generations` list
@@ -193,8 +195,6 @@ has no `excerpt`, and one that still does not fit is left out. A replayed
 reset records each generation once. A new durable workflow refuses a graph
 whose nodes carry `rejected_generations`, as it refuses other execution
 history.
-Detached snapshot values prevent later metadata mutations from changing a
-checkpoint already handed to a custom store.
 
 ## Required state features (version 5)
 
