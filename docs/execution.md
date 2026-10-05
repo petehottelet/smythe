@@ -202,7 +202,9 @@ policy other than the resuming `Swarm`'s `retry_policy`, and a run saved
 without persisted attempts when the resuming policy persists them, since its
 attempts so far are unknown. A completed run returns its saved result under
 any policy. Each executor takes the saved allowance as `attempts_used=` and
-reports its own as the `attempts_used` property, in the same shape.
+reports its own as the `attempts_used` property, in the same shape. The saved
+allowance applies to the executor's first run only: running another graph on
+the same executor starts a new run, with a fresh allowance for every node.
 
 ## Concurrency
 

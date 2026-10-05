@@ -314,7 +314,9 @@ class ExecutorBase:
     ``persist_attempts``, each attempt is recorded in :attr:`attempts_used`
     and saved through the control hook before its call, and
     ``attempts_used``, as a checkpoint saved it, seeds the attempts each node
-    has already used in its current ``execution_generation``.
+    has already used in its current ``execution_generation``. The seed applies
+    to the executor's first run only: a later run is a new run, with a fresh
+    allowance for every node.
     """
 
     def __init__(
@@ -366,8 +368,10 @@ class ExecutorBase:
         if attempts_used is not None and not self._persist_attempts:
             raise ValueError("attempts_used needs a retry_policy with persist_attempts")
         # Like revisions_used, a per-run allowance: each node's generation and
-        # the attempts it has spent there, restored on resume.
+        # the attempts it has spent there, restored on resume. The seed binds
+        # only the first run; a reused executor's next run starts empty.
         self._attempts_used = _attempt_records(attempts_used or {})
+        self._attempts_seed = dict(self._attempts_used)
         if acceptance is not None and not isinstance(acceptance, AcceptancePolicy):
             raise TypeError(
                 f"acceptance must be an AcceptancePolicy or None, not {type(acceptance).__name__}"
@@ -1197,6 +1201,7 @@ class ExecutorBase:
         self._reserved_node_ids.clear()
         self._call_attempts.clear()
         self._deadlines.clear()
+        self._attempts_used, self._attempts_seed = self._attempts_seed, {}
         self._settled_response_errors.clear()
         self._response_settlement_failures.clear()
         self._prepared_graph = None

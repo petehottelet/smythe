@@ -630,9 +630,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   total, and a node with none left fails without a call; a regenerated node
   gets a fresh allowance. An unfinished run resumes only under an equal
   policy, which `smythe runs inspect` names in its resume action. Executors
-  take `attempts_used=` and report the `attempts_used` property, and
-  `smythe.checkpoint.attempt_allowance_from_state()` reads the record. Other
-  runs keep writing version 4. See
+  take `attempts_used=` for their first run and report the `attempts_used`
+  property, and `smythe.checkpoint.attempt_allowance_from_state()` reads the
+  record. Other runs keep writing version 4. See
   [persisted attempts](docs/execution.md#persisted-attempts).
 - `jobs stop --drain-timeout-s SECONDS` bounds a pause's drain. That long
   after the request, the worker cancels each call still awaiting its provider

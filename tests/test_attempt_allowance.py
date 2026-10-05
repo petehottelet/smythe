@@ -412,6 +412,31 @@ def test_an_executor_reports_the_attempts_it_spent(mode):
     assert executor.attempts_used["step"]["attempts"] == 2
 
 
+@pytest.mark.parametrize("mode", MODES)
+def test_a_reused_executor_gives_a_later_graph_its_full_allowance(mode):
+    """The seed and an earlier graph's attempts belong to that run, not to the next.
+
+    The seeded first run spends the last of its node's allowance. A later
+    graph with the same node id is a new run, so its node gets all its
+    attempts: two failures and then an answer.
+    """
+    provider = Flaky("done", ConnectionError("reset"), ConnectionError("reset"), "again")
+    executor = EXECUTORS[mode](provider=provider, registry=Registry(), tracer=Tracer(),
+                               artifact_dir=None, retry_policy=POLICY,
+                               attempts_used={"step": {"execution_generation": 0, "attempts": 2}})
+    first, second = graph(), graph()
+
+    execute(executor, first)
+    assert len(provider.calls) == 1 and first.nodes[0].result == "done"
+    assert executor.attempts_used == {"step": {"execution_generation": 0, "attempts": ALLOWANCE}}
+
+    execute(executor, second)
+
+    assert second.nodes[0].status is NodeStatus.COMPLETED and second.nodes[0].result == "again"
+    assert len(provider.calls) == 1 + ALLOWANCE
+    assert executor.attempts_used == {"step": {"execution_generation": 0, "attempts": ALLOWANCE}}
+
+
 @pytest.mark.parametrize("attempts_used,policy,error", [
     ({"step": {"execution_generation": 0, "attempts": 1}}, RetryPolicy(), "persist_attempts"),
     ({"step": {"execution_generation": 0, "attempts": 1}}, None, "persist_attempts"),
