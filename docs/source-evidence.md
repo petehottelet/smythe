@@ -177,9 +177,14 @@ completed run delivered, or `None` when it recorded none: the operation's key
 and state, the output digest, the run's source set, any `problem`, the claim
 records, and each source record's `summary()` with `available`: whether its
 text is retained, in the record or in the run's recorded sources with the
-same id, version and digest. A tombstoned record is never available. Source
-text is left out unless the caller asks with `include_text=True`, which adds
-each available source's `text` and `None` for the others.
+same id, version and digest, and `removed`: the reason and time of the
+tombstone of a source [removed from the run](tasks.md#remove-a-source), or
+`None`. A tombstoned or removed source is never available, even when the
+journal or the evidence record still holds its text. Source text is left out
+unless the caller asks with `include_text=True`, which adds each available
+source's `text` and `None` for the others. `smythe runs inspect` shows the
+same evidence, summarized, with each claim's unresolved questions as
+[open issues](runs.md#research-runs).
 
 ```python
 from smythe.evidence import load_source_evidence

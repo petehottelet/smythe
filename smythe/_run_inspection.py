@@ -5,7 +5,9 @@
 :class:`~smythe.workflow_store.SQLiteWorkflowStore` opened read-only, and
 reports execution, delivery acceptance and its decision history, a durable
 run's published artifact, cost, timing and the next action as separate JSON
-blocks.
+blocks. For a durable run it also reports its context sources and snapshots,
+its journaled reads, the source evidence its output carried and the issues
+left open, never source text, read bodies or output.
 :meth:`smythe.swarm.SwarmResult.to_dict` builds its execution, delivery,
 unknown-exposure and next-action blocks with the same functions. Nothing here
 constructs a provider, migrates a journal or writes a file.
@@ -13,11 +15,13 @@ constructs a provider, migrates a journal or writes a file.
 
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 from typing import Any
 
 from smythe._money import NANOUSD
+from smythe._redact import redact_account_identifiers
 from smythe.acceptance import (
     _OUTPUT_CHANGED,
     AcceptanceDecision,
@@ -38,10 +42,18 @@ from smythe.checkpoint import (
     task_from_dict,
     timing_segments,
 )
+from smythe.context import (
+    CONTEXT_SNAPSHOT_KEY,
+    CONTEXT_SNAPSHOT_VERSION,
+    sources_from_operation,
+    sources_key,
+)
+from smythe.evidence import load_source_evidence, load_source_tombstones
 from smythe.graph import ExecutionGraph
 from smythe.validation import _json_sha256
 from smythe.workflow_artifact import CurrentArtifact, artifact_problems, current_artifact
 from smythe.workflow_store import (
+    CallKey,
     SQLiteWorkflowStore,
     WorkflowError,
     WorkflowNotFoundError,
@@ -333,8 +345,13 @@ def _checkpoint_view(execution_id: str, state: Any) -> dict[str, Any]:
         "execution": {"state": status, "blocked_reason": None, "nodes": node_counts(graph)},
         "delivery": delivery,
         "decisions": decisions,
-        # Only durable runs publish a rendered document.
+        # Only durable runs publish a rendered document, journal reads and
+        # record context snapshots and source evidence.
         "artifact": None,
+        "context": None,
+        "tool_calls": None,
+        "evidence": None,
+        "issues": issues_view(delivery, None, None),
         "accounting": accounting,
         "timing": checkpoint_timing(state),
         "next_action": next_action(
@@ -398,6 +415,154 @@ def _journal_acceptance(
     return record, problems, decisions
 
 
+def _removal(record: Any) -> dict[str, Any] | None:
+    return None if record is None else {"reason": record.tombstone, "removed_at": record.removed_at}
+
+
+def context_view(store: SQLiteWorkflowStore, run_id: str, recipe: dict[str, Any],
+                 checkpoint: dict[str, Any] | None, graph: ExecutionGraph | None) -> dict | None:
+    """A durable run's context assembly: versions, current sources, snapshots and tombstones.
+
+    None for a run without context assembly. Each source is named by id,
+    version, digest and size, and a removed one by its tombstone's reason and
+    time instead of its size; snapshots are named by node, generation and id.
+    No source text is read out.
+    """
+    version = recipe.get("context_assembly", 0)
+    if not version:
+        return None
+    tombstones = load_source_tombstones(store, run_id)
+    removed = {(record.source_id, record.sha256): record for record in tombstones}
+    binding = checkpoint.get("context_sources") if checkpoint is not None else None
+    sources = []
+    if isinstance(binding, dict) and type(binding.get("revision")) is int:
+        operation = store.load_operation(run_id, sources_key(binding["revision"]))
+        for source in (() if operation is None
+                       else sources_from_operation(operation, binding["revision"])):
+            tombstone = removed.get((source.source_id, source.sha256))
+            sources.append({
+                "source_id": source.source_id, "version": source.version, "sha256": source.sha256,
+                "text_bytes": None if tombstone else len(source.text.encode("utf-8")),
+                "trust": "untrusted", "removed": _removal(tombstone)})
+    else:
+        binding = None
+    snapshots = []
+    for node in graph.nodes if graph is not None else ():
+        stamp = node.metadata.get(CONTEXT_SNAPSHOT_KEY)
+        if isinstance(stamp, dict):
+            snapshots.append({"node_id": node.id, "generation": stamp.get("generation"),
+                              "snapshot_id": stamp.get("snapshot_id")})
+    return {"assembly_version": version, "snapshot_version": CONTEXT_SNAPSHOT_VERSION,
+            "sources_revision": None if binding is None else binding["revision"],
+            "sources_sha256": None if binding is None else binding.get("sha256"),
+            "sources": sources, "snapshots": snapshots,
+            "tombstones": [record.to_dict() for record in tombstones]}
+
+
+def tool_calls_view(store: SQLiteWorkflowStore, run_id: str,
+                    calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """A summary of each journaled read call, from the journal's call records.
+
+    Each names its node, generation, attempt, profile and URL, its states,
+    charge, HTTP status, failure and the response's SHA-256, and the size and
+    SHA-256 of the text decoded from it, never the response body or text.
+    """
+    views = []
+    for call in calls:
+        key = call["key"]
+        if key["phase"] != "tool":
+            continue
+        record = store.lookup_call(run_id, CallKey(**key))
+        provider, receipt = record["provider"], record["receipt"] or {}
+        request = json.loads(record["request_json"])
+        decoded = record["decoded_result"]
+        text = decoded.get("text") if isinstance(decoded, dict) else None
+        url = request.get("url") if isinstance(request, dict) else None
+        views.append({
+            "node_id": key["scope_id"].removeprefix("node/"), "generation": key["generation"],
+            "attempt": key["attempt"], "invocation": key["invocation"],
+            "profile": provider.get("name"), "profile_version": provider.get("version"),
+            "decoder_version": record["decoder_version"], "metered": provider.get("metered"),
+            "repeat_safe": provider.get("repeat_safe"),
+            "url": redact_account_identifiers(url) if isinstance(url, str) else None,
+            "request_sha256": record["request_sha256"], "state": record["state"],
+            "billing_state": record["billing_state"], "result_state": record["result_state"],
+            "cost_nanousd": record["cost_nanousd"], "http_status": receipt.get("http_status"),
+            "transport_error": receipt.get("transport_error"),
+            "response_sha256": receipt.get("response_sha256"),
+            "text_bytes": len(text.encode("utf-8", "surrogatepass")) if isinstance(text, str) else None,
+            "text_sha256": text_sha256(text) if isinstance(text, str) else None,
+            "error": record["error"],
+        })
+    return views
+
+
+def evidence_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any] | None:
+    """The source evidence a completed durable run delivered, summarized; None without any.
+
+    Sources are their records' summaries, with ``available`` and ``removed``;
+    each claim is its id, the number of passages for and against it, the
+    sources they cite, its scope and its unresolved questions. Claim text,
+    quotes and conclusions belong to the output and are left out.
+    """
+    loaded = load_source_evidence(store, run_id)
+    if loaded is None:
+        return None
+    claims = [{
+        "claim_id": claim["claim_id"], "supporting": len(claim["supporting"]),
+        "contradicting": len(claim["contradicting"]),
+        "sources": sorted({passage["source_id"]
+                           for passage in claim["supporting"] + claim["contradicting"]}),
+        "scope": claim["scope"], "unresolved": list(claim["unresolved"]),
+    } for claim in loaded["claims"]]
+    return {key: loaded[key] for key in ("operation_key", "state", "output_sha256",
+                                         "context_sources", "problem", "sources")} | {"claims": claims}
+
+
+def issues_view(delivery: dict[str, Any], evidence: dict[str, Any] | None,
+                tool_calls: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """What a run leaves open, one entry each, as ``kind``, ``subject`` and ``detail``.
+
+    Kinds: ``evidence_problem`` when the output carried no readable evidence;
+    ``source_unavailable`` for a cited source whose text the run does not
+    hold; ``unresolved_question`` for each question a claim leaves open;
+    ``read_failed`` for a read step with no accepted read at its generation,
+    or a read with an unknown charge; and ``validator_rejected`` or
+    ``validator_error`` for a final validator that did not pass.
+    """
+    issues = []
+
+    def issue(kind: str, subject: Any, detail: Any) -> None:
+        issues.append({"kind": kind, "subject": subject, "detail": detail})
+
+    if evidence is not None:
+        if evidence["problem"]:
+            issue("evidence_problem", None, evidence["problem"])
+        for source in evidence["sources"]:
+            if not source["available"]:
+                detail = ("removed from the run: " + source["removed"]["reason"] if source["removed"]
+                          else "tombstoned: " + source["tombstone"] if source["tombstone"]
+                          else "the run does not hold its text")
+                issue("source_unavailable", source["source_id"], detail)
+        for claim in evidence["claims"]:
+            for question in claim["unresolved"]:
+                issue("unresolved_question", claim["claim_id"], question)
+    read = {(call["node_id"], call["generation"]) for call in tool_calls or ()
+            if call["result_state"] in ("accepted", "applied")}
+    for call in tool_calls or ():
+        if call["billing_state"] == "unknown" or (
+                call["result_state"] == "rejected" and (call["node_id"], call["generation"]) not in read):
+            issue("read_failed", call["node_id"], call["error"] or call["state"])
+    record = delivery["record"]
+    for result in record["validators"] if record is not None else ():
+        if result["outcome"] != "passed":
+            name = result["validator"]["name"]
+            detail = next((reason for reason in record["reasons"] if repr(name) in reason),
+                          result["outcome"])
+            issue("validator_" + result["outcome"], name, detail)
+    return issues
+
+
 def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
     from smythe.workflow import _checkpoint_version
 
@@ -456,6 +621,8 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
     resume = "Resume it with Swarm(run_store=...).resume(run_id) and the configuration it started with"
     if policy_sha256 is not None:
         resume += f", including the strict acceptance policy whose sha256 is {policy_sha256}"
+    tool_calls = tool_calls_view(store, run_id, inspected["calls"])
+    evidence = evidence_view(store, run_id)
     return {
         "run_id": run_id,
         "store": "journal",
@@ -467,6 +634,10 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
         "delivery": delivery,
         "decisions": decisions,
         "artifact": None if artifact is None else artifact.to_dict(),
+        "context": context_view(store, run_id, run["config"], checkpoint, graph),
+        "tool_calls": tool_calls,
+        "evidence": evidence,
+        "issues": issues_view(delivery, evidence, tool_calls),
         "accounting": accounting,
         "timing": journal_timing(store, run_id),
         "next_action": next_action(

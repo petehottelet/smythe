@@ -648,6 +648,18 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   holds the tombstone. `smythe.evidence.load_source_tombstones` reads a
   run's tombstones. Earlier journal records and published documents keep
   what they hold. See [remove a source](docs/tasks.md#remove-a-source).
+- `smythe runs inspect` reports what a durable research run was given, read
+  and claimed, without source text, read bodies, quotes or output: a
+  `context` block (the context-assembly and snapshot versions, the current
+  sources by id, version, digest and size, removed sources, each node's
+  snapshot id and the run's tombstones), `tool_calls` (each journaled
+  read's node, attempt, profile, URL, states, charge, HTTP status, response
+  digest and the size and digest of its decoded text), `evidence` (the
+  delivered source evidence: each cited source's availability, and each
+  claim's passage counts, cited sources, scope and unresolved questions)
+  and `issues` (unresolved questions, unavailable sources, failed reads and
+  final validators that did not pass). Ordinary runs report null for the
+  first three. See [research runs](docs/runs.md#research-runs).
 
 ### Changed
 

@@ -349,7 +349,8 @@ def build_parser() -> argparse.ArgumentParser:
     runs_commands = runs.add_subparsers(dest="runs_command", required=True)
     run_inspection = runs_commands.add_parser(
         "inspect",
-        help="show a run's execution, delivery acceptance, cost, timing and next action",
+        help="show a run's execution, delivery acceptance, context, reads, evidence, open issues, "
+             "cost, timing and next action",
     )
     run_inspection.add_argument("run_id")
     _add_runs_output_options(run_inspection, inherited=True)
@@ -780,6 +781,41 @@ def _emit_run_list(value: dict[str, Any]) -> None:
         print(f"More runs: use --offset {value['offset'] + value['returned']}")
 
 
+def _emit_research(value: dict[str, Any]) -> None:
+    """A durable run's context, reads, source evidence and open issues, without any text."""
+    context = value.get("context")
+    if context is not None:
+        print(f"Context: assembly version {context['assembly_version']}, snapshot version "
+              f"{context['snapshot_version']}; sources revision {context['sources_revision']}; "
+              f"{len(context['sources'])} sources, {len(context['snapshots'])} snapshots")
+        for source in context["sources"]:
+            version = f" version {_terminal_text(source['version'])}" if source["version"] else ""
+            removed = source["removed"]
+            state = (f"removed {_terminal_text(removed['removed_at'])}: {_terminal_text(removed['reason'])}"
+                     if removed else f"{source['text_bytes']} bytes")
+            print(f"  Source {_terminal_text(source['source_id'])}{version}: {state}; "
+                  f"sha256 {source['sha256'][:12]}")
+    for call in value.get("tool_calls") or ():
+        status = call["http_status"] if call["http_status"] is not None else "none"
+        text = f"; {call['text_bytes']} bytes of text" if call["text_bytes"] is not None else ""
+        error = f"; {_terminal_text(call['error'])}" if call["error"] else ""
+        print(f"Read {_terminal_text(call['node_id'])} (generation {call['generation']}, attempt "
+              f"{call['attempt']}): {_terminal_text(call['profile'])} "
+              f"{_terminal_text(call['profile_version'])}; {call['state']}, "
+              f"{call['result_state']}; HTTP {status}{text}; cost {call['cost_nanousd']} nanoUSD{error}")
+    evidence = value.get("evidence")
+    if evidence is not None:
+        print(f"Evidence: {len(evidence['claims'])} claims citing {len(evidence['sources'])} sources "
+              f"({evidence['state']})")
+        for claim in evidence["claims"]:
+            print(f"  Claim {_terminal_text(claim['claim_id'])}: {claim['supporting']} supporting, "
+                  f"{claim['contradicting']} contradicting; sources "
+                  f"{_terminal_text(', '.join(claim['sources']) or 'none')}")
+    for issue in value.get("issues") or ():
+        subject = f" ({_terminal_text(issue['subject'])})" if issue["subject"] is not None else ""
+        print(f"Issue {issue['kind']}{subject}: {_terminal_text(issue['detail'])}")
+
+
 def _emit_run_inspection(value: dict[str, Any]) -> None:
     print(f"Run: {_terminal_text(value['run_id'])}")
     saved = value["format"]
@@ -831,6 +867,7 @@ def _emit_run_inspection(value: dict[str, Any]) -> None:
         eligible = "eligible" if eligibility["eligible"] else (
             "not eligible (" + ", ".join(eligibility["reasons"]) + ")")
         print(f"  Delivery eligibility: {eligible}")
+    _emit_research(value)
     accounting = value["accounting"]
     print(f"Cost: ${accounting['total_cost_usd']:.6f} ({accounting['cost_scope']}); "
           f"complete: {_yes(accounting['cost_is_complete'])}; "

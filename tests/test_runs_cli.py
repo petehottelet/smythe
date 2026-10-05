@@ -16,12 +16,16 @@ import sqlite3
 import pytest
 
 from fakes import ManualClock
+from fixture_service import FixtureService, serve_http
 from smythe import (
+    AcceptanceDecision,
     AcceptancePolicy,
     FileCheckpointStore,
     LocalOnly,
     OfflineProvider,
+    ReadProfile,
     SimpleArchitect,
+    SourceEvidenceValidator,
     SQLiteWorkflowStore,
     Swarm,
     Task,
@@ -34,9 +38,12 @@ from smythe.cli import (
     EXIT_INVALID_INPUT, EXIT_JOB_STATE, EXIT_LOCAL_ERROR, EXIT_OK, EXIT_RUN_INDETERMINATE,
     EXIT_RUN_NOT_ACCEPTED, build_parser, main,
 )
-from smythe.graph import ExecutionGraph, Node, Topology
+from smythe.graph import ExecutionGraph, FailurePolicy, Node, Topology
 from smythe.provider import CompletionResult, Provider
 from smythe.validation import hard_finding
+from test_source_evidence import CLAIM, DROPPED, KEPT, STRONG
+from test_source_evidence import SOURCES as EVIDENCE_SOURCES
+from test_source_evidence import artifact as evidence_artifact
 from test_workflow_acceptance import rewrite_checkpoint
 from test_workflow_store_migration import build_journal, dump, mark_version_1
 
@@ -837,3 +844,151 @@ def test_list_shows_durable_decisions(strict_journal, tmp_path, capsys, monkeypa
     text = capsys.readouterr().out
     assert f"{results['rejected'].execution_id}  completed  acceptance rejected  next review_output" in text
     assert journal_state(path) == before
+
+
+# ---------------------------------------------------------------------------
+# Durable research runs: context, reads, evidence and open issues
+# ---------------------------------------------------------------------------
+
+
+class Research:
+    """A journal, a source service on loopback, and research runs over it."""
+
+    def __init__(self, path: Path, port: int, replies: dict[str, str]) -> None:
+        self.path, self.replies = path, replies
+        self.profile = ReadProfile(
+            name="source", version="1", url=f"http://127.0.0.1:{port}/sources/{{source_id}}",
+            input_schema={"source_id": "string"}, metered=False, repeat_safe=True,
+            decode=lambda body: json.loads(body)["content"], decoder_version="fixture-source-v1",
+            allow_private_networks=True)
+
+    def swarm(self, store) -> Swarm:
+        return Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+                     run_store=store, max_budget_usd=1, read_tools=[self.profile],
+                     context_sources=EVIDENCE_SOURCES, acceptance=AcceptancePolicy(
+                         mode="strict", final_validators=[SourceEvidenceValidator(EVIDENCE_SOURCES)]))
+
+    def run(self, output: str, *sources: str):
+        """Read *sources*, each a skipped step when it fails, then write *output*."""
+        self.replies["Write"] = output
+        reads = [self.profile.step(f"fetch-{source_id}", {"source_id": source_id},
+                                   failure_policy=FailurePolicy.SKIP) for source_id in sources]
+        graph = ExecutionGraph([Topology.SERIAL], [
+            *reads, Node(id="write", label="Write", depends_on=[read.id for read in reads])])
+        with SQLiteWorkflowStore(self.path) as store:
+            return self.swarm(store).execute(graph)
+
+
+@pytest.fixture
+def research(tmp_path, monkeypatch):
+    service = FixtureService()
+    for source in EVIDENCE_SOURCES:
+        service.add_source(source.source_id, source.text)
+    replies: dict[str, str] = {}
+
+    async def complete(self, system, prompt, model):
+        return CompletionResult(replies["Write"], cost_usd=0)
+
+    monkeypatch.setattr(OfflineProvider, "complete", complete)
+    with serve_http(service) as endpoint:
+        yield Research(tmp_path / "runs.db", endpoint.port, replies)
+
+
+def test_a_research_run_shows_its_context_reads_evidence_and_open_issues(research, capsys,
+                                                                         monkeypatch):
+    result = research.run(evidence_artifact(KEPT), "survey-2019", "renewals-2026")
+    assert result.accepted
+    run_id, path = result.execution_id, research.path
+    before = journal_state(path)
+    no_side_effects(monkeypatch)
+
+    code, value = inspect_durable(capsys, path, run_id)
+    assert code == EXIT_OK and journal_state(path) == before
+    context = value["context"]
+    assert (context["assembly_version"], context["snapshot_version"],
+            context["sources_revision"]) == (1, 1, 0)
+    assert context["sources"] == [
+        {"source_id": source.source_id, "version": source.version, "sha256": source.sha256,
+         "text_bytes": len(source.text.encode()), "trust": "untrusted", "removed": None}
+        for source in EVIDENCE_SOURCES]
+    (snapshot,) = context["snapshots"]
+    assert (snapshot["node_id"], snapshot["generation"]) == ("write", 0)
+    assert context["tombstones"] == []
+
+    reads = {call["node_id"]: call for call in value["tool_calls"]}
+    assert sorted(reads) == ["fetch-renewals-2026", "fetch-survey-2019"]
+    audit = reads["fetch-renewals-2026"]
+    assert (audit["profile"], audit["profile_version"], audit["decoder_version"]) == (
+        "source", "1", "fixture-source-v1")
+    assert (audit["state"], audit["result_state"], audit["http_status"],
+            audit["cost_nanousd"]) == ("settled", "applied", 200, 0)
+    assert (audit["text_bytes"], audit["text_sha256"]) == (len(STRONG.text.encode()), STRONG.sha256)
+    assert audit["url"].endswith("/sources/renewals-2026") and audit["error"] is None
+
+    evidence = value["evidence"]
+    assert evidence["state"] == "applied" and evidence["problem"] is None
+    assert [(item["source_id"], item["available"]) for item in evidence["sources"]] == [
+        ("survey-2019", True), ("renewals-2026", True)]
+    assert evidence["claims"] == [{
+        "claim_id": "billing-preference", "supporting": 1, "contradicting": 1,
+        "sources": ["renewals-2026", "survey-2019"], "scope": "Customers on self-serve plans",
+        "unresolved": ["Whom did the 2019 poll ask?"]}]
+    assert value["issues"] == [{"kind": "unresolved_question", "subject": "billing-preference",
+                                "detail": "Whom did the 2019 poll ask?"}]
+
+    assert main(["runs", "--journal", str(path), "inspect", run_id]) == EXIT_OK
+    text = capsys.readouterr().out
+    assert "Context: assembly version 1, snapshot version 1; sources revision 0; 2 sources" in text
+    assert ("Read fetch-renewals-2026 (generation 0, attempt 0): source 1; settled, applied; "
+            "HTTP 200") in text
+    assert "Claim billing-preference: 1 supporting, 1 contradicting" in text
+    assert "Issue unresolved_question (billing-preference): Whom did the 2019 poll ask?" in text
+    # No source text, read body, quote or output is shown.
+    for shown in (text, json.dumps(value)):
+        assert all(source.text not in shown for source in EVIDENCE_SOURCES)
+        assert CLAIM.contradicting[0].quote not in shown and KEPT.strip() not in shown
+
+
+def test_inspection_names_failed_reads_rejections_and_removed_sources(research, capsys):
+    # One read finds no such source, and the output's evidence is rejected.
+    result = research.run(evidence_artifact(DROPPED), "renewals-2026", "missing")
+    run_id, path = result.execution_id, research.path
+    assert result.acceptance.decision is AcceptanceDecision.REJECTED
+
+    code, value = inspect_durable(capsys, path, run_id)
+    assert code == EXIT_RUN_NOT_ACCEPTED
+    failed = next(call for call in value["tool_calls"] if call["node_id"] == "fetch-missing")
+    assert (failed["result_state"], failed["http_status"], failed["text_bytes"]) == (
+        "rejected", 404, None)
+    kinds = [(issue["kind"], issue["subject"]) for issue in value["issues"]]
+    assert ("read_failed", "fetch-missing") in kinds
+    assert ("validator_rejected", "smythe.source-evidence") in kinds
+    rejected = next(issue for issue in value["issues"] if issue["kind"] == "validator_rejected")
+    assert "contradiction_missing" in rejected["detail"]
+
+    with SQLiteWorkflowStore(path) as store:
+        research.swarm(store).remove_source(run_id, "renewals-2026", "deleted on request",
+                                            removed_at="2026-10-01")
+    code, value = inspect_durable(capsys, path, run_id)
+    assert code == EXIT_RUN_INDETERMINATE
+    removal = {"reason": "deleted on request", "removed_at": "2026-10-01"}
+    audit = next(source for source in value["context"]["sources"]
+                 if source["source_id"] == "renewals-2026")
+    assert (audit["removed"], audit["text_bytes"]) == (removal, None)
+    assert [item["source_id"] for item in value["context"]["tombstones"]] == ["renewals-2026"]
+    cited = next(source for source in value["evidence"]["sources"]
+                 if source["source_id"] == "renewals-2026")
+    assert (cited["available"], cited["removed"]) == (False, removal)
+    assert {"kind": "source_unavailable", "subject": "renewals-2026",
+            "detail": "removed from the run: deleted on request"} in value["issues"]
+    assert any("was removed from the run after this decision" in reason
+               for reason in value["delivery"]["reasons"])
+
+
+def test_ordinary_runs_have_no_durable_research_blocks(tmp_path, capsys):
+    result = run(tmp_path, policy("reject"))
+    code, value = inspect(capsys, tmp_path, result.execution_id)
+    assert code == EXIT_RUN_NOT_ACCEPTED
+    assert (value["context"], value["tool_calls"], value["evidence"]) == (None, None, None)
+    assert value["issues"] == [{"kind": "validator_rejected", "subject": "fixed-reject",
+                                "detail": value["delivery"]["reasons"][0]}]
