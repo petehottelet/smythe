@@ -396,6 +396,47 @@ class TwoSteps:
         ]), Registry()
 
 
+# The digest of the research output a TwoSteps draft is given offline.
+RESEARCH = DependencyDigest("research", 0, "completed", text_sha256("offline: Research"))
+
+
+def draft_snapshot(planned: ExecutionGraph, **changes) -> ContextSnapshot:
+    """The snapshot the draft of a planned TwoSteps run is given, with *changes*."""
+    fields = dict(
+        node_id="draft", generation=0, step="Draft", goal=task().goal,
+        constraints=tuple(task().constraints), acceptance_criteria=tuple(task().done_when),
+        task_sha256=task_sha256(task()), sources=SOURCES,
+        agent_id=next(node.agent_id for node in planned.nodes if node.id == "draft"),
+        dependencies=(RESEARCH,),
+    )
+    return ContextSnapshot(**{**fields, **changes})
+
+
+def record_operation(store, run_id, key, inputs, result=None, *, kind="context") -> None:
+    """Record a journal operation, completed with *result* if given, as another process would."""
+    lease = store.acquire_lease(run_id, "earlier-process", ttl_s=60)
+    store.begin_operation(lease, key, kind, inputs)
+    if result is not None:
+        store.complete_operation(lease, key, result)
+    store.release_lease(lease)
+
+
+def rewrite_checkpoint(store, run_id, change) -> None:
+    """Checkpoint the run again with *change* applied to a copy of its latest checkpoint."""
+    saved = store.get_checkpoint(run_id)
+    state = json.loads(json.dumps(saved["checkpoint"]))
+    change(state)
+    lease = store.acquire_lease(run_id, "earlier-process", ttl_s=60)
+    store.save_checkpoint(lease, saved["revision"], state)
+    store.release_lease(lease)
+
+
+def node_calls(store, run_id) -> list[str]:
+    """The scope of every node call the journal holds."""
+    return [call["key"]["scope_id"] for call in store.inspect_run(run_id)["calls"]
+            if call["key"]["scope_id"].startswith("node/")]
+
+
 def test_a_revision_cannot_rewire_a_node_that_has_its_snapshot(store):
     class Rewire:
         async def review(self, graph, node, **kwargs):
@@ -411,17 +452,9 @@ def test_a_revision_cannot_rewire_a_node_that_has_its_snapshot(store):
     run_id = planned.run_ref["run_id"]
     # The draft was given its snapshot, as a process does just before it
     # calls, while research was still running.
-    snapshot = ContextSnapshot(
-        node_id="draft", generation=0, step="Draft", goal=task().goal,
-        constraints=tuple(task().constraints), acceptance_criteria=tuple(task().done_when),
-        task_sha256=task_sha256(task()), sources=SOURCES,
-        agent_id=next(node.agent_id for node in planned.nodes if node.id == "draft"),
-        dependencies=(DependencyDigest("research", 0, "completed", text_sha256("offline: Research")),),
-    )
-    lease = store.acquire_lease(run_id, "earlier-process", ttl_s=60)
-    store.begin_operation(lease, context_key("draft", 0), "context", {"snapshot": snapshot.to_dict()})
-    store.complete_operation(lease, context_key("draft", 0), {"snapshot_id": snapshot.snapshot_id})
-    store.release_lease(lease)
+    snapshot = draft_snapshot(planned)
+    record_operation(store, run_id, context_key("draft", 0), {"snapshot": snapshot.to_dict()},
+                     {"snapshot_id": snapshot.snapshot_id})
 
     result = swarm.execute(planned)
     assert [node.id for node in result.graph.nodes] == ["research", "draft"]
@@ -429,6 +462,120 @@ def test_a_revision_cannot_rewire_a_node_that_has_its_snapshot(store):
     assert refused["error"] == "Revision targets work already admitted in the durable journal"
     assert load_context_snapshot(store, run_id, "draft") == snapshot
     assert result.output == "offline: Draft"
+
+
+def two_step_run(store) -> tuple[Swarm, ExecutionGraph]:
+    """A Swarm with context assembly and the TwoSteps run it planned."""
+    swarm = durable(store, architect=LocalOnly(TwoSteps, "two-steps", "1"), context_sources=SOURCES)
+    return swarm, swarm.plan(task())
+
+
+@pytest.mark.parametrize(("changes", "message"), [
+    ({"task_sha256": task_sha256(Task("Answer another question"))}, "The task differs"),
+    ({"dependencies": (DependencyDigest("research", 0, "completed", text_sha256("offline: Other")),)},
+     "output of step 'research' differs"),
+    ({"dependencies": (RESEARCH, DependencyDigest("extra", 0, "completed", "c" * 64))},
+     "output of step 'extra' differs"),
+    ({"dependencies": ()}, "dependencies differ"),
+], ids=["task", "dependency-output", "missing-dependency", "dependency-set"])
+def test_a_retained_snapshot_must_match_the_task_and_dependency_outputs(
+    store, sent, changes, message,
+):
+    swarm, planned = two_step_run(store)
+    run_id = planned.run_ref["run_id"]
+    # The journal kept a snapshot whose digests differ from what the draft
+    # would now be given.
+    snapshot = draft_snapshot(planned, **changes)
+    record_operation(store, run_id, context_key("draft", 0), {"snapshot": snapshot.to_dict()},
+                     {"snapshot_id": snapshot.snapshot_id})
+    with pytest.raises(WorkflowStateError, match=message):
+        swarm.execute(planned)
+    # Research ran; nothing was sent or journaled for the draft.
+    assert len(sent) == 1 and node_calls(store, run_id) == ["node/research"]
+
+
+NOT_ITS_SNAPSHOT = "does not belong to node 'draft' at generation 0"
+
+
+@pytest.mark.parametrize(("changes", "kind", "inputs", "result", "message"), [
+    ({"node_id": "research"}, "context", None, None, NOT_ITS_SNAPSHOT),
+    ({"generation": 1}, "context", None, None, NOT_ITS_SNAPSHOT),
+    ({"sources_revision": 1}, "context", None, None, NOT_ITS_SNAPSHOT),
+    ({}, "supervision", None, None, NOT_ITS_SNAPSHOT),
+    ({}, "context", None, {"snapshot_id": "0" * 64}, NOT_ITS_SNAPSHOT),
+    ({}, "context", {"revision": 0, "sources": []}, {"sha256": sources_sha256(())},
+     "snapshot of node 'draft' is invalid"),
+], ids=["another-node", "another-generation", "another-source-revision", "another-kind",
+        "another-result", "not-a-snapshot"])
+def test_a_context_record_that_is_not_the_nodes_snapshot_is_refused(
+    store, sent, changes, kind, inputs, result, message,
+):
+    swarm, planned = two_step_run(store)
+    run_id = planned.run_ref["run_id"]
+    # The draft's key holds a record that is not its snapshot at this
+    # generation and source revision.
+    snapshot = draft_snapshot(planned, **changes)
+    record_operation(store, run_id, context_key("draft", 0),
+                     {"snapshot": snapshot.to_dict()} if inputs is None else inputs,
+                     {"snapshot_id": snapshot.snapshot_id} if result is None else result, kind=kind)
+    with pytest.raises(WorkflowStateError, match=message):
+        swarm.execute(planned)
+    assert len(sent) == 1 and node_calls(store, run_id) == ["node/research"]
+
+
+@pytest.mark.parametrize(("change", "message"), [
+    ({"sha256": sources_sha256(CHANGED)}, "do not match the journal"),
+    ({"revision": 1}, "names context sources the journal lacks"),
+    ({"text": SOURCES[0].text}, "no valid context sources record"),
+], ids=["digest", "revision", "malformed"])
+def test_a_checkpoint_must_name_a_source_set_its_journal_holds(store, sent, change, message):
+    run_id = durable(store, context_sources=SOURCES).plan(task()).run_ref["run_id"]
+    rewrite_checkpoint(store, run_id, lambda state: state["context_sources"].update(change))
+    with pytest.raises(WorkflowStateError, match=message):
+        durable(store).resume(run_id)
+    with pytest.raises(WorkflowStateError, match=message):
+        durable(store).refresh_context(run_id, CHANGED)
+    assert sent == [] and load_context_sources(store, run_id, 1) is None
+
+
+@pytest.mark.parametrize("marker", [
+    {"response_error": {"type": "ProviderResponseError", "message": "Unreadable response"}},
+    {"accounting_invalid": True}, {"workflow_accounting_invalid": True},
+], ids=["response-error", "accounting-invalid", "workflow-accounting-invalid"])
+def test_refresh_refuses_a_run_with_unresolved_provider_accounting(store, marker):
+    run_id = durable(store, context_sources=SOURCES).plan(task()).run_ref["run_id"]
+    rewrite_checkpoint(store, run_id,
+                       lambda state: state["graph"]["nodes"][0]["metadata"].update(marker))
+    revision = store.get_checkpoint(run_id)["revision"]
+    with pytest.raises(WorkflowStateError, match="unresolved provider accounting"):
+        durable(store).refresh_context(run_id, CHANGED)
+    # The refused refresh recorded no sources and saved no checkpoint.
+    assert load_context_sources(store, run_id, 1) is None
+    assert store.get_checkpoint(run_id)["revision"] == revision
+
+
+def test_reading_back_refuses_a_record_that_is_not_the_one_asked_for(store):
+    run_id = durable(store, context_sources=SOURCES).plan(task()).run_ref["run_id"]
+
+    def snapshot(node_id, generation):
+        return {"snapshot": ContextSnapshot(node_id=node_id, generation=generation, step=node_id,
+                                            goal=None).to_dict()}
+
+    record_operation(store, run_id, context_key("draft", 0), snapshot("research", 0))
+    record_operation(store, run_id, context_key("draft", 1), snapshot("draft", 0))
+    record_operation(store, run_id, context_key("draft", 2), snapshot("draft", 2), kind="supervision")
+    record_operation(store, run_id, sources_key(1), {"revision": 2, "sources": []})
+    record_operation(store, run_id, sources_key(2), {"revision": 2, "sources": []},
+                     {"sha256": sources_sha256(SOURCES)})
+    for generation in (0, 1, 2):
+        with pytest.raises(ValueError, match="not this node's context snapshot"):
+            load_context_snapshot(store, run_id, "draft", generation)
+    with pytest.raises(ValueError, match="not a source set"):
+        load_context_sources(store, run_id, 1)
+    with pytest.raises(ValueError, match="does not match its recorded sha256"):
+        load_context_sources(store, run_id, 2)
+    assert load_context_snapshot(store, run_id, "draft", 3) is None
+    assert load_context_sources(store, run_id, 3) is None
 
 
 def test_a_graph_without_a_task_cannot_carry_task_context_under_context_assembly(store):
