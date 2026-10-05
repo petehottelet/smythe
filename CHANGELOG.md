@@ -502,6 +502,26 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `smythe.context` reads the records back. Recipes without
   `context_assembly` keep their prompts and records byte for byte. See
   [context snapshots](docs/tasks.md#context-snapshots).
+- Source evidence. `smythe.evidence` adds versioned JSON records:
+  `SourceRecord` (a source's id, version or digest, and its retained text, a
+  reference, or a tombstone that keeps only its identity, digest, reason and
+  time), `ClaimRecord` (a claim, supporting and contradicting passages quoted
+  from named sources, scope, unresolved questions and a proposed conclusion)
+  and `SourceEvidence`. `from_dict()` rejects unknown versions and keys. An
+  artifact carries its records in one `source-evidence` fenced block.
+  `SourceEvidenceValidator`, a final validator whose identity pins each
+  source's id, version, digest and state, rejects output whose evidence
+  states no claim, cites a source the run was not given, states another
+  version or digest, quotes a passage that is not verbatim in its source,
+  cites a source it does not list, or lists a contradiction the artifact's
+  body leaves out. A
+  passage from a tombstoned source cannot be checked, which gives an `error`
+  outcome and never acceptance. Whether a passage supports its claim stays a
+  judgement for a gate. A durable run whose strict policy has such a
+  validator journals the evidence its output carries as a `source_evidence`
+  operation keyed `source-evidence/<sha256>`, and
+  `smythe.evidence.load_source_evidence` reads it back without source text
+  unless `include_text=True`. See [source evidence](docs/source-evidence.md).
 
 ### Changed
 

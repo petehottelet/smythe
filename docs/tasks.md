@@ -150,7 +150,10 @@ already uses changes nothing. A run whose checkpoint is still `planned` only
 adopts the new revision. A completed run, or one without context assembly,
 raises `WorkflowStateError`. `smythe.context.load_context_snapshot` and
 `load_context_sources` read the records back; `ContextSnapshot.summary()`
-leaves out source text.
+leaves out source text. A deliverable can carry
+[source evidence](source-evidence.md) that cites these sources by id,
+version and digest, and `SourceEvidenceValidator` checks its quotes against
+them.
 
 Sources reach node calls, not planning. A recipe without `context_assembly`,
 which every run without `context_sources` records, keeps the prompts and

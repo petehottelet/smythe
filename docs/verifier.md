@@ -621,6 +621,17 @@ summary = JSONValidator({"checks": [
 ]})
 ```
 
+**Source evidence.** `SourceEvidenceValidator(sources)`, named
+`smythe.source-evidence`, checks the [source evidence](source-evidence.md)
+that an artifact carries in a `source-evidence` block against the sources the
+run was given: each cited source exists, its stated version and digest match,
+each quoted passage appears verbatim in its source's retained text, no passage
+cites a source the evidence does not list, and each contradiction the
+evidence lists appears in the artifact. A passage from a tombstoned source
+cannot be checked and gives an `error` outcome, never acceptance. The checks
+are mechanical: whether a passage supports its claim stays a judgement for a
+gate or a reviewer.
+
 ### Rejected generations
 
 Under a strict policy a regeneration keeps a record of what it discards. Each

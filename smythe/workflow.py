@@ -27,6 +27,9 @@ from smythe.context import (
     ContextSnapshot, DependencyDigest, context_key, snapshot_sources, sources_from_operation,
     sources_key, sources_sha256, text_sha256 as output_sha256,
 )
+from smythe.evidence import (
+    SOURCE_EVIDENCE_OPERATION, source_evidence_inputs, source_evidence_key, source_evidence_result,
+)
 from smythe.executor_base import REJECTED_GENERATIONS_KEY, SUPPORTED_PROMPT_ASSEMBLY_VERSIONS, ExecutorBase
 from smythe.graph import ExecutionGraph, NodeStatus, Revision, snapshot_run_ref
 from smythe.registry import Registry
@@ -35,6 +38,7 @@ from smythe.synthesizer import deliverable_sources
 from smythe.task import Task, snapshot_task, task_from_dict, task_to_dict
 from smythe.tracer import Tracer
 from smythe.validation import ValidationOutcome
+from smythe.validators import SourceEvidenceValidator
 from smythe.verifier import (
     ADVISORY_VERDICT_KEY, TOKEN_VERIFIER_IDENTITY, TokenVerifier, Verdict, Verifier,
     node_generation, validate_verification_checkpoint, verification_pending,
@@ -1302,6 +1306,7 @@ class WorkflowRuntime:
             final = await self._operation_result(
                 key, "synthesis", {"graph": graph_to_dict(self.graph)}, synthesize,
             )
+            await self._record_source_evidence(final["output"])
             acceptance = None if self.acceptance is None else await self._decide(key, final["output"])
             # The completed checkpoint consumes the synthesis and the decision together.
             self._save("completed", output=final["output"], acceptance=acceptance)
@@ -1315,6 +1320,31 @@ class WorkflowRuntime:
         return _synthesis_key(
             self.graph, scoped=self.checkpoint_version == 2 or bool(self._context_version),
         )
+
+    async def _record_source_evidence(self, output):
+        """Journal the source evidence *output* carries, when the strict policy checks it.
+
+        A ``source_evidence`` operation, keyed by the output's digest and the
+        run's source set, records the evidence read from the output, or why
+        there is none. The completed checkpoint consumes it with the decision.
+        A replay reads the recorded result; the evidence never decides
+        acceptance, which the policy's validators do.
+        """
+        if self.acceptance is None or not any(
+                isinstance(validator, SourceEvidenceValidator)
+                for validator in self.acceptance.final_validators):
+            return
+        sources = None
+        if self._context_version:
+            sources = {"revision": self.context_revision,
+                       "sha256": sources_sha256(self.context_sources)}
+        inputs = source_evidence_inputs(output, sources)
+
+        async def read(_):
+            return source_evidence_result(output)
+
+        await self._operation_result(source_evidence_key(inputs), SOURCE_EVIDENCE_OPERATION,
+                                     inputs, read)
 
     def _acceptance_inputs(self, synthesis_key, output_sha256, strategy, sources, used_fallback):
         """Everything a decision binds; its hash keys the acceptance operation."""

@@ -364,7 +364,12 @@ journals the decision:
   validators on the exact output and reads every gate's final verdict, with
   no provider call. It is keyed by the output digest and everything else its
   record binds, and the completed checkpoint consumes it together with the
-  synthesis, in one transaction.
+  synthesis, in one transaction. When the policy has a
+  `SourceEvidenceValidator`, a `source_evidence` operation keyed
+  `source-evidence/<sha256>` first records the
+  [source evidence](source-evidence.md#durable-runs) the output carries,
+  bound to its digest and the run's source set, and the same checkpoint
+  consumes it.
 - A process lost after synthesis and before the decision commits decides
   again on resume, on the same saved output. A process lost after the
   decision commits replays it, and one lost after the completed checkpoint

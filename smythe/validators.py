@@ -14,27 +14,40 @@ string, object and array sizes, exact or required keys, and citations from an
 allowed set. Both run locally, make no provider call, and report a rejection,
 never an error, for output that fails their checks, including bytes that are
 not UTF-8.
+
+:class:`SourceEvidenceValidator` checks the source evidence a deliverable
+carries (:mod:`smythe.evidence`) against the sources the run was given. Its
+checks are mechanical: they do not show that a passage supports its claim.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 import json
 import math
 import re
 from typing import Any
 
 from smythe.acceptance import ValidationSubject
+from smythe.context import ContextSnapshot, ContextSource
+from smythe.evidence import EVIDENCE_BLOCK, SourceEvidence, SourceRecord, read_source_evidence
 from smythe.validation import (
     ValidationFinding,
+    ValidationOutcome,
     ValidationReport,
     ValidatorIdentity,
     _json_data,
     _require_keys,
+    advisory_finding,
     hard_finding,
 )
 
 TEXT_VALIDATOR_VERSION = "1"
 JSON_VALIDATOR_VERSION = "1"
+SOURCE_EVIDENCE_VALIDATOR_VERSION = "1"
+# The source evidence checks, in the order they run.
+SOURCE_EVIDENCE_CHECKS = ("source_ids", "source_versions", "passages", "references",
+                          "contradictions")
 
 # Counts in JSON checks, and characters in text, accepted by a specification.
 _MAX_COUNT = 10_000
@@ -465,9 +478,201 @@ class JSONValidator:
             "json_invalid", f"output is not strict JSON: {message}"[:200])])
 
 
+# A source evidence report lists at most this many findings, rejections first.
+_MAX_EVIDENCE_FINDINGS = 32
+
+
+def _evidence_sources(sources: Any) -> tuple[SourceRecord, ...]:
+    """A validator's sources as records, each with a digest and a distinct id."""
+    if isinstance(sources, ContextSnapshot):
+        sources = sources.sources
+    if isinstance(sources, (str, bytes, Mapping)) or not isinstance(sources, Iterable):
+        raise TypeError("sources must be a ContextSnapshot or a sequence of ContextSource "
+                        "or SourceRecord values")
+    records = []
+    for source in sources:
+        if isinstance(source, ContextSource):
+            source = SourceRecord.from_context_source(source)
+        if not isinstance(source, SourceRecord):
+            raise TypeError("sources must be ContextSource or SourceRecord values, not "
+                            f"{type(source).__name__}")
+        if source.sha256 is None:
+            raise ValueError(f"source {source.source_id!r} needs its sha256 to be checked against")
+        records.append(source)
+    ids = [record.source_id for record in records]
+    if len(set(ids)) != len(ids):
+        raise ValueError("source ids must be distinct")
+    return tuple(records)
+
+
+def _evidence_findings(
+    evidence: SourceEvidence, body: str, held: dict[str, SourceRecord], checks: list[str],
+) -> tuple[list[ValidationFinding], list[ValidationFinding]]:
+    """The rejections the enabled *checks* find, and each source they could not read."""
+    rejected: list[ValidationFinding] = []
+    unavailable: dict[str, ValidationFinding] = {}
+    listed = {record.source_id for record in evidence.sources}
+    passages = list(evidence.passages())
+    if "source_ids" in checks:
+        named = dict.fromkeys([record.source_id for record in evidence.sources]
+                              + [passage.source_id for _, _, passage in passages])
+        rejected.extend(hard_finding(
+            "source_unknown", f"source {source_id!r} is not one of the sources the run was given",
+            observed=source_id) for source_id in named if source_id not in held)
+    if "source_versions" in checks:
+        for record in evidence.sources:
+            source = held.get(record.source_id)
+            if source is None:
+                continue
+            if record.source_version is not None and record.source_version != source.source_version:
+                rejected.append(hard_finding(
+                    "source_version_mismatch", f"source {record.source_id!r} is version "
+                    f"{record.source_version!r} in the evidence and {source.source_version!r} in "
+                    "the run's sources", expected=source.source_version,
+                    observed=record.source_version))
+            if record.sha256 is not None and record.sha256 != source.sha256:
+                rejected.append(hard_finding(
+                    "source_digest_mismatch", f"source {record.source_id!r} has another SHA-256 "
+                    "in the evidence than in the run's sources", expected=source.sha256,
+                    observed=record.sha256))
+    if "references" in checks:
+        rejected.extend(hard_finding(
+            "reference_dangling", f"claim {claim.claim_id!r} cites source {passage.source_id!r}, "
+            "which its evidence does not list",
+            observed={"claim_id": claim.claim_id, "source_id": passage.source_id})
+            for claim, _, passage in passages if passage.source_id not in listed)
+    if "passages" in checks:
+        for claim, role, passage in passages:
+            source = held.get(passage.source_id)
+            if source is not None and source.text is None:
+                reason = source.tombstone or "its text is not retained"
+                unavailable.setdefault(source.source_id, advisory_finding(
+                    "source_unavailable", f"source {source.source_id!r} is unavailable "
+                    f"({reason}), so passages quoted from it cannot be checked",
+                    observed={"source_id": source.source_id, "state": source.state}))
+            elif source is None or passage.quote not in source.text:
+                rejected.append(hard_finding(
+                    "passage_not_found", f"a {role} passage of claim {claim.claim_id!r} is not "
+                    f"quoted exactly from source {passage.source_id!r}",
+                    observed={"claim_id": claim.claim_id, "source_id": passage.source_id,
+                              "role": role}))
+    if "contradictions" in checks:
+        rejected.extend(hard_finding(
+            "contradiction_missing", f"the passage from source {passage.source_id!r} that "
+            f"contradicts claim {claim.claim_id!r} is not in the artifact",
+            observed={"claim_id": claim.claim_id, "source_id": passage.source_id})
+            for claim in evidence.claims for passage in claim.contradicting
+            if passage.quote not in body)
+    return rejected, list(unavailable.values())
+
+
+class SourceEvidenceValidator:
+    """Checks the source evidence a deliverable carries against the run's sources.
+
+    *sources* are the sources the run was given: a
+    :class:`~smythe.context.ContextSnapshot`, or a sequence of
+    :class:`~smythe.context.ContextSource` or
+    :class:`~smythe.evidence.SourceRecord` values, each with a digest. A
+    tombstoned record, or one without retained text, is an unavailable source.
+
+    The deliverable must carry one ``source-evidence`` block holding a
+    :class:`~smythe.evidence.SourceEvidence` record
+    (:func:`~smythe.evidence.render_source_evidence`); the rest of it is the
+    artifact's body. Output without a readable block, or that is not UTF-8,
+    is rejected, and so is evidence with fewer than ``min_claims`` claims
+    (default 1). The specification is a JSON object with ``min_claims`` and
+    ``checks``, both optional; ``checks`` lists the checks to run, by
+    default all of them:
+
+    - ``source_ids``: every source the evidence lists or a passage cites is
+      one of *sources*;
+    - ``source_versions``: each listed source's stated version and SHA-256
+      equal those of the source with its id;
+    - ``passages``: each supporting and contradicting passage is quoted
+      verbatim from the retained text of its source;
+    - ``references``: each passage cites a source the evidence lists;
+    - ``contradictions``: each contradicting passage appears verbatim in the
+      artifact's body, so a listed contradiction reaches the deliverable.
+
+    A failed check rejects the output. A passage from an unavailable source
+    cannot be checked, so without a rejection the report's outcome is
+    ``error``, which strict acceptance decides as ``indeterminate``, never
+    as accepted. The identity's configuration digest covers the specification
+    and each source's id, version, digest and state, never its text. These
+    checks are mechanical: whether a passage really supports its claim, or a
+    source deserves its weight, is a judgement for a gate or a reviewer.
+    ``name`` renames the validator, so that one policy can hold two of them.
+    """
+
+    def __init__(self, sources: Any, spec: dict[str, Any] | None = None, *,
+                 name: str = "smythe.source-evidence") -> None:
+        data = _spec(spec, "source evidence validator spec",
+                     {"checks": list(SOURCE_EVIDENCE_CHECKS), "min_claims": 1})
+        _count(data["min_claims"], "min_claims")
+        checks = _strings(data["checks"], "checks", limit=len(SOURCE_EVIDENCE_CHECKS))
+        unknown = sorted(set(checks) - set(SOURCE_EVIDENCE_CHECKS))
+        if unknown or not checks:
+            raise ValueError(f"checks must name at least one of {list(SOURCE_EVIDENCE_CHECKS)}"
+                             + (f"; unknown: {unknown}" if unknown else ""))
+        data["checks"] = [check for check in SOURCE_EVIDENCE_CHECKS if check in checks]
+        records = _evidence_sources(sources)
+        pins = [{"source_id": record.source_id, "source_version": record.source_version,
+                 "sha256": record.sha256, "state": record.state}
+                for record in sorted(records, key=lambda record: record.source_id)]
+        self._spec = data
+        self._sources = {record.source_id: record for record in records}
+        self._identity = ValidatorIdentity.for_config(
+            name, SOURCE_EVIDENCE_VALIDATOR_VERSION, {**data, "sources": pins})
+
+    @property
+    def identity(self) -> ValidatorIdentity:
+        return self._identity
+
+    @property
+    def spec(self) -> dict[str, Any]:
+        """A copy of the specification with every default filled in."""
+        return json.loads(json.dumps(self._spec))
+
+    @property
+    def sources(self) -> tuple[SourceRecord, ...]:
+        """The sources the evidence is checked against, as records."""
+        return tuple(self._sources.values())
+
+    def validate(self, subject: ValidationSubject) -> ValidationReport:
+        text, undecodable = _decode(subject)
+        if text is None:
+            return _report(self._identity, [undecodable])
+        try:
+            evidence, body = read_source_evidence(text)
+        except ValueError as exc:
+            return _report(self._identity, [hard_finding("evidence_invalid", str(exc)[:200])])
+        if evidence is None:
+            return _report(self._identity, [hard_finding(
+                "evidence_missing", f"output has no {EVIDENCE_BLOCK} block")])
+        rejected, unavailable = _evidence_findings(evidence, body, self._sources,
+                                                   self._spec["checks"])
+        if len(evidence.claims) < self._spec["min_claims"]:
+            rejected.insert(0, hard_finding(
+                "claims_too_few", f"the evidence states {len(evidence.claims)} claims; at least "
+                f"{self._spec['min_claims']} are required", expected=self._spec["min_claims"],
+                observed=len(evidence.claims)))
+        findings = rejected + unavailable
+        if len(findings) > _MAX_EVIDENCE_FINDINGS:
+            dropped = len(findings) - _MAX_EVIDENCE_FINDINGS + 1
+            findings = findings[:_MAX_EVIDENCE_FINDINGS - 1] + [advisory_finding(
+                "findings_truncated", f"{dropped} more findings are not listed", observed=dropped)]
+        if not rejected and unavailable:
+            return ValidationReport("output", tuple(findings), ValidationOutcome.ERROR,
+                                    self._identity)
+        return _report(self._identity, findings)
+
+
 __all__ = [
     "JSON_VALIDATOR_VERSION",
+    "SOURCE_EVIDENCE_CHECKS",
+    "SOURCE_EVIDENCE_VALIDATOR_VERSION",
     "TEXT_VALIDATOR_VERSION",
     "JSONValidator",
+    "SourceEvidenceValidator",
     "TextValidator",
 ]

@@ -355,7 +355,10 @@ connector or paid run.
    journal [read steps](docs/workflow-accounting.md#recorded-read-steps) of
    declared, versioned HTTP read profiles with byte, time, redirect and
    destination limits; a saved response is reused on resume, verified by
-   killing a real process against a fake service
+   killing a real process against a fake service. Versioned
+   [source and claim records](docs/source-evidence.md) travel with an
+   artifact, and a final validator rejects quotes that are not in their
+   sources and listed contradictions that do not reach the artifact
 2. **Approval gates and reconciled external actions** — pause, approve or
    reject with state that survives restart. Approval binds a verified
    principal to the exact action or artifact, with expiry and revocation

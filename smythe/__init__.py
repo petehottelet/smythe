@@ -19,6 +19,7 @@ from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
 from smythe.context import ContextSnapshot, ContextSource
 from smythe.design import DesignSystem, Finding, design_verifier, inspect_asset
 from smythe.distill import DistillationError, distill_template
+from smythe.evidence import ClaimPassage, ClaimRecord, SourceEvidence, SourceRecord
 from smythe.graph import FailurePolicy, Revision, RevisionError
 from smythe.loader import load_graph
 from smythe.mcp import MCPConfigError, MCPServerSpec, MCPSkillProvider, MCPToolRuntime
@@ -84,7 +85,7 @@ from smythe.validation import (
     ValidationReport,
     ValidatorIdentity,
 )
-from smythe.validators import JSONValidator, TextValidator
+from smythe.validators import JSONValidator, SourceEvidenceValidator, TextValidator
 
 __all__ = [
     "AcceptanceDecision",
@@ -101,6 +102,8 @@ __all__ = [
     "CapabilityMapper",
     "ChatMessage",
     "CheckpointStore",
+    "ClaimPassage",
+    "ClaimRecord",
     "CompletionResult",
     "ConstrainedArchitect",
     "ContextSnapshot",
@@ -151,6 +154,9 @@ __all__ = [
     "SimpleArchitect",
     "SkillProvider",
     "SkillRef",
+    "SourceEvidence",
+    "SourceEvidenceValidator",
+    "SourceRecord",
     "SubGraphTemplate",
     "Supervisor",
     "Swarm",
