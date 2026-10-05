@@ -153,7 +153,10 @@ the node's metadata. Under a
 [strict acceptance policy](verifier.md#strict-delivery-acceptance), a
 regenerated node's files are named for its generation and never replace an
 existing file, so a rejected generation's files keep the bytes that were
-judged. Nodes can receive dependency images as native vision inputs.
+judged. That publication links each file into place, so it needs a filesystem
+with hard links: on one without them, such as FAT or exFAT, the node fails
+with an `OSError` that says so; choose an `artifact_dir` on a filesystem with
+hard links, such as NTFS, APFS or ext4. Nodes can receive dependency images as native vision inputs.
 `OpenAIImageProvider` does not accept image inputs yet, so it raises
 `ValueError` for a request with attachments instead of generating without them.
 

@@ -1,5 +1,6 @@
 """Tests for ExecutorBase shared helpers."""
 
+import errno
 import inspect
 import os
 
@@ -392,6 +393,49 @@ def test_strict_artifacts_never_replace_an_existing_file(tmp_path, monkeypatch):
     assert (tmp_path / "hero_00.png").read_bytes() == b"earlier run"
     assert (tmp_path / "hero_00-2.png").read_bytes() == b"earlier crash"
     assert not list(tmp_path.glob(".*.tmp"))
+
+
+def _refuse_links(monkeypatch, code: int) -> None:
+    def link(source, destination):
+        raise OSError(code, os.strerror(code))
+
+    monkeypatch.setattr("smythe._publish.os.link", link)
+
+
+@pytest.mark.parametrize("code", [errno.EPERM, errno.ENOTSUP, errno.EOPNOTSUPP, errno.EINVAL],
+                         ids=["EPERM", "ENOTSUP", "EOPNOTSUPP", "EINVAL"])
+def test_strict_artifacts_on_a_filesystem_without_hard_links_name_the_cause(
+        tmp_path, monkeypatch, code):
+    """A failed link used to surface as a bare OSError such as "Operation not
+    permitted", which named neither hard links nor what to change."""
+    _refuse_links(monkeypatch, code)
+    node = Node(label="make an image", id="hero")
+    with pytest.raises(OSError) as raised:
+        _strict_base(tmp_path).finalize_node_result(node, _artifact_result())
+
+    message = str(raised.value)
+    assert raised.value.errno == code and isinstance(raised.value.__cause__, OSError)
+    assert "Filesystem does not support exclusive artifact publication" in message
+    assert "hard links" in message and "choose an artifact_dir" in message.lower()
+    assert str(tmp_path) in message
+    assert list(tmp_path.iterdir()) == [] and "artifacts" not in node.metadata
+
+
+def test_publication_names_the_missing_hard_links_for_jobs_too(tmp_path, monkeypatch):
+    from smythe.jobs.artifact_io import atomic_publish_bytes
+
+    _refuse_links(monkeypatch, errno.EPERM)
+    with pytest.raises(PermissionError, match="exclusive artifact publication") as raised:
+        atomic_publish_bytes(tmp_path / "artifact.bin", b"bytes")
+    assert "hard links" in str(raised.value) and "artifact_dir" not in str(raised.value)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_other_link_failures_keep_their_own_error(tmp_path, monkeypatch):
+    _refuse_links(monkeypatch, errno.ENOSPC)
+    with pytest.raises(OSError) as raised:
+        _strict_base(tmp_path).finalize_node_result(Node(label="image", id="hero"), _artifact_result())
+    assert raised.value.errno == errno.ENOSPC and "hard links" not in str(raised.value)
 
 
 def test_finalize_replaces_artifact_atomically(tmp_path, monkeypatch):

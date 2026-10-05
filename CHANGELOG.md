@@ -303,7 +303,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   carry its generation (`draw_g1_00.png`; the first generation keeps
   `draw_00.png`) and never replaces an existing file: a name that is taken,
   for example after an interrupted run, gets a numbered suffix
-  (`draw_00-2.png`). Runs without a strict policy keep their file names and
+  (`draw_00-2.png`). This publication needs hard links: on a filesystem
+  without them, such as FAT or exFAT, the node fails with an `OSError` that
+  names the cause and asks for an `artifact_dir` on a filesystem with hard
+  links. Runs without a strict policy keep their file names and
   still replace a regenerated node's files. See
   [artifacts and jobs](docs/architecture.md#artifacts-and-jobs).
 - Under a strict acceptance policy a regeneration keeps a bounded record of
