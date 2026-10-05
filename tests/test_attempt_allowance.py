@@ -16,8 +16,8 @@ import json
 
 import pytest
 
-from fakes import Crash, crash_when, kill_and_reap, launch_child, wait_for_barrier
-from smythe import FileCheckpointStore, RetryPolicy, Swarm
+from fakes import Crash, ManualClock, crash_when, kill_and_reap, launch_child, wait_for_barrier
+from smythe import FileCheckpointStore, RetryDeadlineError, RetryPolicy, Swarm
 from smythe import checkpoint as checkpoints
 from smythe import swarm as swarm_module
 from smythe.async_executor import AsyncExecutor
@@ -88,9 +88,9 @@ def graph() -> ExecutionGraph:
     return ExecutionGraph([Topology.SERIAL], [step()])
 
 
-def build(store, provider, policy=POLICY, *, parallel: bool = False) -> Swarm:
+def build(store, provider, policy=POLICY, *, parallel: bool = False, **options) -> Swarm:
     return Swarm(model="test-model", provider=provider, checkpoint_store=store, artifact_dir=None,
-                 retry_policy=policy, parallel=parallel)
+                 retry_policy=policy, parallel=parallel, **options)
 
 
 def used(state, node_id: str = "step"):
@@ -226,6 +226,35 @@ def test_a_crash_between_attempts_does_not_refill_the_allowance(monkeypatch, mod
     assert third.calls == []
 
 
+@pytest.mark.parametrize("mode", MODES)
+def test_each_attempt_is_saved_even_when_node_saves_are_batched(monkeypatch, mode):
+    """``checkpoint_every_n_nodes`` batches node saves, never the save that spends an attempt.
+
+    With fifty nodes to a save, the node's own updates write nothing during
+    the run, yet the checkpoint the crash leaves records both attempts, so
+    the resume makes only the one left.
+    """
+    store = Store()
+    first = Flaky(ConnectionError("reset"), Crash("process lost during the call"))
+    crash_when(monkeypatch, store, "save", lambda execution_id, state: len(first.calls) == 2)
+
+    with pytest.raises(Crash):
+        build(store, first, parallel=mode == "parallel",
+              checkpoint_every_n_nodes=50).execute(graph())
+    monkeypatch.undo()
+
+    execution_id, state = saved(store)
+    assert state["status"] == "running" and used(state) == 2
+
+    second = Flaky()
+    with pytest.raises(ConnectionError):
+        build(store, second, checkpoint_every_n_nodes=50).resume(execution_id)
+
+    assert (len(first.calls), len(second.calls)) == (2, 1)
+    assert len(first.calls) + len(second.calls) == ALLOWANCE
+    assert used(saved(store)[1]) == ALLOWANCE
+
+
 def test_without_persist_attempts_a_resume_refills_the_allowance(monkeypatch):
     store = Store()
     first = Flaky(ConnectionError("reset"), Crash("process lost during the call"))
@@ -355,6 +384,47 @@ def test_an_executor_starts_from_the_attempts_its_generation_used(mode, generati
 
     # A record for another generation leaves the node a fresh allowance.
     assert len(provider.calls) == calls
+
+
+class Slow(Flaky):
+    """Each call takes *seconds* on *clock* and then fails transiently."""
+
+    def __init__(self, clock: ManualClock, seconds: float) -> None:
+        super().__init__()
+        self.clock, self.seconds, self.started = clock, seconds, []
+
+    async def complete(self, system, prompt, model):
+        self.started.append(self.clock.monotonic())
+        self.clock.advance(self.seconds)
+        return await super().complete(system, prompt, model)
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_a_resumed_node_is_still_bound_by_its_retry_deadline(mode):
+    """``deadline_s`` starts again at the node's first attempt in the resuming process.
+
+    The node resumes at its second attempt with ten of eleven left. Each call
+    takes 4s on the tracer's clock, so the 10s deadline that starts with the
+    resumed attempt stops the node after three calls, long before its
+    allowance runs out.
+    """
+    clock = ManualClock()
+    clock.advance(100)  # The resuming process starts long after the crash.
+    provider = Slow(clock, 4)
+    executor = EXECUTORS[mode](
+        provider=provider, registry=Registry(), tracer=Tracer(clock=clock.monotonic),
+        artifact_dir=None, retry_policy=RetryPolicy(persist_attempts=True, deadline_s=10),
+        attempts_used={"step": {"execution_generation": 0, "attempts": 1}},
+    )
+    run_graph = ExecutionGraph([Topology.SERIAL], [step(max_retries=10)])
+
+    with pytest.raises(RetryDeadlineError):
+        execute(executor, run_graph)
+
+    # A fourth call would start at 112s, past the deadline at 110s.
+    assert provider.started == [100, 104, 108]
+    assert run_graph.nodes[0].status is NodeStatus.FAILED and "deadline" in run_graph.nodes[0].result
+    assert executor.attempts_used == {"step": {"execution_generation": 0, "attempts": 4}}
 
 
 @pytest.mark.parametrize("mode", MODES)
