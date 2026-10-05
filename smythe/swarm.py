@@ -58,6 +58,7 @@ from smythe.executor_base import (
     validate_retry_backoff_s,
 )
 from smythe.graph import ExecutionGraph, NodeStatus
+from smythe.lineage import LineagePolicy, snapshot_lineage_policy
 from smythe.memory import PlannerMemory
 from smythe.tools import ToolRuntime
 from smythe.planner import Architect, DeterministicArchitect, LLMArchitect, SimpleArchitect
@@ -387,6 +388,12 @@ class Swarm:
     before routing, planning or any node call. Durable runs refuse it. A policy
     with ``persist_attempts`` is saved with the run's checkpoints, with each
     node's attempts, so resume continues the allowance instead of refilling it.
+
+    ``lineage``, a :class:`~smythe.lineage.LineagePolicy`, opts each durable
+    run into artifact lineage under a declared access scope. It needs a
+    ``run_store`` and a strict ``acceptance`` policy, and is refused without
+    them when the Swarm is built. The run's recipe records it, so the run
+    resumes only under the same scope and reuse mode.
     """
 
     def __init__(
@@ -420,6 +427,7 @@ class Swarm:
         context_sources: Sequence[ContextSource] | None = None,
         renderer: MarkdownRenderer | LocalOnly | None = None,
         retry_policy: RetryPolicy | None = None,
+        lineage: LineagePolicy | None = None,
     ) -> None:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
         if renderer is not None and run_store is None:
@@ -434,6 +442,8 @@ class Swarm:
         self.retry_policy = retry_policy
         if graph_policy is not None and run_store is None:
             raise WorkflowBindingError("graph_policy requires a durable run_store")
+        if lineage is not None and run_store is None:
+            raise WorkflowBindingError("lineage requires a durable run_store")
         if read_tools is None:
             read_tools = ()
         if isinstance(read_tools, (str, bytes)) or not hasattr(read_tools, "__iter__"):
@@ -458,6 +468,11 @@ class Swarm:
                 f"acceptance must be an AcceptancePolicy or None, not {type(acceptance).__name__}"
             )
         self._acceptance = acceptance
+        self._lineage = snapshot_lineage_policy(lineage)
+        if self._lineage is not None and self._strict_policy() is None:
+            raise WorkflowBindingError(
+                "lineage requires a strict acceptance policy, whose decision its record binds"
+            )
         # The undecided record a strict run's unfinished checkpoints carry.
         self._pending_record: tuple[Task | None, DeliveryAcceptance] | None = None
         # An ordinary run builds its executor only after routing and planning,
@@ -1623,6 +1638,7 @@ class Swarm:
         graph_policy: WorkflowGraphPolicy | None = None,
         acceptance: AcceptancePolicy | None = None,
         read_tools: tuple[ReadProfile, ...] | list[ReadProfile] = (),
+        lineage: LineagePolicy | None = None,
     ) -> Swarm:
         """Create a Swarm pre-loaded with a YAML-defined execution graph.
 
@@ -1630,7 +1646,7 @@ class Swarm:
         defined in the YAML file.  Call execute() with the loaded graph
         to run it.  A delivery acceptance policy comes only from the
         ``acceptance`` argument, never from the file, and so do the read
-        profiles that the file's read steps name.
+        profiles that the file's read steps name and the ``lineage`` policy.
         """
         from smythe.loader import load_graph
 
@@ -1646,6 +1662,7 @@ class Swarm:
             graph_policy=graph_policy,
             acceptance=acceptance,
             read_tools=read_tools,
+            lineage=lineage,
         )
         if instance._graph_policy is not None:
             instance._graph_policy.validate(graph, default_model=instance.model)
@@ -1724,4 +1741,5 @@ class Swarm:
             read_tools=self._read_tools,
             context_sources=self._context_sources, renderer=self._renderer,
             artifact_dir=self.artifact_dir, retry_policy=self.retry_policy,
+            lineage=self._lineage,
         )

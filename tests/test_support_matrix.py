@@ -18,13 +18,13 @@ import pytest
 
 from fakes import RATE_LIMITED, MessagesTransport, NativeTransport
 from smythe import (
-    AnthropicMessagesProvider, AnthropicProvider, Artifact, BudgetEstimateRequired,
-    CallableVerifier, ChatMessage, CompletionResult, FailurePolicy, FileCheckpointStore,
-    GeminiProvider, LLMArchitect, OfflineProvider, OpenAIImageProvider, OpenAIProvider,
-    OpenAIResponsesProvider, PlannerMemory, Provider, ProviderAccountingError, ProviderFeatures,
-    ProviderResponseError, SimpleArchitect, SQLiteWorkflowStore, Swarm, SynthesisStrategy,
-    Synthesizer, Task, TokenVerifier, ToolRuntime, ToolSession, ToolSpec, WhiteRabbit,
-    WorkflowBindingError,
+    AcceptancePolicy, AnthropicMessagesProvider, AnthropicProvider, Artifact,
+    BudgetEstimateRequired, CallableVerifier, ChatMessage, CompletionResult, FailurePolicy,
+    FileCheckpointStore, GeminiProvider, LineagePolicy, LLMArchitect, OfflineProvider,
+    OpenAIImageProvider, OpenAIProvider, OpenAIResponsesProvider, PlannerMemory, Provider,
+    ProviderAccountingError, ProviderFeatures, ProviderResponseError, SimpleArchitect,
+    SQLiteWorkflowStore, Swarm, SynthesisStrategy, Synthesizer, Task, TextValidator,
+    TokenVerifier, ToolRuntime, ToolSession, ToolSpec, WhiteRabbit, WorkflowBindingError,
 )
 from smythe.checkpoint import build_state
 from smythe.graph import SYNTHESIS_NODE_ID, ExecutionGraph, Node, NodeStatus, Topology
@@ -257,6 +257,33 @@ def test_durable_run_rejects_a_changed_retry_backoff_before_any_call(store, monk
     assert calls == []
     after = store.inspect_run(run_id)
     assert after["calls"] == before["calls"] and after["revision"] == before["revision"]
+
+
+@pytest.mark.parametrize("durable,acceptance,needs", [
+    pytest.param(False, "strict", "durable run_store", id="ordinary"),
+    pytest.param(True, None, "strict acceptance", id="no-policy"),
+    pytest.param(True, "advisory", "strict acceptance", id="advisory-policy"),
+])
+def test_lineage_is_refused_without_a_durable_store_or_strict_policy_before_any_call(
+    store, tmp_path, monkeypatch, durable, acceptance, needs,
+):
+    policy = {"strict": AcceptancePolicy(mode="strict", final_validators=[TextValidator()]),
+              "advisory": AcceptancePolicy(), None: None}[acceptance]
+    path = tmp_path / "graph.yaml"
+    path.write_text("nodes:\n  - id: first\n    label: First\n", encoding="utf-8")
+    options = {"run_store": store} if durable else {}
+    calls = forbid_provider_calls(monkeypatch)
+    # The default LLMArchitect would make a paid planning call first.
+    with pytest.raises(WorkflowBindingError, match=needs) as caught:
+        Swarm(model="claude-opus-5-5", provider=AnthropicProvider(api_key="test-key"),
+              max_budget_usd=1, acceptance=policy, lineage=LineagePolicy(), **options)
+    assert str(caught.value).startswith("lineage ")
+    with pytest.raises(WorkflowBindingError, match=needs):
+        Swarm.from_yaml(str(path), model="claude-opus-5-5",
+                        provider=AnthropicProvider(api_key="test-key"), max_budget_usd=1,
+                        acceptance=policy, lineage=LineagePolicy(), **options)
+    assert calls == []
+    assert store.list_runs() == []
 
 
 def test_durable_run_ignores_artifact_dir_and_tool_iterations_and_allows_no_budget(store, tmp_path):

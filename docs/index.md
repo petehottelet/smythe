@@ -31,6 +31,7 @@ verification, trace, artifact, and recovery controls.
 ## Operate durable work
 
 - [Durable text workflows](workflow-accounting.md) — phase-wide native costs, saved graph limits, exact request quotes, fenced ownership, local response replay, recorded read steps with network limits, strict delivery acceptance journaled with each run and explicit re-evaluation under a changed validator, published documents whose acceptance binds their bytes, and journal upgrades
+- [Artifact lineage](lineage.md) — the opt-in lineage policy for strict durable runs: a declared access scope, the reuse switch, exact recipe identity, and the versioned record of ids, versions and digests
 - [Checkpoint format](checkpoint-format.md) — flushed atomic publication, saved state, and resume semantics
 - [Inspect saved runs](runs.md) — read-only `smythe runs inspect` and `list` over checkpoints and durable journals: execution, delivery acceptance and its decision history, a research run's context, reads, evidence and open issues, cost, timing, next action, and exit codes 10 and 11 for withheld output
 - [Source-to-artifact example](../examples/16_source_to_artifact.py) — offline and keyless: plan, journaled reads of bundled sources, an interruption, resume, and inspection of the accepted document and its evidence

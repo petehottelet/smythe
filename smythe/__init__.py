@@ -21,6 +21,7 @@ from smythe.design import DesignSystem, Finding, design_verifier, inspect_asset
 from smythe.distill import DistillationError, distill_template
 from smythe.evidence import ClaimPassage, ClaimRecord, SourceEvidence, SourceRecord
 from smythe.graph import FailurePolicy, Revision, RevisionError
+from smythe.lineage import ArtifactLineage, LineagePolicy
 from smythe.loader import load_graph
 from smythe.mcp import MCPConfigError, MCPServerSpec, MCPSkillProvider, MCPToolRuntime
 from smythe.memory import PlannerMemory
@@ -96,6 +97,7 @@ __all__ = [
     "AnthropicMessagesProvider",
     "ArchitectError",
     "Artifact",
+    "ArtifactLineage",
     "BudgetEstimateRequired",
     "BudgetReconciliationError",
     "BudgetValidationError",
@@ -120,6 +122,7 @@ __all__ = [
     "Finding",
     "FindingSeverity",
     "GeminiProvider",
+    "LineagePolicy",
     "LLMArchitect",
     "LLMSupervisor",
     "MCPConfigError",

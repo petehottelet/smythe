@@ -37,6 +37,7 @@ from smythe.evidence import (
 )
 from smythe.executor_base import REJECTED_GENERATIONS_KEY, SUPPORTED_PROMPT_ASSEMBLY_VERSIONS, ExecutorBase
 from smythe.graph import ExecutionGraph, NodeStatus, Revision, snapshot_run_ref
+from smythe.lineage import LINEAGE_REUSE_KEY, snapshot_lineage_policy
 from smythe.registry import Registry
 from smythe.provider import ProviderResponseError
 from smythe.task import Task, snapshot_task, task_from_dict, task_to_dict
@@ -553,6 +554,10 @@ class WorkflowRuntime:
     description only when there is one. Without a renderer, ``artifact_dir``
     is ignored, as before. :meth:`republish` publishes a completed run's
     document again when its file is missing or changed.
+
+    ``lineage``, a :class:`~smythe.lineage.LineagePolicy`, needs a strict
+    ``acceptance`` policy. The recipe records it only when it is configured,
+    and compares it exactly on every entry, like ``graph_policy``.
     """
 
     def __init__(self, *, store, model, max_budget_usd, provider, architect, registry,
@@ -560,7 +565,7 @@ class WorkflowRuntime:
                  tool_runtime, checkpoint_store, checkpoint_every_n_nodes, retry_backoff_s,
                  max_concurrency, graph_policy=None, behavior_settings=None, acceptance=None,
                  read_tools=(), context_sources=None, renderer=None, artifact_dir=None,
-                 retry_policy=None):
+                 retry_policy=None, lineage=None):
         if type(store) is not SQLiteWorkflowStore:
             raise WorkflowBindingError(
                 f"run_store must be SQLiteWorkflowStore itself, not {type(store).__name__}"
@@ -603,6 +608,11 @@ class WorkflowRuntime:
         # Only a strict policy decides delivery; an advisory one records nothing.
         if acceptance is not None and acceptance.mode is not AcceptanceMode.STRICT:
             acceptance = None
+        lineage = snapshot_lineage_policy(lineage)
+        if lineage is not None and acceptance is None:
+            raise WorkflowBindingError(
+                "lineage requires a strict acceptance policy, whose decision its record binds"
+            )
         if acceptance is not None and not acceptance.final_validators:
             from smythe.swarm import _synthesis_strategy
 
@@ -650,6 +660,7 @@ class WorkflowRuntime:
         self.retry_backoff_s = retry_backoff_s
         self.checkpoint_every_n_nodes = checkpoint_every_n_nodes
         self.graph_policy = snapshot_graph_policy(graph_policy)
+        self.lineage = lineage
         self.read_tools = _snapshot_read_tools(read_tools)
         # The run's directory is <artifact_dir>/<run id>; no renderer, no publication.
         self.renderer = renderer
@@ -713,6 +724,9 @@ class WorkflowRuntime:
         # change their identity and prevent otherwise compatible recovery.
         if self.graph_policy is not None:
             recipe["graph_policy"] = self.graph_policy.to_dict()
+        if self.lineage is not None:
+            # Identity, like graph_policy: a run keeps its scope and reuse mode.
+            recipe["lineage"] = self.lineage.to_dict()
         if self.gate_validator is not None:
             recipe["verifier"] = VALIDATOR_VERIFIER_IDENTITY
             recipe["validators"] = [describe_component(self.gate_validator, role="validator")]
@@ -776,6 +790,11 @@ class WorkflowRuntime:
             raise WorkflowConflictError(
                 "Workflow renderer differs from the saved recipe; resume the run with the renderer "
                 "it started with"
+            )
+        if _canonical(saved.get("lineage")) != _canonical(current.get("lineage")):
+            raise WorkflowConflictError(
+                "Workflow lineage policy differs from the saved recipe; resume the run with the "
+                "lineage policy it started with"
             )
         if _canonical(_without_pricing(saved, saved=True)) != _canonical(_without_pricing(current)):
             raise WorkflowConflictError("Workflow components or budget differ from the saved recipe")
@@ -986,7 +1005,7 @@ class WorkflowRuntime:
                 "regeneration_intent", "workflow_supervision", "native_receipts", "response_error",
                 "accounting_invalid", "accounting_error", "workflow_accounting_invalid", "cost_usd",
                 "cost_usd_unknown", "cost_usd_is_estimate", ADVISORY_VERDICT_KEY,
-                REJECTED_GENERATIONS_KEY, CONTEXT_SNAPSHOT_KEY,
+                REJECTED_GENERATIONS_KEY, CONTEXT_SNAPSHOT_KEY, LINEAGE_REUSE_KEY,
             )):
                 raise WorkflowBindingError("A new workflow cannot inherit execution or accounting history")
             if self._context_version and graph.task is None and "task_context" in node.metadata:

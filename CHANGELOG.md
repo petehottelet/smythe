@@ -704,6 +704,22 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   under `routing`; resume restores `graph.planning` from the saved plan
   without classifying again. The classifier prompt and durable recipes are
   unchanged. See [routing decisions](docs/architecture.md#routing-decisions).
+- `LineagePolicy` opts a durable run into artifact lineage:
+  `Swarm(run_store=..., acceptance=<strict policy>, lineage=LineagePolicy())`,
+  `Swarm.from_yaml(..., lineage=...)` and `WorkflowRuntime` take one. It
+  declares an `access_scope` label (declared, not authenticated, and compared
+  exactly), the `reuse` switch and what `undeclared_coverage` calls for
+  (`review` or `regenerate`). Without a `run_store` or a strict policy it is
+  refused before any routing, planning or node call. The recipe records it
+  under `lineage` only when configured, so other recipes keep their bytes,
+  and plan, execute, resume and re-evaluation compare it exactly: a run
+  resumed under another policy, or without its own, raises
+  `WorkflowConflictError`. A new durable graph cannot carry `lineage_reuse`
+  node metadata. `ArtifactLineage` is the versioned record of a run's
+  accepted artifact, delivery decision and each node's inputs as ids,
+  versions and digests, with no source text; its reader rejects unknown
+  versions and keys. Runs do not write lineage records yet. See
+  [artifact lineage](docs/lineage.md).
 
 ### Changed
 
