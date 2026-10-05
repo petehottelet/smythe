@@ -88,6 +88,15 @@ policy decides every other one.
 | `security_stop` | None yet: reserved for an explicit security stop | |
 | `deadline` | `RetryDeadlineError`: a retry policy's `deadline_s` ran out | No |
 
+A failed or skipped node keeps its last error's message as its result, which
+checkpoints save and dependents receive, and its trace span and log line keep
+it too. Provider and service messages can name an account, so each copy has
+provider account identifiers and keys in known formats, such as
+organization and project ids, replaced with placeholders like
+`org-[redacted]`; the exception the run raises is left unchanged. Native
+response error markers, Jobs call errors and Autotune trial errors are kept
+the same way.
+
 A status error is any exception that carries an HTTP status in `status_code`
 or `response.status_code`, as the OpenAI and Anthropic SDK status errors do.
 A durable rejection's read-only `ProviderRequestRejectedError.failure_class`

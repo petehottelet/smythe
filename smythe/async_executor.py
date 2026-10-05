@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from smythe._failures import is_terminal
+from smythe._redact import error_text
 from smythe.budget import BudgetValidationError, Sentinel, validate_token_count
 from smythe.executor_base import (
     DEFAULT_MAX_TOOL_ITERATIONS,
@@ -418,7 +419,7 @@ class AsyncExecutor(ExecutorBase):
                     if isinstance(exc, BudgetValidationError):
                         self.mark_accounting_invalid(node, exc)
                     node.status = NodeStatus.FAILED
-                    node.result = str(exc)
+                    node.result = error_text(exc)
                     self._tracer.on_node_error(node, exc)
                     self._tracer.on_node_end(node)
                     self.notify_update(node)
@@ -437,7 +438,7 @@ class AsyncExecutor(ExecutorBase):
 
         self.release_node_budget(node)
 
-        node.result = str(last_exc)
+        node.result = error_text(last_exc)
 
         if node.failure_policy == FailurePolicy.SKIP:
             node.status = NodeStatus.SKIPPED

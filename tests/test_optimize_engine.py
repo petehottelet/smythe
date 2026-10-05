@@ -350,6 +350,25 @@ async def test_holdout_rejection_never_promotes(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_an_unknown_trial_keeps_no_account_identifier_from_its_error(tmp_path):
+    organization = "org-" + "A1b2" * 6  # built here, so no tracked file holds an identifier
+    contract = _contract()
+    incumbent, challenger = _candidates(contract)
+
+    async def evaluate(_context: TrialContext) -> TrialOutcome:
+        raise RuntimeError(f"429 in organization {organization} on requests per min")
+
+    with ExperimentLedger(tmp_path / "redacted.sqlite3", durability="normal") as ledger:
+        runner = _runner(contract, ledger, evaluate)
+        with pytest.raises(OptimizationNeedsAttention):
+            await runner.run(incumbent, (challenger,))
+        (trial,) = ledger.list_trials(runner._build_plan(incumbent, (challenger,))["campaign_id"])
+        assert trial.status is TrialStatus.UNKNOWN
+        assert trial.error == ("evaluator raised RuntimeError after dispatch: 429 in organization "
+                               "org-[redacted] on requests per min")
+
+
+@pytest.mark.asyncio
 async def test_callback_failure_becomes_unknown_and_is_never_redispatched(tmp_path):
     contract = _contract()
     incumbent, challenger = _candidates(contract)

@@ -19,6 +19,7 @@ from typing import Any, Callable, Iterator
 from uuid import uuid4
 
 from smythe._money import MICROUSD
+from smythe._redact import redact_account_identifiers
 from smythe._sqlite import enable_wal
 from smythe.jobs.artifact_io import MAX_ARTIFACT_BYTES, MAX_IMAGE_PIXELS
 from smythe.jobs.models import MAX_CALL_TIMEOUT_S
@@ -1489,15 +1490,18 @@ class SQLiteRunStore:
     def fail_pre_dispatch(
         self, call_id: str, error: str, *, retryable: bool = False, lease: RunLease | None = None,
     ) -> None:
+        """Fail a call that was never dispatched; *error* is kept with account identifiers redacted."""
         with self._transaction() as cursor:
             now = self._clock_ns()
             call = self._call(cursor, call_id)
             self._assert_call_owner(cursor, call, lease, now)
             if call["status"] != "prepared":
                 raise InvalidTransitionError("call was already dispatched")
-            self._fail_safe_call(cursor, call, error, now, retryable=retryable)
+            self._fail_safe_call(cursor, call, redact_account_identifiers(error), now,
+                                 retryable=retryable)
 
     def mark_unknown_outcome(self, call_id: str, error: str, *, lease: RunLease | None = None) -> None:
+        """Record a dispatched call's outcome as unknown; *error* is kept with account identifiers redacted."""
         with self._transaction() as cursor:
             now = self._clock_ns()
             call = self._call(cursor, call_id)
@@ -1506,7 +1510,7 @@ class SQLiteRunStore:
                 raise InvalidTransitionError(
                     "unknown outcome requires a dispatched provider call"
                 )
-            self._unknown_call(cursor, call, error, now)
+            self._unknown_call(cursor, call, redact_account_identifiers(error), now)
 
     def recover_inflight(
         self,

@@ -7,6 +7,7 @@ import inspect
 import time
 
 from smythe._failures import is_terminal
+from smythe._redact import error_text
 from smythe.budget import BudgetValidationError
 from smythe.executor_base import ExecutorBase, NodeFinalizationError
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, _dependency_order
@@ -121,7 +122,7 @@ class Executor(ExecutorBase):
                     if isinstance(exc, BudgetValidationError):
                         self.mark_accounting_invalid(node, exc)
                     node.status = NodeStatus.FAILED
-                    node.result = str(exc)
+                    node.result = error_text(exc)
                     self._tracer.on_node_error(node, exc)
                     self._tracer.on_node_end(node)
                     self.notify_update(node)
@@ -135,7 +136,7 @@ class Executor(ExecutorBase):
         self.release_node_budget(node)
 
         node.status = NodeStatus.FAILED
-        node.result = str(last_exc)
+        node.result = error_text(last_exc)
 
         if node.failure_policy == FailurePolicy.SKIP:
             node.status = NodeStatus.SKIPPED

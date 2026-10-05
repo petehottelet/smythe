@@ -948,6 +948,16 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   current sources decides again. `evaluate_delivery` takes a keyword-only
   `unusable` mapping of validator identities to the reason each cannot
   check the output. See [source evidence](docs/source-evidence.md#durable-runs).
+- Provider and service error text no longer keeps account identifiers where
+  Smythe stores it. A failed or skipped node's result, which checkpoints save
+  and dependents receive, its trace span error and log line, the native
+  response error marker in node metadata, Jobs call and attempt errors, and
+  Autotune trial errors now replace organization and project ids and keys
+  in known provider formats with placeholders such as `org-[redacted]`, as
+  journaled read and source-evidence reasons already did. Raised exceptions
+  are unchanged. Durable decode rejections keep their text, which journals
+  compare byte for byte and which names no account. See
+  [failure classes](docs/execution.md#failure-classes).
 
 ## [0.9.1] - 2026-09-29
 

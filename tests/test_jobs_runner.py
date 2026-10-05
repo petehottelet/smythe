@@ -671,6 +671,43 @@ def test_invalid_accounting_preserves_already_dispatched_sibling_cost(tmp_path, 
     assert len(result["artifacts"]) == 1
 
 
+def test_stored_call_errors_keep_no_account_identifier(tmp_path, store_factory):
+    organization = "org-" + "A1b2" * 6  # built here, so no tracked file holds an identifier
+
+    class AccountRefusal(Provider):
+        async def complete(self, system, prompt, model):
+            raise ConnectionError(f"429 in organization {organization} on images per min")
+
+    class UnconfiguredPool(_FixedPool):
+        """Passes the run's start checks, then refuses each dispatch's own lookup."""
+
+        def __init__(self, provider):
+            super().__init__(provider)
+            self.lookups = 0
+
+        def get(self, operation):
+            self.lookups += 1
+            if self.lookups > 2:
+                raise RuntimeError(f"project for organization {organization} is not enabled")
+            return self.provider
+
+    data = _priced_manifest(count=2).to_dict()
+    data["execution"]["max_concurrency"] = 1
+    plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
+    for name, pool, status, error in (
+        ("after", _FixedPool(AccountRefusal()), "unknown_outcome",
+         "provider failure after dispatch: 429 in organization org-[redacted] on images per min"),
+        ("before", UnconfiguredPool(AccountRefusal()), "failed",
+         "project for organization org-[redacted] is not enabled"),
+    ):
+        store = store_factory(tmp_path / f"{name}.db")
+        result = asyncio.run(JobRunner(store, provider_pool=pool).start(
+            plan, make_approval(plan), manifest_root=tmp_path))
+        assert result["counts"] == {status: 2}
+        assert [item["error"] for item in result["operations"]] == [error, error]
+        assert organization not in repr(store.snapshot(result["run_id"], include_events=True))
+
+
 def test_arbitrary_provider_message_cannot_impersonate_accounting_classification(tmp_path, store_factory):
     class MisleadingFailure(Provider):
         def __init__(self):

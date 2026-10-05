@@ -24,6 +24,7 @@ from dataclasses import dataclass, field, replace
 from uuid import uuid4
 
 from smythe._errors import PicklableError
+from smythe._redact import error_text
 from smythe.budget import BudgetValidationError
 from smythe.tools import ChatMessage, ToolCall, ToolSpec, display_name, wire_name
 
@@ -237,12 +238,15 @@ def _native_receipt(metadata: dict, receipt: dict | None, *, phase: str) -> None
 
 
 def _response_error_marker(error: BaseException | None) -> dict | None:
-    """Find a native error through explicit settlement causes, without raw data."""
+    """Find a native error through explicit settlement causes, without raw data.
+
+    The marker keeps the message with account identifiers redacted.
+    """
     seen = set()
     while error is not None and id(error) not in seen:
         seen.add(id(error))
         if isinstance(error, ProviderResponseError):
-            return {"type": type(error).__name__, "message": str(error)[:500]}
+            return {"type": type(error).__name__, "message": error_text(error)[:500]}
         error = error.__cause__
     return None
 

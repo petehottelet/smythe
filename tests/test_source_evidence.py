@@ -19,7 +19,7 @@ from smythe.acceptance import ValidationSubject, check_validator, evaluate_deliv
 from smythe.context import sources_sha256, text_sha256
 from smythe.evidence import (
     EVIDENCE_BLOCK, SOURCE_EVIDENCE_OPERATION, load_source_evidence, read_source_evidence,
-    render_source_evidence, source_evidence_inputs, source_evidence_key,
+    render_source_evidence, source_evidence_inputs, source_evidence_key, source_evidence_result,
 )
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult
@@ -554,6 +554,19 @@ def test_a_tombstoned_source_leaves_a_durable_decision_indeterminate(store, repl
     assert result.acceptance.decision is AcceptanceDecision.INDETERMINATE
     assert (result.output, result.rejected_output) == ("", artifact(KEPT))
     assert "source_unavailable" in result.acceptance.reasons[0]
+
+
+def test_the_recorded_problem_keeps_no_account_identifier(store, replies):
+    organization = "org-" + "A1b2" * 6  # built here, so no tracked file holds an identifier
+    unreadable = KEPT + f'```{EVIDENCE_BLOCK}\n{{"{organization}": 1, "{organization}": 2}}\n```\n'
+    problem = source_evidence_result(unreadable)["problem"]
+    assert problem == ("the source-evidence block is not strict JSON: duplicate key "
+                       "'org-[redacted]'")
+    script, _ = replies
+    script["Write"] = [unreadable]
+    result = durable(store).execute(single())
+    loaded = load_source_evidence(store, result.execution_id)
+    assert loaded["problem"] == problem and loaded["claims"] == []
 
 
 def test_runs_without_an_evidence_validator_record_no_evidence(store, replies):
