@@ -153,10 +153,12 @@ Who calls again after a failure depends on the path and the provider:
   policy lists (`transient` by default, so not after a 401, 403, 404 or 413),
   waits for a transient status error's `Retry-After` or a capped backoff,
   and stops at the policy's deadline. A provider whose SDK may send a failed
-  call again is refused before routing, planning or any node call: one that
-  does not declare `sdk_retries=0`, such as `AnthropicProvider` or
-  `OpenAIProvider` without `max_retries=0`, or a custom provider that
-  declares nothing. See [retry policy](execution.md#retry-policy).
+  call again is refused before routing, planning or any node call, whether
+  the run's own, a router classifier's, an architect's or an
+  `LLMSupervisor`'s: one that does not declare `sdk_retries=0`, such as
+  `AnthropicProvider` or `OpenAIProvider` without `max_retries=0`, or a
+  custom provider that declares nothing. See
+  [retry policy](execution.md#retry-policy).
 - **Ordinary runs, native providers**: once a request is attempted, no node
   policy calls again. An HTTP error including a 429, a transport failure, a
   refusal, a truncation or an unresolved bill raises `ProviderResponseError`
@@ -252,7 +254,12 @@ Tests:
   refused before any provider call, planning included,
   `tests/test_retry_policy.py::test_a_provider_whose_sdk_may_retry_is_refused_before_any_call`
   and `tests/test_retry_policy.py::test_an_executor_with_a_policy_refuses_hidden_sdk_retries_before_any_node_call`;
-  accepted with `max_retries=0` `tests/test_retry_policy.py::test_a_provider_that_sends_each_call_once_runs_under_a_policy`.
+  every other provider a run can call
+  `tests/test_retry_policy.py::test_every_provider_a_run_can_call_is_refused_before_any_call_when_its_sdk_may_retry`,
+  `tests/test_retry_policy.py::test_a_supervisor_whose_sdk_may_retry_is_refused_before_a_graph_runs`
+  and `tests/test_retry_policy.py::test_resume_refuses_a_merge_whose_sdk_may_retry_when_every_node_completed`;
+  accepted with `max_retries=0` `tests/test_retry_policy.py::test_a_provider_that_sends_each_call_once_runs_under_a_policy`
+  and `tests/test_retry_policy.py::test_a_run_whose_every_provider_sends_each_call_once_runs_under_a_policy`.
 - Ordinary runs, native providers: `tests/test_support_matrix.py::test_native_provider_failure_on_an_ordinary_run_is_terminal_under_a_retry_policy`,
   `tests/test_native_response_accounting.py::test_native_failure_is_terminal_and_preserves_exposure`;
   stop reasons `tests/test_failure_classes.py::test_responses_decode_sets_the_stop_reason_without_changing_the_message`,

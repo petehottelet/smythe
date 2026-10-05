@@ -15,19 +15,23 @@ import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import FrozenInstanceError
 import inspect
+import json
 import math
 import sys
 from types import SimpleNamespace
 
 import pytest
 
-from fakes import _STATUS_ERRORS, HttpError, ManualClock
+from fakes import _STATUS_ERRORS, HttpError, ManualClock, phase_of
 from smythe import RetryDeadlineError, RetryPolicy
 from smythe._failures import classify_failure, is_terminal
 from smythe.async_executor import AsyncExecutor
 from smythe.checkpoint import FileCheckpointStore
+from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
+from smythe.constrained_prompts import CONSTRAINED_SYSTEM_PROMPT
 from smythe.executor import Executor
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
+from smythe.planner import LLMArchitect, SimpleArchitect
 from smythe.pricing_anthropic import MODEL as FABLE
 from smythe.provider import (
     AnthropicProvider, CompletionResult, GeminiProvider, OfflineProvider, OpenAIImageProvider,
@@ -37,8 +41,11 @@ from smythe.provider import (
 from smythe.provider_messages import AnthropicMessagesProvider
 from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.registry import Registry
+from smythe.router import WhiteRabbit
 from smythe.scheduling import _retry_after_s
+from smythe.supervisor import LLMSupervisor
 from smythe.swarm import Swarm
+from smythe.synthesizer import SynthesisStrategy, Synthesizer
 from smythe.task import Task
 from smythe.tools import ToolCall, ToolRuntime, ToolSession, ToolSpec
 from smythe.tracer import Tracer
@@ -677,6 +684,163 @@ def test_a_provider_that_sends_each_call_once_runs_under_a_policy(monkeypatch):
 
     assert result.output == "Drafted" and len(requests) == 2
     assert all(options == {"api_key": "test-key", "max_retries": 0} for options in created)
+
+
+REPLIES = {
+    "planning": json.dumps({"topology": ["serial"], "nodes": [{"id": "draft", "label": "Draft"}]}),
+    "selection": json.dumps([{"template": "draft"}]),
+    "routing": "autonomous",
+    "supervision": json.dumps({"change": False}),
+}
+
+
+class Answering(Provider):
+    """Answers a call of any phase of a run and declares ``sdk_retries``; ``calls`` names each phase."""
+
+    def __init__(self, sdk_retries: int | None = 0) -> None:
+        self.sdk_retries, self.calls = sdk_retries, []
+
+    def feature_support(self, model):
+        return ProviderFeatures(sdk_retries=self.sdk_retries)
+
+    async def complete(self, system, prompt, model):
+        phase = "selection" if system == CONSTRAINED_SYSTEM_PROMPT else phase_of(system)
+        self.calls.append(phase)
+        return CompletionResult(REPLIES.get(phase, "done"), prompt_tokens=1, completion_tokens=1)
+
+
+def draft_template():
+    return SubGraphTemplate("draft", "Write a draft",
+                            lambda task, **params: ([Node(id="draft", label="Draft")], Registry()))
+
+
+# Each Swarm option that gives a run a provider besides its own, and the phase
+# of the call that provider answers.
+OTHER_CALLERS = {
+    "planning-provider": (lambda other: {"planning_provider": other}, "planning"),
+    "llm-architect": (lambda other: {
+        "architect": LLMArchitect(provider=other, planning_model="custom"),
+    }, "planning"),
+    "constrained-architect": (lambda other: {
+        "architect": ConstrainedArchitect(provider=other, templates=[draft_template()],
+                                          model="custom"),
+    }, "selection"),
+    "router-tier": (lambda other: {
+        "router": WhiteRabbit(autonomous=LLMArchitect(provider=other, planning_model="custom")),
+    }, "planning"),
+    "router-classifier": (lambda other: {
+        "router": WhiteRabbit(autonomous=SimpleArchitect(), classifier_provider=other,
+                              classifier_model="custom"),
+    }, "routing"),
+    "supervisor": (lambda other: {
+        "supervisor": LLMSupervisor(other, model="custom"), "max_revisions": 1,
+    }, "supervision"),
+    "supervisor-node-model": (lambda other: {
+        "supervisor": LLMSupervisor(other), "max_revisions": 1,
+    }, "supervision"),
+}
+
+
+def enter(swarm, entry, task_or_graph):
+    if entry == "plan":
+        return swarm.plan(task_or_graph)
+    if entry in ("execute-async", "graph-async"):
+        return asyncio.run(swarm.execute_async(task_or_graph))
+    return swarm.execute(task_or_graph)
+
+
+@pytest.mark.parametrize("entry", ["plan", "execute", "execute-async", "parallel"])
+@pytest.mark.parametrize("caller", OTHER_CALLERS)
+@pytest.mark.parametrize("sdk_retries", [None, 2], ids=["undeclared", "two"])
+def test_every_provider_a_run_can_call_is_refused_before_any_call_when_its_sdk_may_retry(
+    caller, sdk_retries, entry,
+):
+    provider, other = Answering(), Answering(sdk_retries)
+    options, _ = OTHER_CALLERS[caller]
+    swarm = Swarm(model="custom", provider=provider, retry_policy=RetryPolicy(), artifact_dir=None,
+                  parallel=entry == "parallel", **options(other))
+
+    with pytest.raises(ValueError, match="retry_policy must be the only retry owner"):
+        enter(swarm, entry, Task("Report"))
+
+    assert provider.calls == [] and other.calls == []
+
+
+@pytest.mark.parametrize("entry", ["execute", "parallel"])
+@pytest.mark.parametrize("caller", OTHER_CALLERS)
+def test_a_run_whose_every_provider_sends_each_call_once_runs_under_a_policy(caller, entry):
+    provider, other = Answering(), Answering(0)
+    options, phase = OTHER_CALLERS[caller]
+    swarm = Swarm(model="custom", provider=provider, retry_policy=RetryPolicy(), artifact_dir=None,
+                  parallel=entry == "parallel", **options(other))
+
+    result = swarm.execute(Task("Report"))
+
+    assert result.output == "done" and other.calls == [phase]
+    assert provider.calls[-1] == "execution"
+
+
+@pytest.mark.parametrize("entry", ["graph", "graph-async", "parallel"])
+@pytest.mark.parametrize("model", [None, "custom"], ids=["node-model", "own-model"])
+def test_a_supervisor_whose_sdk_may_retry_is_refused_before_a_graph_runs(entry, model):
+    provider, reviewer = Answering(), Answering(None)
+    swarm = Swarm(model="custom", provider=provider, retry_policy=RetryPolicy(), artifact_dir=None,
+                  parallel=entry == "parallel", supervisor=LLMSupervisor(reviewer, model=model),
+                  max_revisions=1)
+    node = Node(id="draft", label="Draft")
+
+    with pytest.raises(ValueError, match="retry_policy must be the only retry owner"):
+        enter(swarm, entry, ExecutionGraph([Topology.SERIAL], [node]))
+
+    assert provider.calls == [] and reviewer.calls == [] and node.status is NodeStatus.PENDING
+
+
+def test_a_supervisor_that_can_make_no_review_is_not_refused():
+    provider, reviewer = Answering(), Answering(None)
+    swarm = Swarm(model="custom", provider=provider, retry_policy=RetryPolicy(), artifact_dir=None,
+                  supervisor=LLMSupervisor(reviewer))
+
+    assert swarm.execute(Task("Report")).output == "done"
+    assert reviewer.calls == []
+
+
+def failed_checkpoint(tmp_path, *, synthesizer=None):
+    """Save the checkpoint of a run whose one node failed, or with *synthesizer*, whose merge did."""
+    provider = Scripted(HttpError(403, "permission_error"))
+    if synthesizer is not None:
+        provider = Scripted("drafted", HttpError(403, "permission_error"))
+    swarm = Swarm(model="custom", provider=provider, retry_policy=RetryPolicy(), artifact_dir=None,
+                  checkpoint_store=FileCheckpointStore(tmp_path), synthesizer=synthesizer)
+    with pytest.raises(_STATUS_ERRORS[403]):
+        swarm.execute(ExecutionGraph([Topology.SERIAL], [Node(id="draft", label="Draft")]))
+    return FileCheckpointStore(tmp_path).list_ids()[0]
+
+
+def test_resume_refuses_a_supervisor_whose_sdk_may_retry_before_any_call(tmp_path):
+    execution_id = failed_checkpoint(tmp_path)
+    provider, reviewer = Answering(), Answering(None)
+    swarm = Swarm(model="custom", provider=provider, retry_policy=RetryPolicy(), artifact_dir=None,
+                  checkpoint_store=FileCheckpointStore(tmp_path),
+                  supervisor=LLMSupervisor(reviewer), max_revisions=1)
+
+    with pytest.raises(ValueError, match="retry_policy must be the only retry owner"):
+        swarm.resume(execution_id)
+
+    assert provider.calls == [] and reviewer.calls == []
+
+
+def test_resume_refuses_a_merge_whose_sdk_may_retry_when_every_node_completed(tmp_path):
+    merge = Synthesizer(SynthesisStrategy.LLM_MERGE)
+    execution_id = failed_checkpoint(tmp_path, synthesizer=merge)
+    provider = Answering(None)
+    swarm = Swarm(model="custom", provider=provider, retry_policy=RetryPolicy(), artifact_dir=None,
+                  checkpoint_store=FileCheckpointStore(tmp_path), synthesizer=merge)
+
+    # No node is left to run, so only the merge would call the provider.
+    with pytest.raises(ValueError, match="retry_policy must be the only retry owner"):
+        swarm.resume(execution_id)
+
+    assert provider.calls == []
 
 
 # ---------------------------------------------------------------------------

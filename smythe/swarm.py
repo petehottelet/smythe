@@ -72,7 +72,7 @@ from smythe.provider import (
 )
 from smythe.registry import Registry
 from smythe.scheduling import RetryPolicy
-from smythe.supervisor import Supervisor
+from smythe.supervisor import LLMSupervisor, Supervisor
 from smythe.synthesizer import SynthesisStrategy, Synthesizer, deliverable_sources
 from smythe.task import Task, snapshot_task, task_snapshots_equal, task_to_dict
 from smythe.tracer import Tracer
@@ -258,6 +258,27 @@ def _planning_architects(router: Any, architect: Any) -> tuple[Any, ...]:
     return ()
 
 
+def _planning_calls(router: Any, architect: Any) -> list[tuple[Any, str]]:
+    """The provider and model of every call routing or planning could make.
+
+    A ``WhiteRabbit``'s classifier and the tiers it could return, or
+    *architect* without a router. Of the built-in architects only
+    ``LLMArchitect`` and ``ConstrainedArchitect`` call a provider.
+    """
+    calls: list[tuple[Any, str]] = []
+    architects: tuple[Any, ...] = (architect,) if router is None else ()
+    if isinstance(router, WhiteRabbit):
+        if router._classifier_provider is not None:
+            calls.append((router._classifier_provider, router._classifier_model))
+        architects = router._architects()
+    for item in architects:
+        if isinstance(item, LLMArchitect):
+            calls.append((item._provider, item._planning_model))
+        elif isinstance(item, ConstrainedArchitect):
+            calls.append((item._provider, item._model))
+    return calls
+
+
 def _check_gate_planning(policy: AcceptancePolicy | None, architects: tuple[Any, ...]) -> None:
     """Refuse, before planning, a strict run whose plan no gate could accept.
 
@@ -346,9 +367,12 @@ class Swarm:
     ``retry_policy``, a :class:`~smythe.scheduling.RetryPolicy`, makes the
     executor the only retry owner of an ordinary run's node calls: only the
     failure classes it lists are retried, waits follow ``Retry-After`` up to
-    a cap, and a deadline bounds each node's attempts and waits. The run's
-    provider must declare ``sdk_retries=0``, or the run is refused before
-    routing, planning or any node call. Durable runs refuse it.
+    a cap, and a deadline bounds each node's attempts and waits. Every
+    provider the run can call must declare ``sdk_retries=0``: its own, a
+    ``WhiteRabbit`` classifier's, each ``LLMArchitect`` or
+    ``ConstrainedArchitect`` that could plan it, and an ``LLMSupervisor``'s
+    when ``max_revisions`` allows a review. Otherwise the run is refused
+    before routing, planning or any node call. Durable runs refuse it.
     """
 
     def __init__(
@@ -719,13 +743,43 @@ class Swarm:
         A tool runtime offers tools to every node, and an ``LLM_MERGE``
         synthesis calls the run's model, so both are known before any plan.
         So is a retry policy, which needs a provider whose SDK sends each
-        call once.
+        call once, as does an ``LLMSupervisor``'s provider.
         """
         if self._tool_runtime is not None or self.retry_policy is not None:
             check_provider_support(self._provider, str(self.model), node_id=None,
                                    check_model=False, tools=self._tool_runtime is not None,
                                    retry_owner=self.retry_policy is not None)
         self._check_synthesis_support(self.max_budget_usd)
+        self._check_retry_owners()
+
+    def _check_retry_owners(
+        self, graph: ExecutionGraph | None = None, *, planning: bool = False,
+    ) -> None:
+        """Under a retry policy, refuse every call the run can make that an SDK may send again.
+
+        Nodes and synthesis call the run's provider. An ``LLMSupervisor``
+        that ``max_revisions`` lets review calls its own provider, with its
+        model or else the reviewed node's: the run's model before a plan
+        exists, then each of *graph*'s. With *planning*, so are the calls
+        routing and planning could make (see ``_planning_calls``).
+        """
+        if self.retry_policy is None:
+            return
+        calls = [(self._provider, self.model)]
+        if planning:
+            calls += _planning_calls(self._router, self._architect)
+        supervisor = self.supervisor
+        if isinstance(supervisor, LLMSupervisor) and self.max_revisions > 0:
+            if supervisor._model:
+                models = {supervisor._model}
+            elif graph is None:
+                models = {self.model}
+            else:
+                models = {node.metadata.get("model", "") for node in graph.nodes}
+            calls += [(supervisor._provider, model) for model in sorted(models, key=str)]
+        for provider, model in calls:
+            check_provider_support(provider, str(model), node_id=None, check_model=False,
+                                   retry_owner=True)
 
     def _check_synthesis_support(self, max_budget_usd: float | None) -> None:
         # A synthesizer that is not a Synthesizer has no merge to check.
@@ -748,6 +802,7 @@ class Swarm:
         could plan generates its gates, which that policy does not count.
         """
         self._check_run_support()
+        self._check_retry_owners(planning=True)
         architects = _planning_architects(self._router, self._architect)
         if architects and all(type(item) is LLMArchitect for item in architects):
             check_provider_support(self._provider, str(self.model), node_id=None,
@@ -765,11 +820,16 @@ class Swarm:
             )
 
     def _check_dispatch_support(self, graph: ExecutionGraph, budget: Sentinel) -> None:
-        """Reject, before any node runs, nodes or a synthesis the provider cannot serve."""
+        """Reject, before any node runs, nodes or a synthesis the provider cannot serve.
+
+        Under a retry policy, synthesis and supervision must send each call
+        once too, even when no node is left to run.
+        """
         check_pending_nodes(self._provider, graph, max_budget_usd=budget.max_budget_usd,
                             tools=self._tool_runtime is not None,
                             retry_owner=self.retry_policy is not None)
         self._check_synthesis_support(budget.max_budget_usd)
+        self._check_retry_owners(graph)
 
     def _plan(self, task: Task, tracer: Tracer, *, executing: bool = True) -> ExecutionGraph:
         """Plan *task*, measuring routing and planning on *tracer*.

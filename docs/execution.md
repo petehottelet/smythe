@@ -134,10 +134,16 @@ then, such as an HTTP client's own request timeout, stays a `transient`
 timeout and is retried. The deadline also bounds the single attempt of a
 `HALT` or `SKIP` node. It is measured on the tracer's monotonic clock.
 
-A run under a policy needs each node call sent once. Its provider must
-declare `ProviderFeatures.sdk_retries` as `0` through `feature_support()`,
-or the run is refused with `ValueError` before routing, planning or any node
-call:
+A run under a policy needs every provider call sent once, planning and
+supervision included. Each provider the run can call must declare
+`ProviderFeatures.sdk_retries` as `0` through `feature_support()`: the run's
+own, a `WhiteRabbit` classifier's, that of each `LLMArchitect` or
+`ConstrainedArchitect` that could plan the run (directly, as a router tier,
+or built from `planning_provider`), and an `LLMSupervisor`'s when
+`max_revisions` lets it review. Otherwise the run is refused with
+`ValueError` before routing, planning or any node call. `execute(graph)` and
+`resume()` check the run's provider and the supervisor's before their first
+call, even when only synthesis is left to run:
 
 | Provider | Declared `sdk_retries` |
 |---|---|
@@ -179,8 +185,9 @@ An ordinary Swarm also checks what its provider declares through
 router or architect is called:
 
 - A `tool_runtime` needs a provider that can call tools.
-- A `retry_policy` needs a provider that declares `sdk_retries=0` (see
-  [retry policy](#retry-policy)).
+- A `retry_policy` needs every provider the run can call, including a
+  router classifier's, an architect's and an `LLMSupervisor`'s, to declare
+  `sdk_retries=0` (see [retry policy](#retry-policy)).
 - An `LLM_MERGE` synthesizer, which calls the run's model after every node
   finishes, needs the per-call ceiling a capped call to that model requires
   and a model the provider accepts.

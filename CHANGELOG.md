@@ -930,6 +930,14 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   whose bytes no longer match the `sha256` in its record now raises
   `smythe.executor_base.ArtifactIntegrityError` before the call. Records
   without a digest, written before digests were recorded, attach as before.
+- A run under a `RetryPolicy` refuses, before routing, planning or any node
+  call, every provider it can call whose SDK may send a failed call again,
+  not only its own: a `WhiteRabbit` classifier's, that of each `LLMArchitect`
+  or `ConstrainedArchitect` that could plan it, including one built from
+  `planning_provider`, and an `LLMSupervisor`'s when `max_revisions` lets it
+  review. `execute(graph)` and `resume()` check the run's provider and the
+  supervisor's even when only synthesis is left to run. These calls used to
+  go out with the SDK's own retries.
 
 ## [0.9.1] - 2026-09-29
 
