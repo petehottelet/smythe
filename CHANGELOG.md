@@ -212,6 +212,20 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   and decisions recorded earlier show one derived from their saved interval
   endpoints, labeled as derived. See the
   [three-way verdict](docs/optimize.md#confirmation-and-holdout-protocol).
+- Preview contract types for external actions in `smythe.actions`, which
+  `import smythe` does not load. `ActionIntent` binds an operation, a
+  tenant-scoped `ActionTarget`, JSON parameters, the accepted content's
+  `ContentRef` and the connector's name and version under contract
+  `smythe.action.v1`; its `digest()` is stable under key reordering and
+  changes with any field. `action_key()` derives one key from the journal,
+  run, slot and sequence that every attempt of an action reuses.
+  `ConnectorProfile` declares deduplication, lookups, a visibility bound,
+  compensation, nanoUSD ceilings and readback limits with exact types.
+  `WriteConnector` and `ApprovalVerifier` are synchronous host protocols with
+  `ConnectorReceipt`, `ObservedObject`, `Principal`, `ConnectorRefused`,
+  `ConnectorAmbiguous` and `ApprovalRejected`; `check_connector()` and
+  `check_verifier()` refuse providers, awaitables and async methods. Nothing
+  stores or dispatches actions yet. See [external actions](docs/actions.md).
 
 ### Changed
 
