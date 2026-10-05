@@ -452,6 +452,40 @@ def test_a_long_rejected_result_keeps_an_excerpt_and_a_sidecar(tmp_path):
     assert sidecar.read_bytes() == full
 
 
+def test_a_failed_sidecar_write_leaves_the_reset_for_resume(tmp_path, monkeypatch):
+    import smythe.executor_base as executor_base
+
+    store = JsonMemoryStore()
+    publish = executor_base.publish_unique
+
+    def no_sidecars(directory, name, data):
+        if name.endswith("_rejected.txt"):
+            raise OSError("disk full")
+        return publish(directory, name, data)
+
+    monkeypatch.setattr(executor_base, "publish_unique", no_sidecars)
+    swarm = Swarm(provider=LongDraftProvider(), model="test", artifact_dir=tmp_path,
+                  checkpoint_store=store, acceptance=AcceptancePolicy(mode="strict"))
+    with pytest.raises(VerificationRecoveryError, match="retain"):
+        swarm.execute(_gated_drawing())
+
+    [execution_id] = store.states
+    draft, judge = store.states[execution_id]["graph"]["nodes"]
+    assert draft["status"] == "completed" and REJECTED_GENERATIONS_KEY not in draft["metadata"]
+    assert "regeneration_intent" in judge["metadata"]
+    assert not list(tmp_path.rglob("*_rejected.txt"))
+
+    monkeypatch.setattr(executor_base, "publish_unique", publish)
+    provider = LongDraftProvider()
+    provider.verdicts = ["PASS"]
+    result = Swarm(provider=provider, model="test", artifact_dir=tmp_path, checkpoint_store=store,
+                   acceptance=AcceptancePolicy(mode="strict")).resume(execution_id)
+
+    assert result.accepted
+    [record] = result.graph.nodes[0].metadata[REJECTED_GENERATIONS_KEY]
+    assert Path(record["sidecar"]).read_bytes() == LongDraftProvider.TEXT.encode("utf-8")
+
+
 def test_without_an_artifact_dir_a_rejected_result_keeps_only_its_excerpt():
     swarm = Swarm(provider=LongDraftProvider(), model="test", artifact_dir=None,
                   acceptance=AcceptancePolicy(mode="strict"))
