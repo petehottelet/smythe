@@ -367,7 +367,9 @@ journals the decision:
 
 The journal format is unchanged: operation kinds are free text, so this needs
 no journal upgrade. `tests/test_workflow_process_loss.py` kills a real
-process at each of these points and resumes the run.
+process at each of these points and resumes the run, including a run with
+priced native calls and a regenerated draft, whose confirmed charges, node
+generations and regeneration count resume unchanged without a new call.
 
 ## Supported scope
 

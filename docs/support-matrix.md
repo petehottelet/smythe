@@ -273,8 +273,9 @@ Tests:
   `tests/test_workflow_acceptance.py::test_a_durable_strict_run_refuses_output_no_gate_could_accept`
   and `tests/test_workflow_acceptance.py::test_a_durable_step_added_after_a_gate_is_refused_without_a_final_validator`;
   recovery `tests/test_workflow_acceptance.py::test_crash_after_synthesis_before_the_decision_decides_again`,
-  `tests/test_workflow_acceptance.py::test_corrupted_stored_output_is_not_accepted`
-  and `tests/test_workflow_process_loss.py::test_killed_durable_run_resumes_its_decision_without_new_calls`.
+  `tests/test_workflow_acceptance.py::test_corrupted_stored_output_is_not_accepted`,
+  `tests/test_workflow_process_loss.py::test_killed_durable_run_resumes_its_decision_without_new_calls`
+  and `tests/test_workflow_process_loss.py::test_killed_priced_run_keeps_its_charges_generations_and_regeneration`.
 - Plain-text nodes: `tests/test_support_matrix.py::test_durable_run_rejects_image_inputs_on_a_caller_graph_before_any_call`,
   `tests/test_workflow_native_runtime.py::test_plan_the_run_cannot_execute_is_repaired_as_an_additional_paid_attempt`
   and `tests/test_workflow_provider.py::test_unsupported_input_rejected_before_journal_or_http`.
