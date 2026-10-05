@@ -12,7 +12,7 @@ import pytest
 from fakes import Crash, crash_when
 from smythe import (
     AcceptanceDecision, AcceptancePolicy, CallableVerifier, FailurePolicy, LocalOnly,
-    OfflineProvider, SimpleArchitect, SQLiteWorkflowStore, Swarm, Task,
+    OfflineProvider, Revision, SimpleArchitect, SQLiteWorkflowStore, Swarm, Task,
     TokenVerifier, WhiteRabbit,
 )
 from smythe.acceptance import task_sha256, text_sha256
@@ -789,3 +789,85 @@ def test_graphs_a_strict_policy_refuses_still_run_durably_without_one(store, rep
     for build in (gated_then, two_gated, BROKEN_GATES["skip"][0]):
         result = durable(store, acceptance=acceptance).execute(build())
         assert result.output and result.acceptance is None
+
+
+# ---------------------------------------------------------------------------
+# The delivered output decides, whatever a gate passed before it
+# ---------------------------------------------------------------------------
+
+
+def test_a_passed_draft_does_not_accept_a_defective_final_step(store, replies):
+    script, calls = replies
+    script.update({"Draft": ["a draft with the needle"], "Judge": ["PASS"],
+                   "Final": ["a final step without it"]})
+    result = durable(store, acceptance=strict(Contains())).execute(gated_then())
+
+    assert result.acceptance.decision is AcceptanceDecision.REJECTED and not result.accepted
+    assert (result.output, result.rejected_output) == ("", "a final step without it")
+    # The validator saw exactly the delivered text; the gate passed only the draft.
+    assert Contains.checked == ["a final step without it"]
+    assert [source.node_id for source in result.acceptance.sources] == ["final"]
+    receipt = result.graph.nodes[1].metadata["verification_receipt"]
+    assert receipt["state"] == "consumed" and receipt["outcome"] == "passed"
+    # A final rejection is terminal: nothing regenerated.
+    assert calls == ["Draft", "Judge", "Final"]
+    again = durable(store, acceptance=strict(Contains())).resume(result.execution_id)
+    assert again.acceptance == result.acceptance
+    assert (again.output, again.rejected_output) == ("", "a final step without it")
+
+
+# ---------------------------------------------------------------------------
+# Supervision cannot make unchecked output accepted
+# ---------------------------------------------------------------------------
+
+
+class AddFinal:
+    """A local supervisor that adds an unchecked final step after the draft."""
+
+    def review(self, graph, node, **kwargs):
+        if node.id != "draft":
+            return None
+        return Revision(add_nodes=(Node(id="final", label="Final", depends_on=["draft"]),),
+                        reason="add a final step")
+
+
+def supervised(store, acceptance, **options) -> Swarm:
+    return durable(store, acceptance=acceptance, max_revisions=1,
+                   supervisor=LocalOnly(AddFinal, "add-final", "1", role="supervisor"), **options)
+
+
+def refused_revisions(result) -> list[dict]:
+    return [span for span in result.trace if span.get("status") == "revision_rejected"]
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_a_durable_step_added_after_a_gate_is_refused_without_a_final_validator(store, replies,
+                                                                                parallel):
+    script, calls = replies
+    script.update({"Draft": ["the gated draft"], "Judge": ["PASS"], "Final": ["unchecked"]})
+    result = supervised(store, strict(), parallel=parallel).execute(gated())
+
+    # The run keeps its plan, so the gate still judges the delivered draft.
+    assert result.accepted and result.output == "the gated draft"
+    assert [node.id for node in result.graph.nodes] == ["draft", "judge"]
+    assert "Final" not in calls
+    (refused,) = refused_revisions(result)
+    assert "strict acceptance policy refuses this revision" in refused["error"]
+    assert "no gate judges 'final'" in refused["error"]
+    assert store.get_checkpoint(result.execution_id)["checkpoint"]["revisions_used"] == 0
+
+
+@pytest.mark.parametrize(("final_text", "decision"), [("unchecked", "rejected"),
+                                                      ("the needle, checked", "accepted")])
+def test_final_validators_decide_a_durable_step_added_after_a_gate(store, replies, final_text,
+                                                                   decision):
+    script, _ = replies
+    script.update({"Draft": ["the gated draft"], "Judge": ["PASS"], "Final": [final_text]})
+    result = supervised(store, strict(Contains())).execute(gated())
+
+    assert [node.id for node in result.graph.nodes] == ["draft", "judge", "final"]
+    assert result.graph.nodes[2].metadata["added_by_revision"] is True
+    assert result.acceptance.decision.value == decision
+    assert final_text in (result.output, result.rejected_output)
+    assert [source.node_id for source in result.acceptance.sources] == ["final"]
+    assert Contains.checked == [final_text] and not refused_revisions(result)

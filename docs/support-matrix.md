@@ -269,8 +269,9 @@ Tests:
   `tests/test_workflow_acceptance.py::test_the_durable_runtime_checks_its_policy_itself`
   and `tests/test_workflow_acceptance.py::test_resume_refuses_another_acceptance_policy_before_any_call`;
   generated gates and obligations `tests/test_workflow_acceptance.py::test_a_durable_gate_from_a_generated_plan_does_not_accept_on_its_own`,
-  `tests/test_workflow_acceptance.py::test_a_durable_strict_run_refuses_a_broken_gate_before_any_call`
-  and `tests/test_workflow_acceptance.py::test_a_durable_strict_run_refuses_output_no_gate_could_accept`;
+  `tests/test_workflow_acceptance.py::test_a_durable_strict_run_refuses_a_broken_gate_before_any_call`,
+  `tests/test_workflow_acceptance.py::test_a_durable_strict_run_refuses_output_no_gate_could_accept`
+  and `tests/test_workflow_acceptance.py::test_a_durable_step_added_after_a_gate_is_refused_without_a_final_validator`;
   recovery `tests/test_workflow_acceptance.py::test_crash_after_synthesis_before_the_decision_decides_again`,
   `tests/test_workflow_acceptance.py::test_corrupted_stored_output_is_not_accepted`
   and `tests/test_workflow_process_loss.py::test_killed_durable_run_resumes_its_decision_without_new_calls`.
