@@ -11,6 +11,7 @@
     "smythe/_canonical.py",
     "smythe/_errors.py",
     "smythe/_failures.py",
+    "smythe/_http_rejection.py",
     "smythe/_images.py",
     "smythe/_money.py",
     "smythe/_publish.py",
