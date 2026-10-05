@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -25,6 +26,7 @@ from smythe.acceptance import (
     validate_acceptance_obligations,
 )
 from smythe.budget import BudgetValidationError, Sentinel
+from smythe.context import ContextSource, snapshot_sources
 from smythe.checkpoint import (
     CHECKPOINT_VERSION,
     SUPPORTED_CHECKPOINT_VERSIONS,
@@ -304,6 +306,12 @@ class Swarm:
     ``run_store``. An ordinary run refuses a read step before any node
     call, whether a caller's graph, an architect's or template's plan or a
     saved checkpoint declares it.
+
+    ``context_sources``, a sequence of :class:`~smythe.context.ContextSource`
+    that needs a durable ``run_store``, opts each new run into context
+    assembly: the run records the sources once, and every node call is given
+    a journaled context snapshot that marks sources and dependency outputs
+    as untrusted data. :meth:`refresh_context` gives a run new sources.
     """
 
     def __init__(
@@ -334,6 +342,7 @@ class Swarm:
         graph_policy: WorkflowGraphPolicy | None = None,
         acceptance: AcceptancePolicy | None = None,
         read_tools: tuple[ReadProfile, ...] | list[ReadProfile] = (),
+        context_sources: Sequence[ContextSource] | None = None,
     ) -> None:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
         if graph_policy is not None and run_store is None:
@@ -349,6 +358,9 @@ class Swarm:
             from smythe.workflow import _snapshot_read_tools
 
             _snapshot_read_tools(read_tools)
+        if context_sources is not None and run_store is None:
+            raise WorkflowBindingError("context_sources requires a durable run_store")
+        self._context_sources = None if context_sources is None else snapshot_sources(context_sources)
         if isinstance(verifier, LocalOnly) and run_store is None:
             raise TypeError(
                 "verifier: a LocalOnly validator judges gates only in a durable run_store run; "
@@ -1050,6 +1062,23 @@ class Swarm:
 
         return _on_control_update
 
+    def refresh_context(self, execution_id: str, sources: Sequence[ContextSource]) -> int:
+        """Give an unfinished durable run new sources.  Sync wrapper around arefresh_context()."""
+        return asyncio.run(self.arefresh_context(execution_id, sources))
+
+    async def arefresh_context(self, execution_id: str, sources: Sequence[ContextSource]) -> int:
+        """Record *sources* as a durable run's next source revision; returns that revision.
+
+        A run with context assembly keeps the sources it recorded, so sources
+        that changed while it was paused reach it only through this call.
+        Every node of the run is pending again at its next generation, and
+        :meth:`resume` re-evaluates each with a new context snapshot; nothing
+        is called here. See ``smythe.workflow.WorkflowRuntime.refresh_context``.
+        """
+        if self._run_store is None:
+            raise ValueError("refresh_context needs a durable run_store")
+        return await self._workflow_runtime().refresh_context(execution_id, sources)
+
     def resume(self, execution_id: str) -> SwarmResult:
         """Resume a checkpointed execution.  Sync wrapper around aresume()."""
         return asyncio.run(self.aresume(execution_id))
@@ -1365,4 +1394,5 @@ class Swarm:
             max_concurrency=self.max_concurrency,
             graph_policy=self._graph_policy, behavior_settings=behavior_settings,
             acceptance=self._acceptance, read_tools=self._read_tools,
+            context_sources=self._context_sources,
         )

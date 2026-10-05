@@ -21,7 +21,7 @@ verification, trace, artifact, and recovery controls.
 ## Plan and execute graphs
 
 - [Architecture](architecture.md) — planning tiers, execution flow, and validated planner history with summed node timing
-- [Tasks and handoffs](tasks.md) — complete task snapshots across planning, inspected graphs, synthesis, memory, and resume
+- [Tasks and handoffs](tasks.md) — complete task snapshots across planning, inspected graphs, synthesis, memory, and resume, and immutable context snapshots that keep sources as untrusted data in durable runs
 - [Execution policies](execution.md) — halt, retry, skip, timeouts, queued work, provider checks before any call, and 5,000-node deep-graph checks
 - [YAML and jobs](jobs.md) — declarative artifact work and the installed CLI
 - [Adaptive supervision](supervisor.md) — revise pending work from completed results

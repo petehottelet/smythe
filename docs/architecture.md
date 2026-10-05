@@ -231,6 +231,12 @@ prompt mutation.
   execution, verification, supervision, and synthesis. Request-bound quotes,
   fenced dispatch, and retained response evidence govern admission and
   recovery. See [managed scope](workflow-accounting.md#supported-scope).
+- With `context_sources`, such a run records the context each node call is
+  given as an immutable snapshot in its journal: sources and dependency
+  outputs reach the model as marked untrusted data, a resumed call is given
+  the snapshot it was first given, and new sources enter a run only through
+  `refresh_context`, which re-evaluates its nodes. See
+  [context snapshots](tasks.md#context-snapshots).
 - A supervisor may change only pending work. It cannot drop a verification
   gate or the node it judges, or leave the gate no longer depending on that
   node; a step it adds after that node is not judged by the gate. One

@@ -16,6 +16,7 @@ from smythe.budget import (
 )
 from smythe.checkpoint import CheckpointStore, FileCheckpointStore
 from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
+from smythe.context import ContextSnapshot, ContextSource
 from smythe.design import DesignSystem, Finding, design_verifier, inspect_asset
 from smythe.distill import DistillationError, distill_template
 from smythe.graph import FailurePolicy, Revision, RevisionError
@@ -102,6 +103,8 @@ __all__ = [
     "CheckpointStore",
     "CompletionResult",
     "ConstrainedArchitect",
+    "ContextSnapshot",
+    "ContextSource",
     "DefaultCapabilityMapper",
     "DeliveryAcceptance",
     "DesignSystem",

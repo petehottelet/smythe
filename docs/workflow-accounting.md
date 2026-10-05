@@ -329,6 +329,16 @@ reads the version from the saved recipe, so a run in flight sends the requests
 it saved, and a saved recipe whose version this release does not support
 raises `WorkflowConflictError`.
 
+A run started with `context_sources` records `context_assembly: 1` in its
+recipe, the same way: each node call is then given a journaled context
+snapshot, and its prompt marks sources and dependency outputs as untrusted
+data ([context snapshots](tasks.md#context-snapshots)). Resume reads the
+version from the saved recipe, so a `Swarm` without `context_sources` resumes
+such a run with the sources it recorded, and one with `context_sources`
+cannot resume a run whose recipe has no `context_assembly`. Such a run keys
+synthesis by node generation, like a strict run, so a refresh of its sources
+never replays an earlier synthesis.
+
 ## Strict delivery acceptance
 
 `Swarm(run_store=store, acceptance=AcceptancePolicy(mode="strict", ...))`

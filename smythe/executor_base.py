@@ -12,11 +12,11 @@ import re
 import tempfile
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from smythe._errors import PicklableError
 from smythe._publish import publish_unique
-from smythe.acceptance import AcceptanceMode, AcceptancePolicy, _unmet_obligations
+from smythe.acceptance import AcceptanceMode, AcceptancePolicy, _unmet_obligations, task_sha256
 from smythe.agent import Agent
 from smythe.budget import (
     BudgetEstimateRequired,
@@ -24,6 +24,9 @@ from smythe.budget import (
     Sentinel,
     validate_completion_usage,
     validate_token_count,
+)
+from smythe.context import (
+    CONTEXT_SNAPSHOT_KEY, UNTRUSTED_DATA_NOTE, ContextSnapshot, text_sha256, untrusted_block,
 )
 from smythe.graph import (
     REVISION_ADDED_KEY, ExecutionGraph, Node, NodeStatus, Revision, RevisionError, _deliverable_ids,
@@ -34,14 +37,14 @@ from smythe.provider import (
     _settle_response_group,
 )
 from smythe.registry import Registry
-from smythe.task import render_task, snapshot_task
+from smythe.task import _prompt_json, render_task, snapshot_task
 from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
 from smythe.tracer import Tracer
 from smythe.verifier import (
     ADVISORY_VERDICT_KEY, TokenVerifier, Verifier, VerificationRecoveryError, node_generation,
     read_verdict, rejection_reason, verification_integer, validate_verification_receipt,
 )
-from smythe.workflow_store import WorkflowError
+from smythe.workflow_store import WorkflowError, WorkflowStateError
 from smythe.workflow_tools import READ_STEP_KEY
 
 if TYPE_CHECKING:
@@ -280,6 +283,12 @@ class ExecutorBase:
     node that declares a read step (``metadata["read_step"]``), which then
     runs without a model call. Without a factory such a node raises
     ``ValueError``: read steps run only in durable workflows.
+
+    ``context_assembler``, an async ``(node, graph, dep_results)`` callable
+    returning a :class:`~smythe.context.ContextSnapshot`, opts into rendering
+    each node prompt from its snapshot (:meth:`build_context_prompt`), with
+    tool results marked as untrusted data as well. Without one, prompts keep
+    their earlier bytes.
     """
 
     def __init__(
@@ -304,8 +313,14 @@ class ExecutorBase:
         *,
         prompt_assembly: int = PROMPT_ASSEMBLY_VERSION,
         read_call_factory: Callable[[Node, int], Any] | None = None,
+        context_assembler: Callable[
+            [Node, ExecutionGraph, dict[str, Any]], Awaitable[ContextSnapshot]
+        ] | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
+        if context_assembler is not None and not callable(context_assembler):
+            raise TypeError("context_assembler must be callable or None")
+        self._context_assembler = context_assembler
         if acceptance is not None and not isinstance(acceptance, AcceptancePolicy):
             raise TypeError(
                 f"acceptance must be an AcceptancePolicy or None, not {type(acceptance).__name__}"
@@ -708,7 +723,8 @@ class ExecutorBase:
             candidate.result = None
             candidate.metadata["execution_generation"] = intent["affected_generations"][candidate.id] + 1
             for key in ("artifacts", "artifacts_discarded", "verification_receipt",
-                        "verification_target_generation", ADVISORY_VERDICT_KEY):
+                        "verification_target_generation", ADVISORY_VERDICT_KEY,
+                        CONTEXT_SNAPSHOT_KEY):
                 candidate.metadata.pop(key, None)
             if candidate.id in retained:
                 listed = candidate.metadata.get(REJECTED_GENERATIONS_KEY)
@@ -1046,6 +1062,49 @@ class ExecutorBase:
         return "\n".join(parts)
 
     @staticmethod
+    def build_context_prompt(
+        snapshot: ContextSnapshot, task: Task | None, dep_results: dict[str, Any], *,
+        is_terminal: bool = False,
+    ) -> str:
+        """Render a node prompt from its context snapshot (context assembly version 1).
+
+        The task's requirements and the step come first, as instructions.
+        The task's context data, each source and each dependency's output
+        follow as untrusted blocks (``smythe.context.untrusted_block``) after
+        a note that they are material, not instructions. The task and every
+        dependency output must be the ones whose digests the snapshot holds,
+        or ``WorkflowStateError`` is raised before anything is sent. A
+        terminal node with sources or dependencies also gets
+        ``TERMINAL_DELIVERABLE_NOTE``.
+        """
+        where = f"the context snapshot of node {snapshot.node_id!r}"
+        if task_sha256(task) != snapshot.task_sha256:
+            raise WorkflowStateError(f"The task differs from {where}")
+        outputs: dict[str, str] = {}
+        for digest in snapshot.dependencies:
+            value = dep_results.get(digest.node_id)
+            text = value if isinstance(value, str) else str(value)
+            if digest.node_id not in dep_results or text_sha256(text) != digest.output_sha256:
+                raise WorkflowStateError(f"The output of step {digest.node_id!r} differs from {where}")
+            outputs[digest.node_id] = text
+        if outputs.keys() != dep_results.keys():
+            raise WorkflowStateError(f"The node's dependencies differ from {where}")
+        parts = [f"Your step: {snapshot.step}"]
+        blocks = []
+        if task is not None:
+            parts.insert(0, "Overall task:\n" + render_task(task, include_context=False))
+            if task.context:
+                blocks.append(untrusted_block("task context (JSON)", _prompt_json(task.context)))
+        blocks.extend(untrusted_block(source.label, source.text) for source in snapshot.sources)
+        blocks.extend(untrusted_block(f"output of step {json.dumps(node_id)}", text)
+                      for node_id, text in outputs.items())
+        if blocks:
+            parts += [UNTRUSTED_DATA_NOTE, *blocks]
+        if is_terminal and (outputs or snapshot.sources) and TERMINAL_DELIVERABLE_NOTE:
+            parts.append(TERMINAL_DELIVERABLE_NOTE)
+        return "\n\n".join(parts)
+
+    @staticmethod
     def node_by_id(node_id: str, graph: ExecutionGraph) -> Node | None:
         return next((n for n in graph.nodes if n.id == node_id), None)
 
@@ -1102,9 +1161,15 @@ class ExecutorBase:
         agent = self._registry.get(node.agent_id) if node.agent_id else None
         dep_results = self.gather_dep_results(node, graph)
         system = self.build_system_prompt(agent)
-        prompt = self.build_user_prompt(
-            node, dep_results, is_terminal=self._is_terminal(node, graph),
-        )
+        if self._context_assembler is None:
+            prompt = self.build_user_prompt(
+                node, dep_results, is_terminal=self._is_terminal(node, graph),
+            )
+        else:
+            snapshot = await self._context_assembler(node, graph, dep_results)
+            prompt = self.build_context_prompt(
+                snapshot, self._task, dep_results, is_terminal=self._is_terminal(node, graph),
+            )
         model = node.metadata.get("model", "")
         attachments = (
             self.load_dep_image_artifacts(node, graph)
@@ -1185,6 +1250,13 @@ class ExecutorBase:
                         )
                     duration_ms = (time.monotonic() - started) * 1000
                     self._tracer.on_tool_call(node, tc.name, duration_ms, outcome.is_error)
+                    if self._context_assembler is not None:
+                        # What a tool returns is material, like a source.
+                        outcome = ToolResult(
+                            outcome.tool_call_id, is_error=outcome.is_error,
+                            content=untrusted_block(f"result of tool {json.dumps(tc.name)}",
+                                                    str(outcome.content)),
+                        )
                     tool_results.append(outcome)
                 messages.append(ChatMessage(role="user", tool_results=tool_results))
 

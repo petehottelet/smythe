@@ -480,6 +480,27 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `read_tools` only when a run declares profiles, so other recipes keep their
   identity. See
   [recorded read steps](docs/workflow-accounting.md#recorded-read-steps).
+- Immutable context snapshots in durable text workflows. A `Swarm` with a
+  `run_store` takes `context_sources`, a sequence of `ContextSource` (an id,
+  text and optional version), and its new runs record `context_assembly: 1`
+  in their recipe and the sources once, as revision 0. Before each node call
+  the run records a `ContextSnapshot` as a `context` journal operation keyed
+  `context/<node>/<generation>`: the task's goal, constraints and acceptance
+  criteria, the step, the sources with their versions and digests, the
+  digest of each dependency output with the calls that produced it, the
+  agent's capability tags and the assembly version. The call's trigger names
+  the snapshot id, checkpoints hold only digests, and the prompt is rendered
+  from the snapshot with the task's context data, sources, dependency
+  outputs and tool results in delimited untrusted-data blocks. A resumed or
+  retried call uses the retained snapshot after checking the task and
+  dependency outputs against it, so sources changed while a run was paused do
+  not reach it; `Swarm.refresh_context` records new sources as the next
+  revision and makes every node pending at its next generation for `resume`
+  to re-evaluate. Such runs key synthesis by node generation. Executors take
+  a keyword-only `context_assembler` that selects this rendering, and
+  `smythe.context` reads the records back. Recipes without
+  `context_assembly` keep their prompts and records byte for byte. See
+  [context snapshots](docs/tasks.md#context-snapshots).
 
 ### Changed
 

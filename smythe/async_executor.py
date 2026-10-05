@@ -6,7 +6,7 @@ import asyncio
 from collections import deque
 from itertools import islice
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from smythe.budget import BudgetValidationError, Sentinel, SentinelAlert, validate_token_count
 from smythe.executor_base import (
@@ -26,6 +26,7 @@ from smythe.workflow_store import WorkflowError
 
 if TYPE_CHECKING:
     from smythe.acceptance import AcceptancePolicy
+    from smythe.context import ContextSnapshot
     from smythe.supervisor import Supervisor
     from smythe.task import Task
     from smythe.verifier import Verifier
@@ -76,6 +77,9 @@ class AsyncExecutor(ExecutorBase):
         *,
         prompt_assembly: int = PROMPT_ASSEMBLY_VERSION,
         read_call_factory: Callable[[Node, int], Any] | None = None,
+        context_assembler: Callable[
+            [Node, ExecutionGraph, dict[str, Any]], Awaitable[ContextSnapshot]
+        ] | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         super().__init__(
@@ -91,6 +95,7 @@ class AsyncExecutor(ExecutorBase):
             prompt_assembly=prompt_assembly,
             read_call_factory=read_call_factory,
             acceptance=acceptance,
+            context_assembler=context_assembler,
         )
         self._estimated_tokens_per_node = validate_token_count(
             estimated_tokens_per_node, "estimated_tokens_per_node",
