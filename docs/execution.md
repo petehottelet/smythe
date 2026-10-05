@@ -44,7 +44,20 @@ planning reply with the problem named, up to `max_retries`, and
 `max_tokens` is the usual fix for truncation. Stop reasons outside these
 values, including any a custom provider returns, count as complete. The native
 `AnthropicMessagesProvider` and `OpenAIResponsesProvider` treat any response
-that did not complete as a terminal response error instead.
+that did not complete as a terminal response error instead. Its
+`ProviderResponseError.stop_reason` uses the same values:
+
+| `stop_reason` | Native signal |
+|---|---|
+| `max_tokens` | Responses `incomplete_details.reason` `max_output_tokens`; Messages `stop_reason` `max_tokens` |
+| `model_context_window_exceeded` | Messages `stop_reason` `model_context_window_exceeded` |
+| `refusal` | A Responses message with a `refusal` part; Messages `stop_reason` `refusal` |
+| `content_filter` | Responses `incomplete_details.reason` `content_filter` |
+| `incomplete` | Any other incomplete Responses reply; Messages `stop_reason` `pause_turn` |
+
+It is `None` for any other unusable response. The error's message never
+includes it, so a durable run matches the text its journal saved for a
+rejected call.
 
 A node timeout follows its failure policy. Invalid accounting, budget
 admission or reconciliation failures, and failures persisting a billed result

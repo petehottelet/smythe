@@ -103,7 +103,10 @@ one outstanding native call, and continuation belongs to its originating
 provider and model.
 
 `ProviderResponseError` retains a known charge when generation was billed but
-its output is incomplete, malformed, or unusable. `ProviderAccountingError`
+its output is incomplete, malformed, or unusable. Its `stop_reason` is
+`max_tokens` or `content_filter` for those `incomplete_details` reasons,
+`refusal` for a refusal part, `incomplete` for any other incomplete response,
+and `None` otherwise ([stop reasons](execution.md)). `ProviderAccountingError`
 retains unknown exposure when billing evidence cannot be reconciled. Execution
 records known charges once, stops further dispatch, and preserves unresolved
 in-memory reservations. These failures cannot trigger an automatic node retry or be

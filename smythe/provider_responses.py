@@ -158,6 +158,36 @@ class RawResponseEnvelope:
         return _json_load(self.body)
 
 
+def _unfinished_stop_reason(envelope: RawResponseEnvelope) -> str | None:
+    """Normalize why a response ended unfinished, as the SDK providers name it.
+
+    ``incomplete_details.reason`` ``max_output_tokens`` is ``max_tokens`` and
+    ``content_filter`` stays ``content_filter``; a message with a refusal part
+    is ``refusal``; any other incomplete response is ``incomplete``. None when
+    the response reports none of these.
+    """
+    try:
+        raw = envelope.json()
+    except ValueError:
+        return None
+    details = raw.get("incomplete_details")
+    reason = details.get("reason") if isinstance(details, dict) else None
+    if reason == "max_output_tokens":
+        return "max_tokens"
+    if reason == "content_filter":
+        return "content_filter"
+    output = raw.get("output")
+    for item in output if isinstance(output, list) else ():
+        content = item.get("content") if isinstance(item, dict) else None
+        if isinstance(content, list) and any(
+            isinstance(part, dict) and part.get("type") == "refusal" for part in content
+        ):
+            return "refusal"
+    if raw.get("status") == "incomplete" or details is not None:
+        return "incomplete"
+    return None
+
+
 @dataclass(frozen=True)
 class ResponseQuote:
     """Input-count evidence and a worst-case ceiling for this exact request."""
@@ -642,9 +672,12 @@ class OpenAIResponsesProvider(Provider):
                 "provider": _NAMESPACE, "model": raw["model"], "output": output,
             }))
         except (ValueError, TypeError, KeyError, RecursionError) as exc:
-            raise ProviderResponseError(
+            error = ProviderResponseError(
                 str(exc), envelope=envelope, receipt=summary, billing_result=billing,
-            ) from exc
+            )
+            # An attribute only: a durable journal compares the message byte for byte.
+            error.stop_reason = _unfinished_stop_reason(envelope)
+            raise error from exc
         billing.text = "\n".join(texts)
         billing.tool_calls = calls
         billing.stop_reason = "tool_use" if calls else "end_turn"

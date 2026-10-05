@@ -535,6 +535,15 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   policy, through one shared classifier, and they retry, skip and stop on
   exactly the failures they did before. See
   [failure classes](docs/execution.md#failure-classes).
+- `ProviderResponseError.stop_reason` names why a native
+  `OpenAIResponsesProvider` or `AnthropicMessagesProvider` response ended
+  unfinished, with the values the SDK providers use: `max_tokens` or
+  `model_context_window_exceeded` for a truncation, `refusal`,
+  `content_filter`, or `incomplete` for any other incomplete response,
+  including a Messages `pause_turn`. It is `None` for other unusable
+  responses and for errors raised elsewhere. The error's message is
+  unchanged, so durable runs still match the text their journals saved for
+  rejected calls. See [execution policies](docs/execution.md).
 
 ### Changed
 

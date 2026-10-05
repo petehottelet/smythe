@@ -11,11 +11,13 @@ from __future__ import annotations
 
 import asyncio
 from collections import Counter
+import copy
+import json
 import pickle
 
 import pytest
 
-from fakes import _STATUS_ERRORS
+from fakes import _STATUS_ERRORS, MessagesTransport
 from smythe._failures import FAILURE_CLASSES, classify_failure, is_terminal, status_failure_class
 from smythe.async_executor import AsyncExecutor
 from smythe.budget import (
@@ -24,17 +26,22 @@ from smythe.budget import (
 from smythe.executor import Executor
 from smythe.executor_base import ArtifactIntegrityError, NodeFinalizationError
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
+from smythe.pricing_anthropic import MODEL as MESSAGES_MODEL
 from smythe.provider import (
     CompletionResult, OutputRefusedError, OutputTruncatedError, Provider,
     ProviderAccountingCancelledError, ProviderAccountingError, ProviderResponseError,
 )
+from smythe.provider_messages import AnthropicMessagesProvider
+from smythe.provider_responses import OpenAIResponsesProvider, RawResponseEnvelope
 from smythe.registry import Registry
-from smythe.tools import ToolLoopLimitError
+from smythe.tools import ChatMessage, ToolLoopLimitError
 from smythe.tracer import Tracer
 from smythe.verifier import VerificationRecoveryError
 from smythe.workflow_binding import WorkflowBindingError
-from smythe.workflow_provider import ProviderRequestRejectedError, WorkflowQuoteError
-from smythe.workflow_store import WorkflowError, WorkflowStateError
+from smythe.workflow_provider import (
+    ProviderRequestRejectedError, WorkflowProviderContext, WorkflowQuoteError,
+)
+from smythe.workflow_store import CallKey, SQLiteWorkflowStore, WorkflowError, WorkflowStateError
 from smythe.workflow_tools import ReadToolError
 
 # The exceptions both executors stopped on, whatever the node's failure
@@ -353,3 +360,142 @@ def test_each_attempt_keeps_its_own_class_outside_the_summary(mode):
     for entry in tracer.summary():
         assert set(entry) == {"node_id", "label", "agent_id", "status", "duration_ms", "error"}
     assert "failure_class" not in node.metadata
+
+
+# ---------------------------------------------------------------------------
+# Native stop reasons
+# ---------------------------------------------------------------------------
+
+RESPONSES_MODEL = "gpt-6-astra"
+
+
+def responses_envelope(**changes):
+    prepared = OpenAIResponsesProvider().prepare(
+        "System", [ChatMessage("user", "Question")], RESPONSES_MODEL)
+    body = {
+        "id": "resp_1", "model": RESPONSES_MODEL, "status": "completed", "service_tier": "default",
+        "usage": {"input_tokens": 100, "output_tokens": 10,
+                  "input_tokens_details": {"cached_tokens": 0, "cache_write_tokens": 0}},
+        "output": [{"type": "message", "status": "completed", "role": "assistant",
+                    "content": [{"type": "output_text", "text": "Answer."}]}],
+        **changes,
+    }
+    return RawResponseEnvelope(prepared, json.dumps(body).encode(), status_code=200,
+                               request_id="req_1")
+
+
+def messages_envelope(**changes):
+    prepared = AnthropicMessagesProvider().prepare(
+        "System", [ChatMessage("user", "Question")], MESSAGES_MODEL)
+    body = {
+        "id": "msg_1", "type": "message", "role": "assistant", "model": MESSAGES_MODEL,
+        "stop_reason": "end_turn", "content": [{"type": "text", "text": "Answer."}],
+        "usage": {"input_tokens": 100, "output_tokens": 20, "cache_read_input_tokens": 0,
+                  "cache_creation_input_tokens": 0, "service_tier": "standard"},
+        **changes,
+    }
+    return RawResponseEnvelope(prepared, json.dumps(body).encode(), status_code=200,
+                               request_id="req_1")
+
+
+def refusal_output():
+    return [{"type": "message", "status": "completed", "role": "assistant",
+             "content": [{"type": "refusal", "refusal": "I can't help with that."}]}]
+
+
+# Each message is the decode failure's text before stop reasons existed: a
+# durable journal compares a rejected call's saved text with it byte for byte.
+@pytest.mark.parametrize("changes,message,stop_reason", [
+    ({"status": "incomplete", "incomplete_details": {"reason": "max_output_tokens"}},
+     "Native response did not complete", "max_tokens"),
+    ({"status": "incomplete", "incomplete_details": {"reason": "content_filter"}},
+     "Native response did not complete", "content_filter"),
+    ({"status": "incomplete", "incomplete_details": {"reason": "a_future_reason"}},
+     "Native response did not complete", "incomplete"),
+    ({"status": "incomplete", "incomplete_details": None},
+     "Native response did not complete", "incomplete"),
+    ({"output": refusal_output()}, "Native message does not contain usable text", "refusal"),
+    ({"status": "failed", "error": {"code": "server_error"}},
+     "Native response did not complete", None),
+    ({"output": []}, "Native response contains no output", None),
+    ({"model": "gpt-5.6-sol"}, "Native response model differs from requested model", None),
+], ids=["max-output-tokens", "content-filter", "other-reason", "no-details", "refusal",
+        "failed", "no-output", "other-model"])
+def test_responses_decode_sets_the_stop_reason_without_changing_the_message(
+        changes, message, stop_reason):
+    with pytest.raises(ProviderResponseError) as caught:
+        OpenAIResponsesProvider.decode(responses_envelope(**changes))
+
+    error = caught.value
+    assert str(error) == message and error.args == (message,)
+    assert error.stop_reason == stop_reason
+    assert error.billing_result.cost_usd > 0
+    assert (classify_failure(error), is_terminal(error)) == ("provider_rejected", True)
+
+
+@pytest.mark.parametrize("stop,stop_reason", [
+    ("max_tokens", "max_tokens"),
+    ("model_context_window_exceeded", "model_context_window_exceeded"),
+    ("refusal", "refusal"),
+    ("pause_turn", "incomplete"),
+    ("stop_sequence", None),
+    (["max_tokens"], None),
+], ids=["max-tokens", "context-window", "refusal", "pause-turn", "stop-sequence", "not-text"])
+def test_messages_decode_sets_the_stop_reason_without_changing_the_message(stop, stop_reason):
+    with pytest.raises(ProviderResponseError) as caught:
+        AnthropicMessagesProvider.decode(messages_envelope(stop_reason=stop))
+
+    error = caught.value
+    message = "Messages response did not complete an assistant turn"
+    assert str(error) == message and error.args == (message,)
+    assert error.stop_reason == stop_reason
+    assert error.billing_result.cost_usd > 0
+    assert (classify_failure(error), is_terminal(error)) == ("provider_rejected", True)
+
+
+def test_a_completed_turn_without_text_has_no_stop_reason():
+    with pytest.raises(ProviderResponseError) as caught:
+        AnthropicMessagesProvider.decode(messages_envelope(content=[]))
+
+    assert str(caught.value) == "Messages response has no content"
+    assert caught.value.stop_reason is None
+
+
+def test_other_response_errors_report_no_stop_reason():
+    assert ProviderResponseError("Unresolved native response").stop_reason is None
+    assert ProviderAccountingError("Native bill is unresolved").stop_reason is None
+
+
+@pytest.mark.parametrize("how", ["pickle", "copy", "deepcopy"])
+def test_the_stop_reason_survives_pickle_and_copy(how):
+    with pytest.raises(ProviderResponseError) as caught:
+        OpenAIResponsesProvider.decode(responses_envelope(output=refusal_output()))
+
+    restored = {"pickle": lambda error: pickle.loads(pickle.dumps(error)),
+                "copy": copy.copy, "deepcopy": copy.deepcopy}[how](caught.value)
+    assert (str(restored), restored.stop_reason) == (str(caught.value), "refusal")
+
+
+def test_a_durable_refusal_keeps_its_journal_text_and_replays_its_stop_reason(
+        tmp_path, monkeypatch):
+    transport = MessagesTransport().install(monkeypatch)
+    transport.overrides["execution"] = {"stop_reason": "refusal"}
+    key = CallKey("execution", "node")
+    with SQLiteWorkflowStore(tmp_path / "calls.sqlite3") as store:
+        run_id = store.create_run({"goal": "test"}, {}, 1_000_000_000)["run_id"]
+        lease = store.acquire_lease(run_id, "tests", 120)
+
+        async def invoke():
+            providers = {"main": AnthropicMessagesProvider()}
+            async with WorkflowProviderContext(store, lease, providers) as context:
+                return await context.for_call("main", key).complete(
+                    "System", "Question", MESSAGES_MODEL)
+
+        for _ in range(2):  # The second call decodes the saved response again.
+            with pytest.raises(ProviderResponseError) as caught:
+                asyncio.run(invoke())
+            assert caught.value.stop_reason == "refusal"
+            assert str(caught.value) == "Messages response did not complete an assistant turn"
+            record = store.lookup_call(run_id, key)
+            assert (record["result_state"], record["error"]) == ("rejected", str(caught.value))
+        assert len(transport.requests) == 1

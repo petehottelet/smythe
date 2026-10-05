@@ -199,7 +199,14 @@ class ProviderResponseError(RuntimeError):
 
     ``billing_result`` carries a validated known charge, even when output cannot
     be consumed. Raw envelopes never enter ordinary node/checkpoint metadata.
+    ``stop_reason`` is the normalized reason a native response ended
+    unfinished, as ``IncompleteOutputError`` names it: ``max_tokens`` or
+    ``model_context_window_exceeded``, ``refusal``, ``content_filter`` or
+    ``incomplete``. It is None when the response reports none of these, and
+    never part of the message.
     """
+
+    stop_reason: str | None = None
 
     def __init__(self, message: str, *, envelope=None, receipt=None, billing_result=None):
         super().__init__(message)

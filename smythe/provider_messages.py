@@ -8,8 +8,9 @@ import os
 from smythe._money import NANOUSD, from_units
 from smythe.pricing_anthropic import (PRICE_VERSION, messages_quote_nanousd, price_messages_response,
                                       price_table)
-from smythe.provider import (CompletionResult, Provider, ProviderAccountingCancelledError,
-                             ProviderAccountingError, ProviderResponseError, _builtin_features)
+from smythe.provider import (TRUNCATED_STOP_REASONS, CompletionResult, Provider,
+                             ProviderAccountingCancelledError, ProviderAccountingError,
+                             ProviderResponseError, _builtin_features)
 from smythe.provider_responses import (PreparedRequest, RawResponseEnvelope, ResponseQuote,
                                       ResponseQuoteError, _close_owned, _json_dump, _safe_id)
 from smythe.tools import ChatMessage
@@ -18,6 +19,19 @@ from smythe.tools import ChatMessage
 MODELS = frozenset(price_table().models)
 _ENDPOINT = "https://api.anthropic.com"
 _EFFORTS = {"low", "medium", "high", "xhigh", "max"}
+
+
+def _unfinished_stop_reason(stop):
+    """Normalize why a reply ended unfinished, as ``AnthropicProvider`` names it.
+
+    ``max_tokens``, ``model_context_window_exceeded`` and ``refusal`` keep
+    their names and ``pause_turn`` is ``incomplete``; None for any other stop.
+    """
+    if type(stop) is not str:
+        return None
+    if stop in TRUNCATED_STOP_REASONS or stop == "refusal":
+        return stop
+    return "incomplete" if stop == "pause_turn" else None
 
 
 class AnthropicMessagesProvider(Provider):
@@ -220,7 +234,10 @@ class AnthropicMessagesProvider(Provider):
             if not any(item.strip() for item in text):
                 raise ValueError("Messages response has no usable text")
         except ValueError as exc:
-            raise ProviderResponseError(str(exc), envelope=envelope, receipt=summary, billing_result=result) from exc
+            error = ProviderResponseError(str(exc), envelope=envelope, receipt=summary, billing_result=result)
+            # An attribute only: a durable journal compares the message byte for byte.
+            error.stop_reason = _unfinished_stop_reason(raw.get("stop_reason"))
+            raise error from exc
         result.text, result.stop_reason = "\n".join(text), "end_turn"
         return result
 

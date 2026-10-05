@@ -152,6 +152,8 @@ Who calls again after a failure depends on the path and the provider:
   policy calls again. An HTTP error including a 429, a transport failure, a
   refusal, a truncation or an unresolved bill raises `ProviderResponseError`
   (`ProviderAccountingError` when the bill is unresolved) and stops the run.
+  A refused, truncated or incomplete response's error names why in
+  `stop_reason`, on this path and on durable text workflows.
 - **Durable text workflows**: a 401, 403, 404, 413 or 429 response settles at
   zero cost, and the node failure policy decides whether to call again.
   Other HTTP or transport failures leave the bill unknown and block the run;
@@ -225,7 +227,10 @@ Tests:
   `tests/test_execution_failure_policies.py::test_truncated_output_is_a_billed_failure_under_the_node_policy`,
   `tests/test_execution_failure_policies.py::test_refused_output_is_a_billed_failure_under_the_node_policy`.
 - Ordinary runs, native providers: `tests/test_support_matrix.py::test_native_provider_failure_on_an_ordinary_run_is_terminal_under_a_retry_policy`,
-  `tests/test_native_response_accounting.py::test_native_failure_is_terminal_and_preserves_exposure`.
+  `tests/test_native_response_accounting.py::test_native_failure_is_terminal_and_preserves_exposure`;
+  stop reasons `tests/test_failure_classes.py::test_responses_decode_sets_the_stop_reason_without_changing_the_message`,
+  `tests/test_failure_classes.py::test_messages_decode_sets_the_stop_reason_without_changing_the_message`
+  and `tests/test_failure_classes.py::test_a_durable_refusal_keeps_its_journal_text_and_replays_its_stop_reason`.
 - Durable text workflows: `tests/test_workflow_native_runtime.py::test_rate_limited_worker_retries_under_retry_policy_with_exact_totals`,
   `tests/test_native_messages.py::test_durable_swarm_retries_rate_limited_node_with_exact_totals`,
   `tests/test_workflow_store.py::test_pre_generation_rejection_settles_at_zero_cost_and_keeps_admission_open`,

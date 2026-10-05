@@ -36,7 +36,10 @@ one-hour writes, and output are separate categories. Claude's ordinary input
 count excludes cache tokens; thinking is included in billed output once.
 Missing usage, inconsistent cache totals, unknown models or service tiers,
 and interrupted dispatches keep their reserved exposure and close admission.
-Refusals and truncated output retain their known charge. A 401, 403, 404, 413
+Refusals and truncated output retain their known charge, and their
+`ProviderResponseError.stop_reason` is `refusal`, `max_tokens`,
+`model_context_window_exceeded`, or `incomplete` for `pause_turn`
+([stop reasons](execution.md)). A 401, 403, 404, 413
 or 429 response, such as a 429 `rate_limit_error`, settles at zero cost and
 follows the node's failure policy when two conditions hold. Its body must be
 Anthropic's plain error object, `{"type": "error", "error": {"type": "...",
