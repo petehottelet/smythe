@@ -281,6 +281,35 @@ def test_eligibility_needs_the_recorded_bytes_and_a_verified_file(sha256, status
     assert operation["delivery_eligibility"] == {"eligible": not reasons, "reasons": reasons}
 
 
+def test_an_adopted_attempt_keeps_its_unknown_outcome_and_its_decision_is_projected():
+    from smythe.jobs.delivery import annotate_delivery, artifact_spec_identity
+
+    spec = {"artifact": {"mime_type": "image/png"}}
+    record = {"version": 1, "scope": "artifacts", "attempt_id": "a2", "decision": "accepted",
+              "reasons": [], "validators": [{"validator": artifact_spec_identity(spec["artifact"])
+                                            .to_dict(), "outcome": "passed", "reports": []}],
+              "subjects": [{"path": "x.png", "sha256": "a" * 64, "size_bytes": 1,
+                            "published": True}]}
+    snapshot = {
+        "operations": [{"operation_id": "op", "status": "succeeded", "accepted_attempt_id": "a2",
+                        "spec": spec}],
+        "attempts": [{"attempt_id": "a1", "operation_id": "op", "attempt_number": 1,
+                      "status": "rejected"},
+                     {"attempt_id": "a2", "operation_id": "op", "attempt_number": 2,
+                      "status": "unknown_outcome"}],
+        "artifacts": [{"attempt_id": "a2", "operation_id": "op", "relative_path": "x.png",
+                       "sha256": "a" * 64, "accepted": 1, "integrity": {"status": "verified"}}],
+    }
+
+    [operation] = annotate_delivery(snapshot, {"a1": dict(record, attempt_id="a1",
+                                                          decision="rejected"),
+                                               "a2": record})["operations"]
+
+    assert operation["delivery_acceptance"]["attempt_id"] == "a2"
+    assert operation["delivery_acceptance"]["decision"] == "accepted"
+    assert operation["delivery_eligibility"] == {"eligible": True, "reasons": []}
+
+
 def _reference_run(tmp_path):
     """An approved run whose first template sends a reference image and whose second sends none."""
     (tmp_path / "brand").mkdir()

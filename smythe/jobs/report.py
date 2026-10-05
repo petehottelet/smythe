@@ -266,6 +266,15 @@ def _operation_rows(operations: list[dict]) -> list[list[str]]:
             ("Delivery decision", _decision(operation.get("delivery_acceptance"))),
             ("Delivery eligibility", reasons),
         ])
+        adoption = operation.get("adoption")
+        if type(adoption) is dict:
+            # Adoption accepts published bytes; the call's outcome stays unknown.
+            detail += _definitions([
+                ("Adoption reason", _text(adoption.get("reason"))),
+                ("Adopted attempt", _code(adoption.get("attempt_id"))),
+                ("Exposure kept on its unknown call", _money(adoption.get("exposure_microusd"))),
+                ("Adopted", _time(adoption.get("adopted_at_ns"))),
+            ])
         specification = _object(operation.get("spec"), "Operation specification")
         detail += _details("Prompt", specification.get("prompt"))
         detail += _details("Complete specification", specification, structured=True)

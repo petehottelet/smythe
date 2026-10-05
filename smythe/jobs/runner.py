@@ -10,12 +10,13 @@ import math
 import os
 import re
 import sqlite3
+import stat
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 from uuid import uuid4
 
 from smythe.acceptance import ValidationSubject
@@ -37,7 +38,7 @@ from smythe.jobs.delivery import (
     validator_registry,
     validator_result,
 )
-from smythe.jobs.inspection import check_artifact_integrity
+from smythe.jobs.inspection import _check_path, check_artifact_integrity
 from smythe.jobs.models import (
     ArtifactSpecV1,
     DEFAULT_CALL_TIMEOUT_S,
@@ -60,7 +61,9 @@ from smythe.jobs.providers import ProviderPool
 from smythe.jobs.store import (
     MAX_ARTIFACTS_PER_CALL,
     MAX_SQLITE_INTEGER,
+    InvalidTransitionError,
     JobBudgetError,
+    JobNotFoundError,
     OperationStatus,
     RunLease,
     RunLeaseError,
@@ -284,6 +287,25 @@ class JobRunner:
         )
         return await asyncio.to_thread(self._delivery_view, result)
 
+    async def adopt(self, run_id: str, operation_key: str, *, reason: str) -> dict[str, Any]:
+        """Accept the bytes an unknown outcome already published, without a provider call.
+
+        The operation's latest attempt directory must hold exactly the files a
+        response with the artifact count its profile requests is published
+        as, and nothing else. Those bytes then pass the built-in artifact
+        check and the plan's registered validators again before
+        :meth:`SQLiteRunStore.adopt_published_attempt` records them under the
+        run's lease. The call keeps its unknown outcome and its exposure. Any
+        other state or bytes refuse adoption with ``InvalidTransitionError``.
+        """
+        _validate_run_id(run_id)
+        record = self.store.manifest_record(run_id)
+        root = Path(record["manifest_root"])
+        plan = self._preflight(JobManifestV1.from_json(record["manifest_json"]), root)
+        verify_approval(plan, JobApprovalV1.from_dict(record["approval"]))
+        result = await self._execute_with_lease(run_id, plan, root, adopt=(operation_key, reason))
+        return await asyncio.to_thread(self._delivery_view, result)
+
     def _delivery_view(self, snapshot: dict[str, Any]) -> dict[str, Any]:
         """Recheck every accepted artifact's bytes and derive delivery eligibility.
 
@@ -329,8 +351,9 @@ class JobRunner:
         recover: bool = False,
         reroll: tuple[list[str], str, bool] | None = None,
         pause_generation: int | None = None,
+        adopt: tuple[str, str] | None = None,
     ) -> dict[str, Any]:
-        """Own the run for recovery, state transitions, and provider execution."""
+        """Own the run for recovery, state transitions, and provider execution or adoption."""
 
         owner_id = f"runner-{uuid4().hex}"
         lease = self.store.acquire_run_lease(
@@ -360,7 +383,8 @@ class JobRunner:
             )
             execution_task = asyncio.create_task(
                 asyncio.wait_for(
-                    self._execute(run_id, plan, root, lease=lease),
+                    self._execute(run_id, plan, root, lease=lease) if adopt is None
+                    else self._adopt(run_id, plan, root, *adopt, lease=lease),
                     timeout=wall_timeout,
                 )
             )
@@ -513,6 +537,52 @@ class JobRunner:
         self.store.finalize_run(run_id, lease=lease)
         snapshot = self.store.snapshot(run_id)
         snapshot["execution_metrics"] = self.last_metrics.to_dict()
+        return snapshot
+
+    async def _adopt(
+        self,
+        run_id: str,
+        plan: JobPlanV1,
+        root: Path,
+        operation_key: str,
+        reason: str,
+        *,
+        lease: RunLease,
+    ) -> dict[str, Any]:
+        snapshot = self.store.snapshot(run_id)
+        await asyncio.to_thread(self._claim_artifact_directory, snapshot, root)
+        state = next((item for item in snapshot["operations"]
+                      if operation_key in (item["operation_key"], item["operation_id"])), None)
+        if state is None:
+            raise JobNotFoundError(f"{run_id}:{operation_key}")
+        if state["status"] != OperationStatus.UNKNOWN_OUTCOME.value:
+            raise InvalidTransitionError(
+                f"operation {state['operation_key']} in state {state['status']} "
+                "has no unknown outcome to adopt"
+            )
+        attempt = max((item for item in snapshot["attempts"]
+                       if item["operation_id"] == state["operation_id"]),
+                      key=lambda item: item["attempt_number"])
+        operation = next(item for item in plan.operations
+                         if item.operation_id == state["operation_id"])
+        check = await asyncio.to_thread(
+            self._check_published,
+            operation,
+            attempt_id=attempt["attempt_id"],
+            attempt_number=attempt["attempt_number"],
+            validators=[self._validators[identity.name] for identity in operation.validators],
+            run_root=_validated_run_root(root, output_directory=plan.output_directory, run_id=run_id,
+                                         artifact_directory=snapshot["artifact_directory"]),
+        )
+        # The store checks again, in its transaction, that this is still the
+        # operation's latest attempt and that its outcome is unknown.
+        self.store.adopt_published_attempt(
+            run_id, state["operation_id"], reason=reason, artifacts=check.records,
+            delivery_acceptance=check.record, lease=lease,
+        )
+        self.store.finalize_run(run_id, lease=lease)
+        snapshot = self.store.snapshot(run_id)
+        snapshot["execution_metrics"] = JobExecutionMetrics(0, 0, 0.0).to_dict()
         return snapshot
 
     async def _execute_operation(
@@ -795,6 +865,7 @@ class JobRunner:
         attempt_number: int,
         run_root: Path,
         validators: Sequence[tuple[ValidatorIdentity, Any]] = (),
+        publish: bool = True,
     ) -> _ArtifactCheck:
         """Check a response's artifacts, then publish every decodable one.
 
@@ -804,7 +875,8 @@ class JobRunner:
         ``accepted=0``. Registered ``validators`` then check each decodable
         artifact's exact bytes; one that fails to decide never makes the call
         an unknown outcome. Artifact data that is not bytes breaks the
-        provider contract and raises instead.
+        provider contract and raises instead. With ``publish`` false nothing
+        is written, as for bytes an attempt already published.
         """
         builtin = artifact_spec_identity(operation.artifact)
         checked: dict[str, list[ValidationReport]] = {
@@ -871,7 +943,8 @@ class JobRunner:
                     checked[identity.name].append(report)
                     errors.extend(reasons)
             destination = run_root / relative
-            _prepare_confined_parent(destination, run_root)
+            if publish:
+                _prepare_confined_parent(destination, run_root)
             records.append(
                 {
                     "artifact_id": uuid4().hex,
@@ -884,10 +957,63 @@ class JobRunner:
                 }
             )
             pending_writes.append((destination, artifact.data))
-        for destination, data in pending_writes:
+        for destination, data in pending_writes if publish else ():
             atomic_publish_bytes(destination, data)
         return _ArtifactCheck(records, errors,
                               delivery_record(attempt_id, subjects, results(reports), errors))
+
+    @staticmethod
+    def _check_published(
+        operation: PlannedOperationV1,
+        *,
+        attempt_id: str,
+        attempt_number: int,
+        run_root: Path,
+        validators: Sequence[tuple[ValidatorIdentity, Any]] = (),
+    ) -> _ArtifactCheck:
+        """Check the bytes an attempt published as the response they came from.
+
+        The attempt's directory must hold exactly the files a response with
+        the artifact count the operation's profile requests is published as,
+        and nothing else, and the response's checks must accept them.
+        Symbolic links and junctions are refused, never followed.
+        """
+        def refuse(problems: list[str]) -> NoReturn:
+            raise InvalidTransitionError(
+                f"attempt {attempt_number} of operation {operation.operation_key} cannot be "
+                "adopted: " + "; ".join(problems)
+            )
+
+        count = _requested_artifacts(operation)
+        if type(count) is not int or not 1 <= count <= MAX_ARTIFACTS_PER_CALL:
+            refuse([f"its profile requests {count!r} artifacts per call"])
+        directory = ("artifacts", _SAFE_COMPONENT.sub("_", operation.operation_key).strip("._"),
+                     f"attempt-{attempt_number:04d}")
+        sample = Artifact(b"", operation.artifact.mime_type)
+        expected = [_artifact_filename(operation, sample, index) for index in range(count)]
+        try:
+            found = os.listdir(_check_path(run_root, directory))
+        except FileNotFoundError:
+            found = []
+        problems = [f"{name} is missing" for name in expected if name not in found]
+        problems += [f"{name} is not part of the response" for name in sorted(found)
+                     if name not in expected]
+        if problems:
+            refuse(problems)
+        artifacts = []
+        for name in expected:
+            path = _check_path(run_root, (*directory, name))
+            if not stat.S_ISREG(path.lstat().st_mode):
+                refuse([f"{name} is not a regular file"])
+            with path.open("rb") as stream:
+                artifacts.append(Artifact(stream.read(MAX_ARTIFACT_BYTES + 1), sample.mime_type))
+        check = JobRunner._persist_and_validate(
+            CompletionResult(text="", artifacts=artifacts), operation, attempt_id=attempt_id,
+            attempt_number=attempt_number, run_root=run_root, validators=validators, publish=False,
+        )
+        if not check.accepted:
+            refuse(check.errors or [f"the decision is {check.record['decision']}"])
+        return check
 
 
 def _positive_finite_timeout(value: object, field: str) -> float:
@@ -933,6 +1059,13 @@ def _artifact_filename(
     stem = Path(requested).stem if requested else "artifact"
     suffix = artifact.suffix
     return f"{stem}-{index + 1:02d}{suffix}"
+
+
+def _requested_artifacts(operation: PlannedOperationV1) -> object:
+    """The artifact count an operation's profile requests from its provider."""
+    option = {ProviderKind.OFFLINE: "artifacts_per_call",
+              ProviderKind.OPENAI_IMAGE: "n"}.get(operation.provider)
+    return operation.options.get(option, 1) if option else 1
 
 
 def _artifact_findings(

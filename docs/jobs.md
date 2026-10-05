@@ -622,8 +622,10 @@ The earlier unknown exposure remains in the ledger after that reroll.
 
 Do not resolve an unknown outcome by ordinary `resume`; that is intentionally a
 no-op for the ambiguous operation. First investigate the provider account and
-artifact destination. If a duplicate call is acceptable, acknowledge that
-risk explicitly during a selective reroll.
+artifact destination. If the attempt already published the whole response,
+[adopt those bytes](#adopt-published-bytes) without another call. If a
+duplicate call is acceptable, acknowledge that risk explicitly during a
+selective reroll.
 
 ## Jobs database upgrades
 
@@ -682,6 +684,50 @@ and attempts recorded by earlier versions keep an empty reason.
 Successful operations cannot be casually rerolled, which preserves accepted
 outputs byte-for-byte.
 
+## Adopt published bytes
+
+A response's bytes are published before its call settles in the journal. A
+process that stops between the two leaves an unknown outcome whose attempt
+may already hold the whole response on disk. When investigation shows the
+provider completed that request, adopt those bytes instead of paying for a
+duplicate call:
+
+```bash
+smythe jobs adopt RUN_ID "tile[3]" --reason "provider console shows one completed image"
+```
+
+Adoption applies only to an `unknown_outcome` operation. Its latest attempt
+directory, `artifacts/<operation-directory>/attempt-NNNN/` beneath the run's
+artifact root, must hold exactly the files of a response with the artifact
+count the profile requests (`artifacts_per_call` for `offline`, `n` for
+`openai_image`, one for `gemini_image`) and nothing else. The bytes then pass
+the [built-in artifact check](#delivery-acceptance) and the plan's
+[registered validators](#registered-validators) again; pass the runner the
+same validators as for the run. Missing, extra, undecodable or wrong-MIME
+bytes, a validator rejection, and any other operation state refuse adoption
+with exit code 6, and symbolic links or junctions with exit code 2. A refusal
+leaves the operation, its attempts, calls and artifact records unchanged.
+
+The adopted operation becomes `succeeded` with that attempt accepted and its
+artifact receipts recorded. No provider call is made and no attempt is used.
+The attempt and its call keep their unknown outcome, and the call keeps its
+full per-call ceiling as exposure: no settlement is invented. A run whose
+operations have all succeeded is therefore `completed` with
+`cost_is_complete: false` while that exposure remains. The
+`unknown_outcome_adopted` event records the reason, call, attempt, kept
+exposure, each artifact's path and SHA-256, and the delivery decision under
+`delivery_acceptance`, from which [delivery eligibility](#delivery-eligibility)
+is derived as for a completed call. `jobs inspect` adds that record, without
+the decision, to the operation as `adoption`, prints an
+`Adopted published bytes:` line, and the HTML report shows it with the
+operation.
+
+Adoption holds the run's lease, like a reroll, and dispatches no pending
+work; resume the run for that. It prints the run and returns its exit code
+like `reroll`. In Python, call `JobRunner.adopt(run_id, operation_key,
+reason=...)`; it records the verified bytes with
+`SQLiteRunStore.adopt_published_attempt`. The Jobs schema stays at version 4.
+
 ## Export
 
 Export includes the manifest and plan hashes, operation and attempt lineage,
@@ -726,7 +772,7 @@ and output charge that one request can incur.
 | 3 | provider configuration or optional dependency failure |
 | 4 | approval mismatch, or an already used approval without `--new-run` |
 | 5 | budget admission failure |
-| 6 | unknown run or invalid state transition |
+| 6 | unknown run, invalid state transition, or refused adoption |
 | 7 | local SQLite/filesystem failure, detached startup failure, or attachment detects a failed worker or expired lease |
 | 130 | detached startup interrupted, or attachment disconnected with Ctrl+C |
 
@@ -793,8 +839,8 @@ runner = JobRunner(store, validators=validators)
   manifest.
 - Rerolls are operator-selected; there is no automatic vision-judge promotion
   policy in the runtime.
-- Unknown provider outcomes require human investigation or explicit duplicate
-  acknowledgment.
+- Unknown provider outcomes require human investigation, then explicit
+  duplicate acknowledgment or adoption of the bytes the attempt published.
 - Jobs do not read a response's `stop_reason`. A response that the provider
   truncated, refused or filtered is judged by its artifacts and accounting
   alone: without an artifact it is `rejected` (`no_artifacts`) at its

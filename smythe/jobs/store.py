@@ -50,8 +50,9 @@ _FENCING_COLUMNS = {"runs": {"lease_epoch"}, "attempts": {"lease_owner_id", "lea
 _ARTIFACT_COLUMNS = {"artifact_namespace", "artifact_owner_id"}
 # Events whose text ``reason`` explains the next attempt of their operation.
 _QUEUED_REASON_EVENTS = ("reroll_queued",)
-# Completion events, which carry a call's delivery decision when one was recorded.
-_COMPLETION_EVENTS = ("call_completed", "artifact_rejected")
+# Events that carry a call's delivery decision when one was recorded: its
+# completion, or the adoption of bytes its unknown-outcome attempt published.
+_COMPLETION_EVENTS = ("call_completed", "artifact_rejected", "unknown_outcome_adopted")
 _DELIVERY_DECISIONS = frozenset({"accepted", "rejected", "indeterminate"})
 _IDENTITY_RE = re.compile(r"[0-9a-f]{32}\Z")
 _CONTROL_TABLE_SQL = """CREATE TABLE IF NOT EXISTS run_controls (
@@ -252,6 +253,35 @@ def _delivery_decision(record: object, accepted: bool,
            for artifact in artifacts):
         raise ValueError("delivery_acceptance needs a published subject for every artifact")
     return decision
+
+
+def _check_artifacts(artifacts: Sequence[dict[str, Any]]) -> None:
+    """Refuse artifact receipts beyond the journal's persistence limits."""
+    if len(artifacts) > MAX_ARTIFACTS_PER_CALL:
+        raise ValueError(
+            f"a call may persist at most {MAX_ARTIFACTS_PER_CALL} artifacts"
+        )
+    for artifact in artifacts:
+        size = _microusd(artifact.get("size_bytes"), field="artifact size_bytes")
+        if size > MAX_ARTIFACT_BYTES:
+            raise ValueError(
+                f"artifact exceeds the {MAX_ARTIFACT_BYTES}-byte persistence limit"
+            )
+        width = artifact.get("width")
+        height = artifact.get("height")
+        if (width is None) != (height is None):
+            raise ValueError("artifact width and height must both be present or absent")
+        if width is not None:
+            if (
+                isinstance(width, bool)
+                or isinstance(height, bool)
+                or not isinstance(width, int)
+                or not isinstance(height, int)
+                or width < 1
+                or height < 1
+                or width * height > MAX_IMAGE_PIXELS
+            ):
+                raise ValueError("artifact dimensions exceed the persistence limits")
 
 
 def _validate_read_row(row, table: str) -> None:
@@ -1319,31 +1349,7 @@ class SQLiteRunStore:
             raise TypeError("cost_is_estimate must be a boolean")
         if cost_is_complete and cost_is_estimate:
             raise ValueError("an estimated cost cannot be marked complete")
-        if len(artifacts) > MAX_ARTIFACTS_PER_CALL:
-            raise ValueError(
-                f"a call may persist at most {MAX_ARTIFACTS_PER_CALL} artifacts"
-            )
-        for artifact in artifacts:
-            size = _microusd(artifact.get("size_bytes"), field="artifact size_bytes")
-            if size > MAX_ARTIFACT_BYTES:
-                raise ValueError(
-                    f"artifact exceeds the {MAX_ARTIFACT_BYTES}-byte persistence limit"
-                )
-            width = artifact.get("width")
-            height = artifact.get("height")
-            if (width is None) != (height is None):
-                raise ValueError("artifact width and height must both be present or absent")
-            if width is not None:
-                if (
-                    isinstance(width, bool)
-                    or isinstance(height, bool)
-                    or not isinstance(width, int)
-                    or not isinstance(height, int)
-                    or width < 1
-                    or height < 1
-                    or width * height > MAX_IMAGE_PIXELS
-                ):
-                    raise ValueError("artifact dimensions exceed the persistence limits")
+        _check_artifacts(artifacts)
         decision = (None if delivery_acceptance is None
                     else _delivery_decision(delivery_acceptance, accepted, artifacts))
         with self._transaction() as cursor:
@@ -1415,30 +1421,7 @@ class SQLiteRunStore:
                     call["run_id"],
                 ),
             )
-            for artifact in artifacts:
-                cursor.execute(
-                    """
-                    INSERT INTO artifacts (
-                        artifact_id, attempt_id, run_id, operation_id,
-                        relative_path, mime_type, sha256, size_bytes,
-                        width, height, accepted, created_at_ns
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        artifact.get("artifact_id", uuid4().hex),
-                        attempt["attempt_id"],
-                        call["run_id"],
-                        call["operation_id"],
-                        artifact["relative_path"],
-                        artifact["mime_type"],
-                        artifact["sha256"],
-                        artifact["size_bytes"],
-                        artifact.get("width"),
-                        artifact.get("height"),
-                        int(accepted),
-                        now,
-                    ),
-                )
+            self._insert_artifacts(cursor, call, artifacts, accepted, now)
             cursor.execute(
                 """UPDATE attempts SET status = ?, result_text = ?, error = ?,
                    completed_at_ns = ? WHERE attempt_id = ?""",
@@ -1648,6 +1631,86 @@ class SQLiteRunStore:
             )
         return queued
 
+    def adopt_published_attempt(
+        self,
+        run_id: str,
+        operation_key: str,
+        *,
+        reason: str,
+        artifacts: Sequence[dict[str, Any]],
+        delivery_acceptance: dict[str, Any],
+        lease: RunLease | None = None,
+    ) -> dict[str, Any]:
+        """Accept the bytes an unknown-outcome attempt already published.
+
+        A response's bytes are published before its call settles, so a
+        process that stopped in between can leave the whole response on disk.
+        ``artifacts`` are receipts for those bytes and ``delivery_acceptance``
+        the ``accepted`` decision of a check of them, naming the operation's
+        latest attempt; ``JobRunner.adopt`` produces both. The operation
+        becomes ``succeeded`` with that attempt accepted and the receipts
+        recorded. The attempt and its call keep their unknown outcome and the
+        call its exposure, so no charge is settled; nothing is dispatched and
+        no attempt is used. Returns the ``unknown_outcome_adopted`` event's
+        payload: the reason, call, attempt, exposure, each artifact's SHA-256
+        and the decision. ``finalize_run`` then derives the run's status.
+        """
+        if not isinstance(reason, str) or not reason.strip() or len(reason) > 2048:
+            raise ValueError("adoption reason must be nonempty text of at most 2048 characters")
+        if not artifacts:
+            raise ValueError("adoption needs at least one published artifact")
+        _check_artifacts(artifacts)
+        decision = _delivery_decision(delivery_acceptance, True, artifacts)
+        with self._transaction() as cursor:
+            now = self._clock_ns()
+            self._assert_write_owner(cursor, run_id, lease, now)
+            operation = cursor.execute(
+                """SELECT * FROM operations WHERE run_id = ?
+                   AND (operation_key = ? OR operation_id = ?)""",
+                (run_id, operation_key, operation_key),
+            ).fetchone()
+            if operation is None:
+                raise JobNotFoundError(f"{run_id}:{operation_key}")
+            attempt = cursor.execute(
+                """SELECT * FROM attempts WHERE run_id = ? AND operation_id = ?
+                   ORDER BY attempt_number DESC LIMIT 1""",
+                (run_id, operation["operation_id"]),
+            ).fetchone()
+            call = attempt and cursor.execute(
+                "SELECT * FROM calls WHERE attempt_id = ?", (attempt["attempt_id"],)
+            ).fetchone()
+            unknown = OperationStatus.UNKNOWN_OUTCOME.value
+            if (operation["status"] != unknown or call is None
+                    or attempt["status"] != unknown or call["status"] != unknown):
+                raise InvalidTransitionError(
+                    f"operation {operation['operation_key']} in state {operation['status']} "
+                    "has no unknown outcome to adopt"
+                )
+            if decision.get("attempt_id") != attempt["attempt_id"]:
+                raise ValueError(
+                    "delivery_acceptance names another attempt than the operation's latest attempt"
+                )
+            self._insert_artifacts(cursor, call, artifacts, True, now)
+            cursor.execute(
+                """UPDATE operations SET status = ?, accepted_attempt_id = ?, error = NULL,
+                   updated_at_ns = ? WHERE run_id = ? AND operation_id = ?""",
+                (OperationStatus.SUCCEEDED.value, attempt["attempt_id"], now, run_id,
+                 operation["operation_id"]),
+            )
+            cursor.execute("UPDATE runs SET updated_at_ns = ? WHERE run_id = ?", (now, run_id))
+            payload = {
+                "call_id": call["call_id"],
+                "attempt_id": attempt["attempt_id"],
+                "reason": reason,
+                "exposure_microusd": call["exposure_microusd"],
+                "artifacts": [{"relative_path": item["relative_path"], "sha256": item["sha256"]}
+                              for item in artifacts],
+                "delivery_acceptance": decision,
+            }
+            self._event(cursor, run_id, operation["operation_id"], "unknown_outcome_adopted",
+                        payload, now)
+        return payload
+
     def finalize_run(self, run_id: str, *, lease: RunLease | None = None) -> str:
         with self._transaction() as cursor:
             now = self._clock_ns()
@@ -1824,7 +1887,9 @@ class SQLiteRunStore:
         Summary counts/costs always describe the full run. Attempts, calls and
         artifacts contain the selected operations' complete local history;
         events contain the latest N for the run or exact operation filter,
-        returned in chronological order. This does not read artifact files.
+        returned in chronological order. Each operation's ``adoption`` is its
+        ``unknown_outcome_adopted`` record without the decision, plus
+        ``adopted_at_ns``, or None. This does not read artifact files.
         """
         if type(limit) is not int or not 1 <= limit <= MAX_LIST_RUNS:
             raise ValueError(f"limit must be an integer between 1 and {MAX_LIST_RUNS}")
@@ -1883,7 +1948,7 @@ class SQLiteRunStore:
                 operations = cursor.execute(f"""SELECT * FROM operations WHERE {where}
                     ORDER BY operation_key,operation_id LIMIT ? OFFSET ?""", (*parameters, limit, offset)).fetchall()
                 ids = tuple(row["operation_id"] for row in operations)
-                attempts, calls, artifacts = [], [], []
+                attempts, calls, artifacts, adoptions = [], [], [], {}
                 if ids:
                     selected = ",".join("?" for _ in ids)
                     lineage = (run_id, *ids)
@@ -1893,6 +1958,16 @@ class SQLiteRunStore:
                         AND operation_id IN ({selected}) ORDER BY created_at_ns,call_id""", lineage).fetchall()
                     artifacts = cursor.execute(f"""SELECT * FROM artifacts WHERE run_id=?
                         AND operation_id IN ({selected}) ORDER BY relative_path,artifact_id""", lineage).fetchall()
+                    for row in cursor.execute(f"""SELECT operation_id,payload_json,created_at_ns FROM events
+                        WHERE run_id=? AND operation_id IN ({selected})
+                        AND event_type='unknown_outcome_adopted'""", lineage):
+                        _validate_read_row(row, "events")
+                        adoption = _read_json_object(row["payload_json"], "events.payload_json")
+                        adoption.pop("delivery_acceptance", None)
+                        exposure = adoption.get("exposure_microusd")
+                        if type(adoption.get("reason")) is not str or type(exposure) is not int or exposure < 0:
+                            raise RunStoreError("Invalid stored adoption record")
+                        adoptions[row["operation_id"]] = adoption | {"adopted_at_ns": row["created_at_ns"]}
                 event_total = cursor.execute(f"SELECT COUNT(*) FROM events WHERE {where}", parameters).fetchone()[0]
                 events = cursor.execute(f"""SELECT * FROM events WHERE {where}
                     ORDER BY sequence DESC LIMIT ?""", (*parameters, events_limit)).fetchall()[::-1]
@@ -1906,6 +1981,8 @@ class SQLiteRunStore:
                 records = self._delivery_records(cursor, run_id, ids)
                 for attempt in result["attempts"]:
                     attempt["delivery_acceptance"] = records.get(attempt["attempt_id"])
+                for item in result["operations"]:
+                    item["adoption"] = adoptions.get(item["operation_id"])
                 result.update(counts=counts, calls=[dict(row) for row in calls], lease=lease,
                               observed_at_ns=observed_at_ns, operation_filter=operation,
                               pagination={"limit": limit, "offset": offset, "total": total,
@@ -2289,6 +2366,34 @@ class SQLiteRunStore:
             {"call_id": call["call_id"], "error": error},
             now,
         )
+
+    @staticmethod
+    def _insert_artifacts(cursor: sqlite3.Cursor, call: sqlite3.Row,
+                          artifacts: Sequence[dict[str, Any]], accepted: bool, now: int) -> None:
+        for artifact in artifacts:
+            cursor.execute(
+                """
+                INSERT INTO artifacts (
+                    artifact_id, attempt_id, run_id, operation_id,
+                    relative_path, mime_type, sha256, size_bytes,
+                    width, height, accepted, created_at_ns
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    artifact.get("artifact_id", uuid4().hex),
+                    call["attempt_id"],
+                    call["run_id"],
+                    call["operation_id"],
+                    artifact["relative_path"],
+                    artifact["mime_type"],
+                    artifact["sha256"],
+                    artifact["size_bytes"],
+                    artifact.get("width"),
+                    artifact.get("height"),
+                    int(accepted),
+                    now,
+                ),
+            )
 
     @staticmethod
     def _queued_reason(cursor: sqlite3.Cursor, run_id: str, operation_id: str) -> str | None:

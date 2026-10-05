@@ -178,8 +178,10 @@ def inspect_job(
     observations and never change recorded acceptance or run status. Each
     attempt carries its recorded ``delivery_acceptance`` decision, and each
     operation a projected ``delivery_acceptance`` and a derived
-    ``delivery_eligibility`` (see :func:`smythe.jobs.delivery.operation_delivery`).
-    Each operation also carries its ``input_digest``, computed from the stored
+    ``delivery_eligibility`` (see :func:`smythe.jobs.delivery.operation_delivery`),
+    and its ``adoption``: the reason, attempt, call and kept exposure of bytes
+    adopted for an unknown outcome, whose attempt and call stay unknown, or
+    ``None``. Each operation also carries its ``input_digest``, computed from the stored
     plan (see :func:`smythe.jobs.preflight.operation_input_digest`), or ``None``
     when its stored specification, or the plan's stored attachment
     fingerprints it needs, cannot produce one.

@@ -788,6 +788,23 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `delivery_acceptance` feature, refuse it. A policy's records stay version
   1, and checkpoint versions are unchanged. See
   [operator decisions](docs/verifier.md#operator-decisions).
+- `jobs adopt RUN_ID OPERATION --reason TEXT` accepts the bytes an
+  unknown-outcome attempt already published, without a provider call. A
+  response's bytes are published before its call settles, so a process that
+  stopped in between can leave the whole response on disk. The latest
+  attempt's directory must hold exactly the files of the artifact count the
+  profile requests and nothing else, and they must pass the built-in artifact
+  check and the plan's registered validators again; other bytes or operation
+  states are refused with exit code 6 and leave the operation unchanged. The
+  operation becomes `succeeded` with that attempt accepted and no attempt
+  used, while the attempt and its call keep their unknown outcome and the
+  call its exposure, so no charge is settled. An `unknown_outcome_adopted`
+  event records the reason, each artifact's SHA-256 and the delivery
+  decision, and `jobs inspect` and its HTML report show the adoption beside
+  the kept exposure. In Python, `JobRunner.adopt()` records the verified
+  bytes with `SQLiteRunStore.adopt_published_attempt()`; the Jobs schema
+  stays at version 4. See
+  [adopt published bytes](docs/jobs.md#adopt-published-bytes).
 
 ### Changed
 

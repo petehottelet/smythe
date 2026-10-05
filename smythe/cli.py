@@ -262,6 +262,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_output_options(reroll, inherited=True)
 
+    adopt = commands.add_parser(
+        "adopt", help="accept verified bytes an unknown outcome already published, without a call",
+    )
+    adopt.add_argument("run_id")
+    adopt.add_argument("operation_key")
+    adopt.add_argument("--reason", required=True)
+    _add_output_options(adopt, inherited=True)
+
     export = commands.add_parser("export", help="export portable run JSON with events")
     export.add_argument("run_id")
     export.add_argument("--out", default=None, help="write atomically to this path")
@@ -737,6 +745,11 @@ def _emit_job_inspection(value: dict[str, Any]) -> None:
               f"({_terminal_text(operation['operation_id'])}): {_terminal_text(operation['status'])}; "
               f"attempts {operation['attempt_count']}/{operation['max_attempts']}")
         print(f"  Input digest: {_terminal_text(operation.get('input_digest') or 'unavailable')}")
+        adoption = operation.get("adoption")
+        if adoption:
+            print(f"  Adopted published bytes: {_terminal_text(adoption['reason'])}; attempt "
+                  f"{_terminal_text(adoption.get('attempt_id'))} keeps its unknown outcome and "
+                  f"exposure {_usd(adoption['exposure_microusd'])}")
         for attempt in value["attempts"]:
             if attempt["operation_id"] != operation["operation_id"]:
                 continue
@@ -915,7 +928,7 @@ def _emit(args: argparse.Namespace, command: str, value: Any) -> None:
         print(f"Operations: {len(value['plan']['operations'])}")
         print(f"Worst-case cost: ${value['plan']['worst_case_cost_usd']}")
         print(f"Approval token: {value['approval']['token']}")
-    elif command in {"run", "status", "resume", "reroll"}:
+    elif command in {"run", "status", "resume", "reroll", "adopt"}:
         job = value
         print(f"Run: {_terminal_text(job['run_id'])}")
         print(f"Status: {_terminal_text(job['status'])}")
@@ -1248,6 +1261,10 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
                     reason=args.reason,
                     acknowledge_unknown=args.acknowledge_unknown,
                 )
+            )
+        elif command == "adopt":
+            snapshot = asyncio.run(
+                JobRunner(store).adopt(args.run_id, args.operation_key, reason=args.reason)
             )
         elif command == "export":
             snapshot = _portable_export(

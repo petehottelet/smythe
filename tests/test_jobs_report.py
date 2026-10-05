@@ -321,6 +321,33 @@ def test_input_digest_from_the_inspection_payload_is_inert():
     assert "&lt;/code&gt;&lt;script&gt;" in html
 
 
+def _with_adoption(sample, reason="Provider console shows one generated image"):
+    sample["operations"][0]["adoption"] = {
+        "attempt_id": "attempt-b", "call_id": "call-b", "reason": reason,
+        "exposure_microusd": 250_000, "adopted_at_ns": 1_788_796_804_000_000_000,
+        "artifacts": [{"relative_path": "glyphs/17.svg", "sha256": "c" * 64}],
+    }
+    return sample
+
+
+def test_an_adopted_operation_shows_its_reason_and_the_exposure_its_call_keeps():
+    document = Document(render_job_report(_with_adoption(payload())))
+    for expected in ("Adoption reason", "Provider console shows one generated image",
+                     "Adopted attempt", "attempt-b", "Exposure kept", "$0.250000", "Adopted"):
+        assert expected in document.content
+    assert sum(tag == "caption" for tag, _ in document.tags) == 6
+
+    assert "Adoption reason" not in Document(render_job_report(payload())).content
+
+
+def test_adoption_fields_from_the_ledger_are_inert():
+    attack = '<script>alert(1)</script><img src=x onerror="alert(2)">'
+    html = render_job_report(_with_adoption(payload(), reason=attack))
+    document = Document(html)
+    assert attack in document.content
+    assert not {tag for tag, _ in document.tags} & {"script", "img"}
+
+
 def test_renderer_is_deterministic_and_does_not_mutate_input():
     sample = payload()
     original = deepcopy(sample)
