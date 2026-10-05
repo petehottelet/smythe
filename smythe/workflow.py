@@ -16,6 +16,7 @@ from smythe._money import FLOOR, NANOUSD, to_units
 from smythe.acceptance import (
     AcceptanceDecision, AcceptanceMode, AcceptancePolicy, AcceptanceSource, DeliveryAcceptance,
     ValidationSubject, _final_check, evaluate_delivery, task_sha256, text_sha256,
+    validate_acceptance_obligations,
 )
 from smythe.budget import BudgetValidationError, Sentinel, validate_completion_usage
 from smythe.checkpoint import (
@@ -241,7 +242,10 @@ class WorkflowRuntime:
 
     A strict ``acceptance`` policy decides delivery after synthesis, as a
     journal operation that the completed checkpoint consumes, and enters the
-    recipe so that the run finishes only under that policy.
+    recipe so that the run finishes only under that policy. As on ordinary
+    runs, it marks the gates of a generated plan, refuses before planning a
+    run no gate of its plan could accept, and refuses a graph that does not
+    meet its acceptance obligations before any node runs.
     """
 
     def __init__(self, *, store, model, max_budget_usd, provider, architect, registry,
@@ -590,6 +594,23 @@ class WorkflowRuntime:
         registry.workflow_description()
         self._validate_graph(graph, fresh=True, registry=registry)
 
+    def _check_planning(self):
+        """Refuse, before routing or planning, a strict run no gate of its plan could accept."""
+        from smythe.swarm import _check_gate_planning, _planning_architects
+
+        _check_gate_planning(self.acceptance, _planning_architects(
+            self.sources["router"], self.sources["architect"]))
+
+    def _check_obligations(self, graph):
+        """Refuse, before any node runs, a graph whose output the strict policy could not decide."""
+        if self.acceptance is not None:
+            from smythe.swarm import _synthesis_strategy
+
+            graph.validate()
+            validate_acceptance_obligations(
+                graph, self.acceptance, strategy=_synthesis_strategy(self.sources["synthesizer"]),
+            )
+
     def _prepare_graph(self, graph, *, fresh=False):
         self._validate_graph(graph, fresh=fresh)
         for node in graph.nodes:
@@ -710,6 +731,11 @@ class WorkflowRuntime:
             for agent in registry.list_agents():
                 self.registry.register(agent)
             graph.task = snapshot_task(frozen)
+            if self.acceptance is not None:
+                # The saved plan carries the marks, so a replay keeps them.
+                from smythe.swarm import _mark_generated_gates
+
+                _mark_generated_gates(graph, architect)
             self._prepare_graph(graph, fresh=True)
             return {"graph": graph_to_dict(graph), "registry": self.registry.workflow_description()}
 
@@ -732,6 +758,7 @@ class WorkflowRuntime:
     async def execute(self, value, *, max_concurrency):
         if isinstance(value, Task):
             task = snapshot_task(value)
+            self._check_planning()
             async with self._session(self._new_run(task)):
                 await self._plan(task)
                 return await self._execute(max_concurrency)
@@ -743,6 +770,8 @@ class WorkflowRuntime:
         value = graph_from_dict(json_snapshot(graph_to_dict(value)))
         reference = snapshot_run_ref(value.run_ref)
         if reference is None:
+            # A refused graph creates no run.
+            self._check_obligations(value)
             async with self._session(self._new_run(value.task)):
                 self._prepare_graph(value, fresh=True)
                 self._save("planned")
@@ -815,6 +844,7 @@ class WorkflowRuntime:
                 task = task_from_dict(self.run["task"])
                 if task is None:
                     raise WorkflowStateError("Caller-built workflow has no saved initial graph")
+                self._check_planning()
                 await self._plan(task)
             return await self._execute(max_concurrency, state=state)
 
@@ -833,6 +863,10 @@ class WorkflowRuntime:
             ):
                 raise WorkflowStateError("Completed workflow has an unresolved control or accounting marker")
             return self._result(state["output"], self._reverified(state["output"]))
+        if state is None or state["status"] == "planned":
+            # No node has run, so a plan, edited or generated, is checked
+            # now. A run that started met its obligations then.
+            self._check_obligations(self.graph)
         self.execution_concurrency = (state.get("max_concurrency") if state else None) or max_concurrency
         if (type(self.execution_concurrency) is not int
                 or not 1 <= self.execution_concurrency <= self.max_concurrency):

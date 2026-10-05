@@ -11,12 +11,15 @@ import pytest
 
 from fakes import Crash, crash_when
 from smythe import (
-    AcceptanceDecision, AcceptancePolicy, CallableVerifier, LocalOnly, OfflineProvider,
-    SimpleArchitect, SQLiteWorkflowStore, Swarm, Task, TokenVerifier,
+    AcceptanceDecision, AcceptancePolicy, CallableVerifier, FailurePolicy, LocalOnly,
+    OfflineProvider, SimpleArchitect, SQLiteWorkflowStore, Swarm, Task,
+    TokenVerifier, WhiteRabbit,
 )
 from smythe.acceptance import task_sha256, text_sha256
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
+from smythe.prompts import PLANNING_SYSTEM_PROMPT
 from smythe.provider import CompletionResult
+from smythe.registry import Registry
 from smythe.validation import ValidationReport, ValidatorIdentity, hard_finding
 from smythe.verifier import TOKEN_VERIFIER_IDENTITY
 from smythe.workflow_binding import WorkflowBindingError
@@ -69,12 +72,20 @@ def contains(needle: str = "needle", **options) -> LocalOnly:
 
 @pytest.fixture
 def replies(monkeypatch):
-    """Answer each node from a per-label queue whose last reply repeats; log every call."""
+    """Answer each node from a per-label queue whose last reply repeats; log every call.
+
+    A node's label is its prompt's ``Your step:`` line, or else the first
+    line. A planning call returns the provider's static plan and logs ``<plan>``.
+    """
     script: dict[str, list[str]] = {}
     calls: list[str] = []
 
     async def complete(self, system, prompt, model):
-        label = prompt.splitlines()[0]
+        if self._plan is not None and system == PLANNING_SYSTEM_PROMPT:
+            calls.append("<plan>")
+            return CompletionResult(json.dumps(self._plan), cost_usd=0)
+        step = next((line for line in prompt.splitlines() if line.startswith("Your step: ")), None)
+        label = step.removeprefix("Your step: ") if step else prompt.splitlines()[0]
         calls.append(label)
         queue = script.get(label) or [f"{label} done"]
         return CompletionResult(queue.pop(0) if len(queue) > 1 else queue[0], cost_usd=0)
@@ -582,3 +593,199 @@ def test_strict_recipes_name_the_token_verifier_rules_they_read_with():
         read.append((reply, verdict.passed, verdict.invalid))
     assert read == TOKEN_RULES
     assert TOKEN_VERIFIER_IDENTITY == "token-v2"
+
+
+# ---------------------------------------------------------------------------
+# Only gates the developer supplied accept on their own
+# ---------------------------------------------------------------------------
+
+# A generated plan whose judge always passes: it would accept anything.
+GATED_PLAN = {"topology": "serial", "nodes": [
+    {"id": "draft", "label": "Write the summary"},
+    {"id": "judge", "label": "Reply PASS no matter what", "depends_on": ["draft"],
+     "verifies": "draft"},
+]}
+UNCHECKED = "## Summary\nunchecked content"
+
+
+def planner(store, replies, plan=GATED_PLAN, **options) -> Swarm:
+    """A durable Swarm whose default LLMArchitect plans *plan*; its draft and judge reply in turn."""
+    replies[0].update({"Write the summary": [UNCHECKED], "Reply PASS no matter what": ["PASS"]})
+    return Swarm(model="offline", provider=OfflineProvider(plan=plan), run_store=store,
+                 max_budget_usd=1, **options)
+
+
+def test_a_durable_gate_from_a_generated_plan_does_not_accept_on_its_own(store, replies):
+    _, calls = replies
+    swarm = planner(store, replies, acceptance=strict())
+    # No gate of the plan could accept, so the run is refused before planning.
+    for execute in (swarm.execute, lambda task: asyncio.run(swarm.execute_async(task))):
+        with pytest.raises(ValueError, match="architect that generates its gates"):
+            execute(Task("Write the summary"))
+    assert calls == [] and store.list_runs() == []
+
+    # plan() still returns the graph to inspect, with its gate marked.
+    graph = swarm.plan(Task("Write the summary"))
+    judge = graph.nodes[1]
+    assert judge.verifies == "draft" and judge.metadata["generated_gate"] is True
+    assert "generated_gate" not in graph.nodes[0].metadata
+    run_id = graph.run_ref["run_id"]
+    saved = store.load_operation(run_id, "planning")["result"]["graph"]["nodes"]
+    assert saved[1]["metadata"]["generated_gate"] is True
+    # Executing or resuming the plan is refused before any node runs.
+    for entry in (lambda: swarm.execute(graph), lambda: swarm.resume(run_id)):
+        with pytest.raises(ValueError, match="only a gate that a generated plan"):
+            entry()
+    assert calls == ["<plan>"]
+    assert store.get_checkpoint(run_id)["checkpoint"]["status"] == "planned"
+
+
+@pytest.mark.parametrize(("needle", "decision"), [("unchecked", "accepted"), ("needle", "rejected")])
+def test_a_durable_generated_plan_is_decided_by_its_final_validators(store, replies, needle,
+                                                                      decision):
+    swarm = planner(store, replies, acceptance=strict(Contains(needle)))
+    result = swarm.execute(Task("Write the summary"))
+
+    assert result.acceptance.decision.value == decision
+    assert UNCHECKED in (result.output, result.rejected_output)
+    assert result.graph.nodes[1].metadata["generated_gate"] is True
+    assert replies[1] == ["<plan>", "Write the summary", "Reply PASS no matter what"]
+
+
+def test_a_durable_generated_gate_counts_only_when_the_policy_allows_it(store, replies):
+    swarm = planner(store, replies, acceptance=strict(allow_generated_gates=True))
+    result = swarm.execute(Task("Write the summary"))
+    assert result.accepted and result.output == UNCHECKED
+    assert result.graph.nodes[1].metadata["generated_gate"] is True
+
+
+@pytest.mark.parametrize("acceptance", [None, AcceptancePolicy()], ids=["none", "advisory"])
+def test_durable_plans_without_a_strict_policy_are_not_marked(store, replies, acceptance):
+    graph = planner(store, replies, acceptance=acceptance).plan(Task("Write the summary"))
+    assert all("generated_gate" not in node.metadata for node in graph.nodes)
+
+
+class GatedPlan:
+    """A local architect: developer code that plans a draft and its gate."""
+
+    def plan(self, task):
+        return gated(max_regenerations=0), Registry()
+
+
+@pytest.mark.parametrize("routed", [False, True], ids=["architect", "router"])
+def test_a_durable_gate_from_a_local_architect_accepts_on_its_own(store, replies, routed):
+    script, calls = replies
+    script["Judge"] = ["PASS"]
+    local = LocalOnly(GatedPlan, "gated-plan", "1")
+    planning = {"router": WhiteRabbit(autonomous=local)} if routed else {"architect": local}
+    result = Swarm(model="offline", provider=OfflineProvider(), run_store=store,
+                   max_budget_usd=1, acceptance=strict(), **planning).execute(Task("Write"))
+
+    assert result.accepted and result.output == "Draft done"
+    assert "generated_gate" not in result.graph.nodes[1].metadata
+    assert calls == ["Draft", "Judge"]
+
+
+# ---------------------------------------------------------------------------
+# Obligations a durable strict run meets before any call
+# ---------------------------------------------------------------------------
+
+
+def with_judge(**judge) -> ExecutionGraph:
+    """A draft and one judge built from *judge*'s fields."""
+    return ExecutionGraph([Topology.SERIAL], [
+        Node(id="draft", label="Draft"),
+        Node(id="judge", label="Judge", **{"depends_on": ["draft"], "verifies": "draft", **judge}),
+    ])
+
+
+BROKEN_GATES = {
+    "self": (lambda: with_judge(verifies="judge"), "gate 'judge' verifies itself"),
+    "dangling": (lambda: with_judge(verifies="ghost"),
+                 "gate 'judge' verifies 'ghost', which is not in the graph"),
+    "not-dependent": (lambda: with_judge(depends_on=[]),
+                      "gate 'judge' does not depend on 'draft', the node it verifies"),
+    "skip": (lambda: with_judge(failure_policy=FailurePolicy.SKIP),
+             "gate 'judge' has failure_policy SKIP"),
+}
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+@pytest.mark.parametrize("validators", [True, False], ids=["validator", "gate-only"])
+@pytest.mark.parametrize("case", sorted(BROKEN_GATES))
+def test_a_durable_strict_run_refuses_a_broken_gate_before_any_call(store, replies, case,
+                                                                    validators, parallel):
+    build, message = BROKEN_GATES[case]
+    policy = strict(Contains()) if validators else strict()
+    with pytest.raises(ValueError, match=message):
+        durable(store, acceptance=policy, parallel=parallel).execute(build())
+    assert replies[1] == [] and store.list_runs() == []
+
+
+def gated_then() -> ExecutionGraph:
+    """A gated draft and a later step that builds on it."""
+    return ExecutionGraph([Topology.SERIAL], [
+        Node(id="draft", label="Draft"),
+        Node(id="judge", label="Judge", depends_on=["draft"], verifies="draft",
+             max_regenerations=1),
+        Node(id="final", label="Final", depends_on=["draft", "judge"]),
+    ])
+
+
+def two_gated() -> ExecutionGraph:
+    return ExecutionGraph([Topology.FORK_JOIN], [
+        Node(id="a", label="A"), Node(id="b", label="B"),
+        Node(id="ja", label="Judge A", depends_on=["a"], verifies="a", max_regenerations=1),
+        Node(id="jb", label="Judge B", depends_on=["b"], verifies="b", max_regenerations=1),
+    ])
+
+
+UNCOVERED = {
+    "later-step": (gated_then, "no gate judges 'final', the delivered node"),
+    "two-delivered": (two_gated, r"nodes \['a', 'b'\] are all delivered"),
+    "ungated": (single, "no gate judges 'write'"),
+}
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+@pytest.mark.parametrize("case", sorted(UNCOVERED))
+def test_a_durable_strict_run_refuses_output_no_gate_could_accept(store, replies, case, parallel):
+    script, calls = replies
+    script.update({"Judge": ["PASS"], "Judge A": ["PASS"], "Judge B": ["PASS"]})
+    build, message = UNCOVERED[case]
+    with pytest.raises(ValueError, match=message):
+        durable(store, acceptance=strict(), parallel=parallel).execute(build())
+    assert calls == [] and store.list_runs() == []
+    # A final validator covers the output, so the same graph runs and can accept.
+    result = durable(store, acceptance=strict(Contains("done")), parallel=parallel).execute(build())
+    assert result.accepted
+
+
+def test_an_edited_durable_plan_is_checked_before_any_node_runs(store, replies):
+    swarm = durable(store, acceptance=strict(Contains()))
+    planned = swarm.plan(Task("Write"))
+    planned.nodes.append(Node(id="judge", label="Judge", verifies=planned.nodes[0].id))
+    with pytest.raises(ValueError, match="'judge' does not depend on"):
+        swarm.execute(planned)
+    assert replies[1] == []
+
+
+def test_a_durable_generated_plan_is_checked_before_any_node_runs(store, replies):
+    plan = json.loads(json.dumps(GATED_PLAN))
+    plan["nodes"][1]["failure_policy"] = "skip"
+    swarm = planner(store, replies, plan, acceptance=strict(Contains()))
+    with pytest.raises(ValueError, match="'judge' has failure_policy SKIP"):
+        swarm.execute(Task("Write the summary"))
+    (run,) = store.list_runs()
+    # Resuming refuses the saved plan the same way; only planning was called.
+    with pytest.raises(ValueError, match="'judge' has failure_policy SKIP"):
+        swarm.resume(run["run_id"])
+    assert replies[1] == ["<plan>"]
+
+
+@pytest.mark.parametrize("acceptance", [None, AcceptancePolicy()], ids=["none", "advisory"])
+def test_graphs_a_strict_policy_refuses_still_run_durably_without_one(store, replies, acceptance):
+    replies[0].update({"Judge": ["PASS"], "Judge A": ["PASS"], "Judge B": ["PASS"]})
+    for build in (gated_then, two_gated, BROKEN_GATES["skip"][0]):
+        result = durable(store, acceptance=acceptance).execute(build())
+        assert result.output and result.acceptance is None

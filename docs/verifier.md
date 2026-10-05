@@ -423,9 +423,10 @@ with a synthesis other than `DELIVERABLE`, and refuses the other cases
 <a id="which-gates-count"></a>
 **Which gates count.** Acceptance criteria are inputs you control, so a gate
 accepts output on its own only when you supplied it: in a graph you pass to
-`execute()` or load from YAML, or in a plan that a `DeterministicArchitect`
-builds or a `ConstrainedArchitect` composes from your templates. A strict
-`Swarm` marks each gate of a plan that any other architect, such as
+`execute()` or load from YAML, in a plan that a `DeterministicArchitect`
+builds or a `ConstrainedArchitect` composes from your templates, or, in a
+durable run, in a plan that a `LocalOnly` architect builds in local code. A
+strict `Swarm` marks each gate of a plan that any other architect, such as
 `LLMArchitect`, generates with `generated_gate: true` in its metadata, and
 `apply_revision` marks every node a supervisor revision adds with
 `added_by_revision: true`. A passed verdict from such a gate does not accept
@@ -460,7 +461,8 @@ still returns the graph for inspection, and executing it is refused. A
 [supervisor revision](supervisor.md#steps-added-after-a-gate) that would
 break an obligation the graph met is refused like any invalid revision. A
 resumed run is not checked again: its graph met the obligations when it
-started.
+started. A [durable run](#strict-acceptance-in-durable-workflows) applies
+the same checks at the same points.
 
 A final validator that raises, returns an awaitable or anything other than a
 `ValidationReport`, reports `outcome="error"`, or returns a report naming
@@ -641,6 +643,19 @@ fields.
 A `Swarm` with a durable `run_store` decides the same way, on the same
 policy, and records the decision in its journal:
 
+- **The same gates count and the same obligations hold.** The run marks each
+  gate of a generated plan `generated_gate`, in the planning result its
+  journal saves, and each node a supervisor revision adds `added_by_revision`,
+  as an ordinary run does ([which gates count](#which-gates-count)). It
+  checks the [obligations](#acceptance-obligations) before any node call: a
+  graph you pass to `execute()` before its run is created, and a generated
+  plan, or a planned graph you edit, before its first node runs. Without
+  final validators or `allow_generated_gates`, `execute()` with a task is
+  refused before the planning call when every architect that could plan
+  generates its gates. A refusal raises `ValueError`. A refused plan keeps
+  its planning charge and stays `planned`, and resuming it is refused the
+  same way. A supervisor revision that would break an obligation is refused
+  and traced, and the run continues on its plan.
 - **The policy is part of the run.** The recipe records `policy.to_dict()`
   under `acceptance`: validator names, versions and configuration digests,
   never code. Final validators are the policy's validator objects, registered

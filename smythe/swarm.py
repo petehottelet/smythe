@@ -74,7 +74,7 @@ from smythe.verifier import (
     validate_verification_checkpoint,
     verification_pending,
 )
-from smythe.workflow_binding import LocalOnly, WorkflowBindingError
+from smythe.workflow_binding import LocalOnly, WorkflowBindingError, _BoundLocal
 from smythe.workflow_policy import WorkflowGraphPolicy, snapshot_graph_policy
 from smythe.workflow_store import SQLiteWorkflowStore
 
@@ -213,14 +213,54 @@ def _synthesis_strategy(synthesizer: Any) -> str:
     return "custom"
 
 
-def _builds_developer_gates(architect: Architect) -> bool:
+def _builds_developer_gates(architect: Any) -> bool:
     """Whether *architect*'s gates come from developer code rather than a model.
 
-    A ``DeterministicArchitect`` builds its graph in Python, and a
-    ``ConstrainedArchitect`` composes developer templates. Any other
-    architect, such as ``LLMArchitect``, may generate its gates.
+    A ``DeterministicArchitect`` builds its graph in Python, a
+    ``ConstrainedArchitect`` composes developer templates, and a durable
+    run's ``LocalOnly`` architect plans in local code. Any other architect,
+    such as ``LLMArchitect``, may generate its gates.
     """
-    return isinstance(architect, (DeterministicArchitect, ConstrainedArchitect))
+    return isinstance(architect, (DeterministicArchitect, ConstrainedArchitect,
+                                  LocalOnly, _BoundLocal))
+
+
+def _planning_architects(router: Any, architect: Any) -> tuple[Any, ...]:
+    """Every architect that could plan a run: *router*'s tiers, or *architect* without one.
+
+    Empty for a router other than ``WhiteRabbit``, whose tiers are unknown.
+    """
+    if router is None:
+        return (architect,)
+    if type(router) is WhiteRabbit:
+        return router._architects()
+    return ()
+
+
+def _check_gate_planning(policy: AcceptancePolicy | None, architects: tuple[Any, ...]) -> None:
+    """Refuse, before planning, a strict run whose plan no gate could accept.
+
+    Without final validators or ``allow_generated_gates`` only a gate from
+    developer code accepts, so a run whose every architect generates its
+    gates could never accept its output.
+    """
+    if (policy is not None and not policy.final_validators
+            and not policy.allow_generated_gates and architects
+            and not any(_builds_developer_gates(item) for item in architects)):
+        raise ValueError(
+            "A strict acceptance policy without a final validator accepts only output "
+            "that a gate you supplied judged, and this run's plan would come from an "
+            "architect that generates its gates. Add a final validator, set "
+            "allow_generated_gates=True, or execute a graph you build."
+        )
+
+
+def _mark_generated_gates(graph: ExecutionGraph, architect: Any) -> None:
+    """Mark each gate of a plan that *architect* generated with ``GENERATED_GATE_KEY``."""
+    if not _builds_developer_gates(architect):
+        for node in graph.nodes:
+            if node.verifies:
+                node.metadata[GENERATED_GATE_KEY] = True
 
 
 def _auto_detect_provider(model: str) -> Provider:
@@ -255,8 +295,8 @@ class Swarm:
     (:func:`~smythe.acceptance.validate_acceptance_obligations`), and before
     planning a run whose plan could not meet that check.
     None, the default, and an advisory policy keep legacy behavior. With a
-    durable ``run_store`` the policy enters the run's recipe and the decision
-    is journaled; see ``smythe.workflow.WorkflowRuntime``.
+    durable ``run_store`` the same checks apply, the policy enters the run's
+    recipe and the decision is journaled; see ``smythe.workflow.WorkflowRuntime``.
     """
 
     def __init__(
@@ -625,26 +665,13 @@ class Swarm:
         could plan generates its gates, which that policy does not count.
         """
         self._check_run_support()
-        if self._router is None:
-            architects = (self._architect,)
-        elif type(self._router) is WhiteRabbit:
-            architects = self._router._architects()
-        else:
-            architects = ()
+        architects = _planning_architects(self._router, self._architect)
         if architects and all(type(item) is LLMArchitect for item in architects):
             check_provider_support(self._provider, str(self.model), node_id=None,
                                    max_budget_usd=self.max_budget_usd if executing else None)
-        policy = self._strict_policy()
-        if (executing and policy is not None and not policy.final_validators
-                and not policy.allow_generated_gates and architects
-                and not any(_builds_developer_gates(item) for item in architects)):
+        if executing:
             # The plan's gates will not count, so nothing could accept its output.
-            raise ValueError(
-                "A strict acceptance policy without a final validator accepts only output "
-                "that a gate you supplied judged, and this run's plan would come from an "
-                "architect that generates its gates. Add a final validator, set "
-                "allow_generated_gates=True, or execute a graph you build."
-            )
+            _check_gate_planning(self._strict_policy(), architects)
 
     def _check_obligations(self, graph: ExecutionGraph) -> None:
         """Refuse, before any node runs, a graph whose output a strict policy could not decide."""
@@ -711,10 +738,8 @@ class Swarm:
         graph.task = task
         self._stamp_model(graph)
         self._stamp_task_context(graph, task)
-        if self._strict_policy() is not None and not _builds_developer_gates(architect):
-            for node in graph.nodes:
-                if node.verifies:
-                    node.metadata[GENERATED_GATE_KEY] = True
+        if self._strict_policy() is not None:
+            _mark_generated_gates(graph, architect)
         return graph
 
     @staticmethod

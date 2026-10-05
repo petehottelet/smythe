@@ -369,12 +369,19 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   and `WorkflowRuntime` takes it as `acceptance`. The recipe records the
   policy, so a run resumes only under it, and gates read with
   `TokenVerifier` record the verifier identity `token-v2`
-  (`smythe.verifier.TOKEN_VERIFIER_IDENTITY`). After synthesis an
-  `acceptance` journal operation makes the decision on the exact output,
-  and the completed checkpoint consumes it with the output in one
-  transaction: a run stopped before the decision commits decides again on
-  resume, and a committed decision replays with no validator run or
-  provider call. Such runs, and runs with a gate validator, write checkpoint
+  (`smythe.verifier.TOKEN_VERIFIER_IDENTITY`). The same gates count and the
+  same obligations hold as on ordinary runs: the saved planning result marks
+  each gate of a generated plan `generated_gate` (a `LocalOnly` architect's
+  plan counts as yours), a run whose architects all generate their gates is
+  refused before the planning call when the policy has no final validator or
+  `allow_generated_gates`, and the acceptance obligations are checked for a
+  supplied graph before its run is created, for a generated or edited plan
+  before its first node runs, and for each supervisor revision before it
+  applies. After synthesis an `acceptance` journal operation makes the
+  decision on the exact output, and the completed checkpoint consumes it
+  with the output in one transaction: a run stopped before the decision
+  commits decides again on resume, and a committed decision replays with no
+  validator run or provider call. Such runs, and runs with a gate validator, write checkpoint
   version 2 with a `delivery_acceptance` block and key synthesis after a
   regeneration as `synthesis/<n>`. Resuming a completed run rechecks the
   output digest, task, source generations and journal decision, giving

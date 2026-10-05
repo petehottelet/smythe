@@ -338,6 +338,16 @@ journals the decision:
   under the same policy, and gates read with `TokenVerifier` record the
   verifier identity `token-v2` in place of `token-v1`. Recipes without a
   strict policy keep their bytes.
+- [Which gates count](verifier.md#which-gates-count) follows the ordinary
+  rule: the saved planning result marks each gate of a generated plan
+  `generated_gate`, and a supervisor revision marks the nodes it adds. The
+  [acceptance obligations](verifier.md#acceptance-obligations) are checked
+  before any node call: for a graph you supply, before the run is created;
+  for a generated or edited plan, before its first node runs, so a refused
+  plan stays `planned` with its planning charge; and for each supervisor
+  revision, before it applies. Without final validators or
+  `allow_generated_gates`, a run whose architects all generate their gates
+  is refused before the planning call.
 - After the `synthesis` operation, an `acceptance` operation runs the final
   validators on the exact output and reads every gate's final verdict, with
   no provider call. It is keyed by the output digest and everything else its
