@@ -17,7 +17,7 @@ from smythe.budget import BudgetValidationError, Sentinel, validate_completion_u
 from smythe.checkpoint import (
     graph_from_dict, graph_to_dict, node_from_dict, node_to_dict, reset_incomplete_nodes,
 )
-from smythe.executor_base import ExecutorBase
+from smythe.executor_base import SUPPORTED_PROMPT_ASSEMBLY_VERSIONS, ExecutorBase
 from smythe.graph import ExecutionGraph, NodeStatus, Revision, snapshot_run_ref
 from smythe.registry import Registry
 from smythe.provider import ProviderResponseError
@@ -62,8 +62,20 @@ MAX_NODE_ID_CHARS = 256
 #   recipe into WorkflowRuntime.behavior, so a changed default applies only to
 #   new runs; a value configured explicitly must equal the saved one. The
 #   settings are read-only after construction, which builds the recipe a new
-#   run records from them. No such field exists yet.
-RECIPE_BEHAVIOR_FIELDS = MappingProxyType({})
+#   run records from them.
+#
+# prompt_assembly selects how node prompts are assembled (see
+# smythe.executor_base.PROMPT_ASSEMBLY_VERSION). Version 1, which recipes
+# without the field mean and new runs still record by default, tells every
+# node that no other node depends on that it is the final step, a judge
+# included. Version 2 tells the nodes DELIVERABLE synthesis returns, as
+# ordinary runs do. A run keeps its version, so its saved requests still match
+# when it resumes.
+RECIPE_BEHAVIOR_FIELDS = MappingProxyType({"prompt_assembly": (1, 1)})
+# The values this release supports for a behavior-version field. A configured
+# value outside them is refused, and so is a saved recipe that records one,
+# for example a recipe a newer release wrote.
+_BEHAVIOR_VERSIONS = MappingProxyType({"prompt_assembly": SUPPORTED_PROMPT_ASSEMBLY_VERSIONS})
 _PROVIDER_FIELDS = frozenset({"kind", "adapter_version", "decoder_version", "endpoint_scope",
                               "price_version", "supported_models", "config"})
 
@@ -102,7 +114,16 @@ def _snapshot_behavior_settings(settings):
     unknown = sorted(set(settings) - set(RECIPE_BEHAVIOR_FIELDS))
     if unknown:
         raise WorkflowBindingError("Unknown workflow behavior version: " + ", ".join(unknown))
+    for name, value in settings.items():
+        if not _supported_behavior(name, value):
+            raise WorkflowBindingError(f"Unsupported workflow {name} version: {value!r}")
     return MappingProxyType(settings)
+
+
+def _supported_behavior(name, value):
+    versions = _BEHAVIOR_VERSIONS.get(name)
+    # Versions are integers; a bool or float equal to one is not a version.
+    return versions is None or (type(value) is int and value in versions)
 
 
 def _hash(value):
@@ -276,6 +297,11 @@ class WorkflowRuntime:
         for name, (absent, _) in RECIPE_BEHAVIOR_FIELDS.items():
             current.pop(name, None)
             behavior[name] = saved.pop(name, absent)
+            if not _supported_behavior(name, behavior[name]):
+                raise WorkflowConflictError(
+                    f"Workflow {name} {behavior[name]!r} in the saved recipe is not supported "
+                    "by this release"
+                )
             if (name in self.behavior_settings
                     and _canonical(self.behavior_settings[name]) != _canonical(behavior[name])):
                 raise WorkflowConflictError(f"Workflow {name} differs from the saved recipe")
@@ -691,6 +717,8 @@ class WorkflowRuntime:
             supervisor=_WorkflowSupervisor(self) if self.bound["supervisor"] else None,
             provider_call_factory=self._worker_call, on_node_update=self._node_update,
             on_control_update=self._save, on_supervision_update=self._supervision_update,
+            # The version the run's recipe records; 1 when it records none.
+            prompt_assembly=self.behavior.get("prompt_assembly", 1),
         )
         self._save()
         try:

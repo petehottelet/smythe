@@ -515,6 +515,20 @@ The verifier's verdict is never the deliverable: `DELIVERABLE`
 synthesis excludes verifier nodes, so a gated run returns the artefact
 rather than the "PASS" that approved it.
 
+### The final step
+
+The executor tells each node whose output `DELIVERABLE` synthesis returns, when
+it has dependencies, that it is the final step: its output is the deliverable
+and must carry forward everything the task asked for, not only its own
+contribution. Prompts follow the same rule as that synthesis. A judge is never
+told it is the final step, and its edge to the node it verifies does not count,
+so in a draft-to-judge graph the draft receives the instruction. A step that
+depends on the draft or on its judge is the final step instead. Executors take a keyword-only `prompt_assembly`; `1`
+restores the earlier placement, which counted the judge's edge and so told a
+judge that nothing depends on, rather than the draft, that it was the final
+step. [Durable text workflows](workflow-accounting.md#recovery-boundaries)
+keep the earlier placement unless the run's recipe records version 2.
+
 ## Cost
 
 A gate node is executed like any other node: it makes a provider call. When

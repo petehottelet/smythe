@@ -542,6 +542,19 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `call_released` event, which `release_before_dispatch` now records too.
   The new `SQLiteWorkflowStore.release_superseded_calls` and
   `release_reserved_calls` perform these releases.
+- In a gated graph, the node a judge verifies is told it is the final step,
+  not the judge. Terminal detection counted the judge's edge to that node, so
+  in a draft-to-judge graph the judge's prompt said its output was the
+  deliverable while `DELIVERABLE` synthesis returned the draft, whose prompt
+  lacked the instruction. Prompts now follow the same rule as that synthesis.
+  This changes the prompts of gated graphs on ordinary runs, so benchmark
+  results for gated graphs from before and after this change are not directly
+  comparable. Executors take a keyword-only `prompt_assembly`, where `1`
+  restores the earlier placement. Durable text workflows keep the earlier
+  placement, so runs in flight resume with the requests they saved; a recipe
+  that records `prompt_assembly: 2` uses the new one, and a saved or
+  configured version this release does not support is refused. See
+  [the final step](docs/verifier.md#the-final-step).
 
 ## [0.9.1] - 2026-09-29
 

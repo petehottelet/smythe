@@ -87,6 +87,19 @@ def _depends_on(adjacency: Mapping[str, list[str]], node_id: str, target: str) -
     return False
 
 
+def _deliverable_ids(nodes: list[Node]) -> set[str]:
+    """Ids of the nodes that can be delivered: terminal nodes that are not verifiers.
+
+    Only an edge from a node that is not a verifier makes its dependency
+    non-terminal, so a judge that depends on the node it judges leaves that
+    node deliverable. ``DELIVERABLE`` synthesis returns these nodes and the
+    executor tells them they are the final step.
+    """
+    verifiers = {node.id for node in nodes if node.verifies}
+    depended_on = {dep for node in nodes if node.id not in verifiers for dep in node.depends_on}
+    return {node.id for node in nodes if node.id not in verifiers and node.id not in depended_on}
+
+
 # House diagram style (docs/style.md): serif type, pure black-and-white nodes,
 # hairline edges, and gentle curves. Opt in via to_mermaid(theme=True).
 MERMAID_THEME = (

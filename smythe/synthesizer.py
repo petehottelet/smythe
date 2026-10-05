@@ -12,7 +12,7 @@ from smythe.budget import (
     BudgetEstimateRequired, BudgetValidationError, Sentinel, validate_completion_usage,
 )
 from smythe.executor_base import check_provider_support
-from smythe.graph import SYNTHESIS_NODE_ID, ExecutionGraph, Node, NodeStatus
+from smythe.graph import SYNTHESIS_NODE_ID, ExecutionGraph, Node, NodeStatus, _deliverable_ids
 from smythe.provider import (
     Provider, ProviderResponseError, _native_receipt, _native_response_errors,
     _raise_if_incomplete, _settle_response_error, _settle_response_group,
@@ -46,16 +46,8 @@ def _completed(graph: ExecutionGraph) -> list[Node]:
 
 
 def _select_deliverable(graph: ExecutionGraph, nodes: list[Node]) -> tuple[list[Node], bool]:
-    verifier_ids = {node.id for node in graph.nodes if node.verifies}
-    depended_on = {
-        dep
-        for node in graph.nodes if node.id not in verifier_ids
-        for dep in node.depends_on
-    }
-    terminal = [
-        n for n in nodes
-        if n.id not in depended_on and n.id not in verifier_ids
-    ]
+    deliverable = _deliverable_ids(graph.nodes)
+    terminal = [n for n in nodes if n.id in deliverable]
     if terminal:
         return terminal, False
     return nodes, bool(nodes)

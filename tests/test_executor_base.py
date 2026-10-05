@@ -1,5 +1,6 @@
 """Tests for ExecutorBase shared helpers."""
 
+import inspect
 import os
 
 import pytest
@@ -108,6 +109,99 @@ def test_executor_marks_only_terminal_nodes():
     first, last = provider.prompts
     assert TERMINAL_DELIVERABLE_NOTE not in first
     assert TERMINAL_DELIVERABLE_NOTE in last
+
+
+class PromptsByStep(Provider):
+    """Records each node's prompt under its first line, the node's label; ``Check`` passes."""
+
+    def __init__(self):
+        self.prompts = {}
+
+    async def complete(self, system, prompt, model):
+        label = prompt.splitlines()[0]
+        self.prompts[label] = prompt
+        return CompletionResult(text="PASS" if label == "Check" else f"{label} output",
+                                prompt_tokens=1, completion_tokens=1)
+
+
+def _draft_and_judge():
+    """Research feeds a draft that a judge checks; no node depends on the judge."""
+    return ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(label="Research", id="research"),
+        Node(label="Draft", id="draft", depends_on=["research"]),
+        Node(label="Check", id="judge", depends_on=["draft"], verifies="draft",
+             max_regenerations=1),
+    ])
+
+
+def _run(graph, *, parallel, **options):
+    import asyncio
+
+    from smythe.async_executor import AsyncExecutor
+    from smythe.executor import Executor
+
+    provider = PromptsByStep()
+    executor_type = AsyncExecutor if parallel else Executor
+    executor = executor_type(provider=provider, registry=Registry(), tracer=Tracer(),
+                             artifact_dir=None, **options)
+    if parallel:
+        asyncio.run(executor.run(graph))
+    else:
+        executor.run(graph)
+    assert all(node.status is NodeStatus.COMPLETED for node in graph.nodes)
+    return provider.prompts
+
+
+@pytest.mark.parametrize("parallel", [False, True], ids=["serial", "parallel"])
+def test_gated_deliverable_receives_the_terminal_note_and_its_judge_does_not(parallel):
+    """The judge's edge to the draft it verifies does not make the draft
+    non-terminal: the note goes to the node DELIVERABLE synthesis returns."""
+    from smythe.executor_base import TERMINAL_DELIVERABLE_NOTE
+    from smythe.synthesizer import deliverable_sources
+
+    graph = _draft_and_judge()
+    prompts = _run(graph, parallel=parallel)
+
+    assert TERMINAL_DELIVERABLE_NOTE in prompts["Draft"]
+    assert TERMINAL_DELIVERABLE_NOTE not in prompts["Check"]
+    assert TERMINAL_DELIVERABLE_NOTE not in prompts["Research"]
+    assert [node.id for node in deliverable_sources(graph)[0]] == ["draft"]
+
+
+@pytest.mark.parametrize("parallel", [False, True], ids=["serial", "parallel"])
+def test_prompt_assembly_version_1_keeps_the_note_on_terminal_judges(parallel):
+    from smythe.executor_base import TERMINAL_DELIVERABLE_NOTE
+
+    prompts = _run(_draft_and_judge(), parallel=parallel, prompt_assembly=1)
+
+    assert TERMINAL_DELIVERABLE_NOTE in prompts["Check"]
+    assert TERMINAL_DELIVERABLE_NOTE not in prompts["Draft"]
+    assert TERMINAL_DELIVERABLE_NOTE not in prompts["Research"]
+
+
+def test_a_step_that_depends_on_the_judge_is_the_terminal_step():
+    from smythe.executor_base import TERMINAL_DELIVERABLE_NOTE
+
+    graph = _draft_and_judge()
+    graph.nodes.append(Node(label="Publish", id="publish", depends_on=["judge", "draft"]))
+    prompts = _run(graph, parallel=False)
+
+    assert TERMINAL_DELIVERABLE_NOTE in prompts["Publish"]
+    assert not any(TERMINAL_DELIVERABLE_NOTE in prompts[label]
+                   for label in ("Research", "Draft", "Check"))
+
+
+@pytest.mark.parametrize("value", [0, 3, True, 2.0, "2", None])
+def test_executors_refuse_an_unknown_prompt_assembly_version(value):
+    from smythe.async_executor import AsyncExecutor
+    from smythe.executor import Executor
+
+    for executor_type in (ExecutorBase, Executor, AsyncExecutor):
+        with pytest.raises(ValueError, match="prompt_assembly"):
+            executor_type(provider=DummyProvider(), registry=Registry(), tracer=Tracer(),
+                          prompt_assembly=value)
+        parameter = inspect.signature(executor_type).parameters["prompt_assembly"]
+        assert (parameter.kind, parameter.default) == (inspect.Parameter.KEYWORD_ONLY, 2)
 
 
 # --- task context propagation ------------------------------------------

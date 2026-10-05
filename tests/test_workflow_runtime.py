@@ -2,14 +2,17 @@
 
 import asyncio
 from copy import deepcopy
+import json
 from dataclasses import replace
 from types import MappingProxyType
 
 import pytest
 
+import fakes
 from fakes import ManualClock, NativeTransport, release_price_version
 from smythe import LocalOnly, OfflineProvider, SimpleArchitect, SQLiteWorkflowStore, Swarm, Task
 from smythe import workflow
+from smythe.executor_base import TERMINAL_DELIVERABLE_NOTE
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Revision, Topology
 from smythe.pricing import PRICE_VERSION, price_table
 from smythe.provider_responses import OpenAIResponsesProvider
@@ -365,71 +368,182 @@ def test_behavior_version_fields_are_read_from_the_saved_recipe(store, monkeypat
     legacy = swarm(store).plan(Task("Report")).run_ref["run_id"]
     recipe = store.load_run(legacy)["config_sha256"]
     # A later release adds a behavior version whose default is 2.
-    monkeypatch.setattr(workflow, "RECIPE_BEHAVIOR_FIELDS", MappingProxyType({"prompt_assembly": (1, 2)}))
+    monkeypatch.setattr(workflow, "RECIPE_BEHAVIOR_FIELDS", MappingProxyType({"example_version": (1, 2)}))
     runtime = swarm(store)._workflow_runtime()
-    assert runtime.recipe["prompt_assembly"] == 2
+    assert runtime.recipe["example_version"] == 2
     assert asyncio.run(runtime.resume(legacy, max_concurrency=1)).execution_id == legacy
-    assert runtime.behavior == {"prompt_assembly": 1}
+    assert runtime.behavior == {"example_version": 1}
     assert store.load_run(legacy)["config_sha256"] == recipe
     # A new run records its default and keeps it when a later default changes.
     started = asyncio.run(swarm(store)._workflow_runtime().plan(Task("Report"))).run_ref["run_id"]
-    assert store.load_run(started)["config"]["prompt_assembly"] == 2
-    monkeypatch.setattr(workflow, "RECIPE_BEHAVIOR_FIELDS", MappingProxyType({"prompt_assembly": (1, 3)}))
+    assert store.load_run(started)["config"]["example_version"] == 2
+    monkeypatch.setattr(workflow, "RECIPE_BEHAVIOR_FIELDS", MappingProxyType({"example_version": (1, 3)}))
     later = swarm(store)._workflow_runtime()
     asyncio.run(later.resume(started, max_concurrency=1))
-    assert later.behavior == {"prompt_assembly": 2}
+    assert later.behavior == {"example_version": 2}
     # A value configured explicitly must equal the saved one.
-    explicit = swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": 3})
-    with pytest.raises(WorkflowConflictError, match="prompt_assembly"):
+    explicit = swarm(store)._workflow_runtime(behavior_settings={"example_version": 3})
+    with pytest.raises(WorkflowConflictError, match="example_version"):
         asyncio.run(explicit.resume(started, max_concurrency=1))
-    assert store.load_run(started)["config"]["prompt_assembly"] == 2
+    assert store.load_run(started)["config"]["example_version"] == 2
 
 
 def test_new_run_records_an_explicit_behavior_version_and_keeps_it(store, monkeypatch):
-    monkeypatch.setattr(workflow, "RECIPE_BEHAVIOR_FIELDS", MappingProxyType({"prompt_assembly": (1, 2)}))
-    runtime = swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": 3})
-    assert runtime.recipe["prompt_assembly"] == 3
+    monkeypatch.setattr(workflow, "RECIPE_BEHAVIOR_FIELDS", MappingProxyType({"example_version": (1, 2)}))
+    runtime = swarm(store)._workflow_runtime(behavior_settings={"example_version": 3})
+    assert runtime.recipe["example_version"] == 3
     planned = asyncio.run(runtime.plan(Task("Report"))).run_ref["run_id"]
-    assert store.load_run(planned)["config"]["prompt_assembly"] == 3
-    assert runtime.behavior == {"prompt_assembly": 3}
+    assert store.load_run(planned)["config"]["example_version"] == 3
+    assert runtime.behavior == {"example_version": 3}
     recipe = store.load_run(planned)["config_sha256"]
     # Executing a Task creates its run the same way. A configured value equal
     # to the one a recipe without the field means is not recorded.
-    unrecorded = swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": 1})
+    unrecorded = swarm(store)._workflow_runtime(behavior_settings={"example_version": 1})
     executed = asyncio.run(unrecorded.execute(Task("Report"), max_concurrency=1)).execution_id
-    assert "prompt_assembly" not in store.load_run(executed)["config"]
-    assert unrecorded.behavior == {"prompt_assembly": 1}
+    assert "example_version" not in store.load_run(executed)["config"]
+    assert unrecorded.behavior == {"example_version": 1}
     # A later release changes the default; each run keeps the value it recorded.
-    monkeypatch.setattr(workflow, "RECIPE_BEHAVIOR_FIELDS", MappingProxyType({"prompt_assembly": (1, 4)}))
+    monkeypatch.setattr(workflow, "RECIPE_BEHAVIOR_FIELDS", MappingProxyType({"example_version": (1, 4)}))
     later = swarm(store)._workflow_runtime()
     result = asyncio.run(later.resume(planned, max_concurrency=1))
     assert result.execution_id == planned and result.output
-    assert later.behavior == {"prompt_assembly": 3}
+    assert later.behavior == {"example_version": 3}
     assert store.load_run(planned)["config_sha256"] == recipe
-    again = swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": 3})
+    again = swarm(store)._workflow_runtime(behavior_settings={"example_version": 3})
     asyncio.run(again.resume(planned, max_concurrency=1))
-    assert again.behavior == {"prompt_assembly": 3}
+    assert again.behavior == {"example_version": 3}
     other = swarm(store)._workflow_runtime()
     asyncio.run(other.resume(executed, max_concurrency=1))
-    assert other.behavior == {"prompt_assembly": 1}
+    assert other.behavior == {"example_version": 1}
 
 
 def test_behavior_settings_are_checked_and_fixed_when_the_runtime_is_built(store, monkeypatch):
-    with pytest.raises(WorkflowBindingError, match="prompt_assembly"):
-        swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": 3})
-    monkeypatch.setattr(workflow, "RECIPE_BEHAVIOR_FIELDS", MappingProxyType({"prompt_assembly": (1, 2)}))
+    with pytest.raises(WorkflowBindingError, match="example_version"):
+        swarm(store)._workflow_runtime(behavior_settings={"example_version": 3})
+    monkeypatch.setattr(workflow, "RECIPE_BEHAVIOR_FIELDS", MappingProxyType({"example_version": (1, 2)}))
     with pytest.raises(WorkflowBindingError):
-        swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": float("nan")})
+        swarm(store)._workflow_runtime(behavior_settings={"example_version": float("nan")})
     with pytest.raises(WorkflowBindingError, match="mapping"):
-        swarm(store)._workflow_runtime(behavior_settings=[("prompt_assembly", 3)])
-    runtime = swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": 3})
+        swarm(store)._workflow_runtime(behavior_settings=[("example_version", 3)])
+    runtime = swarm(store)._workflow_runtime(behavior_settings={"example_version": 3})
     # The recipe is built once, so its settings cannot change afterwards.
     with pytest.raises(AttributeError):
-        runtime.behavior_settings = {"prompt_assembly": 4}
+        runtime.behavior_settings = {"example_version": 4}
     with pytest.raises(TypeError):
-        runtime.behavior_settings["prompt_assembly"] = 4
-    assert runtime.recipe["prompt_assembly"] == 3
+        runtime.behavior_settings["example_version"] = 4
+    assert runtime.recipe["example_version"] == 3
     assert store.list_runs() == []
+
+
+def gated_graph():
+    """Research feeds a draft that an advisory judge checks; no node depends on the judge."""
+    return ExecutionGraph([Topology.SERIAL], [
+        Node(id="research", label="Research"),
+        Node(id="draft", label="Draft", depends_on=["research"]),
+        Node(id="judge", label="Check", depends_on=["draft"], verifies="draft"),
+    ])
+
+
+def node_prompts(store, run_id):
+    """Each node's prompt exactly as its journaled request carries it."""
+    prompts = {}
+    for call in store.inspect_run(run_id)["calls"]:
+        if call["key"]["scope_id"].startswith("node/"):
+            request = store.lookup_call(run_id, CallKey(**call["key"]))["request_json"]
+            prompts[call["key"]["scope_id"].removeprefix("node/")] = json.loads(request)["prompt"]
+    return prompts
+
+
+# The requests every earlier release sent for gated_graph(): the judge is told
+# it is the final step, and the draft it judges is not.
+LEGACY_PROMPTS = {
+    "research": "Research",
+    "draft": "Draft\n\n\nContext from prior steps:\n\n[research]: offline: Research",
+    "judge": ("Check\n\n\nContext from prior steps:\n\n[draft]: offline: Draft\n\n"
+              + TERMINAL_DELIVERABLE_NOTE),
+}
+# The same requests under prompt_assembly 2, which ordinary runs use.
+DELIVERABLE_PROMPTS = {
+    "research": "Research",
+    "draft": LEGACY_PROMPTS["draft"] + "\n\n" + TERMINAL_DELIVERABLE_NOTE,
+    "judge": "Check\n\n\nContext from prior steps:\n\n[draft]: offline: Draft",
+}
+
+
+def test_durable_recipe_without_a_prompt_assembly_version_keeps_its_request_bytes(store):
+    result = swarm(store).execute(gated_graph())
+    assert "prompt_assembly" not in store.load_run(result.execution_id)["config"]
+    assert node_prompts(store, result.execution_id) == LEGACY_PROMPTS
+
+
+def test_durable_run_opts_into_prompt_assembly_2_through_its_recipe(store):
+    runtime = swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": 2})
+    assert runtime.recipe["prompt_assembly"] == 2
+    run_id = asyncio.run(runtime.execute(gated_graph(), max_concurrency=1)).execution_id
+    assert store.load_run(run_id)["config"]["prompt_assembly"] == 2
+    assert node_prompts(store, run_id) == DELIVERABLE_PROMPTS
+    # A runtime that configures nothing resumes it under its saved version.
+    later = swarm(store)._workflow_runtime()
+    asyncio.run(later.resume(run_id, max_concurrency=1))
+    assert later.behavior == {"prompt_assembly": 2}
+    # A configured version must equal the saved one, here a legacy run's 1.
+    legacy = swarm(store).plan(Task("Report")).run_ref["run_id"]
+    with pytest.raises(WorkflowConflictError, match="prompt_assembly"):
+        asyncio.run(swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": 2})
+                    .resume(legacy, max_concurrency=1))
+    assert store.inspect_run(legacy)["call_count"] == 0
+
+
+@pytest.mark.parametrize("settings,expected", [
+    (None, LEGACY_PROMPTS), ({"prompt_assembly": 2}, DELIVERABLE_PROMPTS),
+], ids=["legacy", "opted-in"])
+def test_interrupted_durable_run_resends_the_request_its_recipe_assembled(
+    tmp_path, monkeypatch, settings, expected,
+):
+    # The process is killed after the judge's call was prepared and reserved,
+    # before it was sent. Resuming must prepare exactly the same request, or
+    # the journal refuses it as a different call.
+    image = tmp_path / "killed.db"
+    judge = CallKey("verification", "node/judge")
+    with SQLiteWorkflowStore(tmp_path / "live.db") as store:
+        def due(lease, call_id, _):
+            record = store.lookup_call(lease.run_id, judge)
+            return record is not None and record["call_id"] == call_id
+
+        point = fakes.crash_when(monkeypatch, store, "claim_dispatch", due, image=image,
+                                 connection=store._db)
+        runtime = swarm(store)._workflow_runtime(behavior_settings=settings)
+        with pytest.raises(fakes.Crash):
+            asyncio.run(runtime.execute(gated_graph(), max_concurrency=1))
+        (run,) = store.list_runs()
+    assert point.fired
+    with SQLiteWorkflowStore(image, clock_ns=ManualClock.after(120)) as recovered:
+        saved = recovered.lookup_call(run["run_id"], judge)
+        assert saved["state"] == "reserved"
+        result = swarm(recovered).resume(run["run_id"])
+        assert recovered.lookup_call(run["run_id"], judge)["call_id"] == saved["call_id"]
+        assert node_prompts(recovered, run["run_id"]) == expected
+        assert recovered.audit(run["run_id"])["ok"]
+    assert result.output == "offline: Draft"
+
+
+def test_unsupported_prompt_assembly_version_is_refused_before_a_run_exists(store):
+    for value in (0, 3, True, 2.0, "2", None):
+        with pytest.raises(WorkflowBindingError, match="prompt_assembly"):
+            swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": value})
+    assert store.list_runs() == []
+
+
+def test_saved_recipe_with_an_unsupported_prompt_assembly_version_is_refused(store):
+    with pytest.MonkeyPatch.context() as newer:
+        # A newer release records a version this one does not know.
+        newer.setattr(workflow, "_BEHAVIOR_VERSIONS", MappingProxyType({"prompt_assembly": (1, 2, 3)}))
+        runtime = swarm(store)._workflow_runtime(behavior_settings={"prompt_assembly": 3})
+        run_id = asyncio.run(runtime.plan(Task("Report"))).run_ref["run_id"]
+    calls = store.inspect_run(run_id)["call_count"]
+    with pytest.raises(WorkflowConflictError, match="prompt_assembly"):
+        swarm(store).resume(run_id)
+    assert store.inspect_run(run_id)["call_count"] == calls
 
 
 def test_checkpoint_save_cost_does_not_grow_with_journal_history(tmp_path, monkeypatch):

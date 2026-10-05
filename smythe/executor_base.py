@@ -24,7 +24,7 @@ from smythe.budget import (
     validate_token_count,
 )
 from smythe.graph import (
-    REVISION_ADDED_KEY, ExecutionGraph, Node, NodeStatus, Revision, RevisionError,
+    REVISION_ADDED_KEY, ExecutionGraph, Node, NodeStatus, Revision, RevisionError, _deliverable_ids,
 )
 from smythe.provider import (
     CompletionResult, Provider, ProviderResponseError, _declared_features, _missing_cost_ceiling,
@@ -199,6 +199,16 @@ TERMINAL_DELIVERABLE_NOTE = (
     "own increment."
 )
 
+# How node prompts are assembled. Version 2 gives TERMINAL_DELIVERABLE_NOTE to
+# the nodes DELIVERABLE synthesis returns: terminal nodes that are not
+# verifiers, where a judge's edge to the node it judges does not count.
+# Version 1 counted that edge, so in a gated graph the judge received the note
+# and the node it judged did not. Durable workflows keep version 1 unless their
+# saved recipe records another (see smythe.workflow.RECIPE_BEHAVIOR_FIELDS),
+# because a run's saved requests must not change when it resumes.
+PROMPT_ASSEMBLY_VERSION = 2
+SUPPORTED_PROMPT_ASSEMBLY_VERSIONS = (1, 2)
+
 # What a dependent sees in place of a SKIPPED dependency's result. A node
 # skipped after a failure keeps its error text in ``node.result`` for traces
 # and checkpoints, but that text is not step output: passed on as context,
@@ -219,6 +229,10 @@ class ExecutorBase:
     gate without regenerations under ``advisory_verdict``, and a verdict that
     cannot be read or a verifier that raises as an undecided outcome that
     ends the gate without regeneration. Without one, gates behave as before.
+
+    ``prompt_assembly`` selects how node prompts are assembled (see
+    ``PROMPT_ASSEMBLY_VERSION``); version 1 reproduces the earlier placement
+    of ``TERMINAL_DELIVERABLE_NOTE``.
     """
 
     def __init__(
@@ -241,12 +255,19 @@ class ExecutorBase:
         provider_call_factory: Callable[[Node, str, int, int], Provider] | None = None,
         on_supervision_update: Callable[[Node, bool], None] | None = None,
         *,
+        prompt_assembly: int = PROMPT_ASSEMBLY_VERSION,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         if acceptance is not None and not isinstance(acceptance, AcceptancePolicy):
             raise TypeError(
                 f"acceptance must be an AcceptancePolicy or None, not {type(acceptance).__name__}"
             )
+        if type(prompt_assembly) is not int or prompt_assembly not in SUPPORTED_PROMPT_ASSEMBLY_VERSIONS:
+            raise ValueError(
+                f"prompt_assembly must be one of {list(SUPPORTED_PROMPT_ASSEMBLY_VERSIONS)}, "
+                f"not {prompt_assembly!r}"
+            )
+        self._prompt_assembly = prompt_assembly
         self._strict = acceptance is not None and acceptance.mode is AcceptanceMode.STRICT
         self._acceptance = acceptance if self._strict else None
         self._provider = provider
@@ -269,7 +290,7 @@ class ExecutorBase:
         self._artifact_dir = Path(artifact_dir) if artifact_dir is not None else None
         self._prepared_graph: ExecutionGraph | None = None
         self._node_lookup: dict[str, Node] = {}
-        self._dependent_ids: set[str] = set()
+        self._terminal_ids: set[str] = set()
         self._retry_backoff_s = validate_retry_backoff_s(retry_backoff_s)
         self._max_revisions = validate_max_revisions(max_revisions)
         self._supervisor = supervisor
@@ -821,9 +842,11 @@ class ExecutorBase:
                 self.stamp_task_context(graph.nodes, self._task)
         self._prepared_graph = graph
         self._node_lookup = {node.id: node for node in graph.nodes}
-        self._dependent_ids = {
-            dep_id for node in graph.nodes for dep_id in node.depends_on
-        }
+        if self._prompt_assembly == 1:
+            depended_on = {dep_id for node in graph.nodes for dep_id in node.depends_on}
+            self._terminal_ids = {node.id for node in graph.nodes} - depended_on
+        else:
+            self._terminal_ids = _deliverable_ids(graph.nodes)
 
     def prepare_execution(self, graph: ExecutionGraph) -> None:
         """Bind a new run even when a caller reuses the same graph object."""
@@ -853,7 +876,7 @@ class ExecutorBase:
 
     def _is_terminal(self, node: Node, graph: ExecutionGraph) -> bool:
         self._ensure_graph_prepared(graph)
-        return node.id not in self._dependent_ids
+        return node.id in self._terminal_ids
 
     @staticmethod
     def build_system_prompt(agent: Agent | None) -> str:
