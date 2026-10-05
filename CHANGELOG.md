@@ -525,7 +525,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   validator journals the evidence its output carries as a `source_evidence`
   operation keyed `source-evidence/<sha256>`, and
   `smythe.evidence.load_source_evidence` reads it back without source text
-  unless `include_text=True`. See [source evidence](docs/source-evidence.md).
+  unless `include_text=True`. In a durable run with context assembly, a
+  validator that checks other sources than the run's current source set,
+  such as those before `Swarm.refresh_context`, does not run: its outcome is
+  `error`, the decision follows `on_invalid` (`indeterminate` by default)
+  and the reason names the differing sources; `evaluate_delivery` takes a
+  keyword-only `unusable` mapping of validator identities to the reason each
+  cannot check the output. See [source evidence](docs/source-evidence.md).
 - Failure classes. Every exception a node attempt raises has one class:
   `input_error`, `authority_denied`, `quality_defect`, `provider_rejected`,
   `transient`, `unknown_outcome`, `terminal_accounting`, `persistence` or
@@ -1026,16 +1032,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   whose bytes no longer match the `sha256` in its record now raises
   `smythe.executor_base.ArtifactIntegrityError` before the call. Records
   without a digest, written before digests were recorded, attach as before.
-- A durable run with context assembly no longer accepts output whose
-  `SourceEvidenceValidator` checks other sources than the run's current
-  source set, such as the sources the run had before
-  `Swarm.refresh_context`, or sources its nodes were never given. Such a
-  validator does not run: its outcome is `error`, the decision follows
-  `on_invalid` (`indeterminate` by default) and the reason names the
-  differing sources. Re-evaluating under a validator built from the run's
-  current sources decides again. `evaluate_delivery` takes a keyword-only
-  `unusable` mapping of validator identities to the reason each cannot
-  check the output. See [source evidence](docs/source-evidence.md#durable-runs).
 - Provider and service error text no longer keeps account identifiers where
   Smythe stores it. A failed or skipped node's result, which checkpoints save
   and dependents receive, its trace span error and log line, the native
