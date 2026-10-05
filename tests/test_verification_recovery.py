@@ -32,6 +32,7 @@ from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topolo
 from smythe.provider import Artifact, CompletionResult, Provider
 from smythe.registry import Registry
 from smythe.swarm import Swarm
+from smythe.validation import ValidationReport, ValidatorIdentity
 from smythe.verifier import CallableVerifier
 from smythe.tracer import Tracer
 
@@ -497,6 +498,15 @@ def test_without_an_artifact_dir_a_rejected_result_keeps_only_its_excerpt():
     assert len(record["excerpt"].encode("utf-8")) <= REJECTED_EXCERPT_BYTES
 
 
+class PassesAnything:
+    """A final validator that passes every output, so the gate alone decides."""
+
+    identity = ValidatorIdentity.for_config("passes-anything", "1")
+
+    def validate(self, subject):
+        return ValidationReport("output", validator=self.identity)
+
+
 def test_rejected_generation_records_stay_within_the_checkpoint_byte_cap(tmp_path, monkeypatch):
     """Ordinary checkpoints rewrite the whole graph on every save, so the
     records a strict run keeps are capped in bytes per checkpoint."""
@@ -518,10 +528,14 @@ def test_rejected_generation_records_stay_within_the_checkpoint_byte_cap(tmp_pat
     artifacts = tmp_path / "artifacts"
     # Sidecar durability is not under test here; flushing each one is slow on some hosts.
     monkeypatch.setattr("smythe._publish.os.fsync", lambda descriptor: None)
+    # The four steps are all delivered, so a strict run needs a final
+    # validator; one that passes everything leaves the exhausted gate to decide.
+    policy = AcceptancePolicy(mode="strict", final_validators=[PassesAnything()])
     result = Swarm(provider=Verbose(), model="test", artifact_dir=artifacts, checkpoint_store=store,
-                   acceptance=AcceptancePolicy(mode="strict")).execute(
+                   acceptance=policy).execute(
         ExecutionGraph(topology=[Topology.SERIAL], nodes=nodes))
     assert result.acceptance.decision == "rejected"
+    assert result.acceptance.validators[0].outcome.value == "passed"
 
     # The last checkpoint holds every record the run kept.
     state = store.states[result.execution_id]
