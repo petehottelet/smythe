@@ -483,8 +483,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 - Immutable context snapshots in durable text workflows. A `Swarm` with a
   `run_store` takes `context_sources`, a sequence of `ContextSource` (an id,
   text and optional version), and its new runs record `context_assembly: 1`
-  in their recipe and the sources once, as revision 0. Before each node call
-  the run records a `ContextSnapshot` as a `context` journal operation keyed
+  in their recipe and the sources once, as revision 0, in a `context` journal
+  operation keyed `context-sources/<revision>`. Before each node call the run
+  records a `ContextSnapshot` as a `context` operation keyed
   `context/<node>/<generation>`: the task's goal, constraints and acceptance
   criteria, the step, the sources with their versions and digests, the
   digest of each dependency output with the calls that produced it, the

@@ -100,9 +100,10 @@ with SQLiteWorkflowStore("runs.db") as store:
     result = swarm.execute(Task("Answer the refund question", done_when=["States the window"]))
 ```
 
-The run records its sources once, as source revision 0, with its first
-checkpoint. Before each node call it records a `ContextSnapshot` as a journal
-operation keyed `context/<node>/<generation>`: the task's goal, constraints
+The run records its sources once, as source revision 0 in a journal
+operation keyed `context-sources/<revision>`, with its first checkpoint.
+Before each node call it records a `ContextSnapshot` as a journal operation
+keyed `context/<node>/<generation>`: the task's goal, constraints
 and acceptance criteria, the step, every source with its version and SHA-256,
 the SHA-256 of each dependency output the node sees with the journal calls
 that produced it, the agent and capability tags the node runs as, and the

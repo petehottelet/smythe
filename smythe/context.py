@@ -5,9 +5,11 @@ node call a :class:`ContextSnapshot` before it calls: the task's goal,
 constraints and acceptance criteria, the step, the run's sources with their
 versions and digests, a digest of each dependency's output with the journal
 calls that produced it, and the agent and capability tags the node runs with.
-The journal keeps it as a ``context`` operation, so a resumed call is
-rendered from the snapshot it was first given. A snapshot's id is the
-SHA-256 of its canonical JSON (:mod:`smythe._canonical`).
+The journal keeps it as a ``context`` operation keyed
+``context/<node>/<generation>``, and the run's sources as one keyed
+``context-sources/<revision>``, so a resumed call is rendered from the
+snapshot it was first given. A snapshot's id is the SHA-256 of its canonical
+JSON (:mod:`smythe._canonical`).
 
 Trust labels say what text may do. The task's requirements, the step and the
 capability tags come from developer configuration or the plan and are
@@ -315,8 +317,11 @@ def context_key(node_id: str, generation: int) -> str:
 
 
 def sources_key(revision: int) -> str:
-    """The journal operation key of a run's source set at *revision*."""
-    return f"context/sources/{revision}"
+    """The journal operation key of a run's source set: ``context-sources/<revision>``.
+
+    No node's :func:`context_key` takes this form, whatever the node's id.
+    """
+    return f"context-sources/{revision}"
 
 
 def load_context_snapshot(store: Any, run_id: str, node_id: str,

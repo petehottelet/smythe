@@ -19,8 +19,8 @@ from smythe.acceptance import task_sha256
 from smythe.agent import Agent, AgentProfile
 from smythe.context import (
     CONTEXT_SNAPSHOT_KEY, UNTRUSTED_DATA_NOTE, DependencyDigest, context_key,
-    load_context_snapshot, load_context_sources, snapshot_sources, sources_sha256, text_sha256,
-    untrusted_block,
+    load_context_snapshot, load_context_sources, snapshot_sources, sources_key, sources_sha256,
+    text_sha256, untrusted_block,
 )
 from smythe.executor import Executor
 from smythe.executor_base import TERMINAL_DELIVERABLE_NOTE
@@ -249,6 +249,36 @@ def test_refreshing_sources_is_explicit_versioned_and_reevaluates_on_resume(
     assert result.output == "offline: Draft"
 
 
+def test_a_node_named_sources_keeps_its_snapshots_apart_from_the_source_sets(
+    tmp_path, monkeypatch, sent,
+):
+    # Its snapshot at each generation and the run's source set at each
+    # revision are separate journal records.
+    plan = ExecutionGraph([Topology.SERIAL], [
+        Node(id="sources", label="Gather sources"),
+        Node(id="draft", label="Draft", depends_on=["sources"]),
+    ], task=task())
+    image = tmp_path / "paused.db"
+    with SQLiteWorkflowStore(tmp_path / "live.db") as store:
+        pause_before_sending(monkeypatch, store, "draft", image)
+        with pytest.raises(fakes.Crash):
+            durable(store, context_sources=SOURCES).execute(plan)
+        (run,) = store.list_runs()
+    run_id = run["run_id"]
+    with SQLiteWorkflowStore(image, clock_ns=ManualClock.after(120)) as paused:
+        swarm = durable(paused)
+        assert swarm.refresh_context(run_id, CHANGED) == 1
+        result = swarm.resume(run_id)
+        for revision, sources in enumerate((SOURCES, CHANGED)):
+            assert load_context_sources(paused, run_id, revision) == sources
+            snapshot = load_context_snapshot(paused, run_id, "sources", revision)
+            assert (snapshot.generation, snapshot.sources_revision, snapshot.sources) == (
+                revision, revision, sources)
+        assert paused.audit(run_id)["ok"]
+    assert len(sent) == 3 and CHANGED[0].text in sent[1]
+    assert result.output == "offline: Draft"
+
+
 def test_refreshing_a_planned_run_only_adopts_the_new_sources(store, sent):
     planned = durable(store, context_sources=SOURCES).plan(task())
     run_id = planned.run_ref["run_id"]
@@ -283,7 +313,7 @@ def test_a_run_that_never_recorded_its_sources_resumes_only_with_sources(
     image = tmp_path / "unrecorded.db"
     with SQLiteWorkflowStore(tmp_path / "live.db") as store:
         fakes.crash_when(monkeypatch, store, "begin_operation",
-                         lambda lease, key, kind, inputs: key == "context/sources/0",
+                         lambda lease, key, kind, inputs: key == sources_key(0),
                          image=image, connection=store._db)
         with pytest.raises(fakes.Crash):
             durable(store, context_sources=SOURCES).plan(task())
@@ -484,6 +514,9 @@ def test_snapshot_records_round_trip_and_hash_their_canonical_json():
 
 def test_snapshot_keys_stay_within_journal_key_limits():
     assert context_key("draft", 3) == "context/draft/3"
+    # Source sets have keys of their own, which no node's snapshot key takes.
+    assert sources_key(3) == "context-sources/3"
+    assert context_key("sources", 3) != sources_key(3)
     longest = context_key("n" * workflow.MAX_NODE_ID_CHARS, 10**6)
     assert longest == f"context/{'n' * workflow.MAX_NODE_ID_CHARS}/1000000" and len(longest) <= 512
     hashed = context_key("n" * 600, 0)
