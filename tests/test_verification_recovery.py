@@ -507,9 +507,16 @@ class PassesAnything:
         return ValidationReport("output", validator=self.identity)
 
 
-def test_rejected_generation_records_stay_within_the_checkpoint_byte_cap(tmp_path, monkeypatch):
+@pytest.mark.parametrize("sidecars", [True, False])
+def test_rejected_generation_records_stay_within_the_checkpoint_byte_cap(tmp_path, monkeypatch, sidecars):
     """Ordinary checkpoints rewrite the whole graph on every save, so the
-    records a strict run keeps are capped in bytes per checkpoint."""
+    records a strict run keeps are capped in bytes per checkpoint.
+
+    A record names its sidecar by absolute path, so with sidecars the size
+    of each record, and whether the space left at the cap still fits one
+    without its excerpt, depend on where the test runs. Without sidecars the
+    records have the same sizes everywhere.
+    """
     # Each of these characters is escaped to six bytes of checkpoint JSON.
     text = "\u00e9\u2603 " * 700
 
@@ -531,8 +538,8 @@ def test_rejected_generation_records_stay_within_the_checkpoint_byte_cap(tmp_pat
     # The four steps are all delivered, so a strict run needs a final
     # validator; one that passes everything leaves the exhausted gate to decide.
     policy = AcceptancePolicy(mode="strict", final_validators=[PassesAnything()])
-    result = Swarm(provider=Verbose(), model="test", artifact_dir=artifacts, checkpoint_store=store,
-                   acceptance=policy).execute(
+    result = Swarm(provider=Verbose(), model="test", artifact_dir=artifacts if sidecars else None,
+                   checkpoint_store=store, acceptance=policy).execute(
         ExecutionGraph(topology=[Topology.SERIAL], nodes=nodes))
     assert result.acceptance.decision == "rejected"
     assert result.acceptance.validators[0].outcome.value == "passed"
@@ -547,9 +554,14 @@ def test_rejected_generation_records_stay_within_the_checkpoint_byte_cap(tmp_pat
     # excerpt and then are not kept at all.
     assert 0 < len(records) < 6 * 6
     assert all("excerpt" in record for record in records if record["generation"] == 0)
-    assert any("excerpt" not in record for record in records)
-    sidecars = sorted(str(p.resolve()) for p in artifacts.rglob("*_rejected.txt"))
-    assert sidecars == sorted(record["sidecar"] for record in records)
+    if sidecars:
+        # A record that is not kept leaves no sidecar behind.
+        written = sorted(str(p.resolve()) for p in artifacts.rglob("*_rejected.txt"))
+        assert written == sorted(record["sidecar"] for record in records)
+    else:
+        assert any("excerpt" not in record for record in records)
+        assert not artifacts.exists()
+        assert all("sidecar" not in record for record in records)
 
     for node in state["graph"]["nodes"]:
         node["metadata"].pop(REJECTED_GENERATIONS_KEY, None)
