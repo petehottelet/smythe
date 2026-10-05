@@ -34,7 +34,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   deliveries, and report its own state for comparison with what the caller
   saw. Its requests can name a tenant's collection, whose keys and objects
   other tenants cannot see or update, and it can send a notice for each
-  acknowledged commit or record a forged one.
+  acknowledged commit or record a forged one. `tests/fixture_connector.py`
+  adapts it to the external-action connector contract in process and over
+  loopback HTTP, and provides an HMAC approval verifier for tests.
 - A [support matrix](docs/support-matrix.md) lists the providers, verifiers,
   tools, stores and Jobs profiles that ordinary runs, durable text workflows
   and Jobs accept, how each path records cost and who calls again after a
