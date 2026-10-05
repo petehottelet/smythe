@@ -281,7 +281,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   binds its name, its code version and the SHA-256 of the specification with
   every default filled in. `TextValidator` checks length bounds and required
   Markdown sections, in order and with body text by default, so a strict
-  policy rejects a final step that returns only its own increment.
+  policy rejects a final step that returns only its own increment; a section
+  written as a heading line, such as `## Sources`, drops its `#` marker when
+  the validator is built.
   `JSONValidator` requires strict JSON within a size bound and runs checks at
   JSON paths: `present`, `equals`, `number` within a tolerance, `nonempty`,
   `object`, `length`, `keys`, `required_keys` and `citations`. Both run

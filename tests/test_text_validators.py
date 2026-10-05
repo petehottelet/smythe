@@ -229,6 +229,40 @@ def test_heading_matching_ignores_case_spacing_emphasis_and_a_final_colon(headin
     assert check(ARGUMENT_AND_CRITIQUE, f"{heading}\nShip it.\n## Critique\nWeak.").passed
 
 
+@pytest.mark.parametrize("section", [
+    "## Sources", "# Sources", "###### Sources", "  ## Sources  ", "##\tSources", "## Sources ##",
+    "## **Sources:**",
+])
+def test_a_section_written_as_a_heading_line_requires_that_heading(section):
+    """The '#' marker used to stay in the required title, which no heading
+    title ever holds, so such a section was always reported missing."""
+    validator = TextValidator({"sections": ["Argument", section]})
+    bare = TextValidator({"sections": ["Argument", section.strip().lstrip("#").strip(" \t#")]})
+    assert validator.spec == bare.spec and validator.identity == bare.identity
+    assert check(validator, "## Argument\nShip it.\n\n### Sources\nThe pilot report.").passed
+    report = check(validator, "## Argument\nShip it.")
+    assert codes(report) == ["section_missing"]
+    assert report.findings[0].expected == bare.spec["sections"][1]
+
+
+@pytest.mark.parametrize("section,title", [
+    ("#1 priority", "#1 priority"), ("C#", "C#"), ("####### Sources", "####### Sources"),
+])
+def test_a_section_name_that_is_not_a_heading_line_keeps_its_hashes(section, title):
+    validator = TextValidator({"sections": [section]})
+    assert validator.spec["sections"] == [title]
+    assert check(validator, f"## {title}\nText.").passed
+
+
+@pytest.mark.parametrize("sections,message", [
+    (["##"], "nonempty"), (["## "], "nonempty"), (["## #"], "nonempty"),
+    (["Sources", "## Sources"], "distinct"),
+])
+def test_heading_line_sections_must_still_name_distinct_headings(sections, message):
+    with pytest.raises(ValueError, match=message):
+        TextValidator({"sections": sections})
+
+
 @pytest.mark.parametrize("line", [
     "Argument", "**Argument**", "#Argument", "####### Argument", "    ## Argument",
     "> ## Argument", "- ## Argument", "## Arguments", "## The Argument", "## Argument#",

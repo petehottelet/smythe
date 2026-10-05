@@ -98,6 +98,22 @@ def _title(text: str) -> str:
     return " ".join(text[start:end].split()).casefold()
 
 
+def _heading_text(heading: re.Match[str]) -> str:
+    """The text of a line matched by ``_HEADING``, without its closing run of #s."""
+    title = heading.group(2) or ""
+    # A closing run of #s counts only after a space or tab, or alone.
+    unclosed = title.rstrip("#")
+    if unclosed != title and (not unclosed or unclosed[-1] in " \t"):
+        title = unclosed.rstrip(" \t")
+    return title
+
+
+def _section(name: str) -> str:
+    """A required section's name, without the ``#`` marker if it is written as a heading line."""
+    heading = _HEADING.fullmatch(name.strip())
+    return _heading_text(heading) if heading else name
+
+
 def _headings(lines: list[str]) -> list[tuple[int, int, str]]:
     """``(line, level, title)`` of each Markdown ATX heading outside fenced code."""
     found: list[tuple[int, int, str]] = []
@@ -114,12 +130,7 @@ def _headings(lines: list[str]) -> list[tuple[int, int, str]]:
             continue
         heading = _HEADING.fullmatch(line.rstrip(" \t"))
         if heading:
-            title = heading.group(2) or ""
-            # A closing run of #s counts only after a space or tab, or alone.
-            unclosed = title.rstrip("#")
-            if unclosed != title and (not unclosed or unclosed[-1] in " \t"):
-                title = unclosed.rstrip(" \t")
-            found.append((index, len(heading.group(1)), _title(title)))
+            found.append((index, len(heading.group(1)), _title(_heading_text(heading))))
     return found
 
 
@@ -134,7 +145,9 @@ class TextValidator:
     - ``sections`` (default ``[]``) lists headings the output must contain. A
       heading is a Markdown ATX heading (``#`` to ``######``) outside fenced
       code, at any level, compared ignoring case, spacing, ``*`` and ``_``
-      emphasis and a final colon;
+      emphasis and a final colon. A section written as a heading line, such
+      as ``## Sources``, loses its ``#`` marker and surrounding spaces when
+      the validator is built, so :attr:`spec` lists ``Sources``;
     - ``ordered`` (default True) requires the sections in the listed order;
       other headings may appear between them;
     - ``min_section_chars`` (default 1) is the least number of characters,
@@ -157,6 +170,7 @@ class TextValidator:
                 data["max_chars"] < data["min_chars"]):
             raise ValueError("max_chars must not be less than min_chars")
         _strings(data["sections"], "sections", limit=_MAX_SECTIONS)
+        data["sections"] = [_section(section) for section in data["sections"]]
         titles = [_title(section) for section in data["sections"]]
         if not all(titles) or len(set(titles)) != len(titles):
             raise ValueError("sections must name distinct, nonempty headings")

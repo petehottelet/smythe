@@ -575,7 +575,10 @@ each optional:
 
 Headings compare ignoring case, spacing, `*` and `_` emphasis and a final
 colon, so `## **Critique:**` is the section `Critique`; a bold line or a
-heading inside a code block is not a heading. Findings are `text_too_short`,
+heading inside a code block is not a heading. A section may be written as a
+heading line, such as `## Sources`: its `#` marker and the spaces around it
+are removed when the validator is built, so `spec` lists `Sources` and a
+heading at any level satisfies it. Findings are `text_too_short`,
 `text_too_long`, `section_missing`, `section_out_of_order`, `section_empty`
 and `not_utf8`; a `section_out_of_order` finding observes each required
 heading once, in the order it first appears.
