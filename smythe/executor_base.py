@@ -38,7 +38,7 @@ from smythe.provider import (
     _settle_response_group,
 )
 from smythe.registry import Registry
-from smythe.scheduling import RetryDeadlineError, RetryPolicy, _retry_after_s
+from smythe.scheduling import RetryDeadlineError, RetryPolicy, _attempt_records, _retry_after_s
 from smythe.task import _prompt_json, render_task, snapshot_task
 from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
 from smythe.tracer import Tracer
@@ -310,7 +310,11 @@ class ExecutorBase:
     ``LLMSupervisor``'s. ``sleep(seconds)`` replaces the wait before a retry
     (``time.sleep`` in the serial executor, ``asyncio.sleep`` in the async
     one) and is awaited when it returns an awaitable; ``rng`` replaces the
-    ``random`` module that draws backoff jitter.
+    ``random`` module that draws backoff jitter. Under a policy with
+    ``persist_attempts``, each attempt is recorded in :attr:`attempts_used`
+    and saved through the control hook before its call, and
+    ``attempts_used``, as a checkpoint saved it, seeds the attempts each node
+    has already used in its current ``execution_generation``.
     """
 
     def __init__(
@@ -341,6 +345,7 @@ class ExecutorBase:
         retry_policy: RetryPolicy | None = None,
         sleep: Callable[[float], Any] | None = None,
         rng: Any = None,
+        attempts_used: dict[str, dict[str, int]] | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         if context_assembler is not None and not callable(context_assembler):
@@ -357,6 +362,12 @@ class ExecutorBase:
         self._retry_policy, self._sleep, self._rng = retry_policy, sleep, rng
         # When each node's retry deadline passes, on the tracer's clock.
         self._deadlines: dict[str, float] = {}
+        self._persist_attempts = retry_policy is not None and retry_policy.persist_attempts
+        if attempts_used is not None and not self._persist_attempts:
+            raise ValueError("attempts_used needs a retry_policy with persist_attempts")
+        # Like revisions_used, a per-run allowance: each node's generation and
+        # the attempts it has spent there, restored on resume.
+        self._attempts_used = _attempt_records(attempts_used or {})
         if acceptance is not None and not isinstance(acceptance, AcceptancePolicy):
             raise TypeError(
                 f"acceptance must be an AcceptancePolicy or None, not {type(acceptance).__name__}"
@@ -407,6 +418,12 @@ class ExecutorBase:
     def revisions_used(self) -> int:
         """How many supervisor revisions this executor has applied."""
         return self._revisions_used
+
+    @property
+    def attempts_used(self) -> dict[str, dict[str, int]]:
+        """Under a policy with ``persist_attempts``, each node's attempts in its generation."""
+        return {node_id: {"execution_generation": generation, "attempts": used}
+                for node_id, (generation, used) in self._attempts_used.items()}
 
     async def maybe_revise(self, node: Node, graph: ExecutionGraph) -> bool:
         """Let the supervisor revise the plan after *node* completed.
@@ -940,10 +957,12 @@ class ExecutorBase:
         return (self._rng or random).uniform(0, ceiling)
 
     def _retry_wait_s(self, node: Node, attempt: int, error: BaseException | None) -> float:
-        """The wait before *attempt*; a retry policy's deadline starts at attempt 0.
+        """The wait before *attempt*; a retry policy's deadline starts at the first.
 
-        Raises ``RetryDeadlineError``, from *error*, when the wait would end
-        at or after the node's deadline, so that retry is not made. The trace
+        The first attempt in this process has no *error* before it: attempt
+        0, or a resumed node's first unspent attempt. Raises
+        ``RetryDeadlineError``, from *error*, when the wait would end at or
+        after the node's deadline, so that retry is not made. The trace
         still records the refused attempt, with no duration and no call, as
         it records an attempt the deadline ends: its span says why the node
         stopped.
@@ -951,7 +970,7 @@ class ExecutorBase:
         policy = self._retry_policy
         if policy is None:
             return self.retry_delay_s(attempt)
-        if attempt == 0:
+        if error is None:
             self._deadlines.pop(node.id, None)
             if policy.deadline_s is not None:
                 self._deadlines[node.id] = self._tracer.now() + policy.deadline_s
@@ -970,6 +989,40 @@ class ExecutorBase:
         return RetryDeadlineError(
             f"Node {node.id!r} reached its retry deadline of "
             f"{self._retry_policy.deadline_s}s before an attempt succeeded"
+        )
+
+    def _attempts_spent(self, node: Node) -> int:
+        """The attempts *node* already used in its current generation, under ``persist_attempts``."""
+        generation, used = self._attempts_used.get(node.id, (None, 0))
+        return used if self._persist_attempts and generation == node_generation(node) else 0
+
+    def _spend_attempt(self, node: Node, attempt: int) -> None:
+        """Under ``persist_attempts``, save *attempt* as spent before it is sent.
+
+        The save is not batched. When it fails, the attempt is not counted and
+        its error stops the node without the call.
+        """
+        if not self._persist_attempts:
+            return
+        before = self._attempts_used.get(node.id)
+        self._attempts_used[node.id] = (node_generation(node), attempt + 1)
+        try:
+            if self._on_control_update is not None:
+                self._on_control_update()
+            else:
+                self.notify_update(node)
+        except BaseException:
+            if before is None:
+                del self._attempts_used[node.id]
+            else:
+                self._attempts_used[node.id] = before
+            raise
+
+    @staticmethod
+    def _allowance_spent(node: Node, attempts: int) -> RuntimeError:
+        return RuntimeError(
+            f"Node {node.id!r} already used all {attempts} attempts its retry policy allows "
+            "in this generation"
         )
 
     def _may_retry(self, error: Exception) -> bool:

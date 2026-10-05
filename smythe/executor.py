@@ -82,7 +82,8 @@ class Executor(ExecutorBase):
         last_exc: Exception | None = None
         attempts = 1 + max(node.max_retries, 0) if node.failure_policy == FailurePolicy.RETRY else 1
 
-        for attempt in range(attempts):
+        # A resumed run continues the allowance its checkpoint recorded.
+        for attempt in range(self._attempts_spent(node), attempts):
             self._call_attempts[node.id] = attempt
             try:
                 delay = self._retry_wait_s(node, attempt, last_exc)
@@ -95,6 +96,7 @@ class Executor(ExecutorBase):
                 if inspect.isawaitable(waited):
                     asyncio.run(asyncio.wait_for(waited, None))
                 self._tracer.on_wait("retry_backoff", self._tracer.since(started), node)
+            self._spend_attempt(node, attempt)
             node.status = NodeStatus.RUNNING
             self.begin_verification(node, graph)
             self._tracer.on_node_start(node, attempt=attempt)
@@ -132,6 +134,8 @@ class Executor(ExecutorBase):
                 self._end_failed_attempt(node)
                 if not self._may_retry(exc):
                     break
+        if last_exc is None:  # No attempt was left to make.
+            last_exc = self._allowance_spent(node, attempts)
 
         self.release_node_budget(node)
 

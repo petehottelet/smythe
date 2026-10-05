@@ -337,7 +337,7 @@ def test_completed_run_with_unknown_cost_needs_reconciliation(tmp_path, capsys):
 
 @pytest.mark.parametrize("change", [
     lambda state: state.update(version=6),
-    lambda state: state.update(requires=["delivery_acceptance", "attempt_allowance"]),
+    lambda state: state.update(requires=["delivery_acceptance", "later_feature"]),
     lambda state: state.update(delivery_acceptance={"version": 2}),
     lambda state: state.update(delivery_acceptance_history=[{"sequence": 0}]),
 ])

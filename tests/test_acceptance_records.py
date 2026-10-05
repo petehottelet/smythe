@@ -667,8 +667,8 @@ def test_version_5_requirements_must_be_a_list_of_names(requires):
 def test_version_5_listing_an_unknown_requirement_is_refused(status):
     record = _record() if status == "completed" else _pending_record()
     state = _checkpoint_state(5, status=status, acceptance=record)
-    state["requires"] = ["delivery_acceptance", "attempt_allowance"]
-    with pytest.raises(ValueError, match="attempt_allowance"):
+    state["requires"] = ["delivery_acceptance", "later_feature"]
+    with pytest.raises(ValueError, match="later_feature"):
         delivery_acceptance_from_state(state)
 
 

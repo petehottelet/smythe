@@ -22,7 +22,7 @@ verification, trace, artifact, and recovery controls.
 
 - [Architecture](architecture.md) — planning tiers, routing decision records, execution flow, and validated planner history with summed node timing
 - [Tasks and handoffs](tasks.md) — complete task snapshots across planning, inspected graphs, synthesis, memory, and resume, immutable context snapshots that keep sources as untrusted data in durable runs, and removing a source with a tombstone
-- [Execution policies](execution.md) — halt, retry, skip, timeouts, an opt-in retry policy with one retry owner, `Retry-After`, capped backoff and a shared deadline, queued work, provider checks before any call, and 5,000-node deep-graph checks
+- [Execution policies](execution.md) — halt, retry, skip, timeouts, an opt-in retry policy with one retry owner, `Retry-After`, capped backoff, a shared deadline and attempts that resume cannot refill, queued work, provider checks before any call, and 5,000-node deep-graph checks
 - [YAML and jobs](jobs.md) — declarative artifact work and the installed CLI
 - [Adaptive supervision](supervisor.md) — revise pending work from completed results
 - [Verification](verifier.md) — objective gates, active-work invalidation, recoverable regeneration, and strict acceptance of the delivered output, with its obligations checked before any call and after every revision, and explicit re-evaluation of a completed run's saved output

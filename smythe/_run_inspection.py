@@ -34,6 +34,7 @@ from smythe.budget import Sentinel
 from smythe.checkpoint import (
     _EXECUTION_ID_RE,
     FileCheckpointStore,
+    attempt_allowance_from_state,
     checkpoint_requirements,
     delivery_acceptance_from_state,
     delivery_acceptance_history,
@@ -337,6 +338,9 @@ def _checkpoint_view(execution_id: str, state: Any) -> dict[str, Any]:
     resume = "Resume it with Swarm.resume(execution_id) from a Swarm with this checkpoint store"
     if record is not None:
         resume += f" and the strict acceptance policy whose sha256 is {record.policy_sha256}"
+    allowance = attempt_allowance_from_state(state)
+    if allowance is not None:
+        resume += f" and the retry policy {allowance[0].to_dict()}"
     return {
         "run_id": execution_id,
         "store": "checkpoints",

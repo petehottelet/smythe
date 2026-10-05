@@ -200,7 +200,7 @@ re-evaluation decides again.
 | `action` | When |
 |---|---|
 | `none` | The run completed, its output is delivered and its cost is known |
-| `resume` | The run is unfinished; `detail` says how to resume it, including the strict policy's `sha256` that must resume a strict run, ordinary or durable |
+| `resume` | The run is unfinished; `detail` says how to resume it, including the strict policy's `sha256` that must resume a strict run, ordinary or durable, and the retry policy an ordinary run with [persisted attempts](execution.md#persisted-attempts) records |
 | `republish` | A completed durable run's published document is missing or changed; `Swarm(run_store=...).republish(run_id)` publishes it again without replacing a file |
 | `reconcile_accounting` | Accounting is unresolved (invalid usage, an accounting error, an unresolved native response, or a durable run blocked by `unknown_exposure` or `evidence_conflict`), or a completed run's cost is incomplete |
 | `rerun` | A durable run passed its budget and admits no more calls |

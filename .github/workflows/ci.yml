@@ -204,6 +204,7 @@ jobs:
           tests/test_jobs_artifact_namespace.py
           tests/test_checkpoint_atomic.py
           tests/test_checkpoint.py
+          tests/test_attempt_allowance.py
           tests/test_sqlite_initialization.py
           tests/test_jobs_workflow_initialization.py
           tests/test_workflow_process_loss.py

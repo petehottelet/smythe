@@ -119,6 +119,7 @@ calls. A `RetryPolicy` is frozen and checks its fields when built:
 | `honor_retry_after` | `True` | Wait as long as a transient status error's `Retry-After` asks, in place of the backoff |
 | `backoff_max_s` | `60.0` | The longest wait before any retry; a longer `Retry-After` is cut to it |
 | `deadline_s` | `None` | Seconds that one node's attempts and waits share, from the start of its first attempt |
+| `persist_attempts` | `False` | Save each attempt as spent before its call, so resume continues each node's allowance instead of refilling it (see [persisted attempts](#persisted-attempts)) |
 
 Under the default policy, a 401 or 403 (`authority_denied`), a 404 or 413
 (`input_error`), a refused or truncated reply (`provider_rejected`) and
@@ -167,12 +168,41 @@ call, even when only synthesis is left to run, and so do `Executor` and
 
 So `AnthropicProvider(max_retries=0)` and `OpenAIProvider(max_retries=0)` run
 under a policy, and both providers at their SDK defaults are refused. Durable
-`run_store` runs refuse `retry_policy` with `WorkflowBindingError`. A policy
-is not saved in checkpoints: a resumed run follows the policy of the Swarm
-that resumes it, with a fresh allowance of attempts. `Executor` and
-`AsyncExecutor` also take `sleep`, which replaces the wait before a retry and
-is awaited when it returns an awaitable, and `rng`, which draws the jitter, so
-tests can drive waits from a manual clock.
+`run_store` runs refuse `retry_policy` with `WorkflowBindingError`. Without
+`persist_attempts` a policy is not saved in checkpoints: a resumed run follows
+the policy of the Swarm that resumes it, with a fresh allowance of attempts.
+`Executor` and `AsyncExecutor` also take `sleep`, which replaces the wait
+before a retry and is awaited when it returns an awaitable, and `rng`, which
+draws the jitter, so tests can drive waits from a manual clock.
+
+### Persisted attempts
+
+`RetryPolicy(persist_attempts=True)` makes a node's allowance of attempts
+(`1 + max_retries` for `RETRY`, one otherwise) hold across crashes and
+resumes. Before each attempt's call the executor records it as spent and, with
+a `checkpoint_store`, saves the checkpoint, whatever
+`checkpoint_every_n_nodes` is. An attempt therefore counts once it starts,
+including one that a crash or a cancellation interrupts; if that save fails,
+the attempt is not counted and the node stops with the save's error before
+its call.
+
+The checkpoints of such a run are [version 5](checkpoint-format.md#attempt-allowance-version-5):
+they record the policy and each node's attempts in its current
+`execution_generation`. Resume starts each node from the attempts its
+generation already used, so a run, its crash and its resume together make at
+most `1 + max_retries` calls for a `RETRY` node. A node with no attempt left
+fails at once with a `RuntimeError` naming its allowance, without a call, and
+its failure policy settles it as usual: a `SKIP` node is skipped. A
+regenerated node starts a new generation and gets a fresh allowance, so each
+generation keeps its own bound. `deadline_s` is measured within one process,
+so it starts again at the node's first attempt after a resume.
+
+Resume refuses with `ValueError`, before any provider call, a run saved under a
+policy other than the resuming `Swarm`'s `retry_policy`, and a run saved
+without persisted attempts when the resuming policy persists them, since its
+attempts so far are unknown. A completed run returns its saved result under
+any policy. Each executor takes the saved allowance as `attempts_used=` and
+reports its own as the `attempts_used` property, in the same shape.
 
 ## Concurrency
 

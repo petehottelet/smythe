@@ -87,6 +87,7 @@ class AsyncExecutor(ExecutorBase):
         retry_policy: RetryPolicy | None = None,
         sleep: Callable[[float], Any] | None = None,
         rng: Any = None,
+        attempts_used: dict[str, dict[str, int]] | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         super().__init__(
@@ -106,6 +107,7 @@ class AsyncExecutor(ExecutorBase):
             retry_policy=retry_policy,
             sleep=sleep,
             rng=rng,
+            attempts_used=attempts_used,
         )
         self._estimated_tokens_per_node = validate_token_count(
             estimated_tokens_per_node, "estimated_tokens_per_node",
@@ -360,7 +362,8 @@ class AsyncExecutor(ExecutorBase):
         last_exc: Exception | None = None
         attempts = 1 + max(node.max_retries, 0) if node.failure_policy == FailurePolicy.RETRY else 1
 
-        for attempt in range(attempts):
+        # A resumed run continues the allowance its checkpoint recorded.
+        for attempt in range(self._attempts_spent(node), attempts):
             self._call_attempts[node.id] = attempt
             try:
                 delay = self._retry_wait_s(node, attempt, last_exc)
@@ -375,6 +378,7 @@ class AsyncExecutor(ExecutorBase):
                         await waited
                 finally:
                     self._tracer.on_wait("retry_backoff", self._tracer.since(started), node)
+            self._spend_attempt(node, attempt)
             node.status = NodeStatus.RUNNING
             self.begin_verification(node, graph)
             self._tracer.on_node_start(node, attempt=attempt)
@@ -435,6 +439,8 @@ class AsyncExecutor(ExecutorBase):
             except asyncio.CancelledError:
                 self._requeue_cancelled(node)
                 raise
+        if last_exc is None:  # No attempt was left to make.
+            last_exc = self._allowance_spent(node, attempts)
 
         self.release_node_budget(node)
 

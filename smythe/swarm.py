@@ -35,6 +35,7 @@ from smythe.checkpoint import (
     SUPPORTED_CHECKPOINT_VERSIONS,
     CheckpointStore,
     agents_from_list,
+    attempt_allowance_from_state,
     build_state,
     delivery_acceptance_from_state,
     delivery_acceptance_history,
@@ -383,7 +384,9 @@ class Swarm:
     ``WhiteRabbit`` classifier's, each ``LLMArchitect`` or
     ``ConstrainedArchitect`` that could plan it, and an ``LLMSupervisor``'s
     when ``max_revisions`` allows a review. Otherwise the run is refused
-    before routing, planning or any node call. Durable runs refuse it.
+    before routing, planning or any node call. Durable runs refuse it. A policy
+    with ``persist_attempts`` is saved with the run's checkpoints, with each
+    node's attempts, so resume continues the allowance instead of refilling it.
     """
 
     def __init__(
@@ -686,6 +689,25 @@ class Swarm:
             raise ValueError(
                 f"Checkpoint {execution_id!r} holds a task that its strict delivery acceptance "
                 "record does not bind"
+            )
+
+    def _check_resume_retry_policy(self, execution_id: str, allowance: tuple | None) -> None:
+        """Refuse to finish a run whose saved attempt allowance this Swarm's policy would not keep."""
+        policy = self.retry_policy
+        if policy is not None and not policy.persist_attempts:
+            policy = None
+        saved = allowance[0] if allowance is not None else None
+        if saved is None and policy is not None:
+            raise ValueError(
+                f"Checkpoint {execution_id!r} was written without persisted attempts, so this "
+                "Swarm's retry policy cannot bound them. Resume it under a retry policy "
+                "without persist_attempts, or re-run the task."
+            )
+        if saved != policy:
+            raise ValueError(
+                f"Checkpoint {execution_id!r} records attempts used under the retry policy "
+                f"{saved.to_dict()}; resume it with a Swarm whose retry_policy equals it, or "
+                "re-run the task."
             )
 
     def _check_inherited_verdicts(self, graph: ExecutionGraph) -> None:
@@ -1116,19 +1138,20 @@ class Swarm:
 
         A strict run's states are version 5: they carry *acceptance*, the
         decision, or until there is one an undecided record that binds the
-        run's policy and task.
+        run's policy and task. So are the states of a run whose retry policy
+        persists attempts, which record it and each node's attempts used.
         """
         if self._checkpoint_store is None:
             return
         with timing.tracer.phase("checkpoint"):
             if acceptance is None:
                 acceptance = self._pending_acceptance(task)
+            control = {"revisions_used": getattr(self._active_executor, "revisions_used", 0)}
+            if self.retry_policy is not None and self.retry_policy.persist_attempts:
+                control["retry_policy"] = self.retry_policy.to_dict()
+                control["attempts_used"] = getattr(self._active_executor, "attempts_used", {})
             state = build_state(
-                control={
-                    "revisions_used": getattr(
-                        self._active_executor, "revisions_used", 0,
-                    ),
-                },
+                control=control,
                 execution_id=execution_id,
                 status=status,
                 model=self.model,
@@ -1452,7 +1475,10 @@ class Swarm:
         record, returning it as ``rejected_output`` with ``acceptance=None``.
         An unfinished strict run resumes only under the same strict policy,
         and a strict policy never finishes a run that began without one.
-        Resumed work runs one node at a time
+        Likewise, a run whose retry policy persists attempts resumes only
+        under an equal policy, which starts each node from the attempts its
+        generation already used, and such a policy never finishes a run saved
+        without one. Resumed work runs one node at a time
         unless this Swarm has ``parallel=True``; a durable ``run_store``
         run keeps the concurrency its first execution recorded and resumes
         only under the acceptance policy its recipe records.
@@ -1470,6 +1496,7 @@ class Swarm:
         state = self._load_checkpoint(execution_id)
         version = state["version"]
         acceptance, graph, task, budget = self._restore_checkpoint(state)
+        allowance = attempt_allowance_from_state(state)
 
         completed = state.get("status") == "completed" and state.get("output") is not None
         validate_verification_checkpoint(graph, version=version, completed=completed)
@@ -1498,6 +1525,7 @@ class Swarm:
         # Finishing a run under another policy would decide its output
         # differently, so only the policy it began with may finish it.
         self._check_resume_policy(execution_id, acceptance, task)
+        self._check_resume_retry_policy(execution_id, allowance)
 
         from smythe.async_executor import AsyncExecutor
 
@@ -1540,6 +1568,8 @@ class Swarm:
             ),
             acceptance=self._acceptance,
             retry_policy=self.retry_policy,
+            # Like revisions_used: a crash must not refill a node's attempts.
+            attempts_used=allowance[1] if allowance is not None else None,
         )
         self._active_executor = executor
         tracer.add_phase("recovery", tracer.since(recovery_started))

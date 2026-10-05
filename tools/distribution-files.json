@@ -116,6 +116,7 @@
     "tests/test_astra_runtime.py",
     "tests/test_astra_study.py",
     "tests/test_async_executor.py",
+    "tests/test_attempt_allowance.py",
     "tests/test_banner_optimizer.py",
     "tests/test_benchmark_artifact_records.py",
     "tests/test_benchmark_usage.py",

@@ -28,6 +28,7 @@ from smythe.acceptance import AcceptanceDecision, DeliveryAcceptance, text_sha25
 from smythe.agent import Agent, AgentProfile
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology, snapshot_run_ref
 from smythe.registry import Registry
+from smythe.scheduling import RetryPolicy, _attempt_records
 from smythe.task import Task, task_from_dict, task_snapshots_equal, task_to_dict
 
 CHECKPOINT_VERSION = 4
@@ -37,7 +38,8 @@ CHECKPOINT_VERSION = 4
 # configuration, because builds that write v4 never take servers from model
 # output. Earlier versions may hold servers a model-generated plan declared.
 # v5 adds a top-level ``requires`` list naming the state features a reader must
-# understand, such as a ``delivery_acceptance`` record. Only a state that
+# understand, such as a ``delivery_acceptance`` record or an
+# ``attempt_allowance`` that resume must not refill. Only a state that
 # carries such a feature is written as v5, so builds that read v4 refuse it,
 # and a reader refuses any feature it does not know, instead of finishing or
 # delivering a run it would misread.
@@ -45,7 +47,10 @@ STRICT_CHECKPOINT_VERSION = 5
 SUPPORTED_CHECKPOINT_VERSIONS = (1, 2, 3, 4, 5)
 MCP_TRUSTED_CHECKPOINT_VERSION = 4
 # The version 5 state features this build reads.
-KNOWN_CHECKPOINT_REQUIREMENTS = frozenset({"delivery_acceptance"})
+KNOWN_CHECKPOINT_REQUIREMENTS = frozenset({"delivery_acceptance", "attempt_allowance"})
+# The control keys of an attempt allowance (see RetryPolicy.persist_attempts),
+# which older builds would ignore and so refill.
+_ALLOWANCE_KEYS = frozenset({"retry_policy", "attempts_used"})
 # How many superseded delivery decisions a completed checkpoint keeps. The
 # history is informational, so it is not a required state feature: a reader
 # that does not know it still reads the current decision correctly.
@@ -334,7 +339,8 @@ def build_state(
     ``delivery_acceptance`` makes the state version 5, lists the feature in
     ``requires`` and stores the record under that key. A record that binds an
     output digest needs the matching ``output``, and a completed state's
-    record must hold a decision.
+    record must hold a decision. A ``control`` block with ``retry_policy``
+    and ``attempts_used`` makes it version 5 too, listing ``attempt_allowance``.
     """
     task_data = task_to_dict(task)
     graph_task_data = task_data if graph.task is task else task_to_dict(graph.task)
@@ -364,6 +370,7 @@ def build_state(
         state["budget"]["token_estimate_nodes"] = sorted(token_estimate_nodes)
     if timing is not None:
         state["timing"] = deepcopy(timing)
+    requires = []
     if delivery_acceptance is not None:
         if not isinstance(delivery_acceptance, DeliveryAcceptance):
             raise TypeError("delivery_acceptance must be a DeliveryAcceptance record")
@@ -372,8 +379,13 @@ def build_state(
             raise ValueError("The delivery acceptance record does not match the checkpoint output")
         if status == "completed" and delivery_acceptance.decision is AcceptanceDecision.NOT_EVALUATED:
             raise ValueError("A completed checkpoint's delivery acceptance record must hold a decision")
+        requires.append("delivery_acceptance")
+    if _ALLOWANCE_KEYS & state["control"].keys():
+        requires.append("attempt_allowance")
+    if requires:
         state["version"] = STRICT_CHECKPOINT_VERSION
-        state["requires"] = ["delivery_acceptance"]
+        state["requires"] = requires
+    if delivery_acceptance is not None:
         state["delivery_acceptance"] = delivery_acceptance.to_dict()
     return state
 
@@ -453,6 +465,39 @@ def delivery_acceptance_from_state(state: dict[str, Any]) -> DeliveryAcceptance 
     if state.get("status") == "completed" and record.decision is AcceptanceDecision.NOT_EVALUATED:
         raise ValueError("A completed checkpoint's delivery acceptance record must hold a decision")
     return record
+
+
+def attempt_allowance_from_state(
+    state: dict[str, Any],
+) -> tuple[RetryPolicy, dict[str, dict[str, int]]] | None:
+    """The retry policy and attempts used that a checkpoint's attempt allowance records.
+
+    A version 5 state has an allowance exactly when its ``requires`` list
+    names ``attempt_allowance``: ``control.retry_policy``, a policy with
+    ``persist_attempts``, and ``control.attempts_used``, each node's
+    ``execution_generation`` and attempts spent there. Versions 1-4 have
+    none, whatever keys they hold. Raises ValueError for an unknown
+    requirement, or an allowance that is missing, unlisted or unreadable.
+    """
+    requires = checkpoint_requirements(state)
+    if state["version"] < STRICT_CHECKPOINT_VERSION:
+        return None
+    control = state.get("control")
+    present = isinstance(control, dict) and bool(_ALLOWANCE_KEYS & control.keys())
+    if "attempt_allowance" not in requires:
+        if present:
+            raise ValueError("Checkpoint records an attempt allowance that its 'requires' list omits")
+        return None
+    if not present or not _ALLOWANCE_KEYS <= control.keys():
+        raise ValueError(
+            "A checkpoint that requires attempt_allowance must record control.retry_policy "
+            "and control.attempts_used"
+        )
+    policy = RetryPolicy.from_dict(control["retry_policy"])
+    if not policy.persist_attempts:
+        raise ValueError("A checkpoint's attempt allowance must record a policy with persist_attempts")
+    _attempt_records(control["attempts_used"])
+    return policy, deepcopy(control["attempts_used"])
 
 
 def delivery_acceptance_history(

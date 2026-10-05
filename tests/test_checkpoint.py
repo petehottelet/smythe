@@ -827,11 +827,11 @@ def test_resume_refuses_a_checkpoint_that_requires_an_unknown_feature(tmp_path, 
               else DeliveryAcceptance("not_evaluated", "b" * 64))
     _save(store, 5, status=status, acceptance=record)
     state = store.load("saved")
-    state["requires"].append("attempt_allowance")
+    state["requires"].append("later_feature")
     store.save("saved", state)
     provider = NoCallProvider()
 
-    with pytest.raises(ValueError, match="attempt_allowance"):
+    with pytest.raises(ValueError, match="later_feature"):
         Swarm(provider=provider, model="test-model", checkpoint_store=store).resume("saved")
     assert provider.calls == 0
 

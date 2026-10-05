@@ -9,7 +9,7 @@ here check every policy's fields the same way.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
 from smythe._failures import (
     AUTHORITY_DENIED, INPUT_ERROR, PROVIDER_REJECTED, QUALITY_DEFECT, TRANSIENT, UNKNOWN_OUTCOME,
@@ -68,12 +68,38 @@ class RetryPolicy:
     is shorter, and a retry whose wait would reach the deadline is not made:
     the node fails with ``RetryDeadlineError``. Without a policy, ``RETRY``
     retries every failure that is not terminal, as before.
+
+    With ``persist_attempts``, each attempt is saved as spent before its call
+    and checkpoints record the policy, so a resumed run continues each node's
+    allowance in its ``execution_generation`` instead of refilling it, and
+    resumes only under an equal policy. Its deadline starts again in each
+    process.
     """
 
     retry_classes: frozenset[str] = frozenset({TRANSIENT})
     honor_retry_after: bool = True
     backoff_max_s: float = 60.0
     deadline_s: float | None = None
+    persist_attempts: bool = False
+
+    def to_dict(self) -> dict:
+        """The policy's fields as JSON-ready values, as a checkpoint records them."""
+        return {"retry_classes": sorted(self.retry_classes),
+                "honor_retry_after": self.honor_retry_after, "backoff_max_s": self.backoff_max_s,
+                "deadline_s": self.deadline_s, "persist_attempts": self.persist_attempts}
+
+    @classmethod
+    def from_dict(cls, data: object) -> RetryPolicy:
+        """The policy that :meth:`to_dict` *data* records; ValueError for any other value."""
+        if not isinstance(data, dict):
+            raise ValueError(f"A saved retry policy must be an object, got {data!r}")
+        unknown = sorted(set(data) - {field.name for field in fields(cls)})
+        if unknown:
+            raise ValueError(f"A saved retry policy has fields this build does not know: {unknown}")
+        try:
+            return cls(**data)
+        except TypeError as exc:  # Such as an unhashable retry class.
+            raise ValueError(f"A saved retry policy is not readable: {exc}") from exc
 
     def __post_init__(self) -> None:
         classes = self.retry_classes
@@ -85,8 +111,9 @@ class RetryPolicy:
             raise ValueError(
                 f"retry_classes may list only {sorted(RETRYABLE_CLASSES)}, not {unknown}"
             )
-        if type(self.honor_retry_after) is not bool:
-            raise ValueError(f"honor_retry_after must be a bool, got {self.honor_retry_after!r}")
+        for name in ("honor_retry_after", "persist_attempts"):
+            if type(getattr(self, name)) is not bool:
+                raise ValueError(f"{name} must be a bool, got {getattr(self, name)!r}")
         deadline = self.deadline_s
         if deadline is not None:
             deadline = validate_seconds(deadline, "deadline_s", positive=True)
@@ -116,3 +143,26 @@ def _retry_after_s(error: BaseException) -> float | None:
         if math.isfinite(wait) and wait >= 0:
             return wait
     return None
+
+
+def _attempt_records(data: object) -> dict[str, tuple[int, int]]:
+    """Read attempts used, ``{node_id: {"execution_generation": g, "attempts": n}}``.
+
+    Returns ``{node_id: (g, n)}``; raises ValueError unless every generation
+    and count is a non-negative integer.
+    """
+    if not isinstance(data, dict):
+        raise ValueError(f"attempts_used must map node ids to records, got {data!r}")
+    records = {}
+    for node_id, record in data.items():
+        if (not isinstance(node_id, str) or not isinstance(record, dict)
+                or set(record) != {"execution_generation", "attempts"}):
+            raise ValueError(
+                f"attempts_used of {node_id!r} must hold exactly execution_generation and attempts"
+            )
+        values = record["execution_generation"], record["attempts"]
+        for name, value in zip(("execution_generation", "attempts"), values):
+            if type(value) is not int or value < 0:
+                raise ValueError(f"{name} in attempts_used of {node_id!r} must be an integer >= 0")
+        records[node_id] = values
+    return records

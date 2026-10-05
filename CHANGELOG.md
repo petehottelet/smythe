@@ -614,9 +614,26 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   review; `Executor` and `AsyncExecutor` check the supervisor's with their
   own. Built-in providers declare it, and `AnthropicProvider` takes
   `max_retries`, passed to the SDK only when set. Durable runs refuse the
-  policy, and checkpoints do not record it. Executors also take `sleep` and
-  `rng`, which replace the retry wait and its jitter. Without a policy,
-  retries are unchanged. See [retry policy](docs/execution.md#retry-policy).
+  policy, and checkpoints record it only with `persist_attempts`. Executors
+  also take `sleep` and `rng`, which replace the retry wait and its jitter.
+  Without a policy, retries are unchanged. See
+  [retry policy](docs/execution.md#retry-policy).
+- `RetryPolicy(persist_attempts=True)` keeps a node's allowance of attempts
+  across crashes and resumes. Each attempt is saved as spent before its call,
+  whatever `checkpoint_every_n_nodes` is, and checkpoints record the policy
+  and each node's attempts in its current `execution_generation` under
+  `control.retry_policy` and `control.attempts_used`. Such checkpoints are
+  version 5 and list `attempt_allowance` in `requires`, so builds that read
+  only version 4, or that do not know the feature, refuse them instead of
+  refilling the allowance. Resume starts each node from the attempts its
+  generation used, so a `RETRY` node makes at most `1 + max_retries` calls in
+  total, and a node with none left fails without a call; a regenerated node
+  gets a fresh allowance. An unfinished run resumes only under an equal
+  policy, which `smythe runs inspect` names in its resume action. Executors
+  take `attempts_used=` and report the `attempts_used` property, and
+  `smythe.checkpoint.attempt_allowance_from_state()` reads the record. Other
+  runs keep writing version 4. See
+  [persisted attempts](docs/execution.md#persisted-attempts).
 - `jobs stop --drain-timeout-s SECONDS` bounds a pause's drain. That long
   after the request, the worker cancels each call still awaiting its provider
   and records it as `unknown_outcome`, keeping its full per-call ceiling as
