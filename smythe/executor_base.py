@@ -942,7 +942,10 @@ class ExecutorBase:
         """The wait before *attempt*; a retry policy's deadline starts at attempt 0.
 
         Raises ``RetryDeadlineError``, from *error*, when the wait would end
-        at or after the node's deadline, so that retry is not made.
+        at or after the node's deadline, so that retry is not made. The trace
+        still records the refused attempt, with no duration and no call, as
+        it records an attempt the deadline ends: its span says why the node
+        stopped.
         """
         policy = self._retry_policy
         if policy is None:
@@ -955,7 +958,11 @@ class ExecutorBase:
         delay = self.retry_delay_s(attempt, error=error)
         deadline = self._deadlines.get(node.id)
         if deadline is not None and self._tracer.now() + delay >= deadline:
-            raise self._deadline_error(node) from error
+            refused = self._deadline_error(node)
+            self._tracer.on_node_start(node, attempt=attempt)
+            self._tracer.on_node_error(node, refused)
+            self._end_failed_attempt(node)
+            raise refused from error
         return delay
 
     def _deadline_error(self, node: Node) -> RetryDeadlineError:

@@ -451,7 +451,33 @@ def test_the_deadline_bounds_attempts_and_waits_together(mode):
     assert classify_failure(caught.value.__cause__) == "transient"
     assert node.status is NodeStatus.FAILED and node.result == str(caught.value)
     assert "deadline" in node.result
-    assert attempts(tracer) == [(attempt, "failed", "transient") for attempt in range(3)]
+    # The refused fourth attempt makes no call but is recorded.
+    assert attempts(tracer) == [*((attempt, "failed", "transient") for attempt in range(3)),
+                                (3, "timed_out", "deadline")]
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_a_retry_the_deadline_refuses_is_recorded_on_the_trace(mode):
+    clock = ManualClock()
+    provider = Scripted(HttpError(429, "rate_limit_error", retry_after_s=4), clock=clock)
+    executor, tracer, _ = make_executor(mode, provider, clock, RetryPolicy(deadline_s=10))
+
+    with pytest.raises(RetryDeadlineError) as caught:
+        run(executor, retrying(max_retries=10))
+
+    # The fourth attempt would start at 12s, past the 10s deadline: its span
+    # says why the node stopped, with no duration, and no call is made.
+    assert provider.started == [0, 4, 8]
+    assert attempts(tracer) == [*((attempt, "failed", "transient") for attempt in range(3)),
+                                (3, "timed_out", "deadline")]
+    refused = tracer.spans[-1]
+    assert refused.status == "failed" and refused.duration_ms == 0
+    assert tracer.summary()[-1] == {
+        "node_id": "step", "label": "Step", "agent_id": None, "status": "failed",
+        "duration_ms": 0.0, "error": str(caught.value),
+    }
+    timing = tracer.timing()
+    assert timing["summed_node_ms"] == 0 and timing["waiting_ms"]["retry_backoff"] == 8000
 
 
 @pytest.mark.parametrize("mode", MODES)

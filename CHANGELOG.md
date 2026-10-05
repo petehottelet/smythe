@@ -938,6 +938,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   review. `execute(graph)` and `resume()` check the run's provider and the
   supervisor's even when only synthesis is left to run. These calls used to
   go out with the SDK's own retries.
+- When a `RetryPolicy` deadline refuses a node's next retry, the trace
+  records that attempt: a span with its attempt number, outcome `timed_out`,
+  failure class `deadline` and the `RetryDeadlineError`, with no duration and
+  no call. The trace used to end at the last failed call without saying why
+  the node stopped.
 
 ## [0.9.1] - 2026-09-29
 

@@ -247,7 +247,8 @@ Tests:
   `tests/test_retry_policy.py::test_retry_after_is_capped_and_read_only_where_it_applies`
   and `tests/test_retry_policy.py::test_backoff_doubles_up_to_the_policy_cap`; deadline
   `tests/test_retry_policy.py::test_the_deadline_bounds_attempts_and_waits_together`,
-  `tests/test_retry_policy.py::test_each_attempt_times_out_at_the_remaining_deadline`
+  `tests/test_retry_policy.py::test_each_attempt_times_out_at_the_remaining_deadline`,
+  `tests/test_retry_policy.py::test_a_retry_the_deadline_refuses_is_recorded_on_the_trace`
   and `tests/test_retry_policy.py::test_a_timeout_the_call_raises_itself_is_transient_and_retried`;
   tool errors `tests/test_retry_policy.py::test_a_tool_error_fed_back_to_the_model_is_not_a_retry`.
 - One retry owner: declarations `tests/test_retry_policy.py::test_providers_declare_the_retries_their_sdk_makes`;
