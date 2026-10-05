@@ -301,6 +301,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ### Fixed
 
+- Jobs commands that read a detached worker's receipts, such as `jobs attach`
+  and `jobs status`, retry for up to a second when Windows briefly denies
+  opening a receipt that the worker is replacing, instead of failing.
 - Nine retained evidence archives no longer carry local user paths: the Astra
   pilot and main-study archives with their offline and CI verification logs,
   the Fable pilot and Fable Code archives, and the 5,000-operation Jobs
