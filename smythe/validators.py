@@ -45,8 +45,12 @@ _MAX_PATH = 16
 _CHECK_ID = re.compile(r"[a-z][a-z0-9-]{1,63}")
 _LINES = re.compile(r"\r\n|\r|\n")
 _FENCE = re.compile(r" {0,3}(`{3,}|~{3,})")
-_HEADING = re.compile(r" {0,3}(#{1,6})(?:[ \t]+(.*?))?[ \t]*$")
-_CLOSING_HASHES = re.compile(r"(?:^|[ \t]+)#+[ \t]*$")
+# Matched against a line without trailing spaces and tabs, so that no part of
+# a heading is scanned more than once; output can hold megabyte lines.
+_HEADING = re.compile(r" {0,3}(#{1,6})(?:[ \t]+(.*))?")
+# What a title ignores at its start, and, matched on the reversed title, at its end.
+_TITLE_START = re.compile(r"[\s*_]*")
+_TITLE_END = re.compile(r"[\s*_:]*")
 
 
 def _count(value: Any, what: str, *, optional: bool = False, limit: int = _MAX_COUNT) -> int | None:
@@ -89,11 +93,9 @@ def _decode(subject: ValidationSubject) -> tuple[str | None, ValidationFinding |
 
 def _title(text: str) -> str:
     """A heading compared ignoring case, spacing, emphasis markers and a final colon."""
-    previous = None
-    while text != previous:
-        previous = text
-        text = text.strip().strip("*_").removesuffix(":")
-    return " ".join(text.split()).casefold()
+    start = _TITLE_START.match(text).end()
+    end = len(text) - _TITLE_END.match(text[::-1]).end()
+    return " ".join(text[start:end].split()).casefold()
 
 
 def _headings(lines: list[str]) -> list[tuple[int, int, str]]:
@@ -110,9 +112,13 @@ def _headings(lines: list[str]) -> list[tuple[int, int, str]]:
             marker = opening.group(1)
             fence = re.compile(f" {{0,3}}{re.escape(marker[0])}{{{len(marker)},}}[ \t]*$")
             continue
-        heading = _HEADING.match(line)
+        heading = _HEADING.fullmatch(line.rstrip(" \t"))
         if heading:
-            title = _CLOSING_HASHES.sub("", heading.group(2) or "")
+            title = heading.group(2) or ""
+            # A closing run of #s counts only after a space or tab, or alone.
+            unclosed = title.rstrip("#")
+            if unclosed != title and (not unclosed or unclosed[-1] in " \t"):
+                title = unclosed.rstrip(" \t")
             found.append((index, len(heading.group(1)), _title(title)))
     return found
 

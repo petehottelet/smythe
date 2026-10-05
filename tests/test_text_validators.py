@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import time
 import typing
 
 import pytest
@@ -197,7 +198,7 @@ def test_sections_out_of_order_are_rejected_unless_order_is_not_required():
 @pytest.mark.parametrize("heading", [
     "## Argument", "# argument", "###### ARGUMENT", "   ## Argument", "## **Argument**",
     "## Argument:", "## __Argument__:", "## **Argument**:", "## Argument ##", "##\tArgument",
-    "## Argument  ", "##  Argument #",
+    "## Argument  ", "##  Argument #", "## Argument\t###\t", "## **Argument:** ##", "## Argument ::",
 ])
 def test_heading_matching_ignores_case_spacing_emphasis_and_a_final_colon(heading):
     assert check(ARGUMENT_AND_CRITIQUE, f"{heading}\nShip it.\n## Critique\nWeak.").passed
@@ -205,7 +206,8 @@ def test_heading_matching_ignores_case_spacing_emphasis_and_a_final_colon(headin
 
 @pytest.mark.parametrize("line", [
     "Argument", "**Argument**", "#Argument", "####### Argument", "    ## Argument",
-    "> ## Argument", "- ## Argument", "## Arguments", "## The Argument",
+    "> ## Argument", "- ## Argument", "## Arguments", "## The Argument", "## Argument#",
+    "## Argument # #", "## :Argument",
 ])
 def test_lines_that_are_not_markdown_headings_do_not_count(line):
     report = check(ARGUMENT_AND_CRITIQUE, f"{line}\nShip it.\n## Critique\nWeak.")
@@ -249,6 +251,28 @@ def test_every_failed_check_is_reported():
 
 def test_line_endings_and_windows_newlines_are_lines():
     assert check(ARGUMENT_AND_CRITIQUE, "## Argument\r\nShip it.\r\n## Critique\rWeak.").passed
+
+
+MEGABYTE = 1_000_000
+
+
+@pytest.mark.parametrize("heading,missing", [
+    pytest.param("## Argument" + " " * MEGABYTE + "x", True, id="spaces-then-text"),
+    pytest.param("## Argument" + "\t" * MEGABYTE + "x", True, id="tabs-then-text"),
+    pytest.param("## Argument" + " " * MEGABYTE + "#", False, id="spaces-then-closing-hashes"),
+    pytest.param("## Argument" + ":" * MEGABYTE, False, id="colons"),
+    pytest.param("## Argument" + " :" * (MEGABYTE // 2), False, id="spaced-colons"),
+    pytest.param("## **Argument" + "*:" * (MEGABYTE // 2), False, id="emphasis-and-colons"),
+])
+def test_a_megabyte_heading_line_is_read_in_linear_time(heading, missing):
+    """Heading lines used to be parsed in quadratic time: a run of spaces or
+    tabs inside one took about 28 s at 64,000 characters, and each final
+    colon or emphasis marker copied the title again, stalling acceptance."""
+    output = f"{heading}\nShip it.\n## Critique\nWeak."
+    started = time.perf_counter()
+    report = check(ARGUMENT_AND_CRITIQUE, output)
+    assert time.perf_counter() - started < 1.0
+    assert codes(report) == (["section_missing"] if missing else [])
 
 
 # --- JSON ---------------------------------------------------------------
