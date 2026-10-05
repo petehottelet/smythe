@@ -2,8 +2,10 @@
 
 **Preview.** `smythe.actions` defines the contract types for actions that
 write accepted content to a service outside Smythe, such as publishing a post.
-Smythe does not yet store, approve or dispatch actions, and these types may
-change before it does. `import smythe` does not load the module; import
+Smythe does not yet record, approve or dispatch actions, and these types may
+change before it does. Version 2 workflow journals have
+[tables for actions](workflow-accounting.md#external-action-records), which
+nothing writes yet. `import smythe` does not load the module; import
 `smythe.actions` explicitly.
 
 An external action has three parts that this page describes:

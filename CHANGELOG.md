@@ -248,6 +248,17 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   and `still_authorized()` on a verifier, whose `identity` must be a name
   without control characters. Other methods are not checked. Nothing
   stores or dispatches actions yet. See [external actions](docs/actions.md).
+- Version 2 workflow journals have four tables for external actions:
+  `workflow_actions`, `workflow_action_attempts`, `workflow_action_approvals`
+  and the append-only `workflow_action_records`, which nothing writes yet.
+  Action money is a separate `external_actions` accounting scope that never
+  enters a run's balances. `SQLiteWorkflowStore.audit()` also checks a run's
+  actions: intent digests, action keys, states, verdicts and record kinds,
+  approvals bound to their action's intent, and balances equal to the sums
+  of each action's attempts and records. `inspect_run()` adds an `actions`
+  block only for a run that has actions, without parameters, approval
+  assertions, receipts, record payloads or error text. See
+  [external action records](docs/workflow-accounting.md#external-action-records).
 - Jobs operations have a semantic input digest.
   `smythe.jobs.operation_input_digest()` hashes the provider kind and its
   adapter version (`smythe.jobs.providers.ADAPTER_VERSIONS`), the model,
@@ -873,11 +884,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 - **Durable workflow journals upgrade to format version 2, which Smythe
   0.9.x and earlier cannot open, even read-only. Back up journals before
   upgrading.** Version 2 adds the `tool` call phase to `CallKey` and
-  `CallScope`; its tables are unchanged. Opening a version 1 journal with
-  `SQLiteWorkflowStore(path)` upgrades it in one transaction that changes
-  only the recorded version, so every run, call, balance, reservation,
-  evidence row and the store identity are kept; an interrupted upgrade
-  rolls back. While any run holds an unexpired lease the upgrade raises
+  `CallScope` and the external action tables, and a journal must hold
+  exactly its version's tables. Opening a version 1 journal with
+  `SQLiteWorkflowStore(path)` upgrades it in one transaction that creates
+  those tables, empty, and changes the recorded version, so every run, call,
+  balance, reservation, evidence row and the store identity are kept; an
+  interrupted upgrade rolls back. While any run holds an unexpired lease the upgrade raises
   `WorkflowLeaseError`, so stop workers from earlier releases first.
   `SQLiteWorkflowStore(path, read_only=True)` reads a version 1 journal
   without upgrading it, and the new `store_version` property reports the

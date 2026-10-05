@@ -85,6 +85,7 @@
     "smythe/validators.py",
     "smythe/verifier.py",
     "smythe/workflow.py",
+    "smythe/workflow_actions.py",
     "smythe/workflow_artifact.py",
     "smythe/workflow_binding.py",
     "smythe/workflow_policy.py",

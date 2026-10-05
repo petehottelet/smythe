@@ -691,7 +691,7 @@ combination with the test behind it.
 hashes, and events. `store.lease_sessions(execution_id)` returns the
 journal-clock bounds of each lease session, which a durable result reports as
 its [timing](execution.md#timing). `store.audit(execution_id)` verifies accounting and evidence
-bindings. Open `SQLiteWorkflowStore(path, read_only=True)` for inspection without
+bindings, including a run's [external action records](#external-action-records). Open `SQLiteWorkflowStore(path, read_only=True)` for inspection without
 schema changes or provider construction, including a journal from an earlier
 release ([journal upgrades](#journal-upgrades)). From the command line,
 `smythe runs --journal <path> inspect <run id>` reports the same balances,
@@ -707,13 +707,45 @@ Opening an existing file never changes its permissions. API keys are
 excluded from stored provider descriptions. Ordinary summaries and traces do
 not include raw responses or encrypted reasoning.
 
+## External action records
+
+A version 2 journal has four tables for [external actions](actions.md):
+`workflow_actions` holds each logical action with its intent, connector
+profile, state and balances; `workflow_action_attempts` its numbered attempts;
+`workflow_action_approvals` the approvals and rejections bound to its intent
+digest; and `workflow_action_records` its readbacks, lookups, notices, late
+receipts, findings, decisions and evidence. Records are append-only: SQLite
+refuses to update or delete them. Nothing in this release writes these tables
+yet.
+
+Action money is its own accounting scope, `external_actions`, in whole
+nanoUSD. It never enters a run's balances or `workflow_accounting`, which stay
+equal to the run's call ledger. `store.audit()` also checks a run's actions:
+each intent hashes to its recorded digest and names its profile's connector
+and one of its operations, each key is `action_key(store_id, run_id, slot,
+sequence)`, every state, verdict and record kind is known, approvals bind
+their action's intent digest, attempts are numbered from 1 under an approval,
+and an action's confirmed, reserved and unknown amounts equal the sums of its
+attempts' costs, reservations and exposure and its records' costs. A
+mismatch raises `WorkflowCorruptionError`.
+
+For a run with actions, `inspect_run()` adds an `actions` block after its
+other keys: the scope's totals and, for each action, its identity, intent
+digest, operation and target, state and balances, with its attempts,
+approvals (principal, verifier, ceiling, expiry, consumption and revocation
+time) and records by digest. It never includes parameters, approval
+assertions, receipts, record payloads or error text. A run without actions
+inspects exactly as before.
+
 ## Journal upgrades
 
 The journal records its format version, which `store.store_version` reports.
 This release writes version 2, which adds the `tool` call phase of
-[recorded read steps](#recorded-read-steps); its tables are the same as
-version 1's. Smythe 0.9.x and earlier write version 1 and
-cannot open a version 2 journal, even read-only: they raise
+[recorded read steps](#recorded-read-steps) and the
+[external action tables](#external-action-records). Version 1 has every other
+table, and a journal must hold exactly its version's tables: any other set is
+refused with `WorkflowCorruptionError`. Smythe 0.9.x and earlier write
+version 1 and cannot open a version 2 journal, even read-only: they raise
 `WorkflowCorruptionError("Unsupported workflow journal version")`.
 
 Back up each journal before this release opens it for writing, and keep the
@@ -738,11 +770,13 @@ journal; it is created with your default file permissions.
   and replay work as before, including while an earlier release's worker holds
   a run.
 - `SQLiteWorkflowStore(path)` upgrades a version 1 journal in the transaction
-  that opens it. The upgrade changes only the recorded version: every run,
-  call, balance, reservation, receipt, evidence row, checkpoint and event keeps
-  its bytes, and the store identity is unchanged. Concurrent openers upgrade
-  it once. An interrupted upgrade, including a killed process, rolls back and
-  leaves a version 1 journal.
+  that opens it. The upgrade creates the external action tables, empty, and
+  changes the recorded version; nothing else changes: every run, call,
+  balance, reservation, receipt, evidence row, checkpoint and event keeps its
+  bytes, the store identity is unchanged, and so is the file's mode.
+  Concurrent openers upgrade it once. An interrupted upgrade, including a
+  killed process, rolls back and leaves a version 1 journal without the new
+  tables.
 - Stop workers from earlier releases first. Those workers check the version
   only when they open the journal, so while any run holds an unexpired lease
   the upgrade raises `WorkflowLeaseError` and leaves the journal at version 1
