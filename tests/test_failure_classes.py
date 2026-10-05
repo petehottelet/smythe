@@ -29,8 +29,8 @@ from smythe.executor_base import ArtifactIntegrityError, NodeFinalizationError
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
 from smythe.pricing_anthropic import MODEL as MESSAGES_MODEL
 from smythe.provider import (
-    CompletionResult, OutputRefusedError, OutputTruncatedError, Provider,
-    ProviderAccountingCancelledError, ProviderAccountingError, ProviderResponseError,
+    CompletionResult, NativeOutputDefectError, OutputRefusedError, OutputTruncatedError,
+    Provider, ProviderAccountingCancelledError, ProviderAccountingError, ProviderResponseError,
 )
 from smythe.provider_messages import AnthropicMessagesProvider
 from smythe.provider_responses import OpenAIResponsesProvider, RawResponseEnvelope
@@ -110,6 +110,9 @@ CASES = {
     "rejected-429": (lambda: rejected(429), "transient", False),
     "truncated": (lambda: OutputTruncatedError("max_tokens"), "provider_rejected", False),
     "refused": (lambda: OutputRefusedError("refusal"), "provider_rejected", False),
+    "native-output-defect": (
+        lambda: NativeOutputDefectError("max_tokens", where="Node 'step'"),
+        "quality_defect", False),
     "read-tool": (
         lambda: ReadToolError("Read step 'page' failed: HTTP 404 read response"),
         "provider_rejected", False),

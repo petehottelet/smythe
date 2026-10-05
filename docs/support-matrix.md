@@ -159,11 +159,18 @@ Who calls again after a failure depends on the path and the provider:
   `AnthropicProvider` or `OpenAIProvider` without `max_retries=0`, or a
   custom provider that declares nothing. See
   [retry policy](execution.md#retry-policy).
-- **Ordinary runs, native providers**: once a request is attempted, no node
-  policy calls again. An HTTP error including a 429, a transport failure, a
-  refusal, a truncation or an unresolved bill raises `ProviderResponseError`
-  (`ProviderAccountingError` when the bill is unresolved) and stops the run.
-  A refused, truncated or incomplete response's error names why in
+- **Ordinary runs, native providers**: without a retry policy, once a request
+  is attempted no node policy calls again. An HTTP error including a 429, a
+  transport failure, a refusal, a truncation or an unresolved bill raises
+  `ProviderResponseError` (`ProviderAccountingError` when the bill is
+  unresolved) and stops the run. Under a `RetryPolicy`, a 401, 403, 404, 413
+  or 429 response with the provider's plain error body settles at zero cost,
+  as on durable text workflows, and raises `ProviderRequestRejectedError`,
+  which the policy retries when it lists the status's class (`transient` for
+  a 429). A refusal or `max_tokens` truncation records its known charge and,
+  when the policy lists `quality_defect`, raises `NativeOutputDefectError`,
+  which the policy retries. Every other failure still stops the run. A
+  refused, truncated or incomplete response's error names why in
   `stop_reason`, on this path and on durable text workflows.
 - **Durable text workflows**: a 401, 403, 404, 413 or 429 response settles at
   zero cost, and the node failure policy decides whether to call again.
@@ -267,7 +274,14 @@ Tests:
   `tests/test_native_response_accounting.py::test_native_failure_is_terminal_and_preserves_exposure`;
   stop reasons `tests/test_failure_classes.py::test_responses_decode_sets_the_stop_reason_without_changing_the_message`,
   `tests/test_failure_classes.py::test_messages_decode_sets_the_stop_reason_without_changing_the_message`
-  and `tests/test_failure_classes.py::test_a_durable_refusal_keeps_its_journal_text_and_replays_its_stop_reason`.
+  and `tests/test_failure_classes.py::test_a_durable_refusal_keeps_its_journal_text_and_replays_its_stop_reason`;
+  under a `RetryPolicy`, zero-cost rejections
+  `tests/test_native_classification.py::test_a_plain_rate_limit_settles_at_zero_cost_and_retries_with_exact_totals`,
+  `tests/test_native_classification.py::test_a_plain_rejection_the_policy_does_not_list_fails_the_node_at_zero_cost`
+  and `tests/test_native_classification.py::test_a_rejection_that_may_follow_model_work_stays_unknown_and_terminal`,
+  known charges `tests/test_native_classification.py::test_a_known_charge_refusal_or_truncation_retries_when_quality_defect_is_listed`
+  and `tests/test_native_classification.py::test_a_known_charge_failure_stays_terminal_unless_its_retry_is_listed`,
+  resume `tests/test_native_classification.py::test_a_settled_failure_leaves_the_run_resumable_with_each_charge_counted_once`.
 - Durable text workflows: `tests/test_workflow_native_runtime.py::test_rate_limited_worker_retries_under_retry_policy_with_exact_totals`,
   `tests/test_native_messages.py::test_durable_swarm_retries_rate_limited_node_with_exact_totals`,
   `tests/test_workflow_store.py::test_pre_generation_rejection_settles_at_zero_cost_and_keeps_admission_open`,

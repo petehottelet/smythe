@@ -15,7 +15,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from smythe._errors import PicklableError
-from smythe._failures import classify_failure
+from smythe._failures import QUALITY_DEFECT, classify_failure
+from smythe._http_rejection import _http_rejection_receipt
 from smythe._publish import publish_unique
 from smythe.acceptance import AcceptanceMode, AcceptancePolicy, _unmet_obligations, task_sha256
 from smythe.agent import Agent
@@ -33,10 +34,12 @@ from smythe.graph import (
     REVISION_ADDED_KEY, ExecutionGraph, Node, NodeStatus, Revision, RevisionError, _deliverable_ids,
 )
 from smythe.provider import (
-    CompletionResult, Provider, ProviderResponseError, _declared_features, _missing_cost_ceiling,
-    _native_receipt, _raise_if_incomplete, _settle_response_error, _native_response_errors,
+    CompletionResult, NativeOutputDefectError, Provider, ProviderAccountingError,
+    ProviderResponseError, _declared_features, _missing_cost_ceiling, _native_receipt,
+    _raise_if_incomplete, _settle_response_error, _native_response_errors,
     _settle_response_group,
 )
+from smythe.provider_responses import RawResponseEnvelope
 from smythe.registry import Registry
 from smythe.scheduling import RetryDeadlineError, RetryPolicy, _attempt_records, _retry_after_s
 from smythe.task import _prompt_json, render_task, snapshot_task
@@ -46,6 +49,7 @@ from smythe.verifier import (
     ADVISORY_VERDICT_KEY, TokenVerifier, Verifier, VerificationRecoveryError, node_generation,
     read_verdict, rejection_reason, verification_integer, validate_verification_receipt,
 )
+from smythe.workflow_provider import ProviderRequestRejectedError
 from smythe.workflow_store import WorkflowError, WorkflowStateError
 from smythe.workflow_tools import READ_STEP_KEY
 
@@ -395,6 +399,8 @@ class ExecutorBase:
         self._call_attempts: dict[str, int] = {}
         self._reserved_node_ids: set[str] = set()
         self._settled_response_errors: list[tuple[str, Exception]] = []
+        # Settled errors whose node marker a retry policy cleared for another attempt.
+        self._cleared_response_errors: list[Exception] = []
         self._response_settlement_failures: dict[str, Exception] = {}
         self._registry = registry
         self._tracer = tracer
@@ -1203,6 +1209,7 @@ class ExecutorBase:
         self._deadlines.clear()
         self._attempts_used, self._attempts_seed = self._attempts_seed, {}
         self._settled_response_errors.clear()
+        self._cleared_response_errors.clear()
         self._response_settlement_failures.clear()
         self._prepared_graph = None
         self.prepare_graph(graph)
@@ -1515,8 +1522,72 @@ class ExecutorBase:
                 exc, lambda error: self._record_response_error(node, error, phase=phase),
             )
         except ProviderResponseError as exc:
+            # A classified error is raised without a cause: a run that fails
+            # with it must not save the settled error's unresolved marker.
+            rejection = self._settle_rejection(node, exc, phase)
+            if rejection is not None:
+                raise rejection from None
             self._record_response_error(node, exc, phase=phase)
+            defect = self._release_known_charge(node, exc)
+            if defect is not None:
+                raise defect from None
             raise
+
+    def _settle_rejection(self, node, error, phase):
+        """Under a retry policy, settle a native plain HTTP rejection at zero cost.
+
+        A durable journal's rules decide (``_http_rejection_receipt``): a 401,
+        403, 404, 413 or 429 response with the provider's plain error body.
+        Its zero-cost receipt is recorded as the call's charge, and the
+        ``ProviderRequestRejectedError`` to raise, whose class follows the
+        status, is returned. Any other error returns None and keeps its
+        unknown exposure.
+        """
+        envelope = getattr(error, "envelope", None)
+        if (self._retry_policy is None or not isinstance(error, ProviderAccountingError)
+                or isinstance(error, asyncio.CancelledError)
+                or not isinstance(envelope, RawResponseEnvelope)):
+            return None
+        try:
+            raw = envelope.json()
+        except ValueError:
+            return None
+        recorded = error.receipt if isinstance(error.receipt, dict) else {}
+        receipt = _http_rejection_receipt(
+            {"status_code": envelope.status_code, "transport_error": envelope.transport_error},
+            raw, recorded.get("price_version"),
+        )
+        if receipt is None:
+            return None
+        receipt.update(request_sha256=envelope.request_sha256,
+                       response_sha256=envelope.response_sha256, request_id=envelope.request_id)
+        self._record_cost(node, CompletionResult("", cost_usd=0.0, native_receipt=receipt),
+                          phase=phase)
+        detail = receipt["error_code"] or receipt["error_type"]
+        return ProviderRequestRejectedError(
+            f"Provider rejected the request with HTTP {receipt['http_status']}"
+            + (f" ({detail})" if detail else "") + "; it was settled at zero cost",
+            status_code=receipt["http_status"], envelope=envelope, receipt=receipt,
+        )
+
+    def _release_known_charge(self, node, error):
+        """Under a policy listing ``quality_defect``, release a settled refusal or truncation.
+
+        A native reply whose ``stop_reason`` is ``refusal`` or ``max_tokens``
+        and whose known charge was just recorded has its node marker cleared,
+        so the next attempt can dispatch, and the ``NativeOutputDefectError``
+        to raise is returned. Any other error, or a policy without that class,
+        returns None and stays terminal.
+        """
+        policy = self._retry_policy
+        if (policy is None or QUALITY_DEFECT not in policy.retry_classes
+                or error.billing_result is None or isinstance(error, BudgetValidationError)
+                or error.stop_reason not in ("refusal", "max_tokens")
+                or node.metadata.get("accounting_invalid")):
+            return None
+        node.metadata.pop("response_error", None)
+        self._cleared_response_errors.append(error)
+        return NativeOutputDefectError(error.stop_reason, where=f"Node {node.id!r}")
 
     def _raise_unresolved_response(self, node):
         if self._workflow_managed and "workflow_accounting_invalid" in node.metadata:
@@ -1525,8 +1596,10 @@ class ExecutorBase:
             return
         if node.id in self._response_settlement_failures:
             raise self._response_settlement_failures[node.id]
+        cleared = self._cleared_response_errors
         for node_id, error in reversed(self._settled_response_errors):
-            if node_id == node.id:
+            # A cleared error was settled and released for another attempt.
+            if node_id == node.id and not any(error is done for done in cleared):
                 raise error
         if self._workflow_managed and "response_error" in node.metadata:
             # A new managed run re-enters the same immutable journal call.

@@ -44,7 +44,8 @@ planning reply with the problem named, up to `max_retries`, and
 `max_tokens` is the usual fix for truncation. Stop reasons outside these
 values, including any a custom provider returns, count as complete. The native
 `AnthropicMessagesProvider` and `OpenAIResponsesProvider` treat any response
-that did not complete as a terminal response error instead. Its
+that did not complete as a terminal response error instead, unless a
+[retry policy](#retry-policy) lists `quality_defect`. Its
 `ProviderResponseError.stop_reason` uses the same values:
 
 | `stop_reason` | Native signal |
@@ -79,7 +80,7 @@ policy decides every other one.
 | `authority_denied` | HTTP 401 or 403 `ProviderRequestRejectedError` or status error | No |
 | `transient` | HTTP 429 `ProviderRequestRejectedError`; 408, 409, 429, 499 and 5xx status errors; timeouts; any exception this table does not list | No |
 | `provider_rejected` | `ProviderResponseError`: the provider answered and the charge is known, but the response cannot be used. Also `OutputTruncatedError`, `OutputRefusedError` and `ReadToolError` | `ProviderResponseError` only |
-| `quality_defect` | `ToolLoopLimitError` | No |
+| `quality_defect` | `ToolLoopLimitError`; `NativeOutputDefectError`, a native refusal or truncation with a known charge under a retry policy that lists this class | No |
 | `unknown_outcome` | `ProviderAccountingError`: a native call's charge is unresolved | Yes |
 | `terminal_accounting` | `BudgetValidationError`, `SentinelAlert` and `BudgetReconciliationError` | Yes |
 | `persistence` | `NodeFinalizationError` and `VerificationRecoveryError` | Yes |
@@ -99,8 +100,9 @@ the same way.
 
 A status error is any exception that carries an HTTP status in `status_code`
 or `response.status_code`, as the OpenAI and Anthropic SDK status errors do.
-A durable rejection's read-only `ProviderRequestRejectedError.failure_class`
-gives its class from its status code. A `VerificationRecoveryError` leaves its
+A zero-cost rejection's read-only `ProviderRequestRejectedError.failure_class`
+gives its class from its status code, on a durable run and under a retry
+policy alike. A `VerificationRecoveryError` leaves its
 attempt's span open, so no recorded span carries its class. The [support
 matrix](support-matrix.md) lists who calls again after a failure on each path.
 
@@ -128,6 +130,22 @@ while a rate limit, server error, timeout or connection failure is retried up
 to `max_retries`. A terminal failure stops the run whatever the list says. A
 tool error that goes back to the model as a tool result belongs to the same
 attempt and is not a retry.
+
+Under a policy, the native `OpenAIResponsesProvider` and
+`AnthropicMessagesProvider` settle a 401, 403, 404, 413 or 429 response whose
+body is only the provider's plain error object at zero cost, as a durable
+journal does, and raise `ProviderRequestRejectedError`, whose class follows
+its status: the default policy retries a native 429. A 400, any other status,
+or a body with usage or another field still leaves the bill unknown and stops
+the run. A native refusal (`stop_reason` `refusal`) or truncation
+(`max_tokens`) has a known charge. Under a policy that lists
+`quality_defect`, the executor records that charge once and raises
+`NativeOutputDefectError`, an `IncompleteOutputError`, so the node's failure
+policy applies; under any other policy, or for another stop reason, it still
+stops the run. Neither error leaves an unresolved-response marker, so a run
+that fails with one resumes like any other failed run. The native response's
+`Retry-After` header is not kept, so a native 429 waits for the policy's
+backoff.
 
 `Retry-After` is read from the `response.headers` of a status error whose
 status is transient (408, 409, 429, 499 or 5xx): `retry-after-ms`, then

@@ -187,6 +187,25 @@ class OutputRefusedError(IncompleteOutputError):
         super().__init__(f"{prefix}{cause} (stop_reason={stop_reason!r}); the output is not usable")
 
 
+class NativeOutputDefectError(IncompleteOutputError):
+    """A native reply was refused or truncated after its known charge was recorded.
+
+    An executor under a ``RetryPolicy`` that lists ``quality_defect`` raises
+    it in place of the terminal ``ProviderResponseError`` of an
+    ``OpenAIResponsesProvider`` or ``AnthropicMessagesProvider`` reply whose
+    ``stop_reason`` is ``refusal`` or ``max_tokens``. Its failure class is
+    ``quality_defect``, and the node's failure policy applies.
+    """
+
+    def __init__(self, stop_reason: str, *, where: str | None = None) -> None:
+        self.stop_reason = stop_reason
+        prefix = f"{where}: " if where else ""
+        super().__init__(
+            f"{prefix}the native reply was refused or truncated (stop_reason={stop_reason!r}); "
+            "its charge is recorded and the output is not used"
+        )
+
+
 def _raise_if_incomplete(result: CompletionResult, *, where: str | None = None) -> None:
     """Reject incomplete output. Call only after the result's cost is recorded."""
     if result.stop_reason in TRUNCATED_STOP_REASONS:

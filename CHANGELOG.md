@@ -640,6 +640,22 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   property, and `smythe.checkpoint.attempt_allowance_from_state()` reads the
   record. Other runs keep writing version 4. See
   [persisted attempts](docs/execution.md#persisted-attempts).
+  policy, and checkpoints do not record it. Executors also take `sleep` and
+  `rng`, which replace the retry wait and its jitter. Without a policy,
+  retries are unchanged. See [retry policy](docs/execution.md#retry-policy).
+- Under a `RetryPolicy`, an ordinary run classifies the native providers'
+  failures as a durable journal does. A 401, 403, 404, 413 or 429 response
+  from `OpenAIResponsesProvider` or `AnthropicMessagesProvider` whose body is
+  only the provider's plain error object settles at zero cost and raises
+  `ProviderRequestRejectedError`, whose class follows its status, so the
+  default policy retries a native 429 with exact totals. A 400, another
+  status or a body with usage still leaves the bill unknown and stops the
+  run. A refused or `max_tokens` reply with a known charge raises the new
+  `NativeOutputDefectError`, class `quality_defect`, after recording that
+  charge once, when the policy lists `quality_defect`; otherwise it still
+  stops the run. Neither leaves an unresolved marker, so the run resumes like
+  any other failure. Without a policy, native failures still stop the run.
+  See [retry policy](docs/execution.md#retry-policy).
 - `jobs stop --drain-timeout-s SECONDS` bounds a pause's drain. That long
   after the request, the worker cancels each call still awaiting its provider
   and records it as `unknown_outcome`, keeping its full per-call ceiling as

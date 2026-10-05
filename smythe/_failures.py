@@ -24,7 +24,9 @@ if TYPE_CHECKING:
 INPUT_ERROR = "input_error"
 # The credentials or account may not make the request: HTTP 401 or 403.
 AUTHORITY_DENIED = "authority_denied"
-# The model's work fell short: it did not finish within max_tool_iterations.
+# The model's work fell short: it did not finish within max_tool_iterations,
+# or, under a retry policy that lists this class, a native reply with a known
+# charge was refused or truncated.
 QUALITY_DEFECT = "quality_defect"
 # The provider answered and the charge is known, but the response cannot be
 # used: a refusal, a truncation or an undecodable reply.
@@ -85,7 +87,8 @@ def _rules() -> tuple[tuple[type[BaseException], str | None, bool], ...]:
     from smythe.budget import BudgetEstimateRequired, BudgetValidationError, SentinelAlert
     from smythe.executor_base import ArtifactIntegrityError, NodeFinalizationError
     from smythe.provider import (
-        IncompleteOutputError, ProviderAccountingError, ProviderResponseError,
+        IncompleteOutputError, NativeOutputDefectError, ProviderAccountingError,
+        ProviderResponseError,
     )
     from smythe.scheduling import RetryDeadlineError
     from smythe.tools import ToolLoopLimitError
@@ -105,9 +108,10 @@ def _rules() -> tuple[tuple[type[BaseException], str | None, bool], ...]:
         (SentinelAlert, TERMINAL_ACCOUNTING, True),
         (BudgetValidationError, TERMINAL_ACCOUNTING, True),
         (WorkflowError, WORKFLOW, True),
-        # The node's failure policy decides these. A journaled rejection's
-        # class follows its HTTP status.
+        # The node's failure policy decides these. A free provider
+        # rejection's class follows its HTTP status.
         (ProviderRequestRejectedError, None, False),
+        (NativeOutputDefectError, QUALITY_DEFECT, False),
         (IncompleteOutputError, PROVIDER_REJECTED, False),
         (ReadToolError, PROVIDER_REJECTED, False),
         (ToolLoopLimitError, QUALITY_DEFECT, False),

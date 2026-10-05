@@ -53,6 +53,16 @@ cannot show they were not billed. See
 [workflow accounting](workflow-accounting.md#admission-and-cost) for the exact
 conditions.
 
+An ordinary run stops at any of these failures, unless it has a
+[retry policy](execution.md#retry-policy). Under one, a rejection that meets
+the same two conditions settles at zero cost and raises
+`ProviderRequestRejectedError`, whose
+[failure class](execution.md#failure-classes) follows its status; every other
+4xx or 5xx response still keeps its reserved exposure and stops the run. A
+policy that lists `quality_defect` also makes a `refusal` or `max_tokens` reply
+an ordinary node failure: its known charge is recorded once and
+`NativeOutputDefectError` is raised, so a `RETRY` node can call again.
+
 Input counts are estimates. The quote reserves the entire output cap and
 input headroom at the highest supported input rate. A measured overrun remains
 charged and blocks further admission. Accepted responses replay locally with
