@@ -44,7 +44,8 @@ its runs and its recorded version do not change.
 |---|---|
 | `format` | Checkpoint version and the state features it `requires`; or journal version, durable checkpoint version and revision |
 | `execution` | `state`, `blocked_reason`, and node counts by status. Ordinary states are `running`, `failed` and `completed`; durable runs add `planned` and `blocked`, with the journal's `run_status` and `checkpoint_status` |
-| `delivery` | The delivery acceptance decision; see below |
+| `delivery` | The current delivery acceptance decision; see below |
+| `decisions` | The [decision history](#decision-history): the current decision's sequence and the decisions before it |
 | `accounting` | `cost_scope`, `total_cost_usd`, `max_budget_usd`, `cost_is_complete`, `cost_contains_estimates`, `unknown_cost_nodes`, the durable `workflow_accounting` balances, `unknown_exposure` and `unresolved` accounting that stops resume |
 | `timing` | `elapsed_ms`, `phases_ms` and `waiting_ms` added over the saved [timing segments](checkpoint-format.md#timing-segments), with the segment count, first start and last end; null when none were saved. Durable runs report lease sessions on the journal's wall clock and no phase totals |
 | `next_action` | The first thing the run needs, as an `action` code and a `detail` sentence |
@@ -79,12 +80,39 @@ A durable run under a strict policy keeps its record in
 [checkpoint version 2](verifier.md#strict-acceptance-in-durable-workflows),
 and inspection reads it as resume does. The checkpoint version must be the
 one the run's recipe writes, and the record must be undecided until the run
-completes and belong to the policy the recipe records, or the run is reported
-as unreadable. A decided record is checked as resuming the completed run
-checks it: against the saved output, the task and the source generations,
-and against the decision the journal applied, so a record changed to match
-other output also gives `indeterminate`. Durable runs without a strict
-policy, including runs with only a gate validator, have no record.
+completes and belong to the policy the recipe records, or to a policy a
+re-evaluation decided under, or the run is reported as unreadable. A decided
+record is checked as resuming the completed run checks it: against the saved
+output, the task and the source generations, and against the journal's
+current decision, so a record changed to match other output also gives
+`indeterminate`. Durable runs without a strict policy, including runs with
+only a gate validator, have no record.
+
+### Decision history
+
+A completed run can be decided again with
+[`Swarm.reevaluate`](verifier.md#re-evaluation), which never runs a node. The
+`delivery` block and the exit code always follow the current decision, and
+the `decisions` block lists what came before it:
+
+| Field | Meaning |
+|---|---|
+| `current` | The current decision's sequence: 0 for the decision the run made when it completed, one more for each re-evaluation; null without a decision |
+| `history` | The decisions the current one superseded, oldest first, each with its `sequence` and `record` |
+
+An ordinary checkpoint keeps the last 16 superseded records
+([checkpoint format](checkpoint-format.md#decision-history)), so `history`
+may start after sequence 0. A durable run's history comes from its journal:
+every `acceptance` operation a checkpoint applied, ordered by sequence, the
+last of which is the current decision. A run never decided again has
+`current` 0 and an empty `history`, and the text report lists earlier
+decisions only when there are any:
+
+```text
+Delivery acceptance: accepted
+Decision history: decision 1 is current; earlier decisions:
+  Decision 0: rejected under policy 8a51c0e2d9f4: final validator 'required-section' rejected the output: section_missing: no '## Sources' section
+```
 
 ### Next actions
 
@@ -108,7 +136,9 @@ policy, including runs with only a gate validator, have no record.
 | 10 | The run completed and its output was `rejected` or `needs_review` |
 | 11 | The decision is `indeterminate` |
 
-`list` returns 0 whatever the runs' decisions. Codes 10 and 11 are used only
+Codes 10 and 11 follow the run's current decision, after any
+[re-evaluation](#decision-history). `list` returns 0 whatever the runs'
+decisions. Codes 10 and 11 are used only
 by `runs inspect`; the [Jobs codes](jobs.md#cli-exit-codes) are unchanged.
 
 ## From Python

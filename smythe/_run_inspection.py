@@ -3,11 +3,11 @@
 ``smythe runs`` reads an ordinary run's checkpoint through a
 :class:`~smythe.checkpoint.FileCheckpointStore`, or a durable run from a
 :class:`~smythe.workflow_store.SQLiteWorkflowStore` opened read-only, and
-reports execution, delivery acceptance, cost, timing and the next action as
-separate JSON blocks. :meth:`smythe.swarm.SwarmResult.to_dict` builds its
-execution, delivery, unknown-exposure and next-action blocks with the same
-functions. Nothing here constructs a provider, migrates a journal or writes a
-file.
+reports execution, delivery acceptance and its decision history, cost, timing
+and the next action as separate JSON blocks.
+:meth:`smythe.swarm.SwarmResult.to_dict` builds its execution, delivery,
+unknown-exposure and next-action blocks with the same functions. Nothing here
+constructs a provider, migrates a journal or writes a file.
 """
 
 from __future__ import annotations
@@ -31,6 +31,8 @@ from smythe.checkpoint import (
     FileCheckpointStore,
     checkpoint_requirements,
     delivery_acceptance_from_state,
+    delivery_acceptance_history,
+    delivery_acceptance_sequence,
     graph_from_dict,
     task_from_dict,
     timing_segments,
@@ -92,6 +94,20 @@ def delivery_view(
         withheld = {"field": field, "sha256": text_sha256(text), "bytes": len(text.encode("utf-8"))}
     return {"recorded": True, "decision": decision, "reasons": reasons, "integrity": integrity,
             "output_delivered": delivered, "rejected_output": withheld, "record": record.to_dict()}
+
+
+def decisions_view(
+    current: int | None, history: list[tuple[int, DeliveryAcceptance]] | tuple = (),
+) -> dict[str, Any]:
+    """A run's decision history: the *current* decision's sequence, and each earlier decision.
+
+    Sequence 0 is the decision the run made when it completed, and each
+    re-evaluation adds one. *history* lists the decisions the current one
+    superseded, oldest first, as ``(sequence, record)``.
+    """
+    return {"current": current,
+            "history": [{"sequence": sequence, "record": record.to_dict()}
+                        for sequence, record in history]}
 
 
 def unknown_exposure(workflow_accounting: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -294,6 +310,8 @@ def _checkpoint_view(execution_id: str, state: Any) -> dict[str, Any]:
         problems = _delivery_problems(record, output, graph, task)
     delivery = delivery_view(record, output, field="output", completed=status == "completed",
                              problems=problems)
+    decisions = decisions_view(delivery_acceptance_sequence(state),
+                               delivery_acceptance_history(state))
     accounting = _checkpoint_accounting(state, graph)
     resume = "Resume it with Swarm.resume(execution_id) from a Swarm with this checkpoint store"
     if record is not None:
@@ -305,6 +323,7 @@ def _checkpoint_view(execution_id: str, state: Any) -> dict[str, Any]:
                    "requires": list(checkpoint_requirements(state))},
         "execution": {"state": status, "blocked_reason": None, "nodes": node_counts(graph)},
         "delivery": delivery,
+        "decisions": decisions,
         "accounting": accounting,
         "timing": checkpoint_timing(state),
         "next_action": next_action(
@@ -338,26 +357,32 @@ def inspect_checkpoint(store: FileCheckpointStore, execution_id: str) -> dict[st
 def _journal_acceptance(
     store: SQLiteWorkflowStore, run: dict[str, Any], checkpoint: dict[str, Any],
     graph: ExecutionGraph, policy_sha256: str | None,
-) -> tuple[DeliveryAcceptance | None, list[str]]:
-    """The delivery decision a durable checkpoint holds, and what no longer matches it.
+) -> tuple[DeliveryAcceptance | None, list[str], dict[str, Any]]:
+    """The delivery decision a durable checkpoint holds, what no longer matches it, and its history.
 
     Only the version 2 checkpoints of a run with a strict policy, whose
     digest is *policy_sha256*, hold a record; any other run is shown as not
     recorded, never as accepted. The record is read as resume reads it, and a
     decided one is checked as completed resume checks it: against the saved
-    output, the task, the source generations and the decision the journal
-    applied.
+    output, the task, the source generations and the journal's current
+    decision. The history lists every decision the journal applied.
     """
-    from smythe.workflow import _decision_problems, _saved_record
+    from smythe.workflow import _decision_problems, _saved_record, decision_history
 
     if checkpoint["version"] == 1:
-        return None, []
+        return None, [], decisions_view(None)
     task = task_from_dict(run["task"])
-    record = _saved_record(checkpoint, policy_sha256, task_sha256(task))
+    history = (decision_history(store, run["run_id"])
+               if policy_sha256 is not None and checkpoint.get("status") == "completed" else [])
+    record = _saved_record(checkpoint, policy_sha256, task_sha256(task),
+                           {item["record"].policy_sha256 for item in history if item["sequence"]})
+    decisions = decisions_view(history[-1]["sequence"] if history else None,
+                               [(item["sequence"], item["record"]) for item in history[:-1]])
     if record is None or record.decision is AcceptanceDecision.NOT_EVALUATED:
-        return record, []
-    return record, _decision_problems(store, run["run_id"], graph, checkpoint.get("output"), record,
-                                      task=task, policy_sha256=policy_sha256)
+        return record, [], decisions
+    problems = _decision_problems(store, run["run_id"], graph, checkpoint.get("output"), record,
+                                  task=task, policy_sha256=policy_sha256)
+    return record, problems, decisions
 
 
 def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
@@ -369,7 +394,7 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
     checkpoint = saved["checkpoint"] if saved is not None else None
     policy = run["config"].get("acceptance")
     policy_sha256 = None if policy is None else _json_sha256(policy, "acceptance policy")
-    record, problems, graph = None, [], None
+    record, problems, graph, decisions = None, [], None, decisions_view(None)
     if checkpoint is not None:
         # The run's recipe sets its checkpoint version: version 2 for a
         # strict policy or a gate validator, version 1 otherwise.
@@ -385,7 +410,8 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
                 f"writes version {expected}"
             )
         graph = graph_from_dict(checkpoint["graph"])
-        record, problems = _journal_acceptance(store, run, checkpoint, graph, policy_sha256)
+        record, problems, decisions = _journal_acceptance(store, run, checkpoint, graph,
+                                                          policy_sha256)
     status, blocked = inspected["status"], inspected["blocked_reason"]
     checkpoint_status = checkpoint.get("status") if checkpoint is not None else None
     if status in ("blocked", "completed"):
@@ -422,6 +448,7 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
         "execution": {"state": state, "blocked_reason": blocked, "nodes": node_counts(graph),
                       "run_status": status, "checkpoint_status": checkpoint_status},
         "delivery": delivery,
+        "decisions": decisions,
         "accounting": accounting,
         "timing": journal_timing(store, run_id),
         "next_action": next_action(

@@ -148,6 +148,7 @@ def test_legacy_checkpoint_shows_acceptance_as_not_recorded(tmp_path, capsys, mo
     assert value["execution"] == {"state": "completed", "blocked_reason": None, "nodes": {"completed": 2}}
     assert value["delivery"] == {"recorded": False, "decision": None, "reasons": [], "integrity": None,
                                  "output_delivered": True, "rejected_output": None, "record": None}
+    assert value["decisions"] == {"current": None, "history": []}
     assert value["accounting"]["cost_is_complete"] is True
     assert value["accounting"]["unknown_exposure"] is None
     assert value["accounting"]["unresolved"] == []
@@ -187,6 +188,7 @@ def test_strict_decisions_have_distinct_exit_codes(
     assert delivery["record"]["output_sha256"] == text_sha256(saved["output"])
     assert delivery["record"]["policy_sha256"] == acceptance.sha256
     assert delivery["record"]["validators"][0]["validator"] == Fixed(outcome).identity.to_dict()
+    assert value["decisions"] == {"current": 0, "history": []}
     assert value["next_action"]["action"] == action
     if decision == "accepted":
         assert delivery["output_delivered"] is True and delivery["rejected_output"] is None
@@ -257,6 +259,42 @@ def test_unfinished_strict_run_names_the_policy_that_must_resume_it(tmp_path, ca
     assert acceptance.sha256 in value["next_action"]["detail"]
 
 
+def test_inspection_shows_the_decision_history_and_exits_by_the_current_decision(
+    tmp_path, capsys, monkeypatch,
+):
+    result = run(tmp_path, policy("reject"))
+    swarm = Swarm(model="offline", provider=OfflineProvider(), artifact_dir=None,
+                  checkpoint_store=FileCheckpointStore(tmp_path))
+    accepted = swarm.reevaluate(result.execution_id, acceptance=policy("pass"))
+    before = files(tmp_path)
+
+    with monkeypatch.context() as patched:
+        no_side_effects(patched)
+        code, value = inspect(capsys, tmp_path, result.execution_id)
+        assert main(["runs", "--checkpoints", str(tmp_path), "inspect", result.execution_id]) == code
+        text = capsys.readouterr().out
+
+    assert code == EXIT_OK and files(tmp_path) == before
+    delivery = value["delivery"]
+    assert (delivery["decision"], delivery["integrity"]) == ("accepted", "verified")
+    assert delivery["record"] == accepted.acceptance.to_dict()
+    assert value["decisions"] == {
+        "current": 1, "history": [{"sequence": 0, "record": result.acceptance.to_dict()}]}
+    assert value["next_action"]["action"] == "none"
+    assert "Delivery acceptance: accepted" in text
+    assert "Decision history: decision 1 is current; earlier decisions:" in text
+    assert (f"  Decision 0: rejected under policy {policy('reject').sha256[:12]}: "
+            "final validator 'fixed-reject' rejected the output") in text
+
+    # A later decision that withholds the output sets the exit code again.
+    swarm.reevaluate(result.execution_id, acceptance=policy("raise"))
+    code, value = inspect(capsys, tmp_path, result.execution_id)
+    assert code == EXIT_RUN_INDETERMINATE
+    assert value["decisions"]["current"] == 2
+    assert [entry["record"]["decision"] for entry in value["decisions"]["history"]] == [
+        "rejected", "accepted"]
+
+
 @pytest.mark.parametrize("change,unresolved", [
     (lambda state: state["budget"].update(accounting_error="usage was malformed"),
      "the budget records an accounting error"),
@@ -294,6 +332,7 @@ def test_completed_run_with_unknown_cost_needs_reconciliation(tmp_path, capsys):
     lambda state: state.update(version=6),
     lambda state: state.update(requires=["delivery_acceptance", "attempt_allowance"]),
     lambda state: state.update(delivery_acceptance={"version": 2}),
+    lambda state: state.update(delivery_acceptance_history=[{"sequence": 0}]),
 ])
 def test_unreadable_checkpoint_fails_closed(tmp_path, capsys, change):
     result = run(tmp_path, policy("pass"))
@@ -626,6 +665,7 @@ def test_durable_strict_decisions_have_the_same_exit_codes(
     assert delivery["record"]["policy_sha256"] == DECISIONS[decision].sha256
     outcome = {"accepted": "pass", "rejected": "reject"}.get(decision, "raise")
     assert delivery["record"]["validators"][0]["validator"] == Fixed(outcome).identity.to_dict()
+    assert value["decisions"] == {"current": 0, "history": []}
     assert value["next_action"]["action"] == action
     if decision == "accepted":
         assert delivery["output_delivered"] is True and delivery["rejected_output"] is None
@@ -719,7 +759,44 @@ def test_durable_runs_without_a_strict_policy_have_no_record(strict_journal, tmp
     assert value["format"]["checkpoint_version"] == version
     assert value["delivery"] == {"recorded": False, "decision": None, "reasons": [], "integrity": None,
                                  "output_delivered": True, "rejected_output": None, "record": None}
+    assert value["decisions"] == {"current": None, "history": []}
     assert value["next_action"]["action"] == "none"
+
+
+def test_durable_inspection_shows_the_journal_decision_history(
+    strict_journal, tmp_path, capsys, monkeypatch,
+):
+    path, original = journal_copy(strict_journal, tmp_path), strict_journal[1]["rejected"]
+    run_id = original.execution_id
+    with SQLiteWorkflowStore(path) as store:
+        swarm = Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+                      run_store=store, max_budget_usd=1)
+        accepted = swarm.reevaluate(run_id, acceptance=policy("pass"))
+        undecided = swarm.reevaluate(run_id, acceptance=policy("raise"))
+    with closing(CONNECT(path)) as db:
+        assert db.execute("PRAGMA journal_mode=DELETE").fetchone() == ("delete",)
+    before = journal_state(path)
+
+    with monkeypatch.context() as patched:
+        no_side_effects(patched)
+        code, value = inspect_durable(capsys, path, run_id)
+        assert main(["runs", "--journal", str(path), "inspect", run_id]) == code
+        text = capsys.readouterr().out
+
+    assert code == EXIT_RUN_INDETERMINATE and journal_state(path) == before
+    delivery = value["delivery"]
+    assert (delivery["decision"], delivery["integrity"]) == ("indeterminate", "verified")
+    assert delivery["record"] == undecided.acceptance.to_dict()
+    assert value["decisions"] == {"current": 2, "history": [
+        {"sequence": 0, "record": original.acceptance.to_dict()},
+        {"sequence": 1, "record": accepted.acceptance.to_dict()},
+    ]}
+    assert "Decision history: decision 2 is current; earlier decisions:" in text
+    assert f"  Decision 1: accepted under policy {policy('pass').sha256[:12]}: " in text
+    # Listing reports the current decision.
+    assert main(["runs", "--journal", str(path), "--json", "list"]) == EXIT_OK
+    rows = {row["run_id"]: row["decision"] for row in output(capsys)["list"]["runs"]}
+    assert rows[run_id] == "indeterminate"
 
 
 @pytest.mark.parametrize("change,message", [

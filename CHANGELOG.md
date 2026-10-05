@@ -546,6 +546,33 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   responses and for errors raised elsewhere. The error's message is
   unchanged, so durable runs still match the text their journals saved for
   rejected calls. See [execution policies](docs/execution.md).
+- `Swarm.reevaluate(execution_id, acceptance=policy)` and
+  `Swarm.areevaluate()` record a new delivery acceptance decision for a
+  completed run's saved output, for example under a fixed validator. The
+  strict policy, by default the `Swarm`'s own, runs its final validators on
+  the saved bytes and reads every gate's recorded verdict; no node runs, no
+  provider is called, and costs, the budget, retry and regeneration counters
+  and node generations are left as saved. Only a completed run with a decided
+  record is re-evaluated, and only while its saved output still matches the
+  record's digest and its task, source generations and delivered files are
+  unchanged; otherwise nothing is written, so changed output never becomes
+  accepted. Each decision has a sequence, 0 for the run's own and one more
+  for each re-evaluation, so the same bytes under an unchanged policy get a
+  new decision. An ordinary checkpoint keeps the new record as its
+  `delivery_acceptance` and the last 16 it superseded under
+  `delivery_acceptance_history`, which `smythe.checkpoint` reads back. A
+  durable run accepts a recipe that differs only in its acceptance policy and
+  gate verifier, journals the decision as a new `acceptance` operation keyed
+  `acceptance/<sequence>/<digest>` and applies it with a new completed
+  checkpoint, leaving calls, charges and the recipe unchanged;
+  `smythe.workflow.current_decision()` and `decision_history()` read the
+  decisions back. Resume returns the current decision and never makes a new
+  one: a strict `Swarm` resuming a completed run without a record, or one
+  decided under another policy, behaves as before, and a durable run still
+  resumes only under the policy its recipe records. `smythe runs inspect`
+  adds a `decisions` block with the current decision's sequence and the
+  decisions before it, and its exit codes follow the current decision. See
+  [re-evaluation](docs/verifier.md#re-evaluation).
 
 ### Changed
 

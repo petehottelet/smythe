@@ -25,14 +25,14 @@ verification, trace, artifact, and recovery controls.
 - [Execution policies](execution.md) — halt, retry, skip, timeouts, queued work, provider checks before any call, and 5,000-node deep-graph checks
 - [YAML and jobs](jobs.md) — declarative artifact work and the installed CLI
 - [Adaptive supervision](supervisor.md) — revise pending work from completed results
-- [Verification](verifier.md) — objective gates, active-work invalidation, recoverable regeneration, and strict acceptance of the delivered output, with its obligations checked before any call and after every revision
+- [Verification](verifier.md) — objective gates, active-work invalidation, recoverable regeneration, and strict acceptance of the delivered output, with its obligations checked before any call and after every revision, and explicit re-evaluation of a completed run's saved output
 - [Source evidence](source-evidence.md) — versioned source and claim records an artifact carries, mechanical checks that its quotes and listed contradictions hold, unavailable sources, and evidence journaled in durable runs
 
 ## Operate durable work
 
-- [Durable text workflows](workflow-accounting.md) — phase-wide native costs, saved graph limits, exact request quotes, fenced ownership, local response replay, recorded read steps with network limits, and journal upgrades
+- [Durable text workflows](workflow-accounting.md) — phase-wide native costs, saved graph limits, exact request quotes, fenced ownership, local response replay, recorded read steps with network limits, strict delivery acceptance journaled with each run and explicit re-evaluation under a changed validator, and journal upgrades
 - [Checkpoint format](checkpoint-format.md) — flushed atomic publication, saved state, and resume semantics
-- [Inspect saved runs](runs.md) — read-only `smythe runs inspect` and `list` over checkpoints and durable journals: execution, delivery acceptance, cost, timing, next action, and exit codes 10 and 11 for withheld output
+- [Inspect saved runs](runs.md) — read-only `smythe runs inspect` and `list` over checkpoints and durable journals: execution, delivery acceptance and its decision history, cost, timing, next action, and exit codes 10 and 11 for withheld output
 - [Cost guardrails](budgets.md) — strict usage validation, reservations, per-call ceilings, and failed-accounting recovery
 - [Jobs](jobs.md) — preflight, approval, detached workers and host limits, durable pause/resume, fenced ownership, artifact namespaces, delivery acceptance with registered validators and delivery eligibility, database upgrades, inspection, rerolls, and exports
 - [Optimization](optimize.md) — bounded concurrency experiments, reference arms, evidence ledgers, and campaign ownership, schema-v4 migration, and read-only HTML comparison reports

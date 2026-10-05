@@ -384,8 +384,21 @@ journals the decision:
   `synthesis/<digest>`, a short digest of every node id and its generation,
   so each graph state has its own synthesis.
 - Resuming a completed run checks the saved output, task, source generations
-  and journal decision against the record; a mismatch gives an
+  and the journal's current decision against the record; a mismatch gives an
   `indeterminate` record and moves the text to `rejected_output`.
+- Resuming never decides a completed run again, and resuming under another
+  policy is refused. `Swarm(run_store=store).reevaluate(run_id,
+  acceptance=policy)` is the explicit way to a new decision, for example
+  under a fixed validator: it accepts a recipe that differs only in its
+  acceptance policy and gate verifier, runs no node and calls no provider,
+  journals the decision as a new `acceptance` operation keyed
+  `acceptance/<sequence>/<digest>`, and applies it with a new completed
+  checkpoint. Calls, charges, the budget, revision and regeneration counters,
+  node generations and the recipe are unchanged, and earlier decisions stay
+  in the journal. Output that no longer matches its record is refused. See
+  [re-evaluation](verifier.md#re-evaluation);
+  `smythe.workflow.current_decision(store, run_id)` returns the decision that
+  resume and [`smythe runs inspect`](runs.md#decision-history) report.
 
 The journal format is unchanged: operation kinds are free text, so this needs
 no journal upgrade. `tests/test_workflow_process_loss.py` kills a real

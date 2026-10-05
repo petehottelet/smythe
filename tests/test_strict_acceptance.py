@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from copy import deepcopy
 import hashlib
 import inspect
 import json
@@ -32,7 +33,12 @@ from smythe.acceptance import (
     validate_acceptance_obligations,
 )
 from smythe.async_executor import AsyncExecutor
-from smythe.checkpoint import CheckpointStore
+from smythe.checkpoint import (
+    DELIVERY_ACCEPTANCE_HISTORY_LIMIT,
+    CheckpointStore,
+    delivery_acceptance_history,
+    delivery_acceptance_sequence,
+)
 from smythe.executor import Executor
 from smythe.executor_base import ExecutorBase
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Revision, Topology
@@ -1539,6 +1545,231 @@ def test_completed_resume_reverifies_the_bound_identities(change):
 
     _not_accepted(result, "indeterminate")
     assert provider.runs == {"draft": 1}
+
+
+# ---------------------------------------------------------------------------
+# Re-evaluation
+# ---------------------------------------------------------------------------
+
+
+def _draft_only(task: Task | None = None) -> ExecutionGraph:
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[Node(id="draft", label="draft")])
+    graph.task = task
+    return graph
+
+
+def _run_state(state: dict) -> dict:
+    """A checkpoint state without what a re-evaluation records: its decision and time."""
+    return {key: value for key, value in state.items() if key not in (
+        "delivery_acceptance", "delivery_acceptance_history", "updated_at", "timing")}
+
+
+@pytest.mark.parametrize(("first", "decision"), [
+    (Forbids("Summary"), "rejected"),
+    (Returns(RuntimeError("validator bug")), "indeterminate"),
+], ids=["rejected", "indeterminate"])
+def test_a_fixed_validator_decides_a_completed_run_again_without_a_call(first, decision):
+    store = MemoryStore()
+    provider = Script({})
+    original = _swarm(provider, acceptance=_strict(first), store=store).execute(_draft_only())
+    _not_accepted(original, decision)
+    saved = deepcopy(store.states[original.execution_id])
+    fixed = _strict(Forbids())
+
+    result = _swarm(provider, store=store).reevaluate(original.execution_id, acceptance=fixed)
+
+    assert result.accepted and result.output == original.rejected_output
+    assert result.execution_id == original.execution_id
+    assert result.acceptance.policy_sha256 == fixed.sha256
+    assert result.acceptance.output_sha256 == original.acceptance.output_sha256
+    assert any(span["node_id"] == "acceptance:delivery" for span in result.trace)
+    # No node ran and no call was made; costs, budget and counters are as saved.
+    assert provider.runs == {"draft": 1}
+    assert result.total_cost_usd == original.total_cost_usd
+    state = store.states[original.execution_id]
+    assert _run_state(state) == _run_state(saved)
+    assert state["delivery_acceptance"] == result.acceptance.to_dict()
+    assert state["delivery_acceptance_history"] == [
+        {"sequence": 0, "delivery_acceptance": original.acceptance.to_dict()}]
+    assert delivery_acceptance_sequence(state) == 1
+    assert len(state["timing"]["segments"]) == len(saved["timing"]["segments"]) + 1
+    assert result.timing["resumed"] is True
+
+    # Resuming returns the current decision under the policy that made it,
+    # and, as before re-evaluation, any other strict policy gets no decision.
+    again = _swarm(provider, acceptance=fixed, store=store).resume(original.execution_id)
+    assert again.acceptance == result.acceptance and again.output == result.output
+    other = _swarm(provider, acceptance=_strict(first), store=store).resume(original.execution_id)
+    _not_accepted(other, "indeterminate")
+    assert provider.runs == {"draft": 1}
+
+
+def test_reevaluate_decides_under_the_swarms_own_policy_by_default():
+    store = MemoryStore()
+    provider = Script({})
+    original = _swarm(provider, acceptance=_strict(Forbids("Summary")),
+                      store=store).execute(_draft_only())
+    swarm = _swarm(provider, acceptance=_strict(Forbids()), store=store)
+
+    result = asyncio.run(swarm.areevaluate(original.execution_id))
+
+    assert result.accepted and result.acceptance.policy_sha256 == _strict(Forbids()).sha256
+    # A policy passed for one call outranks the Swarm's own.
+    rejected = swarm.reevaluate(original.execution_id, acceptance=_strict(Forbids("ok")))
+    _not_accepted(rejected, "rejected")
+    assert provider.runs == {"draft": 1}
+
+
+def test_reevaluating_identical_bytes_under_the_same_policy_records_a_new_decision():
+    store = MemoryStore()
+    provider = Script({})
+    policy = _strict(Forbids())
+    original = _swarm(provider, acceptance=policy, store=store).execute(_draft_only())
+    swarm = _swarm(provider, acceptance=policy, store=store)
+
+    first, second = (swarm.reevaluate(original.execution_id) for _ in range(2))
+
+    assert first.acceptance == second.acceptance == original.acceptance
+    state = store.states[original.execution_id]
+    assert delivery_acceptance_history(state) == ((0, original.acceptance), (1, first.acceptance))
+    assert delivery_acceptance_sequence(state) == 2
+
+
+def test_a_checkpoint_keeps_a_bounded_history_of_decisions():
+    store = MemoryStore()
+    provider = Script({})
+    original = _swarm(provider, acceptance=_strict(Forbids()), store=store).execute(_draft_only())
+    swarm = _swarm(provider, store=store)
+    policies = [_strict(Forbids()), _strict(Forbids("Summary"))]
+    for index in range(DELIVERY_ACCEPTANCE_HISTORY_LIMIT + 2):
+        swarm.reevaluate(original.execution_id, acceptance=policies[index % 2])
+
+    state = store.states[original.execution_id]
+    history = delivery_acceptance_history(state)
+    # The oldest decisions are dropped first; sequences keep counting.
+    assert [sequence for sequence, _ in history] == list(
+        range(2, DELIVERY_ACCEPTANCE_HISTORY_LIMIT + 2))
+    assert delivery_acceptance_sequence(state) == DELIVERY_ACCEPTANCE_HISTORY_LIMIT + 2
+    # Decisions alternate between the policies, the last one rejecting.
+    assert [record.decision.value for _, record in history[-2:]] == ["rejected", "accepted"]
+    assert state["delivery_acceptance"]["decision"] == "rejected"
+    assert provider.runs == {"draft": 1}
+
+
+@pytest.mark.parametrize("change", [
+    lambda state: state.update(delivery_acceptance_history={"sequence": 0}),
+    lambda state: state["delivery_acceptance_history"][0].update(sequence=-1),
+    lambda state: state["delivery_acceptance_history"].append(
+        dict(state["delivery_acceptance_history"][0])),
+    lambda state: state["delivery_acceptance_history"][0]["delivery_acceptance"].update(
+        output_sha256="0" * 64),
+    lambda state: state["delivery_acceptance_history"][0]["delivery_acceptance"].update(
+        decision="not_evaluated", reasons=[]),
+    lambda state: state.update(delivery_acceptance_history=[{"sequence": 0}]),
+], ids=["not-a-list", "negative", "repeated", "other-output", "undecided", "no-record"])
+def test_a_malformed_decision_history_is_refused(change):
+    store = MemoryStore()
+    provider = Script({})
+    original = _swarm(provider, acceptance=_strict(Forbids()), store=store).execute(_draft_only())
+    swarm = _swarm(provider, acceptance=_strict(Forbids()), store=store)
+    swarm.reevaluate(original.execution_id)
+    change(store.states[original.execution_id])
+    before = deepcopy(store.states[original.execution_id])
+
+    with pytest.raises(ValueError):
+        delivery_acceptance_history(before)
+    with pytest.raises(ValueError):
+        swarm.reevaluate(original.execution_id)
+    assert store.states[original.execution_id] == before
+    # The history is informational: resume still reads the current decision.
+    assert swarm.resume(original.execution_id).accepted
+
+
+def test_reevaluation_reads_the_recorded_gate_verdicts_without_judging_again():
+    store = MemoryStore()
+    provider = Script({"judge": ["FAIL: thin"]})
+    original = _swarm(provider, acceptance=_strict(), store=store).execute(_gated())
+    _not_accepted(original, "rejected")
+    runs = dict(provider.runs)
+
+    result = _swarm(provider, store=store).reevaluate(
+        original.execution_id, acceptance=_strict(on_exhausted="needs_review"))
+
+    _not_accepted(result, "needs_review")
+    assert any("judge" in reason for reason in result.acceptance.reasons)
+    # A final validator that passes cannot outrank the gate's failing verdict.
+    validated = _swarm(provider, store=store).reevaluate(
+        original.execution_id, acceptance=_strict(Forbids()))
+    _not_accepted(validated, "rejected")
+    assert provider.runs == runs
+
+
+@pytest.mark.parametrize("change,reason", [
+    ("output", "the saved output does not match the digest its record bound"),
+    ("source", "node 'draft' no longer holds the generation its record bound"),
+    ("task", "the saved task does not match the task its record bound"),
+])
+def test_changed_saved_state_is_never_reevaluated(change, reason):
+    store = MemoryStore()
+    provider = Script({})
+    original = _swarm(provider, acceptance=_strict(Forbids("Summary")),
+                      store=store).execute(_draft_only(Task("Write the summary")))
+    state = store.states[original.execution_id]
+    if change == "output":
+        state["output"] += " (edited)"
+    elif change == "source":
+        state["graph"]["nodes"][0]["metadata"]["execution_generation"] = 3
+    else:
+        state["task"]["goal"] = state["graph"]["task"]["goal"] = "Write something else"
+    before = deepcopy(state)
+
+    with pytest.raises(ValueError, match="cannot be re-evaluated") as raised:
+        _swarm(provider, store=store).reevaluate(original.execution_id, acceptance=_strict(Forbids()))
+
+    assert reason in str(raised.value)
+    assert store.states[original.execution_id] == before
+    assert provider.runs == {"draft": 1}
+
+
+def test_changed_delivered_files_are_never_reevaluated(tmp_path):
+    store = MemoryStore()
+    first = _drawing_swarm(tmp_path, _strict(Forbids()), store=store).execute(_gated())
+    assert first.accepted
+    Path(first.graph.nodes[0].metadata["artifacts"][0]["path"]).write_bytes(b"\x89PNX")
+    before = deepcopy(store.states[first.execution_id])
+
+    with pytest.raises(ValueError, match="draft_00.png.*no longer holds the bytes"):
+        _drawing_swarm(tmp_path, _strict(Forbids()), store=store).reevaluate(first.execution_id)
+    assert store.states[first.execution_id] == before
+
+
+def test_reevaluate_refuses_what_it_cannot_decide():
+    store = MemoryStore()
+    for policy in (None, AcceptancePolicy()):
+        with pytest.raises(ValueError, match="strict AcceptancePolicy"):
+            _swarm(Script({}), store=store).reevaluate("run", acceptance=policy)
+    with pytest.raises(TypeError, match="AcceptancePolicy"):
+        _swarm(Script({}), store=store).reevaluate("run", acceptance={"mode": "strict"})
+    with pytest.raises(ValueError, match="checkpoint_store"):
+        Swarm(provider=Script({}), model="test-model").reevaluate("run", acceptance=_strict(Forbids()))
+    with pytest.raises(KeyError):
+        _swarm(Script({}), store=store).reevaluate("missing", acceptance=_strict(Forbids()))
+
+    # An unfinished run is resumed, not re-evaluated.
+    provider = _crashed_strict_run(store, _strict(Forbids()))
+    unfinished = deepcopy(store.states[store.only_id()])
+    with pytest.raises(ValueError, match="not a completed run"):
+        _swarm(provider, store=store).reevaluate(store.only_id(), acceptance=_strict(Forbids()))
+    assert store.states[store.only_id()] == unfinished
+
+    # Nothing bound the output of a completed run without a record.
+    legacy_store = MemoryStore()
+    legacy = _swarm(Script({}), store=legacy_store).execute(_draft_only())
+    saved = deepcopy(legacy_store.states[legacy.execution_id])
+    with pytest.raises(ValueError, match="no delivery acceptance record"):
+        _swarm(Script({}), store=legacy_store).reevaluate(legacy.execution_id,
+                                                          acceptance=_strict(Forbids()))
+    assert legacy_store.states[legacy.execution_id] == saved
 
 
 # ---------------------------------------------------------------------------

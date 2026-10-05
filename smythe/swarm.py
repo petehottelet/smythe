@@ -7,6 +7,7 @@ import json
 import logging
 import time
 from collections.abc import Sequence
+from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -18,6 +19,7 @@ from smythe.acceptance import (
     AcceptanceDecision,
     AcceptanceMode,
     AcceptancePolicy,
+    AcceptanceSource,
     DeliveryAcceptance,
     _delivery_problems,
     evaluate_delivery,
@@ -34,10 +36,12 @@ from smythe.checkpoint import (
     agents_from_list,
     build_state,
     delivery_acceptance_from_state,
+    delivery_acceptance_history,
     drop_untrusted_mcp_servers,
     graph_from_dict,
     graph_to_dict,
     reset_incomplete_nodes,
+    supersede_delivery_acceptance,
     task_from_dict,
     timing_segments,
 )
@@ -73,6 +77,7 @@ from smythe.task import Task, snapshot_task, task_snapshots_equal, task_to_dict
 from smythe.tracer import Tracer
 from smythe.verifier import (
     Verifier,
+    node_generation,
     validate_verification_checkpoint,
     verification_pending,
 )
@@ -216,6 +221,17 @@ def _synthesis_strategy(synthesizer: Any) -> str:
     return "custom"
 
 
+def _delivery_sources(graph: ExecutionGraph, strategy: str) -> tuple[list, bool]:
+    """The nodes *strategy* synthesis delivered from, and whether ``DELIVERABLE`` fell back.
+
+    Any synthesis but ``DELIVERABLE`` reads every completed node with a result.
+    """
+    if strategy == SynthesisStrategy.DELIVERABLE.value:
+        return deliverable_sources(graph)
+    return [node for node in graph.nodes
+            if node.status is NodeStatus.COMPLETED and node.result is not None], False
+
+
 def _builds_developer_gates(architect: Any) -> bool:
     """Whether *architect*'s gates come from developer code rather than a model.
 
@@ -300,6 +316,9 @@ class Swarm:
     None, the default, and an advisory policy keep legacy behavior. With a
     durable ``run_store`` the same checks apply, the policy enters the run's
     recipe and the decision is journaled; see ``smythe.workflow.WorkflowRuntime``.
+    Resuming a completed run never decides it again: :meth:`reevaluate`
+    records a new decision for its saved output, under a fixed or changed
+    validator, without running a node.
 
     ``read_tools`` declares the :class:`~smythe.workflow_tools.ReadProfile`
     reads that a durable run's read steps may name; it requires
@@ -485,12 +504,7 @@ class Swarm:
         if policy is None:
             return None
         strategy = _synthesis_strategy(self._synthesizer)
-        if strategy == SynthesisStrategy.DELIVERABLE.value:
-            sources, used_fallback = deliverable_sources(graph)
-        else:
-            sources = [n for n in graph.nodes
-                       if n.status is NodeStatus.COMPLETED and n.result is not None]
-            used_fallback = False
+        sources, used_fallback = _delivery_sources(graph, strategy)
         with tracer.phase("verification"):
             record = evaluate_delivery(
                 policy, graph, output, strategy=strategy, sources=sources,
@@ -1079,40 +1093,8 @@ class Swarm:
             raise ValueError("refresh_context needs a durable run_store")
         return await self._workflow_runtime().refresh_context(execution_id, sources)
 
-    def resume(self, execution_id: str) -> SwarmResult:
-        """Resume a checkpointed execution.  Sync wrapper around aresume()."""
-        return asyncio.run(self.aresume(execution_id))
-
-    async def aresume(self, execution_id: str) -> SwarmResult:
-        """Resume from the last checkpoint of a prior execution.
-
-        COMPLETED and SKIPPED nodes keep their recorded results and are
-        not re-executed; RUNNING and FAILED nodes are reset to PENDING
-        and re-run. Cost accounting continues against the budget policy
-        recorded in the checkpoint.  If the checkpointed execution
-        already finished, its stored result is returned without
-        re-executing anything; a strict run's result carries its delivery
-        acceptance record after the saved output, task, sources and policy
-        are checked against it, and any mismatch makes it ``indeterminate``.
-        A strict policy withholds the output of a completed run that has no
-        record, returning it as ``rejected_output`` with ``acceptance=None``.
-        An unfinished strict run resumes only under the same strict policy,
-        and a strict policy never finishes a run that began without one.
-        Resumed work runs one node at a time
-        unless this Swarm has ``parallel=True``; a durable ``run_store``
-        run keeps the concurrency its first execution recorded and resumes
-        only under the acceptance policy its recipe records.
-        """
-        if self._run_store is not None:
-            return await self._workflow_runtime().resume(
-                execution_id, max_concurrency=self._execution_concurrency(),
-            )
-        if self._checkpoint_store is None:
-            raise ValueError(
-                "Cannot resume: this Swarm has no checkpoint_store configured."
-            )
-        tracer = self._tracer_factory()
-        recovery_started = tracer.now()
+    def _load_checkpoint(self, execution_id: str) -> dict[str, Any]:
+        """The saved state of *execution_id*, at a checkpoint version this build reads."""
         state = self._checkpoint_store.load(execution_id)
         if state is None:
             raise KeyError(f"No checkpoint found for execution {execution_id!r}")
@@ -1125,6 +1107,17 @@ class Swarm:
                 f"{list(SUPPORTED_CHECKPOINT_VERSIONS)}. Re-run the task "
                 f"instead of resuming."
             )
+        return state
+
+    def _restore_checkpoint(
+        self, state: dict[str, Any],
+    ) -> tuple[DeliveryAcceptance | None, ExecutionGraph, Task | None, Sentinel]:
+        """A saved state's delivery acceptance record, graph, task and restored costs.
+
+        Refuses a durable run's graph, conflicting task copies and accounting
+        that resume cannot continue: invalid usage, an accounting error or an
+        unresolved native response failure.
+        """
         acceptance = delivery_acceptance_from_state(state)
 
         graph = graph_from_dict(state["graph"])
@@ -1175,6 +1168,151 @@ class Swarm:
                 "Cannot resume an unresolved native response failure; reconcile its accounting "
                 "and repair the saved output before clearing the response-error marker."
             )
+        return acceptance, graph, task, budget
+
+    def reevaluate(
+        self, execution_id: str, *, acceptance: AcceptancePolicy | None = None,
+    ) -> SwarmResult:
+        """Decide a completed run's saved output again.  Sync wrapper around areevaluate()."""
+        return asyncio.run(self.areevaluate(execution_id, acceptance=acceptance))
+
+    async def areevaluate(
+        self, execution_id: str, *, acceptance: AcceptancePolicy | None = None,
+    ) -> SwarmResult:
+        """Record a new delivery acceptance decision for a completed run's saved output.
+
+        *acceptance*, by default this Swarm's policy, must be strict. Its final
+        validators run on the saved output, with no provider call, and every
+        gate's recorded final verdict is read, as when the run completed. No
+        node runs, and the saved costs, budget, retry and regeneration
+        counters and node generations are left as they are. Only a completed
+        run whose checkpoint holds a decided record can be re-evaluated: the
+        saved output must still match the digest that record binds, and its
+        task, source generations and delivered files must be unchanged;
+        otherwise ValueError is raised and nothing is written, so changed
+        output never becomes accepted. A run without a record has nothing that
+        binds its output: run the task again under a strict policy.
+
+        The new decision becomes the checkpoint's record, and the record it
+        replaces is kept, with its sequence, in the checkpoint's bounded
+        ``delivery_acceptance_history``. Identical bytes under an unchanged
+        policy still get a new decision. Resuming the run returns the current
+        decision, checked as usual: under a strict policy other than the one
+        that made it, ``indeterminate``. :meth:`resume` never makes a new
+        decision for a completed run; this method is the way to one.
+
+        A durable ``run_store`` run journals the decision as a new
+        ``acceptance`` operation and checkpoint; its recipe may differ from
+        this Swarm's only in its acceptance policy and gate verifier. See
+        ``smythe.workflow.WorkflowRuntime.reevaluate``.
+        """
+        policy = self._acceptance if acceptance is None else acceptance
+        if policy is not None and not isinstance(policy, AcceptancePolicy):
+            raise TypeError(
+                f"acceptance must be an AcceptancePolicy or None, not {type(policy).__name__}"
+            )
+        if policy is None or policy.mode is not AcceptanceMode.STRICT:
+            raise ValueError(
+                "reevaluate needs a strict AcceptancePolicy: pass acceptance=, or build the "
+                "Swarm with one"
+            )
+        if self._run_store is not None:
+            return await self._workflow_runtime(acceptance=policy).reevaluate(execution_id)
+        if self._checkpoint_store is None:
+            raise ValueError("Cannot re-evaluate: this Swarm has no checkpoint_store configured.")
+        tracer = self._tracer_factory()
+        started = tracer.now()
+        state = self._load_checkpoint(execution_id)
+        saved = deepcopy(state)
+        record, graph, task, budget = self._restore_checkpoint(state)
+        output = state.get("output")
+        completed = state.get("status") == "completed" and output is not None
+        validate_verification_checkpoint(graph, version=state["version"], completed=completed)
+        if not completed or verification_pending(graph):
+            raise ValueError(
+                f"Checkpoint {execution_id!r} is not a completed run, so it has no output to "
+                "re-evaluate; resume it to finish it."
+            )
+        if record is None:
+            raise ValueError(
+                f"Checkpoint {execution_id!r} has no delivery acceptance record, so nothing "
+                "bound its output when it completed; run the task again under a strict policy."
+            )
+        # A malformed history is refused before anything is decided.
+        delivery_acceptance_history(state)
+        sources, used_fallback = _delivery_sources(graph, record.strategy)
+        problems = _delivery_problems(record, output, graph, task)
+        if ([AcceptanceSource(node.id, node_generation(node)) for node in sources]
+                != list(record.sources) or used_fallback != record.used_fallback):
+            problems.append("the saved graph no longer delivers the sources its record bound")
+        if problems:
+            raise ValueError(
+                f"Checkpoint {execution_id!r} cannot be re-evaluated: " + "; ".join(problems)
+            )
+        timing = _RunTiming(tracer, resumed=True, previous=timing_segments(state))
+        tracer.add_phase("recovery", tracer.since(started))
+        with tracer.phase("verification"):
+            decided = evaluate_delivery(
+                policy, graph, output, strategy=record.strategy, sources=sources,
+                used_fallback=used_fallback, task=task,
+            )
+        tracer.on_acceptance(decided)
+        updated = supersede_delivery_acceptance(saved, decided)
+        with tracer.phase("checkpoint"):
+            updated["timing"] = timing.checkpoint_block()
+            self._checkpoint_store.save(execution_id, updated)
+        delivered, rejected_output = _delivered(output, decided)
+        return SwarmResult(
+            output=delivered,
+            graph=graph,
+            trace=tracer.summary(),
+            total_cost_usd=budget.total_cost_usd,
+            cost_is_complete=budget.cost_is_complete,
+            cost_contains_estimates=budget.cost_contains_estimates,
+            execution_id=execution_id,
+            timing=timing.result(),
+            acceptance=decided,
+            rejected_output=rejected_output,
+        )
+
+    def resume(self, execution_id: str) -> SwarmResult:
+        """Resume a checkpointed execution.  Sync wrapper around aresume()."""
+        return asyncio.run(self.aresume(execution_id))
+
+    async def aresume(self, execution_id: str) -> SwarmResult:
+        """Resume from the last checkpoint of a prior execution.
+
+        COMPLETED and SKIPPED nodes keep their recorded results and are
+        not re-executed; RUNNING and FAILED nodes are reset to PENDING
+        and re-run. Cost accounting continues against the budget policy
+        recorded in the checkpoint.  If the checkpointed execution
+        already finished, its stored result is returned without
+        re-executing anything; a strict run's result carries its current
+        delivery acceptance record, the latest that :meth:`reevaluate` made if
+        any, after the saved output, task, sources and policy are checked
+        against it, and any mismatch makes it ``indeterminate``.
+        A strict policy withholds the output of a completed run that has no
+        record, returning it as ``rejected_output`` with ``acceptance=None``.
+        An unfinished strict run resumes only under the same strict policy,
+        and a strict policy never finishes a run that began without one.
+        Resumed work runs one node at a time
+        unless this Swarm has ``parallel=True``; a durable ``run_store``
+        run keeps the concurrency its first execution recorded and resumes
+        only under the acceptance policy its recipe records.
+        """
+        if self._run_store is not None:
+            return await self._workflow_runtime().resume(
+                execution_id, max_concurrency=self._execution_concurrency(),
+            )
+        if self._checkpoint_store is None:
+            raise ValueError(
+                "Cannot resume: this Swarm has no checkpoint_store configured."
+            )
+        tracer = self._tracer_factory()
+        recovery_started = tracer.now()
+        state = self._load_checkpoint(execution_id)
+        version = state["version"]
+        acceptance, graph, task, budget = self._restore_checkpoint(state)
 
         completed = state.get("status") == "completed" and state.get("output") is not None
         validate_verification_checkpoint(graph, version=version, completed=completed)
@@ -1374,11 +1512,12 @@ class Swarm:
             return None
         return Path(self.artifact_dir) / execution_id[:12]
 
-    def _workflow_runtime(self, *, behavior_settings=None):
+    def _workflow_runtime(self, *, behavior_settings=None, acceptance=None):
         """Pass explicit component dependencies into an isolated durable run.
 
         ``behavior_settings`` configures behavior versions that a new run
-        records (see ``smythe.workflow.RECIPE_BEHAVIOR_FIELDS``).
+        records (see ``smythe.workflow.RECIPE_BEHAVIOR_FIELDS``), and
+        ``acceptance`` a policy other than this Swarm's.
         """
         from smythe.workflow import WorkflowRuntime
 
@@ -1393,6 +1532,7 @@ class Swarm:
             retry_backoff_s=self.retry_backoff_s,
             max_concurrency=self.max_concurrency,
             graph_policy=self._graph_policy, behavior_settings=behavior_settings,
-            acceptance=self._acceptance, read_tools=self._read_tools,
+            acceptance=self._acceptance if acceptance is None else acceptance,
+            read_tools=self._read_tools,
             context_sources=self._context_sources,
         )

@@ -805,6 +805,14 @@ def _emit_run_inspection(value: dict[str, Any]) -> None:
             print(f"  Validator {_terminal_text(identity['name'])} {_terminal_text(identity['version'])} "
                   f"(config {identity['config_sha256'][:12]}): {result['outcome']}")
         print(f"  Policy: {record['policy_sha256']}")
+    decisions = value["decisions"]
+    if decisions["history"]:
+        print(f"Decision history: decision {decisions['current']} is current; earlier decisions:")
+        for entry in decisions["history"]:
+            earlier = entry["record"]
+            reason = f": {_terminal_text(earlier['reasons'][0])}" if earlier["reasons"] else ""
+            print(f"  Decision {entry['sequence']}: {earlier['decision']} under policy "
+                  f"{earlier['policy_sha256'][:12]}{reason}")
     withheld = delivery["rejected_output"]
     if withheld is not None:
         print(f"Withheld output: {withheld['bytes']} bytes in the saved {withheld['field']} field; "

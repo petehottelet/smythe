@@ -46,6 +46,10 @@ SUPPORTED_CHECKPOINT_VERSIONS = (1, 2, 3, 4, 5)
 MCP_TRUSTED_CHECKPOINT_VERSION = 4
 # The version 5 state features this build reads.
 KNOWN_CHECKPOINT_REQUIREMENTS = frozenset({"delivery_acceptance"})
+# How many superseded delivery decisions a completed checkpoint keeps. The
+# history is informational, so it is not a required state feature: a reader
+# that does not know it still reads the current decision correctly.
+DELIVERY_ACCEPTANCE_HISTORY_LIMIT = 16
 
 _EXECUTION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
@@ -440,3 +444,94 @@ def delivery_acceptance_from_state(state: dict[str, Any]) -> DeliveryAcceptance 
     if state.get("status") == "completed" and record.decision is AcceptanceDecision.NOT_EVALUATED:
         raise ValueError("A completed checkpoint's delivery acceptance record must hold a decision")
     return record
+
+
+def delivery_acceptance_history(
+    state: dict[str, Any],
+) -> tuple[tuple[int, DeliveryAcceptance], ...]:
+    """The decisions a completed checkpoint's current record superseded, oldest first.
+
+    Each is ``(sequence, record)``: sequence 0 is the decision the run made
+    when it completed, and each re-evaluation adds one, so the current
+    record's sequence follows the last one listed
+    (:func:`delivery_acceptance_sequence`). They are kept under
+    ``delivery_acceptance_history``, at most
+    ``DELIVERY_ACCEPTANCE_HISTORY_LIMIT`` of them, the oldest dropped first,
+    and each decided the bytes the current record binds. A state without the
+    key has none. Raises ValueError for a malformed history, or one that a
+    state without a decided record carries.
+    """
+    data = state.get("delivery_acceptance_history")
+    if data is None:
+        return ()
+    current = delivery_acceptance_from_state(state)
+    if (state.get("status") != "completed" or current is None
+            or current.decision is AcceptanceDecision.NOT_EVALUATED):
+        raise ValueError(
+            "Only a completed checkpoint with a delivery decision keeps earlier decisions"
+        )
+    if not isinstance(data, list) or not 1 <= len(data) <= DELIVERY_ACCEPTANCE_HISTORY_LIMIT:
+        raise ValueError(
+            f"delivery_acceptance_history must list 1 to {DELIVERY_ACCEPTANCE_HISTORY_LIMIT} "
+            "earlier decisions"
+        )
+    history: list[tuple[int, DeliveryAcceptance]] = []
+    for entry in data:
+        if not isinstance(entry, dict) or set(entry) != {"sequence", "delivery_acceptance"}:
+            raise ValueError(
+                "Each earlier decision must hold its sequence and its delivery_acceptance"
+            )
+        sequence = entry["sequence"]
+        if type(sequence) is not int or sequence < 0 or (history and sequence <= history[-1][0]):
+            raise ValueError("Earlier decision sequences must be increasing non-negative integers")
+        record = DeliveryAcceptance.from_dict(entry["delivery_acceptance"])
+        if (record.decision is AcceptanceDecision.NOT_EVALUATED
+                or record.output_sha256 != current.output_sha256):
+            raise ValueError(
+                "Each earlier decision must have decided the output the current one binds"
+            )
+        history.append((sequence, record))
+    return tuple(history)
+
+
+def delivery_acceptance_sequence(state: dict[str, Any]) -> int | None:
+    """The current decision's sequence: 0 until a re-evaluation; None without a decided record."""
+    record = delivery_acceptance_from_state(state)
+    if record is None or record.decision is AcceptanceDecision.NOT_EVALUATED:
+        return None
+    history = delivery_acceptance_history(state)
+    return history[-1][0] + 1 if history else 0
+
+
+def supersede_delivery_acceptance(
+    state: dict[str, Any], record: DeliveryAcceptance,
+) -> dict[str, Any]:
+    """A copy of a completed checkpoint *state* whose current decision is *record*.
+
+    The decision it replaces joins ``delivery_acceptance_history`` with its
+    sequence (see :func:`delivery_acceptance_history`), and ``updated_at`` is
+    the current time; every other field is copied as saved. Raises ValueError
+    unless *state* is a completed checkpoint with a decided record and
+    *record* is a decision that binds the same output, which the state's
+    ``output`` still matches.
+    """
+    current = delivery_acceptance_from_state(state)
+    sequence = delivery_acceptance_sequence(state)
+    if state.get("status") != "completed" or current is None or sequence is None:
+        raise ValueError("Only a completed checkpoint's delivery decision can be superseded")
+    if (not isinstance(record, DeliveryAcceptance)
+            or record.decision is AcceptanceDecision.NOT_EVALUATED):
+        raise ValueError("A new delivery decision must be a decided DeliveryAcceptance record")
+    output = state.get("output")
+    if (record.output_sha256 != current.output_sha256 or not isinstance(output, str)
+            or text_sha256(output) != record.output_sha256):
+        raise ValueError("A new delivery decision must bind the output its checkpoint holds")
+    history = [*delivery_acceptance_history(state), (sequence, current)]
+    updated = deepcopy(state)
+    updated["delivery_acceptance"] = record.to_dict()
+    updated["delivery_acceptance_history"] = [
+        {"sequence": number, "delivery_acceptance": item.to_dict()}
+        for number, item in history[-DELIVERY_ACCEPTANCE_HISTORY_LIMIT:]
+    ]
+    updated["updated_at"] = time.time()
+    return updated

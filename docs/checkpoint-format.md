@@ -127,6 +127,7 @@ Notes:
 - `task.done_when` carries the acceptance criteria forward. A resumed run that had forgotten them could not hold its own output to them.
 - `timing` records how long each call that worked on the execution took; see [timing segments](#timing-segments).
 - A version 5 checkpoint adds a top-level `requires` list and the state it names, such as a `delivery_acceptance` record; see [required state features](#required-state-features-version-5).
+- A completed version 5 checkpoint that was [re-evaluated](verifier.md#re-evaluation) adds `delivery_acceptance_history`, the decisions its current record superseded; see [decision history](#decision-history).
 
 ## Timing segments
 
@@ -299,6 +300,33 @@ A completed checkpoint must hold a decided record: `build_state` refuses to
 write a completed state whose record is `not_evaluated`, and resume refuses
 such a state with `ValueError` before any provider call, leaving the
 checkpoint unchanged. Its output is neither delivered nor returned.
+
+### Decision history
+
+[`Swarm.reevaluate`](verifier.md#re-evaluation) replaces a completed
+checkpoint's `delivery_acceptance` with a new decision on the same output and
+keeps the record it replaces in a top-level `delivery_acceptance_history`
+list, oldest first:
+
+```json
+"delivery_acceptance_history": [
+  {"sequence": 0, "delivery_acceptance": {"version": 1, "decision": "rejected", "...": "..."}}
+]
+```
+
+Sequence 0 is the decision the run made when it completed and each
+re-evaluation adds one, so the current record's sequence follows the last
+entry. At most 16 superseded records are kept
+(`smythe.checkpoint.DELIVERY_ACCEPTANCE_HISTORY_LIMIT`), the oldest dropped
+first; sequences keep counting. Every entry is a decided record that binds
+the same `output_sha256` as the current one. The list is informational, so
+it is not a required state feature: resume reads only the current record,
+which a reader that does not know the key still reads correctly.
+Re-evaluation and [`smythe runs inspect`](runs.md#decision-history) refuse a
+malformed history. `delivery_acceptance_history(state)` and
+`delivery_acceptance_sequence(state)` in `smythe.checkpoint` read it back.
+Re-evaluation changes nothing else in the checkpoint except `updated_at`
+and one more [timing segment](#timing-segments).
 
 ## Resume semantics
 

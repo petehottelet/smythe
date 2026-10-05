@@ -1443,6 +1443,39 @@ class SQLiteWorkflowStore:
             row = db.execute("SELECT * FROM workflow_operations WHERE run_id=? AND operation_key=?", (run_id, operation_key)).fetchone()
             return self._operation_record(row) if row else None
 
+    def list_operations(self, run_id, kind):
+        """A run's operations of *kind*, in the order its checkpoints applied them.
+
+        Each record adds ``applied_revision``: the revision of the last
+        checkpoint that consumed the operation, or None for one no checkpoint
+        has consumed, listed last by key. Only reads are made.
+        """
+        _text(kind, "kind")
+        with self._transaction(write=False) as db:
+            self._run(db, run_id)
+            rows = {row["operation_id"]: row for row in db.execute(
+                "SELECT * FROM workflow_operations WHERE run_id=? AND kind=?", (run_id, kind))}
+            applied = {}
+            if rows:
+                for checkpoint in db.execute(
+                        "SELECT revision, operations_json FROM workflow_checkpoints "
+                        "WHERE run_id=? ORDER BY revision", (run_id,)):
+                    operation_ids = _loads(checkpoint["operations_json"], stored=True)
+                    if type(operation_ids) is not list:
+                        raise WorkflowCorruptionError("Invalid checkpoint consumption IDs")
+                    for operation_id in operation_ids:
+                        if operation_id in rows:
+                            applied[operation_id] = checkpoint["revision"]
+            records = [{**self._operation_record(row),
+                        "applied_revision": applied.get(operation_id)}
+                       for operation_id, row in rows.items()]
+            if any((record["state"] == "applied") != (record["applied_revision"] is not None)
+                   for record in records):
+                raise WorkflowCorruptionError("Checkpoint operation is missing or not applied")
+            return sorted(records, key=lambda record: (record["applied_revision"] is None,
+                                                       record["applied_revision"] or 0,
+                                                       record["operation_key"]))
+
     def begin_operation(self, lease, operation_key, kind, inputs):
         _text(operation_key, "operation_key")
         _text(kind, "kind")

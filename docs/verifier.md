@@ -528,7 +528,8 @@ without a strict policy returns its text in `output`, as before. A strict
 logger says how to obtain a decision. Re-run the task under the strict
 policy, or decide the saved output yourself with
 `evaluate_delivery(policy, result.graph, result.rejected_output, ...)`. The
-checkpoint is not changed.
+checkpoint is not changed, and [re-evaluation](#re-evaluation) refuses it:
+nothing bound its output.
 
 The trace gains one span with `node_id` `acceptance:delivery`, status
 `acceptance_<decision>` and the first reason as its label; `Tracer.summary()`
@@ -538,6 +539,51 @@ keys are unchanged, and the validators' time counts as verification in
 sources=...)` makes the same decision outside a run, and
 `smythe.synthesizer.deliverable_sources(graph)` returns the nodes
 `DELIVERABLE` synthesis delivers and whether it fell back.
+
+### Re-evaluation
+
+Resuming a completed run never decides it again. To decide its saved output
+under a fixed or changed validator, call
+`swarm.reevaluate(execution_id, acceptance=policy)`, or
+`await swarm.areevaluate(...)`. Without `acceptance` it uses the `Swarm`'s
+own policy, which must then be strict.
+
+```python
+fixed = AcceptancePolicy(mode="strict", final_validators=[RequiredSection("## Sources")])
+result = swarm.reevaluate(execution_id, acceptance=fixed)
+```
+
+- The policy's final validators run on the saved output, with no provider
+  call, and every gate's recorded final verdict is read, as when the run
+  completed; no judge runs again. No node runs: costs, the budget, retry and
+  regeneration counters and node generations stay as saved, and so do a
+  durable run's calls and charges.
+- Only a completed run whose record holds a decision can be re-evaluated,
+  and only while everything that record binds still holds: the saved output
+  must match its digest, and its task, source generations and delivered files
+  must be unchanged. Otherwise `reevaluate` raises `ValueError`
+  (`WorkflowStateError` on a durable run) and writes nothing, so changed
+  output is never accepted. A completed run without a record, such as an
+  advisory run or a version 4 checkpoint, has nothing that binds its output,
+  and its gates were not marked by origin
+  ([which gates count](#which-gates-count)): run the task again under a
+  strict policy. An unfinished run is resumed, not re-evaluated.
+- The new decision becomes the run's current decision, and the decisions
+  before it are kept. Sequence 0 is the decision the run made when it
+  completed, and each re-evaluation adds one, so the same bytes re-evaluated
+  under an unchanged policy still get a new decision. An ordinary checkpoint
+  keeps the last 16 superseded records under `delivery_acceptance_history`
+  ([checkpoint format](checkpoint-format.md#decision-history)); a durable run
+  keeps every decision in its journal
+  ([durable re-evaluation](#strict-acceptance-in-durable-workflows)).
+- Resuming the run returns its current decision, checked as any completed
+  resume checks its record. An ordinary checkpoint does not record its
+  policy, so, as before, a strict `Swarm` whose policy did not make the
+  current decision gets `indeterminate`. A durable run still resumes only
+  under the policy its recipe records, which re-evaluation does not change,
+  and returns the current decision, whichever policy made it.
+  [`smythe runs inspect`](runs.md#decision-history) lists the decisions and
+  exits by the current one.
 
 ## Built-in final validators
 
@@ -697,11 +743,27 @@ policy, and records the decision in its journal:
   already refuse their recipes.
 - **Completed runs.** Resuming a completed run checks the saved output
   against the record's digest, the task and source generations against the
-  record, and the record against the decision the journal applied. Any
+  record, and the record against the journal's current decision. Any
   mismatch returns an `indeterminate` record with the saved text in
   `rejected_output`, never acceptance. A run without a strict policy returns
   `acceptance=None`. [`smythe runs inspect`](runs.md) makes the same checks
   without resuming the run.
+- **Re-evaluation.** `Swarm(run_store=...).reevaluate(run_id,
+  acceptance=policy)`, or `WorkflowRuntime.reevaluate(run_id)`,
+  [decides a completed run again](#re-evaluation). The saved recipe may
+  differ from the `Swarm`'s only in its acceptance policy and gate verifier,
+  since no gate judges again; anything else raises `WorkflowConflictError`.
+  The decision is a new `acceptance` operation keyed
+  `acceptance/<sequence>/<digest>`, the digest covering the output, the
+  policy and everything else the decision binds, and a new completed
+  checkpoint applies it in one transaction. The run's calls, charges,
+  budget, counters and recipe are unchanged. A re-evaluation stopped before
+  that checkpoint is finished by the next one under the same policy, without
+  validating again. `smythe.workflow.current_decision(store, run_id)` returns
+  the run's current decision, and `decision_history(store, run_id)` every
+  decision a checkpoint applied, by sequence; resume, re-evaluation and
+  `smythe runs inspect` read the decision there. Resuming under a changed
+  policy is still refused with `WorkflowConflictError`.
 - **Synthesis keys.** Such a run journals its synthesis under `synthesis`
   while every node is at generation 0, and otherwise under
   `synthesis/<digest>`, the first 16 hex digits of the SHA-256 of every node

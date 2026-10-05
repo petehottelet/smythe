@@ -34,10 +34,9 @@ from smythe.executor_base import REJECTED_GENERATIONS_KEY, SUPPORTED_PROMPT_ASSE
 from smythe.graph import ExecutionGraph, NodeStatus, Revision, snapshot_run_ref
 from smythe.registry import Registry
 from smythe.provider import ProviderResponseError
-from smythe.synthesizer import deliverable_sources
 from smythe.task import Task, snapshot_task, task_from_dict, task_to_dict
 from smythe.tracer import Tracer
-from smythe.validation import ValidationOutcome
+from smythe.validation import ValidationOutcome, _json_sha256
 from smythe.validators import SourceEvidenceValidator
 from smythe.verifier import (
     ADVISORY_VERDICT_KEY, TOKEN_VERIFIER_IDENTITY, TokenVerifier, Verdict, Verifier,
@@ -225,12 +224,14 @@ def _checkpoint_version(recipe):
     return 2 if "acceptance" in recipe or "validators" in recipe else 1
 
 
-def _saved_record(state, policy_sha256, task_digest):
+def _saved_record(state, policy_sha256, task_digest, reevaluated=()):
     """A version 2 checkpoint's record: undecided until completed, then the decision.
 
     *policy_sha256* is the run's strict policy, or None for a recipe without
-    one, whose checkpoints hold no record; *task_digest* is the run's task.
-    Raises WorkflowStateError for a block that does not match the run.
+    one, whose checkpoints hold no record; *task_digest* is the run's task. A
+    completed checkpoint's decision may instead name one of the policies in
+    *reevaluated*, which the run's re-evaluations decided under. Raises
+    WorkflowStateError for a block that does not match the run.
     """
     if "delivery_acceptance" not in state:
         raise WorkflowStateError("Workflow checkpoint has no delivery acceptance block")
@@ -246,7 +247,7 @@ def _saved_record(state, policy_sha256, task_digest):
     completed = state.get("status") == "completed"
     undecided = DeliveryAcceptance(AcceptanceDecision.NOT_EVALUATED, policy_sha256,
                                    task_sha256=task_digest)
-    if (record.policy_sha256 != policy_sha256
+    if (record.policy_sha256 not in {policy_sha256, *(reevaluated if completed else ())}
             or (record.decision is AcceptanceDecision.NOT_EVALUATED) is completed
             or not completed and record != undecided):
         raise WorkflowStateError("Workflow checkpoint delivery acceptance does not match its run")
@@ -269,32 +270,109 @@ def _synthesis_key(graph, *, scoped):
 
 
 def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, strategy,
-                     sources, used_fallback):
-    """Everything a decision binds; its hash keys the acceptance operation."""
-    return {
+                     sources, used_fallback, sequence=0):
+    """Everything a decision binds; its hash keys the acceptance operation.
+
+    A re-evaluation's decision also binds its *sequence*, so deciding the
+    same bytes under the same policy again is a new operation.
+    """
+    inputs = {
         "synthesis": synthesis_key, "output_sha256": output_sha256,
         "policy_sha256": policy_sha256, "task_sha256": task_digest,
         "strategy": strategy, "used_fallback": used_fallback,
         "sources": [source.to_dict() for source in sources],
     }
+    if sequence:
+        inputs["sequence"] = sequence
+    return inputs
+
+
+def _decision_key(inputs):
+    """The acceptance operation's key: ``acceptance/<digest>``, with the sequence after it.
+
+    A re-evaluation's key is ``acceptance/<sequence>/<digest>``.
+    """
+    sequence = inputs.get("sequence", 0)
+    return f"acceptance/{sequence}/{_hash(inputs)}" if sequence else "acceptance/" + _hash(inputs)
+
+
+def _decision_sequence(key):
+    """The decision sequence an ``acceptance`` operation's key carries: 0 for the run's own."""
+    parts = key.split("/")
+    if len(parts) == 2 and parts[0] == "acceptance":
+        return 0
+    if (len(parts) == 3 and parts[0] == "acceptance" and parts[1].isascii()
+            and parts[1].isdecimal() and parts[1] == str(int(parts[1])) and int(parts[1]) > 0):
+        return int(parts[1])
+    raise WorkflowStateError(f"Delivery decision key {key!r} is not one this release writes")
+
+
+def decision_history(store, run_id):
+    """A durable run's delivery decisions, oldest first.
+
+    Each is a dict: ``sequence``, 0 for the decision the run made when it
+    completed and one more for each re-evaluation; ``operation_key`` and
+    ``inputs`` of its ``acceptance`` operation; ``revision``, the checkpoint
+    that applied it; and ``record``, its :class:`DeliveryAcceptance`. Only
+    decisions a checkpoint applied count, ordered by sequence and then by
+    that checkpoint. Only reads are made, so a store opened read-only will do.
+    """
+    history = []
+    for operation in store.list_operations(run_id, "acceptance"):
+        if operation["applied_revision"] is None:
+            continue
+        try:
+            record = DeliveryAcceptance.from_dict(operation["result"].get("delivery_acceptance"))
+        except (TypeError, ValueError) as error:
+            raise WorkflowStateError("Saved delivery acceptance is invalid") from error
+        history.append({"sequence": _decision_sequence(operation["operation_key"]),
+                        "operation_key": operation["operation_key"],
+                        "revision": operation["applied_revision"],
+                        "inputs": operation["inputs"], "record": record})
+    return sorted(history, key=lambda decision: (decision["sequence"], decision["revision"]))
+
+
+def current_decision(store, run_id):
+    """A durable run's current delivery decision (see :func:`decision_history`), or None.
+
+    The current decision is the latest one: a re-evaluation's, after one.
+    Resuming a completed run, re-evaluating it and ``smythe runs inspect``
+    all check the run's saved record against this decision.
+    """
+    history = decision_history(store, run_id)
+    return history[-1] if history else None
+
+
+def _reevaluation_policies(store, run_id):
+    """The policies a durable run's re-evaluations decided under."""
+    return {decision["record"].policy_sha256 for decision in decision_history(store, run_id)
+            if decision["sequence"]}
 
 
 def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha256):
     """What no longer matches a completed run's decided *record*, one reason each.
 
     The saved *output* must match the record's digest, the run's *task* and
-    the source generations must be those it binds, and the journal must hold
-    the same decision, applied. An empty list means the record holds. Only
-    reads are made, so a store opened read-only will do.
+    the source generations must be those it binds, and the record must be
+    the journal's :func:`current_decision`, made under the run's policy
+    (*policy_sha256*) or, for a re-evaluation, the policy it names. An empty
+    list means the record holds. Only reads are made, so a store opened
+    read-only will do.
     """
     problems = _delivery_problems(record, output, graph, task)
-    inputs = _decision_inputs(
-        _synthesis_key(graph, scoped=True), policy_sha256, task_sha256(task),
-        record.output_sha256, record.strategy, record.sources, record.used_fallback,
-    )
-    operation = store.load_operation(run_id, "acceptance/" + _hash(inputs))
-    if (operation is None or operation["state"] != "applied"
-            or operation["result"] != {"delivery_acceptance": record.to_dict()}):
+    decision = current_decision(store, run_id)
+    holds = decision is not None and decision["record"].to_dict() == record.to_dict()
+    if holds:
+        sequence = decision["sequence"]
+        deciding = record.policy_sha256 if sequence else policy_sha256
+        inputs = _decision_inputs(
+            _synthesis_key(graph, scoped=True), deciding, task_sha256(task),
+            record.output_sha256, record.strategy, record.sources, record.used_fallback,
+            sequence=sequence,
+        )
+        holds = (record.policy_sha256 == deciding and decision["inputs"] == inputs
+                 and decision["operation_key"] == _decision_key(inputs))
+    if not holds:
         problems.append("the journal holds no applied decision matching the saved record")
     return problems
 
@@ -369,7 +447,8 @@ class WorkflowRuntime:
     recipe so that the run finishes only under that policy. As on ordinary
     runs, it marks the gates of a generated plan, refuses before planning a
     run no gate of its plan could accept, and refuses a graph that does not
-    meet its acceptance obligations before any node runs.
+    meet its acceptance obligations before any node runs. :meth:`reevaluate`
+    records a new decision for a completed run under this runtime's policy.
 
     ``read_tools`` declares the :class:`~smythe.workflow_tools.ReadProfile`
     reads that the graph's read steps may name. The recipe records their
@@ -451,6 +530,8 @@ class WorkflowRuntime:
         self.gate_validator = verifier if validator else None
         self.acceptance = acceptance
         self.undecided = self.saved_acceptance = None
+        # The strict policy the bound run's recipe records, by digest.
+        self.run_policy_sha256 = None
         self.max_concurrency = max_concurrency
         self.execution_concurrency = None
         self.retry_backoff_s = retry_backoff_s
@@ -535,9 +616,21 @@ class WorkflowRuntime:
                 recipe[name] = value
         return json_snapshot(recipe)
 
-    def _adopt_recipe(self, saved):
-        """Check a saved recipe against this runtime; bind its behavior versions."""
+    def _adopt_recipe(self, saved, *, reevaluating=False):
+        """Check a saved recipe against this runtime; bind its behavior versions.
+
+        *reevaluating* tolerates a recipe whose acceptance policy and gate
+        verifier differ: a re-evaluation decides under this runtime's policy
+        and reads the verdicts the run's gates recorded without judging again.
+        """
         saved, current = dict(saved), dict(self.recipe)
+        policy = saved.get("acceptance")
+        self.run_policy_sha256 = (None if policy is None
+                                  else _json_sha256(policy, "acceptance policy"))
+        if reevaluating:
+            for name in ("acceptance", "verifier", "validators"):
+                saved.pop(name, None)
+                current.pop(name, None)
         behavior = {}
         for name, (absent, _) in RECIPE_BEHAVIOR_FIELDS.items():
             current.pop(name, None)
@@ -676,16 +769,16 @@ class WorkflowRuntime:
         return sorted(set(ids))
 
     @asynccontextmanager
-    async def _session(self, run):
+    async def _session(self, run, *, reevaluating=False):
         self.run, self.run_id = run, run["run_id"]
         if run["budget_nanousd"] != _nanousd(self.max_budget_usd):
             raise WorkflowConflictError("Workflow components or budget differ from the saved recipe")
-        self._adopt_recipe(run["config"])
+        self._adopt_recipe(run["config"], reevaluating=reevaluating)
         self.context_revision, self.context_sources, self._snapshot_ids = None, (), {}
-        if self.acceptance is not None:
+        if self.run_policy_sha256 is not None:
             # The record a strict run's unfinished checkpoints carry.
             self.undecided = DeliveryAcceptance(
-                AcceptanceDecision.NOT_EVALUATED, self.acceptance.sha256,
+                AcceptanceDecision.NOT_EVALUATED, self.run_policy_sha256,
                 task_sha256=task_sha256(task_from_dict(run["task"])),
             )
         self._bind()
@@ -1173,10 +1266,15 @@ class WorkflowRuntime:
         return state
 
     def _saved_acceptance(self, state):
-        """A version 2 checkpoint's record: undecided until completed, then the decision."""
-        if self.acceptance is None:
+        """A version 2 checkpoint's record: undecided until completed, then the decision.
+
+        A completed run's decision may be a re-evaluation's, under its own policy.
+        """
+        if self.run_policy_sha256 is None:
             return _saved_record(state, None, None)
-        return _saved_record(state, self.acceptance.sha256, self.undecided.task_sha256)
+        reevaluated = (_reevaluation_policies(self.store, self.run_id)
+                       if state.get("status") == "completed" else ())
+        return _saved_record(state, self.run_policy_sha256, self.undecided.task_sha256, reevaluated)
 
     async def resume(self, run_id, *, max_concurrency):
         async with self._session(self.store.load_run(run_id)):
@@ -1246,21 +1344,93 @@ class WorkflowRuntime:
             self._save(status)
             return revision
 
-    async def _execute(self, max_concurrency, *, state=None):
-        from smythe.async_executor import AsyncExecutor
+    async def reevaluate(self, run_id):
+        """Record a new delivery decision for a completed run's saved output.
 
+        This runtime's strict policy decides: its final validators run on the
+        output the run saved, with no provider call, and every gate's recorded
+        final verdict is read. Nothing else changes: no node runs, and the
+        run's calls, charges, budget, revision and regeneration counters,
+        node generations and recipe stay as they are. The decision is a new
+        ``acceptance`` operation whose key carries the next decision sequence,
+        so identical bytes under an unchanged policy still get a new decision.
+        A new completed checkpoint consumes it, which makes it the run's
+        :func:`current_decision`; earlier decisions stay in the journal
+        (:func:`decision_history`). A re-evaluation stopped before that
+        checkpoint is finished by the next one under the same policy.
+
+        The saved recipe may differ from this runtime's only in its acceptance
+        policy and gate verifier. Resuming the run still needs the policy its
+        recipe records, and returns the current decision.
+
+        Raises ``WorkflowBindingError`` without a strict policy;
+        ``WorkflowStateError`` for a run whose recipe has no strict policy, an
+        unfinished run, unresolved accounting, or a saved output, task, source
+        generation or record that no longer matches the journal, so changed
+        output is never accepted; and ``WorkflowConflictError`` for a recipe
+        that differs in anything else.
+        """
+        from smythe.swarm import _delivery_sources
+
+        if self.acceptance is None:
+            raise WorkflowBindingError("reevaluate needs a strict acceptance policy")
+        run = self.store.load_run(run_id)
+        if "acceptance" not in run["config"]:
+            raise WorkflowStateError(
+                "Workflow ran without a strict acceptance policy, so it has no delivery decision "
+                "to re-evaluate; run the task again under one"
+            )
+        async with self._session(run, reevaluating=True):
+            state = self._restore()
+            if state is None or state["status"] != "completed":
+                raise WorkflowStateError(
+                    "Only a completed workflow can be re-evaluated; resume it to finish it"
+                )
+            self._check_completed()
+            output, record = state["output"], self.saved_acceptance
+            if not isinstance(output, str):
+                raise WorkflowStateError("Completed workflow output is not text")
+            problems = _decision_problems(
+                self.store, self.run_id, self.graph, output, record,
+                task=task_from_dict(self.run["task"]), policy_sha256=self.run_policy_sha256,
+            )
+            sources, used_fallback = _delivery_sources(self.graph, record.strategy)
+            if ([AcceptanceSource(node.id, node_generation(node)) for node in sources]
+                    != list(record.sources) or used_fallback != record.used_fallback):
+                problems.append("the saved graph no longer delivers the sources its record bound")
+            if problems:
+                raise WorkflowStateError("Workflow cannot be re-evaluated: " + "; ".join(problems))
+            decided = await self._decide(self._synthesis_key(), output, reevaluation=True)
+            self.execution_concurrency = state.get("max_concurrency")
+            self._save("completed", output=output, acceptance=decided)
+            self.saved_acceptance = decided
+            return self._result(output, decided)
+
+    def _check_completed(self):
+        """Refuse a completed run that still holds unresolved control or accounting."""
         # A verdict's forced checkpoint can precede its ordinary node callback.
         # Resolve proven native replay markers before consuming that control.
         for node in self.graph.nodes:
             self._clear_resolved_native_error(node)
+        validate_verification_checkpoint(self.graph, version=3, completed=True)
+        if verification_pending(self.graph) or any(
+            any(key in node.metadata for key in ("workflow_accounting_invalid", "response_error"))
+            or node.metadata.get("accounting_invalid") for node in self.graph.nodes
+        ):
+            raise WorkflowStateError(
+                "Completed workflow has an unresolved control or accounting marker"
+            )
+
+    async def _execute(self, max_concurrency, *, state=None):
+        from smythe.async_executor import AsyncExecutor
+
         if state and state["status"] == "completed":
-            validate_verification_checkpoint(self.graph, version=3, completed=True)
-            if verification_pending(self.graph) or any(
-                any(key in node.metadata for key in ("workflow_accounting_invalid", "response_error"))
-                or node.metadata.get("accounting_invalid") for node in self.graph.nodes
-            ):
-                raise WorkflowStateError("Completed workflow has an unresolved control or accounting marker")
+            self._check_completed()
             return self._result(state["output"], self._reverified(state["output"]))
+        # A verdict's forced checkpoint can precede its ordinary node callback.
+        # Resolve proven native replay markers before consuming that control.
+        for node in self.graph.nodes:
+            self._clear_resolved_native_error(node)
         if state is None or state["status"] == "planned":
             # No node has run, so a plan, edited or generated, is checked
             # now. A run that started met its obligations then.
@@ -1349,32 +1519,48 @@ class WorkflowRuntime:
         await self._operation_result(source_evidence_key(inputs), SOURCE_EVIDENCE_OPERATION,
                                      inputs, read)
 
-    def _acceptance_inputs(self, synthesis_key, output_sha256, strategy, sources, used_fallback):
+    def _acceptance_inputs(self, synthesis_key, output_sha256, strategy, sources, used_fallback,
+                           sequence=0):
         """Everything a decision binds; its hash keys the acceptance operation."""
         return _decision_inputs(synthesis_key, self.acceptance.sha256, self.undecided.task_sha256,
-                                output_sha256, strategy, sources, used_fallback)
+                                output_sha256, strategy, sources, used_fallback, sequence)
 
-    async def _decide(self, synthesis_key, output):
+    def _next_decision_sequence(self, inputs_at):
+        """A re-evaluation's decision sequence: one past every decision the journal holds.
+
+        A re-evaluation stopped before its checkpoint left its decision
+        unapplied. When *inputs_at* that sequence give the same decision
+        again, it is finished instead of taking a new sequence.
+        """
+        operations = self.store.list_operations(self.run_id, "acceptance")
+        latest = max((_decision_sequence(item["operation_key"]) for item in operations), default=0)
+        unapplied = {item["operation_key"] for item in operations
+                     if item["applied_revision"] is None}
+        if latest and _decision_key(inputs_at(latest)) in unapplied:
+            return latest
+        return latest + 1
+
+    async def _decide(self, synthesis_key, output, *, reevaluation=False):
         """Decide delivery acceptance for exactly *output* as a journal operation.
 
         Final validators run once, locally, and the decision is committed
         before the completed checkpoint consumes it. A run interrupted before
         that commit decides again on the same output; a committed decision is
-        read back and never made again.
+        read back and never made again. A *reevaluation* decides under the
+        next decision sequence (see :meth:`reevaluate`).
         """
-        from smythe.swarm import _synthesis_strategy
+        from smythe.swarm import _delivery_sources, _synthesis_strategy
 
         strategy = _synthesis_strategy(self.sources["synthesizer"])
-        if strategy == "deliverable":
-            sources, used_fallback = deliverable_sources(self.graph)
-        else:
-            sources = [node for node in self.graph.nodes
-                       if node.status is NodeStatus.COMPLETED and node.result is not None]
-            used_fallback = False
-        inputs = self._acceptance_inputs(
-            synthesis_key, text_sha256(output), strategy,
-            [AcceptanceSource(node.id, node_generation(node)) for node in sources], used_fallback,
-        )
+        sources, used_fallback = _delivery_sources(self.graph, strategy)
+        bound = [AcceptanceSource(node.id, node_generation(node)) for node in sources]
+
+        def inputs_at(sequence):
+            return self._acceptance_inputs(synthesis_key, text_sha256(output), strategy, bound,
+                                           used_fallback, sequence)
+
+        sequence = self._next_decision_sequence(inputs_at) if reevaluation else 0
+        inputs = inputs_at(sequence)
 
         async def decide(_):
             record = evaluate_delivery(
@@ -1383,15 +1569,17 @@ class WorkflowRuntime:
             )
             return {"delivery_acceptance": record.to_dict()}
 
-        result = await self._operation_result("acceptance/" + _hash(inputs), "acceptance", inputs, decide)
+        result = await self._operation_result(_decision_key(inputs), "acceptance", inputs, decide)
         try:
             record = DeliveryAcceptance.from_dict(result.get("delivery_acceptance"))
         except (TypeError, ValueError) as error:
             raise WorkflowStateError("Saved delivery acceptance is invalid") from error
         if (record.decision is AcceptanceDecision.NOT_EVALUATED
                 or record.task_sha256 != self.undecided.task_sha256
+                or record.policy_sha256 != self.acceptance.sha256
                 or self._acceptance_inputs(synthesis_key, record.output_sha256, record.strategy,
-                                           record.sources, record.used_fallback) != inputs):
+                                           record.sources, record.used_fallback,
+                                           sequence) != inputs):
             raise WorkflowStateError("Saved delivery acceptance does not match its output")
         self.trace.on_acceptance(record)
         return record
@@ -1400,23 +1588,24 @@ class WorkflowRuntime:
         """Check a completed run's decision against its checkpoint and journal now.
 
         The saved output must match the record's digest, the task and source
-        generations must be those it binds, and the journal must hold the same
-        decision, applied (see :func:`_decision_problems`). A mismatch gives an
+        generations must be those it binds, and the record must be the
+        journal's current decision (see :func:`_decision_problems`), which a
+        re-evaluation may have made under another policy. A mismatch gives an
         ``indeterminate`` record for the saved output, never acceptance. Runs
         without a strict policy have no record.
         """
         record = self.saved_acceptance
-        if self.acceptance is None:
+        if record is None:
             return None
         if not isinstance(output, str):
             raise WorkflowStateError("Completed workflow output is not text")
         problems = _decision_problems(self.store, self.run_id, self.graph, output, record,
                                       task=task_from_dict(self.run["task"]),
-                                      policy_sha256=self.acceptance.sha256)
+                                      policy_sha256=self.run_policy_sha256)
         if not problems:
             return record
         return DeliveryAcceptance(
-            decision=AcceptanceDecision.INDETERMINATE, policy_sha256=self.acceptance.sha256,
+            decision=AcceptanceDecision.INDETERMINATE, policy_sha256=record.policy_sha256,
             output_sha256=text_sha256(output), strategy=record.strategy, sources=record.sources,
             used_fallback=record.used_fallback, task_sha256=self.undecided.task_sha256,
             reasons=tuple(problems),
