@@ -684,7 +684,8 @@ policy, and records the decision in its journal:
   record, and the record against the decision the journal applied. Any
   mismatch returns an `indeterminate` record with the saved text in
   `rejected_output`, never acceptance. A run without a strict policy returns
-  `acceptance=None`.
+  `acceptance=None`. [`smythe runs inspect`](runs.md) makes the same checks
+  without resuming the run.
 - **Synthesis keys.** Such a run journals its synthesis under `synthesis`
   while no node has regenerated and under `synthesis/<n>` afterwards, where
   `n` is the sum of the nodes' generations, so synthesis for a regenerated

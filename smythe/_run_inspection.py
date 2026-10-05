@@ -22,6 +22,7 @@ from smythe.acceptance import (
     AcceptanceDecision,
     DeliveryAcceptance,
     _delivery_problems,
+    task_sha256,
     text_sha256,
 )
 from smythe.budget import Sentinel
@@ -35,6 +36,7 @@ from smythe.checkpoint import (
     timing_segments,
 )
 from smythe.graph import ExecutionGraph
+from smythe.validation import _json_sha256
 from smythe.workflow_store import (
     SQLiteWorkflowStore,
     WorkflowError,
@@ -329,27 +331,57 @@ def inspect_checkpoint(store: FileCheckpointStore, execution_id: str) -> dict[st
         raise RunInspectionError(f"Checkpoint {execution_id!r} cannot be inspected: {exc}") from exc
 
 
-def _journal_acceptance(checkpoint: dict[str, Any] | None) -> DeliveryAcceptance | None:
-    """The delivery decision a durable checkpoint holds.
+def _journal_acceptance(
+    store: SQLiteWorkflowStore, run: dict[str, Any], checkpoint: dict[str, Any],
+    graph: ExecutionGraph, policy_sha256: str | None,
+) -> tuple[DeliveryAcceptance | None, list[str]]:
+    """The delivery decision a durable checkpoint holds, and what no longer matches it.
 
-    Durable runs record no decision yet, so a version 1 checkpoint never has
-    one and its run is shown as not recorded, never as accepted.
+    Only the version 2 checkpoints of a run with a strict policy, whose
+    digest is *policy_sha256*, hold a record; any other run is shown as not
+    recorded, never as accepted. The record is read as resume reads it, and a
+    decided one is checked as completed resume checks it: against the saved
+    output, the task, the source generations and the decision the journal
+    applied.
     """
-    return None
+    from smythe.workflow import _decision_problems, _saved_record
+
+    if checkpoint["version"] == 1:
+        return None, []
+    task = task_from_dict(run["task"])
+    record = _saved_record(checkpoint, policy_sha256, task_sha256(task))
+    if record is None or record.decision is AcceptanceDecision.NOT_EVALUATED:
+        return record, []
+    return record, _decision_problems(store, run["run_id"], graph, checkpoint.get("output"), record,
+                                      task=task, policy_sha256=policy_sha256)
 
 
 def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
+    from smythe.workflow import _checkpoint_version
+
     inspected = store.inspect_run(run_id)
+    run = store.load_run(run_id)
     saved = store.get_checkpoint(run_id)
     checkpoint = saved["checkpoint"] if saved is not None else None
-    if checkpoint is not None and (type(checkpoint.get("version")) is not int
-                                   or checkpoint["version"] != 1):
-        raise RunInspectionError(
-            f"Durable run {run_id!r} has checkpoint version {checkpoint.get('version')!r}, which "
-            "this build of smythe cannot read; it reads version 1"
-        )
-    record = _journal_acceptance(checkpoint)
-    graph = graph_from_dict(checkpoint["graph"]) if checkpoint is not None else None
+    policy = run["config"].get("acceptance")
+    policy_sha256 = None if policy is None else _json_sha256(policy, "acceptance policy")
+    record, problems, graph = None, [], None
+    if checkpoint is not None:
+        # The run's recipe sets its checkpoint version: version 2 for a
+        # strict policy or a gate validator, version 1 otherwise.
+        version, expected = checkpoint.get("version"), _checkpoint_version(run["config"])
+        if type(version) is not int or version not in (1, 2):
+            raise RunInspectionError(
+                f"Durable run {run_id!r} has checkpoint version {version!r}, which this build "
+                "of smythe cannot read; it reads versions 1 and 2"
+            )
+        if version != expected:
+            raise RunInspectionError(
+                f"Durable run {run_id!r} has checkpoint version {version}, but its recipe "
+                f"writes version {expected}"
+            )
+        graph = graph_from_dict(checkpoint["graph"])
+        record, problems = _journal_acceptance(store, run, checkpoint, graph, policy_sha256)
     status, blocked = inspected["status"], inspected["blocked_reason"]
     checkpoint_status = checkpoint.get("status") if checkpoint is not None else None
     if status in ("blocked", "completed"):
@@ -357,7 +389,7 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
     else:
         state = checkpoint_status if checkpoint_status in ("planned", "running", "failed") else "running"
     delivery = delivery_view(record, checkpoint.get("output") if checkpoint is not None else None,
-                             field="output", completed=state == "completed")
+                             field="output", completed=state == "completed", problems=problems)
     accounting_keys = ("confirmed_nanousd", "reserved_nanousd", "unknown_nanousd", "unknown_calls",
                        "call_count")
     workflow_accounting = {key: inspected[key] for key in accounting_keys} | {"unit": NANOUSD}
@@ -374,6 +406,9 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
         "unknown_exposure": unknown_exposure(workflow_accounting),
         "unresolved": [f"admission is closed by {blocked}"] if blocked else [],
     }
+    resume = "Resume it with Swarm(run_store=...).resume(run_id) and the configuration it started with"
+    if policy_sha256 is not None:
+        resume += f", including the strict acceptance policy whose sha256 is {policy_sha256}"
     return {
         "run_id": run_id,
         "store": "journal",
@@ -388,8 +423,7 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
         "next_action": next_action(
             state, delivery, cost_is_complete=accounting["cost_is_complete"],
             unresolved=accounting["unresolved"], blocked_reason=blocked,
-            resume="Resume it with Swarm(run_store=...).resume(run_id) and the configuration "
-                   "it started with, once no worker holds its lease.",
+            resume=resume + ", once no worker holds its lease.",
         ),
     }
 

@@ -55,25 +55,36 @@ number of calls that hold it.
 | `recorded` | Whether the run has a [delivery acceptance record](verifier.md#delivery-acceptance-records) |
 | `decision` | The decision that holds for the saved output now: `not_evaluated`, `accepted`, `rejected`, `needs_review`, `indeterminate`, or null without a record |
 | `reasons` | The reasons for that decision |
-| `integrity` | `verified` when the saved output, task and source node generations still match what the record bound, `mismatch` otherwise, null when nothing was decided |
+| `integrity` | `verified` when the saved output, task and source node generations still match what the record bound, and for a durable run the journal applied the same decision; `mismatch` otherwise; null when nothing was decided |
 | `output_delivered` | Whether resuming the run returns its output as `output` |
 | `rejected_output` | For withheld output: the `field` that holds it, its `sha256` and its size in `bytes` |
 | `record` | The record as saved, including its validators' names, versions, configuration digests and outcomes |
 
 Checkpoints before version 5 and runs without a strict policy have no record:
 `decision` is null and the output is delivered as before. A legacy run is never
-shown as accepted or as not yet evaluated. Durable runs record no delivery
-decision yet and show it the same way. As on [resume](checkpoint-format.md#delivery-acceptance-version-5),
+shown as accepted or as not yet evaluated. As on [resume](checkpoint-format.md#delivery-acceptance-version-5),
 a decided record whose output, task or source generations no longer match
 gives `indeterminate` with the mismatch as its reason, whatever it recorded;
-inspection has no acceptance policy, so it does not check the policy digest.
+an ordinary checkpoint does not hold its acceptance policy, so inspection does
+not check its policy digest.
+
+A durable run under a strict policy keeps its record in
+[checkpoint version 2](verifier.md#strict-acceptance-in-durable-workflows),
+and inspection reads it as resume does. The checkpoint version must be the
+one the run's recipe writes, and the record must be undecided until the run
+completes and belong to the policy the recipe records, or the run is reported
+as unreadable. A decided record is checked as resuming the completed run
+checks it: against the saved output, the task and the source generations,
+and against the decision the journal applied, so a record changed to match
+other output also gives `indeterminate`. Durable runs without a strict
+policy, including runs with only a gate validator, have no record.
 
 ### Next actions
 
 | `action` | When |
 |---|---|
 | `none` | The run completed, its output is delivered and its cost is known |
-| `resume` | The run is unfinished; `detail` says how to resume it, including the strict policy's `sha256` that must resume a strict run |
+| `resume` | The run is unfinished; `detail` says how to resume it, including the strict policy's `sha256` that must resume a strict run, ordinary or durable |
 | `reconcile_accounting` | Accounting is unresolved (invalid usage, an accounting error, an unresolved native response, or a durable run blocked by `unknown_exposure` or `evidence_conflict`), or a completed run's cost is incomplete |
 | `rerun` | A durable run passed its budget and admits no more calls |
 | `review_output` | The output was `rejected` or `needs_review` and is withheld |
@@ -86,7 +97,7 @@ inspection has no acceptance policy, so it does not check the policy digest.
 | 0 | Inspected; the run has no decision that withholds its output. It may still be unfinished: read `execution.state` |
 | 2 | Invalid argument, such as both `--checkpoints` and `--journal`, an invalid run id, or a `list` page out of range |
 | 6 | The store has no run with that id |
-| 7 | The store or the run cannot be read: missing, foreign, corrupt, or written by a newer release |
+| 7 | The store or the run cannot be read: missing, foreign, corrupt, written by a newer release, or a durable checkpoint that resume would refuse |
 | 10 | The run completed and its output was `rejected` or `needs_review` |
 | 11 | The decision is `indeterminate` |
 

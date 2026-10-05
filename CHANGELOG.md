@@ -342,7 +342,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   (never its text), cost completeness and unknown exposure, timing, and the
   next action; `--json` prints one JSON document. A decided record whose saved
   output, task or source generations no longer match is reported as
-  `indeterminate`, as resume would return it. `inspect` exits with 10 when a
+  `indeterminate`, as resume would return it. Durable runs under a strict
+  policy report the decision their version 2 checkpoint holds, which must
+  also match the decision the journal applied. `inspect` exits with 10 when a
   completed run's output was `rejected` or `needs_review` and 11 when the
   decision is `indeterminate`; an accepted run, or one without a record such
   as a version 4 checkpoint, exits 0. An unknown run exits 6 and an unreadable

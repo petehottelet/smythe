@@ -416,7 +416,8 @@ bindings. Open `SQLiteWorkflowStore(path, read_only=True)` for inspection withou
 schema changes or provider construction, including a journal from an earlier
 release ([journal upgrades](#journal-upgrades)). From the command line,
 `smythe runs --journal <path> inspect <run id>` reports the same balances,
-the run's state and its next action through a read-only open; see
+the run's state, its delivery decision and its next action through a
+read-only open; see
 [Inspect saved runs](runs.md). Explicit `load_replay()` and
 `load_evidence()` calls expose sensitive saved text and raw provider responses;
 protect the database and its SQLite sidecar files accordingly. Since 0.8.1, a

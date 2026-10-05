@@ -10,6 +10,7 @@ from __future__ import annotations
 from contextlib import closing
 import json
 from pathlib import Path
+import shutil
 import sqlite3
 
 import pytest
@@ -18,10 +19,12 @@ from fakes import ManualClock
 from smythe import (
     AcceptancePolicy,
     FileCheckpointStore,
+    LocalOnly,
     OfflineProvider,
     SimpleArchitect,
     SQLiteWorkflowStore,
     Swarm,
+    Task,
     ValidationReport,
     ValidatorIdentity,
 )
@@ -34,7 +37,8 @@ from smythe.cli import (
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.provider import CompletionResult, Provider
 from smythe.validation import hard_finding
-from test_workflow_store_migration import build_journal, mark_version_1
+from test_workflow_acceptance import rewrite_checkpoint
+from test_workflow_store_migration import build_journal, dump, mark_version_1
 
 CONNECT = sqlite3.connect
 
@@ -412,7 +416,7 @@ def test_durable_run_in_a_version_1_journal_is_read_without_migrating(tmp_path, 
                                "revision": value["format"]["revision"]}
     assert value["execution"]["state"] == "completed"
     assert value["execution"]["nodes"] == {"completed": 2}
-    # Durable runs record no delivery decision yet: shown as not recorded.
+    # A durable run without a strict policy has no record: shown as not recorded.
     assert value["delivery"]["recorded"] is False and value["delivery"]["decision"] is None
     assert value["delivery"]["output_delivered"] is True
     accounting = value["accounting"]
@@ -476,3 +480,231 @@ def test_blocked_durable_runs_name_the_action_they_need(tmp_path, capsys, monkey
     assert "overrun  blocked  acceptance not recorded  next rerun" in text
     assert path.read_bytes() == before
     assert recorded_version(path) == [(1,)]
+
+
+# ---------------------------------------------------------------------------
+# Durable runs under a strict policy
+# ---------------------------------------------------------------------------
+
+
+DECISIONS = {
+    "accepted": policy("pass"),
+    "rejected": policy("reject"),
+    "needs_review": policy("raise", on_invalid="needs_review"),
+    "indeterminate": policy("raise"),
+}
+
+
+def gated() -> ExecutionGraph:
+    return ExecutionGraph([Topology.SERIAL], [
+        Node(id="draft", label="Draft the answer"),
+        Node(id="judge", label="Judge the draft", depends_on=["draft"], verifies="draft",
+             max_regenerations=1),
+    ])
+
+
+@pytest.fixture(scope="module")
+def strict_journal(tmp_path_factory):
+    """A journal, built once, with a completed durable run for each strict
+    decision, a run without a policy, a run with only a gate validator and an
+    unfinished strict run, saved without WAL sidecars."""
+    path = tmp_path_factory.mktemp("strict-journal") / "runs.db"
+    with SQLiteWorkflowStore(path) as store:
+        def durable(**options):
+            return Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+                         run_store=store, max_budget_usd=1, **options)
+
+        results = {decision: durable(acceptance=acceptance).execute(graph())
+                   for decision, acceptance in DECISIONS.items()}
+        results["legacy"] = durable().execute(graph())
+        validator = LocalOnly(lambda: Fixed("pass"), "fixed-pass", "2", role="validator")
+        results["gate-validator"] = durable(verifier=validator).execute(gated())
+        planned = durable(acceptance=policy("pass")).plan(Task("Write the answer"))
+    with closing(CONNECT(path)) as db:
+        assert db.execute("PRAGMA journal_mode=DELETE").fetchone() == ("delete",)
+    return path, results, planned.run_ref["run_id"]
+
+
+def journal_copy(strict_journal, tmp_path) -> Path:
+    return Path(shutil.copyfile(strict_journal[0], tmp_path / "runs.db"))
+
+
+def journal_state(path: Path):
+    """The journal's bytes and rows, and the files beside it."""
+    return path.read_bytes(), dump(path), sorted(item.name for item in path.parent.iterdir())
+
+
+def inspect_durable(capsys, path, run_id):
+    code = main(["runs", "--journal", str(path), "--json", "inspect", run_id])
+    value = output(capsys)
+    assert value["ok"] is True and value["command"] == "inspect"
+    return code, value["inspect"]
+
+
+def saved_checkpoint(path: Path, run_id: str) -> dict:
+    with SQLiteWorkflowStore(path, read_only=True) as store:
+        return store.get_checkpoint(run_id)["checkpoint"]
+
+
+@pytest.mark.parametrize("decision,exit_code,action", [
+    ("accepted", EXIT_OK, "none"),
+    ("rejected", EXIT_RUN_NOT_ACCEPTED, "review_output"),
+    ("needs_review", EXIT_RUN_NOT_ACCEPTED, "review_output"),
+    ("indeterminate", EXIT_RUN_INDETERMINATE, "resolve_indeterminate"),
+])
+def test_durable_strict_decisions_have_the_same_exit_codes(
+    strict_journal, tmp_path, capsys, monkeypatch, decision, exit_code, action,
+):
+    path, results = journal_copy(strict_journal, tmp_path), strict_journal[1]
+    result = results[decision]
+    saved = saved_checkpoint(path, result.execution_id)
+    before = journal_state(path)
+    no_side_effects(monkeypatch)
+
+    code, value = inspect_durable(capsys, path, result.execution_id)
+
+    assert code == exit_code
+    assert journal_state(path) == before
+    assert value["format"]["checkpoint_version"] == saved["version"] == 2
+    assert value["execution"]["state"] == "completed"
+    delivery = value["delivery"]
+    assert (delivery["recorded"], delivery["decision"], delivery["integrity"]) == (True, decision, "verified")
+    assert delivery["record"] == saved["delivery_acceptance"] == result.acceptance.to_dict()
+    assert delivery["record"]["output_sha256"] == text_sha256(saved["output"])
+    assert delivery["record"]["policy_sha256"] == DECISIONS[decision].sha256
+    outcome = {"accepted": "pass", "rejected": "reject"}.get(decision, "raise")
+    assert delivery["record"]["validators"][0]["validator"] == Fixed(outcome).identity.to_dict()
+    assert value["next_action"]["action"] == action
+    if decision == "accepted":
+        assert delivery["output_delivered"] is True and delivery["rejected_output"] is None
+    else:
+        assert delivery["output_delivered"] is False
+        assert delivery["rejected_output"] == {
+            "field": "output", "sha256": text_sha256(saved["output"]),
+            "bytes": len(saved["output"].encode("utf-8")),
+        }
+    # Inspection reports what the run returned.
+    projected = result.to_dict()
+    if projected["delivery"]["rejected_output"] is not None:
+        projected["delivery"]["rejected_output"]["field"] = "output"
+    assert projected["delivery"] == delivery
+    assert projected["next_action"] == value["next_action"]
+
+    assert main(["runs", "--journal", str(path), "inspect", result.execution_id]) == exit_code
+    text = capsys.readouterr().out
+    assert f"Delivery acceptance: {decision}" in text
+    assert f"Validator fixed-{outcome} 2" in text
+    assert f"Output: sha256 {text_sha256(saved['output'])}" in text
+    assert saved["output"] not in text
+    assert journal_state(path) == before
+
+
+@pytest.mark.parametrize("change,reason", [
+    ("output", "the saved output does not match the digest its record bound"),
+    ("output-and-record", "the journal holds no applied decision matching the saved record"),
+])
+def test_changed_durable_output_is_indeterminate_as_on_resume(strict_journal, tmp_path, capsys, change, reason):
+    path = journal_copy(strict_journal, tmp_path)
+    run_id = strict_journal[1]["accepted"].execution_id
+    tampered = "text that no validator checked"
+
+    def rewrite(checkpoint):
+        checkpoint["output"] = tampered
+        if change == "output-and-record":
+            checkpoint["delivery_acceptance"]["output_sha256"] = text_sha256(tampered)
+
+    rewrite_checkpoint(path, run_id, rewrite)
+    before = journal_state(path)
+
+    code, value = inspect_durable(capsys, path, run_id)
+
+    assert code == EXIT_RUN_INDETERMINATE
+    assert journal_state(path) == before
+    delivery = value["delivery"]
+    assert (delivery["decision"], delivery["integrity"]) == ("indeterminate", "mismatch")
+    assert delivery["record"]["decision"] == "accepted"
+    assert delivery["reasons"] == [reason]
+    assert delivery["output_delivered"] is False
+    assert delivery["rejected_output"]["sha256"] == text_sha256(tampered)
+    assert value["next_action"]["action"] == "resolve_indeterminate"
+    # Resuming the run reaches the same decision for the same reasons.
+    with SQLiteWorkflowStore(path) as store:
+        resumed = Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+                        run_store=store, max_budget_usd=1, acceptance=policy("pass")).resume(run_id)
+    assert resumed.acceptance.decision.value == "indeterminate"
+    assert list(resumed.acceptance.reasons) == delivery["reasons"]
+
+
+def test_unfinished_durable_strict_run_names_the_policy_that_must_resume_it(
+    strict_journal, tmp_path, capsys, monkeypatch,
+):
+    path, run_id = journal_copy(strict_journal, tmp_path), strict_journal[2]
+    before = journal_state(path)
+    no_side_effects(monkeypatch)
+
+    code, value = inspect_durable(capsys, path, run_id)
+
+    assert code == EXIT_OK
+    assert journal_state(path) == before
+    assert value["execution"]["state"] == "planned"
+    delivery = value["delivery"]
+    assert (delivery["recorded"], delivery["decision"], delivery["integrity"]) == (True, "not_evaluated", None)
+    assert delivery["output_delivered"] is False and delivery["rejected_output"] is None
+    assert delivery["record"]["policy_sha256"] == policy("pass").sha256
+    assert value["next_action"]["action"] == "resume"
+    assert policy("pass").sha256 in value["next_action"]["detail"]
+
+
+@pytest.mark.parametrize("name,version", [("legacy", 1), ("gate-validator", 2)])
+def test_durable_runs_without_a_strict_policy_have_no_record(strict_journal, tmp_path, capsys, name, version):
+    path, result = journal_copy(strict_journal, tmp_path), strict_journal[1][name]
+    before = journal_state(path)
+
+    code, value = inspect_durable(capsys, path, result.execution_id)
+
+    assert code == EXIT_OK
+    assert journal_state(path) == before
+    assert value["format"]["checkpoint_version"] == version
+    assert value["delivery"] == {"recorded": False, "decision": None, "reasons": [], "integrity": None,
+                                 "output_delivered": True, "rejected_output": None, "record": None}
+    assert value["next_action"]["action"] == "none"
+
+
+@pytest.mark.parametrize("change,message", [
+    (lambda state: state.update(version=1), "checkpoint version 1, but its recipe writes version 2"),
+    (lambda state: state.update(version=3), "it reads versions 1 and 2"),
+    (lambda state: state.pop("delivery_acceptance"), "no delivery acceptance block"),
+    (lambda state: state["delivery_acceptance"].update(decision="not_evaluated"), "does not match its run"),
+    (lambda state: state["delivery_acceptance"].update(policy_sha256="0" * 64), "does not match its run"),
+    (lambda state: state["delivery_acceptance"].update(version=2), "delivery acceptance is invalid"),
+])
+def test_a_durable_checkpoint_that_resume_would_refuse_is_unreadable(
+    strict_journal, tmp_path, capsys, change, message,
+):
+    path = journal_copy(strict_journal, tmp_path)
+    run_id = strict_journal[1]["accepted"].execution_id
+    rewrite_checkpoint(path, run_id, change)
+    before = journal_state(path)
+
+    assert main(["runs", "--journal", str(path), "--json", "inspect", run_id]) == EXIT_LOCAL_ERROR
+    error = output(capsys)["error"]
+    assert error["type"] == "RunInspectionError" and message in error["message"]
+    assert journal_state(path) == before
+
+
+def test_list_shows_durable_decisions(strict_journal, tmp_path, capsys, monkeypatch):
+    path, (_, results, planned) = journal_copy(strict_journal, tmp_path), strict_journal
+    before = journal_state(path)
+    no_side_effects(monkeypatch)
+
+    assert main(["runs", "--journal", str(path), "--json", "list"]) == EXIT_OK
+    listed = output(capsys)["list"]
+    rows = {row["run_id"]: (row["state"], row["decision"], row["error"]) for row in listed["runs"]}
+    expected = {results[name].execution_id: ("completed", decision, None) for name, decision in (
+        ("accepted", "accepted"), ("rejected", "rejected"), ("needs_review", "needs_review"),
+        ("indeterminate", "indeterminate"), ("legacy", None), ("gate-validator", None))}
+    assert rows == expected | {planned: ("planned", "not_evaluated", None)}
+    assert main(["runs", "--journal", str(path), "list"]) == EXIT_OK
+    text = capsys.readouterr().out
+    assert f"{results['rejected'].execution_id}  completed  acceptance rejected  next review_output" in text
+    assert journal_state(path) == before
