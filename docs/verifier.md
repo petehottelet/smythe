@@ -207,6 +207,17 @@ function is called synchronously: an `async def` function's coroutine is
 closed without running, and the gate fails. These results, and a report
 whose `outcome` is `error`, give a verdict marked `invalid`.
 
+`smythe.design.design_verifier(system, width=..., height=...)` is a ready-made
+objective gate for images. It reads each file the judged node wrote once,
+fails a file that is missing, unreadable or no longer holds the bytes whose
+`sha256` its record carries, and fails blank frames, wrong dimensions and
+near-duplicates; palette and flat-region findings block only with
+`include_advisory=True`. A node without files passes unless
+`require_artifacts=True`, which a gate on an image deliverable should set.
+The palette is checked when the verifier is built, and the verifier's
+`identity` is a `ValidatorIdentity` named `smythe.design` whose version and
+configuration digest cover its settings and detector thresholds.
+
 The executor holds every `Verifier` to the same rule: a verdict passes only
 when its `passed` is exactly `True`. A custom verifier's
 `Verdict(passed="false")` or `Verdict(passed=1)` is a failed verdict, and the
@@ -414,7 +425,8 @@ another validator has outcome `error`.
 
 **Files a delivered node wrote.** Final validators check only the output text.
 A delivered node's files are covered when a passed gate that the policy
-counts judged that node at its current generation. Each file's
+counts judged that node at its current generation, such as
+[`design_verifier(require_artifacts=True)`](#gating-without-a-model). Each file's
 record must carry the `sha256` and `size_bytes` written with it, and the file
 must still hold exactly those bytes when the run decides. A file that is not
 hashed, is missing or has changed, or files that no passed gate on their node

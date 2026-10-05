@@ -320,6 +320,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   gives `on_invalid`, and resuming a completed run re-hashes every bound file.
   `smythe.acceptance.delivered_artifacts(node)` performs the file check. See
   [files a delivered node wrote](docs/verifier.md#strict-delivery-acceptance).
+- `design_verifier(require_artifacts=True)` fails a judged node that wrote no
+  files; the default still passes it. The returned verifier's `identity` is a
+  `ValidatorIdentity` named `smythe.design` at
+  `smythe.design.DESIGN_VERIFIER_VERSION`, whose configuration digest covers
+  the palette, dimensions, `include_advisory`, `require_artifacts` and the
+  detector thresholds. See
+  [gating without a model](docs/verifier.md#gating-without-a-model).
 
 ### Changed
 
@@ -427,6 +434,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   release exits with code 8 (campaign binding drift). Holdout identities
   exclude the runner version, so a used holdout stays used; contracts, contract
   hashes and the ledger schema are unchanged.
+- `design_verifier` checks its palette when it is built: a colour that is not
+  six hexadecimal digits after an optional `#` raises `ValueError` from
+  `design_verifier(...)` instead of from the first verdict. The gate reads
+  each artifact file once, decodes those bytes, and fails a file whose bytes
+  no longer match the `sha256` its record carries with a `changed-artifact`
+  finding.
 
 ### Fixed
 
