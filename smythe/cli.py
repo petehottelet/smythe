@@ -690,6 +690,7 @@ def _emit_job_inspection(value: dict[str, Any]) -> None:
         print(f"Operation {_terminal_text(operation['operation_key'])} "
               f"({_terminal_text(operation['operation_id'])}): {_terminal_text(operation['status'])}; "
               f"attempts {operation['attempt_count']}/{operation['max_attempts']}")
+        print(f"  Input digest: {_terminal_text(operation.get('input_digest') or 'unavailable')}")
         for attempt in value["attempts"]:
             if attempt["operation_id"] != operation["operation_id"]:
                 continue

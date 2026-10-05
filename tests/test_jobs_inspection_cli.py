@@ -205,6 +205,34 @@ def test_human_inspection_shows_costs_call_states_attempts_and_artifact_findings
         assert label in captured.out
 
 
+def test_human_inspection_shows_each_operations_input_digest(job, capsys):
+    assert main(["jobs", "inspect", job.run["run_id"], "--store", str(job.path), "--json"]) == EXIT_OK
+    operations = output(capsys)["inspect"]["operations"]
+    assert operations and all(operation["input_digest"] for operation in operations)
+
+    assert main(["jobs", "inspect", job.run["run_id"], "--store", str(job.path)]) == EXIT_OK
+    lines = capsys.readouterr().out.splitlines()
+    for operation in operations:
+        heading = next(index for index, line in enumerate(lines)
+                       if line.startswith(f"Operation {operation['operation_key']} "))
+        assert lines[heading + 1] == f"  Input digest: {operation['input_digest']}"
+
+
+def test_human_inspection_says_when_an_input_digest_is_unavailable(capsys):
+    from smythe.cli import _emit_job_inspection
+
+    _emit_job_inspection({
+        "run_id": "run", "name": "job", "status": "completed", "counts": {},
+        "cost": {"approved_microusd": 0, "confirmed_microusd": 0, "exposure_microusd": 0,
+                 "reserved_microusd": 0, "cost_is_complete": True, "cost_contains_estimates": False},
+        "pagination": {"returned": 1, "total": 1, "offset": 0, "limit": 50, "has_more": False},
+        "event_pagination": {"returned": 0, "total": 0}, "attempts": [], "calls": [], "artifacts": [],
+        "operations": [{"operation_key": "hero[0]", "operation_id": "op_1", "status": "completed",
+                        "attempt_count": 1, "max_attempts": 1, "input_digest": None}],
+    })
+    assert "  Input digest: unavailable\n" in capsys.readouterr().out
+
+
 def test_human_output_escapes_stored_terminal_controls(capsys):
     from smythe.cli import _emit_job_inspection
 

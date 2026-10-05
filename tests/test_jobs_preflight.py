@@ -610,6 +610,41 @@ def test_input_digest_changes_with_what_the_provider_is_asked_for(tmp_path, chan
     assert set(input_digests(changed)).isdisjoint(input_digests(original))
 
 
+@pytest.mark.parametrize("guessed", [("application/octet-stream", None), (None, None),
+                                     ("image/x-png", None)])
+def test_input_digest_does_not_depend_on_the_platform_mime_database(tmp_path, monkeypatch, guessed):
+    """The digest used the MIME type mimetypes guessed, which varies by platform
+    and Python version (Windows Python 3.12 guesses no type for .webp)."""
+    write_references(tmp_path)
+    (tmp_path / "brand" / "mark.webp").write_bytes(b"mark-bytes")
+    (tmp_path / "brand" / "photo.JPG").write_bytes(b"photo-bytes")
+    data = reference_manifest_data()
+    data["operations"][0]["attachments"] += ["brand/mark.webp", "brand/photo.JPG"]
+    original = reference_plan(tmp_path, data)
+    monkeypatch.setattr(preflight_module.mimetypes, "guess_type", lambda path, strict=True: guessed)
+    elsewhere = reference_plan(tmp_path, data)
+
+    assert {item.mime_type for item in elsewhere.attachments} != {
+        item.mime_type for item in original.attachments}
+    assert input_digests(elsewhere) == input_digests(original)
+
+
+def test_input_digest_reads_attachment_types_from_a_fixed_extension_table():
+    fingerprint = {"relative_path": "a.png", "sha256": "0" * 64, "mime_type": "text/plain"}
+    operation = {"provider": "gemini_image", "model": "m", "options": {}, "prompt": "p",
+                 "artifact": {}, "attachments": ["a.png"]}
+
+    def digest(path: str, recorded: str = "text/plain") -> str:
+        return operation_input_digest(operation | {"attachments": [path]},
+                                      [fingerprint | {"relative_path": path, "mime_type": recorded}])
+
+    assert digest("a.png") == digest("b.PNG", "image/png")
+    assert digest("a.jpg") == digest("a.jpeg") == digest("a.JPEG", "application/octet-stream")
+    assert len({digest("a.png"), digest("a.jpg"), digest("a.gif"), digest("a.webp")}) == 4
+    # Any other type counts as application/octet-stream whatever was guessed.
+    assert digest("notes.txt") == digest("notes.md", "text/markdown") == digest("blob")
+
+
 def test_input_digest_changes_with_the_provider_adapter_version(tmp_path, monkeypatch):
     write_references(tmp_path)
     plan = reference_plan(tmp_path)

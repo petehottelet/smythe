@@ -11,11 +11,12 @@ import stat
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from decimal import Decimal
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from smythe.jobs.delivery import Registry, validator_registry
 from smythe.jobs.models import (
+    _IMAGE_EXTENSIONS_BY_MIME,
     ArtifactSpecV1,
     FrozenJSONValue,
     JobManifestV1,
@@ -449,6 +450,21 @@ def operation_id(
 
 
 INPUT_DIGEST_VERSION = 1
+# The MIME type the input digest records for an attachment, from its file
+# extension. A fingerprint's own type comes from mimetypes, whose guesses vary
+# by platform and Python version (Windows Python 3.12 guesses none for .webp),
+# so the digest reads this fixed table of the image types instead and records
+# any other extension as application/octet-stream.
+_DIGEST_MIME_TYPES = {
+    extension: mime_type
+    for mime_type, extensions in _IMAGE_EXTENSIONS_BY_MIME.items()
+    for extension in extensions
+}
+
+
+def _digest_mime_type(relative_path: str) -> str:
+    suffix = PurePosixPath(relative_path).suffix.lower()
+    return _DIGEST_MIME_TYPES.get(suffix, "application/octet-stream")
 
 
 def operation_input_digest(
@@ -460,9 +476,13 @@ def operation_input_digest(
     It covers the provider kind and adapter version, model, options, prompt,
     artifact spec and each attachment's SHA-256 and MIME type in order, but
     not the template key, count, ordinal, profile name, attempt limit, cost
-    ceilings or attachment paths, so samples of one template share it. It is
-    not part of the plan hash. Both arguments may also be ``to_dict()`` forms;
-    ``ValueError`` is raised for an attachment without a fingerprint.
+    ceilings or attachment paths, so samples of one template share it. The
+    MIME type comes from a fixed table of extensions (``.gif``, ``.jpg``,
+    ``.jpeg``, ``.png`` and ``.webp``; any other is
+    ``application/octet-stream``), not from the fingerprint, so the digest
+    is the same on every platform. It is not part of the plan hash. Both
+    arguments may also be ``to_dict()`` forms; ``ValueError`` is raised for
+    an attachment without a fingerprint.
     """
     # Imported here because the providers module imports this one.
     from smythe.jobs.providers import ADAPTER_VERSIONS
@@ -478,7 +498,7 @@ def operation_input_digest(
         if path not in fingerprints:
             raise ValueError(f"attachment {path!r} has no fingerprint")
         attachments.append({"sha256": fingerprints[path]["sha256"],
-                            "mime_type": fingerprints[path]["mime_type"]})
+                            "mime_type": _digest_mime_type(path)})
     provider = ProviderKind(spec["provider"])
     return _sha256_json({
         "version": INPUT_DIGEST_VERSION,

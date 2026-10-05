@@ -251,13 +251,17 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `smythe.jobs.operation_input_digest()` hashes the provider kind and its
   adapter version (`smythe.jobs.providers.ADAPTER_VERSIONS`), the model,
   options, prompt and artifact spec, and each attachment's SHA-256 and MIME
-  type in order. It leaves out the template key, count, ordinal, profile
-  name, attempt limit, cost ceilings and attachment paths, so every sample of
-  a template shares it. `jobs inspect` adds `input_digest` to each operation,
-  computed from the stored plan, and the HTML report shows it in an Input
-  digest column. `SQLiteRunStore.plan_attachments()` reads a run's recorded
-  attachment fingerprints. The digest is never stored: plan hashes, operation
-  IDs, approval tokens, exports and the Jobs schema are unchanged. See
+  type in order, the type read from a fixed table of image extensions so
+  that the digest is the same on every platform. It leaves out the template
+  key, count, ordinal, profile name, attempt limit, cost ceilings and
+  attachment paths, so every sample of a template shares it. `jobs inspect`
+  adds `input_digest` to each operation, computed from the stored plan, and
+  prints it; the HTML report shows it in an Input digest column. It is null
+  where it cannot be computed, including when the stored attachment
+  fingerprints are unreadable. `SQLiteRunStore.plan_attachments()` reads a
+  run's recorded attachment fingerprints. The digest is never stored: plan
+  hashes, operation IDs, approval tokens, exports and the Jobs schema are
+  unchanged. See
   [operation identity](docs/jobs.md#operation-identity-and-input-digest).
 - Strict runs check their acceptance obligations before they spend.
   `smythe.acceptance.validate_acceptance_obligations(graph, policy)` lists

@@ -205,7 +205,12 @@ followed by the hash of version 1 of a canonical JSON object holding:
   changes how that provider's requests are built;
 - the model, provider options and prompt;
 - the artifact spec; and
-- each attachment's SHA-256 and MIME type, in the operation's order.
+- each attachment's SHA-256 and MIME type, in the operation's order. The
+  MIME type comes from a fixed table of extensions (`.gif`, `.jpg` and
+  `.jpeg`, `.png` and `.webp`, in any case); any other extension counts as
+  `application/octet-stream`. The plan's fingerprints record the type the
+  platform's MIME database guesses, which differs between platforms and
+  Python versions, so the digest does not use it.
 
 The template key, count, ordinal, profile name, `max_attempts`, cost ceilings
 and attachment paths are left out. Every sample of a template therefore shares
@@ -216,8 +221,12 @@ artifact spec, attachment content or attachment order changes it.
 The digest is computed on demand and never stored. It is not part of the plan
 hash or approval token, so plans, exports, approvals and the Jobs schema are
 unchanged. `jobs inspect` adds `input_digest` to each operation, computed from
-the run's stored plan, and the HTML report shows it in an Input digest column.
-It is `null` for an operation whose stored specification cannot produce one.
+the run's stored plan, prints it on an `Input digest:` line under each
+operation, and the HTML report shows it in an Input digest column. It is
+`null` (`unavailable` in the printed output) for an operation whose stored
+specification cannot produce one, or that sends attachments when the plan's
+stored attachment fingerprints cannot be read; inspection itself still
+succeeds.
 Jobs does not reuse artifacts across runs by digest.
 
 ## The dispatch journal

@@ -360,13 +360,25 @@ def test_an_operation_whose_digest_cannot_be_computed_reports_none(tmp_path):
         "no-model": None, "unknown-provider": None, "unplanned-file": None}
 
 
-def test_corrupt_stored_plan_attachments_fail_inspection_closed(tmp_path):
-    database, run_id, _ = _reference_run(tmp_path)
+@pytest.mark.parametrize("attachments", ["'not a list'", "json('[1]')",
+                                         "json('[{\"relative_path\": \"brand/logo.png\"}]')"],
+                         ids=["not-an-array", "not-objects", "missing-fields"])
+def test_corrupt_stored_plan_attachments_give_null_input_digests(tmp_path, attachments):
+    """An unreadable attachments array used to fail the whole inspection; the
+    digest is informational, so only the digests it would feed are null."""
+    database, run_id, plan = _reference_run(tmp_path)
+    plain = operation_input_digest(plan.operations[-1], plan.attachments)
     with closing(sqlite3.connect(database)) as db, db:
-        db.execute("UPDATE runs SET plan_json=json_set(plan_json,'$.attachments','not a list')")
+        db.execute(f"UPDATE runs SET plan_json=json_set(plan_json,'$.attachments',{attachments})")
 
-    with SQLiteRunStore(database, read_only=True) as store, pytest.raises(RunStoreError):
-        inspect_job(store, run_id)
+    with SQLiteRunStore(database, read_only=True) as store:
+        with pytest.raises(RunStoreError):
+            store.plan_attachments(run_id)  # the store itself still fails closed
+        report = inspect_job(store, run_id)
+
+    digests = {operation["operation_key"]: operation["input_digest"]
+               for operation in report["operations"]}
+    assert digests == {"hero[0]": None, "hero[1]": None, "plain[0]": plain}
 
 
 def _fake_store(tmp_path, **updates):
