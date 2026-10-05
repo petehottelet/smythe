@@ -529,3 +529,47 @@ def test_strict_run_accepts_a_final_step_that_returns_the_whole_deliverable():
     result = argue_then_critique(complete)
     assert result.accepted and result.output == complete
     assert result.acceptance.validators[0].outcome == "passed"
+
+
+PLAN_CHECKS = JSONValidator({"checks": CHECKS})
+
+
+def gather_then_report(report: str, *, parallel: bool = False):
+    """A strict run whose final step's JSON a JSONValidator checks."""
+    graph = ExecutionGraph([Topology.SERIAL], [
+        Node(id="gather", label="Gather"),
+        Node(id="report", label="Report", depends_on=["gather"]),
+    ])
+    provider = Steps({"Gather": "The plan has three items, owned by ops.", "Report": report})
+    policy = AcceptancePolicy(mode="strict", final_validators=[PLAN_CHECKS])
+    return Swarm(provider=provider, model="test", acceptance=policy, parallel=parallel).execute(graph)
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_strict_run_accepts_json_that_passes_every_check(parallel):
+    report = json.dumps(DOCUMENT)
+    result = gather_then_report(report, parallel=parallel)
+
+    assert result.accepted and result.output == report and result.rejected_output is None
+    (outcome,) = result.acceptance.validators
+    assert (outcome.validator, outcome.outcome) == (PLAN_CHECKS.identity, "passed")
+    assert result.acceptance.output_sha256 == ValidationSubject.from_text(report).sha256
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+@pytest.mark.parametrize("report,reason", [
+    (json.dumps(dict(DOCUMENT, items=[{"title": "a"}, {"name": "b"}, {"name": "c"}])),
+     "json_path_missing: check 'first-name': $['items'][0]['name'] is missing"),
+    (json.dumps(dict(DOCUMENT, count=4)),
+     "json_check_failed: check 'count' (equals) failed at $['count']"),
+    ("```json\n" + json.dumps(DOCUMENT) + "\n```", "json_invalid: output is not strict JSON: "),
+], ids=["missing-path", "wrong-value", "fenced"])
+def test_strict_run_rejects_json_that_fails_a_check(report, reason, parallel):
+    result = gather_then_report(report, parallel=parallel)
+
+    assert not result.accepted and result.acceptance.decision == "rejected"
+    assert result.output == "" and result.rejected_output == report
+    (outcome,) = result.acceptance.validators
+    assert (outcome.validator, outcome.outcome) == (PLAN_CHECKS.identity, "rejected")
+    (recorded,) = result.acceptance.reasons
+    assert recorded.startswith(f"final validator 'smythe.json-spec' rejected the output: {reason}")
