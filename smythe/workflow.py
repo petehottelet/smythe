@@ -9,6 +9,8 @@ from contextvars import ContextVar
 import hashlib
 import json
 import math
+import os
+from pathlib import Path
 from types import MappingProxyType
 from uuid import uuid4
 
@@ -41,6 +43,11 @@ from smythe.validators import SourceEvidenceValidator
 from smythe.verifier import (
     ADVISORY_VERDICT_KEY, TOKEN_VERIFIER_IDENTITY, TokenVerifier, Verdict, Verifier,
     node_generation, validate_verification_checkpoint, verification_pending,
+)
+from smythe.workflow_artifact import (
+    PUBLICATION_OPERATION, MarkdownRenderer, PublishedArtifact, artifact_problems, claim_directory,
+    current_artifact, owner_bytes, publication_key, publications, publish_bytes, read_publication,
+    read_published, render_document, renderer_settings,
 )
 from smythe.workflow_binding import (
     CallScope, ComponentBinding, LocalOnly, WorkflowBindingError, bind_component,
@@ -462,13 +469,21 @@ class WorkflowRuntime:
     :class:`~smythe.context.ContextSnapshot`. A run that already recorded its
     sources keeps them, whatever sources a later runtime is given;
     :meth:`refresh_context` replaces them explicitly.
+
+    ``renderer``, a :class:`~smythe.workflow_artifact.MarkdownRenderer` or a
+    renderer declared with ``LocalOnly(..., role="renderer")``, publishes the
+    run's delivered document into ``artifact_dir/<run id>`` after synthesis
+    (see :mod:`smythe.workflow_artifact`); the recipe records its
+    description only when there is one. Without a renderer, ``artifact_dir``
+    is ignored, as before. :meth:`republish` publishes a completed run's
+    document again when its file is missing or changed.
     """
 
     def __init__(self, *, store, model, max_budget_usd, provider, architect, registry,
                  router, synthesizer, supervisor, max_revisions, verifier, memory,
                  tool_runtime, checkpoint_store, checkpoint_every_n_nodes, retry_backoff_s,
                  max_concurrency, graph_policy=None, behavior_settings=None, acceptance=None,
-                 read_tools=(), context_sources=None):
+                 read_tools=(), context_sources=None, renderer=None, artifact_dir=None):
         if type(store) is not SQLiteWorkflowStore:
             raise WorkflowBindingError(
                 f"run_store must be SQLiteWorkflowStore itself, not {type(store).__name__}"
@@ -515,6 +530,22 @@ class WorkflowRuntime:
                     "acceptance without a final validator can accept only DELIVERABLE output "
                     f"that a passed gate judged; {strategy} synthesis needs a final validator"
                 )
+        if renderer is not None:
+            if type(renderer) is not MarkdownRenderer and not (
+                    type(renderer) is LocalOnly and renderer.role == "renderer"):
+                shown = (f"a LocalOnly {renderer.role}" if type(renderer) is LocalOnly
+                         else type(renderer).__name__)
+                raise WorkflowBindingError(
+                    "renderer must be MarkdownRenderer or a renderer declared with "
+                    f"LocalOnly(..., role='renderer'), not {shown}"
+                )
+            if not isinstance(artifact_dir, (str, os.PathLike)):
+                raise WorkflowBindingError("renderer needs an artifact_dir to publish into")
+            if acceptance is not None and not acceptance.final_validators:
+                raise WorkflowBindingError(
+                    "acceptance without a final validator accepts only a node's result that a "
+                    "passed gate judged, and a rendered document is not one; add a final validator"
+                )
         if type(max_revisions) is not int or max_revisions < 0:
             raise WorkflowBindingError("max_revisions must be a non-negative integer")
         if type(max_concurrency) is not int or max_concurrency < 1:
@@ -538,6 +569,9 @@ class WorkflowRuntime:
         self.checkpoint_every_n_nodes = checkpoint_every_n_nodes
         self.graph_policy = snapshot_graph_policy(graph_policy)
         self.read_tools = _snapshot_read_tools(read_tools)
+        # The run's directory is <artifact_dir>/<run id>; no renderer, no publication.
+        self.renderer = renderer
+        self.artifact_dir = None if renderer is None else Path(artifact_dir).resolve()
         # Explicitly configured behavior versions (see RECIPE_BEHAVIOR_FIELDS),
         # which the recipe below records for a new run, and, once a run is
         # bound, the versions that run uses.
@@ -610,6 +644,9 @@ class WorkflowRuntime:
             # Profile descriptions, never decoder code; omitted when none.
             recipe["read_tools"] = [self.read_tools[name].workflow_descriptor()
                                     for name in sorted(self.read_tools)]
+        if self.renderer is not None:
+            # Identity and version, never code; omitted when nothing is published.
+            recipe["renderer"] = describe_component(self.renderer, role="renderer")
         for name, (absent, default) in RECIPE_BEHAVIOR_FIELDS.items():
             value = self.behavior_settings.get(name, default)
             if _canonical(value) != _canonical(absent):
@@ -653,6 +690,11 @@ class WorkflowRuntime:
                 "Workflow read_tools differ from the saved recipe; resume the run with the read "
                 "profiles it started with"
             )
+        if _canonical(saved.get("renderer")) != _canonical(current.get("renderer")):
+            raise WorkflowConflictError(
+                "Workflow renderer differs from the saved recipe; resume the run with the renderer "
+                "it started with"
+            )
         if _canonical(_without_pricing(saved, saved=True)) != _canonical(_without_pricing(current)):
             raise WorkflowConflictError("Workflow components or budget differ from the saved recipe")
         self.behavior = behavior
@@ -691,6 +733,12 @@ class WorkflowRuntime:
             if validator.identity.config_sha256 != self.recipe["validators"][0]["config_sha256"]:
                 raise WorkflowBindingError("Gate validator configuration differs from the recipe")
             self.gate_verifier = _ValidatorVerifier(validator)
+        self.bound_renderer = None
+        if self.renderer is not None:
+            self.bound_renderer = bind_component(self.renderer, binding.child("renderer"),
+                                                 role="renderer")
+            settings = renderer_settings(self.bound_renderer)
+            self.renderer_filename, self.renderer_media_type = settings
 
     def _component_call(self, source, scope):
         operation_key = _hash(scope.trigger)
@@ -1435,6 +1483,9 @@ class WorkflowRuntime:
             # No node has run, so a plan, edited or generated, is checked
             # now. A run that started met its obligations then.
             self._check_obligations(self.graph)
+        if self.renderer is not None:
+            # Refuse a directory the run cannot publish into before any call.
+            self._claim_artifact_directory()
         self.execution_concurrency = (state.get("max_concurrency") if state else None) or max_concurrency
         if (type(self.execution_concurrency) is not int
                 or not 1 <= self.execution_concurrency <= self.max_concurrency):
@@ -1479,14 +1530,140 @@ class WorkflowRuntime:
             final = await self._operation_result(
                 key, "synthesis", {"graph": graph_to_dict(self.graph)}, synthesize,
             )
-            await self._record_source_evidence(final["output"])
-            acceptance = None if self.acceptance is None else await self._decide(key, final["output"])
+            output = final["output"]
+            if self.renderer is not None:
+                # The published document is the output delivered and decided.
+                output = await self._publish_output(key, output)
+            await self._record_source_evidence(output)
+            acceptance = None if self.acceptance is None else await self._decide(key, output)
             # The completed checkpoint consumes the synthesis and the decision together.
-            self._save("completed", output=final["output"], acceptance=acceptance)
-            return self._result(final["output"], acceptance)
+            self._save("completed", output=output, acceptance=acceptance)
+            return self._result(output, acceptance)
         except BaseException:
             self._save("failed")
             raise
+
+    def _artifact_directory(self):
+        """The bound run's own directory, ``<artifact_dir>/<run id>``."""
+        return self.artifact_dir / self.run_id
+
+    def _claim_artifact_directory(self):
+        """Bind the run's directory to the run, and check it can publish without replacing."""
+        claim_directory(self._artifact_directory(), owner_bytes(self.store.store_id, self.run_id))
+
+    async def _publication(self, inputs_at, data_for, record_for):
+        """Run the publication whose inputs are ``inputs_at(sequence)``; return its record.
+
+        The sequence is that of the operation that already has those inputs,
+        which then replays, or else the next free one. ``data_for()`` gives
+        the bytes to publish, which ``record_for(sequence, name, data)``
+        records once they are published. The run's directory must already be
+        claimed in this session.
+        """
+        saved = publications(self.store, self.run_id)
+        sequence = next((number for number, operation in enumerate(saved)
+                         if operation["inputs"] == inputs_at(number)), len(saved))
+        inputs = inputs_at(sequence)
+
+        async def publish(_):
+            data = data_for()
+            name = publish_bytes(self._artifact_directory(), self.renderer_filename, data)
+            return {"artifact": record_for(sequence, name, data).to_dict()}
+
+        result = await self._operation_result(publication_key(sequence), PUBLICATION_OPERATION,
+                                              inputs, publish)
+        return read_publication({"kind": PUBLICATION_OPERATION, "inputs": inputs, "result": result},
+                                sequence)
+
+    async def _publish_output(self, synthesis_key, text):
+        """Render the synthesized *text* and publish the document; return the document's text.
+
+        A ``publication`` operation keyed ``publication/<sequence>`` records
+        the file, bound to the synthesis it rendered. A process lost after
+        publishing reuses the file it published; one lost after the operation
+        committed renders the document again and checks that it has the
+        recorded SHA-256, or else reads the published file. The text
+        returned is exactly the published bytes.
+        """
+        rendered = []
+
+        def inputs_at(sequence):
+            return {"sequence": sequence, "synthesis": synthesis_key,
+                    "output_sha256": text_sha256(text), "renderer": self.recipe["renderer"]}
+
+        def render():
+            rendered.append(render_document(self.bound_renderer, text, self.graph.task))
+            return rendered[-1]
+
+        def record_for(sequence, name, data):
+            return PublishedArtifact(
+                sequence=sequence, directory=str(self._artifact_directory()), name=name,
+                sha256=hashlib.sha256(data).hexdigest(), size_bytes=len(data),
+                media_type=self.renderer_media_type, renderer=self.recipe["renderer"],
+                synthesis=synthesis_key, output_sha256=text_sha256(text),
+            )
+
+        record = await self._publication(inputs_at, render, record_for)
+        data = rendered[-1] if rendered else render()
+        if hashlib.sha256(data).hexdigest() != record.sha256:
+            data = read_published(record)
+            if data is None:
+                raise WorkflowStateError(
+                    f"The published document {record.name!r} is missing or changed, and the "
+                    "renderer no longer makes its bytes from the saved synthesis"
+                )
+        return data.decode("utf-8")
+
+    async def republish(self, run_id):
+        """Publish a completed run's document again, as a new file; return the current record.
+
+        When the current publication's file is missing or changed, the saved
+        document's bytes, which must still have the published SHA-256, are
+        published under the renderer's file name or the next free numbered
+        name in the run's directory, never replacing a file, so a changed
+        file stays as it is. The next ``publication`` operation records it and
+        a new completed checkpoint applies it, which makes it current (see
+        :func:`~smythe.workflow_artifact.current_artifact`). The delivery
+        decision is unchanged: it binds the same bytes. Nothing is rendered,
+        validated or called. A run whose current file still holds its bytes
+        is left as it is, and its current record is returned.
+
+        Raises ``WorkflowStateError`` for a run without a renderer, a run that
+        has not completed or published, and a saved output that is not the
+        published document.
+        """
+        async with self._session(self.store.load_run(run_id)):
+            if self.renderer is None:
+                raise WorkflowStateError("Workflow has no renderer, so it publishes no artifact")
+            state = self._restore()
+            if state is None or state["status"] != "completed":
+                raise WorkflowStateError("Only a completed workflow can publish its document again")
+            current, output = current_artifact(self.store, self.run_id), state["output"]
+            if current is None:
+                raise WorkflowStateError("Workflow has no published document to publish again")
+            previous = current.publication
+            if not isinstance(output, str) or text_sha256(output) != previous.sha256:
+                raise WorkflowStateError("The saved output is not the published document")
+            if current.integrity["status"] == "verified":
+                return previous
+
+            def inputs_at(sequence):
+                return {"sequence": sequence, "republishes": previous.sequence,
+                        "sha256": previous.sha256, "size_bytes": previous.size_bytes}
+
+            def record_for(sequence, name, data):
+                return PublishedArtifact(
+                    sequence=sequence, directory=str(self._artifact_directory()), name=name,
+                    sha256=previous.sha256, size_bytes=previous.size_bytes,
+                    media_type=previous.media_type, renderer=previous.renderer,
+                    synthesis=previous.synthesis, output_sha256=previous.output_sha256,
+                )
+
+            self._claim_artifact_directory()
+            record = await self._publication(inputs_at, lambda: output.encode("utf-8"), record_for)
+            self.execution_concurrency = state.get("max_concurrency")
+            self._save("completed", output=output, acceptance=self.saved_acceptance)
+            return record
 
     def _synthesis_key(self):
         """The synthesis operation's key for this run (see :func:`_synthesis_key`)."""
@@ -1602,6 +1779,9 @@ class WorkflowRuntime:
         problems = _decision_problems(self.store, self.run_id, self.graph, output, record,
                                       task=task_from_dict(self.run["task"]),
                                       policy_sha256=self.run_policy_sha256)
+        if self.renderer is not None:
+            # The delivered document must also be published intact.
+            problems += artifact_problems(current_artifact(self.store, self.run_id), output)
         if not problems:
             return record
         return DeliveryAcceptance(

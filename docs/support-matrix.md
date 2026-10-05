@@ -264,11 +264,13 @@ argument's name.
 | `tool_runtime` | `None`; nodes send plain text | Any tool runtime |
 | `read_tools` | `ReadProfile` declarations, named by read steps in graphs and templates you write | Other objects, duplicate names and `read_tools` without `run_store`; read steps naming an undeclared profile, with invalid input or judging another node; read steps on ordinary runs |
 | `checkpoint_store` | `None`; the journal holds checkpoints | Any checkpoint store |
+| `renderer` | `None`, `MarkdownRenderer`, or a renderer declared with `LocalOnly(..., role="renderer")` whose `render()` is synchronous; it [publishes the delivered document](workflow-accounting.md#published-documents) into `artifact_dir` | Other objects and other `LocalOnly` roles; `renderer` without `run_store` or `artifact_dir`; a strict policy without final validators; an `async` `render()` or an invalid `filename` or `media_type`; a run directory that another run owns or that holds files the run does not own |
 | Architects and other components | Built-in components and `LocalOnly` factories | Subclasses and unjournaled dependencies |
 | Node inputs | Plain text | `attach_dep_artifacts`, `attachments` and `artifacts` |
-| Resume | The saved recipe: components, models, budget, `retry_backoff_s`, concurrency, gate validator, acceptance policy and read profiles | Any change raises `WorkflowConflictError` |
+| Resume | The saved recipe: components, models, budget, `retry_backoff_s`, concurrency, gate validator, acceptance policy, read profiles and renderer | Any change raises `WorkflowConflictError` |
 | `max_budget_usd=None` | Runs without a budget | |
-| `artifact_dir`, `max_tool_iterations` | Ignored | |
+| `artifact_dir` | Where a `renderer` publishes; ignored without one | |
+| `max_tool_iterations` | Ignored | |
 
 A caller-built graph with image inputs fails before any node runs. A
 generated plan with them goes back to the planner for a repair, which is a
@@ -305,6 +307,14 @@ Tests:
   `tests/test_workflow_acceptance.py::test_corrupted_stored_output_is_not_accepted`,
   `tests/test_workflow_process_loss.py::test_killed_durable_run_resumes_its_decision_without_new_calls`
   and `tests/test_workflow_process_loss.py::test_killed_priced_run_keeps_its_charges_generations_and_regeneration`.
+- Published documents: `tests/test_workflow_artifact.py::test_the_published_document_is_the_output_the_policy_decides`,
+  `tests/test_workflow_artifact.py::test_runs_without_a_renderer_keep_their_recipe_and_publish_nothing`,
+  `tests/test_workflow_artifact.py::test_a_local_only_renderer_records_its_identity_and_names_its_file`,
+  `tests/test_workflow_artifact.py::test_republishing_never_clobbers`
+  and `tests/test_workflow_artifact.py::test_a_process_lost_after_publishing_reuses_its_file`;
+  refused `tests/test_workflow_artifact.py::test_renderer_configuration_is_checked`,
+  `tests/test_workflow_artifact.py::test_resume_needs_the_renderer_the_run_started_with`
+  and `tests/test_workflow_artifact.py::test_a_directory_with_files_the_run_does_not_own_is_refused_before_any_call`.
 - Read steps: `tests/test_workflow_read_tool.py::test_a_read_step_runs_without_a_model_call`,
   `tests/test_workflow_read_tool.py::test_only_developer_graphs_declare_read_steps`,
   `tests/test_workflow_read_tool.py::test_recipes_record_read_tools_only_when_declared`

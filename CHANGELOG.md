@@ -573,6 +573,25 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   adds a `decisions` block with the current decision's sequence and the
   decisions before it, and its exit codes follow the current decision. See
   [re-evaluation](docs/verifier.md#re-evaluation).
+- Durable text workflows can publish their delivered output as a local
+  document. `Swarm(run_store=..., renderer=MarkdownRenderer())`, or a
+  deterministic renderer declared with `LocalOnly(..., role="renderer")`,
+  renders the synthesized text after synthesis, and the document's bytes are
+  published once into `artifact_dir/<run id>/`, which an owner marker binds
+  to the run, without replacing any file. The recipe records the renderer's
+  identity and version only when there is one. The document is the run's
+  output, so a strict policy's final validators check those bytes and its
+  decision binds their SHA-256; a strict policy with a renderer needs a final
+  validator. Each publication is a journaled `publication` operation holding
+  a `PublishedArtifact` record, and a process lost after publishing reuses
+  its file. `smythe.workflow_artifact.current_artifact()` returns a run's
+  current publication, the decision that covers it and whether it is
+  eligible for delivery. A missing or changed file is not: resuming the run
+  gives an `indeterminate` decision, and `smythe runs inspect` reports the
+  `artifact` block, exits with code 11 and names the next action
+  `republish`. `Swarm.republish()` publishes the saved document again under
+  a free name, which becomes current, with no provider call and the same
+  decision. See [published documents](docs/workflow-accounting.md#published-documents).
 
 ### Changed
 

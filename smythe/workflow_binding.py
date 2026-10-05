@@ -158,6 +158,12 @@ class LocalOnly:
     ``Provider``, a coroutine function or an awaitable is refused as the
     factory and as what it builds, as is an ``async`` ``validate``. The
     recipe records the identity, including its ``config_sha256``.
+
+    With ``role="renderer"`` the factory builds a deterministic document
+    renderer for a durable run's published output: a synchronous
+    ``render(output, task)`` that returns text, with an optional
+    ``filename`` and ``media_type`` (see
+    :func:`smythe.workflow_artifact.renderer_settings`).
     """
 
     factory: Callable[[], object] = field(repr=False, compare=False)
@@ -172,7 +178,8 @@ class LocalOnly:
             not isinstance(value, str) or not value.strip() for value in (self.identity, self.version)
         ):
             raise WorkflowBindingError("LocalOnly requires a factory, identity, and version")
-        if self.role not in {"architect", "supervisor", "synthesizer", "template_builder", "validator"}:
+        if self.role not in {"architect", "supervisor", "synthesizer", "template_builder",
+                             "validator", "renderer"}:
             raise WorkflowBindingError("Unsupported LocalOnly component role")
 
     def workflow_description(self, **defaults) -> dict:
@@ -181,6 +188,8 @@ class LocalOnly:
                        "identity": self.identity, "version": self.version}
         if self.role == "validator":
             description["config_sha256"] = self.validator().identity.config_sha256
+        elif self.role == "renderer":
+            self.renderer()  # Refuse an unusable renderer when it is declared.
         return description
 
     def workflow_providers(self) -> tuple[Provider, ...]:
@@ -211,9 +220,33 @@ class LocalOnly:
             )
         return component
 
+    def renderer(self):
+        """Build a fresh renderer and check it against the renderer contract."""
+        from smythe.workflow_artifact import renderer_settings
+
+        if self.role != "renderer":
+            raise WorkflowBindingError(f"LocalOnly {self.role} is not a renderer")
+        require_exact(self, LocalOnly)
+        component = self.factory()
+        if inspect.isawaitable(component):
+            if inspect.iscoroutine(component):
+                component.close()
+            raise WorkflowBindingError("LocalOnly renderer factory returned an awaitable")
+        if component is self or isinstance(component, Provider):
+            raise WorkflowBindingError("LocalOnly factory must produce a local component")
+        render = getattr(component, "render", None)
+        if not callable(render):
+            raise WorkflowBindingError("LocalOnly renderer requires render()")
+        if inspect.iscoroutinefunction(render) or inspect.isasyncgenfunction(render):
+            raise WorkflowBindingError("LocalOnly renderer render() must be synchronous")
+        renderer_settings(component)
+        return component
+
     def bind_run(self, binding: ComponentBinding):
         if self.role == "validator":
             return self.validator()
+        if self.role == "renderer":
+            return _BoundLocal(self, self.renderer(), binding)
         self.workflow_description()
         component = self.factory()
         if component is self or isinstance(component, Provider):
@@ -275,6 +308,9 @@ class _BoundLocal:
         method = getattr(self.component, "asynthesize", None)
         return await method(graph) if method is not None else self.component.synthesize(graph)
 
+    def render(self, output, task):
+        return self.component.render(output, task)
+
     def __call__(self, *args, **kwargs):
         return self.component(*args, **kwargs)
 
@@ -286,9 +322,10 @@ def _supported_types():
     from smythe.router import WhiteRabbit
     from smythe.supervisor import LLMSupervisor
     from smythe.synthesizer import Synthesizer
+    from smythe.workflow_artifact import MarkdownRenderer
 
     return (LLMArchitect, SimpleArchitect, ConstrainedArchitect, Registry,
-            WhiteRabbit, LLMSupervisor, Synthesizer, LocalOnly, _BoundLocal)
+            WhiteRabbit, LLMSupervisor, Synthesizer, MarkdownRenderer, LocalOnly, _BoundLocal)
 
 
 def describe_component(component, *, role=None, default_provider=None, default_model="") -> dict:
@@ -305,7 +342,7 @@ def describe_component(component, *, role=None, default_provider=None, default_m
         "architect": {"llm_architect", "simple_architect", "constrained_architect"},
         "router": {"white_rabbit"}, "registry": {"registry"},
         "supervisor": {"llm_supervisor"}, "synthesizer": {"synthesizer"},
-        "template_builder": set(), "validator": set(),
+        "template_builder": set(), "validator": set(), "renderer": {"markdown_renderer"},
     }
     if role is not None and (
         role not in roles or not (

@@ -3,8 +3,9 @@
 ``smythe runs`` reads an ordinary run's checkpoint through a
 :class:`~smythe.checkpoint.FileCheckpointStore`, or a durable run from a
 :class:`~smythe.workflow_store.SQLiteWorkflowStore` opened read-only, and
-reports execution, delivery acceptance and its decision history, cost, timing
-and the next action as separate JSON blocks.
+reports execution, delivery acceptance and its decision history, a durable
+run's published artifact, cost, timing and the next action as separate JSON
+blocks.
 :meth:`smythe.swarm.SwarmResult.to_dict` builds its execution, delivery,
 unknown-exposure and next-action blocks with the same functions. Nothing here
 constructs a provider, migrates a journal or writes a file.
@@ -39,6 +40,7 @@ from smythe.checkpoint import (
 )
 from smythe.graph import ExecutionGraph
 from smythe.validation import _json_sha256
+from smythe.workflow_artifact import CurrentArtifact, artifact_problems, current_artifact
 from smythe.workflow_store import (
     SQLiteWorkflowStore,
     WorkflowError,
@@ -126,13 +128,14 @@ def _action(action: str, detail: str) -> dict[str, str]:
 def next_action(
     state: str, delivery: dict[str, Any], *, cost_is_complete: bool,
     unresolved: list[str] | tuple[str, ...] = (), blocked_reason: str | None = None,
-    resume: str = "",
+    resume: str = "", artifact: dict[str, Any] | None = None,
 ) -> dict[str, str]:
     """The first thing a saved run needs, as a code and a sentence.
 
     Unresolved accounting comes first, because resume refuses it; then an
     unfinished run's resume (*resume* says how); then a completed run's
-    withheld output, then its unknown cost.
+    published *artifact* whose file is missing or changed; then its withheld
+    output, then its unknown cost.
     """
     if blocked_reason == "budget_overrun":
         return _action("rerun", "Spending passed the run's budget, so it admits no more calls; "
@@ -143,6 +146,12 @@ def next_action(
                        + "; ".join(unresolved) + ".")
     if state != "completed":
         return _action("resume", resume)
+    if artifact is not None and any(reason.startswith("artifact_") for reason in
+                                    artifact["delivery_eligibility"]["reasons"]):
+        return _action("republish", "The published document is "
+                                    f"{artifact['integrity']['status']}; publish it again with "
+                                    "Swarm(run_store=...).republish(run_id), which never replaces "
+                                    "a file.")
     decision = delivery["decision"]
     if decision in NOT_ACCEPTED:
         return _action("review_output", f"The decision is {decision}, so the output is withheld; "
@@ -324,6 +333,8 @@ def _checkpoint_view(execution_id: str, state: Any) -> dict[str, Any]:
         "execution": {"state": status, "blocked_reason": None, "nodes": node_counts(graph)},
         "delivery": delivery,
         "decisions": decisions,
+        # Only durable runs publish a rendered document.
+        "artifact": None,
         "accounting": accounting,
         "timing": checkpoint_timing(state),
         "next_action": next_action(
@@ -356,7 +367,7 @@ def inspect_checkpoint(store: FileCheckpointStore, execution_id: str) -> dict[st
 
 def _journal_acceptance(
     store: SQLiteWorkflowStore, run: dict[str, Any], checkpoint: dict[str, Any],
-    graph: ExecutionGraph, policy_sha256: str | None,
+    graph: ExecutionGraph, policy_sha256: str | None, artifact: CurrentArtifact | None,
 ) -> tuple[DeliveryAcceptance | None, list[str], dict[str, Any]]:
     """The delivery decision a durable checkpoint holds, what no longer matches it, and its history.
 
@@ -365,7 +376,8 @@ def _journal_acceptance(
     recorded, never as accepted. The record is read as resume reads it, and a
     decided one is checked as completed resume checks it: against the saved
     output, the task, the source generations and the journal's current
-    decision. The history lists every decision the journal applied.
+    decision, and for a run with a renderer against its current published
+    *artifact*. The history lists every decision the journal applied.
     """
     from smythe.workflow import _decision_problems, _saved_record, decision_history
 
@@ -382,6 +394,8 @@ def _journal_acceptance(
         return record, [], decisions
     problems = _decision_problems(store, run["run_id"], graph, checkpoint.get("output"), record,
                                   task=task, policy_sha256=policy_sha256)
+    if run["config"].get("renderer") is not None:
+        problems += artifact_problems(artifact, checkpoint.get("output"))
     return record, problems, decisions
 
 
@@ -395,6 +409,10 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
     policy = run["config"].get("acceptance")
     policy_sha256 = None if policy is None else _json_sha256(policy, "acceptance policy")
     record, problems, graph, decisions = None, [], None, decisions_view(None)
+    # The run's current publication, read through the one accessor resume uses.
+    artifact = None
+    if run["config"].get("renderer") is not None:
+        artifact = current_artifact(store, run_id)
     if checkpoint is not None:
         # The run's recipe sets its checkpoint version: version 2 for a
         # strict policy or a gate validator, version 1 otherwise.
@@ -411,7 +429,7 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
             )
         graph = graph_from_dict(checkpoint["graph"])
         record, problems, decisions = _journal_acceptance(store, run, checkpoint, graph,
-                                                          policy_sha256)
+                                                          policy_sha256, artifact)
     status, blocked = inspected["status"], inspected["blocked_reason"]
     checkpoint_status = checkpoint.get("status") if checkpoint is not None else None
     if status in ("blocked", "completed"):
@@ -449,12 +467,14 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
                       "run_status": status, "checkpoint_status": checkpoint_status},
         "delivery": delivery,
         "decisions": decisions,
+        "artifact": None if artifact is None else artifact.to_dict(),
         "accounting": accounting,
         "timing": journal_timing(store, run_id),
         "next_action": next_action(
             state, delivery, cost_is_complete=accounting["cost_is_complete"],
             unresolved=accounting["unresolved"], blocked_reason=blocked,
             resume=resume + ", once no worker holds its lease.",
+            artifact=None if artifact is None else artifact.to_dict(),
         ),
     }
 

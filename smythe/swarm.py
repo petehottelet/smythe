@@ -81,6 +81,7 @@ from smythe.verifier import (
     validate_verification_checkpoint,
     verification_pending,
 )
+from smythe.workflow_artifact import MarkdownRenderer, PublishedArtifact
 from smythe.workflow_binding import LocalOnly, WorkflowBindingError, _BoundLocal
 from smythe.workflow_policy import WorkflowGraphPolicy, snapshot_graph_policy
 from smythe.workflow_store import SQLiteWorkflowStore
@@ -331,6 +332,15 @@ class Swarm:
     assembly: the run records the sources once, and every node call is given
     a journaled context snapshot that marks sources and dependency outputs
     as untrusted data. :meth:`refresh_context` gives a run new sources.
+
+    ``renderer``, which needs a durable ``run_store``, publishes each run's
+    delivered output as a local document: a
+    :class:`~smythe.workflow_artifact.MarkdownRenderer`, or a deterministic
+    renderer declared with ``LocalOnly(..., role="renderer")``, renders the
+    synthesized text after synthesis, and the document is published once
+    into ``artifact_dir/<run id>`` without replacing any file. The document
+    is the run's output, so a strict policy decides on its exact bytes.
+    :meth:`republish` publishes it again when its file is missing or changed.
     """
 
     def __init__(
@@ -362,8 +372,14 @@ class Swarm:
         acceptance: AcceptancePolicy | None = None,
         read_tools: tuple[ReadProfile, ...] | list[ReadProfile] = (),
         context_sources: Sequence[ContextSource] | None = None,
+        renderer: MarkdownRenderer | LocalOnly | None = None,
     ) -> None:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
+        if renderer is not None and run_store is None:
+            raise WorkflowBindingError("renderer requires a durable run_store")
+        if renderer is not None and artifact_dir is None:
+            raise WorkflowBindingError("renderer needs an artifact_dir to publish into")
+        self._renderer = renderer
         if graph_policy is not None and run_store is None:
             raise WorkflowBindingError("graph_policy requires a durable run_store")
         if read_tools is None:
@@ -1093,6 +1109,23 @@ class Swarm:
             raise ValueError("refresh_context needs a durable run_store")
         return await self._workflow_runtime().refresh_context(execution_id, sources)
 
+    def republish(self, execution_id: str) -> PublishedArtifact:
+        """Publish a completed durable run's document again.  Sync wrapper around arepublish()."""
+        return asyncio.run(self.arepublish(execution_id))
+
+    async def arepublish(self, execution_id: str) -> PublishedArtifact:
+        """Publish a completed run's document again when its file is missing or changed.
+
+        The saved document's bytes go to a new file in the run's directory,
+        which becomes the run's current publication; no file is replaced, no
+        provider is called, and the delivery decision, which binds the same
+        bytes, is unchanged. Returns the current record. See
+        ``smythe.workflow.WorkflowRuntime.republish``.
+        """
+        if self._run_store is None:
+            raise ValueError("republish needs a durable run_store")
+        return await self._workflow_runtime().republish(execution_id)
+
     def _load_checkpoint(self, execution_id: str) -> dict[str, Any]:
         """The saved state of *execution_id*, at a checkpoint version this build reads."""
         state = self._checkpoint_store.load(execution_id)
@@ -1534,5 +1567,6 @@ class Swarm:
             graph_policy=self._graph_policy, behavior_settings=behavior_settings,
             acceptance=self._acceptance if acceptance is None else acceptance,
             read_tools=self._read_tools,
-            context_sources=self._context_sources,
+            context_sources=self._context_sources, renderer=self._renderer,
+            artifact_dir=self.artifact_dir,
         )

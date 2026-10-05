@@ -817,6 +817,17 @@ def _emit_run_inspection(value: dict[str, Any]) -> None:
     if withheld is not None:
         print(f"Withheld output: {withheld['bytes']} bytes in the saved {withheld['field']} field; "
               f"sha256 {withheld['sha256']}")
+    artifact = value["artifact"]
+    if artifact is not None:
+        published, eligibility = artifact["publication"], artifact["delivery_eligibility"]
+        print(f"Artifact: {_terminal_text(artifact['path'], limit=1000)} (publication "
+              f"{published['sequence']}); {published['size_bytes']} bytes; "
+              f"sha256 {published['sha256']}")
+        print(f"  Integrity: {artifact['integrity']['status']}: "
+              f"{_terminal_text(artifact['integrity']['detail'])}")
+        eligible = "eligible" if eligibility["eligible"] else (
+            "not eligible (" + ", ".join(eligibility["reasons"]) + ")")
+        print(f"  Delivery eligibility: {eligible}")
     accounting = value["accounting"]
     print(f"Cost: ${accounting['total_cost_usd']:.6f} ({accounting['cost_scope']}); "
           f"complete: {_yes(accounting['cost_is_complete'])}; "

@@ -46,6 +46,7 @@ its runs and its recorded version do not change.
 | `execution` | `state`, `blocked_reason`, and node counts by status. Ordinary states are `running`, `failed` and `completed`; durable runs add `planned` and `blocked`, with the journal's `run_status` and `checkpoint_status` |
 | `delivery` | The current delivery acceptance decision; see below |
 | `decisions` | The [decision history](#decision-history): the current decision's sequence and the decisions before it |
+| `artifact` | A durable run's [published document](#published-documents); null for a run that publishes none and for ordinary runs |
 | `accounting` | `cost_scope`, `total_cost_usd`, `max_budget_usd`, `cost_is_complete`, `cost_contains_estimates`, `unknown_cost_nodes`, the durable `workflow_accounting` balances, `unknown_exposure` and `unresolved` accounting that stops resume |
 | `timing` | `elapsed_ms`, `phases_ms` and `waiting_ms` added over the saved [timing segments](checkpoint-format.md#timing-segments), with the segment count, first start and last end; null when none were saved. Durable runs report lease sessions on the journal's wall clock and no phase totals |
 | `next_action` | The first thing the run needs, as an `action` code and a `detail` sentence |
@@ -63,7 +64,7 @@ number of calls that hold it.
 | `recorded` | Whether the run has a [delivery acceptance record](verifier.md#delivery-acceptance-records) |
 | `decision` | The decision that holds for the saved output now: `not_evaluated`, `accepted`, `rejected`, `needs_review`, `indeterminate`, or null without a record |
 | `reasons` | The reasons for that decision |
-| `integrity` | `verified` when the saved output, task and source node generations still match what the record bound, and for a durable run the journal applied the same decision; `mismatch` otherwise; null when nothing was decided |
+| `integrity` | `verified` when the saved output, task and source node generations still match what the record bound, and for a durable run the journal applied the same decision and any [published document](#published-documents) still holds the decided bytes; `mismatch` otherwise; null when nothing was decided |
 | `output_delivered` | Whether resuming the run returns its output as `output` |
 | `rejected_output` | For withheld output: the `field` that holds it, its `sha256` and its size in `bytes` |
 | `record` | The record as saved, including its validators' names, versions, configuration digests and outcomes |
@@ -114,12 +115,31 @@ Decision history: decision 1 is current; earlier decisions:
   Decision 0: rejected under policy 8a51c0e2d9f4: final validator 'required-section' rejected the output: section_missing: no '## Sources' section
 ```
 
+### Published documents
+
+A durable run with a [renderer](workflow-accounting.md#published-documents)
+reports its current publication under `artifact`, read through the same
+accessor resume uses:
+
+| Field | Meaning |
+|---|---|
+| `publication` | The `PublishedArtifact` record: `sequence`, `directory`, `name`, `sha256`, `size_bytes`, `media_type`, the `renderer` description, and the `synthesis` it rendered with that text's `output_sha256` |
+| `path` | Where the published file is |
+| `decision` | The delivery decision that covers it, or null |
+| `integrity` | `status` and `detail` from rechecking the file's size and SHA-256: `verified`, `missing`, `changed`, `unsafe` or `unreadable` |
+| `delivery_eligibility` | `eligible`, and `reasons` for every unmet condition: `no_decision`, `not_accepted`, `record_mismatch`, `artifact_missing`, `artifact_changed`, `artifact_unsafe`, `artifact_unreadable` |
+
+The file is only read. As on resume, a decided record whose published file is
+missing or changed gives `indeterminate` with that reason, and the next action
+is `republish`.
+
 ### Next actions
 
 | `action` | When |
 |---|---|
 | `none` | The run completed, its output is delivered and its cost is known |
 | `resume` | The run is unfinished; `detail` says how to resume it, including the strict policy's `sha256` that must resume a strict run, ordinary or durable |
+| `republish` | A completed durable run's published document is missing or changed; `Swarm(run_store=...).republish(run_id)` publishes it again without replacing a file |
 | `reconcile_accounting` | Accounting is unresolved (invalid usage, an accounting error, an unresolved native response, or a durable run blocked by `unknown_exposure` or `evidence_conflict`), or a completed run's cost is incomplete |
 | `rerun` | A durable run passed its budget and admits no more calls |
 | `review_output` | The output was `rejected` or `needs_review` and is withheld |
