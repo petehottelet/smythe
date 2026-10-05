@@ -1,10 +1,15 @@
 """Dedicated tests for WhiteRabbit — the task classifier/router."""
 
+import hashlib
+import json
+
 import pytest
 
 from helpers import ClassifierMockProvider, FixedArchitect
+from smythe import RoutingDecision as ExportedRoutingDecision
 from smythe.planner import ArchitectError
-from smythe.router import WhiteRabbit
+from smythe.provider import CompletionResult, Provider
+from smythe.router import CLASSIFIER_SYSTEM_PROMPT, ClassifierUsage, RoutingDecision, WhiteRabbit
 from smythe.task import Task
 
 
@@ -221,3 +226,179 @@ def test_sync_route_delegates_to_aroute():
     task = Task(goal="Sync test")
     result = router.route(task)
     assert result is det
+
+
+# --- Routing decision records ---
+
+
+class UsageProvider(Provider):
+    """Replies with a fixed classification and the usage it is given."""
+
+    def __init__(self, reply: str, **usage) -> None:
+        self.reply = reply
+        self.usage = usage
+        self.calls = 0
+
+    async def complete(self, system, prompt, model):
+        self.calls += 1
+        return CompletionResult(text=self.reply, **self.usage)
+
+
+def _router(reply: str | None, **tiers) -> WhiteRabbit:
+    tiers.setdefault("autonomous", FixedArchitect("fallback"))
+    provider = None if reply is None else ClassifierMockProvider(reply)
+    return WhiteRabbit(classifier_provider=provider, classifier_model="test", **tiers)
+
+
+def test_decide_without_a_classifier_records_the_fallback():
+    router = _router(None, deterministic={"k": FixedArchitect("k")})
+
+    architect, decision = router.decide(Task(goal="Anything"))
+
+    assert architect is router._autonomous
+    assert decision.to_dict() == {
+        "version": 1, "tier": "autonomous", "method": "fallback_no_classifier",
+        "alternatives": ["deterministic:k", "autonomous"],
+        "reasons": ["no classifier is configured, so the autonomous tier plans"],
+        "policy_version": 1, "matched_token": None, "usage": None, "call_ids": [],
+    }
+
+
+@pytest.mark.asyncio
+async def test_adecide_without_a_classifier_or_autonomous_tier_raises():
+    with pytest.raises(ArchitectError, match="No autonomous architect configured"):
+        await WhiteRabbit().adecide(Task(goal="Anything"))
+
+
+@pytest.mark.parametrize("reply,tier,token", [
+    ("Deterministic: MyShape", "deterministic:MyShape", "deterministic:myshape"),
+    ("**deterministic:`MyShape`**", "deterministic:MyShape", "deterministic:myshape"),
+    ("`Constrained`.", "constrained", "constrained"),
+    ("autonomous", "autonomous", "autonomous"),
+])
+def test_a_matched_reply_records_its_tier_and_normalized_token(reply, tier, token):
+    router = _router(reply, deterministic={"MyShape": FixedArchitect("shape")},
+                     constrained=FixedArchitect("constrained"))
+
+    architect, decision = router.decide(Task(goal="Shape it"))
+
+    assert architect is router.route(Task(goal="Shape it"))
+    assert (decision.tier, decision.method, decision.matched_token) == (tier, "classifier", token)
+    assert decision.alternatives == ("deterministic:MyShape", "constrained", "autonomous")
+    assert decision.reasons == (f"the classifier chose {tier}",)
+    assert decision.usage == ClassifierUsage(prompt_tokens=5, completion_tokens=2)
+    assert decision.call_ids == ()
+
+
+@pytest.mark.parametrize("reply", [
+    "I think this is a constrained task", "deterministic:missing", "constrained",
+])
+def test_an_unmatched_reply_records_the_fallback_without_the_reply(reply):
+    router = _router(reply, deterministic={"real": FixedArchitect("real")})
+
+    architect, decision = router.decide(Task(goal="Unclear"))
+
+    assert architect is router._autonomous
+    assert (decision.tier, decision.method, decision.matched_token) == (
+        "autonomous", "fallback_unmatched", None)
+    assert decision.reasons == ("the classifier reply named no configured tier, so the "
+                                "autonomous tier plans",)
+    assert reply not in json.dumps(decision.to_dict())
+    assert decision.usage == ClassifierUsage(prompt_tokens=5, completion_tokens=2)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("usage,expected", [
+    ({"prompt_tokens": 7, "completion_tokens": 3},
+     {"prompt_tokens": 7, "completion_tokens": 3, "cost_usd": None,
+      "cost_usd_is_estimate": False, "cost_usd_unknown": False}),
+    ({"prompt_tokens": 7, "completion_tokens": 3, "cost_usd": 0.002, "cost_usd_is_estimate": True},
+     {"prompt_tokens": 7, "completion_tokens": 3, "cost_usd": 0.002,
+      "cost_usd_is_estimate": True, "cost_usd_unknown": False}),
+    ({"prompt_tokens": 0, "completion_tokens": 9, "cost_usd": 1, "cost_usd_unknown": True},
+     {"prompt_tokens": 0, "completion_tokens": 9, "cost_usd": 1.0,
+      "cost_usd_is_estimate": False, "cost_usd_unknown": True}),
+])
+async def test_adecide_records_the_classifier_usage_the_provider_reported(usage, expected):
+    provider = UsageProvider("constrained", **usage)
+    constrained = FixedArchitect("constrained")
+    router = WhiteRabbit(constrained=constrained, autonomous=FixedArchitect("fallback"),
+                         classifier_provider=provider, classifier_model="test")
+
+    architect, decision = await router.adecide(Task(goal="Guided"))
+
+    assert architect is constrained and provider.calls == 1
+    assert decision.to_dict()["usage"] == expected
+    assert RoutingDecision.from_dict(decision.to_dict()) == decision
+
+
+@pytest.mark.asyncio
+async def test_aroute_returns_the_architect_adecide_chooses():
+    det = FixedArchitect("det")
+    router = _router("deterministic:k", deterministic={"k": det})
+    assert await router.aroute(Task(goal="Route")) is det
+    assert (await router.adecide(Task(goal="Route")))[0] is det
+
+
+def test_routing_records_leave_the_classifier_prompt_unchanged():
+    assert hashlib.sha256(CLASSIFIER_SYSTEM_PROMPT.encode()).hexdigest() == (
+        "06c5c9280bfbb157a9017e3e4bae9cd932c038c74fe94818e248a41e09dab632")
+    provider = ClassifierMockProvider("constrained")
+    router = WhiteRabbit(deterministic={"MyShape": FixedArchitect("s")},
+                         constrained=FixedArchitect("c"), autonomous=FixedArchitect("a"),
+                         classifier_provider=provider, classifier_model="test")
+    router.decide(Task(goal="Shape it"))
+    assert provider.calls[0].system == (
+        "You are a task classifier.  Given a user's goal, decide which planning strategy "
+        "to use.  Respond with ONLY one of the following tokens:\n\n- deterministic:MyShape\n"
+        "- constrained\n- autonomous\n\nDo not add any other text.\n"
+    )
+
+
+def _record(**changes):
+    data = {
+        "version": 1, "tier": "constrained", "method": "classifier",
+        "alternatives": ["constrained", "autonomous"], "reasons": ["the classifier chose constrained"],
+        "policy_version": 1, "matched_token": "constrained",
+        "usage": {"prompt_tokens": 5, "completion_tokens": 2, "cost_usd": None,
+                  "cost_usd_is_estimate": False, "cost_usd_unknown": False},
+        "call_ids": [],
+    }
+    data.update(changes)
+    return data
+
+
+def test_routing_decision_round_trips_and_is_exported():
+    assert ExportedRoutingDecision is RoutingDecision
+    decision = RoutingDecision.from_dict(_record())
+    assert decision.to_dict() == _record()
+    durable = RoutingDecision.from_dict(_record(usage=None, call_ids=["call-1"]))
+    assert durable.call_ids == ("call-1",) and durable.usage is None
+    assert RoutingDecision.from_dict(durable.to_dict()) == durable
+    hash(decision)
+
+
+_USAGE = {"prompt_tokens": 5, "completion_tokens": 2, "cost_usd": None,
+          "cost_usd_is_estimate": False, "cost_usd_unknown": False}
+
+
+@pytest.mark.parametrize("data", [
+    _record(version=2), _record(version=True), _record(method="rule"), _record(extra=1),
+    {key: value for key, value in _record().items() if key != "call_ids"},
+    _record(tier="single"), _record(tier=""), _record(alternatives="constrained"),
+    _record(reasons=[""]), _record(reasons="chose"), _record(matched_token=None),
+    _record(matched_token=""), _record(policy_version=0), _record(policy_version="1"),
+    _record(usage={**_USAGE, "prompt_tokens": -1}),
+    _record(usage={**_USAGE, "cost_usd": float("nan")}),
+    _record(usage={**_USAGE, "cost_usd_is_estimate": "no"}),
+    _record(usage={"prompt_tokens": 5, "completion_tokens": 2}),
+    _record(usage={**_USAGE, "raw_reply": "constrained"}),
+    _record(usage=[5, 2]), _record(call_ids=[""]), _record(call_ids="call-1"),
+    _record(tier="autonomous", method="fallback_unmatched"),
+    _record(tier="autonomous", method="fallback_no_classifier", matched_token=None),
+    _record(tier="constrained", method="fallback_unmatched", matched_token=None),
+    "not a record", None,
+])
+def test_routing_decision_from_dict_rejects_what_it_cannot_read(data):
+    with pytest.raises(ValueError):
+        RoutingDecision.from_dict(data)

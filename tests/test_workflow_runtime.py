@@ -1,9 +1,11 @@
 """Offline integration of durable graph handoffs and control recovery."""
 
 import asyncio
+from contextlib import closing
 from copy import deepcopy
 import json
 from dataclasses import replace
+import sqlite3
 from types import MappingProxyType
 
 import pytest
@@ -17,6 +19,7 @@ from smythe.graph import ExecutionGraph, Node, NodeStatus, Revision, Topology
 from smythe.pricing import PRICE_VERSION, price_table
 from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.registry import Registry
+from smythe.router import WhiteRabbit
 from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.workflow import WorkflowRuntime, _nanousd
 from smythe.workflow_binding import WorkflowBindingError
@@ -653,3 +656,148 @@ def test_durable_timing_marks_a_session_that_never_released_its_lease(tmp_path):
     assert (lost["started_at"], lost["ended_at"]) == (1010.0, 1010.0)
     assert current["started_at"] == 1050.0
     assert result.timing["run_wall_ms"] == 50_000.0
+
+
+# ---------------------------------------------------------------------------
+# Routing decision records
+# ---------------------------------------------------------------------------
+
+
+class TemplatesArchitect:
+    """A local architect that records the template it planned from under its own key."""
+
+    def plan(self, task):
+        graph = ExecutionGraph([Topology.SERIAL], [Node(id="write", label="Write")])
+        graph.planning = {"templates": [{"name": "report", "version": 1}]}
+        return graph, Registry()
+
+
+def routed(store, autonomous=None):
+    """A durable Swarm whose offline classifier's echoed reply names no tier."""
+    router = WhiteRabbit(classifier_provider=OfflineProvider(), classifier_model="offline",
+                         autonomous=autonomous or SimpleArchitect())
+    return Swarm(model="offline", provider=OfflineProvider(), router=router, run_store=store,
+                 max_budget_usd=1)
+
+
+def classifier_calls(monkeypatch):
+    original, calls = OfflineProvider.complete, []
+
+    async def complete(self, system, prompt, model):
+        if system.startswith("You are a task classifier."):
+            calls.append(prompt)
+        return await original(self, system, prompt, model)
+
+    monkeypatch.setattr(OfflineProvider, "complete", complete)
+    return calls
+
+
+def routing_call_ids(store, run_id):
+    return [call["call_id"] for call in store.inspect_run(run_id)["calls"]
+            if call["key"]["phase"] == "routing"]
+
+
+def test_the_planning_operation_carries_the_routing_decision(tmp_path, monkeypatch):
+    from smythe.router import RoutingDecision
+
+    NativeTransport().install(monkeypatch)
+    provider = OpenAIResponsesProvider(api_key="test-key", max_output_tokens=100)
+    router = WhiteRabbit(classifier_provider=provider, classifier_model="gpt-6-astra",
+                         autonomous=SimpleArchitect())
+    with SQLiteWorkflowStore(tmp_path / "routed.db") as store:
+        result = Swarm(model="gpt-6-astra", provider=provider, max_budget_usd=1, run_store=store,
+                       router=router).execute(Task("Write and check"))
+        run_id = result.execution_id
+        operation = store.load_operation(run_id, "planning")
+        checkpoint = store.get_checkpoint(run_id)["checkpoint"]
+        [call_id] = routing_call_ids(store, run_id)
+
+    routing = operation["result"]["routing"]
+    assert routing == result.graph.planning["routing"] == checkpoint["graph"]["planning"]["routing"]
+    assert operation["result"]["graph"]["planning"] == {"routing": routing}
+    assert (routing["tier"], routing["method"], routing["matched_token"]) == (
+        "autonomous", "classifier", "autonomous")
+    # The journal holds the classifier's charge; the record names its call.
+    assert routing["usage"] is None and routing["call_ids"] == [call_id]
+    assert RoutingDecision.from_dict(routing).call_ids == (call_id,)
+    assert all("routing" not in node["metadata"] for node in checkpoint["graph"]["nodes"])
+
+
+def test_replay_after_a_crash_restores_the_routing_decision_without_a_classifier_call(
+    store, monkeypatch,
+):
+    runtime = routed(store, LocalOnly(TemplatesArchitect, "templates-architect", "1"))
+    restore = crash_checkpoints(monkeypatch, store, lambda state, _: state["status"] == "planned")
+    with pytest.raises(Crash):
+        runtime.plan(Task("Report"))
+    restore()
+    (run,) = store.list_runs()
+    run_id = run["run_id"]
+    result = store.load_operation(run_id, "planning")["result"]
+    recorded = result["graph"]["planning"]
+    assert set(recorded) == {"templates", "routing"}
+    assert result["routing"] == recorded["routing"]
+    assert recorded["routing"]["method"] == "fallback_unmatched"
+    assert recorded["routing"]["call_ids"] == routing_call_ids(store, run_id)
+    calls = classifier_calls(monkeypatch)
+
+    resumed = runtime.resume(run_id)
+
+    assert calls == []
+    assert resumed.graph.planning == recorded
+    assert store.get_checkpoint(run_id)["checkpoint"]["graph"]["planning"] == recorded
+    assert len(routing_call_ids(store, run_id)) == 1
+    assert runtime.resume(run_id).graph.planning == recorded
+
+
+def test_a_planning_operation_saved_without_routing_restores_no_record(tmp_path, monkeypatch):
+    from smythe.workflow_store import _canonical, _sha
+
+    path = tmp_path / "legacy.db"
+    with SQLiteWorkflowStore(path) as store:
+        runtime = routed(store)
+        restore = crash_checkpoints(monkeypatch, store, lambda state, _: state["status"] == "planned")
+        with pytest.raises(Crash):
+            runtime.plan(Task("Report"))
+        restore()
+        (run,) = store.list_runs()
+    run_id = run["run_id"]
+    # Rewrite the operation as a release that recorded no routing saved it.
+    with closing(sqlite3.connect(path)) as db, db:
+        text = db.execute("SELECT result_json FROM workflow_operations WHERE run_id=? AND "
+                          "operation_key='planning'", (run_id,)).fetchone()[0]
+        result = json.loads(text)
+        del result["routing"], result["graph"]["planning"]
+        text = _canonical(result)
+        db.execute("UPDATE workflow_operations SET result_json=?, result_sha=? WHERE run_id=? "
+                   "AND operation_key='planning'", (text, _sha(text), run_id))
+    calls = classifier_calls(monkeypatch)
+    with SQLiteWorkflowStore(path) as store:
+        resumed = routed(store).resume(run_id)
+        checkpoint = store.get_checkpoint(run_id)["checkpoint"]
+
+    assert calls == []
+    assert resumed.graph.planning is None
+    assert "planning" not in checkpoint["graph"]
+
+
+def test_routing_records_leave_the_recipe_and_unrouted_runs_unchanged(store):
+    runtime = routed(store)._workflow_runtime()
+    offline = {"adapter_version": "offline-static-v1", "config": {"echo_prefix": "offline: ", "plan": None},
+               "decoder_version": "offline-static-v1", "endpoint_scope": "offline", "kind": "offline",
+               "price_version": "offline-zero-v1", "supported_models": None}
+    assert runtime.recipe["components"]["router"] == {
+        "type": "white_rabbit", "version": 1,
+        "classifier": {"provider": offline, "model": "offline"},
+        "deterministic": {}, "constrained": {"type": "none"},
+        "autonomous": {"type": "simple_architect", "version": 1},
+    }
+    routed_run = routed(store).execute(Task("Report")).execution_id
+    assert store.load_run(routed_run)["config"] == runtime.recipe
+
+    plain = swarm(store).execute(Task("Report"))
+    operation = store.load_operation(plain.execution_id, "planning")
+    assert set(operation["result"]) == {"graph", "registry"}
+    assert "planning" not in operation["result"]["graph"]
+    assert plain.graph.planning is None
+    assert "planning" not in store.get_checkpoint(plain.execution_id)["checkpoint"]["graph"]

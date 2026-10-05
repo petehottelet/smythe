@@ -108,23 +108,32 @@ def graph_to_dict(graph: ExecutionGraph) -> dict[str, Any]:
 
 def _graph_snapshot(graph: ExecutionGraph, task_data: dict[str, Any] | None) -> dict[str, Any]:
     """Serialize graph state using an already captured Task representation."""
-    return {
+    snapshot = {
         "topology": [t.value for t in graph.topology],
         "estimated_cost_usd": graph.estimated_cost_usd,
         "task": task_data,
         "run_ref": snapshot_run_ref(graph.run_ref),
         "nodes": [node_to_dict(n) for n in graph.nodes],
     }
+    # Informational and additive: a graph without planning records keeps its
+    # bytes, and readers that do not know the key ignore it.
+    if graph.planning is not None:
+        snapshot["planning"] = deepcopy(graph.planning)
+    return snapshot
 
 
 def graph_from_dict(data: dict[str, Any]) -> ExecutionGraph:
     """Exact restore of a serialized graph, including statuses and results."""
+    planning = data.get("planning")
+    if planning is not None and not isinstance(planning, dict):
+        raise ValueError("Graph planning records must be a JSON object")
     return ExecutionGraph(
         topology=[Topology(t) for t in data.get("topology", ["serial"])],
         nodes=[node_from_dict(n) for n in data.get("nodes", [])],
         estimated_cost_usd=data.get("estimated_cost_usd"),
         task=task_from_dict(data.get("task")),
         run_ref=snapshot_run_ref(data.get("run_ref")),
+        planning=deepcopy(planning),
     )
 
 

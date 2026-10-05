@@ -61,7 +61,7 @@ from smythe.memory import PlannerMemory
 from smythe.tools import ToolRuntime
 from smythe.planner import Architect, DeterministicArchitect, LLMArchitect, SimpleArchitect
 from smythe.constrained_planner import ConstrainedArchitect
-from smythe.router import WhiteRabbit
+from smythe.router import RoutingDecision, WhiteRabbit
 from smythe.provider import (
     AnthropicProvider,
     GeminiProvider,
@@ -278,6 +278,16 @@ def _planning_calls(router: Any, architect: Any) -> list[tuple[Any, str]]:
         elif isinstance(item, ConstrainedArchitect):
             calls.append((item._provider, item._model))
     return calls
+
+
+def _records_routing(router: Any) -> bool:
+    """Whether *router* routes as WhiteRabbit does, so its decision can be recorded.
+
+    Any other router, including a subclass that overrides route() or
+    aroute(), is called as before and records no decision.
+    """
+    return (isinstance(router, WhiteRabbit) and type(router).route is WhiteRabbit.route
+            and type(router).aroute is WhiteRabbit.aroute)
 
 
 def _check_gate_planning(policy: AcceptancePolicy | None, architects: tuple[Any, ...]) -> None:
@@ -710,7 +720,9 @@ class Swarm:
         not stop planning: set each node's ``metadata["estimated_cost_usd"]``
         before ``execute(graph)``, which checks every node before its first
         call. An ``LLM_MERGE`` synthesis, which no node estimate covers, is
-        still refused before planning.
+        still refused before planning. With a ``WhiteRabbit`` router, the
+        graph's ``planning["routing"]`` records the
+        :class:`~smythe.router.RoutingDecision` that chose its architect.
         """
         if self._run_store is not None:
             return asyncio.run(self._workflow_runtime().plan(task))
@@ -841,12 +853,12 @@ class Swarm:
         self._check_planning_support(executing=executing)
         task = snapshot_task(task)
         started = tracer.now()
-        architect = self._select_architect(snapshot_task(task))
+        architect, routing = self._select_architect(snapshot_task(task))
         if self._router is not None:
             tracer.add_phase("routing", tracer.since(started))
         with tracer.phase("planning"):
             graph, architect_registry = architect.plan(snapshot_task(task))
-            return self._adopt_plan(graph, architect_registry, task, architect)
+            return self._adopt_plan(graph, architect_registry, task, architect, routing)
 
     async def aplan(self, task: Task) -> ExecutionGraph:
         """Async variant of plan() — safe to call from a running event loop."""
@@ -860,15 +872,16 @@ class Swarm:
         self._check_planning_support(executing=executing)
         task = snapshot_task(task)
         started = tracer.now()
-        architect = await self._aselect_architect(snapshot_task(task))
+        architect, routing = await self._aselect_architect(snapshot_task(task))
         if self._router is not None:
             tracer.add_phase("routing", tracer.since(started))
         with tracer.phase("planning"):
             graph, architect_registry = await architect.aplan(snapshot_task(task))
-            return self._adopt_plan(graph, architect_registry, task, architect)
+            return self._adopt_plan(graph, architect_registry, task, architect, routing)
 
     def _adopt_plan(
         self, graph: ExecutionGraph, architect_registry: Registry, task: Task, architect: Architect,
+        routing: RoutingDecision | None = None,
     ) -> ExecutionGraph:
         """Register the plan's agents and stamp its nodes for execution.
 
@@ -877,6 +890,7 @@ class Swarm:
         call. Under a strict policy, each gate of a plan that *architect*
         generated rather than built from developer code is marked with
         ``GENERATED_GATE_KEY``, so that gate does not accept output on its own.
+        A *routing* decision becomes ``graph.planning["routing"]``.
         """
         self._refuse_read_steps(graph)
         for agent in architect_registry.list_agents():
@@ -888,6 +902,9 @@ class Swarm:
         self._stamp_task_context(graph, task)
         if self._strict_policy() is not None:
             _mark_generated_gates(graph, architect)
+        if routing is not None:
+            # The Swarm writes only this key; the architect may have set others.
+            graph.planning = {**(graph.planning or {}), "routing": routing.to_dict()}
         return graph
 
     @staticmethod
@@ -895,17 +912,21 @@ class Swarm:
         """Refresh every node from the authoritative full Task snapshot."""
         ExecutorBase.stamp_task_context(graph.nodes, task)
 
-    def _select_architect(self, task: Task) -> Architect:
-        """Pick the architect — use router if set, otherwise the default."""
-        if self._router is not None:
-            return self._router.route(task)
-        return self._architect
+    def _select_architect(self, task: Task) -> tuple[Architect, RoutingDecision | None]:
+        """Pick the architect — use router if set, otherwise the default — and its decision."""
+        if self._router is None:
+            return self._architect, None
+        if _records_routing(self._router):
+            return self._router.decide(task)
+        return self._router.route(task), None
 
-    async def _aselect_architect(self, task: Task) -> Architect:
-        """Async architect selection — uses aroute when a router is set."""
-        if self._router is not None:
-            return await self._router.aroute(task)
-        return self._architect
+    async def _aselect_architect(self, task: Task) -> tuple[Architect, RoutingDecision | None]:
+        """Async architect selection — uses adecide or aroute when a router is set."""
+        if self._router is None:
+            return self._architect, None
+        if _records_routing(self._router):
+            return await self._router.adecide(task)
+        return await self._router.aroute(task), None
 
     def execute(
         self, task_or_graph: Task | ExecutionGraph | None = None,

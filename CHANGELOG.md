@@ -671,6 +671,22 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `SourceEvidenceValidator` and `TextValidator`, and prints the accepted
   document's path, the decision, the evidence and the
   `smythe runs inspect` report. `tests/test_examples_smoke.py` runs it.
+- Routing decision records. `WhiteRabbit.decide()` and `adecide()` return the
+  chosen architect with a `RoutingDecision`: the tier, the method
+  (`classifier`, `fallback_no_classifier` or `fallback_unmatched`), the tiers
+  offered, reasons, the routing policy version, the matched reply only as its
+  normalized token, and the classifier call's token usage and reported cost;
+  `route()` and `aroute()` still return the architect. A `Swarm` with a
+  `WhiteRabbit` router records the decision as `graph.planning["routing"]`,
+  where the new optional `ExecutionGraph.planning` holds informational
+  records keyed by namespace. Ordinary checkpoints keep it and stay version
+  4, a graph without records is saved as before, and the classifier's usage
+  is recorded without being charged to the run's budget. A durable run's
+  decision names the journal calls of its `routing` phase instead of copying
+  their amounts, and its `planning` operation result carries the decision
+  under `routing`; resume restores `graph.planning` from the saved plan
+  without classifying again. The classifier prompt and durable recipes are
+  unchanged. See [routing decisions](docs/architecture.md#routing-decisions).
 
 ### Changed
 

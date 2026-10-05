@@ -95,6 +95,47 @@ same task and params: resume rebuilds each saved selection, and a repair prompt
 can name a node id, so a builder that relies on `Node`'s random default id can
 make resume fail with `WorkflowConflictError`.
 
+### Routing decisions
+
+`WhiteRabbit.decide(task)` and `adecide(task)` return the chosen architect
+with a `RoutingDecision` that records the choice; `route()` and `aroute()`
+still return only the architect. The record holds:
+
+- `tier`: `deterministic:<key>`, `constrained` or `autonomous`, one of the
+  `alternatives` the classifier is offered;
+- `method`: `classifier` when the reply named a configured tier,
+  `fallback_no_classifier` without a classifier, or `fallback_unmatched` when
+  the reply named none; both fallbacks choose `autonomous`;
+- `matched_token`: the reply as normalized and matched, such as
+  `deterministic:faq`, for the `classifier` method only. The raw reply is
+  never recorded;
+- `reasons`, which explain the choice, and `policy_version`, the version of
+  the routing policy that made it;
+- `usage`: the classifier call's tokens, reported `cost_usd` and its
+  `cost_usd_is_estimate` and `cost_usd_unknown` flags, or `null` without a
+  call;
+- `call_ids`: in a durable run, the journal calls of its `routing` phase,
+  which hold the classifier's charge, in place of `usage`.
+
+A `Swarm` with a `WhiteRabbit` router stores `decision.to_dict()` as
+`graph.planning["routing"]`. `ExecutionGraph.planning` holds informational
+records keyed by namespace, and each component writes only its own key, so an
+architect may record others beside it; it is `None` when nothing recorded any,
+and it never enters node metadata. The record holds no elapsed time:
+[`SwarmResult.timing`](execution.md#timing) reports routing time under
+`phases_ms.routing`. An ordinary run records the classifier's usage without
+charging it to the run's budget, whose scope stays execution and synthesis.
+Checkpoints keep the record, and resume restores it
+([graph planning records](checkpoint-format.md#graph-planning-records)).
+
+In a durable run, the `planning` operation's result carries the decision under
+`routing` as well as in its saved graph. Resuming restores the whole
+`graph.planning` from the saved graph without classifying again; a run planned
+before these records existed restores `None`. A router other than
+`WhiteRabbit`, or a subclass that overrides `route()` or `aroute()`, is called
+as before and records nothing. The record changes neither the classifier's
+prompt nor a durable recipe.
+
 ### Topology vocabulary
 
 - **Serial** for dependent stages.

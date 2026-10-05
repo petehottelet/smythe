@@ -86,7 +86,10 @@ and recovery controls.
         "verifies": null,
         "max_regenerations": 0
       }
-    ]
+    ],
+    "planning": {
+      "routing": {"version": 1, "tier": "constrained", "method": "classifier", "…": "…"}
+    }
   },
   "agents": [
     {"id": "a1b2c3d4e5f6", "name": "Researcher", "persona": "…", "capabilities": ["research"]}
@@ -126,6 +129,7 @@ Notes:
 - A node that a revision added carries `"added_by_revision": true` in its `metadata` (from 0.8.2). `LLMSupervisor` counts these nodes against `max_total_added_nodes`, so resume does not reset the count ([what the cap limits](supervisor.md#safety)). Nodes added before 0.8.2 have no marker and are not counted.
 - `task.done_when` carries the acceptance criteria forward. A resumed run that had forgotten them could not hold its own output to them.
 - `timing` records how long each call that worked on the execution took; see [timing segments](#timing-segments).
+- `graph.planning`, present only when a component recorded how the graph was planned, holds informational records keyed by namespace; see [graph planning records](#graph-planning-records).
 - A version 5 checkpoint adds a top-level `requires` list and the state it names, such as a `delivery_acceptance` record; see [required state features](#required-state-features-version-5).
 - A completed version 5 checkpoint that was [re-evaluated](verifier.md#re-evaluation) adds `delivery_acceptance_history`, the decisions its current record superseded; see [decision history](#decision-history).
 
@@ -147,6 +151,37 @@ segments, when no process was running the execution, shows only in their
 wall-clock times, which clock adjustments can shift. The block is
 informational: when it is missing or unreadable, resume starts a new list, and
 it does not change the checkpoint version.
+
+## Graph planning records
+
+`graph.planning` is an object keyed by namespace, and each component writes
+only its own key. A `Swarm` with a `WhiteRabbit` router writes `routing`, the
+[routing decision](architecture.md#routing-decisions) that chose the
+architect:
+
+```json
+"planning": {
+  "routing": {
+    "version": 1,
+    "tier": "constrained",
+    "method": "classifier",
+    "alternatives": ["deterministic:faq", "constrained", "autonomous"],
+    "reasons": ["the classifier chose constrained"],
+    "policy_version": 1,
+    "matched_token": "constrained",
+    "usage": {"prompt_tokens": 412, "completion_tokens": 3, "cost_usd": null,
+              "cost_usd_is_estimate": false, "cost_usd_unknown": false},
+    "call_ids": []
+  }
+}
+```
+
+The key is absent when nothing recorded a plan, so such a graph is saved as
+before. Resume restores the object unchanged and never needs it: the records
+are informational, so the checkpoint stays version 4. A value other than an
+object stops resume with `ValueError`. `smythe.RoutingDecision.from_dict()`
+reads the `routing` record back and rejects a version, method or key it does
+not know.
 
 ## Verification state
 
@@ -366,6 +401,10 @@ they write; this build resumes checkpoints that lack it.
 `budget.token_estimate_nodes` is optional in the same way. A checkpoint
 without it restores no token estimates, as before the key existed, so
 `cost_contains_token_estimates` then reports only calls made after resume.
+
+So is `graph.planning`. Earlier builds read a saved graph key by key, so they
+ignore it when they resume and leave it out of the checkpoints they write; a
+graph without it restores `planning` as `None`.
 
 Version 4 adds no field. It records that every MCP server listed under
 `agents` came from developer configuration: from 0.8.1 on, a model-generated

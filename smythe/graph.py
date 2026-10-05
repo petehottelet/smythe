@@ -269,6 +269,10 @@ class ExecutionGraph:
         estimated_cost_usd: Pre-execution cost estimate set by the planner.
         task: Detached Task snapshot carried through execution and recovery.
         run_ref: Identity of the durable workflow store, run, and frozen recipe.
+        planning: Informational records of how the graph was planned, keyed
+            by namespace, each written by one component: a ``Swarm`` with a
+            ``WhiteRabbit`` router sets ``routing`` to its
+            ``RoutingDecision.to_dict()``. None when nothing recorded any.
     """
 
     topology: list[Topology]
@@ -276,6 +280,7 @@ class ExecutionGraph:
     estimated_cost_usd: float | None = None
     task: Task | None = None
     run_ref: dict[str, Any] | None = None
+    planning: dict[str, Any] | None = None
 
     def roots(self) -> list[Node]:
         """Nodes with no dependencies — entry points for execution."""

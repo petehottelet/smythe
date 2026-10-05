@@ -770,3 +770,148 @@ def test_resume_starts_new_timing_when_the_saved_block_is_missing_or_unreadable(
     [segment] = result.timing["segments"]
     assert segment["resumed"] is True
     assert store.load(execution_id)["timing"]["segments"] == [segment]
+
+
+# ---------------------------------------------------------------------------
+# Routing decision records
+# ---------------------------------------------------------------------------
+
+
+class _TemplateArchitect(FixedArchitect):
+    """Records its own planning key, as an architect that names its templates does."""
+
+    def plan(self, task):
+        graph, registry = super().plan(task)
+        graph.planning = {"templates": [{"name": "report", "version": 1}]}
+        return graph, registry
+
+
+class _CrashOnce(Provider):
+    """Classifies as constrained; every other call fails once, then succeeds."""
+
+    def __init__(self) -> None:
+        self.classified = 0
+        self.failed = False
+
+    async def complete(self, system, prompt, model):
+        if system.startswith("You are a task classifier."):
+            self.classified += 1
+            return CompletionResult(text="constrained", prompt_tokens=5, completion_tokens=2,
+                                    cost_usd=0.25)
+        if not self.failed:
+            self.failed = True
+            raise RuntimeError("process died")
+        return CompletionResult(text="done", prompt_tokens=1, completion_tokens=1)
+
+
+_LEGACY_GRAPH_KEYS = {"topology", "estimated_cost_usd", "task", "run_ref", "nodes"}
+
+
+@pytest.mark.parametrize("asynchronous", [False, True])
+def test_a_router_records_its_decision_on_the_planned_graph(asynchronous):
+    router = WhiteRabbit(
+        constrained=FixedArchitect("constrained"), autonomous=SimpleArchitect(),
+        classifier_provider=ClassifierMockProvider("constrained"), classifier_model="test",
+    )
+    swarm = Swarm(provider=MockProvider(), router=router, artifact_dir=None)
+    task = Task(goal="Guided task")
+
+    graph = asyncio.run(swarm.aplan(task)) if asynchronous else swarm.plan(task)
+
+    _, expected = router.decide(task)
+    assert graph.planning == {"routing": expected.to_dict()}
+    assert graph.planning["routing"]["method"] == "classifier"
+    assert graph.planning["routing"]["usage"]["prompt_tokens"] == 5
+    assert all("routing" not in node.metadata for node in graph.nodes)
+
+
+def test_an_explicit_architect_leaves_planning_unset_and_checkpoints_unchanged(tmp_path):
+    store = FileCheckpointStore(tmp_path)
+    swarm = Swarm(provider=MockProvider(), architect=SimpleArchitect(), checkpoint_store=store,
+                  artifact_dir=None)
+
+    result = swarm.execute(Task(goal="Do something"))
+
+    assert result.graph.planning is None
+    saved = store.load(result.execution_id)
+    assert saved["version"] == 4 and set(saved["graph"]) == _LEGACY_GRAPH_KEYS
+
+
+def test_a_router_without_a_classifier_records_its_fallback():
+    router = WhiteRabbit(autonomous=FixedArchitect("autonomous"))
+
+    graph = Swarm(provider=MockProvider(), router=router).plan(Task(goal="Ambiguous task"))
+
+    assert graph.planning["routing"]["method"] == "fallback_no_classifier"
+    assert graph.planning["routing"]["usage"] is None
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_the_routing_record_survives_checkpoints_and_resume(tmp_path, parallel):
+    store = FileCheckpointStore(tmp_path)
+    provider = _CrashOnce()
+    router = WhiteRabbit(constrained=_TemplateArchitect("constrained"),
+                         autonomous=SimpleArchitect(), classifier_provider=provider,
+                         classifier_model="test")
+    swarm = Swarm(model="m", provider=provider, router=router, parallel=parallel,
+                  checkpoint_store=store, artifact_dir=None)
+
+    with pytest.raises(RuntimeError, match="process died"):
+        swarm.execute(Task(goal="Report"))
+    [execution_id] = store.list_ids()
+    saved = store.load(execution_id)
+    recorded = saved["graph"]["planning"]
+    assert saved["version"] == 4
+    assert set(recorded) == {"templates", "routing"}
+    assert recorded["templates"] == [{"name": "report", "version": 1}]
+    assert recorded["routing"]["tier"] == "constrained"
+    assert recorded["routing"]["usage"]["cost_usd"] == 0.25
+
+    resumed = Swarm(model="m", provider=provider, checkpoint_store=store, artifact_dir=None)
+    result = resumed.resume(execution_id)
+
+    assert result.graph.planning == recorded
+    assert store.load(execution_id)["graph"]["planning"] == recorded
+    assert resumed.resume(execution_id).graph.planning == recorded
+    assert provider.classified == 1
+
+
+def test_routing_usage_is_recorded_but_not_charged_to_the_budget():
+    class Priced(Provider):
+        async def complete(self, system, prompt, model):
+            cost = 5.0 if system.startswith("You are a task classifier.") else 0.5
+            return CompletionResult(text="autonomous", prompt_tokens=1, completion_tokens=1,
+                                    cost_usd=cost)
+
+    routed = Swarm(model="m", provider=Priced(), max_budget_usd=2, artifact_dir=None, router=WhiteRabbit(
+        autonomous=SimpleArchitect(), classifier_provider=Priced(), classifier_model="test"))
+    result = routed.execute(Task(goal="Do something"))
+
+    assert result.graph.planning["routing"]["usage"]["cost_usd"] == 5.0
+    assert result.total_cost_usd == 0.5
+    assert result.cost_scope == "execution_and_synthesis"
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_a_router_that_routes_its_own_way_records_nothing(parallel):
+    chosen = FixedArchitect("custom")
+
+    class Router:
+        def route(self, task):
+            return chosen
+
+        async def aroute(self, task):
+            return chosen
+
+    class Overriding(WhiteRabbit):
+        def route(self, task):
+            return chosen
+
+        async def aroute(self, task):
+            return chosen
+
+    for router in (Router(), Overriding(autonomous=SimpleArchitect())):
+        result = Swarm(provider=MockProvider(), router=router, parallel=parallel,
+                       artifact_dir=None).execute(Task(goal="Route"))
+        assert result.graph.nodes[0].label == "custom: Route"
+        assert result.graph.planning is None

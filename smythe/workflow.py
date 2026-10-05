@@ -1298,8 +1298,8 @@ class WorkflowRuntime:
     async def _plan(self, task):
         async def build(inputs):
             frozen = task_from_dict(inputs["task"])
-            architect = (await self.bound["router"].aroute(snapshot_task(frozen))
-                         if self.bound["router"] else self.bound["architect"])
+            architect, routing = ((await self.bound["router"].adecide(snapshot_task(frozen)))
+                                  if self.bound["router"] else (self.bound["architect"], None))
             graph, registry = await architect.aplan(snapshot_task(frozen))
             self._validate_graph_policy(graph)
             registry.workflow_description()
@@ -1311,11 +1311,19 @@ class WorkflowRuntime:
                 from smythe.swarm import _mark_generated_gates
 
                 _mark_generated_gates(graph, architect)
+            if routing is not None:
+                # The run writes only this key; the architect may have set others.
+                graph.planning = {**(graph.planning or {}), "routing": routing.to_dict()}
             self._prepare_graph(graph, fresh=True)
-            return {"graph": graph_to_dict(graph), "registry": self.registry.workflow_description()}
+            result = {"graph": graph_to_dict(graph), "registry": self.registry.workflow_description()}
+            if routing is not None:
+                result["routing"] = routing.to_dict()
+            return result
 
         result = await self._operation_result("planning", "planning", {"task": task_to_dict(task)}, build)
         registry = Registry.from_workflow_description(result["registry"])
+        # The graph snapshot carries its planning records, so a replay restores
+        # them all; a result saved before routing records has none.
         graph = graph_from_dict(result["graph"])
         # Completed planning operations replay without invoking build(). Apply
         # the same graph policy before adopting or checkpointing that result.
