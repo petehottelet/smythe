@@ -278,6 +278,31 @@ def test_both_executors_retry_skip_and_stop_on_the_same_failures_as_before(case,
     assert [span.outcome for span in tracer.spans] == [outcome] * provider.calls
 
 
+class Interrupted(asyncio.CancelledError, Exception):
+    """A cancellation that is also an Exception, and not a terminal one."""
+
+
+@pytest.mark.parametrize("policy", [FailurePolicy.RETRY, FailurePolicy.SKIP])
+def test_a_cancellation_that_is_also_an_exception_still_cancels_a_concurrent_node(policy):
+    """The node returns to pending and the cancellation propagates; no attempt follows."""
+    provider, tracer = Raising(Interrupted), Tracer()
+    node, graph = one_node(policy)
+    executor = AsyncExecutor(provider=provider, registry=Registry(), tracer=tracer,
+                             artifact_dir=None, max_concurrency=1)
+
+    async def scenario():
+        with pytest.raises(Interrupted):
+            await executor.run(graph)
+
+    asyncio.run(scenario())
+
+    assert is_terminal(Interrupted()) is False
+    assert provider.calls == 1
+    assert (node.status, node.result) == (NodeStatus.PENDING, None)
+    assert [span.outcome for span in tracer.spans] == ["cancelled"]
+    assert "failure_class" not in tracer.spans[0].metadata
+
+
 @pytest.mark.parametrize("case", CASES)
 def test_regeneration_settlement_stops_on_the_same_failures_as_before(case):
     """A sibling that fails while a regeneration cancels it stops the run only when terminal."""

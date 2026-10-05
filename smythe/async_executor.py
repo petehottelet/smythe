@@ -392,8 +392,9 @@ class AsyncExecutor(ExecutorBase):
             except VerificationRecoveryError:
                 raise
             except Exception as exc:
-                # ProviderAccountingCancelledError is an Exception as well as a
-                # cancellation: it takes this terminal path, not the one below.
+                # A cancellation can also be an Exception. A terminal one, such
+                # as ProviderAccountingCancelledError, fails the node here; any
+                # other is a cancellation and is never retried or skipped.
                 if is_terminal(exc):
                     # A reconciliation alert or post-billing persistence failure
                     # is non-retryable here: another provider call would compound
@@ -407,14 +408,14 @@ class AsyncExecutor(ExecutorBase):
                     self._tracer.on_node_end(node)
                     self.notify_update(node)
                     raise
+                if isinstance(exc, asyncio.CancelledError):
+                    self._requeue_cancelled(node)
+                    raise
                 last_exc = exc
                 self._tracer.on_node_error(node, exc)
                 self._end_failed_attempt(node)
             except asyncio.CancelledError:
-                self.release_node_budget(node)
-                node.status = NodeStatus.PENDING
-                node.result = None
-                self._tracer.on_node_end(node)
+                self._requeue_cancelled(node)
                 raise
 
         self.release_node_budget(node)
@@ -429,3 +430,10 @@ class AsyncExecutor(ExecutorBase):
         node.status = NodeStatus.FAILED
         self.notify_update(node)
         raise last_exc  # type: ignore[misc]
+
+    def _requeue_cancelled(self, node: Node) -> None:
+        """Return a cancelled attempt's node to pending and release its reservation."""
+        self.release_node_budget(node)
+        node.status = NodeStatus.PENDING
+        node.result = None
+        self._tracer.on_node_end(node)
