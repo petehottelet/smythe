@@ -1228,14 +1228,22 @@ class ExecutorBase:
         Owns cost recording: every provider call inside is billed via
         Sentinel.add_cost, so executors must not record costs again. Under
         a retry deadline the timeout is at most the time left, and reaching
-        it raises ``RetryDeadlineError``.
+        it raises ``RetryDeadlineError``. A ``TimeoutError`` the conversation
+        raises itself, such as an HTTP client's own timeout, is an ordinary
+        timeout even then.
         """
         timeout, by_deadline = self._attempt_timeout(node)
         coro = self._run_node_conversation(node, graph)
+        deadline_timer = None
         try:
             if timeout is None:
                 return await coro
-            return await asyncio.wait_for(coro, timeout=timeout)
+            if not by_deadline:
+                return await asyncio.wait_for(coro, timeout=timeout)
+            # A scope of its own tells the deadline's expiry apart from a
+            # TimeoutError raised inside the conversation.
+            async with asyncio.timeout(timeout) as deadline_timer:
+                return await coro
         except BaseExceptionGroup as exc:
             if not _native_response_errors(exc):
                 _raise_workflow_error(exc)
@@ -1251,11 +1259,12 @@ class ExecutorBase:
         except WorkflowError:
             raise
         except TimeoutError as exc:
-            # wait_for can wrap a native CancelledError subclass on timeout.
-            # Its unknown bill remains terminal, regardless of retry policy.
+            # wait_for or the deadline's timer can wrap a native CancelledError
+            # subclass on timeout. Its unknown bill remains terminal,
+            # regardless of retry policy.
             if isinstance(exc.__cause__, ProviderResponseError):
                 raise exc.__cause__
-            if by_deadline:
+            if deadline_timer is not None and deadline_timer.expired():
                 raise self._deadline_error(node) from None
             raise TimeoutError(
                 f"Node {node.id!r} timed out after {node.timeout_s}s"

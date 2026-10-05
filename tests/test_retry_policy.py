@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import FrozenInstanceError
+import inspect
 import math
 import sys
 from types import SimpleNamespace
@@ -30,7 +31,8 @@ from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topolo
 from smythe.pricing_anthropic import MODEL as FABLE
 from smythe.provider import (
     AnthropicProvider, CompletionResult, GeminiProvider, OfflineProvider, OpenAIImageProvider,
-    OpenAIProvider, OutputTruncatedError, Provider, ProviderFeatures,
+    OpenAIProvider, OutputTruncatedError, Provider, ProviderAccountingCancelledError,
+    ProviderFeatures,
 )
 from smythe.provider_messages import AnthropicMessagesProvider
 from smythe.provider_responses import OpenAIResponsesProvider
@@ -51,8 +53,9 @@ class Scripted(Provider):
     """Answers or fails each call in turn, repeating the last outcome; it sends each call once.
 
     An outcome is reply text, an ``HttpError`` raised as its SDK status error,
-    ``HANG``, or a callable returning a ``CompletionResult`` or an exception
-    to raise. ``started`` holds the clock reading at the start of each call.
+    ``HANG``, or a callable returning a ``CompletionResult``, an exception to
+    raise, or an awaitable that gives either. ``started`` holds the clock
+    reading at the start of each call.
     """
 
     def __init__(self, *outcomes, clock: ManualClock | None = None) -> None:
@@ -70,6 +73,8 @@ class Scripted(Provider):
             raise outcome.exception()
         if callable(outcome):
             outcome = outcome()
+            if inspect.isawaitable(outcome):
+                outcome = await outcome
             if isinstance(outcome, BaseException):
                 raise outcome
             return outcome
@@ -122,16 +127,25 @@ def attempts(tracer):
 
 
 @pytest.fixture
-def wait_for_timeouts(monkeypatch):
-    """Record the timeout of every ``asyncio.wait_for``; the wait itself is unchanged."""
+def attempt_timeouts(monkeypatch):
+    """Record the timeout of every ``asyncio.wait_for`` and ``asyncio.timeout``, in order.
+
+    An attempt timed by its node's ``timeout_s`` runs under ``wait_for``, and
+    one timed by the retry deadline under ``timeout``; the timers are unchanged.
+    """
     timeouts: list[float | None] = []
-    real = asyncio.wait_for
+    real_wait_for, real_timeout = asyncio.wait_for, asyncio.timeout
 
     async def wait_for(awaitable, timeout):
         timeouts.append(timeout)
-        return await real(awaitable, timeout)
+        return await real_wait_for(awaitable, timeout)
+
+    def timeout(delay):
+        timeouts.append(delay)
+        return real_timeout(delay)
 
     monkeypatch.setattr(asyncio, "wait_for", wait_for)
+    monkeypatch.setattr(asyncio, "timeout", timeout)
     return timeouts
 
 
@@ -435,7 +449,7 @@ def test_the_deadline_bounds_attempts_and_waits_together(mode):
 
 @pytest.mark.parametrize("mode", MODES)
 @pytest.mark.parametrize("timeout_s", [None, 30.0])
-def test_each_attempt_times_out_at_the_remaining_deadline(mode, timeout_s, wait_for_timeouts):
+def test_each_attempt_times_out_at_the_remaining_deadline(mode, timeout_s, attempt_timeouts):
     clock = ManualClock()
     provider = Scripted(HttpError(429, "rate_limit_error", retry_after_s=9.95), HANG, clock=clock)
     executor, tracer, waits = make_executor(mode, provider, clock, RetryPolicy(deadline_s=10))
@@ -445,14 +459,14 @@ def test_each_attempt_times_out_at_the_remaining_deadline(mode, timeout_s, wait_
         run(executor, node)
 
     # The 9.95s wait left the second attempt 0.05s of the deadline.
-    assert wait_for_timeouts == [10, pytest.approx(0.05)]
+    assert attempt_timeouts == [10, pytest.approx(0.05)]
     assert len(provider.started) == 2 and waits == [9.95]
     assert attempts(tracer) == [(0, "failed", "transient"), (1, "timed_out", "deadline")]
     assert node.status is NodeStatus.FAILED
 
 
 @pytest.mark.parametrize("mode", MODES)
-def test_a_node_timeout_inside_the_deadline_is_transient_and_retried(mode, wait_for_timeouts):
+def test_a_node_timeout_inside_the_deadline_is_transient_and_retried(mode, attempt_timeouts):
     clock = ManualClock()
     provider = Scripted(HANG, "done", clock=clock)
     executor, tracer, _ = make_executor(mode, provider, clock, RetryPolicy(deadline_s=100))
@@ -460,19 +474,75 @@ def test_a_node_timeout_inside_the_deadline_is_transient_and_retried(mode, wait_
 
     run(executor, node)
 
-    assert wait_for_timeouts == [0.05, 0.05]
+    assert attempt_timeouts == [0.05, 0.05]
     assert node.status is NodeStatus.COMPLETED
     assert attempts(tracer) == [(0, "timed_out", "transient"), (1, "completed", None)]
 
 
+async def time_out_on_its_own_timer():
+    """Time out as an HTTP client's own request timer does, with an ``asyncio`` timeout."""
+    async with asyncio.timeout(0):
+        await asyncio.Event().wait()
+
+
 @pytest.mark.parametrize("mode", MODES)
-def test_without_a_deadline_a_node_keeps_its_own_timeout(mode, wait_for_timeouts):
+@pytest.mark.parametrize("policy", [
+    pytest.param(None, id="no-policy"),
+    pytest.param(RetryPolicy(), id="no-deadline"),
+    pytest.param(RetryPolicy(deadline_s=100), id="deadline"),
+])
+@pytest.mark.parametrize("timeout_s", [None, 300.0])
+@pytest.mark.parametrize("fault", [
+    pytest.param(lambda: TimeoutError("request timed out after 30s"), id="raised"),
+    pytest.param(time_out_on_its_own_timer, id="own-timer"),
+])
+def test_a_timeout_the_call_raises_itself_is_transient_and_retried(mode, policy, timeout_s, fault):
+    clock = ManualClock()
+    provider = Scripted(fault, "done", clock=clock)
+    executor, tracer, waits = make_executor(mode, provider, clock, policy)
+    # Under the deadline, a timeout_s of None or 300s leaves the deadline to time
+    # each attempt, and it never runs out: the clock stays at 0 of its 100s.
+    node = retrying(max_retries=2, timeout_s=timeout_s)
+
+    run(executor, node)
+
+    assert node.status is NodeStatus.COMPLETED and node.result == "done"
+    assert provider.started == [0, 0] and waits == []
+    assert attempts(tracer) == [(0, "timed_out", "transient"), (1, "completed", None)]
+
+
+async def bill_unknown_when_cancelled():
+    """Hang until cancelled, then report that the native call's bill is unknown."""
+    try:
+        await asyncio.Event().wait()
+    except asyncio.CancelledError as exc:
+        raise ProviderAccountingCancelledError(
+            "Native dispatch interrupted; bill unknown", receipt={"cost_is_complete": False},
+        ) from exc
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_an_unknown_bill_when_the_deadline_runs_out_stays_terminal(mode):
+    clock = ManualClock()
+    provider = Scripted(bill_unknown_when_cancelled, "done", clock=clock)
+    executor, _, _ = make_executor(mode, provider, clock, RetryPolicy(deadline_s=0.05))
+    node = retrying(max_retries=2)
+
+    with pytest.raises(ProviderAccountingCancelledError):
+        run(executor, node)
+
+    assert len(provider.started) == 1
+    assert node.status is NodeStatus.FAILED and node.metadata["accounting_invalid"]
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_without_a_deadline_a_node_keeps_its_own_timeout(mode, attempt_timeouts):
     clock = ManualClock()
     executor, _, _ = make_executor(mode, Scripted("done", clock=clock), clock, RetryPolicy())
 
     run(executor, retrying(timeout_s=30), Node(id="untimed", label="Untimed"))
 
-    assert wait_for_timeouts == [30]
+    assert attempt_timeouts == [30]
 
 
 # ---------------------------------------------------------------------------

@@ -129,7 +129,9 @@ With `deadline_s`, each attempt's timeout is the node's `timeout_s` or the
 time left, whichever is shorter, and a retry whose wait would end at or after
 the deadline is not made. The node then fails with `RetryDeadlineError`, a
 `TimeoutError` whose class is `deadline`, and its failure policy settles it
-like any other failure. The deadline also bounds the single attempt of a
+like any other failure. A `TimeoutError` that the call raises itself before
+then, such as an HTTP client's own request timeout, stays a `transient`
+timeout and is retried. The deadline also bounds the single attempt of a
 `HALT` or `SKIP` node. It is measured on the tracer's monotonic clock.
 
 A run under a policy needs each node call sent once. Its provider must
