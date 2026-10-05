@@ -69,7 +69,9 @@ class ClassifierUsage:
 
     @classmethod
     def from_result(cls, result: CompletionResult) -> ClassifierUsage:
-        return cls(*(getattr(result, name) for name in _USAGE_KEYS))
+        """Usage of a result whose token counts were validated; flags count when truthy."""
+        return cls(result.prompt_tokens, result.completion_tokens, getattr(result, "cost_usd", None),
+                   *(bool(getattr(result, name, False)) for name in _USAGE_KEYS[3:]))
 
     def to_dict(self) -> dict[str, Any]:
         return {name: getattr(self, name) for name in _USAGE_KEYS}
@@ -276,8 +278,9 @@ class WhiteRabbit:
         validate_completion_usage(result)
 
         architect, tier, method, token = self._parse_classification(result.text.strip())
-        receipt = result.native_receipt or {}
-        call_id = receipt.get("workflow_call_id") if self._run_binding else None
+        receipt = getattr(result, "native_receipt", None)
+        call_id = (receipt.get("workflow_call_id")
+                   if self._run_binding and isinstance(receipt, dict) else None)
         if isinstance(call_id, str) and call_id:
             return architect, self._decision(tier, method, matched_token=token, call_ids=(call_id,))
         return architect, self._decision(tier, method, matched_token=token,

@@ -2,11 +2,12 @@
 
 import hashlib
 import json
+from types import SimpleNamespace
 
 import pytest
 
-from helpers import ClassifierMockProvider, FixedArchitect
-from smythe import RoutingDecision as ExportedRoutingDecision
+from helpers import ClassifierMockProvider, FixedArchitect, MockProvider
+from smythe import RoutingDecision as ExportedRoutingDecision, Swarm
 from smythe.planner import ArchitectError
 from smythe.provider import CompletionResult, Provider
 from smythe.router import CLASSIFIER_SYSTEM_PROMPT, ClassifierUsage, RoutingDecision, WhiteRabbit
@@ -330,6 +331,43 @@ async def test_adecide_records_the_classifier_usage_the_provider_reported(usage,
     assert architect is constrained and provider.calls == 1
     assert decision.to_dict()["usage"] == expected
     assert RoutingDecision.from_dict(decision.to_dict()) == decision
+
+
+class ResultProvider(Provider):
+    """Returns the result object it is given, as a provider with its own result type may."""
+
+    def __init__(self, result) -> None:
+        self.result = result
+
+    async def complete(self, system, prompt, model):
+        return self.result
+
+
+@pytest.mark.parametrize("result,flags", [
+    (CompletionResult(text="constrained", prompt_tokens=1, completion_tokens=1,
+                      cost_usd_unknown=None), (False, False)),
+    (CompletionResult(text="constrained", prompt_tokens=1, completion_tokens=1,
+                      cost_usd_is_estimate=1, cost_usd_unknown=0), (True, False)),
+    (SimpleNamespace(text="constrained", prompt_tokens=1, completion_tokens=1), (False, False)),
+    (SimpleNamespace(text="constrained", prompt_tokens=1, completion_tokens=1, cost_usd=0.5,
+                     cost_usd_unknown=1, native_receipt=["not", "a", "dict"]), (False, True)),
+])
+def test_routing_accepts_a_classifier_result_with_loose_usage_flags(result, flags):
+    constrained = FixedArchitect("constrained")
+    router = WhiteRabbit(constrained=constrained, autonomous=FixedArchitect("fallback"),
+                         classifier_provider=ResultProvider(result), classifier_model="test")
+
+    assert router.route(Task(goal="Guided")) is constrained
+    architect, decision = router.decide(Task(goal="Guided"))
+
+    assert architect is constrained
+    recorded = (decision.usage.cost_usd_is_estimate, decision.usage.cost_usd_unknown)
+    assert recorded == flags and {type(flag) for flag in recorded} == {bool}
+    assert decision.usage.cost_usd == getattr(result, "cost_usd", None)
+    assert RoutingDecision.from_dict(decision.to_dict()) == decision
+    graph = Swarm(provider=MockProvider(), router=router, artifact_dir=None).plan(Task(goal="Guided"))
+    assert graph.nodes[0].label == "constrained: Guided"
+    assert graph.planning == {"routing": decision.to_dict()}
 
 
 @pytest.mark.asyncio

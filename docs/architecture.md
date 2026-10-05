@@ -112,8 +112,9 @@ still return only the architect. The record holds:
 - `reasons`, which explain the choice, and `policy_version`, the version of
   the routing policy that made it;
 - `usage`: the classifier call's tokens, reported `cost_usd` and its
-  `cost_usd_is_estimate` and `cost_usd_unknown` flags, or `null` without a
-  call;
+  `cost_usd_is_estimate` and `cost_usd_unknown` flags as booleans, or `null`
+  without a call. A cost or flag the provider's result omits records as
+  `null` or `false`;
 - `call_ids`: in a durable run, the journal calls of its `routing` phase,
   which hold the classifier's charge, in place of `usage`.
 
