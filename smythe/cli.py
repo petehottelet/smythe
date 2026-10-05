@@ -234,6 +234,9 @@ def build_parser() -> argparse.ArgumentParser:
     stop = commands.add_parser("stop", help="request a durable pause and let admitted calls drain")
     stop.add_argument("run_id")
     stop.add_argument("--reason", default="operator requested pause", help="saved reason for this stop request")
+    stop.add_argument("--drain-timeout-s", type=float, default=None,
+                      help="record calls still awaiting a provider this long after the request "
+                           "as unknown outcomes (0-3600 seconds; default: wait for them)")
     stop.add_argument("--timeout-s", type=float, default=30.0,
                       help="drain observation duration (0-3600 seconds; default: 30)")
     stop.add_argument("--poll-interval-s", type=float, default=1.0,
@@ -1163,7 +1166,8 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
             observe = stop_job if command == "stop" else attach_job
             snapshot = observe(args.store, args.run_id, timeout_s=args.timeout_s,
                                poll_interval_s=args.poll_interval_s, on_update=update,
-                               **({"reason": args.reason} if command == "stop" else {}))
+                               **({"reason": args.reason, "drain_timeout_s": args.drain_timeout_s}
+                                  if command == "stop" else {}))
         except KeyboardInterrupt:
             _emit(args, command, {"run_id": args.run_id, "attachment": {"state": "disconnected"}})
             return EXIT_INTERRUPTED

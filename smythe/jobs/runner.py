@@ -11,7 +11,7 @@ import os
 import re
 import time
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -75,6 +75,7 @@ _SAFE_COMPONENT = re.compile(r"[^A-Za-z0-9._-]+")
 _SAFE_RUN_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 MAX_TOTAL_ARTIFACT_BYTES_PER_CALL = 128 * 1024 * 1024
 _INVALID_ACCOUNTING_PREFIX = "invalid provider accounting: "
+_DRAIN_POLL_S = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +103,25 @@ class _ArtifactCheck:
     @property
     def accepted(self) -> bool:
         return self.record["decision"] == "accepted"
+
+
+@dataclass(slots=True)
+class _Drain:
+    """A pause request's drain deadline, in event-loop time.
+
+    ``waits`` holds the timeouts of calls still awaiting their provider;
+    an earlier deadline reschedules each one.
+    """
+
+    when: float | None = None
+    waits: set[asyncio.Timeout] = field(default_factory=set)
+
+    def tighten(self, when: float) -> None:
+        if self.when is None or when < self.when:
+            self.when = when
+            for wait in self.waits:
+                if not wait.expired():
+                    wait.reschedule(when)
 
 
 class JobRunner:
@@ -415,6 +435,7 @@ class JobRunner:
         counter_lock = asyncio.Lock()
         stop_dispatch = asyncio.Event()
         pause_dispatch = asyncio.Event()
+        drain = _Drain()
         start = time.perf_counter()
 
         async def producer() -> None:
@@ -441,7 +462,7 @@ class JobRunner:
                         await self._execute_operation(
                             run_id, operation, root, plan, stop_dispatch=stop_dispatch,
                             pause_dispatch=pause_dispatch, lease=lease,
-                            artifact_directory=snapshot["artifact_directory"],
+                            artifact_directory=snapshot["artifact_directory"], drain=drain,
                         )
                     finally:
                         async with counter_lock:
@@ -449,15 +470,25 @@ class JobRunner:
                 finally:
                     queue.task_done()
 
+        async def watch_drain() -> None:
+            # Admission cannot see a pause while every worker awaits a provider,
+            # so poll for a drain deadline until the workers finish.
+            loop = asyncio.get_running_loop()
+            poll_s = min(_DRAIN_POLL_S, self.lease_heartbeat_s)
+            while (await asyncio.wait(workers, timeout=poll_s))[1]:
+                remaining = self.store.drain_time_remaining(run_id)
+                if remaining is not None:
+                    drain.tighten(loop.time() + remaining)
+
         producer_task = asyncio.create_task(producer())
         workers = [asyncio.create_task(worker()) for _ in range(concurrency)]
+        tasks = [producer_task, *workers, asyncio.create_task(watch_drain())]
         try:
-            await asyncio.gather(producer_task, *workers)
+            await asyncio.gather(*tasks)
         except BaseException:
-            producer_task.cancel()
-            for task in workers:
+            for task in tasks:
                 task.cancel()
-            await asyncio.gather(producer_task, *workers, return_exceptions=True)
+            await asyncio.gather(*tasks, return_exceptions=True)
             raise
         finally:
             wall_s = time.perf_counter() - start
@@ -479,6 +510,7 @@ class JobRunner:
         pause_dispatch: asyncio.Event,
         lease: RunLease,
         artifact_directory: str,
+        drain: _Drain,
     ) -> None:
         try:
             attempt = self.store.begin_attempt(run_id, operation.operation_id, lease=lease)
@@ -543,20 +575,27 @@ class JobRunner:
             fallback=DEFAULT_CALL_TIMEOUT_S,
         )
         try:
-            result = await asyncio.wait_for(
-                provider.chat(
-                    "Create exactly the requested artifact. Return no extra variants.",
-                    [
-                        ChatMessage(
-                            role="user",
-                            content=operation.prompt,
-                            attachments=attachments,
-                        )
-                    ],
-                    operation.model,
-                ),
-                timeout=call_timeout,
-            )
+            # A pause's drain deadline bounds only the wait for the provider;
+            # a response that has arrived settles normally.
+            async with asyncio.timeout(drain.when) as bound:
+                drain.waits.add(bound)
+                try:
+                    result = await asyncio.wait_for(
+                        provider.chat(
+                            "Create exactly the requested artifact. Return no extra variants.",
+                            [
+                                ChatMessage(
+                                    role="user",
+                                    content=operation.prompt,
+                                    attachments=attachments,
+                                )
+                            ],
+                            operation.model,
+                        ),
+                        timeout=call_timeout,
+                    )
+                finally:
+                    drain.waits.discard(bound)
         except asyncio.CancelledError:
             try:
                 self.store.mark_unknown_outcome(
@@ -568,7 +607,8 @@ class JobRunner:
         except TimeoutError:
             self.store.mark_unknown_outcome(
                 permit.call_id,
-                f"provider call exceeded its {call_timeout:g}s deadline after dispatch",
+                "provider call was still running at the pause drain deadline" if bound.expired()
+                else f"provider call exceeded its {call_timeout:g}s deadline after dispatch",
                 lease=lease,
             )
             return

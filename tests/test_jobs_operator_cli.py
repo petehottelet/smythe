@@ -188,6 +188,27 @@ def test_stop_cli_persists_reason_and_reports_bounded_observation(tmp_path, caps
     assert result["attachment"]["state"] == "not_running" and result["status"] == "approved"
 
 
+def test_stop_cli_saves_a_drain_deadline_and_refuses_an_invalid_one_before_any_request(tmp_path, capsys):
+    _, plan, approval = planned(tmp_path)
+    database = tmp_path / "jobs.db"
+    with SQLiteRunStore(database) as store:
+        store.create_run(plan, approval, manifest_root=tmp_path, run_id="run")
+    for invalid in ("-1", "3601", "nan"):
+        assert main(["jobs", "stop", "run", "--drain-timeout-s", invalid, "--timeout-s", "0",
+                     "--store", str(database), "--json"]) == EXIT_INVALID_INPUT
+        assert "drain_timeout_s" in payload(capsys)["error"]["message"]
+    with SQLiteRunStore(database, read_only=True) as store:
+        assert store.get_control("run")["pause_generation"] == 0
+    assert main(["jobs", "stop", "run", "--drain-timeout-s", "5", "--timeout-s", "0",
+                 "--store", str(database), "--json"]) == EXIT_OK
+    request = payload(capsys)["stop"]["stop_request"]
+    with SQLiteRunStore(database, read_only=True) as store:
+        assert 0 < store.drain_time_remaining("run") <= 5
+        events = store.snapshot("run", include_events=True)["events"]
+    assert events[-1]["payload"]["drain_deadline_ns"] == request["drain_deadline_ns"]
+    assert request["pause_generation"] == 1
+
+
 def test_stop_cli_interrupt_reports_the_committed_request(monkeypatch, capsys):
     monkeypatch.setattr(operator, "stop_job", lambda *args, **kwargs: {
         "run_id": "run", "stop_request": {"pause_generation": 3, "pause_requested": True},

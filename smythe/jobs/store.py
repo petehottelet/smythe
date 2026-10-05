@@ -21,6 +21,7 @@ from uuid import uuid4
 from smythe._money import MICROUSD
 from smythe._sqlite import enable_wal
 from smythe.jobs.artifact_io import MAX_ARTIFACT_BYTES, MAX_IMAGE_PIXELS
+from smythe.jobs.models import MAX_CALL_TIMEOUT_S
 from smythe.jobs.preflight import ApprovalError, JobApprovalV1, JobPlanV1, verify_approval
 
 
@@ -824,15 +825,24 @@ class SQLiteRunStore:
                 raise JobNotFoundError(run_id)
             return self._control(cursor, run_id, version)
 
-    def request_pause(self, run_id: str, *, reason: str = "operator requested pause") -> dict[str, Any]:
+    def request_pause(self, run_id: str, *, reason: str = "operator requested pause",
+                      drain_timeout_s: float | None = None) -> dict[str, Any]:
         """Request a graceful drain; this operator action needs no worker token.
 
         It neither revokes the worker lease nor cancels an admitted provider
         call. Admission checks the request in the same transaction as dispatch.
         Each request advances intent so an older resume cannot erase it.
+
+        ``drain_timeout_s`` (0-3600) sets a drain deadline that long after this
+        request; the worker then abandons calls still awaiting their provider.
+        The earliest deadline of an open request holds until resume clears it,
+        and the result reports it as ``drain_deadline_ns``.
         """
         if not isinstance(reason, str) or not reason.strip() or len(reason) > 2048:
             raise ValueError("pause reason must be nonempty text of at most 2048 characters")
+        if drain_timeout_s is not None and (type(drain_timeout_s) not in (int, float)
+                                            or not 0 <= drain_timeout_s <= MAX_CALL_TIMEOUT_S):
+            raise ValueError(f"drain_timeout_s must be between 0 and {MAX_CALL_TIMEOUT_S:g} seconds")
         with self._transaction() as cursor:
             now = self._clock_ns()
             if cursor.execute("SELECT 1 FROM runs WHERE run_id=?", (run_id,)).fetchone() is None:
@@ -842,12 +852,44 @@ class SQLiteRunStore:
             if generation == MAX_SQLITE_INTEGER:
                 raise RunStoreError("Jobs pause generation is exhausted")
             generation += 1
+            deadline = self._drain_deadline(cursor, run_id, control)
+            if drain_timeout_s is not None:
+                requested = _microusd(now + int(drain_timeout_s * 1e9), field="drain deadline")
+                deadline = requested if deadline is None else min(deadline, requested)
             cursor.execute("""UPDATE run_controls SET pause_generation=?, pause_requested=1,
                 pause_reason=?, pause_requested_at_ns=?, drained_at_ns=NULL WHERE run_id=?""",
                 (generation, reason, now, run_id))
-            self._event(cursor, run_id, None, "pause_requested",
-                        {"pause_generation": generation, "reason": reason}, now)
-            return self._control(cursor, run_id)
+            # The deadline rides in the request's event, so the schema is unchanged.
+            payload = {"pause_generation": generation, "reason": reason}
+            if deadline is not None:
+                payload["drain_deadline_ns"] = deadline
+            self._event(cursor, run_id, None, "pause_requested", payload, now)
+            control = self._control(cursor, run_id)
+            return control if deadline is None else dict(control, drain_deadline_ns=deadline)
+
+    def drain_time_remaining(self, run_id: str) -> float | None:
+        """Seconds until the open pause request's drain deadline, if it set one.
+
+        The value is negative once the deadline has passed.
+        """
+        with self._read_transaction() as cursor:
+            control = self._control(cursor, run_id, self._read_schema_version(cursor))
+            deadline = self._drain_deadline(cursor, run_id, control)
+            return None if deadline is None else (deadline - self._clock_ns()) / 1e9
+
+    @staticmethod
+    def _drain_deadline(cursor: sqlite3.Cursor, run_id: str, control: dict[str, Any]) -> int | None:
+        if not control["pause_requested"]:
+            return None
+        row = cursor.execute("""SELECT payload_json FROM events WHERE run_id=?
+            AND event_type='pause_requested' ORDER BY sequence DESC LIMIT 1""", (run_id,)).fetchone()
+        payload = {} if row is None else _read_json_object(row["payload_json"], "events.payload_json")
+        deadline = payload.get("drain_deadline_ns")
+        if deadline is None or payload.get("pause_generation") != control["pause_generation"]:
+            return None
+        if type(deadline) is not int or not 0 <= deadline <= MAX_SQLITE_INTEGER:
+            raise RunStoreError("Invalid stored pause drain deadline")
+        return deadline
 
     @staticmethod
     def _control(cursor: sqlite3.Cursor, run_id: str, schema_version: int = STORE_VERSION) -> dict[str, Any]:

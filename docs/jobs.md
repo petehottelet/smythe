@@ -538,10 +538,30 @@ smythe jobs resume RUN_ID --detach
 
 The request blocks new attempt, reservation, and dispatch admission. Calls
 already marked dispatched finish through the normal accounting and artifact
-path. A pause does not cancel a provider request. Safe prepared calls return
-to pending; accepted outputs and attempt history remain intact. The run becomes
+path. Without a drain deadline, a pause does not cancel a provider request.
+Safe prepared calls return to pending; accepted outputs and attempt history
+remain intact. The run becomes
 `paused` after admitted work drains and pending work remains. Completed work,
 unknown outcomes, and budget overruns retain their corresponding statuses.
+
+`--drain-timeout-s` (0 to 3,600 seconds) bounds the drain:
+
+```bash
+smythe jobs stop RUN_ID --drain-timeout-s 60
+```
+
+That long after the request, the worker cancels each call still awaiting its
+provider and records it as `unknown_outcome`, keeping its full per-call
+ceiling as exposure; the run then becomes `needs_attention`. A call whose
+response has arrived settles normally. The deadline counts from the request,
+and the worker checks for it at least once a second; a worker from an earlier
+release ignores it and waits for every call. The request's `pause_requested`
+event and the JSON `stop_request` record it as `drain_deadline_ns`; the Jobs
+schema is unchanged. A later stop can bring the deadline forward but not
+extend it, and resume clears it with the pause. Investigate abandoned calls as
+described under [unknown outcomes](#resume-and-unknown-outcomes). In Python,
+pass `drain_timeout_s` to `SQLiteRunStore.request_pause` or
+`smythe.jobs.operator.stop_job`.
 
 `stop` uses the same timeout and polling ranges as `attach`. Set `--timeout-s 0`
 to return immediately after saving the request. A timeout or Ctrl+C ends only
@@ -769,6 +789,10 @@ runner = JobRunner(store, validators=validators)
   policy in the runtime.
 - Unknown provider outcomes require human investigation or explicit duplicate
   acknowledgment.
+- Jobs do not read a response's `stop_reason`. A response that the provider
+  truncated, refused or filtered is judged by its artifacts and accounting
+  alone: without an artifact it is `rejected` (`no_artifacts`) at its
+  reported cost, and artifacts that pass every check are accepted.
 
 ## High-fan-out example workload
 
