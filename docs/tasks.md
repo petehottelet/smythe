@@ -191,7 +191,10 @@ from the journal's copy:
   removal as its reason, until [`reevaluate`](verifier.md#re-evaluation)
   decides again under a source evidence validator that holds the tombstone.
   Passages quoted from the removed source then cannot be checked, so the run
-  is accepted only when its evidence does not rest on them.
+  is accepted only when its evidence does not rest on them. A decision binds
+  the keys of the tombstones the run held when it was made, so one made
+  before the removal never counts after it: a re-evaluation stopped before
+  the removal is decided again, not finished.
 
 This is a tombstone, not an erasure: the journal's earlier records keep what
 they hold, including saved requests, read responses, snapshots and outputs,

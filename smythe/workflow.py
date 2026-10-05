@@ -280,11 +280,15 @@ def _synthesis_key(graph, *, scoped):
 
 
 def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, strategy,
-                     sources, used_fallback, sequence=0):
+                     sources, used_fallback, sequence=0, tombstones=()):
     """Everything a decision binds; its hash keys the acceptance operation.
 
     A re-evaluation's decision also binds its *sequence*, so deciding the
-    same bytes under the same policy again is a new operation.
+    same bytes under the same policy again is a new operation. A decision
+    made while the run holds source tombstones binds their journal keys
+    (*tombstones*, see :func:`_tombstone_keys`): the removals it was made
+    under. A decision made before a removal therefore never matches one made
+    after it.
     """
     inputs = {
         "synthesis": synthesis_key, "output_sha256": output_sha256,
@@ -294,7 +298,15 @@ def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, s
     }
     if sequence:
         inputs["sequence"] = sequence
+    if tombstones:
+        inputs["tombstones"] = list(tombstones)
     return inputs
+
+
+def _tombstone_keys(store, run_id):
+    """The journal keys of the source tombstones a durable run committed, sorted."""
+    return sorted(source_tombstone_key(record.source_id, record.sha256)
+                  for record, _ in _tombstone_operations(store, run_id))
 
 
 def _decision_key(inputs):
@@ -382,13 +394,13 @@ def _held_record(record, output, problems, task_digest):
     )
 
 
-def _removal_problems(store, run_id, decided_at):
+def _removal_problems(store, run_id, considered):
     """The sources a completed run delivered from that were removed after its decision.
 
-    *decided_at* is the revision of the checkpoint that applied the decision,
-    or None without one. A tombstone that a later checkpoint applied, or that
-    none has applied yet, came after the decision. One reason each; only
-    reads are made.
+    *considered* holds the tombstone keys the decision binds (see
+    :func:`_decision_inputs`), empty without a decision. Any other tombstone
+    came after the decision, whichever checkpoint applied either. One reason
+    each; only reads are made.
     """
     saved = store.get_checkpoint(run_id)
     binding = None if saved is None else saved["checkpoint"].get("context_sources")
@@ -401,9 +413,9 @@ def _removal_problems(store, run_id, decided_at):
                  for source in sources_from_operation(operation, binding["revision"])}
     return [f"source {record.source_id!r} was removed from the run after this decision "
             f"({record.tombstone}); re-evaluate the run"
-            for record, applied in _tombstone_operations(store, run_id)
+            for record, _ in _tombstone_operations(store, run_id)
             if (record.source_id, record.sha256) in delivered
-            and (applied is None or decided_at is None or applied > decided_at)]
+            and source_tombstone_key(record.source_id, record.sha256) not in considered]
 
 
 def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha256,
@@ -413,29 +425,38 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
     The saved *output* must match the record's digest, the run's *task* and
     the source generations must be those it binds, and the record must be
     the journal's :func:`current_decision`, made under the run's policy
-    (*policy_sha256*) or, for a re-evaluation, the policy it names. With
-    *removed*, a source the run delivered from that was removed after the
-    decision (:meth:`WorkflowRuntime.remove_source`) is a problem too. An
-    empty list means the record holds. Only reads are made, so a store
-    opened read-only will do.
+    (*policy_sha256*) or, for a re-evaluation, the policy it names, and under
+    tombstones the journal holds. With *removed*, a source the run delivered
+    from that was removed after the decision
+    (:meth:`WorkflowRuntime.remove_source`) is a problem too. An empty list
+    means the record holds. Only reads are made, so a store opened read-only
+    will do.
     """
     problems = _delivery_problems(record, output, graph, task)
     decision = current_decision(store, run_id)
     holds = decision is not None and decision["record"].to_dict() == record.to_dict()
+    considered = []
     if holds:
         sequence = decision["sequence"]
         deciding = record.policy_sha256 if sequence else policy_sha256
+        considered = decision["inputs"].get("tombstones", [])
+        if type(considered) is not list or any(type(key) is not str for key in considered):
+            considered, holds = [], False
         inputs = _decision_inputs(
             _synthesis_key(graph, scoped=True), deciding, task_sha256(task),
             record.output_sha256, record.strategy, record.sources, record.used_fallback,
-            sequence=sequence,
+            sequence=sequence, tombstones=considered,
         )
-        holds = (record.policy_sha256 == deciding and decision["inputs"] == inputs
-                 and decision["operation_key"] == _decision_key(inputs))
+        # A decision binds each tombstone once, sorted; the journal keeps them all.
+        holds = (holds and record.policy_sha256 == deciding and decision["inputs"] == inputs
+                 and decision["operation_key"] == _decision_key(inputs)
+                 and (not considered or (considered == sorted(set(considered))
+                                         and set(considered) <= set(_tombstone_keys(store, run_id)))))
     if not holds:
+        considered = []
         problems.append("the journal holds no applied decision matching the saved record")
     if removed:
-        problems += _removal_problems(store, run_id, None if decision is None else decision["revision"])
+        problems += _removal_problems(store, run_id, considered)
     return problems
 
 
@@ -1542,7 +1563,9 @@ class WorkflowRuntime:
         A new completed checkpoint consumes it, which makes it the run's
         :func:`current_decision`; earlier decisions stay in the journal
         (:func:`decision_history`). A re-evaluation stopped before that
-        checkpoint is finished by the next one under the same policy.
+        checkpoint is finished by the next one under the same policy, unless
+        a source was removed from the run after it decided: the next one then
+        decides again, since a decision binds the run's tombstones.
 
         The saved recipe may differ from this runtime's only in its acceptance
         policy and gate verifier. Resuming the run still needs the policy its
@@ -1897,17 +1920,20 @@ class WorkflowRuntime:
         return unusable
 
     def _acceptance_inputs(self, synthesis_key, output_sha256, strategy, sources, used_fallback,
-                           sequence=0):
+                           sequence=0, tombstones=()):
         """Everything a decision binds; its hash keys the acceptance operation."""
         return _decision_inputs(synthesis_key, self.acceptance.sha256, self.undecided.task_sha256,
-                                output_sha256, strategy, sources, used_fallback, sequence)
+                                output_sha256, strategy, sources, used_fallback, sequence,
+                                tombstones)
 
     def _next_decision_sequence(self, inputs_at):
         """A re-evaluation's decision sequence: one past every decision the journal holds.
 
         A re-evaluation stopped before its checkpoint left its decision
         unapplied. When *inputs_at* that sequence give the same decision
-        again, it is finished instead of taking a new sequence.
+        again, it is finished instead of taking a new sequence. They never
+        do once a source was removed after it decided, since the inputs bind
+        the run's tombstones: a validator then decides again.
         """
         operations = self.store.list_operations(self.run_id, "acceptance")
         latest = max((_decision_sequence(item["operation_key"]) for item in operations), default=0)
@@ -1931,10 +1957,13 @@ class WorkflowRuntime:
         strategy = _synthesis_strategy(self.sources["synthesizer"])
         sources, used_fallback = _delivery_sources(self.graph, strategy)
         bound = [AcceptanceSource(node.id, node_generation(node)) for node in sources]
+        # The removals the decision is made under; only a run with context
+        # assembly can have any.
+        tombstones = _tombstone_keys(self.store, self.run_id) if self._context_version else []
 
         def inputs_at(sequence):
             return self._acceptance_inputs(synthesis_key, text_sha256(output), strategy, bound,
-                                           used_fallback, sequence)
+                                           used_fallback, sequence, tombstones)
 
         sequence = self._next_decision_sequence(inputs_at) if reevaluation else 0
         inputs = inputs_at(sequence)
@@ -1957,7 +1986,7 @@ class WorkflowRuntime:
                 or record.policy_sha256 != self.acceptance.sha256
                 or self._acceptance_inputs(synthesis_key, record.output_sha256, record.strategy,
                                            record.sources, record.used_fallback,
-                                           sequence) != inputs):
+                                           sequence, tombstones) != inputs):
             raise WorkflowStateError("Saved delivery acceptance does not match its output")
         self.trace.on_acceptance(record)
         return record

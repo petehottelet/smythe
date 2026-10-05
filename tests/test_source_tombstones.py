@@ -13,10 +13,11 @@ import json
 
 import pytest
 
+from fakes import Crash, crash_when
 from smythe import (
     AcceptanceDecision, AcceptancePolicy, ClaimPassage, ClaimRecord, ContextSource,
-    OfflineProvider, SimpleArchitect, SourceEvidence, SourceEvidenceValidator, SourceRecord,
-    SQLiteWorkflowStore, Swarm, Task,
+    DeliveryAcceptance, OfflineProvider, SimpleArchitect, SourceEvidence, SourceEvidenceValidator,
+    SourceRecord, SQLiteWorkflowStore, Swarm, Task,
 )
 from smythe.context import SourceRemovedError, load_context_snapshot, load_context_sources
 from smythe.evidence import (
@@ -212,6 +213,93 @@ def test_a_new_decision_that_holds_the_tombstone_stands(store, replies):
     again = durable(store).reevaluate(run_id, acceptance=held)
     assert again.accepted
     # The re-evaluation came after the removal, so resuming keeps it.
+    assert durable(store).resume(run_id).acceptance == again.acceptance
+
+
+def stop_reevaluation(monkeypatch, store, run_id, acceptance) -> str:
+    """Re-evaluate until the decision commits, stop before its checkpoint; return its key."""
+    stop = crash_when(monkeypatch, store, "save_checkpoint")
+    with pytest.raises(Crash):
+        durable(store).reevaluate(run_id, acceptance=acceptance)
+    stop.restore()
+    (stopped,) = [item for item in store.list_operations(run_id, "acceptance")
+                  if item["applied_revision"] is None]
+    return stopped["operation_key"]
+
+
+def test_a_reevaluation_stopped_before_a_removal_decides_again(store, replies, monkeypatch):
+    replies["Write"] = artifact(KEPT)
+    run_id = durable(store).execute(single()).execution_id
+    stopped = stop_reevaluation(monkeypatch, store, run_id, policy())
+    # The stopped decision accepted the run, but no checkpoint applied it.
+    assert DeliveryAcceptance.from_dict(
+        store.load_operation(run_id, stopped)["result"]["delivery_acceptance"]).accepted
+    remove(store, run_id)
+
+    # The same policy still holds the removed text, so it cannot check the run,
+    # and the decision stopped before the removal is never finished.
+    again = durable(store).reevaluate(run_id, acceptance=policy())
+    assert again.acceptance.decision is AcceptanceDecision.INDETERMINATE and not again.accepted
+    assert "holds the text of the removed source 'renewals-2026'" in again.acceptance.reasons[0]
+    decision = current_decision(store, run_id)
+    assert decision["sequence"] == 2 and decision["operation_key"] != stopped
+    assert decision["inputs"]["tombstones"] == [source_tombstone_key("renewals-2026", STRONG.sha256)]
+    assert store.load_operation(run_id, stopped)["state"] == "completed"
+    resumed = durable(store).resume(run_id)
+    assert resumed.acceptance == again.acceptance and not resumed.accepted
+
+
+def test_a_decision_stopped_before_a_removal_never_holds_after_it(store, replies, monkeypatch):
+    replies["Write"] = artifact(KEPT)
+    run_id = durable(store).execute(single()).execution_id
+    stopped = stop_reevaluation(monkeypatch, store, run_id, policy())
+    remove(store, run_id)
+    # A checkpoint that applies the stopped decision after the removal, as one
+    # written by a process that never saw the tombstone would.
+    saved = store.get_checkpoint(run_id)
+    operation = store.load_operation(run_id, stopped)
+    checkpoint = dict(saved["checkpoint"], delivery_acceptance=operation["result"]["delivery_acceptance"])
+    lease = store.acquire_lease(run_id, "earlier-process", ttl_s=60)
+    store.save_checkpoint(lease, saved["revision"], checkpoint,
+                          consumed_operation_ids=[operation["operation_id"]])
+    store.release_lease(lease)
+    assert current_decision(store, run_id)["operation_key"] == stopped
+
+    resumed = durable(store).resume(run_id)
+    assert resumed.acceptance.decision is AcceptanceDecision.INDETERMINATE
+    assert ("source 'renewals-2026' was removed from the run after this decision "
+            f"({REASON}); re-evaluate the run") in resumed.acceptance.reasons
+
+
+def test_a_reevaluation_stopped_after_a_removal_is_finished_by_the_next(store, replies,
+                                                                        monkeypatch):
+    replies["Write"] = artifact("# Billing\n\nA 2019 poll favoured annual billing.\n\n", POLL_ONLY)
+    run_id = durable(store).execute(single()).execution_id
+    remove(store, run_id)
+    held = policy(MISLEADING, tombstone_of(STRONG))
+    stopped = stop_reevaluation(monkeypatch, store, run_id, held)
+
+    again = durable(store).reevaluate(run_id, acceptance=held)
+    assert again.accepted
+    assert current_decision(store, run_id)["operation_key"] == stopped
+    assert durable(store).resume(run_id).acceptance == again.acceptance
+
+
+def test_a_decision_made_under_a_removal_its_checkpoint_left_unapplied_holds(store, replies,
+                                                                            monkeypatch):
+    replies["Write"] = artifact("# Billing\n\nA 2019 poll favoured annual billing.\n\n", POLL_ONLY)
+    run_id = durable(store).execute(single()).execution_id
+    # The removal commits its tombstone, then stops before its checkpoint.
+    stop = crash_when(monkeypatch, store, "save_checkpoint")
+    with pytest.raises(Crash):
+        remove(store, run_id)
+    stop.restore()
+    held = policy(MISLEADING, tombstone_of(STRONG))
+    again = durable(store).reevaluate(run_id, acceptance=held)
+    assert again.accepted
+
+    # The decision was made under the tombstone, so applying it later does not undo it.
+    assert remove(store, run_id) == tombstone_of(STRONG)
     assert durable(store).resume(run_id).acceptance == again.acceptance
 
 

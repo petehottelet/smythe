@@ -759,8 +759,10 @@ policy, and records the decision in its journal:
   checkpoint applies it in one transaction. The run's calls, charges,
   budget, counters and recipe are unchanged. A re-evaluation stopped before
   that checkpoint is finished by the next one under the same policy, without
-  validating again. `smythe.workflow.current_decision(store, run_id)` returns
-  the run's current decision, and `decision_history(store, run_id)` every
+  validating again, unless a source was [removed](tasks.md#remove-a-source)
+  from the run after it decided; the next one then decides again.
+  `smythe.workflow.current_decision(store, run_id)` returns the run's
+  current decision, and `decision_history(store, run_id)` every
   decision a checkpoint applied, by sequence; resume, re-evaluation and
   `smythe runs inspect` read the decision there. Resuming under a changed
   policy is still refused with `WorkflowConflictError`. A run with a renderer
