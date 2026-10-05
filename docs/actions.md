@@ -144,7 +144,9 @@ authenticate users. It has an `identity` string naming the verifier and its
 version. `verify(assertion, intent_sha256, now_ns)` returns the `Principal`
 (issuer, subject and tenant) that issued the assertion for exactly that intent
 digest, or raises `ApprovalRejected`. `still_authorized(principal, intent,
-now_ns)` reports whether that principal may still approve the intent.
+now_ns)` reports whether that principal may still approve the intent. The
+same `verify()` authenticates an [operator's decision](verifier.md#operator-decisions)
+on output that strict delivery acceptance left for review.
 
 `check_connector()` returns the connector's profile and `check_verifier()`
 the verifier's identity. Both refuse a `Provider`, a class, a coroutine

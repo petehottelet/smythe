@@ -18,8 +18,8 @@ from uuid import uuid4
 from smythe._money import FLOOR, NANOUSD, to_units
 from smythe.acceptance import (
     AcceptanceDecision, AcceptanceMode, AcceptancePolicy, AcceptanceSource, DeliveryAcceptance,
-    ValidationSubject, _delivery_problems, _final_check, evaluate_delivery, task_sha256, text_sha256,
-    validate_acceptance_obligations,
+    ValidationSubject, _delivery_problems, _final_check, _operator_record, evaluate_delivery,
+    task_sha256, text_sha256, validate_acceptance_obligations,
 )
 from smythe.budget import BudgetValidationError, Sentinel, validate_completion_usage
 from smythe.checkpoint import (
@@ -281,7 +281,7 @@ def _synthesis_key(graph, *, scoped):
 
 
 def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, strategy,
-                     sources, used_fallback, sequence=0, tombstones=()):
+                     sources, used_fallback, sequence=0, tombstones=(), operator=None):
     """Everything a decision binds; its hash keys the acceptance operation.
 
     A re-evaluation's decision also binds its *sequence*, so deciding the
@@ -289,7 +289,8 @@ def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, s
     made while the run holds source tombstones binds their journal keys
     (*tombstones*, see :func:`_tombstone_keys`): the removals it was made
     under. A decision made before a removal therefore never matches one made
-    after it.
+    after it. An operator's decision binds *operator* (see
+    :func:`_operator_inputs`).
     """
     inputs = {
         "synthesis": synthesis_key, "output_sha256": output_sha256,
@@ -301,6 +302,8 @@ def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, s
         inputs["sequence"] = sequence
     if tombstones:
         inputs["tombstones"] = list(tombstones)
+    if operator is not None:
+        inputs["operator"] = operator
     return inputs
 
 
@@ -308,6 +311,13 @@ def _tombstone_keys(store, run_id):
     """The journal keys of the source tombstones a durable run committed, sorted."""
     return sorted(source_tombstone_key(record.source_id, record.sha256)
                   for record, _ in _tombstone_operations(store, run_id))
+
+
+def _operator_inputs(record):
+    """What an operator's decision binds beyond a policy's: its decision and operator; else None."""
+    if record.operator is None:
+        return None
+    return {"decision": record.decision.value, **record.operator.to_dict()}
 
 
 def _decision_key(inputs):
@@ -446,7 +456,7 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
         inputs = _decision_inputs(
             _synthesis_key(graph, scoped=True), deciding, task_sha256(task),
             record.output_sha256, record.strategy, record.sources, record.used_fallback,
-            sequence=sequence, tombstones=considered,
+            sequence=sequence, tombstones=considered, operator=_operator_inputs(record),
         )
         # A decision binds each tombstone once, sorted; the journal keeps them all.
         holds = (holds and record.policy_sha256 == deciding and decision["inputs"] == inputs
@@ -532,7 +542,8 @@ class WorkflowRuntime:
     runs, it marks the gates of a generated plan, refuses before planning a
     run no gate of its plan could accept, and refuses a graph that does not
     meet its acceptance obligations before any node runs. :meth:`reevaluate`
-    records a new decision for a completed run under this runtime's policy.
+    records a new decision for a completed run under this runtime's policy,
+    or an authorized operator's for output left for review.
 
     ``read_tools`` declares the :class:`~smythe.workflow_tools.ReadProfile`
     reads that the graph's read steps may name. The recipe records their
@@ -1583,7 +1594,7 @@ class WorkflowRuntime:
                     f"({tombstone.tombstone}); {advice}"
                 )
 
-    async def reevaluate(self, run_id):
+    async def reevaluate(self, run_id, *, operator=None):
         """Record a new delivery decision for a completed run's saved output.
 
         This runtime's strict policy decides: its final validators run on the
@@ -1604,18 +1615,27 @@ class WorkflowRuntime:
         policy and gate verifier. Resuming the run still needs the policy its
         recipe records, and returns the current decision.
 
-        Raises ``WorkflowBindingError`` without a strict policy;
+        *operator*, an :class:`~smythe.acceptance.OperatorDecision`, records
+        that operator's decision instead, with or without a policy on this
+        runtime: a version 2 record that keeps what the current decision binds
+        and names the operator, in a new ``acceptance`` operation whose inputs
+        also bind the decision and operator. Only a current ``needs_review``
+        or ``indeterminate`` decision can be resolved; any other stands.
+
+        Raises ``WorkflowBindingError`` without a strict policy or *operator*;
         ``WorkflowStateError`` for a run whose recipe has no strict policy, an
-        unfinished run, unresolved accounting, or a saved output, task, source
+        unfinished run, unresolved accounting, a saved output, task, source
         generation or record that no longer matches the journal, so changed
-        output is never accepted, and for a run with a renderer whose published
+        output is never accepted, a run with a renderer whose published
         document is missing or changed (:meth:`republish` publishes it again
-        first); and ``WorkflowConflictError`` for a recipe
-        that differs in anything else.
+        first), or a current decision an operator cannot resolve;
+        ``WorkflowConflictError`` for a recipe that differs in anything else;
+        and whatever the operator's verifier raises, such as
+        ``ApprovalRejected``, before anything is journaled.
         """
         from smythe.swarm import _delivery_sources
 
-        if self.acceptance is None:
+        if self.acceptance is None and operator is None:
             raise WorkflowBindingError("reevaluate needs a strict acceptance policy")
         run = self.store.load_run(run_id)
         if "acceptance" not in run["config"]:
@@ -1623,6 +1643,8 @@ class WorkflowRuntime:
                 "Workflow ran without a strict acceptance policy, so it has no delivery decision "
                 "to re-evaluate; run the task again under one"
             )
+        # A runtime without a policy writes the checkpoint version the recipe does.
+        self.checkpoint_version = _checkpoint_version(run["config"])
         async with self._session(run, reevaluating=True):
             state = self._restore()
             if state is None or state["status"] != "completed":
@@ -1653,7 +1675,10 @@ class WorkflowRuntime:
                         "Workflow cannot be re-evaluated: " + "; ".join(damaged)
                         + "; publish its document again with republish() first"
                     )
-            decided = await self._decide(self._synthesis_key(), output, reevaluation=True)
+            if operator is None:
+                decided = await self._decide(self._synthesis_key(), output, reevaluation=True)
+            else:
+                decided = await self._operator_decide(operator, record)
             self.execution_concurrency = state.get("max_concurrency")
             self._save("completed", output=output, acceptance=decided)
             self.saved_acceptance = decided
@@ -2023,6 +2048,36 @@ class WorkflowRuntime:
             raise WorkflowStateError("Saved delivery acceptance does not match its output")
         self.trace.on_acceptance(record)
         return record
+
+    async def _operator_decide(self, operator, record):
+        """Journal *operator*'s decision on the current *record* as the next acceptance operation.
+
+        The assertion is verified first, so nothing is journaled for one the
+        verifier refuses. An operator decision stopped before its checkpoint
+        is finished by the same decision again.
+        """
+        sequence = current_decision(self.store, self.run_id)["sequence"]
+        decided = _operator_record(operator, self.run_id, sequence, record, WorkflowStateError)
+        # Like a policy's decision, it binds the removals it was made under.
+        tombstones = _tombstone_keys(self.store, self.run_id) if self._context_version else []
+
+        def inputs_at(number):
+            return _decision_inputs(self._synthesis_key(), decided.policy_sha256,
+                                    self.undecided.task_sha256, decided.output_sha256,
+                                    decided.strategy, decided.sources, decided.used_fallback,
+                                    number, tombstones=tombstones,
+                                    operator=_operator_inputs(decided))
+
+        inputs = inputs_at(self._next_decision_sequence(inputs_at))
+
+        async def write(_):
+            return {"delivery_acceptance": decided.to_dict()}
+
+        result = await self._operation_result(_decision_key(inputs), "acceptance", inputs, write)
+        if result.get("delivery_acceptance") != decided.to_dict():
+            raise WorkflowStateError("Saved delivery acceptance does not match its output")
+        self.trace.on_acceptance(decided)
+        return decided
 
     def _reverified(self, output):
         """Check a completed run's decision against its checkpoint and journal now.

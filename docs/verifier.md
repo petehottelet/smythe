@@ -319,7 +319,8 @@ from execution and cost. `smythe.acceptance` defines its types:
   `not_evaluated`, `accepted`, `rejected`, `needs_review` or `indeterminate`.
   It binds the SHA-256 of the delivered bytes, the synthesis strategy, the
   source nodes and their generations, the task and policy hashes, and each
-  validator's outcome. Checkpoints and JSON keep it under
+  validator's outcome; version 2 records an
+  [operator's decision](#operator-decisions). Checkpoints and JSON keep it under
   `delivery_acceptance`; the [checkpoint format](checkpoint-format.md#delivery-acceptance-version-5)
   lists its fields.
 - A validator is trusted local code: an object with an `identity`
@@ -590,6 +591,66 @@ result = swarm.reevaluate(execution_id, acceptance=fixed)
   [`smythe runs inspect`](runs.md#decision-history) lists the decisions and
   exits by the current one.
 
+### Operator decisions
+
+A policy that selects `needs_review`, or a decision left `indeterminate`,
+withholds output until someone decides it. An authorized operator can
+resolve it, as accepted or rejected, through the same entry point:
+`swarm.reevaluate(execution_id, operator=decision)`, or
+`await swarm.areevaluate(...)`. `decision` is an
+`smythe.acceptance.OperatorDecision`; it takes no `acceptance` policy, and the
+`Swarm` needs none.
+
+Smythe does not authenticate operators. Your host's approval verifier does,
+through the [`ApprovalVerifier`](actions.md#connectors-and-approval-verifiers)
+contract that external actions use: it issues an assertion for one digest and
+returns the `Principal` behind it from `verify()`.
+`operator_decision_sha256(run_id, sequence, record, decision,
+evidence_sha256)` is the digest to approve. It binds the run, the current
+decision's sequence and record, the operator's `"accepted"` or `"rejected"`,
+and the SHA-256 of the evidence the operator decided on, which your host
+keeps; Smythe stores only the digest.
+
+```python
+from smythe.acceptance import OperatorDecision, operator_decision_sha256
+from smythe.checkpoint import delivery_acceptance_sequence
+
+record = result.acceptance                       # needs_review
+sequence = delivery_acceptance_sequence(checkpoint_store.load(execution_id))
+digest = operator_decision_sha256(execution_id, sequence, record, "accepted", evidence_sha256)
+assertion = identity_host.issue(digest, ...)     # your host's approval flow
+decided = swarm.reevaluate(execution_id, operator=OperatorDecision(
+    "accepted", evidence_sha256, assertion=assertion, verifier=identity_host))
+assert decided.accepted
+```
+
+On a durable run, `smythe.workflow.current_decision(store, run_id)` gives the
+`sequence` and `record`.
+
+- Only a current decision of `needs_review` or `indeterminate` can be
+  resolved. An `accepted` or `rejected` decision, including an operator's,
+  stands: `reevaluate` raises `ValueError` (`WorkflowStateError` on a durable
+  run) before the assertion is checked. As with re-evaluation, the run must
+  be completed and everything its record binds must still hold.
+- The verifier must accept the assertion for exactly that digest. A forged,
+  expired or revoked assertion, or one issued for another run, decision,
+  sequence, record or evidence, makes it raise `ApprovalRejected`, which
+  propagates; nothing is written.
+- No node runs, no validator or provider is called, and costs, the budget,
+  retry and regeneration counters and node generations stay as saved.
+- The new decision is a version 2 record with the bindings of the one it
+  resolves, no validator outcomes, and an `operator` block: the principal's
+  `issuer`, `subject` and `tenant`, the verifier's `identity`, and
+  `evidence_sha256`. A reader that knows only version 1 records refuses it.
+  It becomes the current decision and the earlier one is kept, as for a
+  re-evaluation: an ordinary checkpoint also lists `operator_decision` in
+  [`requires`](checkpoint-format.md#required-state-features-version-5) while
+  it holds such a record, and a durable run journals it as the next
+  `acceptance` operation, whose inputs also bind the decision and the
+  operator. Delivery, resume and `smythe runs inspect` follow it.
+- A later re-evaluation under a policy still records a new decision, and
+  keeps the operator's among the earlier ones.
+
 ## Built-in final validators
 
 `TextValidator` and `JSONValidator` (in `smythe.validators`, also exported
@@ -774,7 +835,9 @@ policy, and records the decision in its journal:
   `smythe runs inspect` read the decision there. Resuming under a changed
   policy is still refused with `WorkflowConflictError`. A run with a renderer
   is re-evaluated only while its published document is intact; when the
-  file is missing or changed, `republish()` publishes it again first.
+  file is missing or changed, `republish()` publishes it again first. An
+  [operator's decision](#operator-decisions) is journaled and applied the
+  same way, by a `Swarm` with or without a policy.
 - **Synthesis keys.** Such a run journals its synthesis under `synthesis`
   while every node is at generation 0, and otherwise under
   `synthesis/<digest>`, the first 16 hex digits of the SHA-256 of every node

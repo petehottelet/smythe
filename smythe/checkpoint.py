@@ -46,8 +46,11 @@ CHECKPOINT_VERSION = 4
 STRICT_CHECKPOINT_VERSION = 5
 SUPPORTED_CHECKPOINT_VERSIONS = (1, 2, 3, 4, 5)
 MCP_TRUSTED_CHECKPOINT_VERSION = 4
-# The version 5 state features this build reads.
-KNOWN_CHECKPOINT_REQUIREMENTS = frozenset({"delivery_acceptance", "attempt_allowance"})
+# The version 5 state features this build reads. ``operator_decision`` is
+# listed while the record or a kept earlier one is an operator's decision.
+OPERATOR_DECISION_REQUIREMENT = "operator_decision"
+KNOWN_CHECKPOINT_REQUIREMENTS = frozenset(
+    {"delivery_acceptance", "attempt_allowance", OPERATOR_DECISION_REQUIREMENT})
 # The control keys of an attempt allowance (see RetryPolicy.persist_attempts),
 # which older builds would ignore and so refill.
 _ALLOWANCE_KEYS = frozenset({"retry_policy", "attempts_used"})
@@ -382,6 +385,8 @@ def build_state(
         requires.append("delivery_acceptance")
     if _ALLOWANCE_KEYS & state["control"].keys():
         requires.append("attempt_allowance")
+    if delivery_acceptance is not None and delivery_acceptance.operator is not None:
+        requires.append(OPERATOR_DECISION_REQUIREMENT)
     if requires:
         state["version"] = STRICT_CHECKPOINT_VERSION
         state["requires"] = requires
@@ -445,7 +450,8 @@ def delivery_acceptance_from_state(state: dict[str, Any]) -> DeliveryAcceptance 
     completed state's record must hold a decision. The record is read as
     stored; comparing it with the saved output is left to the caller.
     Raises ValueError for an unsupported version, an unknown requirement, a
-    missing or unlisted record, or an unreadable one.
+    missing or unlisted record, or an unreadable one, and for an operator
+    decision that an unfinished state holds or ``requires`` does not list.
     """
     requires = checkpoint_requirements(state)
     if state["version"] < STRICT_CHECKPOINT_VERSION:
@@ -464,6 +470,19 @@ def delivery_acceptance_from_state(state: dict[str, Any]) -> DeliveryAcceptance 
     record = DeliveryAcceptance.from_dict(block)
     if state.get("status") == "completed" and record.decision is AcceptanceDecision.NOT_EVALUATED:
         raise ValueError("A completed checkpoint's delivery acceptance record must hold a decision")
+    return _listed(state, requires, record)
+
+
+def _listed(
+    state: dict[str, Any], requires: tuple[str, ...], record: DeliveryAcceptance,
+) -> DeliveryAcceptance:
+    """*record*, unless it is an operator decision that *state* may not hold."""
+    if record.operator is not None and (OPERATOR_DECISION_REQUIREMENT not in requires
+                                        or state.get("status") != "completed"):
+        raise ValueError(
+            "Only a completed checkpoint that lists operator_decision in 'requires' holds an "
+            "operator decision"
+        )
     return record
 
 
@@ -544,7 +563,7 @@ def delivery_acceptance_history(
             raise ValueError(
                 "Each earlier decision must have decided the output the current one binds"
             )
-        history.append((sequence, record))
+        history.append((sequence, _listed(state, checkpoint_requirements(state), record)))
     return tuple(history)
 
 
@@ -563,8 +582,10 @@ def supersede_delivery_acceptance(
     """A copy of a completed checkpoint *state* whose current decision is *record*.
 
     The decision it replaces joins ``delivery_acceptance_history`` with its
-    sequence (see :func:`delivery_acceptance_history`), and ``updated_at`` is
-    the current time; every other field is copied as saved. Raises ValueError
+    sequence (see :func:`delivery_acceptance_history`), ``requires`` lists
+    ``operator_decision`` exactly while *record* or a kept earlier decision is
+    an operator's, and ``updated_at`` is the current time; every other field
+    is copied as saved. Raises ValueError
     unless *state* is a completed checkpoint with a decided record and
     *record* is a decision that binds the same output, which the state's
     ``output`` still matches.
@@ -581,11 +602,15 @@ def supersede_delivery_acceptance(
             or text_sha256(output) != record.output_sha256):
         raise ValueError("A new delivery decision must bind the output its checkpoint holds")
     history = [*delivery_acceptance_history(state), (sequence, current)]
+    kept = history[-DELIVERY_ACCEPTANCE_HISTORY_LIMIT:]
     updated = deepcopy(state)
     updated["delivery_acceptance"] = record.to_dict()
     updated["delivery_acceptance_history"] = [
-        {"sequence": number, "delivery_acceptance": item.to_dict()}
-        for number, item in history[-DELIVERY_ACCEPTANCE_HISTORY_LIMIT:]
+        {"sequence": number, "delivery_acceptance": item.to_dict()} for number, item in kept
     ]
+    requires = [name for name in updated["requires"] if name != OPERATOR_DECISION_REQUIREMENT]
+    if record.operator or any(item.operator for _, item in kept):
+        requires.append(OPERATOR_DECISION_REQUIREMENT)
+    updated["requires"] = requires
     updated["updated_at"] = time.time()
     return updated

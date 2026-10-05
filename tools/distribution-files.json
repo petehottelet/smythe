@@ -99,6 +99,7 @@
     "tests/fixture_service.py",
     "tests/helpers.py",
     "tests/mcp_test_server.py",
+    "tests/test_acceptance_operator_decision.py",
     "tests/test_acceptance_records.py",
     "tests/test_acquisition_demo.py",
     "tests/test_action_contract.py",

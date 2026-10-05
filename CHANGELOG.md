@@ -769,6 +769,25 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   when set, so other recipes keep their identity.
   `smythe.evidence.render_contradictions()` writes the section. See
   [keep contradictions through synthesis](docs/source-evidence.md#keep-contradictions-through-synthesis).
+- An authorized operator can resolve output that a strict policy left
+  `needs_review` or `indeterminate`. `Swarm.reevaluate(execution_id,
+  operator=OperatorDecision(...))`, and `WorkflowRuntime.reevaluate(run_id,
+  operator=...)`, take the operator's `accepted` or `rejected`, the SHA-256 of
+  the evidence they decided on and an assertion that the host's
+  `ApprovalVerifier` must accept for exactly `operator_decision_sha256()` of
+  the run, the current decision's sequence and record, the decision and the
+  evidence. A forged, expired or misbound assertion raises the verifier's
+  `ApprovalRejected` and nothing is written, and an `accepted` or `rejected`
+  decision stands. No node runs, no provider is called, and costs, budget and
+  counters stay as saved. The decision is a new delivery acceptance record,
+  version 2, whose `operator` block names the verified principal, the
+  verifier and the evidence digest; the earlier record is kept. An ordinary
+  checkpoint lists `operator_decision` in `requires` while it holds such a
+  record, and a durable run journals it as its next `acceptance` operation.
+  Readers that know only version 1 records, or only the
+  `delivery_acceptance` feature, refuse it. A policy's records stay version
+  1, and checkpoint versions are unchanged. See
+  [operator decisions](docs/verifier.md#operator-decisions).
 
 ### Changed
 

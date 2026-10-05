@@ -243,9 +243,12 @@ the state features its reader must understand:
 "requires": ["delivery_acceptance"]
 ```
 
-This build knows two features, [`delivery_acceptance`](#delivery-acceptance-version-5)
-and [`attempt_allowance`](#attempt-allowance-version-5); a state with both
-lists them in that order. A reader refuses, with
+This build knows three features: [`delivery_acceptance`](#delivery-acceptance-version-5),
+[`attempt_allowance`](#attempt-allowance-version-5), and `operator_decision`,
+which a completed state lists while its record or a kept
+[earlier decision](#decision-history) is an
+[operator's decision](verifier.md#operator-decisions). A state lists those it
+needs in that order. A reader refuses, with
 `ValueError` and before any provider call, a version 5 checkpoint whose
 `requires` is missing or is not a list of strings, or that lists a feature it
 does not know, whether the run finished or not. A later feature can therefore
@@ -294,6 +297,12 @@ listing it, is refused, and so is a `completed` state whose record is
 
 - `version` is the record format. A reader rejects a record version, a
   `decision` or a key it does not know instead of guessing what it means.
+  A policy's decision is version 1. An operator's decision is version 2,
+  which adds `operator`: the verified principal's `issuer`, `subject` and
+  `tenant`, the approval `verifier`'s identity and the `evidence_sha256` the
+  operator decided on. It is `accepted` or `rejected`, lists no validator
+  outcomes, and is held only by a `completed` state that lists
+  `operator_decision` in `requires`.
 - `decision` is `not_evaluated`, `accepted`, `rejected`, `needs_review` or
   `indeterminate`. Every decision except `not_evaluated` binds
   `output_sha256`, the SHA-256 of the checkpoint's `output` encoded as UTF-8,
@@ -341,7 +350,8 @@ checkpoint unchanged. Its output is neither delivered nor returned.
 
 ### Decision history
 
-[`Swarm.reevaluate`](verifier.md#re-evaluation) replaces a completed
+[`Swarm.reevaluate`](verifier.md#re-evaluation), under a policy or with an
+[operator's decision](verifier.md#operator-decisions), replaces a completed
 checkpoint's `delivery_acceptance` with a new decision on the same output and
 keeps the record it replaces in a top-level `delivery_acceptance_history`
 list, oldest first:
@@ -359,7 +369,10 @@ entry. At most 16 superseded records are kept
 first; sequences keep counting. Every entry is a decided record that binds
 the same `output_sha256` as the current one. The list is informational, so
 it is not a required state feature: resume reads only the current record,
-which a reader that does not know the key still reads correctly.
+which a reader that does not know the key still reads correctly. An
+operator's decision is the exception: while the current record or a kept
+entry is one, `requires` lists `operator_decision`, and once no kept record
+is one, it no longer does.
 Re-evaluation and [`smythe runs inspect`](runs.md#decision-history) refuse a
 malformed history. `delivery_acceptance_history(state)` and
 `delivery_acceptance_sequence(state)` in `smythe.checkpoint` read it back.

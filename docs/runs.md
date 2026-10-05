@@ -96,13 +96,15 @@ only a gate validator, have no record.
 ### Decision history
 
 A completed run can be decided again with
-[`Swarm.reevaluate`](verifier.md#re-evaluation), which never runs a node. The
+[`Swarm.reevaluate`](verifier.md#re-evaluation), under a policy or with an
+[operator's decision](verifier.md#operator-decisions), which never runs a
+node; an operator's record carries an `operator` block. The
 `delivery` block and the exit code always follow the current decision, and
 the `decisions` block lists what came before it:
 
 | Field | Meaning |
 |---|---|
-| `current` | The current decision's sequence: 0 for the decision the run made when it completed, one more for each re-evaluation; null without a decision |
+| `current` | The current decision's sequence: 0 for the decision the run made when it completed, one more for each re-evaluation or operator decision; null without a decision |
 | `history` | The decisions the current one superseded, oldest first, each with its `sequence` and `record` |
 
 An ordinary checkpoint keeps the last 16 superseded records

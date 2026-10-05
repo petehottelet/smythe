@@ -21,7 +21,9 @@ from smythe.acceptance import (
     AcceptancePolicy,
     AcceptanceSource,
     DeliveryAcceptance,
+    OperatorDecision,
     _delivery_problems,
+    _operator_record,
     evaluate_delivery,
     task_sha256,
     text_sha256,
@@ -39,6 +41,7 @@ from smythe.checkpoint import (
     build_state,
     delivery_acceptance_from_state,
     delivery_acceptance_history,
+    delivery_acceptance_sequence,
     drop_untrusted_mcp_servers,
     graph_from_dict,
     graph_to_dict,
@@ -354,7 +357,8 @@ class Swarm:
     recipe and the decision is journaled; see ``smythe.workflow.WorkflowRuntime``.
     Resuming a completed run never decides it again: :meth:`reevaluate`
     records a new decision for its saved output, under a fixed or changed
-    validator, without running a node.
+    validator or, for output left for review, an authorized operator's,
+    without running a node.
 
     ``read_tools`` declares the :class:`~smythe.workflow_tools.ReadProfile`
     reads that a durable run's read steps may name; it requires
@@ -1407,12 +1411,14 @@ class Swarm:
 
     def reevaluate(
         self, execution_id: str, *, acceptance: AcceptancePolicy | None = None,
+        operator: OperatorDecision | None = None,
     ) -> SwarmResult:
         """Decide a completed run's saved output again.  Sync wrapper around areevaluate()."""
-        return asyncio.run(self.areevaluate(execution_id, acceptance=acceptance))
+        return asyncio.run(self.areevaluate(execution_id, acceptance=acceptance, operator=operator))
 
     async def areevaluate(
         self, execution_id: str, *, acceptance: AcceptancePolicy | None = None,
+        operator: OperatorDecision | None = None,
     ) -> SwarmResult:
         """Record a new delivery acceptance decision for a completed run's saved output.
 
@@ -1440,19 +1446,33 @@ class Swarm:
         ``acceptance`` operation and checkpoint; its recipe may differ from
         this Swarm's only in its acceptance policy and gate verifier. See
         ``smythe.workflow.WorkflowRuntime.reevaluate``.
+
+        *operator*, an :class:`~smythe.acceptance.OperatorDecision`, records an
+        operator's decision instead of a policy's, and takes no *acceptance*.
+        Only a current decision of ``needs_review`` or ``indeterminate`` can be
+        resolved this way; any other stands, and ValueError is raised before
+        the assertion is checked. The operator's approval verifier must accept
+        its assertion for exactly this run's current decision, or its
+        ``ApprovalRejected`` propagates and nothing is written. The new record,
+        version 2, keeps what the current one binds and names the operator.
         """
+        if operator is not None and acceptance is not None:
+            raise ValueError("reevaluate takes acceptance= or operator=, not both")
+        if operator is not None and not isinstance(operator, OperatorDecision):
+            raise TypeError(f"operator must be an OperatorDecision, not {type(operator).__name__}")
         policy = self._acceptance if acceptance is None else acceptance
         if policy is not None and not isinstance(policy, AcceptancePolicy):
             raise TypeError(
                 f"acceptance must be an AcceptancePolicy or None, not {type(policy).__name__}"
             )
-        if policy is None or policy.mode is not AcceptanceMode.STRICT:
+        if operator is None and (policy is None or policy.mode is not AcceptanceMode.STRICT):
             raise ValueError(
                 "reevaluate needs a strict AcceptancePolicy: pass acceptance=, or build the "
                 "Swarm with one"
             )
         if self._run_store is not None:
-            return await self._workflow_runtime(acceptance=policy).reevaluate(execution_id)
+            return await self._workflow_runtime(acceptance=policy).reevaluate(
+                execution_id, operator=operator)
         if self._checkpoint_store is None:
             raise ValueError("Cannot re-evaluate: this Swarm has no checkpoint_store configured.")
         tracer = self._tracer_factory()
@@ -1487,10 +1507,14 @@ class Swarm:
         timing = _RunTiming(tracer, resumed=True, previous=timing_segments(state))
         tracer.add_phase("recovery", tracer.since(started))
         with tracer.phase("verification"):
-            decided = evaluate_delivery(
-                policy, graph, output, strategy=record.strategy, sources=sources,
-                used_fallback=used_fallback, task=task,
-            )
+            if operator is not None:
+                decided = _operator_record(operator, execution_id,
+                                           delivery_acceptance_sequence(saved), record)
+            else:
+                decided = evaluate_delivery(
+                    policy, graph, output, strategy=record.strategy, sources=sources,
+                    used_fallback=used_fallback, task=task,
+                )
         tracer.on_acceptance(decided)
         updated = supersede_delivery_acceptance(saved, decided)
         with tracer.phase("checkpoint"):

@@ -25,7 +25,7 @@ verification, trace, artifact, and recovery controls.
 - [Execution policies](execution.md) — halt, retry, skip, timeouts, an opt-in retry policy with one retry owner, `Retry-After`, capped backoff, a shared deadline and attempts that resume cannot refill, queued work, provider checks before any call, and 5,000-node deep-graph checks
 - [YAML and jobs](jobs.md) — declarative artifact work and the installed CLI
 - [Adaptive supervision](supervisor.md) — revise pending work from completed results
-- [Verification](verifier.md) — objective gates, active-work invalidation, recoverable regeneration, and strict acceptance of the delivered output, with its obligations checked before any call and after every revision, and explicit re-evaluation of a completed run's saved output
+- [Verification](verifier.md) — objective gates, active-work invalidation, recoverable regeneration, and strict acceptance of the delivered output, with its obligations checked before any call and after every revision, explicit re-evaluation of a completed run's saved output, and authorized operator decisions on output left for review
 - [Source evidence](source-evidence.md) — versioned source and claim records an artifact carries, mechanical checks that its quotes and listed contradictions hold against the run's current sources, unavailable and removed sources, synthesis that keeps listed contradictions, and evidence journaled in durable runs
 
 ## Operate durable work
