@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from fakes import Crash
+from smythe import workflow
 from smythe import (
     AcceptanceDecision, AcceptancePolicy, LocalOnly, MarkdownRenderer, OfflineProvider,
     PublishedArtifact, SimpleArchitect, SQLiteWorkflowStore, Swarm, Task, ValidationReport,
@@ -401,6 +402,70 @@ def test_a_process_lost_after_publication_decides_on_the_published_bytes(store, 
     assert Mentions.checked == [path.read_text(encoding="utf-8")] == [result.output]
     assert result.accepted and listing(path.parent) == [".smythe-run-owner.json", "document.md"]
     assert store.load_operation(run_id, "publication/1") is None
+
+
+@pytest.mark.parametrize("how,status,problem", [
+    ("changed", "changed", "the published artifact 'document.md' no longer holds the bytes its "
+                           "record bound"),
+    ("missing", "missing", "the published artifact 'document.md' is missing"),
+])
+@pytest.mark.parametrize("lost", ["before_the_decision", "before_the_completed_checkpoint"])
+def test_a_run_resumed_after_publication_never_delivers_a_damaged_document(
+    store, tmp_path, monkeypatch, how, status, problem, lost,
+):
+    planned = durable(store, tmp_path, acceptance=strict()).plan(Task("Write the brief"))
+    run_id = planned.run_ref["run_id"]
+    if lost == "before_the_decision":
+        restore = stop_at(monkeypatch, store, "complete_operation",
+                          lambda lease, key, *args, **kwargs: key.startswith("acceptance/"))
+    else:
+        restore = stop_at(monkeypatch, store, "save_checkpoint",
+                          lambda lease, revision, state, **kwargs: state["status"] == "completed")
+    with pytest.raises(Crash):
+        durable(store, tmp_path, acceptance=strict()).execute(planned)
+    restore()
+    assert operations(store, run_id)["publication/0"] == (PUBLICATION_OPERATION, "completed")
+    path = run_directory(tmp_path, run_id) / "document.md"
+    document = path.read_text(encoding="utf-8")
+    damage(path, how)
+    on_disk = listing(path.parent)
+
+    # The run completes under its decision, but the file no longer holds the
+    # decided bytes, so nothing is delivered: the result agrees with the accessor.
+    resumed = durable(store, tmp_path, acceptance=strict()).resume(run_id)
+    assert resumed.acceptance.decision is AcceptanceDecision.INDETERMINATE
+    assert problem in resumed.acceptance.reasons
+    assert (resumed.output, resumed.rejected_output) == ("", document)
+    current = current_artifact(store, run_id)
+    assert current.decision.accepted and current.reasons == (f"artifact_{status}",)
+    assert store.get_checkpoint(run_id)["checkpoint"]["status"] == "completed"
+    # Resuming again gives the same answer, and no file is written or replaced.
+    again = durable(store, tmp_path, acceptance=strict()).resume(run_id)
+    assert again.acceptance == resumed.acceptance and again.output == ""
+    assert listing(path.parent) == on_disk
+
+    # Republishing restores delivery under the decision the run made.
+    swarm = durable(store, tmp_path, acceptance=strict())
+    assert swarm.republish(run_id).sha256 == current.decision.output_sha256
+    delivered = swarm.resume(run_id)
+    assert delivered.accepted and delivered.output == document
+    assert current_artifact(store, run_id).eligible
+
+
+def test_checking_the_file_after_completion_never_fails_the_completed_run(
+    store, tmp_path, monkeypatch,
+):
+    def unreadable_journal(*args):
+        raise RuntimeError("journal read failed")
+
+    monkeypatch.setattr(workflow, "current_artifact", unreadable_journal)
+    with pytest.raises(RuntimeError, match="journal read failed"):
+        durable(store, tmp_path, acceptance=strict()).execute(graph())
+    monkeypatch.undo()
+
+    (run,) = store.list_runs()
+    assert store.get_checkpoint(run["run_id"])["checkpoint"]["status"] == "completed"
+    assert durable(store, tmp_path, acceptance=strict()).resume(run["run_id"]).accepted
 
 
 @pytest.mark.parametrize("file_intact", [True, False])

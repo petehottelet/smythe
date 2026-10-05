@@ -483,18 +483,19 @@ junction or non-regular file) or `artifact_unreadable` from rechecking the
 file's size and SHA-256. Eligibility is derived on every read and never stored;
 the accessor only reads, so a store opened read-only will do.
 
-Resuming a completed strict run and `smythe runs inspect` both check the
-current publication: a missing or changed file gives an `indeterminate`
-decision with the reason, the output moves to `rejected_output`, and
-[inspection](runs.md#published-documents) exits with code 11 and the next
-action `republish`. `swarm.republish(run_id)` publishes the saved document
-again: its bytes, which must still have the published SHA-256, go to the
-renderer's file name or, when that is taken, the next free numbered name, so a
-changed file keeps its bytes, and the next `publication` operation, applied by
-a new completed checkpoint, becomes current. It calls no provider, runs no
-validator and leaves the decision as it is, since that binds the same bytes. A
-run whose current file is intact is left as it is. Operation kinds are free
-text, so publication needs no journal upgrade.
+A strict run's result, whether the run completes now, including after an
+interrupted publication, or completed earlier, and `smythe runs inspect` all
+check the current publication: a missing or changed file gives an
+`indeterminate` decision with the reason, the output moves to
+`rejected_output`, and [inspection](runs.md#published-documents) exits with
+code 11 and the next action `republish`. `swarm.republish(run_id)` publishes
+the saved document again: its bytes, which must still have the published
+SHA-256, go to the renderer's file name or, when that is taken, the next free
+numbered name, so a changed file keeps its bytes, and the next `publication`
+operation, applied by a new completed checkpoint, becomes current. It calls no
+provider, runs no validator and leaves the decision as it is, since that binds
+the same bytes. A run whose current file is intact is left as it is. Operation
+kinds are free text, so publication needs no journal upgrade.
 
 ## Recorded read steps
 

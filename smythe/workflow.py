@@ -1538,10 +1538,15 @@ class WorkflowRuntime:
             acceptance = None if self.acceptance is None else await self._decide(key, output)
             # The completed checkpoint consumes the synthesis and the decision together.
             self._save("completed", output=output, acceptance=acceptance)
-            return self._result(output, acceptance)
         except BaseException:
             self._save("failed")
             raise
+        if self.renderer is not None and acceptance is not None:
+            # As on completed resume, delivery needs the published file
+            # intact, including one a lost process published before.
+            acceptance = self._held(acceptance, output, artifact_problems(
+                current_artifact(self.store, self.run_id), output))
+        return self._result(output, acceptance)
 
     def _artifact_directory(self):
         """The bound run's own directory, ``<artifact_dir>/<run id>``."""
@@ -1583,7 +1588,8 @@ class WorkflowRuntime:
         publishing reuses the file it published; one lost after the operation
         committed renders the document again and checks that it has the
         recorded SHA-256, or else reads the published file. The text
-        returned is exactly the published bytes.
+        returned is exactly the published bytes; whether the file still holds
+        them is checked when the run's result is built.
         """
         rendered = []
 
@@ -1782,6 +1788,10 @@ class WorkflowRuntime:
         if self.renderer is not None:
             # The delivered document must also be published intact.
             problems += artifact_problems(current_artifact(self.store, self.run_id), output)
+        return self._held(record, output, problems)
+
+    def _held(self, record, output, problems):
+        """*record* when nothing is wrong, else ``indeterminate`` for *output* with *problems*."""
         if not problems:
             return record
         return DeliveryAcceptance(
