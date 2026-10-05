@@ -751,6 +751,62 @@ def test_an_executor_refuses_only_obligations_a_revision_breaks():
     assert [n.id for n in graph.nodes] == ["draft", "judge", "final", "notes"]
 
 
+def _replacing(*drop: str) -> Revision:
+    """A revision that drops *drop*, the pending final work, and adds ``rewrite`` in its place."""
+    rewrite = Node(id="rewrite", label="rewrite", depends_on=["draft", "judge"])
+    return Revision(add_nodes=(rewrite,), drop_node_ids=drop, reason="replace the final step")
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+@pytest.mark.parametrize(("drop", "refusal"), [
+    (("final",), "cannot drop node 'final'; verifier 'check' judges it"),
+    (("final", "check"), "cannot drop verifier 'check'; it judges 'final'"),
+])
+def test_a_revision_cannot_replace_a_gated_final_step_with_unchecked_output(drop, refusal, parallel):
+    graph = _gated(final=True)
+    graph.nodes.append(Node(id="check", label="check", depends_on=["final"], verifies="final",
+                            max_regenerations=1))
+    provider = Script({"draft": ["## Summary\nGated draft."], "judge": ["PASS"],
+                       "final": ["## Summary\nChecked final."], "check": ["PASS"],
+                       "rewrite": ["## Summary\nUnchecked replacement."]})
+    supervisor, swarm = _supervised(provider, _replacing(*drop), acceptance=_strict(),
+                                    parallel=parallel)
+
+    result = swarm.execute(graph)
+
+    # The gate on the final step keeps it in the plan, so that gate still decides.
+    assert result.accepted and result.output == "## Summary\nChecked final."
+    assert [node.id for node in result.graph.nodes] == ["draft", "judge", "final", "check"]
+    assert "rewrite" not in provider.runs and supervisor.reviews[0] == "draft"
+    (refused,) = _refused_revisions(result)
+    assert refusal in refused["error"]
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+@pytest.mark.parametrize(("replacement", "decision"), [
+    ("## Summary\nDEFECT in the replacement.", "rejected"),
+    ("## Summary\nA clean replacement.", "accepted"),
+])
+def test_final_validators_decide_a_replacement_for_the_final_step(replacement, decision, parallel):
+    provider = Script({"draft": ["## Summary\nGated draft."], "judge": ["PASS"],
+                       "final": ["## Summary\nThe planned final step."], "rewrite": [replacement]})
+    supervisor, swarm = _supervised(provider, _replacing("final"), acceptance=_strict(Forbids()),
+                                    parallel=parallel)
+
+    result = swarm.execute(_gated(final=True))
+
+    assert [node.id for node in result.graph.nodes] == ["draft", "judge", "rewrite"]
+    assert "final" not in provider.runs and not _refused_revisions(result)
+    assert result.acceptance.decision.value == decision
+    assert [source.node_id for source in result.acceptance.sources] == ["rewrite"]
+    delivered = result.output if decision == "accepted" else result.rejected_output
+    assert delivered == replacement
+    # The draft's passed gate does not decide the output that replaced the final step.
+    assert result.graph.nodes[1].metadata["verification_receipt"]["outcome"] == "passed"
+    assert result.acceptance.validators[0].outcome.value == ("passed" if decision == "accepted"
+                                                             else "rejected")
+
+
 class FinalReviewProvider(GatedRunProvider):
     """The judge passes the draft; a final review adds a ``polish`` step with a defect."""
 
