@@ -13,6 +13,7 @@
     "smythe/_images.py",
     "smythe/_money.py",
     "smythe/_publish.py",
+    "smythe/_redact.py",
     "smythe/_run_inspection.py",
     "smythe/_sqlite.py",
     "smythe/acceptance.py",

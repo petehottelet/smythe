@@ -148,6 +148,13 @@ def test_redaction_leaves_ordinary_text_and_placeholder_keys_alone():
     assert redact_account_identifiers(text) == text
 
 
+def test_benchmark_records_redact_with_the_library_patterns():
+    from smythe import _redact
+
+    assert artifact_records.redact_account_identifiers is _redact.redact_account_identifiers
+    assert artifact_records.ACCOUNT_IDENTIFIER_PATTERNS is _redact.ACCOUNT_IDENTIFIER_PATTERNS
+
+
 @pytest.fixture
 def fake_home(tmp_path, monkeypatch):
     home = tmp_path / "home" / "Example Person"
