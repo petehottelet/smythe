@@ -359,6 +359,26 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   without one are unchanged. An ordinary `Swarm` refuses a `LocalOnly`
   verifier with `TypeError`. See
   [gate validators in durable workflows](docs/verifier.md#gate-validators-in-durable-workflows).
+- Strict delivery acceptance in durable text workflows. A `Swarm` with a
+  `run_store` now takes a strict `AcceptancePolicy` instead of refusing it,
+  and `WorkflowRuntime` takes it as `acceptance`. The recipe records the
+  policy, so a run resumes only under it, and gates read with
+  `TokenVerifier` record the verifier identity `token-v2`
+  (`smythe.verifier.TOKEN_VERIFIER_IDENTITY`). After synthesis an
+  `acceptance` journal operation makes the decision on the exact output,
+  and the completed checkpoint consumes it with the output in one
+  transaction: a run stopped before the decision commits decides again on
+  resume, and a committed decision replays with no validator run or
+  provider call. Such runs, and runs with a gate validator, write checkpoint
+  version 2 with a `delivery_acceptance` block and key synthesis after a
+  regeneration as `synthesis/<n>`. Resuming a completed run rechecks the
+  output digest, task, source generations and journal decision, giving
+  `indeterminate` on any mismatch, and results follow the strict output
+  rule. A verification receipt left pending, including one from a release
+  before 0.8.1, is read on resume with the current rules and never passes
+  unread. Recipes and checkpoints without a strict policy or gate validator
+  are unchanged, including `"verifier": "token-v1"`. See
+  [strict acceptance in durable workflows](docs/verifier.md#strict-acceptance-in-durable-workflows).
 
 ### Changed
 

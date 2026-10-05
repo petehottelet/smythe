@@ -308,7 +308,8 @@ Competing openers reuse that identity. Failed initialization rolls back;
 existing evidence and read-only inspection retain their behavior.
 
 Resume requires the same component descriptions, model configuration, budget,
-retry backoff, and concurrency policy, apart from the
+retry backoff, concurrency policy, gate validator and
+[acceptance policy](#strict-delivery-acceptance), apart from the
 [price versions](#price-versions) of saved provider descriptions. It does not
 refill allowances. An
 inspected pending plan can be edited before execution; a stale graph from an
@@ -325,6 +326,38 @@ verifies. A recipe that records `prompt_assembly: 2` places it as
 the saved recipe, so a run in flight sends the requests it saved. A runtime
 configured with a different version raises `WorkflowConflictError`, and so does
 a saved recipe whose version this release does not support.
+
+## Strict delivery acceptance
+
+`Swarm(run_store=store, acceptance=AcceptancePolicy(mode="strict", ...))`
+decides whether the synthesized output is accepted, as an ordinary run does
+([strict delivery acceptance](verifier.md#strict-delivery-acceptance)), and
+journals the decision:
+
+- The recipe records the policy under `acceptance`, so the run resumes only
+  under the same policy, and gates read with `TokenVerifier` record the
+  verifier identity `token-v2` in place of `token-v1`. Recipes without a
+  strict policy keep their bytes.
+- After the `synthesis` operation, an `acceptance` operation runs the final
+  validators on the exact output and reads every gate's final verdict, with
+  no provider call. It is keyed by the output digest and everything else its
+  record binds, and the completed checkpoint consumes it together with the
+  synthesis, in one transaction.
+- A process lost after synthesis and before the decision commits decides
+  again on resume, on the same saved output. A process lost after the
+  decision commits replays it, and one lost after the completed checkpoint
+  returns it; neither runs a validator or calls a provider again.
+- Checkpoints of runs with a strict policy or a gate validator are version 2,
+  with a `delivery_acceptance` block; other runs keep version 1. Synthesis in
+  such a run is keyed `synthesis` until a node regenerates, then
+  `synthesis/<n>` with `n` the sum of the node generations.
+- Resuming a completed run checks the saved output, task, source generations
+  and journal decision against the record; a mismatch gives an
+  `indeterminate` record and moves the text to `rejected_output`.
+
+The journal format is unchanged: operation kinds are free text, so this needs
+no journal upgrade. `tests/test_workflow_process_loss.py` kills a real
+process at each of these points and resumes the run.
 
 ## Supported scope
 

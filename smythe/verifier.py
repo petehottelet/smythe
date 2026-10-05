@@ -492,6 +492,13 @@ def _decide(evidence: _Evidence, first_line: str) -> Verdict:
     return _rejected(f"no PASS or FAIL verdict: {first_line}")
 
 
+# The identity of TokenVerifier's reading rules, which a durable recipe with a
+# strict acceptance policy records so that its gates are read only by the
+# rules the run started with. Change it whenever the rules change. Other
+# durable recipes keep "token-v1", which named the rules before 0.8.1 too.
+TOKEN_VERIFIER_IDENTITY = "token-v2"
+
+
 class TokenVerifier(Verifier):
     """Reads a verdict from the verifier node's text, failing closed.
 

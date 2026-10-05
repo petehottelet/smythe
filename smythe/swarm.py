@@ -254,7 +254,9 @@ class Swarm:
     it refuses a graph whose delivered output it could not decide
     (:func:`~smythe.acceptance.validate_acceptance_obligations`), and before
     planning a run whose plan could not meet that check.
-    None, the default, and an advisory policy keep legacy behavior.
+    None, the default, and an advisory policy keep legacy behavior. With a
+    durable ``run_store`` the policy enters the run's recipe and the decision
+    is journaled; see ``smythe.workflow.WorkflowRuntime``.
     """
 
     def __init__(
@@ -296,11 +298,6 @@ class Swarm:
         if acceptance is not None and not isinstance(acceptance, AcceptancePolicy):
             raise TypeError(
                 f"acceptance must be an AcceptancePolicy or None, not {type(acceptance).__name__}"
-            )
-        if run_store is not None and acceptance is not None and acceptance.mode is AcceptanceMode.STRICT:
-            raise WorkflowBindingError(
-                "A strict acceptance policy needs an ordinary run: a durable run_store "
-                "does not decide delivery acceptance"
             )
         self._acceptance = acceptance
         # The undecided record a strict run's unfinished checkpoints carry.
@@ -1022,7 +1019,8 @@ class Swarm:
         and a strict policy never finishes a run that began without one.
         Resumed work runs one node at a time
         unless this Swarm has ``parallel=True``; a durable ``run_store``
-        run keeps the concurrency its first execution recorded.
+        run keeps the concurrency its first execution recorded and resumes
+        only under the acceptance policy its recipe records.
         """
         if self._run_store is not None:
             return await self._workflow_runtime().resume(
@@ -1298,4 +1296,5 @@ class Swarm:
             retry_backoff_s=self.retry_backoff_s,
             max_concurrency=self.max_concurrency,
             graph_policy=self._graph_policy, behavior_settings=behavior_settings,
+            acceptance=self._acceptance,
         )

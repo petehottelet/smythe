@@ -3,18 +3,24 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import closing
+import json
+import sqlite3
 
 import pytest
 
+from fakes import Crash, crash_when
 from smythe import (
-    CallableVerifier, LocalOnly, OfflineProvider, SimpleArchitect, SQLiteWorkflowStore, Swarm, Task,
-    TokenVerifier,
+    AcceptanceDecision, AcceptancePolicy, CallableVerifier, LocalOnly, OfflineProvider,
+    SimpleArchitect, SQLiteWorkflowStore, Swarm, Task, TokenVerifier,
 )
+from smythe.acceptance import task_sha256, text_sha256
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult
 from smythe.validation import ValidationReport, ValidatorIdentity, hard_finding
+from smythe.verifier import TOKEN_VERIFIER_IDENTITY
 from smythe.workflow_binding import WorkflowBindingError
-from smythe.workflow_store import WorkflowConflictError
+from smythe.workflow_store import WorkflowConflictError, WorkflowStateError, _canonical, _sha
 
 
 @pytest.fixture
@@ -179,3 +185,369 @@ def test_completed_validator_run_replays_without_calls(store, replies):
     again = asyncio.run(durable(store, verifier=contains()).aresume(first.execution_id))
     assert again.output == first.output and calls == sent
     assert all(node.status is NodeStatus.COMPLETED for node in again.graph.nodes)
+
+
+# ---------------------------------------------------------------------------
+# Strict delivery acceptance
+# ---------------------------------------------------------------------------
+
+
+def strict(*validators, **settings) -> AcceptancePolicy:
+    return AcceptancePolicy(mode="strict", final_validators=list(validators), **settings)
+
+
+def single(label: str = "Write") -> ExecutionGraph:
+    return ExecutionGraph([Topology.SERIAL], [Node(id="write", label=label)])
+
+
+def operations(store, run_id) -> dict[str, tuple[str, str]]:
+    rows = store._db.execute(
+        "SELECT operation_key, kind, state FROM workflow_operations WHERE run_id=?", (run_id,))
+    return {row[0]: (row[1], row[2]) for row in rows}
+
+
+def saved_states(monkeypatch, store) -> list[dict]:
+    states = []
+    save = store.save_checkpoint
+
+    def record(lease, revision, checkpoint, **kwargs):
+        states.append(json.loads(json.dumps(checkpoint)))
+        return save(lease, revision, checkpoint, **kwargs)
+
+    monkeypatch.setattr(store, "save_checkpoint", record)
+    return states
+
+
+def stop_at(monkeypatch, store, name, due):
+    """Raise ``Crash`` from ``store.<name>`` once due, then from every later checkpoint.
+
+    A killed process writes nothing more, so its failed checkpoint is never
+    saved. Returns a function that restores the store.
+    """
+    points = [crash_when(monkeypatch, store, name, due)]
+    if name != "save_checkpoint":
+        points.append(crash_when(monkeypatch, store, "save_checkpoint",
+                                 lambda *args, **kwargs: points[0].fired))
+    return lambda: [point.restore() for point in reversed(points)]
+
+
+def stop_after_saving(monkeypatch, store, due):
+    """Commit the checkpoint that makes ``due`` true, then stop as a killed process would."""
+    save, stopped = store.save_checkpoint, []
+
+    def checkpoint(lease, revision, state, **kwargs):
+        if stopped:
+            raise Crash("Process already stopped")
+        saved = save(lease, revision, state, **kwargs)
+        if due(state):
+            stopped.append(True)
+            raise Crash("Stopped after a durable checkpoint")
+        return saved
+
+    monkeypatch.setattr(store, "save_checkpoint", checkpoint)
+    return lambda: monkeypatch.setattr(store, "save_checkpoint", save)
+
+
+def rewrite_checkpoint(path, run_id, change):
+    """Change a run's latest checkpoint and rehash it, so the journal accepts the bytes."""
+    with closing(sqlite3.connect(path)) as db, db:
+        revision, text = db.execute(
+            "SELECT revision, checkpoint_json FROM workflow_checkpoints WHERE run_id=? "
+            "ORDER BY revision DESC LIMIT 1", (run_id,)).fetchone()
+        checkpoint = json.loads(text)
+        change(checkpoint)
+        text = _canonical(checkpoint)
+        db.execute("UPDATE workflow_checkpoints SET checkpoint_json=?, checkpoint_sha=? "
+                   "WHERE run_id=? AND revision=?", (text, _sha(text), run_id, revision))
+
+
+def test_strict_durable_run_decides_on_the_delivered_output(store, replies, monkeypatch):
+    script, calls = replies
+    script["Write"] = ["the needle report"]
+    policy = strict(Contains())
+    states = saved_states(monkeypatch, store)
+    result = durable(store, acceptance=policy).execute(single())
+
+    record = result.acceptance
+    assert record.accepted and result.accepted
+    assert (result.output, result.rejected_output) == ("the needle report", None)
+    assert record.output_sha256 == text_sha256("the needle report")
+    assert record.policy_sha256 == policy.sha256 and record.strategy == "deliverable"
+    assert [source.to_dict() for source in record.sources] == [
+        {"node_id": "write", "execution_generation": 0}]
+    assert Contains.checked == ["the needle report"] and calls == ["Write"]
+    # Every checkpoint is version 2; only the completed one holds a decision.
+    assert {state["version"] for state in states} == {2}
+    assert [state["delivery_acceptance"]["decision"] for state in states] == [
+        "not_evaluated"] * (len(states) - 1) + ["accepted"]
+    assert states[-1]["delivery_acceptance"] == record.to_dict()
+    run_id = result.execution_id
+    recipe = store.load_run(run_id)["config"]
+    assert recipe["acceptance"] == policy.to_dict()
+    assert recipe["verifier"] == TOKEN_VERIFIER_IDENTITY == "token-v2"
+    # The decision is a journal operation consumed with the completed checkpoint.
+    saved = operations(store, run_id)
+    (key,) = [key for key, (kind, _) in saved.items() if kind == "acceptance"]
+    assert saved == {"synthesis": ("synthesis", "applied"), key: ("acceptance", "applied")}
+    decision = store.load_operation(run_id, key)
+    assert decision["result"] == {"delivery_acceptance": record.to_dict()}
+    assert decision["operation_id"] in store.get_checkpoint(run_id)["consumed_operation_ids"]
+    assert result.to_dict()["delivery_acceptance"] == record.to_dict()
+    assert any(span["node_id"] == "acceptance:delivery" for span in result.trace)
+    assert store.audit(run_id)["ok"]
+
+
+def test_strict_decision_binds_the_run_task(store, replies):
+    task = Task("Write", constraints=["Brief"], context={"source": {"pages": [1, 2]}},
+                done_when=["Mentions the needle"])
+    result = durable(store, acceptance=strict(Contains())).execute(task)
+    assert result.acceptance.task_sha256 == task_sha256(task)
+    again = durable(store, acceptance=strict(Contains())).resume(result.execution_id)
+    assert again.acceptance == result.acceptance
+
+
+def test_strict_durable_rejection_withholds_the_output(store, replies):
+    script, _ = replies
+    script["Write"] = ["a report without it"]
+    result = durable(store, acceptance=strict(Contains())).execute(single())
+    assert result.acceptance.decision is AcceptanceDecision.REJECTED and not result.accepted
+    assert (result.output, result.rejected_output) == ("", "a report without it")
+    assert "no 'needle'" in result.acceptance.reasons[0]
+    again = durable(store, acceptance=strict(Contains())).resume(result.execution_id)
+    assert (again.output, again.rejected_output) == ("", "a report without it")
+    assert again.acceptance == result.acceptance
+
+
+@pytest.mark.parametrize("judge,decision", [
+    (["PASS"], "accepted"), (["FAIL: thin"], "rejected"), (["no verdict here"], "indeterminate"),
+])
+def test_strict_durable_gate_reads_and_records_its_final_verdict(store, replies, judge, decision):
+    script, calls = replies
+    script["Judge"] = judge
+    result = durable(store, acceptance=strict()).execute(gated(max_regenerations=1))
+    assert result.acceptance.decision.value == decision
+    receipt = result.graph.nodes[1].metadata["verification_receipt"]
+    assert receipt["state"] == "consumed"
+    assert receipt["outcome"] == {"accepted": "passed", "rejected": "rejected",
+                                  "indeterminate": "error"}[decision]
+    # An unreadable verdict ends the gate without spending its regeneration.
+    assert calls.count("Draft") == (2 if decision == "rejected" else 1)
+
+
+def test_strict_durable_run_with_a_gate_validator(store, replies):
+    script, _ = replies
+    script["Draft"] = ["first", "the needle"]
+    result = durable(store, verifier=contains(), acceptance=strict()).execute(gated())
+    assert result.accepted and result.output == "the needle"
+    assert result.graph.nodes[1].metadata["verification_receipt"]["outcome"] == "passed"
+    recipe = store.load_run(result.execution_id)["config"]
+    assert recipe["verifier"] == "validator-v1" and len(recipe["validators"]) == 1
+    assert recipe["acceptance"] == strict().to_dict()
+    # Synthesis after a regeneration has its own key, scoped by the node generations.
+    keys = operations(store, result.execution_id)
+    assert keys["synthesis/2"] == ("synthesis", "applied") and "synthesis" not in keys
+
+
+def test_legacy_runs_keep_the_unscoped_synthesis_key(store, replies):
+    script, _ = replies
+    script["Judge"] = ["FAIL: thin", "PASS"]
+    result = durable(store).execute(gated())
+    assert result.graph.nodes[0].metadata["execution_generation"] == 1
+    assert operations(store, result.execution_id)["synthesis"] == ("synthesis", "applied")
+
+
+def test_crash_after_synthesis_before_the_decision_decides_again(store, replies, monkeypatch):
+    script, calls = replies
+    script["Write"] = ["a report without it"]
+    planned = durable(store, acceptance=strict(Contains())).plan(Task("Write"))
+    run_id = planned.run_ref["run_id"]
+    restore = stop_at(monkeypatch, store, "complete_operation",
+                      lambda lease, key, *args, **kwargs: key.startswith("acceptance/"))
+    with pytest.raises(Crash):
+        durable(store, acceptance=strict(Contains())).execute(planned)
+    restore()
+    saved = operations(store, run_id)
+    assert saved["synthesis"] == ("synthesis", "completed")
+    assert [state for kind, state in saved.values() if kind == "acceptance"] == ["started"]
+    checkpoint = store.get_checkpoint(run_id)["checkpoint"]
+    assert checkpoint["status"] == "running"
+    assert checkpoint["delivery_acceptance"]["decision"] == "not_evaluated"
+    sent, Contains.checked = list(calls), []
+
+    result = durable(store, acceptance=strict(Contains())).resume(run_id)
+    # The validator decides again on the saved output, which is never assumed accepted.
+    assert Contains.checked == ["a report without it"] and calls == sent
+    assert result.acceptance.decision is AcceptanceDecision.REJECTED
+    assert (result.output, result.rejected_output) == ("", "a report without it")
+    assert {state for _, state in operations(store, run_id).values()} == {"applied"}
+
+
+def test_a_committed_decision_replays_without_validating_or_calling(store, replies, monkeypatch):
+    _, calls = replies
+    planned = durable(store, acceptance=strict(Contains())).plan(Task("Write the needle"))
+    run_id = planned.run_ref["run_id"]
+    restore = stop_at(monkeypatch, store, "save_checkpoint",
+                      lambda lease, revision, checkpoint, **kwargs: checkpoint["status"] == "completed")
+    with pytest.raises(Crash):
+        durable(store, acceptance=strict(Contains())).execute(planned)
+    restore()
+    assert [state for kind, state in operations(store, run_id).values()
+            if kind == "acceptance"] == ["completed"]
+    sent, Contains.checked = list(calls), []
+
+    result = durable(store, acceptance=strict(Contains())).resume(run_id)
+    assert Contains.checked == [] and calls == sent
+    assert result.accepted and result.output == "Write the needle done"
+    # After the commit, resume returns the saved decision with no call.
+    again = durable(store, acceptance=strict(Contains())).resume(run_id)
+    assert again.acceptance == result.acceptance and again.output == result.output
+    assert calls == sent and Contains.checked == []
+
+
+@pytest.mark.parametrize("change", ["output", "output-and-record"])
+def test_corrupted_stored_output_is_not_accepted(tmp_path, replies, change):
+    path = tmp_path / "corrupt.db"
+    with SQLiteWorkflowStore(path) as store:
+        first = durable(store, acceptance=strict(Contains())).execute(single("Write the needle"))
+    assert first.accepted
+    tampered = "a needle, but not the text that was decided"
+
+    def rewrite(checkpoint):
+        checkpoint["output"] = tampered
+        if change == "output-and-record":
+            checkpoint["delivery_acceptance"]["output_sha256"] = text_sha256(tampered)
+
+    rewrite_checkpoint(path, first.execution_id, rewrite)
+    _, calls = replies
+    sent, Contains.checked = list(calls), []
+    with SQLiteWorkflowStore(path) as store:
+        result = durable(store, acceptance=strict(Contains())).resume(first.execution_id)
+    assert result.acceptance.decision is AcceptanceDecision.INDETERMINATE
+    assert (result.output, result.rejected_output) == ("", tampered)
+    assert result.acceptance.output_sha256 == text_sha256(tampered)
+    expected = ("does not match the digest" if change == "output"
+                else "the journal holds no applied decision")
+    assert any(expected in reason for reason in result.acceptance.reasons)
+    assert calls == sent and Contains.checked == []
+
+
+def test_a_legacy_completed_run_has_no_acceptance_record(store, replies):
+    result = durable(store).execute(single())
+    assert (result.acceptance, result.rejected_output, result.output) == (None, None, "Write done")
+    saved = store.get_checkpoint(result.execution_id)["checkpoint"]
+    assert saved["version"] == 1 and "delivery_acceptance" not in saved
+    assert "acceptance" not in store.load_run(result.execution_id)["config"]
+    cached = durable(store).resume(result.execution_id)
+    assert (cached.acceptance, cached.output) == (None, "Write done")
+    # An advisory policy is the default: the same recipe, and no record.
+    advisory = durable(store, acceptance=AcceptancePolicy()).resume(result.execution_id)
+    assert (advisory.acceptance, advisory.output) == (None, "Write done")
+
+
+def test_resume_refuses_another_acceptance_policy_before_any_call(store, replies):
+    _, calls = replies
+    legacy = durable(store).plan(Task("Write")).run_ref["run_id"]
+    checked = durable(store, acceptance=strict(Contains())).plan(Task("Write")).run_ref["run_id"]
+    for run_id, policy in ((legacy, strict(Contains())), (checked, None),
+                           (checked, strict(Contains("other"))), (checked, strict())):
+        with pytest.raises(WorkflowConflictError, match="acceptance policy"):
+            durable(store, acceptance=policy).resume(run_id)
+    assert calls == []
+    assert durable(store, acceptance=strict(Contains())).resume(checked).acceptance is not None
+
+
+def test_the_durable_runtime_checks_its_policy_itself(store):
+    from smythe.synthesizer import SynthesisStrategy, Synthesizer
+
+    swarm = durable(store, synthesizer=Synthesizer(SynthesisStrategy.CONCATENATE))
+    swarm._acceptance = strict()
+    with pytest.raises(WorkflowBindingError, match="^acceptance .*concatenate synthesis"):
+        swarm._workflow_runtime()
+    swarm._acceptance = {"mode": "strict"}
+    with pytest.raises(WorkflowBindingError, match="^acceptance must be an AcceptancePolicy"):
+        swarm._workflow_runtime()
+    # An advisory policy records nothing.
+    swarm._acceptance = AcceptancePolicy()
+    runtime = swarm._workflow_runtime()
+    assert runtime.acceptance is None and runtime.checkpoint_version == 1
+    assert "acceptance" not in runtime.recipe and runtime.recipe["verifier"] == "token-v1"
+
+
+@pytest.mark.parametrize("policy", [None, "strict"])
+def test_callable_verifier_stays_rejected_on_durable_runs(store, replies, policy):
+    swarm = durable(store, verifier=CallableVerifier(lambda judge, target: True),
+                    acceptance=strict(Contains()) if policy else None)
+    for entry in (swarm.plan, swarm.execute):
+        with pytest.raises(WorkflowBindingError, match="^verifier .*CallableVerifier"):
+            entry(Task("Write"))
+    assert replies[1] == [] and store.list_runs() == []
+
+
+def test_a_checkpoint_version_must_match_its_recipe(tmp_path, replies):
+    path = tmp_path / "versions.db"
+    with SQLiteWorkflowStore(path) as store:
+        checked = durable(store, acceptance=strict(Contains())).plan(Task("Write")).run_ref["run_id"]
+        legacy = durable(store).plan(Task("Write")).run_ref["run_id"]
+    rewrite_checkpoint(path, checked, lambda state: state.update(version=1))
+    rewrite_checkpoint(path, legacy, lambda state: state.update(version=2))
+    with SQLiteWorkflowStore(path) as store:
+        with pytest.raises(WorkflowStateError, match="version 1 does not match"):
+            durable(store, acceptance=strict(Contains())).resume(checked)
+        with pytest.raises(WorkflowStateError, match="version 2 does not match"):
+            durable(store).resume(legacy)
+    assert replies[1] == []
+
+
+@pytest.mark.parametrize("policy", [None, "strict"])
+def test_a_pending_verdict_is_read_again_on_resume_and_never_passes_unread(
+    store, replies, monkeypatch, policy,
+):
+    script, calls = replies
+    # TokenVerifier passed this reply before 0.8.1; the current rules read no verdict in it.
+    script["Judge"] = ["The draft does not PASS the bar.", "PASS"]
+    acceptance = strict() if policy else None
+    restore = stop_after_saving(monkeypatch, store, lambda state: any(
+        node["metadata"].get("verification_receipt", {}).get("state") == "pending"
+        for node in state["graph"]["nodes"]))
+    with pytest.raises(Crash):
+        durable(store, acceptance=acceptance).execute(gated())
+    restore()
+    (run,) = store.list_runs()
+    assert calls == ["Draft", "Judge"]
+
+    result = durable(store, acceptance=acceptance).resume(run["run_id"])
+    if policy:
+        # Undecided, without spending the gate's regeneration.
+        assert result.graph.nodes[1].metadata["verification_receipt"]["outcome"] == "error"
+        assert result.acceptance.decision is AcceptanceDecision.INDETERMINATE
+        assert (result.output, result.rejected_output) == ("", "Draft done")
+        assert calls == ["Draft", "Judge"]
+    else:
+        # The verdict fails closed, so the gate sends the draft back.
+        assert result.acceptance is None
+        assert result.graph.nodes[0].metadata["execution_generation"] == 1
+        assert calls == ["Draft", "Judge", "Draft", "Judge"]
+
+
+# Replies whose verdicts pin the reading rules TOKEN_VERIFIER_IDENTITY names.
+# A change to TokenVerifier that alters any of them must change the identity.
+TOKEN_RULES = [
+    ("PASS", True, False), ("pass.", True, False), ("Verdict: PASS", True, False),
+    ("Criterion 1: PASS\nVerdict: PASS", True, False), ('{"passed": true}', True, False),
+    ("FAIL - two claims lack sources", False, False),
+    ('{"passed": false, "reason": "thin"}', False, False),
+    ('{"passed": "false"}', False, True), ("", False, True),
+    ("The draft does not PASS.", False, True), ("PASS if the sources hold", False, True),
+    ("- PASS", False, True), ("PASS\nFAIL", False, True), ("Looks fine to me", False, True),
+]
+
+
+def test_strict_recipes_name_the_token_verifier_rules_they_read_with():
+    judge, target = Node(id="judge", label="judge"), Node(id="draft", label="draft")
+    read = []
+    for reply, _, _ in TOKEN_RULES:
+        judge.result = reply
+        verdict = TokenVerifier().verdict(judge, target)
+        read.append((reply, verdict.passed, verdict.invalid))
+    assert read == TOKEN_RULES
+    assert TOKEN_VERIFIER_IDENTITY == "token-v2"

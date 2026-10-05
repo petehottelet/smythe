@@ -48,7 +48,6 @@ from smythe.synthesizer import (
 from smythe.tracer import Tracer
 from smythe.validation import hard_finding
 from smythe.verifier import TokenVerifier, Verifier
-from smythe.workflow_binding import WorkflowBindingError
 from test_supervisor import GatedRunProvider, ScriptedSupervisor
 
 STRATEGIES = list(SynthesisStrategy)
@@ -1491,12 +1490,19 @@ def test_swarm_rejects_a_value_that_is_not_a_policy():
         Swarm(provider=Script({}), model="test-model", acceptance={"mode": "strict"})
 
 
-def test_strict_acceptance_is_not_available_on_durable_runs(tmp_path):
-    from smythe import SQLiteWorkflowStore
+def test_a_durable_swarm_takes_its_strict_policy_into_the_run_recipe(tmp_path):
+    from smythe import OfflineProvider, SQLiteWorkflowStore
 
-    store = SQLiteWorkflowStore(tmp_path / "runs.db")
-    with pytest.raises(WorkflowBindingError, match="acceptance"):
-        Swarm(provider=Script({}), model="test-model", run_store=store, acceptance=_strict())
+    policy = _strict(Forbids())
+    with SQLiteWorkflowStore(tmp_path / "runs.db") as store:
+        runtime = Swarm(provider=OfflineProvider(), model="offline", run_store=store,
+                        acceptance=policy)._workflow_runtime()
+        assert runtime.acceptance is policy
+        assert runtime.recipe["acceptance"] == policy.to_dict()
+        # Gate acceptance alone still needs DELIVERABLE synthesis.
+        with pytest.raises(ValueError, match="final validator"):
+            Swarm(provider=OfflineProvider(), model="offline", run_store=store,
+                  synthesizer=Synthesizer(SynthesisStrategy.CONCATENATE), acceptance=_strict())
 
 
 def test_executors_take_the_policy_as_the_last_keyword_only_argument():

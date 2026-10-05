@@ -235,12 +235,13 @@ argument's name.
 |---|---|---|
 | `run_store` | `SQLiteWorkflowStore` | Subclasses |
 | `verifier` | `None`, `TokenVerifier`, or a validator declared with `LocalOnly(..., role="validator")` | `CallableVerifier`, other verifiers, `TokenVerifier` subclasses and other `LocalOnly` roles |
+| `acceptance` | `None`, an advisory policy, or a strict `AcceptancePolicy` whose final validators are registered validator objects | A value that is not an `AcceptancePolicy`; a strict policy without final validators under a synthesis other than `DELIVERABLE` |
 | `memory` | `None` | Any planner memory |
 | `tool_runtime` | `None`; nodes send plain text | Any tool runtime |
 | `checkpoint_store` | `None`; the journal holds checkpoints | Any checkpoint store |
 | Architects and other components | Built-in components and `LocalOnly` factories | Subclasses and unjournaled dependencies |
 | Node inputs | Plain text | `attach_dep_artifacts`, `attachments` and `artifacts` |
-| Resume | The saved recipe: components, models, budget, `retry_backoff_s`, concurrency and gate validator | Any change raises `WorkflowConflictError` |
+| Resume | The saved recipe: components, models, budget, `retry_backoff_s`, concurrency, gate validator and acceptance policy | Any change raises `WorkflowConflictError` |
 | `max_budget_usd=None` | Runs without a budget | |
 | `artifact_dir`, `max_tool_iterations` | Ignored | |
 
@@ -261,6 +262,14 @@ Tests:
   `tests/test_workflow_acceptance.py::test_a_changed_validator_configuration_or_version_refuses_resume_before_any_call`,
   `tests/test_workflow_binding.py::test_local_only_validator_refuses_a_provider_coroutine_or_awaitable_factory`,
   `tests/test_workflow_binding.py::test_local_only_validator_refuses_what_its_factory_builds`.
+- Strict acceptance: `tests/test_workflow_acceptance.py::test_strict_durable_run_decides_on_the_delivered_output`,
+  `tests/test_workflow_acceptance.py::test_strict_durable_gate_reads_and_records_its_final_verdict`,
+  `tests/test_workflow_acceptance.py::test_callable_verifier_stays_rejected_on_durable_runs`,
+  `tests/test_workflow_acceptance.py::test_the_durable_runtime_checks_its_policy_itself`
+  and `tests/test_workflow_acceptance.py::test_resume_refuses_another_acceptance_policy_before_any_call`;
+  recovery `tests/test_workflow_acceptance.py::test_crash_after_synthesis_before_the_decision_decides_again`,
+  `tests/test_workflow_acceptance.py::test_corrupted_stored_output_is_not_accepted`
+  and `tests/test_workflow_process_loss.py::test_killed_durable_run_resumes_its_decision_without_new_calls`.
 - Plain-text nodes: `tests/test_support_matrix.py::test_durable_run_rejects_image_inputs_on_a_caller_graph_before_any_call`,
   `tests/test_workflow_native_runtime.py::test_plan_the_run_cannot_execute_is_repaired_as_an_additional_paid_attempt`
   and `tests/test_workflow_provider.py::test_unsupported_input_rejected_before_journal_or_http`.

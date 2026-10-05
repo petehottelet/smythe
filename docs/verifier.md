@@ -389,8 +389,8 @@ section, and the strict run keeps the defective text as `rejected_output`.
 policy. It comes only from that argument: a YAML file, a graph, a `Task`, a
 generated plan or a supervisor revision cannot set or weaken it. `None`, the
 default, and `AcceptancePolicy()` keep the behavior described above. Strict
-acceptance runs on ordinary runs; a `Swarm` with a durable `run_store` refuses
-a strict policy with `WorkflowBindingError`.
+acceptance runs on ordinary runs and on
+[durable text workflows](#strict-acceptance-in-durable-workflows).
 
 **The delivered output decides.** After synthesis, the run decides on exactly
 the text it delivers, as UTF-8 bytes. Every final validator runs once on those
@@ -632,6 +632,59 @@ regeneration span in the trace still names its node. Without a strict policy
 a regeneration clears rejected results and artifact references as before. The
 [checkpoint format](checkpoint-format.md#verification-state) lists the record's
 fields.
+
+### Strict acceptance in durable workflows
+
+A `Swarm` with a durable `run_store` decides the same way, on the same
+policy, and records the decision in its journal:
+
+- **The policy is part of the run.** The recipe records `policy.to_dict()`
+  under `acceptance`: validator names, versions and configuration digests,
+  never code. Final validators are the policy's validator objects, registered
+  in-process as on ordinary runs. Resuming under another policy, or without
+  one, raises `WorkflowConflictError` before any call, and so does a strict
+  `Swarm` resuming a run that began without one. Gates use `TokenVerifier`
+  or a [gate validator](#gate-validators-in-durable-workflows);
+  `CallableVerifier` is refused with `WorkflowBindingError`.
+- **The decision is a journal operation.** After synthesis, an operation of
+  kind `acceptance`, keyed by the output digest and everything else the
+  record binds, runs the final validators and reads the gates, and the
+  completed checkpoint consumes it in the same transaction as the output.
+  A run stopped after synthesis and before the decision is committed decides
+  again when it resumes: the validators run on the same saved output, which
+  is never accepted for having been synthesized. A committed decision is read
+  back without running a validator or calling a provider.
+- **Checkpoints.** A run whose recipe has a strict policy or a gate validator
+  writes checkpoint version 2, which adds `delivery_acceptance`: the
+  `not_evaluated` record until the run completes, then the decision, and
+  `null` without a strict policy. Other runs still write version 1, and a
+  checkpoint whose version does not match its recipe raises
+  `WorkflowStateError`. Earlier releases cannot resume version 2 runs; they
+  already refuse their recipes.
+- **Completed runs.** Resuming a completed run checks the saved output
+  against the record's digest, the task and source generations against the
+  record, and the record against the decision the journal applied. Any
+  mismatch returns an `indeterminate` record with the saved text in
+  `rejected_output`, never acceptance. A run without a strict policy returns
+  `acceptance=None`.
+- **Synthesis keys.** Such a run journals its synthesis under `synthesis`
+  while no node has regenerated and under `synthesis/<n>` afterwards, where
+  `n` is the sum of the nodes' generations, so synthesis for a regenerated
+  graph never replays an earlier generation's output. Other runs keep the key
+  `synthesis`.
+
+**Verdicts left pending.** A judge's receipt stays `pending` until its verdict
+is read, and resume then reads the judge's saved reply with the rules of the
+release that resumes. A pending receipt never passes unread. The rules
+[above](#reading-a-verdict) date from 0.8.1: earlier releases passed replies
+such as `the draft does not PASS` or an empty reply, while durable recipes
+kept the verifier identity `token-v1`. A receipt that such a release left
+pending is read with the current rules and fails closed, so the gate
+regenerates within its allowance. Under a strict policy an unreadable verdict
+is an `error` outcome that makes the decision `indeterminate`. Strict recipes
+name the current rules `token-v2` (`smythe.verifier.TOKEN_VERIFIER_IDENTITY`).
+A release that changes the rules changes that identity, and with it the
+recipe, so a strict run is read only with the rules it started with.
 
 ## Gating from YAML and from a generated plan
 
