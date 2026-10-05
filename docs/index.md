@@ -21,18 +21,19 @@ verification, trace, artifact, and recovery controls.
 ## Plan and execute graphs
 
 - [Architecture](architecture.md) — planning tiers, execution flow, and validated planner history with summed node timing
-- [Tasks and handoffs](tasks.md) — complete task snapshots across planning, inspected graphs, synthesis, memory, and resume, and immutable context snapshots that keep sources as untrusted data in durable runs
+- [Tasks and handoffs](tasks.md) — complete task snapshots across planning, inspected graphs, synthesis, memory, and resume, immutable context snapshots that keep sources as untrusted data in durable runs, and removing a source with a tombstone
 - [Execution policies](execution.md) — halt, retry, skip, timeouts, an opt-in retry policy with one retry owner, `Retry-After`, capped backoff and a shared deadline, queued work, provider checks before any call, and 5,000-node deep-graph checks
 - [YAML and jobs](jobs.md) — declarative artifact work and the installed CLI
 - [Adaptive supervision](supervisor.md) — revise pending work from completed results
 - [Verification](verifier.md) — objective gates, active-work invalidation, recoverable regeneration, and strict acceptance of the delivered output, with its obligations checked before any call and after every revision, and explicit re-evaluation of a completed run's saved output
-- [Source evidence](source-evidence.md) — versioned source and claim records an artifact carries, mechanical checks that its quotes and listed contradictions hold, unavailable sources, and evidence journaled in durable runs
+- [Source evidence](source-evidence.md) — versioned source and claim records an artifact carries, mechanical checks that its quotes and listed contradictions hold against the run's current sources, unavailable and removed sources, and evidence journaled in durable runs
 
 ## Operate durable work
 
 - [Durable text workflows](workflow-accounting.md) — phase-wide native costs, saved graph limits, exact request quotes, fenced ownership, local response replay, recorded read steps with network limits, strict delivery acceptance journaled with each run and explicit re-evaluation under a changed validator, published documents whose acceptance binds their bytes, and journal upgrades
 - [Checkpoint format](checkpoint-format.md) — flushed atomic publication, saved state, and resume semantics
-- [Inspect saved runs](runs.md) — read-only `smythe runs inspect` and `list` over checkpoints and durable journals: execution, delivery acceptance and its decision history, cost, timing, next action, and exit codes 10 and 11 for withheld output
+- [Inspect saved runs](runs.md) — read-only `smythe runs inspect` and `list` over checkpoints and durable journals: execution, delivery acceptance and its decision history, a research run's context, reads, evidence and open issues, cost, timing, next action, and exit codes 10 and 11 for withheld output
+- [Source-to-artifact example](../examples/16_source_to_artifact.py) — offline and keyless: plan, journaled reads of bundled sources, an interruption, resume, and inspection of the accepted document and its evidence
 - [Cost guardrails](budgets.md) — strict usage validation, reservations, per-call ceilings, and failed-accounting recovery
 - [Jobs](jobs.md) — preflight, approval, detached workers and host limits, durable pause/resume, fenced ownership, artifact namespaces, delivery acceptance with registered validators and delivery eligibility, database upgrades, inspection, rerolls, and exports
 - [Optimization](optimize.md) — bounded concurrency experiments, reference arms, evidence ledgers, and campaign ownership, schema-v4 migration, and read-only HTML comparison reports

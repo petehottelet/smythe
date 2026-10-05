@@ -358,7 +358,13 @@ connector or paid run.
    killing a real process against a fake service. Versioned
    [source and claim records](docs/source-evidence.md) travel with an
    artifact, and a final validator rejects quotes that are not in their
-   sources and listed contradictions that do not reach the artifact
+   sources and listed contradictions that do not reach the artifact. The
+   offline [source-to-artifact example](examples/16_source_to_artifact.py)
+   plans, reads, is interrupted, resumes and delivers an accepted document;
+   [run inspection](docs/runs.md#research-runs) shows its sources, reads,
+   evidence and open questions without their text, and a
+   [removed source](docs/tasks.md#remove-a-source) leaves a tombstone that
+   withholds a decision resting on it until it is re-evaluated
 2. **Approval gates and reconciled external actions** — pause, approve or
    reject with state that survives restart. Approval binds a verified
    principal to the exact action or artifact, with expiry and revocation
