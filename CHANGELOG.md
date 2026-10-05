@@ -592,6 +592,22 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `republish`. `Swarm.republish()` publishes the saved document again under
   a free name, which becomes current, with no provider call and the same
   decision. See [published documents](docs/workflow-accounting.md#published-documents).
+- An opt-in `RetryPolicy` makes the executor the only retry owner of an
+  ordinary run's node calls; `Swarm(retry_policy=...)` and both executors
+  take one. A `RETRY` node then calls again only after a failure whose class
+  the policy lists (`transient` by default, so never after a 401, 403, 404 or
+  413), waits as long as a transient status error's `Retry-After` asks or
+  else a jittered backoff, never longer than `backoff_max_s`, and stops at
+  `deadline_s`, which a node's attempts and waits share: each attempt's
+  timeout shrinks to the time left, and the node fails with
+  `RetryDeadlineError`, failure class `deadline`. A run under a policy
+  refuses, before routing, planning or any node call, a provider that does
+  not declare `ProviderFeatures.sdk_retries` as `0`, so no SDK retries a call
+  unseen. Built-in providers declare it, and `AnthropicProvider` takes
+  `max_retries`, passed to the SDK only when set. Durable runs refuse the
+  policy, and checkpoints do not record it. Executors also take `sleep` and
+  `rng`, which replace the retry wait and its jitter. Without a policy,
+  retries are unchanged. See [retry policy](docs/execution.md#retry-policy).
 
 ### Changed
 

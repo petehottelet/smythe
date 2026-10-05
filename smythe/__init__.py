@@ -52,6 +52,7 @@ from smythe.workflow_policy import WorkflowGraphPolicy
 from smythe.workflow_store import SQLiteWorkflowStore, WorkflowError
 from smythe.workflow_tools import ReadProfile, ReadToolError
 from smythe.router import WhiteRabbit
+from smythe.scheduling import RetryDeadlineError, RetryPolicy
 from smythe.skills import (
     CapabilityHydrationMode,
     CapabilityMapper,
@@ -150,6 +151,8 @@ __all__ = [
     "PublishedArtifact",
     "ReadProfile",
     "ReadToolError",
+    "RetryDeadlineError",
+    "RetryPolicy",
     "Revision",
     "RevisionError",
     "Sentinel",

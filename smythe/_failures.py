@@ -5,7 +5,7 @@ classes below, and ``is_terminal`` says whether the executors stop the run at
 once instead of applying the node's failure policy. Both executors take that
 decision here. A class describes a failure and does not by itself decide a
 retry: ``RETRY`` retries every exception that is not terminal, whatever its
-class.
+class, unless a ``RetryPolicy`` lists the classes it retries.
 
 The exception types are imported on first use, so any module can import this
 one without an import cycle.
@@ -44,10 +44,13 @@ WORKFLOW = "workflow"
 VALIDATOR_ERROR = "validator_error"
 # Reserved for an explicit security stop; no exception has it yet.
 SECURITY_STOP = "security_stop"
+# A retry policy's deadline ran out before an attempt succeeded.
+DEADLINE = "deadline"
 
 FAILURE_CLASSES = frozenset({
     INPUT_ERROR, AUTHORITY_DENIED, QUALITY_DEFECT, PROVIDER_REJECTED, TRANSIENT,
     UNKNOWN_OUTCOME, TERMINAL_ACCOUNTING, PERSISTENCE, WORKFLOW, VALIDATOR_ERROR, SECURITY_STOP,
+    DEADLINE,
 })
 
 # 4xx statuses that are not input errors: authentication and permission, and
@@ -84,6 +87,7 @@ def _rules() -> tuple[tuple[type[BaseException], str | None, bool], ...]:
     from smythe.provider import (
         IncompleteOutputError, ProviderAccountingError, ProviderResponseError,
     )
+    from smythe.scheduling import RetryDeadlineError
     from smythe.tools import ToolLoopLimitError
     from smythe.verifier import VerificationRecoveryError
     from smythe.workflow_binding import WorkflowBindingError
@@ -110,6 +114,7 @@ def _rules() -> tuple[tuple[type[BaseException], str | None, bool], ...]:
         (WorkflowBindingError, INPUT_ERROR, False),
         (BudgetEstimateRequired, INPUT_ERROR, False),
         (ArtifactIntegrityError, INPUT_ERROR, False),
+        (RetryDeadlineError, DEADLINE, False),
     )
 
 

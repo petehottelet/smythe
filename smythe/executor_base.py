@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from smythe._errors import PicklableError
+from smythe._failures import classify_failure
 from smythe._publish import publish_unique
 from smythe.acceptance import AcceptanceMode, AcceptancePolicy, _unmet_obligations, task_sha256
 from smythe.agent import Agent
@@ -37,6 +38,7 @@ from smythe.provider import (
     _settle_response_group,
 )
 from smythe.registry import Registry
+from smythe.scheduling import RetryDeadlineError, RetryPolicy, _retry_after_s
 from smythe.task import _prompt_json, render_task, snapshot_task
 from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
 from smythe.tracer import Tracer
@@ -102,7 +104,7 @@ def validate_max_concurrency(value: int | None) -> int | None:
 def check_provider_support(
     provider: Provider, model: str, *, node_id: str | None, max_budget_usd: float | None = None,
     estimate: object = None, check_model: bool = True, tools: bool = False,
-    attachments: bool = False,
+    attachments: bool = False, retry_owner: bool = False,
 ) -> None:
     """Raise, before any call, what calling *model* would raise for this configuration.
 
@@ -112,12 +114,21 @@ def check_provider_support(
     ``BudgetEstimateRequired``, as the executor would when it reserves the
     node's budget. A model (when *check_model*), tool calling or image
     attachments the provider declares unsupported raise ``ValueError``; a
-    feature it does not declare never raises.
+    feature it does not declare never raises. With *retry_owner*, for a run
+    under a retry policy, so does a provider that does not declare
+    ``sdk_retries=0``.
     """
     name = type(provider).__name__
     if max_budget_usd is not None and estimate is None and _missing_cost_ceiling(provider, model):
         raise BudgetEstimateRequired(node_id, model, name)
     features = _declared_features(provider, model)
+    if retry_owner and features.sdk_retries != 0:
+        raise ValueError(
+            f"retry_policy must be the only retry owner, but {name} declares "
+            f"sdk_retries={features.sdk_retries!r} for model {model!r}, so its SDK may send a "
+            "failed call again. Construct it with max_retries=0, or declare sdk_retries=0 "
+            "in feature_support()"
+        )
     if check_model and features.model_supported is False:
         where = "a generated plan's nodes" if node_id is None else f"node {node_id!r}"
         raise ValueError(f"{name} does not support model {model!r}, which {where} would use")
@@ -134,6 +145,7 @@ def check_provider_support(
 
 def check_pending_nodes(
     provider: Provider, graph: ExecutionGraph, *, max_budget_usd: float | None, tools: bool,
+    retry_owner: bool = False,
 ) -> None:
     """Check every node that has not completed or been skipped, before any of them runs."""
     for node in graph.nodes:
@@ -142,7 +154,7 @@ def check_pending_nodes(
         check_provider_support(
             provider, str(node.metadata.get("model", "")), node_id=node.id,
             max_budget_usd=max_budget_usd, estimate=node.metadata.get("estimated_cost_usd"),
-            tools=tools, attachments=node.attach_dep_artifacts,
+            tools=tools, attachments=node.attach_dep_artifacts, retry_owner=retry_owner,
         )
 
 
@@ -289,6 +301,15 @@ class ExecutorBase:
     each node prompt from its snapshot (:meth:`build_context_prompt`), with
     tool results marked as untrusted data as well. Without one, prompts keep
     their earlier bytes.
+
+    ``retry_policy``, a :class:`~smythe.scheduling.RetryPolicy`, opts into
+    classified retries with ``Retry-After``, a backoff cap and a deadline
+    shared by each node's attempts and waits; a run under one refuses,
+    before any node call, a provider that does not declare
+    ``sdk_retries=0``. ``sleep(seconds)`` replaces the wait before a retry
+    (``time.sleep`` in the serial executor, ``asyncio.sleep`` in the async
+    one) and is awaited when it returns an awaitable; ``rng`` replaces the
+    ``random`` module that draws backoff jitter.
     """
 
     def __init__(
@@ -316,11 +337,25 @@ class ExecutorBase:
         context_assembler: Callable[
             [Node, ExecutionGraph, dict[str, Any]], Awaitable[ContextSnapshot]
         ] | None = None,
+        retry_policy: RetryPolicy | None = None,
+        sleep: Callable[[float], Any] | None = None,
+        rng: Any = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         if context_assembler is not None and not callable(context_assembler):
             raise TypeError("context_assembler must be callable or None")
         self._context_assembler = context_assembler
+        if retry_policy is not None and not isinstance(retry_policy, RetryPolicy):
+            raise TypeError(
+                f"retry_policy must be a RetryPolicy or None, not {type(retry_policy).__name__}"
+            )
+        if sleep is not None and not callable(sleep):
+            raise TypeError("sleep must be callable or None")
+        if rng is not None and not callable(getattr(rng, "uniform", None)):
+            raise TypeError("rng must have a uniform(low, high) method, or be None")
+        self._retry_policy, self._sleep, self._rng = retry_policy, sleep, rng
+        # When each node's retry deadline passes, on the tracer's clock.
+        self._deadlines: dict[str, float] = {}
         if acceptance is not None and not isinstance(acceptance, AcceptancePolicy):
             raise TypeError(
                 f"acceptance must be an AcceptancePolicy or None, not {type(acceptance).__name__}"
@@ -339,6 +374,8 @@ class ExecutorBase:
         self._workflow_managed = (
             provider_call_factory is not None or getattr(provider, "workflow_managed", False) is True
         )
+        if retry_policy is not None and self._workflow_managed:
+            raise ValueError("retry_policy is not supported with journal-managed provider calls")
         self._call_attempts: dict[str, int] = {}
         self._reserved_node_ids: set[str] = set()
         self._settled_response_errors: list[tuple[str, Exception]] = []
@@ -872,18 +909,81 @@ class ExecutorBase:
                 # A goal-only SimpleArchitect retains its original bare prompt.
                 node.metadata.pop("task_context", None)
 
-    def retry_delay_s(self, attempt: int) -> float:
+    def retry_delay_s(self, attempt: int, *, error: BaseException | None = None) -> float:
         """Full-jitter exponential backoff before retry `attempt` (1-based).
 
         Returns 0 when backoff is disabled (the default) so existing
         RETRY behavior and test timing are unchanged; opt in via
         ``retry_backoff_s`` for rate-limited workloads (429s at wide
-        parallel image fan-out).
+        parallel image fan-out). Under a retry policy, the ``Retry-After``
+        of *error*, the failure being retried, replaces the backoff when it
+        is a transient status error and the policy honors the header, and
+        no wait exceeds ``backoff_max_s``.
         """
-        if attempt <= 0 or not self._retry_backoff_s:
+        if attempt <= 0:
             return 0.0
-        ceiling = self._retry_backoff_s * (2 ** (attempt - 1))
-        return random.uniform(0, ceiling)
+        policy = self._retry_policy
+        if policy is not None and policy.honor_retry_after and error is not None:
+            asked = _retry_after_s(error)
+            if asked is not None:
+                return min(asked, policy.backoff_max_s)
+        if not self._retry_backoff_s:
+            return 0.0
+        if policy is None:
+            ceiling = self._retry_backoff_s * (2 ** (attempt - 1))
+        else:
+            try:
+                ceiling = min(math.ldexp(self._retry_backoff_s, attempt - 1), policy.backoff_max_s)
+            except OverflowError:
+                ceiling = policy.backoff_max_s
+        return (self._rng or random).uniform(0, ceiling)
+
+    def _retry_wait_s(self, node: Node, attempt: int, error: BaseException | None) -> float:
+        """The wait before *attempt*; a retry policy's deadline starts at attempt 0.
+
+        Raises ``RetryDeadlineError``, from *error*, when the wait would end
+        at or after the node's deadline, so that retry is not made.
+        """
+        policy = self._retry_policy
+        if policy is None:
+            return self.retry_delay_s(attempt)
+        if attempt == 0:
+            self._deadlines.pop(node.id, None)
+            if policy.deadline_s is not None:
+                self._deadlines[node.id] = self._tracer.now() + policy.deadline_s
+            return 0.0
+        delay = self.retry_delay_s(attempt, error=error)
+        deadline = self._deadlines.get(node.id)
+        if deadline is not None and self._tracer.now() + delay >= deadline:
+            raise self._deadline_error(node) from error
+        return delay
+
+    def _deadline_error(self, node: Node) -> RetryDeadlineError:
+        return RetryDeadlineError(
+            f"Node {node.id!r} reached its retry deadline of "
+            f"{self._retry_policy.deadline_s}s before an attempt succeeded"
+        )
+
+    def _may_retry(self, error: Exception) -> bool:
+        """Whether a failed attempt may be retried: under a policy, only a listed class."""
+        policy = self._retry_policy
+        return policy is None or classify_failure(error) in policy.retry_classes
+
+    def _attempt_timeout(self, node: Node) -> tuple[float | None, bool]:
+        """The attempt's timeout, and whether the retry deadline set it.
+
+        Under a deadline the timeout is ``timeout_s`` or the time left,
+        whichever is shorter; with no time left the attempt is not started.
+        """
+        deadline = self._deadlines.get(node.id)
+        if deadline is None:
+            return node.timeout_s, False
+        remaining = deadline - self._tracer.now()
+        if remaining <= 0:
+            raise self._deadline_error(node)
+        if node.timeout_s is not None and node.timeout_s < remaining:
+            return node.timeout_s, False
+        return remaining, True
 
     def _end_failed_attempt(self, node: Node) -> None:
         """Close the span of an attempt that raised, recording it as failed.
@@ -1017,8 +1117,14 @@ class ExecutorBase:
                 if ("workflow_accounting_invalid" in node.metadata
                         or node.metadata.get("accounting_invalid") and "response_error" not in node.metadata):
                     raise BudgetValidationError("Unjournaled accounting requires reconciliation")
+        if self._retry_policy is not None:
+            for model in sorted({str(node.metadata.get("model", "")) for node in graph.nodes
+                                 if node.status not in (NodeStatus.COMPLETED, NodeStatus.SKIPPED)}):
+                check_provider_support(self._provider, model, node_id=None, check_model=False,
+                                       retry_owner=True)
         self._reserved_node_ids.clear()
         self._call_attempts.clear()
+        self._deadlines.clear()
         self._settled_response_errors.clear()
         self._response_settlement_failures.clear()
         self._prepared_graph = None
@@ -1120,13 +1226,16 @@ class ExecutorBase:
         """Run the node's conversation (including any tool loop) under timeout_s.
 
         Owns cost recording: every provider call inside is billed via
-        Sentinel.add_cost, so executors must not record costs again.
+        Sentinel.add_cost, so executors must not record costs again. Under
+        a retry deadline the timeout is at most the time left, and reaching
+        it raises ``RetryDeadlineError``.
         """
+        timeout, by_deadline = self._attempt_timeout(node)
         coro = self._run_node_conversation(node, graph)
         try:
-            if node.timeout_s is None:
+            if timeout is None:
                 return await coro
-            return await asyncio.wait_for(coro, timeout=node.timeout_s)
+            return await asyncio.wait_for(coro, timeout=timeout)
         except BaseExceptionGroup as exc:
             if not _native_response_errors(exc):
                 _raise_workflow_error(exc)
@@ -1146,6 +1255,8 @@ class ExecutorBase:
             # Its unknown bill remains terminal, regardless of retry policy.
             if isinstance(exc.__cause__, ProviderResponseError):
                 raise exc.__cause__
+            if by_deadline:
+                raise self._deadline_error(node) from None
             raise TimeoutError(
                 f"Node {node.id!r} timed out after {node.timeout_s}s"
             ) from None

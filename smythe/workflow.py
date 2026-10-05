@@ -483,13 +483,19 @@ class WorkflowRuntime:
                  router, synthesizer, supervisor, max_revisions, verifier, memory,
                  tool_runtime, checkpoint_store, checkpoint_every_n_nodes, retry_backoff_s,
                  max_concurrency, graph_policy=None, behavior_settings=None, acceptance=None,
-                 read_tools=(), context_sources=None, renderer=None, artifact_dir=None):
+                 read_tools=(), context_sources=None, renderer=None, artifact_dir=None,
+                 retry_policy=None):
         if type(store) is not SQLiteWorkflowStore:
             raise WorkflowBindingError(
                 f"run_store must be SQLiteWorkflowStore itself, not {type(store).__name__}"
             )
         Sentinel(max_budget_usd)
         # Each unsupported argument is named, so a caller knows what to remove.
+        if retry_policy is not None:
+            raise WorkflowBindingError(
+                "retry_policy is not supported by durable text workflows, whose journal "
+                "settles rejected calls; use node failure policies and retry_backoff_s"
+            )
         if memory is not None:
             raise WorkflowBindingError(
                 "memory is not supported by durable text workflows; planner memory "

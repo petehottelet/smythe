@@ -3,8 +3,9 @@
 ``classify_failure`` names how an attempt failed and ``is_terminal`` whether
 the run stops at once, whatever the node's failure policy. Both executors take
 that decision from ``is_terminal`` alone, and it stops on exactly the
-exceptions they stopped on before failure classes existed. A class describes
-a failure; it never changes what is retried.
+exceptions they stopped on before failure classes existed. Without a retry
+policy (``tests/test_retry_policy.py``), a class describes a failure; it never
+changes what is retried.
 """
 
 from __future__ import annotations
@@ -146,7 +147,7 @@ def test_failure_classes_are_the_named_set():
     assert FAILURE_CLASSES == {
         "input_error", "authority_denied", "quality_defect", "provider_rejected", "transient",
         "unknown_outcome", "terminal_accounting", "persistence", "workflow", "validator_error",
-        "security_stop",
+        "security_stop", "deadline",
     }
 
 

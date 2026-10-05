@@ -68,9 +68,10 @@ are terminal regardless of that policy. See [Cost guardrails](budgets.md).
 Every exception a node attempt raises has one failure class. The attempt's
 trace span records it as `metadata["failure_class"]` on `Tracer.spans`; the
 keys of `Tracer.summary()` and `SwarmResult.trace` are unchanged, and
-checkpoints do not store it. A class describes a failure and does not change
-what is retried: the exceptions marked terminal stop the run whatever the
-node's failure policy, and that policy decides every other one.
+checkpoints do not store it. Without a [retry policy](#retry-policy), a class
+describes a failure and does not change what is retried: the exceptions
+marked terminal stop the run whatever the node's failure policy, and that
+policy decides every other one.
 
 | Class | Exceptions | Terminal |
 |---|---|---|
@@ -85,6 +86,7 @@ node's failure policy, and that policy decides every other one.
 | `workflow` | `WorkflowError` and its subclasses, such as `WorkflowQuoteError` | Yes |
 | `validator_error` | None: the class of a validator outcome `error` | |
 | `security_stop` | None yet: reserved for an explicit security stop | |
+| `deadline` | `RetryDeadlineError`: a retry policy's `deadline_s` ran out | No |
 
 A status error is any exception that carries an HTTP status in `status_code`
 or `response.status_code`, as the OpenAI and Anthropic SDK status errors do.
@@ -92,6 +94,64 @@ A durable rejection's read-only `ProviderRequestRejectedError.failure_class`
 gives its class from its status code. A `VerificationRecoveryError` leaves its
 attempt's span open, so no recorded span carries its class. The [support
 matrix](support-matrix.md) lists who calls again after a failure on each path.
+
+## Retry policy
+
+Without a policy, `RETRY` calls again after every failure that is not
+terminal, and the SDK client inside `AnthropicProvider` or `OpenAIProvider`
+can send a failed request again before the executor sees the failure.
+`Swarm(retry_policy=RetryPolicy(...))`, or `retry_policy=` on either
+executor, makes the executor the only retry owner of an ordinary run's node
+calls. A `RetryPolicy` is frozen and checks its fields when built:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `retry_classes` | `{"transient"}` | The [failure classes](#failure-classes) a `RETRY` node calls again for: any of `transient`, `input_error`, `authority_denied`, `provider_rejected`, `quality_defect` and `unknown_outcome`. Any other failure fails the node at once |
+| `honor_retry_after` | `True` | Wait as long as a transient status error's `Retry-After` asks, in place of the backoff |
+| `backoff_max_s` | `60.0` | The longest wait before any retry; a longer `Retry-After` is cut to it |
+| `deadline_s` | `None` | Seconds that one node's attempts and waits share, from the start of its first attempt |
+
+Under the default policy, a 401 or 403 (`authority_denied`), a 404 or 413
+(`input_error`), a refused or truncated reply (`provider_rejected`) and
+`ToolLoopLimitError` (`quality_defect`) fail the node without another call,
+while a rate limit, server error, timeout or connection failure is retried up
+to `max_retries`. A terminal failure stops the run whatever the list says. A
+tool error that goes back to the model as a tool result belongs to the same
+attempt and is not a retry.
+
+`Retry-After` is read from the `response.headers` of a status error whose
+status is transient (408, 409, 429, 499 or 5xx): `retry-after-ms`, then
+`retry-after`, as a number of seconds. An HTTP date is not read. Without such
+a header, the wait is the full-jitter backoff that doubles from
+`retry_backoff_s`, capped at `backoff_max_s`.
+
+With `deadline_s`, each attempt's timeout is the node's `timeout_s` or the
+time left, whichever is shorter, and a retry whose wait would end at or after
+the deadline is not made. The node then fails with `RetryDeadlineError`, a
+`TimeoutError` whose class is `deadline`, and its failure policy settles it
+like any other failure. The deadline also bounds the single attempt of a
+`HALT` or `SKIP` node. It is measured on the tracer's monotonic clock.
+
+A run under a policy needs each node call sent once. Its provider must
+declare `ProviderFeatures.sdk_retries` as `0` through `feature_support()`,
+or the run is refused with `ValueError` before routing, planning or any node
+call:
+
+| Provider | Declared `sdk_retries` |
+|---|---|
+| `OfflineProvider`, `OpenAIResponsesProvider`, `AnthropicMessagesProvider` | `0` |
+| `GeminiProvider` | `0` with its own client; nothing with a caller-owned `_client` |
+| `AnthropicProvider`, `OpenAIProvider`, `OpenAIImageProvider` | Its `max_retries`, or a caller-owned client's `max_retries`; nothing at the SDK default |
+| Custom `Provider` | Nothing unless its `feature_support()` declares it |
+
+So `AnthropicProvider(max_retries=0)` and `OpenAIProvider(max_retries=0)` run
+under a policy, and both providers at their SDK defaults are refused. Durable
+`run_store` runs refuse `retry_policy` with `WorkflowBindingError`. A policy
+is not saved in checkpoints: a resumed run follows the policy of the Swarm
+that resumes it, with a fresh allowance of attempts. `Executor` and
+`AsyncExecutor` also take `sleep`, which replaces the wait before a retry and
+is awaited when it returns an awaitable, and `rng`, which draws the jitter, so
+tests can drive waits from a manual clock.
 
 ## Concurrency
 
@@ -117,6 +177,8 @@ An ordinary Swarm also checks what its provider declares through
 router or architect is called:
 
 - A `tool_runtime` needs a provider that can call tools.
+- A `retry_policy` needs a provider that declares `sdk_retries=0` (see
+  [retry policy](#retry-policy)).
 - An `LLM_MERGE` synthesizer, which calls the run's model after every node
   finishes, needs the per-call ceiling a capped call to that model requires
   and a model the provider accepts.
@@ -127,7 +189,8 @@ router or architect is called:
   `execute(Task)` and `execute_async(Task)`, the same ceiling.
 
 `plan()` and `aplan()` refuse before planning only what no estimate on the
-returned graph can fix: a tool runtime, which every node is offered, an
+returned graph can fix: a tool runtime, which every node is offered, a
+provider whose SDK may retry under a retry policy, an
 `LLM_MERGE` synthesis, whose ceiling can come only from the provider, and,
 when `LLMArchitect` plans, a run model the provider does not accept. A
 missing ceiling for the run's model is not refused there. Set
@@ -139,8 +202,9 @@ routing or planning.
 
 Before the first node call, `execute()`, `execute_async()` and `resume()`
 check each node that has not completed or been skipped: its model, its
-`attach_dep_artifacts` against a provider that cannot take image inputs, and
-its ceiling. This covers caller-built and YAML graphs, plans that other
+`attach_dep_artifacts` against a provider that cannot take image inputs, its
+ceiling and, under a retry policy, the SDK retries its provider declares.
+This covers caller-built and YAML graphs, plans that other
 architects or an overridden `plan()` produce, and generated plans that ask
 for image inputs. With a `checkpoint_store`, a rejection here saves a failed
 checkpoint like any other failure, so a Swarm with a suitable provider can

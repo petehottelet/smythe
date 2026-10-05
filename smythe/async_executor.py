@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from collections import deque
 from itertools import islice
 from pathlib import Path
@@ -20,6 +21,7 @@ from smythe.executor_base import (
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
 from smythe.provider import Provider
 from smythe.registry import Registry
+from smythe.scheduling import RetryDeadlineError
 from smythe.tools import ToolRuntime
 from smythe.tracer import Tracer
 from smythe.verifier import VerificationRecoveryError
@@ -27,6 +29,7 @@ from smythe.verifier import VerificationRecoveryError
 if TYPE_CHECKING:
     from smythe.acceptance import AcceptancePolicy
     from smythe.context import ContextSnapshot
+    from smythe.scheduling import RetryPolicy
     from smythe.supervisor import Supervisor
     from smythe.task import Task
     from smythe.verifier import Verifier
@@ -80,6 +83,9 @@ class AsyncExecutor(ExecutorBase):
         context_assembler: Callable[
             [Node, ExecutionGraph, dict[str, Any]], Awaitable[ContextSnapshot]
         ] | None = None,
+        retry_policy: RetryPolicy | None = None,
+        sleep: Callable[[float], Any] | None = None,
+        rng: Any = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         super().__init__(
@@ -96,6 +102,9 @@ class AsyncExecutor(ExecutorBase):
             read_call_factory=read_call_factory,
             acceptance=acceptance,
             context_assembler=context_assembler,
+            retry_policy=retry_policy,
+            sleep=sleep,
+            rng=rng,
         )
         self._estimated_tokens_per_node = validate_token_count(
             estimated_tokens_per_node, "estimated_tokens_per_node",
@@ -352,11 +361,17 @@ class AsyncExecutor(ExecutorBase):
 
         for attempt in range(attempts):
             self._call_attempts[node.id] = attempt
-            delay = self.retry_delay_s(attempt)
+            try:
+                delay = self._retry_wait_s(node, attempt, last_exc)
+            except RetryDeadlineError as exc:
+                last_exc = exc
+                break
             if delay:
                 started = self._tracer.now()
                 try:
-                    await asyncio.sleep(delay)
+                    waited = (self._sleep or asyncio.sleep)(delay)
+                    if inspect.isawaitable(waited):
+                        await waited
                 finally:
                     self._tracer.on_wait("retry_backoff", self._tracer.since(started), node)
             node.status = NodeStatus.RUNNING
@@ -414,6 +429,8 @@ class AsyncExecutor(ExecutorBase):
                 last_exc = exc
                 self._tracer.on_node_error(node, exc)
                 self._end_failed_attempt(node)
+                if not self._may_retry(exc):
+                    break
             except asyncio.CancelledError:
                 self._requeue_cancelled(node)
                 raise

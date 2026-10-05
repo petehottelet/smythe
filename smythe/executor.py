@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import time
 
 from smythe._failures import is_terminal
 from smythe.budget import BudgetValidationError
 from smythe.executor_base import ExecutorBase, NodeFinalizationError
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, _dependency_order
+from smythe.scheduling import RetryDeadlineError
 from smythe.verifier import VerificationRecoveryError
 
 
@@ -81,10 +83,16 @@ class Executor(ExecutorBase):
 
         for attempt in range(attempts):
             self._call_attempts[node.id] = attempt
-            delay = self.retry_delay_s(attempt)
+            try:
+                delay = self._retry_wait_s(node, attempt, last_exc)
+            except RetryDeadlineError as exc:
+                last_exc = exc
+                break
             if delay:
                 started = self._tracer.now()
-                time.sleep(delay)
+                waited = (self._sleep or time.sleep)(delay)
+                if inspect.isawaitable(waited):
+                    asyncio.run(asyncio.wait_for(waited, None))
                 self._tracer.on_wait("retry_backoff", self._tracer.since(started), node)
             node.status = NodeStatus.RUNNING
             self.begin_verification(node, graph)
@@ -121,6 +129,8 @@ class Executor(ExecutorBase):
                 last_exc = exc
                 self._tracer.on_node_error(node, exc)
                 self._end_failed_attempt(node)
+                if not self._may_retry(exc):
+                    break
 
         self.release_node_budget(node)
 

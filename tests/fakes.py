@@ -193,11 +193,25 @@ _STATUS_ERRORS = {
 
 @dataclass(frozen=True)
 class HttpError:
-    """A scheduled HTTP status error from the provider."""
+    """A scheduled HTTP status error from the provider.
+
+    With ``retry_after_s``, its response carries a ``retry-after`` header
+    asking the caller to wait that many seconds.
+    """
 
     status: int
     error_type: str
     message: str = "Provider error"
+    retry_after_s: int | float | None = None
+
+    def exception(self, body: dict | None = None, headers: dict | None = None) -> APIStatusError:
+        """The SDK status error for this fault, without any SDK installed."""
+        headers = dict(headers or {})
+        if self.retry_after_s is not None:
+            headers["retry-after"] = str(self.retry_after_s)
+        error = _STATUS_ERRORS.get(self.status, APIStatusError)
+        return error(self.status, {"error": {"type": self.error_type, "message": self.message}}
+                     if body is None else body, headers)
 
 
 RATE_LIMITED = HttpError(429, "rate_limit_error", "Rate limit reached")
@@ -344,9 +358,8 @@ class _Transport:
             await gate.wait()
         if isinstance(fault, HttpError):
             record(f"http_{fault.status}", request_id)
-            error = _STATUS_ERRORS.get(fault.status, APIStatusError)
-            raise error(fault.status, self._error_body(fault, request_id),
-                        {self.request_id_header: request_id})
+            raise fault.exception(self._error_body(fault, request_id),
+                                  {self.request_id_header: request_id})
         outcome = "delivered"
         if fault == DUPLICATE and operation in self._last_body:
             body, request_id = self._last_body[operation]

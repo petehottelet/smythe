@@ -71,6 +71,7 @@ from smythe.provider import (
     _response_error_marker,
 )
 from smythe.registry import Registry
+from smythe.scheduling import RetryPolicy
 from smythe.supervisor import Supervisor
 from smythe.synthesizer import SynthesisStrategy, Synthesizer, deliverable_sources
 from smythe.task import Task, snapshot_task, task_snapshots_equal, task_to_dict
@@ -341,6 +342,13 @@ class Swarm:
     into ``artifact_dir/<run id>`` without replacing any file. The document
     is the run's output, so a strict policy decides on its exact bytes.
     :meth:`republish` publishes it again when its file is missing or changed.
+
+    ``retry_policy``, a :class:`~smythe.scheduling.RetryPolicy`, makes the
+    executor the only retry owner of an ordinary run's node calls: only the
+    failure classes it lists are retried, waits follow ``Retry-After`` up to
+    a cap, and a deadline bounds each node's attempts and waits. The run's
+    provider must declare ``sdk_retries=0``, or the run is refused before
+    routing, planning or any node call. Durable runs refuse it.
     """
 
     def __init__(
@@ -373,6 +381,7 @@ class Swarm:
         read_tools: tuple[ReadProfile, ...] | list[ReadProfile] = (),
         context_sources: Sequence[ContextSource] | None = None,
         renderer: MarkdownRenderer | LocalOnly | None = None,
+        retry_policy: RetryPolicy | None = None,
     ) -> None:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
         if renderer is not None and run_store is None:
@@ -380,6 +389,11 @@ class Swarm:
         if renderer is not None and artifact_dir is None:
             raise WorkflowBindingError("renderer needs an artifact_dir to publish into")
         self._renderer = renderer
+        if retry_policy is not None and not isinstance(retry_policy, RetryPolicy):
+            raise TypeError(
+                f"retry_policy must be a RetryPolicy or None, not {type(retry_policy).__name__}"
+            )
+        self.retry_policy = retry_policy
         if graph_policy is not None and run_store is None:
             raise WorkflowBindingError("graph_policy requires a durable run_store")
         if read_tools is None:
@@ -704,10 +718,13 @@ class Swarm:
 
         A tool runtime offers tools to every node, and an ``LLM_MERGE``
         synthesis calls the run's model, so both are known before any plan.
+        So is a retry policy, which needs a provider whose SDK sends each
+        call once.
         """
-        if self._tool_runtime is not None:
+        if self._tool_runtime is not None or self.retry_policy is not None:
             check_provider_support(self._provider, str(self.model), node_id=None,
-                                   check_model=False, tools=True)
+                                   check_model=False, tools=self._tool_runtime is not None,
+                                   retry_owner=self.retry_policy is not None)
         self._check_synthesis_support(self.max_budget_usd)
 
     def _check_synthesis_support(self, max_budget_usd: float | None) -> None:
@@ -750,7 +767,8 @@ class Swarm:
     def _check_dispatch_support(self, graph: ExecutionGraph, budget: Sentinel) -> None:
         """Reject, before any node runs, nodes or a synthesis the provider cannot serve."""
         check_pending_nodes(self._provider, graph, max_budget_usd=budget.max_budget_usd,
-                            tools=self._tool_runtime is not None)
+                            tools=self._tool_runtime is not None,
+                            retry_owner=self.retry_policy is not None)
         self._check_synthesis_support(budget.max_budget_usd)
 
     def _plan(self, task: Task, tracer: Tracer, *, executing: bool = True) -> ExecutionGraph:
@@ -906,6 +924,7 @@ class Swarm:
                 execution_id, graph, budget, task, created_at, timing,
             ),
             acceptance=self._acceptance,
+            retry_policy=self.retry_policy,
         )
         self._active_executor = executor
         try:
@@ -970,6 +989,7 @@ class Swarm:
                 execution_id, graph, budget, task, created_at, timing,
             ),
             acceptance=self._acceptance,
+            retry_policy=self.retry_policy,
         )
         self._active_executor = executor
         try:
@@ -1415,6 +1435,7 @@ class Swarm:
                 execution_id, graph, budget, task, created_at, timing,
             ),
             acceptance=self._acceptance,
+            retry_policy=self.retry_policy,
         )
         self._active_executor = executor
         tracer.add_phase("recovery", tracer.since(recovery_started))
@@ -1568,5 +1589,5 @@ class Swarm:
             acceptance=self._acceptance if acceptance is None else acceptance,
             read_tools=self._read_tools,
             context_sources=self._context_sources, renderer=self._renderer,
-            artifact_dir=self.artifact_dir,
+            artifact_dir=self.artifact_dir, retry_policy=self.retry_policy,
         )

@@ -101,7 +101,7 @@ Tests:
 | Provider | Durable text workflows | Jobs profile | Cost recorded | Retries inside the SDK |
 |---|---|---|---|---|
 | `OfflineProvider` | Static plan and echo only | `offline` | Ordinary: blended token estimate, flagged by `Sentinel.cost_contains_token_estimates`. Durable and Jobs: zero | None |
-| `AnthropicProvider` | Rejected | None | Blended token estimate, flagged by `Sentinel.cost_contains_token_estimates`; `cost_contains_estimates` stays `False` | The Anthropic SDK default |
+| `AnthropicProvider` | Rejected | None | Blended token estimate, flagged by `Sentinel.cost_contains_token_estimates`; `cost_contains_estimates` stays `False` | The Anthropic SDK default, unless `max_retries` is set |
 | `OpenAIProvider` | Rejected | None | Blended token estimate, flagged by `Sentinel.cost_contains_token_estimates`; `cost_contains_estimates` stays `False` | The OpenAI SDK default, unless `max_retries` is set |
 | `OpenAIImageProvider` | Rejected | `openai_image` | Per-call ceiling; without one, a per-image estimate marked incomplete, or unknown | The OpenAI SDK default, unless `max_retries` is set. Jobs sets 0 |
 | `GeminiProvider` | Rejected | `gemini_image` | Text: blended token estimate, flagged by `Sentinel.cost_contains_token_estimates`; `cost_contains_estimates` stays `False`. Images: as for `OpenAIImageProvider` | None configured |
@@ -145,9 +145,18 @@ Each path keeps money in its own unit:
 
 Who calls again after a failure depends on the path and the provider:
 
-- **Ordinary runs, other providers**: the node failure policy
-  (`max_retries`, `retry_backoff_s`) decides, including after a refused or
-  truncated reply.
+- **Ordinary runs, other providers**: without a retry policy, the node
+  failure policy (`max_retries`, `retry_backoff_s`) decides, including after
+  a refused or truncated reply.
+- **Ordinary runs under a `RetryPolicy`**: the executor is the only retry
+  owner. A `RETRY` node calls again only after a failure whose class the
+  policy lists (`transient` by default, so not after a 401, 403, 404 or 413),
+  waits for a transient status error's `Retry-After` or a capped backoff,
+  and stops at the policy's deadline. A provider whose SDK may send a failed
+  call again is refused before routing, planning or any node call: one that
+  does not declare `sdk_retries=0`, such as `AnthropicProvider` or
+  `OpenAIProvider` without `max_retries=0`, or a custom provider that
+  declares nothing. See [retry policy](execution.md#retry-policy).
 - **Ordinary runs, native providers**: once a request is attempted, no node
   policy calls again. An HTTP error including a 429, a transport failure, a
   refusal, a truncation or an unresolved bill raises `ProviderResponseError`
@@ -168,7 +177,10 @@ Who calls again after a failure depends on the path and the provider:
   up to `max_attempts`.
 
 The last column of the table lists retries an SDK makes inside one call,
-which Smythe neither sees nor records.
+which Smythe neither sees nor records. Each built-in provider declares their
+number as `ProviderFeatures.sdk_retries`: `0` for `OfflineProvider`, the
+native providers and `GeminiProvider` with its own client, and the
+`max_retries` setting for the other SDK providers.
 
 Every failed node attempt on ordinary runs and durable text workflows also
 records its [failure class](execution.md#failure-classes) on its trace span.
@@ -226,6 +238,20 @@ Tests:
 - Ordinary runs, other providers: `tests/test_execution_failure_policies.py::test_consumed_failure_policy_allows_later_work`,
   `tests/test_execution_failure_policies.py::test_truncated_output_is_a_billed_failure_under_the_node_policy`,
   `tests/test_execution_failure_policies.py::test_refused_output_is_a_billed_failure_under_the_node_policy`.
+- Ordinary runs under a `RetryPolicy`: classes `tests/test_retry_policy.py::test_authority_and_input_rejections_are_not_retried_under_the_policy`,
+  `tests/test_retry_policy.py::test_without_a_policy_retry_still_retries_every_rejection`
+  and `tests/test_retry_policy.py::test_a_truncated_reply_is_retried_only_when_its_class_is_listed`;
+  waits `tests/test_retry_policy.py::test_a_rate_limit_is_retried_after_exactly_its_retry_after`,
+  `tests/test_retry_policy.py::test_retry_after_is_capped_and_read_only_where_it_applies`
+  and `tests/test_retry_policy.py::test_backoff_doubles_up_to_the_policy_cap`; deadline
+  `tests/test_retry_policy.py::test_the_deadline_bounds_attempts_and_waits_together`
+  and `tests/test_retry_policy.py::test_each_attempt_times_out_at_the_remaining_deadline`;
+  tool errors `tests/test_retry_policy.py::test_a_tool_error_fed_back_to_the_model_is_not_a_retry`.
+- One retry owner: declarations `tests/test_retry_policy.py::test_providers_declare_the_retries_their_sdk_makes`;
+  refused before any provider call, planning included,
+  `tests/test_retry_policy.py::test_a_provider_whose_sdk_may_retry_is_refused_before_any_call`
+  and `tests/test_retry_policy.py::test_an_executor_with_a_policy_refuses_hidden_sdk_retries_before_any_node_call`;
+  accepted with `max_retries=0` `tests/test_retry_policy.py::test_a_provider_that_sends_each_call_once_runs_under_a_policy`.
 - Ordinary runs, native providers: `tests/test_support_matrix.py::test_native_provider_failure_on_an_ordinary_run_is_terminal_under_a_retry_policy`,
   `tests/test_native_response_accounting.py::test_native_failure_is_terminal_and_preserves_exposure`;
   stop reasons `tests/test_failure_classes.py::test_responses_decode_sets_the_stop_reason_without_changing_the_message`,
@@ -251,9 +277,9 @@ Tests:
 
 A durable run checks its provider and components each time `plan()`,
 `execute()` or `resume()` starts, before routing or planning. A rejected
-`run_store`, `verifier`, `memory`, `tool_runtime` or `checkpoint_store`
-raises `WorkflowBindingError`, a `ValueError` whose message starts with the
-argument's name.
+`run_store`, `verifier`, `memory`, `tool_runtime`, `checkpoint_store` or
+`retry_policy` raises `WorkflowBindingError`, a `ValueError` whose message
+starts with the argument's name.
 
 | Component | Accepted | Rejected |
 |---|---|---|
@@ -265,6 +291,7 @@ argument's name.
 | `read_tools` | `ReadProfile` declarations, named by read steps in graphs and templates you write | Other objects, duplicate names and `read_tools` without `run_store`; read steps naming an undeclared profile, with invalid input or judging another node; read steps on ordinary runs |
 | `checkpoint_store` | `None`; the journal holds checkpoints | Any checkpoint store |
 | `renderer` | `None`, `MarkdownRenderer`, or a renderer declared with `LocalOnly(..., role="renderer")` whose `render()` is synchronous; it [publishes the delivered document](workflow-accounting.md#published-documents) into `artifact_dir` | Other objects and other `LocalOnly` roles; `renderer` without `run_store` or `artifact_dir`; a strict policy without final validators; an `async` `render()` or an invalid `filename` or `media_type`; a run directory that another run owns or that holds files the run does not own |
+| `retry_policy` | `None`; the node failure policy decides each retry | Any `RetryPolicy` |
 | Architects and other components | Built-in components and `LocalOnly` factories | Subclasses and unjournaled dependencies |
 | Node inputs | Plain text | `attach_dep_artifacts`, `attachments` and `artifacts` |
 | Resume | The saved recipe: components, models, budget, `retry_backoff_s`, concurrency, gate validator, acceptance policy, read profiles and renderer | Any change raises `WorkflowConflictError` |
@@ -288,7 +315,8 @@ Tests:
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[memory]`,
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[tool-runtime]`,
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[checkpoint-store]`,
-  `tests/test_workflow_acceptance.py::test_durable_runs_refuse_unregistered_verifier_code_before_any_call`.
+  `tests/test_workflow_acceptance.py::test_durable_runs_refuse_unregistered_verifier_code_before_any_call`,
+  `tests/test_retry_policy.py::test_durable_runs_refuse_a_retry_policy_by_name_before_any_call`.
 - Gate validators: `tests/test_workflow_acceptance.py::test_registered_validator_judges_durable_gates_from_the_exact_target_text`,
   `tests/test_workflow_acceptance.py::test_a_changed_validator_configuration_or_version_refuses_resume_before_any_call`,
   `tests/test_workflow_acceptance.py::test_a_validator_that_cannot_decide_ends_its_gate_without_regeneration`,
