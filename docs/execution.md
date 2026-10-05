@@ -146,7 +146,8 @@ or built from `planning_provider`), and an `LLMSupervisor`'s when
 `max_revisions` lets it review. Otherwise the run is refused with
 `ValueError` before routing, planning or any node call. `execute(graph)` and
 `resume()` check the run's provider and the supervisor's before their first
-call, even when only synthesis is left to run:
+call, even when only synthesis is left to run, and so do `Executor` and
+`AsyncExecutor` run without a Swarm before their first node call:
 
 | Provider | Declared `sdk_retries` |
 |---|---|

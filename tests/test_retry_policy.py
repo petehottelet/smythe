@@ -821,6 +821,44 @@ def test_a_supervisor_whose_sdk_may_retry_is_refused_before_a_graph_runs(entry, 
     assert provider.calls == [] and reviewer.calls == [] and node.status is NodeStatus.PENDING
 
 
+@pytest.mark.parametrize("mode", MODES)
+@pytest.mark.parametrize("model", [None, "custom"], ids=["node-model", "own-model"])
+@pytest.mark.parametrize("sdk_retries", [None, 2], ids=["undeclared", "two"])
+def test_an_executor_with_a_policy_refuses_a_supervisor_whose_sdk_may_retry(mode, model,
+                                                                            sdk_retries):
+    provider, reviewer = Answering(), Answering(sdk_retries)
+    executor, _, _ = make_executor(mode, provider, ManualClock(), RetryPolicy(),
+                                   supervisor=LLMSupervisor(reviewer, model=model),
+                                   max_revisions=1)
+    node = Node(id="draft", label="Draft", metadata={"model": "custom"})
+
+    with pytest.raises(ValueError, match="retry_policy must be the only retry owner"):
+        run(executor, node)
+
+    assert provider.calls == [] and reviewer.calls == [] and node.status is NodeStatus.PENDING
+
+
+@pytest.mark.parametrize("mode", MODES)
+@pytest.mark.parametrize("sdk_retries,max_revisions,revisions_used,reviews", [
+    pytest.param(0, 1, 0, ["supervision"], id="sends-each-call-once"),
+    pytest.param(None, 0, 0, [], id="no-revisions"),
+    pytest.param(None, 1, 1, [], id="revisions-spent"),
+])
+def test_an_executor_with_a_policy_runs_a_supervisor_that_sends_each_call_once_or_cannot_review(
+    mode, sdk_retries, max_revisions, revisions_used, reviews,
+):
+    provider, reviewer = Answering(), Answering(sdk_retries)
+    executor, _, _ = make_executor(mode, provider, ManualClock(), RetryPolicy(),
+                                   supervisor=LLMSupervisor(reviewer), max_revisions=max_revisions,
+                                   revisions_used=revisions_used)
+    node = Node(id="draft", label="Draft", metadata={"model": "custom"})
+
+    run(executor, node)
+
+    assert node.status is NodeStatus.COMPLETED and provider.calls == ["execution"]
+    assert reviewer.calls == reviews
+
+
 def test_a_supervisor_that_can_make_no_review_is_not_refused():
     provider, reviewer = Answering(), Answering(None)
     swarm = Swarm(model="custom", provider=provider, retry_policy=RetryPolicy(), artifact_dir=None,

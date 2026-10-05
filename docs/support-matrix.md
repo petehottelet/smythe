@@ -257,10 +257,12 @@ Tests:
   and `tests/test_retry_policy.py::test_an_executor_with_a_policy_refuses_hidden_sdk_retries_before_any_node_call`;
   every other provider a run can call
   `tests/test_retry_policy.py::test_every_provider_a_run_can_call_is_refused_before_any_call_when_its_sdk_may_retry`,
-  `tests/test_retry_policy.py::test_a_supervisor_whose_sdk_may_retry_is_refused_before_a_graph_runs`
+  `tests/test_retry_policy.py::test_a_supervisor_whose_sdk_may_retry_is_refused_before_a_graph_runs`,
+  `tests/test_retry_policy.py::test_an_executor_with_a_policy_refuses_a_supervisor_whose_sdk_may_retry`
   and `tests/test_retry_policy.py::test_resume_refuses_a_merge_whose_sdk_may_retry_when_every_node_completed`;
-  accepted with `max_retries=0` `tests/test_retry_policy.py::test_a_provider_that_sends_each_call_once_runs_under_a_policy`
-  and `tests/test_retry_policy.py::test_a_run_whose_every_provider_sends_each_call_once_runs_under_a_policy`.
+  accepted with `max_retries=0` `tests/test_retry_policy.py::test_a_provider_that_sends_each_call_once_runs_under_a_policy`,
+  `tests/test_retry_policy.py::test_a_run_whose_every_provider_sends_each_call_once_runs_under_a_policy`
+  and `tests/test_retry_policy.py::test_an_executor_with_a_policy_runs_a_supervisor_that_sends_each_call_once_or_cannot_review`.
 - Ordinary runs, native providers: `tests/test_support_matrix.py::test_native_provider_failure_on_an_ordinary_run_is_terminal_under_a_retry_policy`,
   `tests/test_native_response_accounting.py::test_native_failure_is_terminal_and_preserves_exposure`;
   stop reasons `tests/test_failure_classes.py::test_responses_decode_sets_the_stop_reason_without_changing_the_message`,

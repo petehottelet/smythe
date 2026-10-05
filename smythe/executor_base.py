@@ -306,7 +306,8 @@ class ExecutorBase:
     classified retries with ``Retry-After``, a backoff cap and a deadline
     shared by each node's attempts and waits; a run under one refuses,
     before any node call, a provider that does not declare
-    ``sdk_retries=0``. ``sleep(seconds)`` replaces the wait before a retry
+    ``sdk_retries=0``, its own or, while revisions remain, an
+    ``LLMSupervisor``'s. ``sleep(seconds)`` replaces the wait before a retry
     (``time.sleep`` in the serial executor, ``asyncio.sleep`` in the async
     one) and is awaited when it returns an awaitable; ``rng`` replaces the
     ``random`` module that draws backoff jitter.
@@ -1125,9 +1126,20 @@ class ExecutorBase:
                         or node.metadata.get("accounting_invalid") and "response_error" not in node.metadata):
                     raise BudgetValidationError("Unjournaled accounting requires reconciliation")
         if self._retry_policy is not None:
-            for model in sorted({str(node.metadata.get("model", "")) for node in graph.nodes
-                                 if node.status not in (NodeStatus.COMPLETED, NodeStatus.SKIPPED)}):
-                check_provider_support(self._provider, model, node_id=None, check_model=False,
+            calls = [(self._provider, model) for model in sorted(
+                {str(node.metadata.get("model", "")) for node in graph.nodes
+                 if node.status not in (NodeStatus.COMPLETED, NodeStatus.SKIPPED)})]
+            from smythe.supervisor import LLMSupervisor
+
+            # A supervisor that may still revise reviews with its own model or
+            # else the reviewed node's, which can be any node of the graph.
+            supervisor = self._supervisor
+            if isinstance(supervisor, LLMSupervisor) and self._max_revisions > self._revisions_used:
+                models = {supervisor._model} if supervisor._model else {
+                    str(node.metadata.get("model", "")) for node in graph.nodes}
+                calls += [(supervisor._provider, model) for model in sorted(models)]
+            for provider, model in calls:
+                check_provider_support(provider, model, node_id=None, check_model=False,
                                        retry_owner=True)
         self._reserved_node_ids.clear()
         self._call_attempts.clear()

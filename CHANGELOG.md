@@ -936,8 +936,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   or `ConstrainedArchitect` that could plan it, including one built from
   `planning_provider`, and an `LLMSupervisor`'s when `max_revisions` lets it
   review. `execute(graph)` and `resume()` check the run's provider and the
-  supervisor's even when only synthesis is left to run. These calls used to
-  go out with the SDK's own retries.
+  supervisor's even when only synthesis is left to run, and `Executor` and
+  `AsyncExecutor` run without a Swarm check the supervisor's with their own.
+  These calls used to go out with the SDK's own retries.
 - When a `RetryPolicy` deadline refuses a node's next retry, the trace
   records that attempt: a span with its attempt number, outcome `timed_out`,
   failure class `deadline` and the `RetryDeadlineError`, with no duration and
