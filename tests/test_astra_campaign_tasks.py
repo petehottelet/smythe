@@ -1,6 +1,7 @@
 """Frozen sources, independent answer-key arithmetic and evaluator separation."""
 
 from collections import Counter
+from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal, ROUND_FLOOR
 import json
@@ -12,6 +13,7 @@ import pytest
 from benchmarks.astra_campaign import CampaignPlanError, check_output, load_task_pack, provider_task
 from benchmarks.astra_campaign._json import MAX_FILE_BYTES, digest
 from benchmarks.astra_campaign.tasks import DATA_DIR, MAX_OUTPUT_BYTES, SHAPES
+from smythe import JSONValidator, ValidationSubject
 
 
 @pytest.fixture(scope="module")
@@ -273,3 +275,64 @@ def test_manifest_path_escape_is_rejected(copy_pack, name):
     path.write_text(json.dumps(data))
     with pytest.raises(CampaignPlanError):
         load_task_pack(copy_pack)
+
+
+def _place(path, value):
+    """A JSON document holding ``value`` at ``path``, with padding on the way."""
+    for part in reversed(path):
+        value = [None] * part + [value] if type(part) is int else {part: value}
+    return value
+
+
+def _candidates(check):
+    """Values at a check's path: the first passes it, and the others probe its edges."""
+    kind = check["kind"]
+    if kind == "equals":
+        expected = check["expected"]
+        values = [expected, [expected], {"value": expected}]
+        if type(expected) in (int, float):
+            values += [float(expected), expected + 1, True]
+    elif kind == "number":
+        expected, tolerance = check["expected"], check["tolerance"]
+        values = [expected, float(expected), expected + tolerance, expected - tolerance,
+                  expected + tolerance + 1, True, str(expected)]
+    elif kind == "nonempty":
+        size = check["min_chars"]
+        values = ["x" * size, "x" * max(size - 1, 0), " " * (size + 1) + "x" * size, 5, ["x" * size]]
+    elif kind == "object":
+        size = check["minimum"]
+        values = [{f"k{index}": index for index in range(count)}
+                  for count in (size, size + 1, max(size - 1, 0))]
+    elif kind == "length":
+        size = check["expected"]
+        values = [list(range(size)), {str(index): index for index in range(size)},
+                  list(range(size + 1)), "x" * size]
+    elif kind == "keys":
+        keys = check["expected"]
+        values = [dict.fromkeys(keys, 1), dict.fromkeys(keys + ["extra"], 1),
+                  dict.fromkeys(keys[1:], 1), list(keys)]
+    else:
+        allowed, size = check["allowed"], check["minimum"]
+        values = [allowed[:size], allowed, allowed[:size] + allowed[:1], allowed[:size] + ["unlisted"],
+                  allowed[:max(size - 1, 0)], [1] * size, " ".join(allowed)]
+    return values + [None, "text", [], {}]
+
+
+def test_library_json_validator_matches_every_campaign_check(cases):
+    """The library's JSONValidator applies the campaign's check semantics."""
+    outcomes = Counter()
+    for case in cases.values():
+        whole = JSONValidator({"checks": case.checks, "max_bytes": MAX_OUTPUT_BYTES})
+        assert whole.spec["checks"] == case.checks  # campaign checks state every key
+        for check in case.checks:
+            single = replace(case, checks_json=json.dumps([check]))
+            validator = JSONValidator({"checks": [check], "max_bytes": MAX_OUTPUT_BYTES})
+            texts = [json.dumps(_place(check["path"], value)) for value in _candidates(check)]
+            texts += [json.dumps({"elsewhere": 1}), "[]", "not JSON", '{"a": 1, "a": 2}']
+            for text in texts:
+                report = validator.validate(ValidationSubject.from_text(text))
+                assert report.passed is check_output(single, text)["deterministic_passed"], (
+                    case.task_id, check, text)
+                outcomes[report.passed] += 1
+            assert validator.validate(ValidationSubject.from_text(texts[0])).passed, (case.task_id, check)
+    assert outcomes[True] > 50 and outcomes[False] > 200

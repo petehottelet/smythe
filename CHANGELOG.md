@@ -267,6 +267,20 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   required section, and a strict policy with a local final validator
   rejects the returned text and keeps it as `rejected_output`. Without the
   validator the same strict run is refused before any provider call.
+- Built-in final validators `TextValidator` and `JSONValidator` in
+  `smythe.validators`, also exported from `smythe`. Each interprets a
+  specification given as JSON data with versioned code, and its identity
+  binds its name, its code version and the SHA-256 of the specification with
+  every default filled in. `TextValidator` checks length bounds and required
+  Markdown sections, in order and with body text by default, so a strict
+  policy rejects a final step that returns only its own increment.
+  `JSONValidator` requires strict JSON within a size bound and runs checks at
+  JSON paths: `present`, `equals`, `number` within a tolerance, `nonempty`,
+  `object`, `length`, `keys`, `required_keys` and `citations`. Both run
+  locally with no provider call, reject output that fails a check, including
+  bytes that are not UTF-8, and refuse an invalid specification with
+  `ValueError`. See
+  [built-in final validators](docs/verifier.md#built-in-final-validators).
 
 ### Changed
 

@@ -293,6 +293,9 @@ class RequiredSection:
 policy = AcceptancePolicy(mode="strict", final_validators=[RequiredSection("## Sources")])
 ```
 
+The [built-in final validators](#built-in-final-validators) check required
+sections, length bounds and JSON paths without a class of your own.
+
 `SwarmResult.acceptance` holds the record, or `None` when there is none.
 `SwarmResult.accepted` is true only for an `accepted` record. When a record
 exists and does not accept, `output` is `""` and the text is in
@@ -467,6 +470,82 @@ keys are unchanged, and the validators' time counts as verification in
 sources=...)` makes the same decision outside a run, and
 `smythe.synthesizer.deliverable_sources(graph)` returns the nodes
 `DELIVERABLE` synthesis delivers and whether it fell back.
+
+## Built-in final validators
+
+`TextValidator` and `JSONValidator` (in `smythe.validators`, also exported
+from `smythe`) are final validators configured by a specification: JSON data
+that versioned library code interprets. A validator's `identity` is its name,
+the version of that code (`"1"`), and the SHA-256 of its specification with
+every default filled in, so a policy's `sha256` and each acceptance record pin
+the exact checks; `validator.spec` returns that specification. Both run
+locally with no provider call and report `rejected`, never `error`, for output
+that fails a check, including bytes that are not UTF-8. An invalid
+specification raises `ValueError` when the validator is built: an unknown key
+or kind, a missing key, a character count outside 0 to 1,000,000,000 or a
+check's count outside 0 to 10,000, a non-finite number, or a repeated section
+or check id. `name=` renames a validator, so that one policy
+can hold two of the same kind; a policy refuses two validators with one name.
+
+```python
+from smythe import AcceptancePolicy, JSONValidator, Swarm, TextValidator
+
+complete = TextValidator({"sections": ["Argument", "Critique"], "max_chars": 12_000})
+swarm = Swarm(acceptance=AcceptancePolicy(mode="strict", final_validators=[complete]), ...)
+```
+
+**Text.** `TextValidator(spec)`, named `smythe.text-spec`, takes these keys,
+each optional:
+
+| Key | Default | Requires |
+|---|---|---|
+| `min_chars` | `1` | at least this many characters after surrounding whitespace is removed, so empty output fails |
+| `max_chars` | `None` | at most this many characters, when set |
+| `sections` | `[]` | each listed heading, as a Markdown ATX heading (`#` to `######`) outside fenced code, at any level |
+| `ordered` | `true` | the sections in the listed order; other headings may come between them |
+| `min_section_chars` | `1` | at least this many characters in each required section, up to the next heading at its level or above |
+
+Headings compare ignoring case, spacing, `*` and `_` emphasis and a final
+colon, so `## **Critique:**` is the section `Critique`; a bold line or a
+heading inside a code block is not a heading. Findings are `text_too_short`,
+`text_too_long`, `section_missing`, `section_out_of_order`, `section_empty`
+and `not_utf8`.
+
+A sections check is how strict acceptance holds a run to its whole
+deliverable. With the policy above, a final step that returns only its own
+increment, such as `## Critique` without the argument it critiques, fails
+with `section_missing: required section 'Argument' is missing`: the decision
+is `rejected`, `output` is `""` and the increment is in `rejected_output`.
+
+**JSON.** `JSONValidator(spec)`, named `smythe.json-spec`, requires the whole
+output to be strict JSON: a code fence around it, a repeated object key,
+`NaN`, `Infinity` or a number too large for a float fails with
+`json_invalid`, and output larger than `max_bytes` (default 1,048,576) with
+`json_too_large`. Its `checks` (default `[]`) each have an `id` (2 to 64
+lowercase letters, digits or hyphens, starting with a letter), a `kind` and a
+`path`: a list of object keys and array indexes from the document root, `[]`
+for the root itself. A path that does not resolve fails with
+`json_path_missing`; any other failed check gives `json_check_failed`.
+
+| Kind | Other keys | Passes when the value at `path` |
+|---|---|---|
+| `present` | | exists |
+| `equals` | `expected` | equals `expected` as canonical JSON, so `1` does not equal `1.0` or `true` |
+| `number` | `expected`, `tolerance` (default 0) | is a finite number, not a bool, within `tolerance` of `expected` |
+| `nonempty` | `min_chars` (default 1) | is a string with at least `min_chars` characters after surrounding whitespace is removed |
+| `object` | `minimum` (default 1) | is an object with at least `minimum` keys |
+| `length` | `expected` | is an array or object with exactly `expected` items |
+| `keys` | `expected` | is an object whose keys are exactly `expected` |
+| `required_keys` | `expected` | is an object holding every key in `expected` |
+| `citations` | `allowed`, `minimum` (default 1) | is an array of distinct strings, each in `allowed`, with at least `minimum` of them |
+
+```python
+summary = JSONValidator({"checks": [
+    {"id": "fields", "kind": "required_keys", "path": [], "expected": ["total", "sources"]},
+    {"id": "total", "kind": "number", "path": ["total"], "expected": 41},
+    {"id": "sources", "kind": "citations", "path": ["sources"], "allowed": ["doc-1", "doc-2"]},
+]})
+```
 
 ## Gating from YAML and from a generated plan
 

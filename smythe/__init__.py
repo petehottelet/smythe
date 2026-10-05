@@ -82,6 +82,7 @@ from smythe.validation import (
     ValidationReport,
     ValidatorIdentity,
 )
+from smythe.validators import JSONValidator, TextValidator
 
 __all__ = [
     "AcceptanceDecision",
@@ -121,6 +122,7 @@ __all__ = [
     "OpenAIProvider",
     "OpenAIResponsesProvider",
     "IncompleteOutputError",
+    "JSONValidator",
     "OutputRefusedError",
     "OutputTruncatedError",
     "NativeReceipt",
@@ -155,6 +157,7 @@ __all__ = [
     "ToolResult",
     "ToolRuntime",
     "ToolSession",
+    "TextValidator",
     "TokenVerifier",
     "ToolSpec",
     "ValidationFinding",
