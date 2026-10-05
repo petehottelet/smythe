@@ -618,6 +618,28 @@ def test_an_async_profile_property_does_not_warn_as_never_awaited():
     assert not [warning for warning in caught if "never awaited" in str(warning.message)]
 
 
+class _AsyncSubmitProperty(_Connector):
+    @property
+    async def submit(self):
+        return None
+
+
+def test_an_async_method_property_is_refused_without_an_unawaited_coroutine():
+    class _AsyncVerifyProperty(_Verifier):
+        @property
+        async def verify(self):
+            return None
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        with pytest.raises(TypeError, match=r"has no submit\(\) method"):
+            check_connector(_AsyncSubmitProperty())
+        with pytest.raises(TypeError, match=r"has no verify\(\) method"):
+            check_verifier(_AsyncVerifyProperty())
+        gc.collect()
+    assert not [warning for warning in caught if "never awaited" in str(warning.message)]
+
+
 class _Verifier:
     identity = "example-hmac/1"
 
