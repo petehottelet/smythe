@@ -381,6 +381,31 @@ def test_corrupt_stored_plan_attachments_give_null_input_digests(tmp_path, attac
     assert digests == {"hero[0]": None, "hero[1]": None, "plain[0]": plain}
 
 
+@pytest.mark.parametrize("spec", [
+    "json_set(spec_json,'$.attachments',json('{\"brand/logo.png\": 1}'))",
+    "json_set(spec_json,'$.attachments','brand/logo.png')",
+    "json_set(spec_json,'$.attachments',json('[[\"brand/logo.png\"]]'))",
+    "json_set(spec_json,'$.attachments',null)",
+    "json_remove(spec_json,'$.attachments')",
+], ids=["object", "text", "nested-array", "null", "missing"])
+def test_corrupt_stored_operation_attachments_give_a_null_input_digest(tmp_path, spec):
+    """Only the operation whose stored attachments are not an array of
+    planned paths loses its digest; the inspection still succeeds."""
+    database, run_id, plan = _reference_run(tmp_path)
+    hero, _, plain = (operation_input_digest(operation, plan.attachments)
+                      for operation in plan.operations)
+    with closing(sqlite3.connect(database)) as db, db:
+        db.execute(f"UPDATE operations SET spec_json={spec} WHERE operation_key='hero[0]'")
+
+    with SQLiteRunStore(database, read_only=True) as store:
+        report = inspect_job(store, run_id)
+
+    digests = {operation["operation_key"]: operation["input_digest"]
+               for operation in report["operations"]}
+    assert digests == {"hero[0]": None, "hero[1]": hero, "plain[0]": plain}
+    json.dumps(report)
+
+
 def _fake_store(tmp_path, **updates):
     data = b"fixture"
     path = tmp_path / "outputs" / "run" / "artifact.bin"

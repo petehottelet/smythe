@@ -674,3 +674,22 @@ def test_input_digest_of_a_stored_plan_matches_its_planned_operations(tmp_path):
     assert re.fullmatch(r"sha256:[0-9a-f]{64}", input_digests(plan)[0])
     with pytest.raises(ValueError, match="brand/logo.png"):
         operation_input_digest(plan.operations[0], plan.attachments[1:])
+
+
+@pytest.mark.parametrize("corrupt", ["object", "text", "null", "number"])
+def test_input_digest_refuses_attachments_that_are_not_an_array(tmp_path, corrupt):
+    """An object of planned paths used to digest like the array of its keys."""
+    write_references(tmp_path)
+    plan = reference_plan(tmp_path)
+    stored = json.loads(json.dumps(plan.to_dict()))
+    operation = stored["operations"][0]
+    paths = operation["attachments"]
+    assert paths
+    # An in-memory tuple is an array too.
+    assert operation_input_digest(operation | {"attachments": tuple(paths)},
+                                  stored["attachments"]) == input_digests(plan)[0]
+    attachments = {"object": dict.fromkeys(paths, 1), "text": paths[0],
+                   "null": None, "number": 5}[corrupt]
+
+    with pytest.raises(ValueError, match="attachments must be an array"):
+        operation_input_digest(operation | {"attachments": attachments}, stored["attachments"])

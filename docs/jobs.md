@@ -217,6 +217,8 @@ and attachment paths are left out. Every sample of a template therefore shares
 one digest, and renaming a profile or moving an attachment to another path
 with the same bytes and extension keeps it. A different prompt, model, option,
 artifact spec, attachment content or attachment order changes it.
+`operation_input_digest` raises `ValueError` when the operation's attachments
+are not an array or an attachment has no fingerprint in the list it is given.
 
 The digest is computed on demand and never stored. It is not part of the plan
 hash or approval token, so plans, exports, approvals and the Jobs schema are
@@ -224,7 +226,8 @@ unchanged. `jobs inspect` adds `input_digest` to each operation, computed from
 the run's stored plan, prints it on an `Input digest:` line under each
 operation, and the HTML report shows it in an Input digest column. It is
 `null` (`unavailable` in the printed output) for an operation whose stored
-specification cannot produce one, or that sends attachments when the plan's
+specification cannot produce one, such as one whose stored attachments are
+not an array of planned paths, or that sends attachments when the plan's
 stored attachment fingerprints cannot be read; inspection itself still
 succeeds.
 Jobs does not reuse artifacts across runs by digest.

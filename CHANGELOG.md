@@ -258,10 +258,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   adds `input_digest` to each operation, computed from the stored plan, and
   prints it; the HTML report shows it in an Input digest column. It is null
   where it cannot be computed, including when the stored attachment
-  fingerprints are unreadable. `SQLiteRunStore.plan_attachments()` reads a
-  run's recorded attachment fingerprints. The digest is never stored: plan
-  hashes, operation IDs, approval tokens, exports and the Jobs schema are
-  unchanged. See
+  fingerprints are unreadable or an operation's stored attachments are not an
+  array, which the function refuses with `ValueError`.
+  `SQLiteRunStore.plan_attachments()` reads a run's recorded attachment
+  fingerprints. The digest is never stored: plan hashes, operation IDs,
+  approval tokens, exports and the Jobs schema are unchanged. See
   [operation identity](docs/jobs.md#operation-identity-and-input-digest).
 - Strict runs check their acceptance obligations before they spend.
   `smythe.acceptance.validate_acceptance_obligations(graph, policy)` lists

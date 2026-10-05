@@ -482,7 +482,8 @@ def operation_input_digest(
     ``application/octet-stream``), not from the fingerprint, so the digest
     is the same on every platform. It is not part of the plan hash. Both
     arguments may also be ``to_dict()`` forms; ``ValueError`` is raised for
-    an attachment without a fingerprint.
+    attachments that are not an array (a list or tuple) and for an attachment
+    without a fingerprint.
     """
     # Imported here because the providers module imports this one.
     from smythe.jobs.providers import ADAPTER_VERSIONS
@@ -493,8 +494,12 @@ def operation_input_digest(
         if isinstance(fingerprint, AttachmentFingerprintV1):
             fingerprint = fingerprint.to_dict()
         fingerprints[fingerprint["relative_path"]] = fingerprint
+    paths = spec["attachments"]
+    # An object would otherwise digest like the array of its keys.
+    if not isinstance(paths, (list, tuple)):
+        raise ValueError("attachments must be an array of relative paths")
     attachments = []
-    for path in spec["attachments"]:
+    for path in paths:
         if path not in fingerprints:
             raise ValueError(f"attachment {path!r} has no fingerprint")
         attachments.append({"sha256": fingerprints[path]["sha256"],
