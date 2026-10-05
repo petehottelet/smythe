@@ -8,12 +8,22 @@ import math
 import os
 from collections.abc import Mapping
 from enum import Enum
+from types import MappingProxyType
 from typing import Callable
 
 from smythe._errors import PicklableError
 from smythe.jobs.models import _IMAGE_EXTENSIONS_BY_MIME, ProviderKind
 from smythe.jobs.preflight import PlannedOperationV1
 from smythe.provider import GeminiProvider, OfflineProvider, OpenAIImageProvider, Provider
+
+# How each adapter turns a planned operation into a provider request. Bump a
+# kind's version whenever its request shaping changes, so that operations'
+# input digests (``operation_input_digest``) change with it.
+ADAPTER_VERSIONS: Mapping[ProviderKind, int] = MappingProxyType({
+    ProviderKind.OFFLINE: 1,
+    ProviderKind.OPENAI_IMAGE: 1,
+    ProviderKind.GEMINI_IMAGE: 1,
+})
 
 
 class ProviderConfigurationError(ValueError):

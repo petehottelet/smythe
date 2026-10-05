@@ -226,6 +226,18 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `ConnectorAmbiguous` and `ApprovalRejected`; `check_connector()` and
   `check_verifier()` refuse providers, awaitables and async methods. Nothing
   stores or dispatches actions yet. See [external actions](docs/actions.md).
+- Jobs operations have a semantic input digest.
+  `smythe.jobs.operation_input_digest()` hashes the provider kind and its
+  adapter version (`smythe.jobs.providers.ADAPTER_VERSIONS`), the model,
+  options, prompt and artifact spec, and each attachment's SHA-256 and MIME
+  type in order. It leaves out the template key, count, ordinal, profile
+  name, attempt limit, cost ceilings and attachment paths, so every sample of
+  a template shares it. `jobs inspect` adds `input_digest` to each operation,
+  computed from the stored plan, and the HTML report shows it in an Input
+  digest column. `SQLiteRunStore.plan_attachments()` reads a run's recorded
+  attachment fingerprints. The digest is never stored: plan hashes, operation
+  IDs, approval tokens, exports and the Jobs schema are unchanged. See
+  [operation identity](docs/jobs.md#operation-identity-and-input-digest).
 
 ### Changed
 

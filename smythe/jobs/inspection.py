@@ -12,6 +12,7 @@ from typing import Any
 
 from smythe.jobs.artifact_io import MAX_ARTIFACT_BYTES
 from smythe.jobs.delivery import annotate_delivery
+from smythe.jobs.preflight import operation_input_digest
 from smythe.jobs.store import SQLiteRunStore
 
 
@@ -178,12 +179,16 @@ def inspect_job(
     attempt carries its recorded ``delivery_acceptance`` decision, and each
     operation a projected ``delivery_acceptance`` and a derived
     ``delivery_eligibility`` (see :func:`smythe.jobs.delivery.operation_delivery`).
+    Each operation also carries its ``input_digest``, computed from the stored
+    plan (see :func:`smythe.jobs.preflight.operation_input_digest`), or ``None``
+    when its stored specification cannot produce one.
     """
     snapshot = store.inspection_snapshot(
         run_id, operation=operation, limit=limit, offset=offset, events_limit=events_limit
     )
     snapshot["inspection_version"] = INSPECTION_VERSION
     snapshot["inspected_at_ns"] = time.time_ns()
+    _add_input_digests(store, run_id, snapshot.get("operations", ()))
     summary = check_artifact_integrity(
         snapshot, snapshot["artifacts"], byte_limit=MAX_INSPECTION_HASH_BYTES,
     )
@@ -195,6 +200,19 @@ def inspect_job(
                for attempt in snapshot.get("attempts", ())
                if attempt.get("delivery_acceptance") is not None}
     return annotate_delivery(snapshot, records)
+
+
+def _add_input_digests(store: SQLiteRunStore, run_id: str, operations) -> None:
+    # Plan fingerprints are read only when a listed operation sends attachments.
+    fingerprints = []
+    if any(type(item.get("spec")) is dict and item["spec"].get("attachments")
+           for item in operations):
+        fingerprints = store.plan_attachments(run_id)
+    for item in operations:
+        try:
+            item["input_digest"] = operation_input_digest(item["spec"], fingerprints)
+        except (KeyError, TypeError, ValueError):
+            item["input_digest"] = None
 
 
 def check_artifact_integrity(

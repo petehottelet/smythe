@@ -272,10 +272,11 @@ def _operation_rows(operations: list[dict]) -> list[list[str]]:
         detail += _details("Selected response", operation.get("result_text"))
         if operation.get("error") is not None:
             detail += _details("Operation error", operation["error"], opened=True)
+        digest = operation.get("input_digest")
         rows.append([
             _code(operation.get("operation_key", identity)), _state(operation.get("status")),
             f'{_number(operation.get("attempt_count"))} / {_number(operation.get("max_attempts"))}',
-            delivery,
+            delivery, "Not available" if digest is None else _code(digest),
             f"<details><summary>Inspect operation</summary>{detail}</details>",
         ])
     return rows
@@ -342,7 +343,8 @@ def render_job_report(payload: dict) -> str:
     if page.get("has_more") is True:
         parts.append('<p class="note">More operations are available in the next inspection page.</p>')
     parts.append(_table("Operations in this page",
-                        ["Operation", "State", "Attempts / limit", "Delivery", "Record"],
+                        ["Operation", "State", "Attempts / limit", "Delivery", "Input digest",
+                         "Record"],
                         _operation_rows(operations), wide="wide") if operations
                  else '<p class="empty">No operations match this inspection page.</p>')
     parts.append('<h3>Attempts</h3><p class="note">Attempt history includes rerolls and parent attempts.</p>')

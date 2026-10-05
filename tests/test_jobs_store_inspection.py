@@ -40,6 +40,29 @@ def logical_dump(path):
         return list(db.iterdump())
 
 
+def test_plan_attachments_reads_only_the_recorded_fingerprints(tmp_path, journal):
+    (tmp_path / "reference.png").write_bytes(b"reference")
+    manifest = JobManifestV1.from_dict({
+        "version": 1, "name": "references",
+        "profiles": [{"name": "test", "provider": "offline", "model": "offline-image",
+                      "max_cost_per_call_usd": "0"}],
+        "operations": [{"key": "item", "prompt": "Draw", "profile": "test",
+                        "attachments": ["reference.png"]}],
+        "execution": {"max_concurrency": 1, "max_attempts": 1, "max_budget_usd": "0"},
+    })
+    plan = preflight_job(manifest, manifest_root=tmp_path)
+    journal.create_run(plan, make_approval(plan), manifest_root=tmp_path, run_id="references")
+    before = logical_dump(journal.path)
+
+    with SQLiteRunStore(journal.path, read_only=True) as reader:
+        assert reader.plan_attachments("references") == [
+            attachment.to_dict() for attachment in plan.attachments]
+        assert reader.plan_attachments("run") == []
+        with pytest.raises(JobNotFoundError):
+            reader.plan_attachments("missing")
+    assert logical_dump(journal.path) == before
+
+
 def test_read_only_open_and_all_read_methods_preserve_database(journal, monkeypatch):
     from smythe.provider_responses import OpenAIResponsesProvider
     monkeypatch.setattr(OpenAIResponsesProvider, "_get_client", lambda *args: pytest.fail("SDK constructed"))

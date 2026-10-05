@@ -25,6 +25,7 @@ from smythe.jobs.preflight import (
     canonical_json_bytes,
     make_approval,
     operation_id,
+    operation_input_digest,
     preflight_job,
     verify_approval,
 )
@@ -51,6 +52,7 @@ __all__ = [
     "micros_to_usd",
     "normalize_usd",
     "operation_id",
+    "operation_input_digest",
     "preflight_job",
     "usd_to_micros",
     "verify_approval",

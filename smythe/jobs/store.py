@@ -1913,6 +1913,27 @@ class SQLiteRunStore:
             "approval": _read_json_object(run["approval_json"], "runs.approval_json"),
         }
 
+    def plan_attachments(self, run_id: str) -> list[dict[str, Any]]:
+        """Return the attachment fingerprints recorded in a run's plan.
+
+        Only the plan's ``attachments`` array is decoded, not its operations.
+        """
+        with self._read_transaction() as cursor:
+            row = cursor.execute("""SELECT json_extract(plan_json,'$.attachments') AS attachments,
+                json_type(plan_json,'$.attachments') AS kind FROM runs WHERE run_id=?""",
+                                 (run_id,)).fetchone()
+        if row is None:
+            raise JobNotFoundError(run_id)
+        if row["kind"] != "array":
+            raise RunStoreError("Invalid stored plan attachments")
+        attachments = _read_json_object('{"attachments":' + row["attachments"] + "}",
+                                        "runs.plan_json")["attachments"]
+        if any(type(item) is not dict or any(type(item.get(field)) is not str for field in
+                                             ("relative_path", "sha256", "mime_type"))
+               for item in attachments):
+            raise RunStoreError("Invalid stored plan attachments")
+        return attachments
+
     def _call_rows(self, run_id: str) -> list[sqlite3.Row]:
         with self._lock:
             return self._connection.execute(

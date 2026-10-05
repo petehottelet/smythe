@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
+from contextlib import closing
 import copy
 import hashlib
 import json
 import os
+import sqlite3
 from types import SimpleNamespace
 
 import pytest
 
-from smythe.jobs import JobManifestV1, make_approval, preflight_job
+from smythe.jobs import JobManifestV1, make_approval, operation_input_digest, preflight_job
 from smythe.jobs.inspection import inspect_job, list_jobs
-from smythe.jobs.store import SQLiteRunStore
+from smythe.jobs.store import RunStoreError, SQLiteRunStore
 
 
 @pytest.fixture
@@ -277,6 +279,94 @@ def test_eligibility_needs_the_recorded_bytes_and_a_verified_file(sha256, status
     [operation] = annotate_delivery(snapshot, {"a1": record})["operations"]
 
     assert operation["delivery_eligibility"] == {"eligible": not reasons, "reasons": reasons}
+
+
+def _reference_run(tmp_path):
+    """An approved run whose first template sends a reference image and whose second sends none."""
+    (tmp_path / "brand").mkdir()
+    (tmp_path / "brand" / "logo.png").write_bytes(b"logo-bytes")
+    manifest = JobManifestV1.from_dict({
+        "version": 1, "name": "input-digest",
+        "profiles": [{"name": "render", "provider": "gemini_image",
+                      "model": "gemini-2.5-flash-image", "max_cost_per_call_usd": "0.05"}],
+        "operations": [
+            {"key": "hero", "count": 2, "prompt": "Render the hero", "profile": "render",
+             "attachments": ["brand/logo.png"]},
+            {"key": "plain", "prompt": "Render the hero", "profile": "render"},
+        ],
+        "execution": {"max_concurrency": 2, "max_attempts": 1, "max_budget_usd": "0.15",
+                      "output_directory": "outputs"},
+    })
+    plan = preflight_job(manifest, manifest_root=tmp_path)
+    database = tmp_path / "jobs.sqlite3"
+    with SQLiteRunStore(database) as store:
+        run_id = store.create_run(plan, make_approval(plan), manifest_root=tmp_path)
+    return database, run_id, plan
+
+
+def test_inspection_reports_each_operations_input_digest_from_the_stored_plan(tmp_path):
+    database, run_id, plan = _reference_run(tmp_path)
+    expected = {operation.operation_id: operation_input_digest(operation, plan.attachments)
+                for operation in plan.operations}
+    before = database.read_bytes()
+    with SQLiteRunStore(database, read_only=True) as store:
+        report = inspect_job(store, run_id)
+        [selected] = inspect_job(store, run_id, operation="hero[1]")["operations"]
+        paged = inspect_job(store, run_id, limit=1, offset=2)["operations"]
+
+    assert database.read_bytes() == before
+    digests = {operation["operation_id"]: operation["input_digest"]
+               for operation in report["operations"]}
+    assert digests == expected
+    by_key = {operation["operation_key"]: operation["input_digest"]
+              for operation in report["operations"]}
+    assert by_key["hero[0]"] == by_key["hero[1]"] != by_key["plain[0]"]
+    assert selected["input_digest"] == by_key["hero[1]"]
+    assert [operation["input_digest"] for operation in paged] == [by_key["plain[0]"]]
+    assert all("input_digest" not in operation["spec"] for operation in report["operations"])
+    json.dumps(report)
+
+
+def test_repeated_samples_without_attachments_share_an_input_digest(recorded):
+    database, run_id, _ = recorded
+    with SQLiteRunStore(database, read_only=True) as store:
+        report = inspect_job(store, run_id)
+
+    [digest] = {operation["input_digest"] for operation in report["operations"]}
+    assert digest.startswith("sha256:") and len(digest) == len("sha256:") + 64
+
+
+def test_an_operation_whose_digest_cannot_be_computed_reports_none(tmp_path):
+    valid = {"provider": "offline", "model": "offline-image", "options": {}, "prompt": "Draw",
+             "attachments": [], "artifact": {"mime_type": "image/png"}}
+    snapshot = {
+        "run_id": "run", "manifest_root": str(tmp_path), "output_directory": "outputs",
+        "artifacts": [],
+        "operations": [
+            {"operation_id": "valid", "spec": valid},
+            {"operation_id": "no-model", "spec": {k: v for k, v in valid.items() if k != "model"}},
+            {"operation_id": "unknown-provider", "spec": valid | {"provider": "other"}},
+            {"operation_id": "unplanned-file", "spec": valid | {"attachments": ["unplanned.png"]}},
+        ],
+    }
+    store = SimpleNamespace(inspection_snapshot=lambda *a, **kw: copy.deepcopy(snapshot),
+                            plan_attachments=lambda run_id: [])
+
+    digests = {operation["operation_id"]: operation["input_digest"]
+               for operation in inspect_job(store, "run")["operations"]}
+
+    assert digests["valid"].startswith("sha256:")
+    assert {key: value for key, value in digests.items() if key != "valid"} == {
+        "no-model": None, "unknown-provider": None, "unplanned-file": None}
+
+
+def test_corrupt_stored_plan_attachments_fail_inspection_closed(tmp_path):
+    database, run_id, _ = _reference_run(tmp_path)
+    with closing(sqlite3.connect(database)) as db, db:
+        db.execute("UPDATE runs SET plan_json=json_set(plan_json,'$.attachments','not a list')")
+
+    with SQLiteRunStore(database, read_only=True) as store, pytest.raises(RunStoreError):
+        inspect_job(store, run_id)
 
 
 def _fake_store(tmp_path, **updates):

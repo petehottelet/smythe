@@ -188,6 +188,38 @@ different ceiling produces a different token. Resume and reroll continue an
 existing run and need no new approval. The check covers one database, and the
 token remains an acknowledgment rather than a credential.
 
+### Operation identity and input digest
+
+Each planned operation has two identities. Its `operation_id` (`op_...`) names
+one expanded operation: it covers the template, including its key, count,
+prompt and artifact spec, the ordinal, the profile, including its name and
+per-call ceiling, and the attachment paths. `jobs inspect --operation` and
+`jobs reroll` accept it.
+
+Its input digest describes what the operation asks its provider for.
+`operation_input_digest(operation, plan.attachments)` returns `sha256:`
+followed by the hash of version 1 of a canonical JSON object holding:
+
+- the provider kind and its adapter version from
+  `smythe.jobs.providers.ADAPTER_VERSIONS`, which increases whenever Smythe
+  changes how that provider's requests are built;
+- the model, provider options and prompt;
+- the artifact spec; and
+- each attachment's SHA-256 and MIME type, in the operation's order.
+
+The template key, count, ordinal, profile name, `max_attempts`, cost ceilings
+and attachment paths are left out. Every sample of a template therefore shares
+one digest, and renaming a profile or moving an attachment to another path
+with the same bytes and extension keeps it. A different prompt, model, option,
+artifact spec, attachment content or attachment order changes it.
+
+The digest is computed on demand and never stored. It is not part of the plan
+hash or approval token, so plans, exports, approvals and the Jobs schema are
+unchanged. `jobs inspect` adds `input_digest` to each operation, computed from
+the run's stored plan, and the HTML report shows it in an Input digest column.
+It is `null` for an operation whose stored specification cannot produce one.
+Jobs does not reuse artifacts across runs by digest.
+
 ## The dispatch journal
 
 Each run is stored incrementally in SQLite using WAL mode. Before a provider

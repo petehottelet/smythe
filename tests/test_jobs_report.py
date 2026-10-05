@@ -294,6 +294,33 @@ def test_delivery_fields_from_the_ledger_are_inert():
     assert "&lt;script&gt;" in html
 
 
+def test_each_operation_shows_its_input_digest_in_its_own_column():
+    digest = "sha256:" + "e" * 64
+    sample = payload()
+    sample["operations"][0]["input_digest"] = digest
+    html = render_job_report(sample)
+    document = Document(html)
+
+    assert "Input digest" in document.content and digest in document.content
+    assert f'data-label="Input digest"><div class="cell-value"><code>{digest}</code></div>' in html
+    assert sum(tag == "caption" for tag, _ in document.tags) == 6
+
+    older = render_job_report(payload())
+    assert 'data-label="Input digest"><div class="cell-value">Not available</div>' in older
+
+
+def test_input_digest_from_the_inspection_payload_is_inert():
+    attack = '</code><script>alert(1)</script><img src=x onerror="alert(2)">'
+    sample = payload()
+    sample["operations"][0]["input_digest"] = attack
+    html = render_job_report(sample)
+    document = Document(html)
+
+    assert attack in document.content
+    assert not {tag for tag, _ in document.tags} & {"script", "img"}
+    assert "&lt;/code&gt;&lt;script&gt;" in html
+
+
 def test_renderer_is_deterministic_and_does_not_mutate_input():
     sample = payload()
     original = deepcopy(sample)

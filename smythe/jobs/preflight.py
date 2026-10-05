@@ -448,6 +448,50 @@ def operation_id(
     return "op_" + digest[:32]
 
 
+INPUT_DIGEST_VERSION = 1
+
+
+def operation_input_digest(
+    operation: PlannedOperationV1 | Mapping[str, Any],
+    attachment_fingerprints: Sequence[AttachmentFingerprintV1 | Mapping[str, Any]],
+) -> str:
+    """Return a ``sha256:`` digest of what one operation asks its provider for.
+
+    It covers the provider kind and adapter version, model, options, prompt,
+    artifact spec and each attachment's SHA-256 and MIME type in order, but
+    not the template key, count, ordinal, profile name, attempt limit, cost
+    ceilings or attachment paths, so samples of one template share it. It is
+    not part of the plan hash. Both arguments may also be ``to_dict()`` forms;
+    ``ValueError`` is raised for an attachment without a fingerprint.
+    """
+    # Imported here because the providers module imports this one.
+    from smythe.jobs.providers import ADAPTER_VERSIONS
+
+    spec = operation.to_dict() if isinstance(operation, PlannedOperationV1) else operation
+    fingerprints = {}
+    for fingerprint in attachment_fingerprints:
+        if isinstance(fingerprint, AttachmentFingerprintV1):
+            fingerprint = fingerprint.to_dict()
+        fingerprints[fingerprint["relative_path"]] = fingerprint
+    attachments = []
+    for path in spec["attachments"]:
+        if path not in fingerprints:
+            raise ValueError(f"attachment {path!r} has no fingerprint")
+        attachments.append({"sha256": fingerprints[path]["sha256"],
+                            "mime_type": fingerprints[path]["mime_type"]})
+    provider = ProviderKind(spec["provider"])
+    return _sha256_json({
+        "version": INPUT_DIGEST_VERSION,
+        "provider": provider.value,
+        "adapter_version": ADAPTER_VERSIONS[provider],
+        "model": spec["model"],
+        "options": spec["options"],
+        "prompt": spec["prompt"],
+        "artifact": spec["artifact"],
+        "attachments": attachments,
+    })
+
+
 def _canonical_plan_size_upper_bound(
     *,
     manifest: JobManifestV1,
