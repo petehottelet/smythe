@@ -353,8 +353,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   version, role="validator")` declares a registered validator, and a durable
   `Swarm` takes the declaration as `verifier`: each gate's verdict is that
   validator's report on the exact text of the node it judges, and a
-  validator that raises or cannot decide fails the gate as an invalid
-  verdict. The declaration refuses a `Provider`, coroutine function or
+  validator that raises or cannot decide ends the gate without a verdict,
+  spending no regeneration and buying no further judge call, with or without
+  a strict policy. The declaration refuses a `Provider`, coroutine function or
   awaitable factory, and a built validator that is a provider, awaitable or
   class, lacks a synchronous `validate()` or names another identity or
   version. The recipe records `"verifier": "validator-v1"` and the

@@ -258,7 +258,9 @@ class ExecutorBase:
     and recorded for delivery acceptance: an exhausted gate's last verdict, a
     gate without regenerations under ``advisory_verdict``, and a verdict that
     cannot be read or a verifier that raises as an undecided outcome that
-    ends the gate without regeneration. Without one, gates behave as before.
+    ends the gate without regeneration. Without one, gates behave as before,
+    except that a durable run's registered gate validator that cannot decide
+    ends its gate undecided in the same way.
 
     ``prompt_assembly`` selects how node prompts are assembled (see
     ``PROMPT_ASSEMBLY_VERSION``); version 1 reproduces the earlier placement
@@ -555,6 +557,16 @@ class ExecutorBase:
             # Only an exact True passes; a truthy "false" from a custom verifier fails.
             if verdict.passed is True:
                 node.metadata["verification_receipt"] = dict(receipt, state="consumed", passed=True, reason=verdict.reason)
+                self.notify_control_update(node)
+                return None
+            if (getattr(self._verifier, "_invalid_ends_gate", False) is True
+                    and getattr(verdict, "invalid", False) is True):
+                # A registered validator that could not decide ends the gate
+                # undecided, as under a strict policy: no regeneration is spent.
+                node.metadata["verification_receipt"] = dict(
+                    receipt, state="consumed", outcome="error", passed=False,
+                    reason=rejection_reason(verdict),
+                )
                 self.notify_control_update(node)
                 return None
         intent = {

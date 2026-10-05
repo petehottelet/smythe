@@ -53,6 +53,15 @@ class Raises:
         raise RuntimeError("validator bug")
 
 
+class Undecided:
+    """A validator that reports it could not decide."""
+
+    identity = ValidatorIdentity.for_config("undecided", "1")
+
+    def validate(self, subject):
+        return ValidationReport("output", outcome="error", validator=self.identity)
+
+
 def contains(needle: str = "needle", **options) -> LocalOnly:
     return LocalOnly(lambda: Contains(needle, **options), options.get("name", "contains"),
                      options.get("version", "1"), role="validator")
@@ -115,17 +124,39 @@ def test_registered_validator_judges_durable_gates_from_the_exact_target_text(st
     assert store.audit(result.execution_id)["ok"]
 
 
-def test_a_validator_that_cannot_decide_fails_its_gate(store, replies):
-    script, _ = replies
-    script["Draft"] = ["first", "second"]
-    declared = LocalOnly(Raises, "raises", "1", role="validator")
-    result = durable(store, verifier=declared).execute(gated())
+UNDECIDED = {
+    "raises": (Raises, "gate validator 'raises' raised RuntimeError"),
+    "error-report": (Undecided, "gate validator 'undecided' could not decide"),
+}
 
-    # The verdict fails closed, so the gate regenerates within its allowance.
-    assert result.graph.nodes[1].metadata["regenerations_used"] == 1
-    assert result.output == "second"
-    span = next(item for item in result.trace if item["status"] == "regeneration")
-    assert span["label"] == "gate validator 'raises' raised RuntimeError"
+
+@pytest.mark.parametrize("policy", [None, "strict"])
+@pytest.mark.parametrize("kind", sorted(UNDECIDED))
+def test_a_validator_that_cannot_decide_ends_its_gate_without_regeneration(store, replies,
+                                                                           kind, policy):
+    script, calls = replies
+    script["Draft"] = ["first", "second"]
+    factory, reason = UNDECIDED[kind]
+    declared = LocalOnly(factory, factory.identity.name, "1", role="validator")
+    result = durable(store, verifier=declared,
+                     acceptance=strict() if policy else None).execute(gated())
+
+    # The gate ends without a verdict: no regeneration, no second judge call.
+    assert calls == ["Draft", "Judge"]
+    draft, judge = result.graph.nodes
+    assert judge.metadata.get("regenerations_used", 0) == 0
+    assert draft.metadata.get("execution_generation", 0) == 0
+    receipt = judge.metadata["verification_receipt"]
+    assert receipt["state"] == "consumed" and receipt["outcome"] == "error"
+    assert receipt["passed"] is False and receipt["reason"] == reason
+    assert not any(span["status"] == "regeneration" for span in result.trace)
+    if policy:
+        assert result.acceptance.decision is AcceptanceDecision.INDETERMINATE
+        assert (result.output, result.rejected_output) == ("", "first")
+        assert any(reason in item for item in result.acceptance.reasons)
+    else:
+        assert (result.acceptance, result.output) == (None, "first")
+    assert store.audit(result.execution_id)["ok"]
 
 
 def test_a_changed_validator_configuration_or_version_refuses_resume_before_any_call(store, replies):

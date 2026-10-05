@@ -151,8 +151,14 @@ class _ValidatorVerifier(Verifier):
 
     A ``passed`` report passes and a ``rejected`` one fails. A validator that
     raises, returns anything but its own report or reports ``error``, and a
-    target without text, give a failing verdict marked ``invalid``.
+    target without text, give a failing verdict marked ``invalid``, which
+    ends the gate without a verdict, with or without a strict policy.
     """
+
+    # The executor ends a gate whose verdict is marked invalid instead of
+    # regenerating: a validator that could not decide never spends a
+    # regeneration or buys another judge call.
+    _invalid_ends_gate = True
 
     def __init__(self, validator):
         self.validator, self.identity = validator, validator.identity

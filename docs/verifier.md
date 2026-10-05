@@ -274,9 +274,12 @@ builds a fresh validator for each run; its `ValidatorIdentity` must have the
 declared name and version. Each gate then passes when the validator's report
 on the exact text of the node it judges is `passed`, and fails with the
 report's hard findings when it is `rejected`. A validator that raises, returns
-anything but its own `ValidationReport` or reports `error` fails the gate with
-a verdict marked `invalid`. The gate node still runs and makes its provider
-call; only the verdict comes from the validator.
+anything but its own `ValidationReport` or reports `error` could not decide:
+the gate ends at once without a verdict, its receipt consumed with `outcome`
+`error`, so it spends no regeneration and buys no further judge call, with or
+without a strict policy. The run continues with the judged output, which a
+strict policy decides `on_invalid`. The gate node still runs and makes its
+provider call; only the verdict comes from the validator.
 
 The declaration refuses a `Provider`, a coroutine function or an awaitable as
 the factory, and refuses what the factory builds when it is a provider, an

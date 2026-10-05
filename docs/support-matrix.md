@@ -260,6 +260,7 @@ Tests:
   `tests/test_workflow_acceptance.py::test_durable_runs_refuse_unregistered_verifier_code_before_any_call`.
 - Gate validators: `tests/test_workflow_acceptance.py::test_registered_validator_judges_durable_gates_from_the_exact_target_text`,
   `tests/test_workflow_acceptance.py::test_a_changed_validator_configuration_or_version_refuses_resume_before_any_call`,
+  `tests/test_workflow_acceptance.py::test_a_validator_that_cannot_decide_ends_its_gate_without_regeneration`,
   `tests/test_workflow_binding.py::test_local_only_validator_refuses_a_provider_coroutine_or_awaitable_factory`,
   `tests/test_workflow_binding.py::test_local_only_validator_refuses_what_its_factory_builds`.
 - Strict acceptance: `tests/test_workflow_acceptance.py::test_strict_durable_run_decides_on_the_delivered_output`,
