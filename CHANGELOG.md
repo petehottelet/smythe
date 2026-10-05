@@ -471,9 +471,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   adjustment during an attempt no longer distorts a span's `duration_ms` or
   `PlannerMemory`'s summed node time. `start_time` and `end_time` remain
   wall-clock seconds.
-- The package audit's size limits are 600,000 bytes for the wheel and
+- The package audit's size limits are 800,000 bytes for the wheel and
   2,000,000 bytes for the compressed source archive, up from 400,000 and
-  1,000,000, to fit delivery acceptance, recorded tools and context, and
+  1,000,000, to fit delivery acceptance, recorded tools and context,
+  governed external actions, artifact lineage, the evaluation additions and
   their tests.
 - **Durable workflow journals upgrade to format version 2, which Smythe
   0.9.x and earlier cannot open, even read-only. Back up journals before

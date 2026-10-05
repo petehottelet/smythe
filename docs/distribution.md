@@ -31,11 +31,12 @@ python tools/package_smoke.py --dist dist --work /path/to/fresh/package-check
 ```
 
 Use fresh output directories. The audit enforces an exact file inventory,
-a 2,000,000-byte compressed source limit and a 600,000-byte wheel limit.
+a 2,000,000-byte compressed source limit and an 800,000-byte wheel limit.
 The limits catch accidental inclusions such as generated output or large
-fixtures; delivery acceptance, recorded tools and context, and their tests
-raised them from 1,000,000 and 400,000 bytes. Raise a limit only in the same
-change that documents why.
+fixtures. Delivery acceptance, recorded tools and context, governed external
+actions, artifact lineage and the evaluation additions raised them from
+1,000,000 and 400,000 bytes. Raise a limit only in the same change that
+documents why.
 It checks metadata, CLI entry points, release-tag README links and matching
 package bytes. The smoke check compares checkout and source-rebuilt wheels,
 installs into a clean environment, runs an offline graph and CLI, verifies
