@@ -978,8 +978,16 @@ class _ReturnsBool(Verifier):
         return True
 
 
+async def _passes_later():
+    return True
+
+
 @pytest.mark.parametrize("verifier", [
     pytest.param(CallableVerifier(lambda v, t: "PASS"), id="string"),
+    pytest.param(CallableVerifier(lambda v, t: "FAIL"), id="fail-string"),
+    pytest.param(CallableVerifier(lambda v, t: [hard_finding("thin", "too thin")]),
+                 id="findings-list"),
+    pytest.param(CallableVerifier(lambda v, t: _passes_later()), id="unawaited-coroutine"),
     pytest.param(CallableVerifier(lambda v, t: 1), id="int"),
     pytest.param(CallableVerifier(lambda v, t: Verdict(passed="yes")), id="verdict-string"),
     pytest.param(CallableVerifier(lambda v, t: Verdict(passed=True, invalid=True)),
@@ -993,6 +1001,19 @@ def test_a_verdict_that_is_not_a_bool_is_never_accepted(verifier):
     result = _swarm(provider, acceptance=_strict(), verifier=verifier).execute(_gated())
     _not_accepted(result, "indeterminate")
     assert provider.runs == {"draft": 1, "judge": 1}
+
+
+def test_a_gate_report_with_hard_findings_rejects_after_its_regeneration():
+    def report(verifier_node, target):
+        return ValidationReport("output", (hard_finding("thin", "too thin"),))
+
+    provider = Script({"draft": ["## Summary\nv1", "## Summary\nv2"], "judge": ["PASS"]})
+    result = _swarm(provider, acceptance=_strict(),
+                    verifier=CallableVerifier(report)).execute(_gated(max_regenerations=1))
+
+    _not_accepted(result, "rejected")
+    assert result.rejected_output == "## Summary\nv2"
+    assert provider.runs == {"draft": 2, "judge": 2}
 
 
 @pytest.mark.parametrize(("validator", "detail"), [
@@ -1419,6 +1440,43 @@ def test_an_unfinished_strict_run_resumes_under_its_policy():
     assert result.accepted and result.output == "## Summary\nok"
     assert provider.runs == {"draft": 1, "judge": 2}
     assert store.states[result.execution_id]["delivery_acceptance"]["decision"] == "accepted"
+
+
+class _CentPerCall(Script):
+    """A Script whose every answered call costs exactly one cent."""
+
+    async def complete(self, system, prompt, model):
+        result = await super().complete(system, prompt, model)
+        result.cost_usd = 0.01
+        return result
+
+
+def test_a_priced_strict_run_resumed_after_a_crash_keeps_its_charges_and_generations():
+    store = MemoryStore()
+    provider = _CentPerCall({
+        "draft": ["## Summary\nv1", "## Summary\nv2"], "judge": ["FAIL: thin", "PASS"],
+        "final": [RuntimeError("crash before final"), "## Summary\nfinal"],
+    })
+    swarm = _swarm(provider, acceptance=_strict(Forbids()), store=store, max_budget_usd=1.0)
+    with pytest.raises(RuntimeError, match="crash before final"):
+        swarm.execute(_gated(final=True))
+    crashed = deepcopy(store.states[store.only_id()])
+    # Two drafts and two verdicts were answered; the call that raised was not.
+    assert sum(crashed["budget"]["node_costs"].values()) == pytest.approx(0.04)
+
+    result = _swarm(provider, acceptance=_strict(Forbids()), store=store,
+                    max_budget_usd=1.0).resume(store.only_id())
+
+    assert result.accepted and result.output == "## Summary\nfinal"
+    assert result.total_cost_usd == pytest.approx(0.05)
+    assert provider.runs == {"draft": 2, "judge": 2, "final": 2}
+    assert [(s.node_id, s.execution_generation) for s in result.acceptance.sources] == [("final", 1)]
+    # The regeneration and its rejected attempt are kept as the crash left them.
+    before = {node["id"]: node["metadata"] for node in crashed["graph"]["nodes"]}
+    after = {node.id: node.metadata for node in result.graph.nodes}
+    for node_id, key in [("draft", "execution_generation"), ("judge", "regenerations_used"),
+                         ("draft", "rejected_generations")]:
+        assert after[node_id].get(key) == before[node_id].get(key) is not None, (node_id, key)
 
 
 @pytest.mark.parametrize("acceptance", [None, AcceptancePolicy(), _strict(Forbids("OTHER"))],
