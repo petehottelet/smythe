@@ -938,6 +938,16 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   whose bytes no longer match the `sha256` in its record now raises
   `smythe.executor_base.ArtifactIntegrityError` before the call. Records
   without a digest, written before digests were recorded, attach as before.
+- A durable run with context assembly no longer accepts output whose
+  `SourceEvidenceValidator` checks other sources than the run's current
+  source set, such as the sources the run had before
+  `Swarm.refresh_context`, or sources its nodes were never given. Such a
+  validator does not run: its outcome is `error`, the decision follows
+  `on_invalid` (`indeterminate` by default) and the reason names the
+  differing sources. Re-evaluating under a validator built from the run's
+  current sources decides again. `evaluate_delivery` takes a keyword-only
+  `unusable` mapping of validator identities to the reason each cannot
+  check the output. See [source evidence](docs/source-evidence.md#durable-runs).
 
 ## [0.9.1] - 2026-09-29
 

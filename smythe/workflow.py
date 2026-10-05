@@ -1740,6 +1740,43 @@ class WorkflowRuntime:
         await self._operation_result(source_evidence_key(inputs), SOURCE_EVIDENCE_OPERATION,
                                      inputs, read)
 
+    def _unusable_evidence_validators(self):
+        """Why each source evidence validator of the strict policy cannot check this run, by identity.
+
+        Such a validator must check exactly the run's current source set:
+        the same source ids, each with the same version and digest. One that
+        checks other sources, such as the sources of an earlier revision,
+        could accept evidence for sources the run's nodes were never given,
+        so its outcome is ``error`` and the run is never accepted. A run
+        without context assembly records no source set, and its validators
+        check the sources they were given.
+        """
+        if not self._context_version:
+            return {}
+        current = {source.source_id: (source.version, source.sha256)
+                   for source in self.context_sources}
+        unusable = {}
+        for validator, identity in zip(self.acceptance.final_validators,
+                                       self.acceptance.validator_identities):
+            if not isinstance(validator, SourceEvidenceValidator):
+                continue
+            checked = {record.source_id: (record.source_version, record.sha256)
+                       for record in validator.sources}
+            differences = [
+                f"source {source_id!r} is not one of the run's sources" if source_id not in current
+                else f"it lacks the run's source {source_id!r}" if source_id not in checked
+                else f"source {source_id!r} has another version or digest"
+                for source_id in sorted(current.keys() | checked.keys())
+                if current.get(source_id) != checked.get(source_id)
+            ]
+            if differences:
+                unusable[identity] = (
+                    f"final validator {identity.name!r} checks other sources than the run's "
+                    f"current source set (revision {self.context_revision}): "
+                    + "; ".join(differences[:3])
+                )
+        return unusable
+
     def _acceptance_inputs(self, synthesis_key, output_sha256, strategy, sources, used_fallback,
                            sequence=0):
         """Everything a decision binds; its hash keys the acceptance operation."""
@@ -1787,6 +1824,7 @@ class WorkflowRuntime:
             record = evaluate_delivery(
                 self.acceptance, self.graph, output, strategy=strategy, sources=sources,
                 used_fallback=used_fallback, task=self.graph.task,
+                unusable=self._unusable_evidence_validators(),
             )
             return {"delivery_acceptance": record.to_dict()}
 

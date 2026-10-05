@@ -158,6 +158,18 @@ again; the validators, not this record, decide acceptance. Other runs record
 no such operation. The journal format is unchanged: operation kinds are free
 text.
 
+In a run with context assembly, each `SourceEvidenceValidator` must check
+exactly the run's current source set: the same source ids, each with the
+same version and digest. A validator built from other sources, such as the
+sources a run had before [`Swarm.refresh_context`](tasks.md#context-snapshots)
+gave it new ones, could accept evidence for sources the run's nodes were
+never shown, so it does not run: its outcome is `error`, the decision follows
+`on_invalid` (`indeterminate` by default), and the reason names the sources
+that differ. The recipe keeps the policy the run started with, so re-evaluate
+such a run with [`Swarm.reevaluate`](verifier.md#re-evaluation) and a
+validator built from its current sources. A run without context assembly
+records no source set, and its validators check the sources they were given.
+
 ### Inspect evidence
 
 `smythe.evidence.load_source_evidence(store, run_id)` returns the evidence a

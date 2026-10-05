@@ -25,7 +25,7 @@ import hashlib
 import inspect
 # Imported at runtime, not only for type checking, so that
 # typing.get_type_hints() can resolve the dataclass field annotations.
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -759,6 +759,7 @@ def evaluate_delivery(
     sources: Sequence[Node],
     used_fallback: bool = False,
     task: Task | None = None,
+    unusable: Mapping[ValidatorIdentity, str] | None = None,
 ) -> DeliveryAcceptance:
     """Decide delivery acceptance for exactly *output* under a strict *policy*.
 
@@ -767,6 +768,9 @@ def evaluate_delivery(
     ``Synthesizer``), and *sources* are the nodes it came from. Every final
     validator runs, with no provider call, on the UTF-8 bytes of *output*,
     and every gate in *graph* is read from its recorded final verdict.
+    *unusable* maps the identity of a final validator that cannot check this
+    output, such as one configured for other sources than the run's, to why:
+    it does not run, and its outcome is ``error``.
 
     The decision is ``rejected`` when a final validator rejects the output,
     then ``policy.on_exhausted`` when a gate's final verdict fails, then
@@ -793,7 +797,10 @@ def evaluate_delivery(
     invalid: list[str] = []
     results: list[ValidatorResult] = []
     for validator, identity in zip(policy.final_validators, policy.validator_identities):
-        outcome, reason = _final_check(validator, identity, subject)
+        if unusable and identity in unusable:
+            outcome, reason = ValidationOutcome.ERROR, unusable[identity]
+        else:
+            outcome, reason = _final_check(validator, identity, subject)
         results.append(ValidatorResult(identity, outcome))
         if outcome is ValidationOutcome.REJECTED:
             rejected.append(reason)

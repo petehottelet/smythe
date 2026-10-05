@@ -596,6 +596,62 @@ def test_evidence_is_read_once_and_replayed_after_a_crash(store, replies, monkey
     assert operations(store, run_id)[key] == (SOURCE_EVIDENCE_OPERATION, "applied")
 
 
+# A revised audit the run was never given, and an artifact whose evidence cites it.
+REVISED = ContextSource(
+    "renewals-2026", "Audited renewals for 2026 show that 71% of 18,400 customers chose monthly "
+    "billing over annual billing. Revised in October.", version="2026-q3")
+REVISED_EVIDENCE = SourceEvidence(tuple(SourceRecord.from_context_source(source).without_text()
+                                        for source in (MISLEADING, REVISED)), (CLAIM,))
+
+
+def test_evidence_checked_against_sources_the_run_was_not_given_is_never_accepted(store, replies):
+    script, _ = replies
+    script["Write"] = [artifact(KEPT, REVISED_EVIDENCE)]
+    # The validator's sources pass this evidence, but the run's nodes saw the 2026-q2 audit.
+    stale = SourceEvidenceValidator((MISLEADING, REVISED))
+    assert check(artifact(KEPT, REVISED_EVIDENCE), sources=(MISLEADING, REVISED)).passed
+    result = durable(store, stale).execute(single())
+    assert result.acceptance.decision is AcceptanceDecision.INDETERMINATE and not result.accepted
+    assert (result.output, result.rejected_output) == ("", artifact(KEPT, REVISED_EVIDENCE))
+    (outcome,) = result.acceptance.validators
+    assert outcome.validator == stale.identity and outcome.outcome is ValidationOutcome.ERROR
+    reason = result.acceptance.reasons[0]
+    assert "checks other sources than the run's current source set (revision 0)" in reason
+    assert "'renewals-2026'" in reason
+    # The decision is journaled, so resuming the completed run gives it again.
+    assert durable(store, stale).resume(result.execution_id).acceptance == result.acceptance
+
+
+def test_a_run_given_new_sources_needs_a_validator_for_them(store, replies):
+    script, _ = replies
+    script["Write"] = [artifact(KEPT)]
+    planned = durable(store).plan(Task("Write"))
+    run_id = planned.run_ref["run_id"]
+    assert durable(store).refresh_context(run_id, (MISLEADING, REVISED)) == 1
+    # The recipe's validator still checks the sources of revision 0.
+    result = durable(store).resume(run_id)
+    assert result.acceptance.decision is AcceptanceDecision.INDETERMINATE
+    assert "(revision 1)" in result.acceptance.reasons[0]
+    # Re-evaluating under a validator for the run's current sources decides again.
+    current = SourceEvidenceValidator((MISLEADING, REVISED))
+    policy = AcceptancePolicy(mode="strict", final_validators=[current])
+    again = durable(store).reevaluate(run_id, acceptance=policy)
+    assert again.acceptance.decision is AcceptanceDecision.REJECTED
+    assert "source_version_mismatch" in again.acceptance.reasons[0]
+
+
+def test_reevaluating_under_a_validator_for_other_sources_is_never_accepted(store, replies):
+    script, _ = replies
+    script["Write"] = [artifact(KEPT, REVISED_EVIDENCE)]
+    result = durable(store).execute(single())
+    assert result.acceptance.decision is AcceptanceDecision.REJECTED
+    stale = AcceptancePolicy(mode="strict",
+                             final_validators=[SourceEvidenceValidator((MISLEADING, REVISED))])
+    again = durable(store).reevaluate(result.execution_id, acceptance=stale)
+    assert again.acceptance.decision is AcceptanceDecision.INDETERMINATE and not again.accepted
+    assert "checks other sources than the run's current source set" in again.acceptance.reasons[0]
+
+
 def test_a_judge_still_decides_whether_evidence_supports_a_claim(store, replies):
     script, _ = replies
     script["Draft"] = [artifact(KEPT)]
