@@ -1231,21 +1231,26 @@ def test_completed_resume_rechecks_delivered_file_bytes(tmp_path):
     pytest.param({"judge": ["FAIL: thin"]}, {}, "rejected", id="gate-exhausted"),
     pytest.param({"judge": ["FAIL: thin"]}, {"on_exhausted": "needs_review"}, "needs_review",
                  id="gate-exhausted-review"),
-    pytest.param({"judge": ["PASS"]}, {}, "indeterminate", id="all-checks-pass"),
-    pytest.param({"judge": ["PASS"]}, {"on_invalid": "needs_review"}, "needs_review",
-                 id="all-checks-pass-review"),
 ])
-def test_output_from_a_node_that_wrote_files_is_never_accepted(tmp_path, script, settings,
-                                                                decision):
-    # A valid rejection still decides; only when nothing rejects do the
-    # unhashed files make the decision on_invalid.
+def test_a_valid_rejection_decides_output_from_a_node_that_wrote_files(tmp_path, script, settings,
+                                                                     decision):
     provider = Script(script, artifacts={"draft": [Artifact(data=b"\x89PNG", mime_type="image/png")]})
     swarm = Swarm(provider=provider, model="test-model", artifact_dir=tmp_path,
                   checkpoint_store=MemoryStore(), acceptance=_strict(Forbids(), **settings))
     result = swarm.execute(_gated())
 
     _not_accepted(result, decision)
-    assert any("not hashed" in reason for reason in result.acceptance.reasons)
+
+
+def test_hashed_files_of_a_gated_node_are_accepted_with_the_output(tmp_path):
+    provider = Script({"judge": ["PASS"]},
+                      artifacts={"draft": [Artifact(data=b"\x89PNG", mime_type="image/png")]})
+    swarm = Swarm(provider=provider, model="test-model", artifact_dir=tmp_path,
+                  checkpoint_store=MemoryStore(), acceptance=_strict(Forbids()))
+    result = swarm.execute(_gated())
+
+    assert result.accepted
+    assert [artifact.name for artifact in result.acceptance.artifacts] == ["draft_00.png"]
 
 
 def test_trace_records_the_decision_without_new_summary_keys():
