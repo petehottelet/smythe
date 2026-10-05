@@ -554,6 +554,49 @@ def test_corrupted_stored_output_is_not_accepted(tmp_path, replies, change):
     assert calls == sent and Contains.checked == []
 
 
+@pytest.mark.parametrize("change", ["source", "task"])
+def test_completed_resume_rechecks_the_bound_source_generation_and_task(tmp_path, replies, change):
+    path = tmp_path / "bound.db"
+    with SQLiteWorkflowStore(path) as store:
+        first = durable(store, acceptance=strict(Contains())).execute(Task("Write the needle"))
+    assert first.accepted
+    node_id = first.graph.nodes[0].id
+
+    def rewrite(checkpoint):
+        if change == "source":
+            checkpoint["graph"]["nodes"][0]["metadata"]["execution_generation"] = 3
+        else:
+            checkpoint["delivery_acceptance"]["task_sha256"] = "0" * 64
+
+    rewrite_checkpoint(path, first.execution_id, rewrite)
+    _, calls = replies
+    sent, Contains.checked = list(calls), []
+    with SQLiteWorkflowStore(path) as store:
+        result = durable(store, acceptance=strict(Contains())).resume(first.execution_id)
+
+    assert result.acceptance.decision is AcceptanceDecision.INDETERMINATE
+    assert (result.output, result.rejected_output) == ("", first.output)
+    expected = {"source": f"node {node_id!r} no longer holds the generation its record bound",
+                "task": "the saved task does not match the task its record bound"}[change]
+    assert expected in result.acceptance.reasons
+    # The journal holds the decision for the graph and record that were decided, not these.
+    assert "the journal holds no applied decision matching the saved record" in result.acceptance.reasons
+    assert calls == sent and Contains.checked == []
+
+
+def test_completed_resume_refuses_a_checkpoint_without_its_acceptance_block(tmp_path, replies):
+    path = tmp_path / "block.db"
+    with SQLiteWorkflowStore(path) as store:
+        first = durable(store, acceptance=strict(Contains())).execute(Task("Write the needle"))
+    rewrite_checkpoint(path, first.execution_id, lambda state: state.pop("delivery_acceptance"))
+    _, calls = replies
+    sent, Contains.checked = list(calls), []
+    with SQLiteWorkflowStore(path) as store:
+        with pytest.raises(WorkflowStateError, match="no delivery acceptance block"):
+            durable(store, acceptance=strict(Contains())).resume(first.execution_id)
+    assert calls == sent and Contains.checked == []
+
+
 def test_a_legacy_completed_run_has_no_acceptance_record(store, replies):
     result = durable(store).execute(single())
     assert (result.acceptance, result.rejected_output, result.output) == (None, None, "Write done")
