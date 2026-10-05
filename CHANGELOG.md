@@ -436,6 +436,23 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   The cap joins the plan hash only when set and is not part of the holdout
   identity, so changing it never reopens a used holdout; the ledger schema is
   unchanged.
+- `OptimizationRunner.run()` takes `references`, sealed comparison policies
+  such as a predecessor or a simpler alternative, and a `reference_rule`.
+  References skip development and run beside the incumbent and the selected
+  challenger on the same confirmation and holdout seeds, and the challenger is
+  assessed against each. Under `"must_not_be_worse"` a stage also fails when a
+  reference is better on the primary objective; the default `"report"` only
+  records the comparisons. A reference is never promoted, and its holdout
+  trials draw from a finite holdout pool but are not holdout use, so a policy
+  that already used its holdout can still be a baseline. Decisions record
+  `reference_rule` and a `references` list with each comparison and verdict,
+  `OptimizationResult.references` returns them, HTML reports add a table of
+  every arm, and `smythe optimize concurrency --reference N` adds reference
+  concurrencies. References join the plan hash only when declared, so two-arm
+  plans keep their hashes; the ledger schema, contract hash and holdout
+  identity are unchanged. Earlier releases count reference holdout trials as
+  holdout use and refuse to export a report for a decision with references.
+  See [reference arms](docs/optimize.md#reference-arms).
 
 ### Changed
 

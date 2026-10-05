@@ -83,8 +83,10 @@ one gate and a value rule for every mutable field, so empty gate maps and
 unbounded mutations cannot pass vacuously. It runs the declared number of
 trials, bounds active evaluator series with `max_parallel_candidates`, and
 applies `max_wall_seconds` to the campaign and each remaining evaluator call.
-Confirmation and holdout compare only the incumbent and the one selected
-challenger, limiting both cost and repeated testing.
+Confirmation and holdout compare the incumbent with only the one selected
+challenger, limiting both cost and repeated testing; declared
+[reference arms](#reference-arms) join those comparisons but are never
+promoted.
 
 Independent implementation ceilings bound otherwise-valid contracts to 1,024
 candidates, 256 parallel candidate series, 10,000 repetitions per split, and
@@ -107,7 +109,7 @@ The runner keeps search data separate from promotion evidence:
 | Split | Purpose | Seed rule | Decision use |
 |---|---|---|---|
 | Development | Screen or rank candidate ideas cheaply | Deterministic seeds may be reused while searching | Never sufficient for promotion |
-| Confirmation | Re-evaluate the selected candidate against the incumbent | Candidate and incumbent use the same ordered, unique seeds | Candidate must pass the complete promotion policy |
+| Confirmation | Re-evaluate the selected candidate against the incumbent and any references | Candidate, incumbent, and references use the same ordered, unique seeds | Candidate must pass the complete promotion policy |
 | Holdout | Test the confirmed candidate on evidence not used for selection | Derive a separate paired seed set from secret material created only after the candidate plan is frozen | Candidate must pass again before promotion |
 
 `compare_metric()` requires at least three equal-length baseline/candidate
@@ -204,7 +206,8 @@ different holdout evaluation and draws a fresh holdout; for the CLI, that
 means `--work-items`, `--provider-capacity`, `--base-latency-ms`,
 `--max-p95-latency-ms`, `--max-error-rate`, `--holdout-repetitions`,
 `--confidence`, or `--min-improvement`. The campaign that used the holdout can
-still be resumed and replayed. Incumbent holdout trials do not count as use.
+still be resumed and replayed. Incumbent and [reference](#reference-arms)
+holdout trials do not count as use.
 
 Each use's identity is recomputed from its campaign's stored contract and its
 holdout trial's evaluator hash, so holdout trials recorded by 0.8.0, which
@@ -235,6 +238,67 @@ is tested on confirmation and holdout at the contract confidence. Screening
 many challengers therefore favors one that was lucky in development, and the
 independent one-time holdout is an important guard against that selection
 bias.
+
+### Reference arms
+
+One campaign can compare its challenger with more than one baseline. Pass
+sealed comparison policies, such as the policy the incumbent replaced or a
+simpler alternative, as `references`:
+
+```python
+result = await runner.run(
+    incumbent,
+    challengers,
+    references=(predecessor, simpler),
+    reference_rule="must_not_be_worse",
+)
+```
+
+References are sealed in the candidate inventory after the challengers, so a
+reference may name a challenger as its parent but not the reverse. Each must
+differ from the incumbent and every challenger by candidate ID and policy
+hash. References take no part in development or selection. Each runs beside
+the incumbent and the selected challenger on the same confirmation seeds and,
+when confirmation passes, the same holdout seeds and tasks, under its own
+`reference.plan_<plan hash>` trial phase. The challenger is then assessed
+against each reference exactly as against the incumbent, with the reference as
+the baseline, so each reference's verdict reads from the challenger's side:
+`worse` means the reference is better on the primary objective.
+
+`reference_rule` decides what those comparisons do:
+
+| Rule | Effect |
+|---|---|
+| `report` (default) | Records each comparison; promotion depends on the incumbent comparison alone |
+| `must_not_be_worse` | A stage also fails when any reference's verdict there is `worse`; a confirmation that fails this way never reaches the holdout |
+
+Each comparison uses the contract confidence, with no multiple-comparison
+correction across references.
+
+A reference is never promoted and is never the decision candidate. Its holdout
+trials are therefore not holdout use: a policy that already used its holdout,
+such as an earlier challenger, can still be a reference, and serving as one
+uses nothing. Reference holdout trials still draw from the holdout pool and
+count toward [`max_holdout_draws`](#finite-task-pools), so a finite held-out
+pack cannot be re-drawn through references.
+
+Each reference adds one confirmation series and one holdout series to the
+plan's required trials and one candidate to `max_candidates`. The reference IDs
+and rule join the plan hash only when references are declared, so two-arm
+plans keep their hashes. The decision records `reference_rule` and a
+`references` list giving each reference's ID, policy hash, confirmation and
+holdout assessments, and final verdict; a campaign that stops in development
+records only the IDs and policy hashes. `OptimizationResult.references`
+returns the same entries. The ledger derives references from the sealed
+inventory, the trial phases, and the decision: declared references must be
+the last sealed candidates, in order, with trials only in the paired splits
+under the reference phase, and no challenger may use that phase.
+
+The ledger schema, contract hash, and holdout identity are unchanged. Earlier
+releases count reference holdout trials as holdout use, which is stricter, and
+refuse a decision with references when they validate it, as
+`smythe optimize inspect --out` does; export reports for such campaigns with a
+release that supports reference arms.
 
 ## Deterministic offline concurrency campaign
 
@@ -290,15 +354,18 @@ Useful controls include `--candidate-concurrency`, `--work-items`,
 `--max-error-rate`, the three `--*-repetitions` options,
 `--max-parallel-candidates`, `--max-wall-seconds`, `--confidence`,
 `--min-improvement`, and `--bootstrap-resamples` (descriptive interval only).
-Use `--ledger PATH` to
+`--reference N[,N...]` adds [reference arms](#reference-arms) at those
+concurrencies under the `report` rule; a reference cannot repeat a
+challenger's value or the incumbent's `1`. Use `--ledger PATH` to
 override the default `~/.smythe/optimize.sqlite3`. The CLI defaults to
 `--ledger-durability normal`; choose `full` when the evidence must also survive
 host power loss rather than only a process crash.
 
 Output includes the contract, evaluator, optimization-plan, and public holdout
 commitment identities; the campaign's three-way `verdict` beside `promoted`;
-development and paired statistical evidence; the selected candidate (or null
-when none is development-viable); and a ledger snapshot. A completed campaign
+development and paired statistical evidence, including `evidence.references`
+when the campaign has references; the selected candidate (or null when none is
+development-viable); and a ledger snapshot. A completed campaign
 exits with code 0 whatever its verdict. The secret holdout material is never
 emitted. `recommended_patch` appears only when confirmation and holdout both
 promote the candidate. Rejection never emits a patch to apply.
@@ -306,7 +373,8 @@ promote the candidate. Rejection never emits a patch to apply.
 The optimization plan hash binds the contract, incumbent, ordered challenger
 set, policy hashes, evaluator hash, runner version, promotion method,
 descriptive bootstrap configuration, ledger durability, and required trial
-count, plus any declared [task pools and holdout draw cap](#finite-task-pools).
+count, plus any declared [task pools and holdout draw cap](#finite-task-pools)
+and [reference arms](#reference-arms).
 When `--campaign-id` is omitted, the durable campaign identity is
 derived from that full plan. Repeating the same command reuses completed
 trials; changing a candidate, contract, evaluator, bootstrap, or durability
@@ -391,6 +459,14 @@ labeled as derived, or "Not recorded" when either is missing. A recorded verdict
 that is not one of the three values, or that disagrees with its saved interval
 or with the decision's final stage, stops export.
 
+A decision with [reference arms](#reference-arms) adds a References section:
+its rule, a table that compares the incumbent and each reference with the
+decision candidate on each paired stage (arm and candidate means of the
+primary objective, the saved interval, and the verdict), and each reference's
+final verdict. The policies list marks each reference. A reference that is not
+a recorded candidate, or whose verdict disagrees with its saved interval or
+final stage, stops export.
+
 Export does not rerun an evaluator, recompute statistics, rank candidates, or
 change a decision. Every retained development score is shown, and the
 challenger selected for confirmation is marked. Decisions recorded by earlier
@@ -448,8 +524,9 @@ campaign's monotonic deadline and, when the runner declares
 exactly the contract's metrics and gate inventory, signed-63-bit integer
 micro-USD cost, and optional SHA-256 artifact hashes.
 `OptimizationResult` carries the plan identity, development scores,
-confirmation and holdout assessments, the campaign's three-way `verdict`,
-decision and trial keys, and ledger snapshot. Each `PromotionAssessment` has its
+confirmation and holdout assessments, the campaign's three-way `verdict`, any
+[reference](#reference-arms) comparisons under `references`, decision and
+trial keys, and ledger snapshot. Each `PromotionAssessment` has its
 own `verdict`.
 
 ### Evaluator manifests
@@ -547,11 +624,12 @@ runner = OptimizationRunner(
 )
 ```
 
-A campaign draws when it prepares its first holdout trial, for the incumbent
-or a challenger, and every campaign that did so under the identity counts,
-including campaigns run without a cap. Once the cap is reached, a new
-campaign under the identity is refused with `HoldoutAlreadyUsedError` before
-it is created, even for a policy that never used the holdout; a campaign that
+A campaign draws when it prepares its first holdout trial, for the incumbent,
+a challenger, or a reference, and every campaign that did so under the
+identity counts, including campaigns run without a cap. Once the cap is
+reached, a new campaign under the identity is refused with
+`HoldoutAlreadyUsedError` before it is created, even for a policy that never
+used the holdout; a campaign that
 already drew can still resume and replay. The ledger repeats the check in the
 write transaction that records a campaign's first holdout trial, so two
 campaigns racing for the last draw cannot both take it, and
@@ -663,9 +741,10 @@ Snapshots separate confirmed spend, live reservations, and unknown exposure.
 Promotion decisions are append-only records with a reason, non-empty completed
 trial evidence, and a JSON-safe assessment payload. The ledger permits exactly
 one terminal decision per campaign (an exact replay is idempotent), verifies
-that development evidence covers the complete sealed inventory, and requires
-the selected challenger to have the exact paired confirmation and, when
-confirmation passes, holdout evidence prescribed by the contract. Decision
+that development evidence covers the complete sealed inventory except declared
+references, and requires the incumbent, the selected challenger, and each
+reference to have the exact paired confirmation and, when confirmation passes,
+holdout evidence prescribed by the contract. Decision
 construction detaches and recursively freezes the assessment, then caches the
 exact canonical bytes and identifier written to the ledger so later caller
 mutation cannot change its evidence identity. Resume revalidates that decision

@@ -494,6 +494,45 @@ def _assessment(value: object, stage: str, objectives: dict[str, dict]) -> str:
     return ''.join(parts)
 
 
+def _references(assessment: dict, incumbent: object, recorded: list) -> str:
+    """Tabulate each saved arm against the decision candidate, stage by stage."""
+    references = _rows(assessment['references'], 'References')
+    if any(item.get('candidate_id') not in recorded for item in references):
+        raise ValueError('Reference is not a recorded candidate')
+    rule = assessment.get('reference_rule')
+    effect = (' A stage fails when any reference is better on the primary objective (verdict worse).'
+              if rule == 'must_not_be_worse' else
+              ' References are recorded and do not change promotion.' if rule == 'report' else '')
+    parts = ['<h3>References</h3>', f'<p>Reference rule: {_code(rule)}.{effect}</p>']
+    rows = []
+    for identifier, role, saved in [(incumbent, 'Incumbent', assessment),
+                                    *((item['candidate_id'], 'Reference', item) for item in references)]:
+        for stage in ('confirmation', 'holdout'):
+            if saved.get(stage) is None:
+                continue
+            item = _object(saved[stage], f'{role} {stage}')
+            primary, verdict = _comparison(item.get('primary')), _verdict(item)
+            values = ['Not recorded'] * 3 if primary is None else [
+                _number(primary['baseline_mean']), _number(primary['candidate_mean']),
+                _number(primary['confidence_interval'][0]) + ' to ' + _number(primary['confidence_interval'][1])]
+            rows.append([_code(identifier), role, stage.title(), *values, 'Not recorded' if verdict is None
+                         else _text(verdict[0]) + (' (derived)' if verdict[1] else '')])
+    if rows:
+        parts.append('<p class="note">Each row compares one arm with the decision candidate on the same seeds, '
+                     'on the primary objective in recorded metric units; positive improvement means the '
+                     'candidate is better.</p>')
+        parts.append(_table('Saved comparisons with the decision candidate',
+                            ['Arm', 'Role', 'Stage', 'Arm mean', 'Candidate mean', 'Improvement interval',
+                             'Verdict'], rows))
+    else:
+        parts.append('<p>References were not compared: the campaign stopped in development.</p>')
+    for item in references:
+        line = _decision_verdict(item)
+        if line:
+            parts.append(f'<h4>Reference {_code(item["candidate_id"])}</h4>{line}')
+    return ''.join(parts)
+
+
 def render_optimization_report(payload: dict) -> str:
     """Render the hash-bound v1 payload as inert standalone HTML.
 
@@ -594,6 +633,7 @@ def render_optimization_report(payload: dict) -> str:
              '<section aria-labelledby="comparisons"><h2 id="comparisons">Saved comparisons</h2>',
              '<p>These are retained evaluator observations and decision results. Statistics are not rerun, '
              'and the report does not establish live-provider performance or statistical calibration.</p>']
+    references: set[str] = set()
     if decision is None:
         parts.append('<p>No decision assessment is available.</p>')
     else:
@@ -601,6 +641,9 @@ def render_optimization_report(payload: dict) -> str:
         parts.append(_development(assessment))
         parts.append(_assessment(assessment.get('confirmation'), 'Confirmation', objectives))
         parts.append(_assessment(assessment.get('holdout'), 'Holdout', objectives))
+        if 'references' in assessment:
+            parts.append(_references(assessment, campaign.get('incumbent_candidate_id'), order))
+            references = {item['candidate_id'] for item in assessment['references']}
     parts.append('</section><section aria-labelledby="policies"><h2 id="policies">Candidate policies</h2>'
                  '<p>Recorded inventory order is preserved. This is not a new performance ranking.</p>')
     for row in candidates:
@@ -611,6 +654,8 @@ def render_optimization_report(payload: dict) -> str:
             roles.append('Incumbent')
         if decision and identifier == decision.get('candidate_id'):
             roles.append('Decision candidate')
+        if identifier in references:
+            roles.append('Reference')
         parts.append(f'<h3>{_code(identifier)}</h3><p class="state">{_text(" · ".join(roles) or "Recorded candidate")}</p>')
         parts.append(f'<p>{_text(candidate.get("hypothesis"))}</p>')
         parts.append(_definitions([('Parent', _code(candidate.get('parent'))),

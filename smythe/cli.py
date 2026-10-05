@@ -290,6 +290,17 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="N[,N...]",
         help="challenger concurrency (repeatable or comma-separated; default: 2,4,8,12,16)",
     )
+    concurrency.add_argument(
+        "--reference",
+        action="append",
+        default=None,
+        metavar="N[,N...]",
+        help=(
+            "reference concurrency compared with the selected challenger on "
+            "confirmation and holdout seeds and never promoted (repeatable or "
+            "comma-separated)"
+        ),
+    )
     concurrency.add_argument("--work-items", type=int, default=250)
     concurrency.add_argument("--provider-capacity", type=int, default=8)
     concurrency.add_argument("--base-latency-ms", type=float, default=120.0)
@@ -350,7 +361,10 @@ def _candidate_concurrencies(
     values: Sequence[str] | None,
     *,
     maximum_value: int = MAX_OPTIMIZE_CONCURRENCY,
+    role: str = "candidate",
 ) -> tuple[int, ...]:
+    if values is None and role == "reference":
+        return ()
     raw_values = ("2,4,8,12,16",) if values is None else tuple(values)
     parsed: list[int] = []
     seen: set[int] = set()
@@ -358,31 +372,30 @@ def _candidate_concurrencies(
         for token in raw_value.split(","):
             item = token.strip()
             if not item:
-                raise ValueError("candidate concurrency contains an empty value")
+                raise ValueError(f"{role} concurrency contains an empty value")
             try:
                 value = int(item)
             except ValueError as exc:
                 raise ValueError(
-                    f"candidate concurrency must be an integer, got {item!r}"
+                    f"{role} concurrency must be an integer, got {item!r}"
                 ) from exc
             if value < 1:
-                raise ValueError("candidate concurrency must be positive")
+                raise ValueError(f"{role} concurrency must be positive")
             if value == 1:
-                raise ValueError("candidate concurrency 1 is reserved for the incumbent")
+                raise ValueError(f"{role} concurrency 1 is reserved for the incumbent")
             if value > maximum_value:
                 raise ValueError(
-                    f"candidate concurrency must not exceed {maximum_value}"
+                    f"{role} concurrency must not exceed {maximum_value}"
                 )
             if value in seen:
-                raise ValueError(f"duplicate candidate concurrency: {value}")
+                raise ValueError(f"duplicate {role} concurrency: {value}")
             seen.add(value)
             parsed.append(value)
             if len(parsed) > MAX_OPTIMIZE_CANDIDATES:
-                raise ValueError(
-                    f"at most {MAX_OPTIMIZE_CANDIDATES} challenger candidates are allowed"
-                )
+                kind = "challenger candidates" if role == "candidate" else "references"
+                raise ValueError(f"at most {MAX_OPTIMIZE_CANDIDATES} {kind} are allowed")
     if not parsed:
-        raise ValueError("at least one candidate concurrency is required")
+        raise ValueError(f"at least one {role} concurrency is required")
     return tuple(parsed)
 
 
@@ -413,7 +426,15 @@ def _probability(value: float, name: str, *, confidence: bool = False) -> float:
 
 def _concurrency_campaign(
     args: argparse.Namespace,
-) -> tuple[ExperimentContract, Candidate, tuple[Candidate, ...], ConcurrencyScenario]:
+) -> tuple[
+    ExperimentContract,
+    Candidate,
+    tuple[Candidate, ...],
+    ConcurrencyScenario,
+    tuple[Candidate, ...],
+]:
+    """Build the contract, incumbent, challengers, scenario and references."""
+
     work_items = _positive_int(
         args.work_items,
         "work-items",
@@ -423,6 +444,14 @@ def _concurrency_campaign(
         args.candidate_concurrency,
         maximum_value=min(MAX_OPTIMIZE_CONCURRENCY, work_items),
     )
+    reference_values = _candidate_concurrencies(
+        args.reference,
+        maximum_value=min(MAX_OPTIMIZE_CONCURRENCY, work_items),
+        role="reference",
+    )
+    shared = sorted(set(reference_values) & set(challenger_values))
+    if shared:
+        raise ValueError(f"reference concurrency {shared[0]} is also a challenger")
     scenario = ConcurrencyScenario(
         work_items=work_items,
         provider_capacity=_positive_int(
@@ -458,7 +487,7 @@ def _concurrency_campaign(
     )
     if args.min_improvement < 0:
         raise ValueError("min-improvement must be non-negative")
-    max_candidates = 1 + len(challenger_values)
+    max_candidates = 1 + len(challenger_values) + len(reference_values)
     max_parallel = _positive_int(
         args.max_parallel_candidates,
         "max-parallel-candidates",
@@ -471,12 +500,16 @@ def _concurrency_campaign(
     )
     if max_parallel > max_candidates:
         raise ValueError(
-            "max-parallel-candidates cannot exceed the incumbent plus challengers"
+            "max-parallel-candidates cannot exceed the incumbent plus challengers "
+            "and references"
         )
 
-    # Every policy receives development evidence. Only the selected challenger
-    # and incumbent advance, so two policies consume each later paired split.
-    max_trials = max_candidates * development + 2 * (confirmation + holdout)
+    # The incumbent and every challenger receive development evidence. Only
+    # the selected challenger and the incumbent advance, beside each
+    # reference, so each later paired split runs 2 + references arms.
+    max_trials = (1 + len(challenger_values)) * development + (
+        2 + len(reference_values)
+    ) * (confirmation + holdout)
     simulated_operations = max_trials * scenario.work_items
     if simulated_operations > MAX_OPTIMIZE_SIMULATED_OPERATIONS:
         raise ValueError(
@@ -543,9 +576,18 @@ def _concurrency_campaign(
         )
         for value in challenger_values
     )
+    references = tuple(
+        Candidate(
+            contract=contract,
+            policy={"max_concurrency": value},
+            hypothesis=f"Concurrency {value} is a reference for the selected challenger",
+            parent=incumbent,
+        )
+        for value in reference_values
+    )
     # Validation above is deliberately eager; this keeps bad CLI input from
     # creating a durable campaign before the runner starts.
-    return contract, incumbent, challengers, scenario
+    return contract, incumbent, challengers, scenario, references
 
 
 def _plan(path: str) -> tuple[Any, Path]:
@@ -872,7 +914,7 @@ async def _run_optimize_concurrency(args: argparse.Namespace) -> dict[str, Any]:
     # of the optional optimization surface during rolling upgrades.
     from smythe.optimize.engine import OptimizationRunner, TrialOutcome
 
-    contract, incumbent, challengers, scenario = _concurrency_campaign(args)
+    contract, incumbent, challengers, scenario, references = _concurrency_campaign(args)
 
     async def evaluate(context: Any) -> Any:
         simulated = await asyncio.to_thread(
@@ -914,7 +956,7 @@ async def _run_optimize_concurrency(args: argparse.Namespace) -> dict[str, Any]:
             bootstrap_resamples=args.bootstrap_resamples,
             campaign_id=args.campaign_id,
         )
-        result = await runner.run(incumbent, challengers)
+        result = await runner.run(incumbent, challengers, references=references)
 
     candidates_by_id = {
         candidate.candidate_id: candidate

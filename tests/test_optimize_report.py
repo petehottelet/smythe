@@ -490,6 +490,77 @@ def test_development_decisions_have_no_verdict():
     assert 'selected for confirmation' not in visible(output)
 
 
+def reference_payload(rule='must_not_be_worse'):
+    data = verdict_payload()
+    snapshot = data['ledger_snapshot']
+    snapshot['candidates'].append({'candidate_id': 'reference', 'policy_hash': 'sha256:' + '8' * 64,
+                                   'candidate': {'policy': {'concurrency': 3},
+                                                 'hypothesis': 'Synthetic reference policy',
+                                                 'parent': 'incumbent'}, 'created_at_ns': 0})
+    snapshot['candidate_count'] = 3
+    snapshot['campaign']['ordered_candidate_ids'].append('reference')
+    worse = paired_t_comparison()
+    worse.update(baseline_mean=15.5, candidate_mean=13.25, mean_improvement=-2.25,
+                 confidence_interval=[-3.0, -0.5], lower_confidence_bound=-3.0)
+    stages = {}
+    for stage in ('confirmation', 'holdout'):
+        saved = deepcopy(snapshot['decisions'][0]['assessment'][stage])
+        saved.update(primary=deepcopy(worse), verdict='worse', promote=False)
+        stages[stage] = saved
+    snapshot['decisions'][0]['assessment'].update(reference_rule=rule, references=[
+        {'candidate_id': 'reference', 'policy_hash': 'sha256:' + '8' * 64, **stages, 'verdict': 'worse'}])
+    return data
+
+
+def test_multi_arm_decisions_tabulate_every_arm_against_the_decision_candidate():
+    output = render_optimization_report(bind(reference_payload()))
+    text = stage_text(output, 'References')
+    assert 'must_not_be_worse' in text
+    table = output.split('<h3>References</h3>', 1)[1].split('</table>', 1)[0]
+    rows = re.findall(r'<tr role="row">(.*?)</tr>', table)[1:]
+    cells = [[visible(cell) for cell in re.findall(r'<(?:th|td) [^>]*>(.*?)</(?:th|td)>', row)]
+             for row in rows]
+    assert [row[:3] for row in cells] == [
+        ['incumbent', 'Incumbent', 'Confirmation'], ['incumbent', 'Incumbent', 'Holdout'],
+        ['reference', 'Reference', 'Confirmation'], ['reference', 'Reference', 'Holdout']]
+    assert [row[-1] for row in cells] == ['improved', 'improved', 'worse', 'worse']
+    assert cells[2][3:6] == ['15.5', '13.25', '-3.0 to -0.5']
+    assert 'Reference referenceVerdict: worse' in text
+    policies = visible(output.split('<h2 id="policies">', 1)[1].split('<h2 id="trials">', 1)[0])
+    assert 'Reference' in policies and 'Decision candidate' in policies
+    # The two-arm sections are unchanged.
+    assert output.count('<svg ') == 4
+    assert 'References' not in visible(render_optimization_report(bind(verdict_payload())))
+
+
+def test_multi_arm_report_shows_references_a_development_decision_never_compared():
+    data = reference_payload('report')
+    record = data['ledger_snapshot']['decisions'][0]
+    record.update(promoted=False)
+    record['assessment'] = {'stage': 'development', 'development_scores': [development()],
+                            'reference_rule': 'report',
+                            'references': [{'candidate_id': 'reference',
+                                            'policy_hash': 'sha256:' + '8' * 64}]}
+    text = stage_text(render_optimization_report(bind(data)), 'References')
+    assert 'report' in text and 'not compared' in text
+
+
+@pytest.mark.parametrize('change', ['verdict', 'final', 'rows', 'unknown'])
+def test_inconsistent_reference_evidence_is_refused(change):
+    data = reference_payload()
+    reference = data['ledger_snapshot']['decisions'][0]['assessment']['references'][0]
+    if change == 'verdict':
+        reference['holdout']['verdict'] = 'improved'
+    elif change == 'final':
+        reference['verdict'] = 'improved'
+    elif change == 'rows':
+        data['ledger_snapshot']['decisions'][0]['assessment']['references'] = {'reference': True}
+    else:
+        reference['candidate_id'] = 'missing'
+    with pytest.raises(ValueError):
+        render_optimization_report(bind(data))
+
+
 def test_direction_labels_are_html_text_outside_scaled_svg_for_each_saved_interval():
     output = render_optimization_report(payload())
     svgs = re.findall(r'<svg .*?</svg>', output)

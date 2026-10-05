@@ -1283,3 +1283,366 @@ async def test_task_pools_and_draw_cap_leave_existing_holdout_uses_unchanged(tmp
             assert "finite holdout task pool" not in str(refused.value)
         assert ledger.holdout_uses(identity) == uses
         assert ledger.holdout_draw_campaigns(identity) == (first.campaign_id,)
+
+
+def _reference_arms(
+    contract: ExperimentContract, incumbent: Candidate, *strengths: int
+) -> tuple[Candidate, ...]:
+    return tuple(
+        Candidate(
+            contract=contract,
+            policy={"strength": strength},
+            hypothesis=f"a simpler reference with strength {strength}",
+            parent=incumbent.candidate_id,
+        )
+        for strength in strengths
+    )
+
+
+def _arm_evaluator(quality: Mapping[int, object], calls: list[TrialContext] | None = None):
+    """Score each policy by strength; a mapping value scores by split."""
+
+    async def evaluate(context: TrialContext) -> TrialOutcome:
+        if calls is not None:
+            calls.append(context)
+        value = quality[context.candidate.policy["strength"]]
+        if isinstance(value, Mapping):
+            value = value[context.split]
+        return TrialOutcome(
+            metrics={"quality": value, "risk": 1.0},
+            gates={"safe": True},
+            actual_cost_microusd=1,
+        )
+
+    return evaluate
+
+
+# Two development trials, then four arms on three confirmation and three
+# holdout seeds each.
+_THREE_ARM_LIMITS = {"max_candidates": 4, "max_trials": 26, "max_budget_microusd": 260}
+
+
+@pytest.mark.asyncio
+async def test_three_arm_campaign_compares_the_challenger_with_every_reference(tmp_path):
+    contract = _contract(**_THREE_ARM_LIMITS)
+    incumbent, challenger = _candidates(contract)
+    simpler, stronger = _reference_arms(contract, incumbent, 3, 4)
+    calls: list[TrialContext] = []
+    evaluate = _arm_evaluator({1: 0.0, 2: 10.0, 3: 4.0, 4: 20.0}, calls)
+    pools = {"confirmation": 3, "holdout": 3}
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+
+    with ExperimentLedger(tmp_path / "references.sqlite3", durability="normal") as ledger:
+        result = await _runner(contract, ledger, evaluate, task_pools=pools).run(
+            incumbent, (challenger,), references=(simpler, stronger)
+        )
+        # The default rule reports references without changing promotion.
+        assert result.promoted is True
+        assert result.verdict == "improved"
+        assert [item["candidate_id"] for item in result.references] == [
+            simpler.candidate_id,
+            stronger.candidate_id,
+        ]
+        assert [item["verdict"] for item in result.references] == ["improved", "worse"]
+        for item in result.references:
+            assert item["confirmation"]["primary"]["sample_count"] == 3
+            assert item["holdout"]["primary"]["sample_count"] == 3
+            assert "reference.safe" in item["holdout"]["gates"]
+
+        snapshot = ledger.snapshot(result.campaign_id)
+        assert snapshot["campaign"]["ordered_candidate_ids"] == [
+            incumbent.candidate_id,
+            challenger.candidate_id,
+            simpler.candidate_id,
+            stronger.candidate_id,
+        ]
+        assert snapshot["trial_counts"] == {"completed": 26}
+        assessment = snapshot["decisions"][0]["assessment"]
+        assert assessment["reference_rule"] == "report"
+        assert assessment["references"] == result.to_dict()["references"]
+        assert assessment["verdict"] == "improved"
+        assert len(ledger.validate_decision_inventory(result.campaign_id)) == 1
+
+        # References run on exactly the incumbent's and challenger's seeds and
+        # tasks, under their own phase, and never in development.
+        for split in ("confirmation", "holdout"):
+            expected = _assigned(calls, split, challenger)
+            assert len(expected) == 3
+            for arm in (incumbent, simpler, stronger):
+                assert _assigned(calls, split, arm) == expected
+        assert {
+            context.phase for context in calls if context.candidate in (simpler, stronger)
+        } == {_bound_phase("reference", result.optimization_plan_hash)}
+        assert not [
+            context
+            for context in calls
+            if context.split == "development" and context.candidate in (simpler, stronger)
+        ]
+
+        # Reference holdout trials draw from the pool but are not holdout use.
+        assert ledger.holdout_uses(identity) == {
+            challenger.policy_hash: (result.campaign_id,)
+        }
+        assert ledger.holdout_draw_campaigns(identity) == (result.campaign_id,)
+
+        evaluated = len(calls)
+        replay = await _runner(contract, ledger, evaluate, task_pools=pools).run(
+            incumbent, (challenger,), references=(simpler, stronger)
+        )
+        assert len(calls) == evaluated
+        assert replay.decision_id == result.decision_id
+        assert replay.to_dict() == result.to_dict()
+
+    # A fresh ledger seals a new holdout; the confirmation comparisons repeat.
+    with ExperimentLedger(tmp_path / "again.sqlite3", durability="normal") as ledger:
+        again = await _runner(contract, ledger, evaluate, task_pools=pools).run(
+            incumbent, (challenger,), references=(simpler, stronger)
+        )
+    assert again.campaign_id == result.campaign_id
+    assert [item["verdict"] for item in again.references] == ["improved", "worse"]
+    assert [item["confirmation"] for item in again.references] == [
+        item["confirmation"] for item in result.references
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_policy_whose_holdout_was_used_can_be_a_reference_baseline(tmp_path):
+    contract = _contract(**_THREE_ARM_LIMITS)
+    incumbent, predecessor = _candidates(contract)
+    successor = _second_policy(contract, incumbent, 3)
+    evaluate = _arm_evaluator({1: 0.0, 2: 5.0, 3: 10.0})
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+
+    with ExperimentLedger(tmp_path / "baseline.sqlite3", durability="normal") as ledger:
+        first = await _runner(contract, ledger, evaluate).run(incumbent, (predecessor,))
+        assert first.promoted is True
+        with pytest.raises(HoldoutAlreadyUsedError, match=first.campaign_id):
+            await _runner(contract, ledger, evaluate).run(
+                incumbent, (_rewording(contract, incumbent, "the predecessor again"),)
+            )
+
+        # The used predecessor is a second baseline for its successor.
+        second = await _runner(contract, ledger, evaluate).run(
+            incumbent, (successor,), references=(predecessor,)
+        )
+        assert second.promoted is True
+        assert second.references[0]["candidate_id"] == predecessor.candidate_id
+        assert second.references[0]["verdict"] == "improved"
+        assert ledger.holdout_uses(identity) == {
+            predecessor.policy_hash: (first.campaign_id,),
+            successor.policy_hash: (second.campaign_id,),
+        }
+        assert ledger.holdout_draw_campaigns(identity) == (
+            first.campaign_id,
+            second.campaign_id,
+        )
+
+        # Without reference arms, that comparison re-tests the successor in a
+        # second campaign, which is refused.
+        with pytest.raises(HoldoutAlreadyUsedError, match=second.campaign_id):
+            await _runner(contract, ledger, evaluate).run(predecessor, (successor,))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("reference_quality", "rejected_at"),
+    [
+        (20.0, "confirmation"),
+        ({"confirmation": 5.0, "holdout": 20.0}, "holdout"),
+        (5.0, None),
+    ],
+    ids=["better-on-confirmation", "better-on-holdout", "not-better"],
+)
+async def test_must_not_be_worse_blocks_promotion_when_a_reference_is_better(
+    tmp_path, reference_quality, rejected_at
+):
+    contract = _contract(max_candidates=3, max_trials=20, max_budget_microusd=200)
+    incumbent, challenger = _candidates(contract)
+    (reference,) = _reference_arms(contract, incumbent, 3)
+    evaluate = _arm_evaluator({1: 0.0, 2: 10.0, 3: reference_quality})
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+
+    with ExperimentLedger(tmp_path / "report.sqlite3", durability="normal") as ledger:
+        reported = await _runner(contract, ledger, evaluate).run(
+            incumbent, (challenger,), references=(reference,)
+        )
+    assert reported.promoted is True
+
+    with ExperimentLedger(tmp_path / "rule.sqlite3", durability="normal") as ledger:
+        result = await _runner(contract, ledger, evaluate).run(
+            incumbent,
+            (challenger,),
+            references=(reference,),
+            reference_rule="must_not_be_worse",
+        )
+        assert result.campaign_id != reported.campaign_id
+        assert result.confirmation_assessment.promote is True
+        assessment = ledger.list_decisions(result.campaign_id)[0]["assessment"]
+        assert assessment["reference_rule"] == "must_not_be_worse"
+        assert len(ledger.validate_decision_inventory(result.campaign_id)) == 1
+        if rejected_at is None:
+            assert result.promoted is True
+            assert result.references[0]["verdict"] == "improved"
+            return
+        assert result.promoted is False
+        assert result.reason == (
+            f"{rejected_at} rejected candidate: reference {reference.candidate_id} "
+            "is better on the primary objective"
+        )
+        # The challenger's own comparison with the incumbent still improved.
+        assert result.verdict == "improved"
+        assert result.references[0]["verdict"] == "worse"
+        if rejected_at == "confirmation":
+            # A blocked confirmation never reaches, or uses, the holdout.
+            assert result.holdout_assessment is None
+            assert result.references[0]["holdout"] is None
+            assert {trial.split for trial in ledger.list_trials(result.campaign_id)} == {
+                "development",
+                "confirmation",
+            }
+            assert ledger.holdout_uses(identity) == {}
+        else:
+            assert result.holdout_assessment.promote is True
+            assert ledger.holdout_uses(identity) == {
+                challenger.policy_hash: (result.campaign_id,)
+            }
+
+
+@pytest.mark.asyncio
+async def test_a_campaign_stopped_in_development_never_runs_its_references(tmp_path):
+    contract = _contract(max_candidates=3, max_trials=20, max_budget_microusd=200)
+    incumbent, challenger = _candidates(contract)
+    (reference,) = _reference_arms(contract, incumbent, 3)
+    calls: list[TrialContext] = []
+
+    async def unsafe_challenger(context: TrialContext) -> TrialOutcome:
+        calls.append(context)
+        return TrialOutcome(
+            metrics={"quality": 10.0, "risk": 1.0},
+            gates={"safe": context.candidate != challenger},
+            actual_cost_microusd=1,
+        )
+
+    with ExperimentLedger(tmp_path / "stopped.sqlite3", durability="normal") as ledger:
+        runner = _runner(contract, ledger, unsafe_challenger)
+        result = await runner.run(incumbent, (challenger,), references=(reference,))
+        assert result.selected_candidate_id is None
+        assert result.references == (
+            {"candidate_id": reference.candidate_id, "policy_hash": reference.policy_hash},
+        )
+        assert {context.candidate.candidate_id for context in calls} == {
+            incumbent.candidate_id,
+            challenger.candidate_id,
+        }
+        assessment = ledger.list_decisions(result.campaign_id)[0]["assessment"]
+        assert assessment["stage"] == "development"
+        assert assessment["references"] == list(result.references)
+        assert len(ledger.validate_decision_inventory(result.campaign_id)) == 1
+        replay = await _runner(contract, ledger, unsafe_challenger).run(
+            incumbent, (challenger,), references=(reference,)
+        )
+        assert replay.decision_id == result.decision_id
+        assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_two_arm_campaigns_are_unchanged_by_reference_support(tmp_path):
+    contract = _contract(**_THREE_ARM_LIMITS)
+    incumbent, challenger = _candidates(contract)
+    (reference,) = _reference_arms(contract, incumbent, 3)
+    evaluate = _arm_evaluator({1: 0.0, 2: 10.0, 3: 5.0})
+    two_arm_payload = {
+        "runner_version": 4,
+        "statistics": {"method": PROMOTION_METHOD, "descriptive_bootstrap_resamples": 100},
+        "contract_hash": contract.contract_hash,
+        "incumbent_candidate_id": incumbent.candidate_id,
+        "ordered_candidate_ids": [challenger.candidate_id],
+        "ordered_policy_hashes": [challenger.policy_hash],
+        "evaluator_hash": EVALUATOR_HASH,
+        "ledger_durability": "normal",
+        "required_trials": 14,
+    }
+
+    with ExperimentLedger(tmp_path / "two-arm.sqlite3", durability="normal") as ledger:
+
+        def plan(*references: Candidate, **options: object) -> dict:
+            runner = _runner(contract, ledger, evaluate)
+            return runner._build_plan(incumbent, (challenger,), references, **options)
+
+        legacy = sha256_prefixed(two_arm_payload)
+        assert plan()["plan_hash"] == legacy
+        # A rule without references has nothing to apply to.
+        assert plan(reference_rule="must_not_be_worse")["plan_hash"] == legacy
+        referenced = plan(reference)
+        assert referenced["required_trials"] == 14 + 3 + 3
+        assert referenced["plan_hash"] == sha256_prefixed(
+            {
+                **two_arm_payload,
+                "required_trials": 20,
+                "ordered_reference_ids": [reference.candidate_id],
+                "reference_rule": "report",
+            }
+        )
+        assert plan(reference, reference_rule="must_not_be_worse")["plan_hash"] not in {
+            legacy,
+            referenced["plan_hash"],
+        }
+
+        result = await _runner(contract, ledger, evaluate).run(incumbent, (challenger,))
+        assert result.optimization_plan_hash == legacy
+        assert result.references == ()
+        assert "references" not in result.to_dict()
+        assessment = ledger.list_decisions(result.campaign_id)[0]["assessment"]
+        assert "references" not in assessment
+        assert "reference_rule" not in assessment
+        assert {
+            trial.phase.split(".")[0] for trial in ledger.list_trials(result.campaign_id)
+        } == {"incumbent", "challenger"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("change", "error", "message"),
+    [
+        ("incumbent", OptimizationError, "differ from the incumbent"),
+        ("challenger", OptimizationError, "differ from the incumbent"),
+        ("reworded-challenger", OptimizationError, "differ from the incumbent"),
+        ("duplicate", OptimizationError, "reference candidate IDs"),
+        ("not-a-candidate", TypeError, "references"),
+        ("string", TypeError, "references"),
+        ("rule", ValueError, "reference_rule"),
+        ("max-candidates", OptimizationLimitError, "max_candidates"),
+        ("max-trials", OptimizationLimitError, "requires 26 trials"),
+    ],
+)
+async def test_invalid_reference_plans_are_refused_before_any_campaign(
+    tmp_path, change, error, message
+):
+    limits = dict(_THREE_ARM_LIMITS)
+    if change == "max-candidates":
+        limits["max_candidates"] = 3
+    if change == "max-trials":
+        limits["max_trials"] = 25
+    contract = _contract(**limits)
+    incumbent, challenger = _candidates(contract)
+    first, second = _reference_arms(contract, incumbent, 3, 4)
+    references: object = {
+        "incumbent": (first, incumbent),
+        "challenger": (challenger,),
+        "reworded-challenger": (_rewording(contract, incumbent, "the challenger policy"),),
+        "duplicate": (first, first),
+        "not-a-candidate": (first, {"strength": 4}),
+        "string": "references",
+    }.get(change, (first, second))
+    options = {"reference_rule": "must_beat"} if change == "rule" else {}
+
+    async def never_called(_context: TrialContext) -> TrialOutcome:
+        raise AssertionError("a refused plan must not invoke the evaluator")
+
+    with ExperimentLedger(tmp_path / "refused.sqlite3", durability="normal") as ledger:
+        with pytest.raises(error, match=message):
+            await _runner(contract, ledger, never_called).run(
+                incumbent, (challenger,), references=references, **options
+            )
+        count = ledger._connection.execute("SELECT COUNT(*) FROM campaigns").fetchone()[0]
+        assert count == 0

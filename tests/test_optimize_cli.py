@@ -61,8 +61,9 @@ def test_concurrency_contract_is_bounded_exact_and_lineage_bound():
         ]
     )
 
-    contract, incumbent, challengers, scenario = _concurrency_campaign(args)
+    contract, incumbent, challengers, scenario, references = _concurrency_campaign(args)
 
+    assert references == ()
     assert scenario.work_items == 250
     assert contract.max_candidates == 4
     assert contract.max_trials == 4 * 3 + 2 * (5 + 5)
@@ -288,7 +289,7 @@ def test_auto_identity_includes_candidates_and_bootstrap_configuration(tmp_path,
 
     def plan(ledger, *options):
         args = parser.parse_args(["optimize", "concurrency", *options, *common])
-        contract, incumbent, candidates, scenario = _concurrency_campaign(args)
+        contract, incumbent, candidates, scenario, _references = _concurrency_campaign(args)
         runner = OptimizationRunner(
             contract,
             ledger,
@@ -459,6 +460,65 @@ def test_run_json_reports_a_worse_verdict_without_a_patch(tmp_path, capsys):
     assert "Verdict: <strong>worse</strong></p>" in out.read_text(encoding="utf-8")
 
 
+def test_reference_concurrency_is_compared_on_paired_splits_and_never_promoted(
+    tmp_path, capsys
+):
+    args = build_parser().parse_args(
+        ["optimize", "concurrency", *_SMALL_CAMPAIGN, "--reference", "2", "--reference", "4"]
+    )
+    contract, incumbent, challengers, _scenario, references = _concurrency_campaign(args)
+    assert [item.policy["max_concurrency"] for item in references] == [2, 4]
+    assert all(item.parent == incumbent.candidate_id for item in references)
+    assert len(challengers) == 1
+    assert contract.max_candidates == 4
+    assert contract.max_trials == 2 * 1 + (2 + 2) * (3 + 3)
+
+    ledger_path = tmp_path / "references.sqlite3"
+    result = _run(ledger_path, capsys, *_SMALL_CAMPAIGN, "--reference", "2,4")
+    assert result["promoted"] is True
+    assert result["selected_candidate"]["policy"] == {"max_concurrency": 8}
+    compared = result["evidence"]["references"]
+    assert [item["candidate_id"] for item in compared] == [
+        item.candidate_id for item in references
+    ]
+    assert all(item["holdout"] is not None for item in compared)
+    assessment = result["ledger_snapshot"]["decisions"][0]["assessment"]
+    assert assessment["reference_rule"] == "report"
+    assert assessment["references"] == compared
+    assert result["ledger_snapshot"]["trial_count"] == 26
+
+    out = tmp_path / "report.html"
+    assert main(
+        ["optimize", "inspect", result["campaign_id"], "--ledger", str(ledger_path),
+         "--out", str(out), "--json"]
+    ) == EXIT_OK
+    capsys.readouterr()
+    assert "<h3>References</h3>" in out.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    "values, message",
+    [
+        (["8"], "reference concurrency 8 is also a challenger"),
+        (["1"], "reference concurrency 1 is reserved for the incumbent"),
+        (["2,2"], "duplicate reference concurrency"),
+        (["2", "two"], "reference concurrency must be an integer"),
+    ],
+)
+def test_reference_concurrency_rejects_ambiguous_input(tmp_path, capsys, values, message):
+    options = [item for value in values for item in ("--reference", value)]
+    args = build_parser().parse_args(["optimize", "concurrency", *_SMALL_CAMPAIGN, *options])
+    with pytest.raises(ValueError, match=message):
+        _concurrency_campaign(args)
+    ledger_path = tmp_path / "invalid.sqlite3"
+    assert main(
+        ["optimize", "concurrency", "--ledger", str(ledger_path), "--json",
+         *_SMALL_CAMPAIGN, *options]
+    ) == EXIT_INVALID_INPUT
+    assert _json_output(capsys)["error"]["type"] == "ValueError"
+    assert not ledger_path.exists()
+
+
 def test_explicit_campaign_id_from_runner_version_3_exits_with_binding_drift(
     tmp_path, capsys, monkeypatch
 ):
@@ -622,7 +682,7 @@ def test_holdout_rows_from_0_8_0_still_block_a_cli_reroll(tmp_path, capsys):
     args = build_parser().parse_args(
         ["optimize", "concurrency", *_HOLDOUT_EVALUATION, "--candidate-concurrency", "4,8"]
     )
-    contract, incumbent, challengers, scenario = _concurrency_campaign(args)
+    contract, incumbent, challengers, scenario, _references = _concurrency_campaign(args)
     used = next(item for item in challengers if item.policy["max_concurrency"] == 8)
     phase = "challenger.plan_" + "0" * 64
     trial_key = ExperimentLedger.make_trial_key("legacy-0-8-0", used.candidate_id, "holdout", phase, 1)
