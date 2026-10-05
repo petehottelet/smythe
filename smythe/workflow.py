@@ -254,15 +254,18 @@ def _saved_record(state, policy_sha256, task_digest):
 
 
 def _synthesis_key(graph, *, scoped):
-    """The synthesis operation's key: ``synthesis`` at generation 0.
+    """The synthesis operation's key: ``synthesis`` while every node is at generation 0.
 
-    A recipe with a strict policy or a gate validator (*scoped*) scopes the
-    key by the sum of the graph's node generations, so synthesis after a
-    regeneration never replays an earlier generation's output. Other
+    A recipe with a strict policy, a gate validator or context assembly
+    (*scoped*) keys synthesis for any other graph state by a short digest of
+    every node's id and generation, so synthesis for one graph state never
+    replays another's output, whatever their generations add up to. Other
     recipes keep the one key their journals already hold.
     """
-    generation = sum(node_generation(node) for node in graph.nodes) if scoped else 0
-    return "synthesis" if generation == 0 else f"synthesis/{generation}"
+    generations = {node.id: node_generation(node) for node in graph.nodes} if scoped else {}
+    if not any(generations.values()):
+        return "synthesis"
+    return "synthesis/" + _hash(generations)[:16]
 
 
 def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, strategy,

@@ -400,7 +400,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   commits decides again on resume, and a committed decision replays with no
   validator run or provider call. Such runs, and runs with a gate validator, write checkpoint
   version 2 with a `delivery_acceptance` block and key synthesis after a
-  regeneration as `synthesis/<n>`. Resuming a completed run rechecks the
+  regeneration as `synthesis/<digest>`, a short digest of every node id and
+  its generation, so two graph states whose generations add up to the same
+  number never share a synthesis. Resuming a completed run rechecks the
   output digest, task, source generations and journal decision, giving
   `indeterminate` on any mismatch, and results follow the strict output
   rule. A verification receipt left pending, including one from a release

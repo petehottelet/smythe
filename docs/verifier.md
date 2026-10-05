@@ -703,10 +703,11 @@ policy, and records the decision in its journal:
   `acceptance=None`. [`smythe runs inspect`](runs.md) makes the same checks
   without resuming the run.
 - **Synthesis keys.** Such a run journals its synthesis under `synthesis`
-  while no node has regenerated and under `synthesis/<n>` afterwards, where
-  `n` is the sum of the nodes' generations, so synthesis for a regenerated
-  graph never replays an earlier generation's output. Other runs keep the key
-  `synthesis`.
+  while every node is at generation 0, and otherwise under
+  `synthesis/<digest>`, the first 16 hex digits of the SHA-256 of every node
+  id and its generation, so synthesis for one graph state never replays the
+  output of another, even when their generations add up to the same number.
+  Other runs keep the key `synthesis`.
 
 **Verdicts left pending.** A judge's receipt stays `pending` until its verdict
 is read, and resume then reads the judge's saved reply with the rules of the

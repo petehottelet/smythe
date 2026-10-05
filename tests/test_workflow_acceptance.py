@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import closing
+import hashlib
 import json
 import sqlite3
 
@@ -22,6 +23,7 @@ from smythe.provider import CompletionResult
 from smythe.registry import Registry
 from smythe.validation import ValidationReport, ValidatorIdentity, hard_finding
 from smythe.verifier import TOKEN_VERIFIER_IDENTITY
+from smythe.workflow import _synthesis_key
 from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_store import WorkflowConflictError, WorkflowStateError, _canonical, _sha
 
@@ -387,7 +389,8 @@ def test_strict_durable_run_with_a_gate_validator(store, replies):
     assert recipe["acceptance"] == strict().to_dict()
     # Synthesis after a regeneration has its own key, scoped by the node generations.
     keys = operations(store, result.execution_id)
-    assert keys["synthesis/2"] == ("synthesis", "applied") and "synthesis" not in keys
+    assert keys[generation_key(draft=1, judge=1)] == ("synthesis", "applied")
+    assert "synthesis" not in keys
 
 
 def test_legacy_runs_keep_the_unscoped_synthesis_key(store, replies):
@@ -396,6 +399,84 @@ def test_legacy_runs_keep_the_unscoped_synthesis_key(store, replies):
     result = durable(store).execute(gated())
     assert result.graph.nodes[0].metadata["execution_generation"] == 1
     assert operations(store, result.execution_id)["synthesis"] == ("synthesis", "applied")
+
+
+def generation_key(**generations) -> str:
+    """The scoped synthesis key of a graph whose nodes hold *generations*."""
+    digest = hashlib.sha256(json.dumps(generations, sort_keys=True, separators=(",", ":"))
+                            .encode()).hexdigest()
+    return "synthesis/" + digest[:16]
+
+
+def at_generations(**generations) -> ExecutionGraph:
+    return ExecutionGraph([Topology.FORK_JOIN], [
+        Node(id=node_id, label=node_id.upper(), metadata={"execution_generation": generation})
+        for node_id, generation in generations.items()])
+
+
+def test_scoped_synthesis_keys_name_every_node_generation():
+    states = [
+        {"a": 1, "b": 0}, {"a": 0, "b": 1},
+        # A dropped node, then another regeneration, gives the same sum.
+        {"a": 1, "b": 1, "c": 0}, {"a": 2, "c": 0}, {"a": 1, "b": 0, "c": 1},
+    ]
+    keys = [_synthesis_key(at_generations(**state), scoped=True) for state in states]
+    assert keys == [generation_key(**state) for state in states]
+    assert len(set(keys)) == len(states)
+    # The literal key stays while every node is at generation 0, and for other recipes.
+    assert _synthesis_key(at_generations(a=0, b=0), scoped=True) == "synthesis"
+    assert _synthesis_key(at_generations(a=1, b=0), scoped=False) == "synthesis"
+
+
+def test_synthesis_for_another_graph_state_with_the_same_generation_sum_is_not_replayed(
+    tmp_path, replies, monkeypatch,
+):
+    """Scoped synthesis keys were the sum of node generations, so synthesis for
+    a graph at {a: 0, b: 1} replayed output saved for {a: 1, b: 0}."""
+    script, calls = replies
+    script.update({"A": ["first a"], "B": ["first b"]})
+    path = tmp_path / "states.db"
+    policy = strict(Contains("first"))
+    graph = ExecutionGraph([Topology.FORK_JOIN], [Node(id="a", label="A"), Node(id="b", label="B")])
+    with SQLiteWorkflowStore(path) as store:
+        restore = stop_after_saving(monkeypatch, store, lambda state: state["status"] == "planned")
+        with pytest.raises(Crash):
+            durable(store, acceptance=policy).execute(graph)
+        restore()
+        (run,) = store.list_runs()
+    run_id = run["run_id"]
+    # The run's first state: node a at generation 1, b at 0.
+    rewrite_checkpoint(path, run_id, lambda state: state["graph"]["nodes"][0]["metadata"].update(
+        execution_generation=1))
+    with SQLiteWorkflowStore(path) as store:
+        restore = stop_at(monkeypatch, store, "begin_operation",
+                          lambda lease, key, *args, **kwargs: key.startswith("acceptance/"))
+        with pytest.raises(Crash):
+            durable(store, acceptance=policy).resume(run_id)
+        restore()
+        (first,) = [key for key, (kind, _) in operations(store, run_id).items() if kind == "synthesis"]
+        assert store.load_operation(run_id, first)["result"] == {"output": "first a\n\nfirst b"}
+
+    def second_state(state):
+        a, b = state["graph"]["nodes"]
+        assert (a["status"], b["status"]) == ("completed", "completed")
+        a["metadata"]["execution_generation"], b["metadata"]["execution_generation"] = 0, 1
+        b["result"] = "first b, regenerated"
+
+    # Another state with the same generation sum, and another result for b.
+    rewrite_checkpoint(path, run_id, second_state)
+    sent = list(calls)
+    with SQLiteWorkflowStore(path) as store:
+        result = durable(store, acceptance=policy).resume(run_id)
+        keys = operations(store, run_id)
+
+    assert calls == sent
+    assert result.accepted and result.output == "first a\n\nfirst b, regenerated"
+    second = generation_key(a=0, b=1)
+    assert (first, keys[first]) == (generation_key(a=1, b=0), ("synthesis", "completed"))
+    # The stopped process never applied its synthesis; the second state's was applied.
+    assert keys[second] == ("synthesis", "applied")
+    assert {key for key, (kind, _) in keys.items() if kind == "synthesis"} == {first, second}
 
 
 def test_crash_after_synthesis_before_the_decision_decides_again(store, replies, monkeypatch):

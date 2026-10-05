@@ -380,8 +380,9 @@ journals the decision:
   returns it; neither runs a validator or calls a provider again.
 - Checkpoints of runs with a strict policy or a gate validator are version 2,
   with a `delivery_acceptance` block; other runs keep version 1. Synthesis in
-  such a run is keyed `synthesis` until a node regenerates, then
-  `synthesis/<n>` with `n` the sum of the node generations.
+  such a run is keyed `synthesis` while every node is at generation 0, then
+  `synthesis/<digest>`, a short digest of every node id and its generation,
+  so each graph state has its own synthesis.
 - Resuming a completed run checks the saved output, task, source generations
   and journal decision against the record; a mismatch gives an
   `indeterminate` record and moves the text to `rejected_output`.

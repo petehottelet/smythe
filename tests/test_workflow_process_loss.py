@@ -18,6 +18,7 @@ from smythe.acceptance import text_sha256
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.validation import ValidationReport, ValidatorIdentity, hard_finding
+from test_workflow_acceptance import generation_key
 
 # A durable OfflineProvider echoes each step: "offline: <label>".
 DELIVERED = "offline: Write the summary"
@@ -250,6 +251,7 @@ def test_killed_priced_run_keeps_its_charges_generations_and_regeneration(tmp_pa
     # Only a decision the child never committed is made again.
     assert Mentions.validated == ([DRAFTS[1]] if stop == "deciding" else [])
     keys = operation_keys(path, run_id)
-    assert keys["synthesis/2"] == ("synthesis", "applied") and "synthesis" not in keys
+    assert keys[generation_key(draft=1, judge=1)] == ("synthesis", "applied")
+    assert "synthesis" not in keys
     assert [state for kind, state in keys.values() if kind == "acceptance"] == ["applied"]
     assert after["status"] == "completed" and after["ok"]

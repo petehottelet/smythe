@@ -32,6 +32,7 @@ from smythe.tracer import Tracer
 from smythe.validation import ValidationReport, ValidatorIdentity, hard_finding
 from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_store import CallKey, WorkflowConflictError, WorkflowStateError
+from test_workflow_acceptance import generation_key
 
 SOURCES = (ContextSource("handbook", "Refunds are accepted within 30 days.", version="2026-09"),)
 # The same source, edited while a run was paused.
@@ -240,7 +241,8 @@ def test_refreshing_sources_is_explicit_versioned_and_reevaluates_on_resume(
             assert (refreshed.sources, refreshed.sources_revision) == (CHANGED, 1)
             assert load_context_snapshot(paused, run_id, node, 0) == original[node]
         assert CHANGED[0].text in prompts(paused, run_id)[("draft", 1)]
-        assert paused.load_operation(run_id, "synthesis/2")["result"] == {"output": "offline: Draft"}
+        synthesis = generation_key(research=1, draft=1)
+        assert paused.load_operation(run_id, synthesis)["result"] == {"output": "offline: Draft"}
         assert paused.audit(run_id)["ok"]
         # A completed run keeps the sources it delivered with.
         with pytest.raises(WorkflowStateError, match="completed"):
