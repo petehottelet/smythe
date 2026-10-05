@@ -351,7 +351,11 @@ connector or paid run.
    again; immutable snapshots of the context each worker saw, with source
    content marked untrusted; and evidence records that carry claims, sources
    and contradictions through synthesis. A source-to-artifact example runs
-   offline, survives interruption and resumes
+   offline, survives interruption and resumes. In progress: durable workflows
+   journal [read steps](docs/workflow-accounting.md#recorded-read-steps) of
+   declared, versioned HTTP read profiles with byte, time, redirect and
+   destination limits; a saved response is reused on resume, verified by
+   killing a real process against a fake service
 2. **Approval gates and reconciled external actions** — pause, approve or
    reject with state that survives restart. Approval binds a verified
    principal to the exact action or artifact, with expiry and revocation

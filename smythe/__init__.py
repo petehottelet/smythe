@@ -47,6 +47,7 @@ from smythe.workflow_binding import LocalOnly, WorkflowBindingError
 from smythe.workflow_provider import ProviderRequestRejectedError
 from smythe.workflow_policy import WorkflowGraphPolicy
 from smythe.workflow_store import SQLiteWorkflowStore, WorkflowError
+from smythe.workflow_tools import ReadProfile, ReadToolError
 from smythe.router import WhiteRabbit
 from smythe.skills import (
     CapabilityHydrationMode,
@@ -138,6 +139,8 @@ __all__ = [
     "ProviderAccountingError",
     "ProviderAccountingCancelledError",
     "ProviderRequestRejectedError",
+    "ReadProfile",
+    "ReadToolError",
     "Revision",
     "RevisionError",
     "Sentinel",

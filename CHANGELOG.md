@@ -453,6 +453,30 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   identity are unchanged. Earlier releases count reference holdout trials as
   holdout use and refuse to export a report for a decision with references.
   See [reference arms](docs/optimize.md#reference-arms).
+- Recorded read steps in durable text workflows. A `ReadProfile` declares one
+  versioned read: an HTTP `GET` of a URL whose path or query placeholders take
+  a step's checked input, a decoder and its version, whether a read can be
+  charged (`metered`, with its per-call price as `ceiling_nanousd`) and
+  whether it is safe to send again (`repeat_safe`), and limits on response
+  bytes, time, redirects and hosts. Loopback, private and other non-public
+  addresses are refused before the request and at each redirect unless
+  `allow_private_networks` is set, and the request connects to the address
+  that was checked. `Swarm(run_store=..., read_tools=[...])` runs a node whose
+  `metadata["read_step"]` names a profile and its input, as
+  `ReadProfile.step()` builds, without a model call. The journal records each
+  read as a `read_tool` call in the `tool` phase, quoted at its declared
+  ceiling and dispatched once, and saves the response before settling and
+  decoding it, so a saved response or text is reused on resume without
+  reading again. A free read costs nothing; a metered read is charged its
+  price for a 200 response and otherwise keeps unknown exposure. A rejected
+  read raises `ReadToolError` for the node's failure policy. A free,
+  repeat-safe read whose response was lost is read again as a new call; any
+  other read without a response blocks the run and is never sent again. Only
+  graphs and templates you write declare read steps, never a generated plan,
+  and an ordinary run refuses one before any call. The recipe records
+  `read_tools` only when a run declares profiles, so other recipes keep their
+  identity. See
+  [recorded read steps](docs/workflow-accounting.md#recorded-read-steps).
 
 ### Changed
 

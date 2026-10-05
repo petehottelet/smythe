@@ -6,7 +6,7 @@ import asyncio
 from collections import deque
 from itertools import islice
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from smythe.budget import BudgetValidationError, Sentinel, SentinelAlert, validate_token_count
 from smythe.executor_base import (
@@ -75,6 +75,7 @@ class AsyncExecutor(ExecutorBase):
         on_supervision_update: Callable[[Node, bool], None] | None = None,
         *,
         prompt_assembly: int = PROMPT_ASSEMBLY_VERSION,
+        read_call_factory: Callable[[Node, int], Any] | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         super().__init__(
@@ -88,6 +89,7 @@ class AsyncExecutor(ExecutorBase):
             provider_call_factory=provider_call_factory,
             on_supervision_update=on_supervision_update,
             prompt_assembly=prompt_assembly,
+            read_call_factory=read_call_factory,
             acceptance=acceptance,
         )
         self._estimated_tokens_per_node = validate_token_count(

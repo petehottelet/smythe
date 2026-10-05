@@ -77,6 +77,7 @@ from smythe.verifier import (
 from smythe.workflow_binding import LocalOnly, WorkflowBindingError, _BoundLocal
 from smythe.workflow_policy import WorkflowGraphPolicy, snapshot_graph_policy
 from smythe.workflow_store import SQLiteWorkflowStore
+from smythe.workflow_tools import READ_STEP_KEY, ReadProfile
 
 logger = logging.getLogger("smythe.swarm")
 
@@ -297,6 +298,11 @@ class Swarm:
     None, the default, and an advisory policy keep legacy behavior. With a
     durable ``run_store`` the same checks apply, the policy enters the run's
     recipe and the decision is journaled; see ``smythe.workflow.WorkflowRuntime``.
+
+    ``read_tools`` declares the :class:`~smythe.workflow_tools.ReadProfile`
+    reads that a durable run's read steps may name; it requires
+    ``run_store``. An ordinary run refuses a graph with a read step before
+    any call.
     """
 
     def __init__(
@@ -326,10 +332,22 @@ class Swarm:
         run_store: SQLiteWorkflowStore | None = None,
         graph_policy: WorkflowGraphPolicy | None = None,
         acceptance: AcceptancePolicy | None = None,
+        read_tools: tuple[ReadProfile, ...] | list[ReadProfile] = (),
     ) -> None:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
         if graph_policy is not None and run_store is None:
             raise WorkflowBindingError("graph_policy requires a durable run_store")
+        if read_tools is None:
+            read_tools = ()
+        if isinstance(read_tools, (str, bytes)) or not hasattr(read_tools, "__iter__"):
+            raise WorkflowBindingError("read_tools must be a sequence of ReadProfile declarations")
+        read_tools = tuple(read_tools)
+        if read_tools:
+            if run_store is None:
+                raise WorkflowBindingError("read_tools requires a durable run_store")
+            from smythe.workflow import _snapshot_read_tools
+
+            _snapshot_read_tools(read_tools)
         if isinstance(verifier, LocalOnly) and run_store is None:
             raise TypeError(
                 "verifier: a LocalOnly validator judges gates only in a durable run_store run; "
@@ -361,6 +379,7 @@ class Swarm:
         self.max_revisions = max_revisions
         self.verifier = verifier
         self._run_store = run_store
+        self._read_tools = read_tools
         # The running executor, so checkpoints can record the revision
         # allowance actually consumed rather than assuming zero.
         self._active_executor: Any = None
@@ -1238,13 +1257,15 @@ class Swarm:
         run_store: SQLiteWorkflowStore | None = None,
         graph_policy: WorkflowGraphPolicy | None = None,
         acceptance: AcceptancePolicy | None = None,
+        read_tools: tuple[ReadProfile, ...] | list[ReadProfile] = (),
     ) -> Swarm:
         """Create a Swarm pre-loaded with a YAML-defined execution graph.
 
         The returned Swarm's internal registry is populated with agents
         defined in the YAML file.  Call execute() with the loaded graph
         to run it.  A delivery acceptance policy comes only from the
-        ``acceptance`` argument, never from the file.
+        ``acceptance`` argument, never from the file, and so do the read
+        profiles that the file's read steps name.
         """
         from smythe.loader import load_graph
 
@@ -1259,6 +1280,7 @@ class Swarm:
             run_store=run_store,
             graph_policy=graph_policy,
             acceptance=acceptance,
+            read_tools=read_tools,
         )
         if instance._graph_policy is not None:
             instance._graph_policy.validate(graph, default_model=instance.model)
@@ -1282,6 +1304,12 @@ class Swarm:
         if graph.run_ref is not None:
             raise ValueError("This graph requires its matching durable run_store")
         graph.validate()
+        read_steps = [node.id for node in graph.nodes if READ_STEP_KEY in node.metadata]
+        if read_steps:
+            raise ValueError(
+                f"Nodes {read_steps} declare read steps, which run only in a durable workflow: "
+                "pass run_store and read_tools to Swarm"
+            )
         self._check_inherited_verdicts(graph)
         self._stamp_model(graph)
         if graph.task is not None:
@@ -1321,5 +1349,5 @@ class Swarm:
             retry_backoff_s=self.retry_backoff_s,
             max_concurrency=self.max_concurrency,
             graph_policy=self._graph_policy, behavior_settings=behavior_settings,
-            acceptance=self._acceptance,
+            acceptance=self._acceptance, read_tools=self._read_tools,
         )

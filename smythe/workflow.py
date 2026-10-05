@@ -46,6 +46,7 @@ from smythe.workflow_store import (
     CallKey, SQLiteWorkflowStore, WorkflowConflictError, WorkflowError, WorkflowLeaseError,
     WorkflowStateError, WorkflowValidationError, _is_http_rejection, _registered_price_version,
 )
+from smythe.workflow_tools import READ_STEP_KEY, JournaledReadTool, ReadProfile, reinvocable
 
 # Journal keys that embed a node id stop at 512 characters. Capping durable node
 # ids well below that leaves room for "supervision/<id>/<generation>".
@@ -131,6 +132,23 @@ def _supported_behavior(name, value):
     versions = _BEHAVIOR_VERSIONS.get(name)
     # Versions are integers; a bool or float equal to one is not a version.
     return versions is None or (type(value) is int and value in versions)
+
+
+def _snapshot_read_tools(read_tools):
+    """The declared read profiles by name; each name once, built-in profiles only."""
+    if read_tools is None:
+        read_tools = ()
+    if isinstance(read_tools, (str, bytes, Mapping)) or not hasattr(read_tools, "__iter__"):
+        raise WorkflowBindingError("read_tools must be a sequence of ReadProfile declarations")
+    profiles = {}
+    for profile in read_tools:
+        if type(profile) is not ReadProfile:
+            raise WorkflowBindingError(
+                f"read_tools takes ReadProfile declarations, not {type(profile).__name__}")
+        if profile.name in profiles:
+            raise WorkflowBindingError(f"read_tools declares {profile.name!r} more than once")
+        profiles[profile.name] = profile
+    return MappingProxyType(profiles)
 
 
 def _hash(value):
@@ -326,12 +344,18 @@ class WorkflowRuntime:
     runs, it marks the gates of a generated plan, refuses before planning a
     run no gate of its plan could accept, and refuses a graph that does not
     meet its acceptance obligations before any node runs.
+
+    ``read_tools`` declares the :class:`~smythe.workflow_tools.ReadProfile`
+    reads that the graph's read steps may name. The recipe records their
+    descriptions only when there are any, and each read step runs as a
+    journaled ``tool`` call without a model call.
     """
 
     def __init__(self, *, store, model, max_budget_usd, provider, architect, registry,
                  router, synthesizer, supervisor, max_revisions, verifier, memory,
                  tool_runtime, checkpoint_store, checkpoint_every_n_nodes, retry_backoff_s,
-                 max_concurrency, graph_policy=None, behavior_settings=None, acceptance=None):
+                 max_concurrency, graph_policy=None, behavior_settings=None, acceptance=None,
+                 read_tools=()):
         if type(store) is not SQLiteWorkflowStore:
             raise WorkflowBindingError(
                 f"run_store must be SQLiteWorkflowStore itself, not {type(store).__name__}"
@@ -398,6 +422,7 @@ class WorkflowRuntime:
         self.retry_backoff_s = retry_backoff_s
         self.checkpoint_every_n_nodes = checkpoint_every_n_nodes
         self.graph_policy = snapshot_graph_policy(graph_policy)
+        self.read_tools = _snapshot_read_tools(read_tools)
         # Explicitly configured behavior versions (see RECIPE_BEHAVIOR_FIELDS),
         # which the recipe below records for a new run, and, once a run is
         # bound, the versions that run uses.
@@ -445,6 +470,10 @@ class WorkflowRuntime:
             recipe["acceptance"] = self.acceptance.to_dict()
             if self.gate_validator is None:
                 recipe["verifier"] = TOKEN_VERIFIER_IDENTITY
+        if self.read_tools:
+            # Profile descriptions, never decoder code; omitted when none.
+            recipe["read_tools"] = [self.read_tools[name].workflow_descriptor()
+                                    for name in sorted(self.read_tools)]
         for name, (absent, default) in RECIPE_BEHAVIOR_FIELDS.items():
             value = self.behavior_settings.get(name, default)
             if _canonical(value) != _canonical(absent):
@@ -470,6 +499,11 @@ class WorkflowRuntime:
             raise WorkflowConflictError(
                 "Workflow acceptance policy differs from the saved recipe; resume the run with "
                 "the policy it started with"
+            )
+        if _canonical(saved.get("read_tools")) != _canonical(current.get("read_tools")):
+            raise WorkflowConflictError(
+                "Workflow read_tools differ from the saved recipe; resume the run with the read "
+                "profiles it started with"
             )
         if _canonical(_without_pricing(saved, saved=True)) != _canonical(_without_pricing(current)):
             raise WorkflowConflictError("Workflow components or budget differ from the saved recipe")
@@ -544,6 +578,31 @@ class WorkflowRuntime:
         result = self._component_call(self.execution_provider, scope)
         self._worker_keys.setdefault((node.id, node_generation(node)), set()).add(result.key)
         return result
+
+    def _read_call(self, node, attempt):
+        """Bind a read step's attempt to its journal call, in the ``tool`` phase.
+
+        Re-entering the last call of an invocation that a free, repeat-safe
+        read settled as rejected, such as one whose response was lost, moves
+        to a new invocation and reads again; a rejection that a later attempt
+        already followed replays. Other rejections replay, and a read with an
+        unknown charge is never sent again.
+        """
+        step = node.metadata[READ_STEP_KEY]
+        generation, scope_id = node_generation(node), f"node/{node.id}"
+        operation_key = _hash({"node_id": node.id, "read_step": step})
+
+        def allocate(suffix=""):
+            invocation = self.store.allocate_invocation(
+                self.context.lease, "tool", scope_id, generation, operation_key + suffix)
+            return CallKey("tool", scope_id, generation, invocation, attempt, 0)
+
+        keys = [allocate()]
+        while (reinvocable(self.store.lookup_call(self.run_id, keys[-1]))
+               and not self.store.has_later_call(self.run_id, keys[-1])):
+            keys.append(allocate(f"/after-read-rejection/{len(keys)}"))
+        self._worker_keys.setdefault((node.id, generation), set()).update(keys)
+        return JournaledReadTool(self.context, self.read_tools[step["profile"]], keys[-1], step["input"])
 
     def _call_ids(self, keys):
         ids = []
@@ -657,11 +716,38 @@ class WorkflowRuntime:
                     f"Durable workflows currently support plain text nodes; node {node.id!r} "
                     "uses attach_dep_artifacts, attachments or artifacts"
                 )
+            if READ_STEP_KEY in node.metadata:
+                self._check_read_step(node)
             validate_workflow_model(self.execution_provider, node.metadata.get("model", self.model))
             if node.agent_id is not None and self.registry.get(node.agent_id) is None and (
                 registry is None or registry.get(node.agent_id) is None
             ):
                 raise WorkflowBindingError(f"Node {node.id!r} names an unknown agent")
+
+    def _check_read_step(self, node):
+        """Check a read step against the profiles the run's recipe declares.
+
+        A generated plan cannot declare one: model output may set no node
+        metadata but ``role`` (``smythe.loader``). Developer graphs and
+        template builders can, and their steps must name a declared profile
+        with valid input.
+        """
+        step = node.metadata[READ_STEP_KEY]
+        if type(step) is not dict or step.keys() != {"profile", "input"} or type(step["profile"]) is not str:
+            raise WorkflowBindingError(
+                f"Node {node.id!r} {READ_STEP_KEY} must be {{'profile': name, 'input': {{...}}}}")
+        profile = self.read_tools.get(step["profile"])
+        if profile is None:
+            raise WorkflowBindingError(
+                f"Node {node.id!r} reads with {step['profile']!r}, which this run's read_tools do "
+                "not declare"
+            )
+        try:
+            profile.request(step["input"])
+        except WorkflowBindingError as error:
+            raise WorkflowBindingError(f"Node {node.id!r} read step: {error}") from error
+        if node.verifies is not None:
+            raise WorkflowBindingError(f"Node {node.id!r} is a read step and cannot verify another node")
 
     def _check_plan(self, graph, registry):
         """Apply _plan's checks to a candidate plan without adopting it.
@@ -948,7 +1034,7 @@ class WorkflowRuntime:
             on_control_update=self._save, on_supervision_update=self._supervision_update,
             # The version the run's recipe records; 1 when it records none.
             prompt_assembly=self.behavior.get("prompt_assembly", 1),
-            acceptance=self.acceptance,
+            acceptance=self.acceptance, read_call_factory=self._read_call,
         )
         self._save()
         try:
@@ -1194,7 +1280,7 @@ class _WorkflowSupervisor:
                 )
                 return None
             target = call_key["scope_id"].removeprefix("node/")
-            if (call_key["phase"] in {"execution", "verification"}
+            if (call_key["phase"] in {"execution", "verification", "tool"}
                     and call_key["scope_id"].startswith("node/") and target in generations
                     and call_key["generation"] == generations[target]):
                 runtime.trace.on_revision(

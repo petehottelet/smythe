@@ -249,7 +249,9 @@ Each call has a stable phase, component or node scope, generation, invocation,
 attempt, and turn. Its request, provider configuration, price version, and
 decoder version are immutable. A transaction grants dispatch permission once.
 After that point, missing response evidence stops automatic replay of the HTTP
-request, even if a connection failure leaves the remote outcome uncertain.
+request, even if a connection failure leaves the remote outcome uncertain. The
+one exception is a [read step](#recorded-read-steps) whose profile declares it
+free and safe to send again, which is read again as a new call.
 
 A call that was reserved but never dispatched, as when a process is killed
 between the reservation and the dispatch claim, keeps its reservation while
@@ -371,6 +373,139 @@ process at each of these points and resumes the run, including a run with
 priced native calls and a regenerated draft, whose confirmed charges, node
 generations and regeneration count resume unchanged without a new call.
 
+## Recorded read steps
+
+A durable run can read a source as a step of its own, without a model call,
+and journal the read like a model call: a saved response is reused on resume
+instead of read again. Declare each read operation as a `ReadProfile`, pass
+the profiles as `read_tools`, and add read steps to a graph you write:
+
+```python
+import json
+
+from smythe import OpenAIResponsesProvider, ReadProfile, SQLiteWorkflowStore, Swarm
+from smythe.graph import ExecutionGraph, Node, Topology
+
+source = ReadProfile(
+    name="source", version="1",
+    url="https://docs.example.com/sources/{source_id}",
+    input_schema={"source_id": "string"},
+    metered=False, repeat_safe=True,
+    decode=lambda body: json.loads(body)["content"], decoder_version="source-json-v1",
+)
+graph = ExecutionGraph([Topology.SERIAL], [
+    source.step("fetch", {"source_id": "q3-brief"}),
+    Node(id="summary", label="Summarize the brief in three sentences", depends_on=["fetch"]),
+])
+with SQLiteWorkflowStore("smythe-runs.db") as store:
+    swarm = Swarm(model="gpt-6-astra", provider=OpenAIResponsesProvider(max_output_tokens=2048),
+                  run_store=store, max_budget_usd=1.00, read_tools=[source])
+    result = swarm.execute(graph)
+```
+
+A read step is a node whose `metadata["read_step"]` is
+`{"profile": <name>, "input": {...}}`; `profile.step(node_id, input, ...)`
+builds one after checking its input, and YAML graphs can declare the same
+metadata. The step's result is the decoded text, which the steps that depend
+on it receive as context, like any other step's result.
+
+### Profiles
+
+A profile is versioned data plus an optional local decoder:
+
+- `url` is an `http` or `https` URL. `{field}` placeholders may appear only
+  in its path or query, so input never chooses the host, and each takes the
+  percent-encoded value of an input field. A URL with credentials, a
+  fragment, spaces or non-ASCII text is refused.
+- `input_schema` maps each input field to `"string"` or `"integer"`. A step
+  must give exactly those fields; strings are 1 to 512 characters, without
+  control characters, and not `.` or `..`.
+- `metered` and `repeat_safe` have no defaults. `metered` says whether a
+  read can be charged: a metered profile declares its per-call price as
+  `ceiling_nanousd`, and a free one declares 0. `repeat_safe` says whether
+  sending the read again is harmless.
+- `decode(body)` turns a 200 response body into the step's text, and
+  `decoder_version` names it; a custom decoder needs its own version. Without
+  one, the body is read as strict UTF-8 (`utf8-text-v1`). The decoder is a
+  caller contract, not a sandbox: it must be local code without side effects.
+- `max_response_bytes` (default 1,000,000, at most 16 MiB), `timeout_s`
+  (default 30 seconds, at most 600), `max_redirects` (default 0, at most 10),
+  `allowed_hosts` (the URL's host is always allowed) and
+  `allow_private_networks` (default `False`) limit each read.
+
+A read sends one `GET`, asking for an uncompressed body, with no proxy. Unless
+`allow_private_networks` is set, every address its host resolves to must be
+public: loopback, private, link-local, shared and other special addresses are
+refused. The request connects to the address that was checked, so a second
+lookup cannot move it, and HTTPS still verifies the certificate for the host
+name. A destination refused before anything is sent releases the call's
+reservation, and the step fails. After the request is sent, a redirect beyond
+`max_redirects`, to a host outside `allowed_hosts`, to a scheme other than
+`http` or `https`, or from `https` to `http`, a body over
+`max_response_bytes`, and a read that takes longer than `timeout_s` are
+refused; the saved response then has an empty body and names the limit.
+
+### Who can declare a read
+
+Only graphs and templates you write. A generated plan cannot: model output may
+set no node metadata except `role`, and `LLMSupervisor` adds steps with only
+an id, a label and dependencies. A step must name a profile in the run's
+`read_tools`, with valid input, and cannot judge another step.
+`read_tools` requires a `run_store`, and an ordinary run refuses a graph with
+a read step before any call. A `tool_runtime` and model function calling stay
+unsupported in durable runs.
+
+The recipe records the profile descriptions under `read_tools`, without
+decoder code, only when a run declares any, so existing recipes keep their
+identity. Resuming with a changed profile raises `WorkflowConflictError` before
+any call. Read text is data for the steps after it: it cannot add a step, a
+profile, a tool or budget, or change the recipe.
+
+### Journal, cost and retries
+
+Each read is a call in the journal's `tool` phase, keyed by its node, its
+generation, invocation and attempt, with the kind `read_tool` and the price
+version `declared-read-v1`. The journal admits only the exact request the
+recorded profile builds from the step's input. The quote is the profile's
+declared ceiling; the call reserves it, claims its dispatch once, and saves
+the raw response before settling and decoding it.
+
+- A free read costs nothing, whatever its outcome, with one exception: a
+  read that is not `repeat_safe` and received no response has an uncertain
+  outcome, so it keeps unknown exposure, and the run is blocked with
+  `unknown_exposure`.
+- A metered read is charged its declared price for a 200 response. Any other
+  outcome may still have been charged, so it keeps unknown exposure at that
+  price and blocks the run. An uncertain metered read is never sent again
+  automatically.
+
+A read makes one request per journaled call and never retries inside it. A
+free read whose response is not a usable 200, such as another status, a
+refused limit or a lost connection, and any read whose decoder fails, settle
+at their known cost as a rejected result, and the step raises `ReadToolError`
+with the status or failure name, never the response body. The node's failure policy decides what happens next:
+`RETRY` reads again as a new journaled call. Resuming re-enters the last
+rejected call of a free, `repeat_safe` read as a new invocation, so a halted
+step reads once more; other rejections replay.
+
+### Interrupted reads
+
+| The process stopped | On resume |
+|---|---|
+| Before the dispatch claim | The same call is sent under its reservation and saved quote; nothing had been sent. |
+| After the claim, before the response was saved | A free, `repeat_safe` read settles at zero cost as rejected, records a `read_response_lost` event and reads again as a new invocation. Any other read keeps unknown exposure and blocks the run; it is never sent again. |
+| After the response was saved | The response is settled and decoded locally, without reading again. |
+| After the text was accepted | The saved text replays until a checkpoint consumes it. |
+
+`tests/test_workflow_read_tool.py` kills a real process at each of these
+points, against a fake service that counts every read it receives, and
+resumes the run.
+
+`inspect_run()`, `list_runs()` and journal events never include a read's URL,
+input, response or text; a receipt records the declared pricing, the HTTP
+status and any failure name. `load_replay()` and `load_evidence()` return
+them explicitly.
+
 ## Supported scope
 
 The managed path supports plain text with three exact built-in providers:
@@ -379,9 +514,10 @@ native `OpenAIResponsesProvider` for `gpt-6-astra` and `gpt-5.6-sol`, native
 `OfflineProvider` plan/echo fixtures. Both native providers use their global
 endpoints. The path binds the built-in simple, LLM, and constrained architects,
 WhiteRabbit routing, static registries, LLM supervision, synthesis strategies,
-token verification, and gates judged by a
+token verification, gates judged by a
 [registered validator](verifier.md#gate-validators-in-durable-workflows)
-declared with `LocalOnly(..., role="validator")`. Every reachable router tier
+declared with `LocalOnly(..., role="validator")`, and
+[recorded read steps](#recorded-read-steps) of declared profiles. Every reachable router tier
 and template is checked before routing can make a paid call. Provider
 instances are snapshotted per run.
 
@@ -396,7 +532,7 @@ component that performs no provider calls or external side effects. A template
 builder must also return the same nodes, with the same ids, for the same task
 and params ([why](architecture.md#planning-tiers)). This is an
 explicit caller contract, not a sandbox. Arbitrary paid custom components,
-scripted offline response cursors, tools, image attachments, active capability
+scripted offline response cursors, model-driven tools, image attachments, active capability
 hydration, live planner memory, and a separate checkpoint store are rejected.
 Those features remain available through the ordinary Swarm and artifact Jobs
 APIs within their documented accounting scopes. A rejected `run_store`,
@@ -419,7 +555,7 @@ release ([journal upgrades](#journal-upgrades)). From the command line,
 the run's state, its delivery decision and its next action through a
 read-only open; see
 [Inspect saved runs](runs.md). Explicit `load_replay()` and
-`load_evidence()` calls expose sensitive saved text and raw provider responses;
+`load_evidence()` calls expose sensitive saved text and raw provider and read responses;
 protect the database and its SQLite sidecar files accordingly. Since 0.8.1, a
 new database file is created readable and writable by its owner only (mode
 0600 on POSIX), and SQLite gives its `-wal` and `-shm` files the same mode.
@@ -430,8 +566,9 @@ not include raw responses or encrypted reasoning.
 ## Journal upgrades
 
 The journal records its format version, which `store.store_version` reports.
-This release writes version 2, which adds the `tool` call phase; its tables
-are the same as version 1's. Smythe 0.9.x and earlier write version 1 and
+This release writes version 2, which adds the `tool` call phase of
+[recorded read steps](#recorded-read-steps); its tables are the same as
+version 1's. Smythe 0.9.x and earlier write version 1 and
 cannot open a version 2 journal, even read-only: they raise
 `WorkflowCorruptionError("Unsupported workflow journal version")`.
 

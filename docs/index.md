@@ -29,7 +29,7 @@ verification, trace, artifact, and recovery controls.
 
 ## Operate durable work
 
-- [Durable text workflows](workflow-accounting.md) — phase-wide native costs, saved graph limits, exact request quotes, fenced ownership, local response replay, and journal upgrades
+- [Durable text workflows](workflow-accounting.md) — phase-wide native costs, saved graph limits, exact request quotes, fenced ownership, local response replay, recorded read steps with network limits, and journal upgrades
 - [Checkpoint format](checkpoint-format.md) — flushed atomic publication, saved state, and resume semantics
 - [Inspect saved runs](runs.md) — read-only `smythe runs inspect` and `list` over checkpoints and durable journals: execution, delivery acceptance, cost, timing, next action, and exit codes 10 and 11 for withheld output
 - [Cost guardrails](budgets.md) — strict usage validation, reservations, per-call ceilings, and failed-accounting recovery

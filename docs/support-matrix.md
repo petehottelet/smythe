@@ -156,6 +156,12 @@ Who calls again after a failure depends on the path and the provider:
   zero cost, and the node failure policy decides whether to call again.
   Other HTTP or transport failures leave the bill unknown and block the run;
   a refusal or truncation is terminal.
+- **Durable read steps** make one request per journaled call. A failed free
+  read settles at zero cost and the node failure policy decides whether to
+  read again, unless no response arrived and its profile does not declare it
+  safe to send again. That read, and a metered read without a 200 response,
+  keep unknown exposure and block the run. See
+  [recorded read steps](workflow-accounting.md#recorded-read-steps).
 - **Jobs** never retry on their own: an operator reroll makes a new attempt,
   up to `max_attempts`.
 
@@ -221,6 +227,8 @@ Tests:
   `tests/test_native_messages.py::test_server_errors_including_overloaded_keep_unknown_exposure`,
   `tests/test_native_messages.py::test_truncations_refusals_keep_their_known_charge`,
   `tests/test_workflow_provider.py::test_known_bad_output_is_paid_terminal_and_replayed_locally`.
+- Durable read steps: `tests/test_workflow_read_tool.py::test_a_failed_read_follows_its_node_failure_policy`,
+  `tests/test_workflow_read_tool.py::test_reads_settle_by_their_declared_charge_and_outcome`.
 - Jobs: `tests/test_jobs_runner.py::test_selective_reroll_replaces_only_rejected_operation`.
 
 ## Durable text workflow components
@@ -238,10 +246,11 @@ argument's name.
 | `acceptance` | `None`, an advisory policy, or a strict `AcceptancePolicy` whose final validators are registered validator objects | A value that is not an `AcceptancePolicy`; a strict policy without final validators under a synthesis other than `DELIVERABLE` |
 | `memory` | `None` | Any planner memory |
 | `tool_runtime` | `None`; nodes send plain text | Any tool runtime |
+| `read_tools` | `ReadProfile` declarations, named by read steps in graphs and templates you write | Other objects, duplicate names and `read_tools` without `run_store`; read steps naming an undeclared profile, with invalid input or judging another node; read steps on ordinary runs |
 | `checkpoint_store` | `None`; the journal holds checkpoints | Any checkpoint store |
 | Architects and other components | Built-in components and `LocalOnly` factories | Subclasses and unjournaled dependencies |
 | Node inputs | Plain text | `attach_dep_artifacts`, `attachments` and `artifacts` |
-| Resume | The saved recipe: components, models, budget, `retry_backoff_s`, concurrency, gate validator and acceptance policy | Any change raises `WorkflowConflictError` |
+| Resume | The saved recipe: components, models, budget, `retry_backoff_s`, concurrency, gate validator, acceptance policy and read profiles | Any change raises `WorkflowConflictError` |
 | `max_budget_usd=None` | Runs without a budget | |
 | `artifact_dir`, `max_tool_iterations` | Ignored | |
 
@@ -276,6 +285,16 @@ Tests:
   `tests/test_workflow_acceptance.py::test_corrupted_stored_output_is_not_accepted`,
   `tests/test_workflow_process_loss.py::test_killed_durable_run_resumes_its_decision_without_new_calls`
   and `tests/test_workflow_process_loss.py::test_killed_priced_run_keeps_its_charges_generations_and_regeneration`.
+- Read steps: `tests/test_workflow_read_tool.py::test_a_read_step_runs_without_a_model_call`,
+  `tests/test_workflow_read_tool.py::test_only_developer_graphs_declare_read_steps`,
+  `tests/test_workflow_read_tool.py::test_recipes_record_read_tools_only_when_declared`
+  and `tests/test_workflow_read_tool.py::test_source_content_never_changes_what_a_run_may_do`;
+  limits `tests/test_workflow_read_tool.py::test_private_destinations_are_refused_before_anything_is_sent`,
+  `tests/test_workflow_read_tool.py::test_reads_are_limited_in_bytes_redirects_and_destinations`
+  and `tests/test_workflow_read_tool.py::test_reads_are_limited_in_time`; recovery
+  `tests/test_workflow_read_tool.py::test_a_saved_read_response_is_used_on_resume_without_reading_again`,
+  `tests/test_workflow_read_tool.py::test_a_lost_read_response_is_read_again_only_when_free_and_repeat_safe`
+  and `tests/test_workflow_read_tool.py::test_killed_read_resumes_without_a_duplicate_read`.
 - Plain-text nodes: `tests/test_support_matrix.py::test_durable_run_rejects_image_inputs_on_a_caller_graph_before_any_call`,
   `tests/test_workflow_native_runtime.py::test_plan_the_run_cannot_execute_is_repaired_as_an_additional_paid_attempt`
   and `tests/test_workflow_provider.py::test_unsupported_input_rejected_before_journal_or_http`.

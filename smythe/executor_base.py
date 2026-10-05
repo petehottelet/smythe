@@ -42,6 +42,7 @@ from smythe.verifier import (
     read_verdict, rejection_reason, verification_integer, validate_verification_receipt,
 )
 from smythe.workflow_store import WorkflowError
+from smythe.workflow_tools import READ_STEP_KEY
 
 if TYPE_CHECKING:
     from smythe.supervisor import Supervisor
@@ -265,6 +266,11 @@ class ExecutorBase:
     ``prompt_assembly`` selects how node prompts are assembled (see
     ``PROMPT_ASSEMBLY_VERSION``); version 1 reproduces the earlier placement
     of ``TERMINAL_DELIVERABLE_NOTE``.
+
+    ``read_call_factory(node, attempt)`` returns the journaled read for a
+    node that declares a read step (``metadata["read_step"]``), which then
+    runs without a model call. Without a factory such a node raises
+    ``ValueError``: read steps run only in durable workflows.
     """
 
     def __init__(
@@ -288,6 +294,7 @@ class ExecutorBase:
         on_supervision_update: Callable[[Node, bool], None] | None = None,
         *,
         prompt_assembly: int = PROMPT_ASSEMBLY_VERSION,
+        read_call_factory: Callable[[Node, int], Any] | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         if acceptance is not None and not isinstance(acceptance, AcceptancePolicy):
@@ -304,6 +311,7 @@ class ExecutorBase:
         self._acceptance = acceptance if self._strict else None
         self._provider = provider
         self._provider_call_factory = provider_call_factory
+        self._read_call_factory = read_call_factory
         self._workflow_managed = (
             provider_call_factory is not None or getattr(provider, "workflow_managed", False) is True
         )
@@ -1080,6 +1088,8 @@ class ExecutorBase:
     async def _run_node_conversation(
         self, node: Node, graph: ExecutionGraph,
     ) -> CompletionResult:
+        if READ_STEP_KEY in node.metadata:
+            return await self._run_read_step(node)
         agent = self._registry.get(node.agent_id) if node.agent_id else None
         dep_results = self.gather_dep_results(node, graph)
         system = self.build_system_prompt(agent)
@@ -1173,6 +1183,29 @@ class ExecutorBase:
         raise ToolLoopLimitError(
             f"Node {node.id!r} hit max_tool_iterations={limit} without completing"
         )
+
+    async def _run_read_step(self, node: Node) -> CompletionResult:
+        """Run a declared read step through its journaled read; no model is called.
+
+        The trace records it as a tool call named ``read:<profile>``, with
+        its duration and whether it failed, but not its input or text.
+        """
+        if self._read_call_factory is None:
+            raise ValueError(
+                f"Node {node.id!r} declares a read step, which runs only in a durable "
+                "workflow: pass run_store and read_tools to Swarm"
+            )
+        step = node.metadata[READ_STEP_KEY]
+        name = step.get("profile") if isinstance(step, dict) else None
+        read = self._read_call_factory(node, self._call_attempts.get(node.id, 0))
+        started, failed = time.monotonic(), True
+        try:
+            result = await read.read()
+            failed = False
+        finally:
+            self._tracer.on_tool_call(node, f"read:{name}", (time.monotonic() - started) * 1000, failed)
+        self._record_cost(node, result, phase="tool")
+        return result
 
     def _readmit_node_budget(self, node: Node) -> None:
         """Admit another call for a node whose reservation a billed call used.
@@ -1278,13 +1311,13 @@ class ExecutorBase:
         if error.billing_result is not None:
             self._reserved_node_ids.discard(node.id)
 
-    def _record_cost(self, node: Node, result: CompletionResult) -> None:
+    def _record_cost(self, node: Node, result: CompletionResult, *, phase: str | None = None) -> None:
         # Custom providers can mutate CompletionResult after construction.
         # Reject malformed usage even when this executor has no Sentinel.
         validate_completion_usage(result)
         _native_receipt(
             node.metadata, result.native_receipt,
-            phase="verification" if node.verifies else "execution",
+            phase=phase or ("verification" if node.verifies else "execution"),
         )
         budget = self._accounting_budget
         if budget is not None:
