@@ -21,11 +21,13 @@ import pytest
 from fakes import Crash, Gate, ManualClock, crash_when, kill_and_reap, launch_child, wait_for_barrier
 from fixture_service import FixtureService, serve_http
 from smythe import (
-    MCPToolRuntime, OfflineProvider, ReadProfile, ReadToolError, SimpleArchitect,
-    SQLiteWorkflowStore, Swarm, Task,
+    DeterministicArchitect, MCPToolRuntime, OfflineProvider, ReadProfile, ReadToolError,
+    SimpleArchitect, SQLiteWorkflowStore, Swarm, Task,
 )
+from smythe.checkpoint import FileCheckpointStore
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, Topology
 from smythe.loader import build_graph_from_model_output
+from smythe.registry import Registry
 from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_provider import WorkflowProviderContext
 from smythe.workflow_store import (
@@ -692,6 +694,85 @@ def test_only_developer_graphs_declare_read_steps(tmp_path, service, monkeypatch
     with pytest.raises(ValueError, match="run only in a durable workflow"):
         Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect()).execute(
             graph_for(profile))
+    assert prompts == [] and service.arrivals == []
+
+
+def recorded_prompts(monkeypatch) -> list[str]:
+    """Record every OfflineProvider prompt, which a test expects to stay empty."""
+    prompts = []
+    complete = OfflineProvider.complete
+
+    async def recording(self, system, prompt, model):
+        prompts.append(prompt)
+        return await complete(self, system, prompt, model)
+
+    monkeypatch.setattr(OfflineProvider, "complete", recording)
+    return prompts
+
+
+class ReadingArchitect(DeterministicArchitect):
+    """Builds, in code, a draft step followed by a read step under *policy*."""
+
+    def __init__(self, profile: ReadProfile, policy: FailurePolicy) -> None:
+        self.profile, self.policy = profile, policy
+
+    def plan(self, task):
+        return ExecutionGraph([Topology.SERIAL], [
+            Node(id="draft", label="Draft"),
+            self.profile.step("fetch", {"source_id": "brief"}, depends_on=["draft"],
+                              failure_policy=self.policy),
+        ]), Registry()
+
+
+@pytest.mark.parametrize("entry", ["execute", "execute_async", "plan", "overridden_plan"])
+@pytest.mark.parametrize("policy", [FailurePolicy.HALT, FailurePolicy.SKIP])
+def test_an_ordinary_run_refuses_an_architects_read_step_before_any_node_call(service, monkeypatch,
+                                                                             entry, policy):
+    prompts = recorded_prompts(monkeypatch)
+    architect = ReadingArchitect(profile_for(service.port), policy)
+
+    class Planned(Swarm):
+        def plan(self, task):
+            return architect.plan(task)[0]
+
+    swarm = (Planned if entry == "overridden_plan" else Swarm)(
+        model="offline", provider=OfflineProvider(), architect=architect)
+    run = {
+        "execute": lambda: swarm.execute(Task("Go")),
+        "execute_async": lambda: asyncio.run(swarm.execute_async(Task("Go"))),
+        "plan": lambda: swarm.plan(Task("Go")),
+        "overridden_plan": lambda: swarm.execute(Task("Go")),
+    }[entry]
+    with pytest.raises(ValueError, match=r"\['fetch'\] declare read steps, which run only in a durable"):
+        run()
+    assert prompts == [] and service.arrivals == []
+
+
+def test_an_ordinary_resume_refuses_a_read_step_before_any_node_call(tmp_path, service, monkeypatch):
+    checkpoints = FileCheckpointStore(tmp_path / "checkpoints")
+    swarm = Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+                  checkpoint_store=checkpoints, artifact_dir=None)
+
+    async def unavailable(self, system, prompt, model):
+        raise ConnectionError("provider unavailable")
+
+    # A halted run leaves both steps to run on resume.
+    monkeypatch.setattr(OfflineProvider, "complete", unavailable)
+    with pytest.raises(ConnectionError):
+        swarm.execute(ExecutionGraph([Topology.SERIAL], [
+            Node(id="draft", label="Draft"), Node(id="fetch", label="Read", depends_on=["draft"])]))
+    (execution_id,) = checkpoints.list_ids()
+    # A checkpoint whose step declares a read, as an earlier build could save.
+    state = checkpoints.load(execution_id)
+    fetch = next(item for item in state["graph"]["nodes"] if item["id"] == "fetch")
+    fetch["metadata"]["read_step"] = {"profile": "source", "input": {"source_id": "brief"}}
+    fetch["failure_policy"] = FailurePolicy.SKIP.value
+    checkpoints.save(execution_id, state)
+
+    monkeypatch.undo()
+    prompts = recorded_prompts(monkeypatch)
+    with pytest.raises(ValueError, match=r"\['fetch'\] declare read steps, which run only in a durable"):
+        swarm.resume(execution_id)
     assert prompts == [] and service.arrivals == []
 
 

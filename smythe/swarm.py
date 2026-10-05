@@ -301,8 +301,9 @@ class Swarm:
 
     ``read_tools`` declares the :class:`~smythe.workflow_tools.ReadProfile`
     reads that a durable run's read steps may name; it requires
-    ``run_store``. An ordinary run refuses a graph with a read step before
-    any call.
+    ``run_store``. An ordinary run refuses a read step before any node
+    call, whether a caller's graph, an architect's or template's plan or a
+    saved checkpoint declares it.
     """
 
     def __init__(
@@ -641,7 +642,9 @@ class Swarm:
             # the plan exists.
             self._check_run_support()
             with tracer.phase("planning"):
-                return self.plan(task)
+                graph = self.plan(task)
+            self._refuse_read_steps(graph)
+            return graph
         return self._plan(task, tracer)
 
     async def _aplan_for_execution(self, task: Task, tracer: Tracer) -> ExecutionGraph:
@@ -649,7 +652,9 @@ class Swarm:
         if type(self).aplan is not Swarm.aplan:
             self._check_run_support()
             with tracer.phase("planning"):
-                return await self.aplan(task)
+                graph = await self.aplan(task)
+            self._refuse_read_steps(graph)
+            return graph
         return await self._aplan(task, tracer)
 
     def _check_run_support(self) -> None:
@@ -746,10 +751,13 @@ class Swarm:
     ) -> ExecutionGraph:
         """Register the plan's agents and stamp its nodes for execution.
 
-        Under a strict policy, each gate of a plan that *architect* generated
-        rather than built from developer code is marked with
+        Only ordinary runs plan here, so a plan with read steps, which an
+        architect or template can build in code, is refused before any node
+        call. Under a strict policy, each gate of a plan that *architect*
+        generated rather than built from developer code is marked with
         ``GENERATED_GATE_KEY``, so that gate does not accept output on its own.
         """
+        self._refuse_read_steps(graph)
         for agent in architect_registry.list_agents():
             self._registry.register(agent)
 
@@ -1161,6 +1169,8 @@ class Swarm:
                 acceptance=acceptance,
                 rejected_output=rejected_output,
             )
+        # A checkpoint saved before ordinary runs refused read steps may hold one.
+        self._refuse_read_steps(graph)
         # Finishing a run under another policy would decide its output
         # differently, so only the policy it began with may finish it.
         self._check_resume_policy(execution_id, acceptance, task)
@@ -1294,6 +1304,16 @@ class Swarm:
             if "model" not in node.metadata:
                 node.metadata["model"] = self.model
 
+    @staticmethod
+    def _refuse_read_steps(graph: ExecutionGraph) -> None:
+        """Refuse, before any node call, an ordinary run of a graph with read steps."""
+        read_steps = [node.id for node in graph.nodes if READ_STEP_KEY in node.metadata]
+        if read_steps:
+            raise ValueError(
+                f"Nodes {read_steps} declare read steps, which run only in a durable workflow: "
+                "pass run_store and read_tools to Swarm"
+            )
+
     def _prepare_graph(self, graph: ExecutionGraph) -> ExecutionGraph:
         """Ready a caller-built graph for execution.
 
@@ -1304,12 +1324,7 @@ class Swarm:
         if graph.run_ref is not None:
             raise ValueError("This graph requires its matching durable run_store")
         graph.validate()
-        read_steps = [node.id for node in graph.nodes if READ_STEP_KEY in node.metadata]
-        if read_steps:
-            raise ValueError(
-                f"Nodes {read_steps} declare read steps, which run only in a durable workflow: "
-                "pass run_store and read_tools to Swarm"
-            )
+        self._refuse_read_steps(graph)
         self._check_inherited_verdicts(graph)
         self._stamp_model(graph)
         if graph.task is not None:

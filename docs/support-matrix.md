@@ -258,6 +258,10 @@ A caller-built graph with image inputs fails before any node runs. A
 generated plan with them goes back to the planner for a repair, which is a
 new paid planning call.
 
+An ordinary run raises `ValueError` for a read step before any node call: a
+caller-built graph before it runs, a plan that an architect or template
+builds as soon as it exists, and a saved checkpoint before it resumes.
+
 Tests:
 
 - Rejected components: `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[store-subclass]`,
@@ -289,6 +293,8 @@ Tests:
   `tests/test_workflow_read_tool.py::test_only_developer_graphs_declare_read_steps`,
   `tests/test_workflow_read_tool.py::test_recipes_record_read_tools_only_when_declared`
   and `tests/test_workflow_read_tool.py::test_source_content_never_changes_what_a_run_may_do`;
+  ordinary runs `tests/test_workflow_read_tool.py::test_an_ordinary_run_refuses_an_architects_read_step_before_any_node_call`
+  and `tests/test_workflow_read_tool.py::test_an_ordinary_resume_refuses_a_read_step_before_any_node_call`;
   limits `tests/test_workflow_read_tool.py::test_private_destinations_are_refused_before_anything_is_sent`,
   `tests/test_workflow_read_tool.py::test_reads_are_limited_in_bytes_redirects_and_destinations`,
   `tests/test_workflow_read_tool.py::test_reads_are_limited_in_time`,

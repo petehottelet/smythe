@@ -475,7 +475,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   repeat-safe read whose response was lost is read again as a new call; any
   other read without a response blocks the run and is never sent again. Only
   graphs and templates you write declare read steps, never a generated plan,
-  and an ordinary run refuses one before any call. The recipe records
+  and an ordinary run refuses one before any node call, in a caller's graph,
+  an architect's or template's plan, or a saved checkpoint. The recipe records
   `read_tools` only when a run declares profiles, so other recipes keep their
   identity. See
   [recorded read steps](docs/workflow-accounting.md#recorded-read-steps).

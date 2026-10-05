@@ -456,9 +456,11 @@ Only graphs and templates you write. A generated plan cannot: model output may
 set no node metadata except `role`, and `LLMSupervisor` adds steps with only
 an id, a label and dependencies. A step must name a profile in the run's
 `read_tools`, with valid input, and cannot judge another step.
-`read_tools` requires a `run_store`, and an ordinary run refuses a graph with
-a read step before any call. A `tool_runtime` and model function calling stay
-unsupported in durable runs.
+`read_tools` requires a `run_store`. An ordinary run raises `ValueError` for a
+read step before any node call: in a graph passed to `execute()` before it
+runs, in a plan that an architect or template builds as soon as it exists,
+and in a saved checkpoint before it resumes. A `tool_runtime` and model
+function calling stay unsupported in durable runs.
 
 The recipe records the profile descriptions under `read_tools`, without
 decoder code, only when a run declares any, so existing recipes keep their
