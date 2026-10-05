@@ -26,7 +26,7 @@ verification, trace, artifact, and recovery controls.
 - [YAML and jobs](jobs.md) — declarative artifact work and the installed CLI
 - [Adaptive supervision](supervisor.md) — revise pending work from completed results
 - [Verification](verifier.md) — objective gates, active-work invalidation, recoverable regeneration, and strict acceptance of the delivered output, with its obligations checked before any call and after every revision, and explicit re-evaluation of a completed run's saved output
-- [Source evidence](source-evidence.md) — versioned source and claim records an artifact carries, mechanical checks that its quotes and listed contradictions hold against the run's current sources, unavailable and removed sources, and evidence journaled in durable runs
+- [Source evidence](source-evidence.md) — versioned source and claim records an artifact carries, mechanical checks that its quotes and listed contradictions hold against the run's current sources, unavailable and removed sources, synthesis that keeps listed contradictions, and evidence journaled in durable runs
 
 ## Operate durable work
 

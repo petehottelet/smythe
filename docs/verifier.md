@@ -415,7 +415,9 @@ in the graph is read from its recorded final verdict. The decision is:
 A gate therefore accepts only the node it judged. A later step, including one
 a supervisor adds after the gated node, two deliverable nodes, the
 `DELIVERABLE` fallback to every completed node, and `CONCATENATE`,
-`STRUCTURED`, `LLM_MERGE` or a custom synthesizer all need a final validator.
+`STRUCTURED`, `LLM_MERGE` or a custom synthesizer all need a final validator,
+and so does `DELIVERABLE` output to which `retain_contradictions` appends a
+[contradictions section](source-evidence.md#keep-contradictions-through-synthesis).
 A `Swarm` whose strict policy has none raises `ValueError` when it is built
 with a synthesis other than `DELIVERABLE`, and refuses the other cases
 [before any call](#acceptance-obligations).
@@ -676,7 +678,9 @@ cites a source the evidence does not list, and each contradiction the
 evidence lists appears in the artifact. A passage from a tombstoned source
 cannot be checked and gives an `error` outcome, never acceptance. The checks
 are mechanical: whether a passage supports its claim stays a judgement for a
-gate or a reviewer.
+gate or a reviewer. `Synthesizer(retain_contradictions=True)`
+[keeps listed contradictions through synthesis](source-evidence.md#keep-contradictions-through-synthesis),
+and these checks then run on the output it delivers.
 
 ### Rejected generations
 

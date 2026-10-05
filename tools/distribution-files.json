@@ -132,6 +132,7 @@
     "tests/test_committed_identifiers.py",
     "tests/test_constrained_planner.py",
     "tests/test_context_snapshots.py",
+    "tests/test_contradiction_synthesis.py",
     "tests/test_design.py",
     "tests/test_distill.py",
     "tests/test_distribution.py",

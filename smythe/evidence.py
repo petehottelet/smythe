@@ -18,6 +18,8 @@ is its body (:func:`read_source_evidence`).
 :class:`~smythe.validators.SourceEvidenceValidator` checks the records
 mechanically against the sources a run was given and the body. Whether a
 passage really supports its claim is a judgement those checks do not make.
+:func:`render_contradictions` writes a section for each listed contradiction
+a body leaves out.
 
 A durable text workflow whose strict acceptance policy has such a validator
 journals the evidence its delivered output carries as a ``source_evidence``
@@ -50,8 +52,8 @@ __all__ = [
     "EVIDENCE_BLOCK", "SOURCE_EVIDENCE_OPERATION", "SOURCE_EVIDENCE_VERSION",
     "SOURCE_TOMBSTONE_OPERATION", "ClaimPassage", "ClaimRecord", "SourceEvidence",
     "SourceRecord", "load_source_evidence", "load_source_tombstones", "read_source_evidence",
-    "render_source_evidence", "source_evidence_inputs", "source_evidence_key",
-    "source_evidence_result", "source_tombstone_key",
+    "render_contradictions", "render_source_evidence", "source_evidence_inputs",
+    "source_evidence_key", "source_evidence_result", "source_tombstone_key",
 ]
 
 # The record version every source, claim and evidence record carries.
@@ -577,3 +579,50 @@ def load_source_evidence(store: Any, run_id: str, *, include_text: bool = False)
             "output_sha256": inputs["output_sha256"], "context_sources": binding,
             "problem": result["problem"], "sources": sources,
             "claims": [claim.to_dict() for claim in evidence.claims]}
+
+
+def _cited(role: str, passage: ClaimPassage) -> str:
+    """A list line naming *passage*'s source, then its quote exactly as written.
+
+    A quote of several lines goes in a fenced block longer than any run of
+    backticks in it, so that no line of the quote opens or closes a block.
+    """
+    line = f"  - {role} source {json.dumps(passage.source_id, ensure_ascii=False)}:"
+    quote = passage.quote
+    if "\n" not in quote and "\r" not in quote:
+        return f'{line} "{quote}"'
+    fence = "`" * max(3, 1 + max(map(len, re.findall("`+", quote)), default=0))
+    return f"{line}\n\n{fence}text\n{quote}\n{fence}"
+
+
+def render_contradictions(claims: Iterable[ClaimRecord], body: str) -> str:
+    """A Markdown ``Contradictions`` section for each contradiction *body* leaves out.
+
+    A contradicting passage of one of *claims* is left out when its quote is
+    not in *body* exactly: the test the ``contradictions`` check of
+    :class:`~smythe.validators.SourceEvidenceValidator` makes. Each such claim
+    is listed once, in order, with its text, its supporting passages, the
+    contradicting passages *body* leaves out and its proposed conclusion; each
+    quote is copied exactly. Returns ``""`` when *body* leaves nothing out.
+    """
+    claims = _items(claims, ClaimRecord, "claims")
+    if not isinstance(body, str):
+        raise TypeError("render_contradictions takes the artifact's body as text")
+    lines: list[str] = []
+    listed: set[ClaimRecord] = set()
+    for claim in claims:
+        missing = [passage for passage in claim.contradicting if passage.quote not in body]
+        if not missing or claim in listed:
+            continue
+        listed.add(claim)
+        lines.append(f"- Claim {json.dumps(claim.claim_id, ensure_ascii=False)}: "
+                     f"{json.dumps(claim.text, ensure_ascii=False)}")
+        lines += [_cited("Supported by", passage) for passage in claim.supporting]
+        lines += [_cited("Contradicted by", passage) for passage in missing]
+        if claim.conclusion is not None:
+            lines.append("  - Proposed conclusion: "
+                         + json.dumps(claim.conclusion, ensure_ascii=False))
+    if not lines:
+        return ""
+    return "\n".join(["## Contradictions", "", "The source evidence lists these contradictions; "
+                      "the text above does not quote them.", "", *lines]) + "\n"

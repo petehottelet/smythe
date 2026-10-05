@@ -138,6 +138,61 @@ artifact, such as one read with `TokenVerifier`, or for a reviewer. Under a
 strict policy a failing gate still decides `rejected` when every mechanical
 check passed.
 
+## Keep contradictions through synthesis
+
+`Synthesizer(retain_contradictions=True)` keeps the contradictions that
+source evidence lists. It is off by default and applies to two strategies;
+`CONCATENATE` and `STRUCTURED` raise `ValueError` with it.
+
+- **`DELIVERABLE`** reads the claim records in the evidence block of each
+  node it delivers. For each contradicting passage whose quote the delivered
+  text, without its evidence blocks, does not contain exactly, it appends a
+  `## Contradictions` section after the output. The section lists each such
+  claim once with its text, its supporting passages, the missing
+  contradicting passages and its proposed conclusion. Quotes are copied
+  exactly, so the `contradictions` check passes on the output; a quote of
+  several lines goes in a fenced block that no line of it can close. The
+  section is local code with no provider call, and the same results always
+  give the same bytes. Output that leaves nothing out, or whose nodes carry
+  no readable evidence, is delivered unchanged. Records of nodes it does not
+  deliver, such as an earlier research step, are not read.
+- **`LLM_MERGE`** appends `smythe.synthesizer.CONTRADICTION_NOTE` to the
+  merge's prompt: quote each listed contradiction exactly, beside the
+  passages it contradicts, never settle one by choosing a side silently, and
+  carry one evidence block. `MERGE_SYSTEM_PROMPT` is unchanged, and the merged
+  text is delivered as the model wrote it.
+
+`smythe.evidence.render_contradictions(claims, body)` writes the same section
+for a renderer or a step of your own, and returns `""` when *body* quotes
+every contradiction.
+
+```python
+from smythe import AcceptancePolicy, SourceEvidenceValidator, Swarm, Synthesizer
+
+swarm = Swarm(..., synthesizer=Synthesizer(retain_contradictions=True),
+              acceptance=AcceptancePolicy(mode="strict",
+                                          final_validators=[SourceEvidenceValidator([poll, audit])]))
+```
+
+**Review.** Under a strict policy the final validators decide on the exact
+output, section included. A merge that leaves out a listed contradiction is
+rejected with `contradiction_missing`, and the run returns its text only as
+`rejected_output`. The section changes the delivered bytes, so a gate's
+verdict on the delivered node no longer covers them on its own: without a
+final validator such output is decided by `on_invalid`. Whether a
+contradiction is weighed fairly stays a judgement. A gate's judge reviewing
+the draft receives the draft's evidence, listed contradictions included, and,
+with [context assembly](tasks.md#context-snapshots), the run's sources as
+untrusted data in its context snapshot; its failing verdict still rejects.
+Source text quoted into the section is data: instructions in it change no
+capability, budget or acceptance policy.
+
+A durable run's recipe names `"retain_contradictions": true` in its
+synthesizer's description only when it is set, so other recipes keep their
+identity and a run resumes only with the same setting. The synthesized text
+is journaled with the `synthesis` operation, so a resumed run replays it
+without another call.
+
 ## Durable runs
 
 A durable run whose strict policy has a `SourceEvidenceValidator` journals

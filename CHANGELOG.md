@@ -756,6 +756,19 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `Sentinel.check()` treats held allowance as spent. Durable runs refuse the
   option. Without it, reservations are unchanged. See
   [held allowance](docs/budgets.md#held-allowance-for-checks).
+- `Synthesizer(retain_contradictions=True)` keeps the contradictions that
+  source evidence lists. `DELIVERABLE` synthesis appends a deterministic
+  `Contradictions` section for each contradicting passage that the delivered
+  nodes' claim records list and their text does not quote, citing both
+  sides exactly, so strict acceptance's `contradictions` check passes on the
+  exact output; text that quotes every one is delivered unchanged.
+  `LLM_MERGE` appends `CONTRADICTION_NOTE` to the merge prompt; a strict
+  policy with `SourceEvidenceValidator` still rejects a merge that drops a
+  listed contradiction. `MERGE_SYSTEM_PROMPT` is unchanged. `CONCATENATE` and `STRUCTURED` refuse
+  the option. A durable recipe names it in its synthesizer description only
+  when set, so other recipes keep their identity.
+  `smythe.evidence.render_contradictions()` writes the section. See
+  [keep contradictions through synthesis](docs/source-evidence.md#keep-contradictions-through-synthesis).
 
 ### Changed
 
