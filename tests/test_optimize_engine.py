@@ -18,6 +18,7 @@ from smythe.optimize.contracts import (
     MetricObjective,
     MutableFieldRule,
     ObjectiveDirection,
+    sha256_prefixed,
 )
 from smythe.optimize.engine import (
     OptimizationError,
@@ -28,6 +29,7 @@ from smythe.optimize.engine import (
     TrialOutcome,
     _bound_phase,
     _split_seeds,
+    _task_indices,
 )
 from smythe.optimize.ledger import (
     CampaignLeaseConflict,
@@ -36,6 +38,7 @@ from smythe.optimize.ledger import (
     TrialStatus,
     holdout_identity,
 )
+from smythe.optimize.statistics import PROMOTION_METHOD
 
 
 EVALUATOR_HASH = "sha256:" + "e" * 64
@@ -108,6 +111,7 @@ def _runner(
     *,
     campaign_id: str | None = None,
     bootstrap_resamples: int = 100,
+    **options: object,
 ) -> OptimizationRunner:
     return OptimizationRunner(
         contract,
@@ -116,6 +120,7 @@ def _runner(
         evaluator_hash=EVALUATOR_HASH,
         bootstrap_resamples=bootstrap_resamples,
         campaign_id=campaign_id,
+        **options,  # type: ignore[arg-type]
     )
 
 
@@ -997,3 +1002,153 @@ async def test_a_changed_task_pack_in_the_evaluator_manifest_draws_a_new_holdout
         assert ledger.holdout_uses(new_identity) == {
             challenger.policy_hash: (second.campaign_id,)
         }
+
+
+async def _record_contexts(
+    path, contract: ExperimentContract, incumbent: Candidate, challenger: Candidate, **options
+) -> list[TrialContext]:
+    calls: list[TrialContext] = []
+
+    async def evaluate(context: TrialContext) -> TrialOutcome:
+        calls.append(context)
+        return await _challengers_win(context)
+
+    with ExperimentLedger(path, durability="normal") as ledger:
+        result = await _runner(contract, ledger, evaluate, **options).run(
+            incumbent, (challenger,)
+        )
+    assert result.promoted is True
+    return calls
+
+
+def _assigned(
+    calls: list[TrialContext], split: str, candidate: Candidate
+) -> list[tuple[int, int | None]]:
+    """(seed, task_index) for one candidate's trials in one split, in seed order."""
+
+    return [
+        (context.seed, context.task_index)
+        for context in calls
+        if context.split == split and context.candidate == candidate
+    ]
+
+
+@pytest.mark.asyncio
+async def test_task_index_is_deterministic_and_never_repeats_within_a_split(tmp_path):
+    contract = _contract()
+    incumbent, challenger = _candidates(contract)
+    pools = {"development": 2, "confirmation": 3, "holdout": 5}
+
+    first = await _record_contexts(
+        tmp_path / "first.sqlite3", contract, incumbent, challenger, task_pools=pools
+    )
+    again = await _record_contexts(
+        tmp_path / "again.sqlite3", contract, incumbent, challenger, task_pools=pools
+    )
+    unpooled = await _record_contexts(
+        tmp_path / "unpooled.sqlite3", contract, incumbent, challenger
+    )
+
+    assert {context.task_index for context in unpooled} == {None}
+    for calls in (first, again):
+        for split, pool in pools.items():
+            assigned = _assigned(calls, split, challenger)
+            seeds = tuple(seed for seed, _ in assigned)
+            indices = tuple(index for _, index in assigned)
+            # Each seed of a split names a different task inside its pool,
+            # and the incumbent's paired trial uses the same task.
+            assert len(set(indices)) == len(indices) == len(seeds)
+            assert all(0 <= index < pool for index in indices)
+            assert _assigned(calls, split, incumbent) == assigned
+            assert indices == _task_indices(split, seeds, pool)
+    # Development and confirmation seeds come from the contract, so a fresh
+    # ledger repeats their tasks; holdout seeds come from each campaign's
+    # sealed secret, and its tasks follow them.
+    for split in ("development", "confirmation"):
+        assert _assigned(again, split, challenger) == _assigned(first, split, challenger)
+
+
+def test_task_indices_follow_a_fixed_derivation():
+    seeds = (11, 22, 33)
+
+    # Fixed values: a resumed campaign must keep drawing the same tasks.
+    assert _task_indices("holdout", seeds, 10) == (1, 4, 9)
+    assert _task_indices("confirmation", seeds, 10) == (3, 4, 5)
+    assert _task_indices("holdout", seeds, None) == (None, None, None)
+    assert sorted(_task_indices("development", (5, 6, 7, 8), 4)) == [0, 1, 2, 3]
+    large = _task_indices("holdout", tuple(range(1_000)), 2**62)
+    assert len(set(large)) == 1_000
+    assert all(0 <= index < 2**62 for index in large)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "pools",
+    [{"holdout": 2}, {"confirmation": 2}, {"development": 1, "holdout": 2}],
+    ids=["holdout", "confirmation", "two-splits"],
+)
+async def test_plan_with_more_repetitions_than_its_task_pool_is_refused(tmp_path, pools):
+    contract = _contract()
+    incumbent, challenger = _candidates(contract)
+
+    async def never_called(_context: TrialContext) -> TrialOutcome:
+        raise AssertionError("a refused plan must not invoke the evaluator")
+
+    with ExperimentLedger(tmp_path / "pool.sqlite3", durability="normal") as ledger:
+        runner = _runner(contract, ledger, never_called, task_pools=pools)
+        with pytest.raises(OptimizationLimitError, match="task pool"):
+            await runner.run(incumbent, (challenger,))
+        count = ledger._connection.execute("SELECT COUNT(*) FROM campaigns").fetchone()[0]
+        assert count == 0
+
+
+@pytest.mark.parametrize(
+    ("pools", "error"),
+    [
+        ({"regression": 3}, ValueError),
+        ({"holdout": 0}, ValueError),
+        ({"holdout": True}, ValueError),
+        ({"holdout": 3.0}, ValueError),
+        ({"holdout": 2**63}, ValueError),
+        ([("holdout", 3)], TypeError),
+    ],
+)
+def test_runner_rejects_invalid_task_pools(tmp_path, pools, error):
+    with ExperimentLedger(tmp_path / "invalid-pool.sqlite3") as ledger:
+        with pytest.raises(error, match="task_pools"):
+            _runner(_contract(), ledger, _challengers_win, task_pools=pools)
+
+
+def test_task_pools_join_the_plan_hash_only_when_declared(tmp_path):
+    contract = _contract()
+    incumbent, challenger = _candidates(contract)
+
+    with ExperimentLedger(tmp_path / "plan.sqlite3", durability="normal") as ledger:
+
+        def plan_hash(**options: object) -> str:
+            runner = _runner(contract, ledger, _challengers_win, **options)
+            return runner._build_plan(incumbent, (challenger,))["plan_hash"]
+
+        # Plans that declare no task pool keep their earlier bytes.
+        legacy = sha256_prefixed(
+            {
+                "runner_version": 4,
+                "statistics": {
+                    "method": PROMOTION_METHOD,
+                    "descriptive_bootstrap_resamples": 100,
+                },
+                "contract_hash": contract.contract_hash,
+                "incumbent_candidate_id": incumbent.candidate_id,
+                "ordered_candidate_ids": [challenger.candidate_id],
+                "ordered_policy_hashes": [challenger.policy_hash],
+                "evaluator_hash": EVALUATOR_HASH,
+                "ledger_durability": "normal",
+                "required_trials": 14,
+            }
+        )
+        assert plan_hash() == legacy
+        assert plan_hash(task_pools={}) == legacy
+        pooled = plan_hash(task_pools={"holdout": 3})
+        assert pooled != legacy
+        assert plan_hash(task_pools={"holdout": 4}) != pooled
+        assert plan_hash(task_pools={"holdout": 3, "development": 5}) != pooled

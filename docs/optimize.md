@@ -304,7 +304,8 @@ promote the candidate. Rejection never emits a patch to apply.
 The optimization plan hash binds the contract, incumbent, ordered challenger
 set, policy hashes, evaluator hash, runner version, promotion method,
 descriptive bootstrap configuration, ledger durability, and required trial
-count. When `--campaign-id` is omitted, the durable campaign identity is
+count, plus any declared [task pools](#finite-task-pools). When
+`--campaign-id` is omitted, the durable campaign identity is
 derived from that full plan. Repeating the same command reuses completed
 trials; changing a candidate, contract, evaluator, bootstrap, or durability
 setting creates a different automatic campaign. That campaign is refused if
@@ -439,7 +440,9 @@ result = await runner.run(incumbent, challengers)
 ```
 
 The async evaluator receives an immutable `TrialContext`, including the
-campaign's monotonic deadline, and must return a `TrialOutcome` containing
+campaign's monotonic deadline and, when the runner declares
+[task pools](#finite-task-pools), the task to run, and must return a
+`TrialOutcome` containing
 exactly the contract's metrics and gate inventory, signed-63-bit integer
 micro-USD cost, and optional SHA-256 artifact hashes.
 `OptimizationResult` carries the plan identity, development scores,
@@ -491,6 +494,40 @@ validator, judge, or price snapshot defines a new holdout evaluation.
 fields. Runners still accept any raw `sha256:` evaluator hash; the manifest is
 a convenience for computing one. Keep a held-out pack's tasks away from
 whoever proposes candidates: the manifest records only its digest.
+
+### Finite task pools
+
+Seeds are unlimited, but a task pack is not. Declare how many distinct tasks
+each split's evaluator draws from with `task_pools`:
+
+```python
+runner = OptimizationRunner(
+    contract,
+    ledger,
+    evaluate,
+    evaluator_hash=manifest.evaluator_hash,
+    task_pools={"development": 12, "confirmation": 12, "holdout": 12},
+)
+```
+
+Each `TrialContext` for a split with a pool then carries a `task_index` from
+0 to one less than that split's pool size; the evaluator runs that task. Within a split no two
+seeds share a task, and the incumbent and challenger trials on one seed run
+the same task, so every pair compares the two policies on one task. The
+indices are a deterministic shuffle of the split's seeds, so a resumed
+campaign draws the same tasks, development and confirmation repeat across
+campaigns with the same contract, and holdout tasks follow the campaign's
+sealed holdout seeds. Each split's pool is indexed on its own; give
+confirmation its own pack if it must not repeat development tasks. A split
+without a pool gets `task_index=None`, as before.
+
+A plan whose repetitions for a split exceed that split's pool is refused with
+`OptimizationLimitError` before the campaign is created, since it would have
+to repeat a task. Pools that are declared join the plan hash, so changing one
+starts a different automatic campaign; a plan that declares none keeps its
+hash. Pool sizes are not part of the holdout identity. Requirements the
+engine does not model, such as a regression set whose results must not get
+worse, belong in the evaluator as required gates.
 
 <a id="campaign-ownership-unreleased"></a>
 

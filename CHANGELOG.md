@@ -387,6 +387,14 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   changed held-out task pack or validator defines a new holdout. Runners still
   accept a raw evaluator hash. See
   [evaluator manifests](docs/optimize.md#evaluator-manifests).
+- `OptimizationRunner` takes `task_pools`, the number of distinct tasks each
+  split's evaluator draws from. `TrialContext.task_index` then names the
+  task for each trial: the incumbent and challenger share it on a seed, no
+  two seeds of a split repeat it, and it is reproducible on resume while
+  holdout tasks follow the campaign's sealed seeds. A plan with more
+  repetitions than a split's pool is refused before the campaign is created.
+  Declared pools join the plan hash; plans that declare none keep theirs.
+  See [finite task pools](docs/optimize.md#finite-task-pools).
 
 ### Changed
 

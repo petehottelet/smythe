@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any, TypeAlias
 
 from smythe.optimize.contracts import (
+    _SPLITS,
     Candidate,
     ExperimentContract,
     ObjectiveDirection,
@@ -76,7 +77,13 @@ class OptimizationLimitError(OptimizationError):
 
 @dataclass(frozen=True, slots=True)
 class TrialContext:
-    """Immutable input supplied to one in-process evaluator invocation."""
+    """Immutable input supplied to one in-process evaluator invocation.
+
+    ``task_index`` names the task to evaluate, from 0 below the split's
+    declared task pool, or is None when the runner declares no pool for the
+    split.  Paired trials on one seed share it, and no two seeds of a split
+    do.
+    """
 
     campaign_id: str
     optimization_plan_hash: str
@@ -88,6 +95,7 @@ class TrialContext:
     evaluator_hash: str
     ceiling_microusd: int
     deadline_monotonic: float
+    task_index: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,6 +238,7 @@ class OptimizationRunner:
         campaign_id: str | None = None,
         lease_ttl_s: float = 30.0,
         lease_heartbeat_s: float | None = None,
+        task_pools: Mapping[str, int] | None = None,
     ) -> None:
         if not isinstance(contract, ExperimentContract):
             raise TypeError("contract must be an ExperimentContract")
@@ -256,6 +265,16 @@ class OptimizationRunner:
             not isinstance(campaign_id, str) or not campaign_id.strip()
         ):
             raise ValueError("campaign_id must be a non-empty string when provided")
+        if task_pools is not None and not isinstance(task_pools, Mapping):
+            raise TypeError("task_pools must map split names to task counts")
+        pools = dict(task_pools or {})
+        for split, size in pools.items():
+            if split not in _SPLITS:
+                raise ValueError(f"task_pools has an unknown split: {split!r}")
+            if isinstance(size, bool) or not isinstance(size, int) or not (
+                1 <= size <= _MAX_SIGNED_63
+            ):
+                raise ValueError(f"task_pools[{split!r}] must be a positive integer")
 
         self.contract = contract
         self.ledger = ledger
@@ -270,6 +289,7 @@ class OptimizationRunner:
             raise ValueError("lease heartbeat must be shorter than its TTL")
         self.lease_ttl_s = float(lease_ttl_s)
         self.lease_heartbeat_s = float(interval)
+        self.task_pools = {split: pools[split] for split in _SPLITS if split in pools}
 
     async def run(
         self,
@@ -605,6 +625,13 @@ class OptimizationRunner:
                 f"paired plan requires {required_reservation} microusd of reservation "
                 f"but max_budget_microusd is {self.contract.max_budget_microusd}"
             )
+        for split, pool in self.task_pools.items():
+            repetitions = getattr(self.contract, f"{split}_repetitions")
+            if repetitions > pool:
+                raise OptimizationLimitError(
+                    f"{split} needs {repetitions} distinct tasks but its task pool "
+                    f"has {pool}"
+                )
         plan_payload = {
             "runner_version": RUNNER_VERSION,
             "statistics": {
@@ -619,6 +646,10 @@ class OptimizationRunner:
             "ledger_durability": self.ledger.durability,
             "required_trials": required_trials,
         }
+        # Optional settings join the plan only when declared, so plans that
+        # declare none keep their hashes.
+        if self.task_pools:
+            plan_payload["task_pools"] = dict(self.task_pools)
         plan_hash = sha256_prefixed(plan_payload)
         campaign_id = self.campaign_id or (
             f"optimization_v{RUNNER_VERSION}_" + plan_hash.removeprefix("sha256:")
@@ -968,7 +999,10 @@ class OptimizationRunner:
         lease: CampaignLease,
     ) -> tuple[TrialRecord, ...]:
         records: list[TrialRecord] = []
-        for seed in seeds:
+        # ``seeds`` is always the split's complete sealed seed list, so every
+        # candidate maps a seed to the same task.
+        task_indices = _task_indices(split, seeds, self.task_pools.get(split))
+        for seed, task_index in zip(seeds, task_indices, strict=True):
             if stop_event is not None and stop_event.is_set():
                 raise OptimizationNeedsAttention(
                     "parallel evaluation stopped before admitting another trial"
@@ -985,6 +1019,7 @@ class OptimizationRunner:
                     duration_budget,
                     stop_event,
                     lease=lease,
+                    task_index=task_index,
                 )
             )
         return tuple(records)
@@ -1002,6 +1037,7 @@ class OptimizationRunner:
         stop_event: asyncio.Event | None,
         *,
         lease: CampaignLease,
+        task_index: int | None = None,
     ) -> TrialRecord:
         self._require_time(deadline)
         trial_key = self._prepare_trial(
@@ -1055,6 +1091,7 @@ class OptimizationRunner:
             evaluator_hash=self.evaluator_hash,
             ceiling_microusd=self.contract.per_trial_reservation_microusd,
             deadline_monotonic=deadline,
+            task_index=task_index,
         )
         trial_started = time.monotonic()
         try:
@@ -1527,6 +1564,31 @@ def _split_seeds(
         for index in range(contract.holdout_repetitions)
     )
     return development, confirmation, holdout
+
+
+def _task_indices(
+    split: str, seeds: Sequence[int], pool: int | None
+) -> tuple[int | None, ...]:
+    """Draw one distinct task index below *pool* for each of a split's seeds.
+
+    A partial Fisher-Yates shuffle keyed by SHA-256 of the split and its
+    ordered seeds, so the draw is reproducible on resume and on any Python,
+    and holdout tasks follow the campaign's sealed holdout seeds.
+    """
+
+    if pool is None:
+        return (None,) * len(seeds)
+    key = canonical_json_bytes({"split": split, "seeds": list(seeds)})
+    moved: dict[int, int] = {}
+    indices: list[int | None] = []
+    for position in range(len(seeds)):
+        digest = hashlib.sha256(
+            b"smythe.optimize.task-index.v1\0" + key + position.to_bytes(8, "big")
+        ).digest()
+        chosen = position + int.from_bytes(digest[:8], "big") % (pool - position)
+        indices.append(moved.get(chosen, chosen))
+        moved[chosen] = moved.get(position, position)
+    return tuple(indices)
 
 
 def _comparison_dict(result: ComparisonResult) -> dict[str, Any]:
