@@ -458,10 +458,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   a step's checked input, a decoder and its version, whether a read can be
   charged (`metered`, with its per-call price as `ceiling_nanousd`) and
   whether it is safe to send again (`repeat_safe`), and limits on response
-  bytes, time, redirects and hosts. Loopback, private and other non-public
-  addresses are refused before the request and at each redirect unless
-  `allow_private_networks` is set, and the request connects to the address
-  that was checked. `Swarm(run_store=..., read_tools=[...])` runs a node whose
+  bytes, time, redirects and hosts. A read stops at its time limit however
+  slowly the source sends, and once connected, as soon as its step stops
+  waiting. Loopback, private and other non-public addresses are refused
+  before the request and at each redirect unless `allow_private_networks` is
+  set, and the request connects to the address that was checked.
+  `Swarm(run_store=..., read_tools=[...])` runs a node whose
   `metadata["read_step"]` names a profile and its input, as
   `ReadProfile.step()` builds, without a model call. The journal records each
   read as a `read_tool` call in the `tool` phase, quoted at its declared

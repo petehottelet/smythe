@@ -290,8 +290,10 @@ Tests:
   `tests/test_workflow_read_tool.py::test_recipes_record_read_tools_only_when_declared`
   and `tests/test_workflow_read_tool.py::test_source_content_never_changes_what_a_run_may_do`;
   limits `tests/test_workflow_read_tool.py::test_private_destinations_are_refused_before_anything_is_sent`,
-  `tests/test_workflow_read_tool.py::test_reads_are_limited_in_bytes_redirects_and_destinations`
-  and `tests/test_workflow_read_tool.py::test_reads_are_limited_in_time`; recovery
+  `tests/test_workflow_read_tool.py::test_reads_are_limited_in_bytes_redirects_and_destinations`,
+  `tests/test_workflow_read_tool.py::test_reads_are_limited_in_time`,
+  `tests/test_workflow_read_tool.py::test_a_slow_source_cannot_hold_a_read_past_its_time_limit`
+  and `tests/test_workflow_read_tool.py::test_a_step_that_stops_waiting_stops_its_read`; recovery
   `tests/test_workflow_read_tool.py::test_a_saved_read_response_is_used_on_resume_without_reading_again`,
   `tests/test_workflow_read_tool.py::test_a_lost_read_response_is_read_again_only_when_free_and_repeat_safe`
   and `tests/test_workflow_read_tool.py::test_killed_read_resumes_without_a_duplicate_read`.

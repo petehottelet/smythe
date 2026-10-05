@@ -444,6 +444,11 @@ reservation, and the step fails. After the request is sent, a redirect beyond
 `http` or `https`, or from `https` to `http`, a body over
 `max_response_bytes`, and a read that takes longer than `timeout_s` are
 refused; the saved response then has an empty body and names the limit.
+The time limit covers the whole read, however slowly the source sends: the
+read stops and closes its connection once `timeout_s` seconds have passed.
+Only a host name lookup can take longer, for as long as the system resolver
+allows. Once connected, a read also stops as soon as its step stops waiting,
+for example at the node's own `timeout_s`.
 
 ### Who can declare a read
 

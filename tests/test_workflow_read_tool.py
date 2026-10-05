@@ -14,6 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import sqlite3
 import threading
+import time
 
 import pytest
 
@@ -494,6 +495,89 @@ def test_reads_are_limited_in_time(tmp_path, service):
     assert (record["billing_state"], record["cost_nanousd"], record["result_state"]) == (
         "known", 0, "rejected")
     assert service.arrivals == ["brief"]
+
+
+DRIP_BYTES = 300
+DRIP_INTERVAL_S = 0.05  # 15 seconds for the slow part
+
+
+@contextmanager
+def drip(part):
+    """Serve a 200 response on loopback whose headers or body arrive a byte at a time.
+
+    Each byte comes well within any per-receive timeout, so only a limit on
+    the whole read stops it. ``server.arrived`` is when the request arrived,
+    ``server.sent`` counts the slow bytes sent, and ``server.stopped`` is set
+    once the reader hangs up or every byte has gone.
+    """
+    if part == "headers":
+        head, slow = b"HTTP/1.1 200 OK\r\n", b"X-Filler: " + b"x" * DRIP_BYTES + b"\r\n\r\n"
+    else:
+        head, slow = b"HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n" % DRIP_BYTES, b"y" * DRIP_BYTES
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.server.arrived = time.monotonic()
+            try:
+                self.wfile.write(head)
+                for index in range(len(slow)):
+                    time.sleep(DRIP_INTERVAL_S)
+                    self.wfile.write(slow[index:index + 1])
+                    self.server.sent += 1
+            except OSError:
+                pass  # The reader hung up.
+            finally:
+                self.server.stopped.set()
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.arrived, server.sent, server.stopped = None, 0, threading.Event()
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield server
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(10)
+
+
+@pytest.mark.parametrize("part", ["headers", "body"])
+def test_a_slow_source_cannot_hold_a_read_past_its_time_limit(tmp_path, part):
+    with drip(part) as server, journal(tmp_path) as (store, lease):
+        profile = page_profile(server.server_address[1], timeout_s=0.5)
+        with pytest.raises(ReadToolError, match="TimeoutError"):
+            read(store, lease, profile, {"page": "slow"})
+        returned = time.monotonic()
+        # The read hung up at its limit, so the source stopped sending.
+        assert server.stopped.wait(5)
+        record = store.lookup_call("run", CallKey("tool", "node/fetch"))
+
+    # The read, and the event loop that waited for it, ended seconds before
+    # the source would have finished.
+    assert returned - server.arrived < 4.0
+    assert server.sent < DRIP_BYTES // 2
+    assert (record["billing_state"], record["cost_nanousd"], record["result_state"]) == (
+        "known", 0, "rejected")
+
+
+def test_a_step_that_stops_waiting_stops_its_read(tmp_path):
+    with drip("body") as server, SQLiteWorkflowStore(tmp_path / "runs.db") as store:
+        profile = page_profile(server.server_address[1], timeout_s=60.0)
+        graph = ExecutionGraph([Topology.SERIAL], [profile.step("fetch", {"page": "slow"}, timeout_s=4.0)])
+        with pytest.raises(TimeoutError, match="timed out after 4.0s"):
+            build(store, profile).execute(graph)
+        returned = time.monotonic()
+        assert server.stopped.wait(5)
+        (run,) = store.list_runs()
+        (call,) = tool_calls(store, run["run_id"])
+
+    # The step's own limit ended the read in flight, long before the profile's.
+    assert returned - server.arrived < 7.0
+    assert server.sent < DRIP_BYTES // 2
+    assert (call["billing_state"], call["cost_nanousd"], call["result_state"]) == ("known", 0, "rejected")
 
 
 def test_a_decoder_failure_is_a_settled_rejection_with_a_redacted_reason(tmp_path, service):

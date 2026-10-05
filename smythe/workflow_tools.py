@@ -23,12 +23,14 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+import functools
 import hashlib
 import inspect
 import ipaddress
 import math
 import socket
 import string
+import threading
 import time
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Callable, NamedTuple
@@ -53,6 +55,13 @@ TEXT_DECODER_VERSION = "utf8-text-v1"
 MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 MAX_TIMEOUT_S = 600.0
 MAX_REDIRECTS = 10
+# A connected read waits for bytes in slices this long, so it notices its time
+# limit, or that its step stopped waiting, however slowly the source sends.
+_WAIT_SLICE_S = 0.1
+# How long a step waits past a read's time limit for the read to report how it
+# stopped. Only a redirect's host name lookup, which no socket timeout bounds,
+# can keep a read running that long.
+_STOP_GRACE_S = 1.0
 _INPUT_TYPES = {"string": str, "integer": int}
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 _DESCRIPTOR_KEYS = frozenset({
@@ -270,12 +279,15 @@ class ReadProfile:
 
     Each read follows at most ``max_redirects`` redirects, to http or https
     URLs on ``allowed_hosts`` (the url's host is always allowed) without a
-    downgrade from https, reads at most ``max_response_bytes`` and takes at
-    most ``timeout_s`` seconds. Unless ``allow_private_networks`` is set,
-    every address a host resolves to must be a public one: loopback,
-    private, link-local and other special addresses are refused, before the
-    first request and at each redirect. Requests go to the address that was
-    checked, never through a proxy, and ask for an uncompressed body.
+    downgrade from https, and reads at most ``max_response_bytes``. It stops
+    once it has run for ``timeout_s`` seconds, however slowly the source
+    sends; only a host name lookup can wait longer, for the system resolver.
+    Once connected, it also stops as soon as its step stops waiting. Unless
+    ``allow_private_networks`` is set, every address a host resolves to must
+    be a public one: loopback, private, link-local and other special
+    addresses are refused, before the first request and at each redirect.
+    Requests go to the address that was checked, never through a proxy, and
+    ask for an uncompressed body.
 
     The run's recipe records the profile description, without the decoder
     code, so resuming with a changed profile is refused.
@@ -374,6 +386,78 @@ class _Response(NamedTuple):
     error: str | None  # an exception class or limit name, never response text
 
 
+class _Cutoff:
+    """When a read must stop: at its time limit, or once its step stops waiting."""
+
+    def __init__(self, timeout_s: float) -> None:
+        self.deadline = time.monotonic() + timeout_s
+        self._stopped = threading.Event()
+
+    def stop(self) -> None:
+        self._stopped.set()
+
+    def remaining(self) -> float:
+        """Seconds left; raises ``TimeoutError`` once the read must stop."""
+        remaining = self.deadline - time.monotonic()
+        if remaining <= 0 or self._stopped.is_set():
+            raise TimeoutError("Read time limit reached")
+        return remaining
+
+
+# The cutoff of the read that the current worker thread runs.
+_reading = threading.local()
+
+
+class _BoundedIO:
+    """Socket I/O that ends at its read's cutoff, however slowly bytes arrive.
+
+    A socket timeout restarts with every receive, so a source that sends one
+    byte at a time could hold a read far past its limit. Receives, and a TLS
+    handshake, wait in slices of ``_WAIT_SLICE_S`` and check the cutoff
+    between them; a send waits at most until the cutoff, and so does
+    connecting (see ``_pinned``).
+    """
+
+    def _bounded(self, call: Callable, *args: Any) -> Any:
+        cutoff = getattr(_reading, "cutoff", None)
+        while True:
+            if cutoff is not None:
+                self.settimeout(min(cutoff.remaining(), _WAIT_SLICE_S))
+            try:
+                return call(*args)
+            except TimeoutError:
+                if cutoff is None:
+                    raise
+                # Nothing was consumed: wait again unless the read must stop.
+
+    def recv_into(self, *args: Any) -> int:
+        return self._bounded(super().recv_into, *args)
+
+    def sendall(self, *args: Any) -> None:
+        cutoff = getattr(_reading, "cutoff", None)
+        if cutoff is not None:
+            self.settimeout(cutoff.remaining())
+        return super().sendall(*args)
+
+
+class _BoundedSocket(_BoundedIO, socket.socket):
+    """A TCP socket whose receives end at the read's cutoff."""
+
+
+@functools.cache
+def _bounded_tls_socket() -> type:
+    """The TLS socket class for reads; ``ssl`` loads only when a read uses https."""
+    import ssl
+
+    class BoundedTLSSocket(_BoundedIO, ssl.SSLSocket):
+        """A TLS socket whose handshake and receives end at the read's cutoff."""
+
+        def do_handshake(self, block: bool = False) -> None:
+            return self._bounded(super().do_handshake, block)
+
+    return BoundedTLSSocket
+
+
 def _public(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     mapped = getattr(address, "ipv4_mapped", None)
     address = mapped or address
@@ -398,44 +482,65 @@ def _addresses(host: str, port: int, allow_private: bool) -> list[str]:
     return list(dict.fromkeys(str(address) for address in found))
 
 
-def _pinned(addresses: list[str]):
-    """A connection factory for http.client that connects only to checked addresses."""
+def _pinned(addresses: list[str], cutoff: _Cutoff):
+    """A connection factory for http.client that connects only to checked addresses.
+
+    Each attempt waits at most until the read's cutoff.
+    """
 
     def connect(address, timeout=None, source_address=None):
         error: OSError | None = None
         for candidate in addresses:
+            family = socket.AF_INET6 if ":" in candidate else socket.AF_INET
+            sock = _BoundedSocket(family, socket.SOCK_STREAM)
             try:
-                return socket.create_connection((candidate, address[1]), timeout, source_address)
+                sock.settimeout(cutoff.remaining())
+                sock.connect((candidate, address[1]))
+                # A TLS handshake starts with the time that is left.
+                sock.settimeout(cutoff.remaining())
+                return sock
             except OSError as failure:
+                sock.close()
                 error = failure
         raise error or OSError("No address to connect to")
 
     return connect
 
 
-def _fetch(descriptor: dict, url: str, addresses: list[str], deadline: float) -> _Response:
+def _fetch(descriptor: dict, url: str, addresses: list[str], cutoff: _Cutoff) -> _Response:
     """Send one GET and follow its allowed redirects; never retry.
 
-    Runs in a worker thread. A failure becomes the response's ``error``.
+    Runs in a worker thread, and stops at *cutoff*. A failure becomes the
+    response's ``error``.
     """
+    _reading.cutoff = cutoff
+    try:
+        return _follow(descriptor, url, addresses, cutoff)
+    finally:
+        _reading.cutoff = None
+
+
+def _follow(descriptor: dict, url: str, addresses: list[str], cutoff: _Cutoff) -> _Response:
     import http.client
     import ssl
 
     limit, hops, status = descriptor["max_response_bytes"], 0, None
     while True:
         parts = urlsplit(url)
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
+        try:
+            remaining = cutoff.remaining()
+        except TimeoutError:
             return _Response(status, b"", "TimeoutError")
         port = parts.port or (443 if parts.scheme == "https" else 80)
         if parts.scheme == "https":
-            connection = http.client.HTTPSConnection(
-                parts.hostname, port, timeout=remaining, context=ssl.create_default_context())
+            context = ssl.create_default_context()
+            context.sslsocket_class = _bounded_tls_socket()
+            connection = http.client.HTTPSConnection(parts.hostname, port, timeout=remaining, context=context)
         else:
             connection = http.client.HTTPConnection(parts.hostname, port, timeout=remaining)
         # Connect to the address that was checked, so a second lookup cannot
         # move the read; TLS still verifies the certificate for the host name.
-        connection._create_connection = _pinned(addresses)
+        connection._create_connection = _pinned(addresses, cutoff)
         status = None
         try:
             target = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
@@ -564,13 +669,17 @@ class JournaledReadTool:
             store.release_before_dispatch(context.lease, call_id, refused.args[0])
             raise self._fail(f"destination refused before dispatch ({refused.args[0]})") from None
         permit = store.claim_dispatch(context.lease, call_id, self._request_sha)
+        cutoff = _Cutoff(self.profile.timeout_s)
         interrupted: BaseException | None = None
         try:
+            # The read stops itself at its time limit and reports how.
             response = await asyncio.wait_for(asyncio.to_thread(
-                _fetch, self._descriptor, self.request["url"], addresses,
-                time.monotonic() + self.profile.timeout_s), self.profile.timeout_s)
+                _fetch, self._descriptor, self.request["url"], addresses, cutoff),
+                self.profile.timeout_s + _STOP_GRACE_S)
         except BaseException as error:  # A timeout, or cancellation of the node.
             interrupted, response = error, _Response(None, b"", type(error).__name__)
+        finally:
+            cutoff.stop()  # A read still running ends at its next check.
         try:
             record["evidence_id"] = store.append_response(permit, {
                 "body": response.body, "operation": "response", "request_sha256": self._request_sha,
