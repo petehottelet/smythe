@@ -191,6 +191,29 @@ def test_a_step_that_depends_on_the_judge_is_the_terminal_step():
                    for label in ("Research", "Draft", "Check"))
 
 
+@pytest.mark.parametrize("strict", [False, True], ids=["legacy", "strict"])
+@pytest.mark.parametrize("parallel", [False, True], ids=["serial", "parallel"])
+def test_a_swarm_gives_the_terminal_note_to_the_gated_draft_and_not_its_judge(parallel, strict):
+    """A Swarm places the note as its executors do: on the node its
+    DELIVERABLE synthesis returns, never on the judge that verifies it."""
+    from smythe.acceptance import AcceptancePolicy
+    from smythe.executor_base import TERMINAL_DELIVERABLE_NOTE
+    from smythe.swarm import Swarm
+
+    provider = PromptsByStep()
+    swarm = Swarm(provider=provider, model="test", parallel=parallel, artifact_dir=None,
+                  acceptance=AcceptancePolicy(mode="strict") if strict else None)
+    result = swarm.execute(_draft_and_judge())
+
+    assert TERMINAL_DELIVERABLE_NOTE in provider.prompts["Draft"]
+    assert TERMINAL_DELIVERABLE_NOTE not in provider.prompts["Check"]
+    assert TERMINAL_DELIVERABLE_NOTE not in provider.prompts["Research"]
+    # The judged draft is what the run delivers, and under a strict policy
+    # its passed gate accepts it.
+    assert result.output == "Draft output"
+    assert result.accepted is strict
+
+
 @pytest.mark.parametrize("value", [0, 3, True, 2.0, "2", None])
 def test_executors_refuse_an_unknown_prompt_assembly_version(value):
     from smythe.async_executor import AsyncExecutor
