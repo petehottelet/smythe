@@ -473,6 +473,8 @@ class OptimizationRunner:
                     "holdout_seed_commitment": holdout_seed_commitment,
                     "stage": "development",
                     "development_scores": list(scores),
+                    # No paired interval was formed: the campaign's verdict.
+                    "verdict": _final_verdict(None, None),
                     **_reference_fields(plan, references),
                 },
             )

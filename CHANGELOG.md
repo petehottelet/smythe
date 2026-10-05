@@ -223,7 +223,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `inconclusive` otherwise. `PromotionAssessment.verdict`,
   `OptimizationResult.verdict` and
   `smythe.optimize.statistics.improvement_verdict()` expose it; decisions
-  record it for each paired stage and the campaign; and
+  record it for each paired stage and the campaign, and a decision made in
+  development records `inconclusive`; and
   `smythe optimize concurrency --json` reports it beside `promoted`, with
   unchanged exit codes. Promotion is unchanged. HTML reports show each verdict,
   and decisions recorded earlier show one derived from their saved interval

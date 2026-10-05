@@ -859,6 +859,9 @@ async def test_development_only_campaign_verdict_is_inconclusive(tmp_path):
         assessment = ledger.list_decisions(result.campaign_id)[0]["assessment"]
         assert assessment["stage"] == "development"
         assert assessment["runner_version"] == 4
+        # The decision records the campaign's verdict, as a paired decision does.
+        assert assessment["verdict"] == "inconclusive"
+        assert len(ledger.validate_decision_inventory(result.campaign_id)) == 1
         assert [score["candidate_id"] for score in assessment["development_scores"]] == [
             challenger.candidate_id
         ]
