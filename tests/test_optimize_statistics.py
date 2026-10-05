@@ -601,6 +601,26 @@ def test_assessment_verdict_follows_the_primary_interval_not_promotion():
 
 
 @pytest.mark.parametrize(
+    ("deltas", "minimum", "bootstrap_reading"),
+    [((1.0, 1.1, 5.0), 0.5, "improved"), ((-1.0, -1.1, -5.0), 0.0, "worse")],
+    ids=["would-be-improved", "would-be-worse"],
+)
+def test_verdict_reads_the_paired_t_interval_not_the_bootstrap_interval(
+    deltas, minimum, bootstrap_reading
+):
+    # Skewed deltas: the narrow descriptive bootstrap interval clears a
+    # threshold that the paired-t interval, about (-3.30, 8.03) here,
+    # straddles. Only the paired-t interval decides the verdict.
+    assessment = _assess_quality(deltas, min_improvement=minimum)
+    primary = assessment.primary
+    assert improvement_verdict(primary.descriptive_bootstrap_interval, minimum) == (
+        bootstrap_reading
+    )
+    assert improvement_verdict(primary.confidence_interval, minimum) == "inconclusive"
+    assert (assessment.verdict, assessment.promote) == ("inconclusive", False)
+
+
+@pytest.mark.parametrize(
     ("delta", "verdict", "promote"),
     [(1.0, "improved", True), (0.5, "inconclusive", False), (-1.0, "worse", False)],
 )

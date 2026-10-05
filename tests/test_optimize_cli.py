@@ -419,6 +419,46 @@ def test_run_json_reports_the_three_way_verdict_with_unchanged_exit_codes(
     assert stopped["verdict"] == "inconclusive"
 
 
+# A serial-capacity provider and a challenger whose single development trial
+# looked better, while its paired confirmation interval lies below zero. The
+# loose latency bound only varies the contract, and so the simulator's seeds.
+_WORSE_CAMPAIGN = (
+    "--candidate-concurrency", "2",
+    "--provider-capacity", "1",
+    "--work-items", "40",
+    "--base-latency-ms", "60",
+    "--max-p95-latency-ms", "1016000",
+    "--max-error-rate", "0.99",
+    "--min-improvement", "0",
+    "--bootstrap-resamples", "10",
+    "--development-repetitions", "1",
+    "--confirmation-repetitions", "3",
+    "--holdout-repetitions", "3",
+)
+
+
+def test_run_json_reports_a_worse_verdict_without_a_patch(tmp_path, capsys):
+    ledger_path = tmp_path / "worse.sqlite3"
+    worse = _run(ledger_path, capsys, *_WORSE_CAMPAIGN)
+
+    assert (worse["promoted"], worse["verdict"]) == (False, "worse")
+    assert "recommended_patch" not in worse and "verdict" not in worse["evidence"]
+    assert worse["selected_candidate"]["policy"] == {"max_concurrency": 2}
+    confirmation = worse["evidence"]["confirmation_assessment"]
+    assert confirmation["verdict"] == "worse" and confirmation["promote"] is False
+    assert confirmation["primary"]["confidence_interval"][1] < 0
+    assert worse["evidence"]["holdout_assessment"] is None
+    assert worse["evidence"]["reason"].startswith("confirmation rejected candidate")
+    [decision] = worse["ledger_snapshot"]["decisions"]
+    assert decision["assessment"]["verdict"] == "worse"
+
+    out = tmp_path / "worse.html"
+    assert main(["optimize", "inspect", worse["campaign_id"], "--ledger", str(ledger_path),
+                 "--out", str(out), "--json"]) == EXIT_OK
+    capsys.readouterr()
+    assert "Verdict: <strong>worse</strong></p>" in out.read_text(encoding="utf-8")
+
+
 def test_explicit_campaign_id_from_runner_version_3_exits_with_binding_drift(
     tmp_path, capsys, monkeypatch
 ):
