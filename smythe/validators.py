@@ -195,6 +195,8 @@ class TextValidator:
         positions: dict[str, list[int]] = {}
         for position, (_, _, title) in enumerate(headings):
             positions.setdefault(title, []).append(position)
+        # Each required heading once, in the order it first appears.
+        order = [title for title in positions if title in self._title_set]
         after, previous = -1, None
         for section, title in zip(spec["sections"], self._titles):
             matches = positions.get(title, [])
@@ -206,8 +208,7 @@ class TextValidator:
             if spec["ordered"] and not later:
                 findings.append(hard_finding(
                     "section_out_of_order", f"section {section!r} must follow {previous!r}",
-                    expected=spec["sections"],
-                    observed=[heading[2] for heading in headings if heading[2] in self._title_set]))
+                    expected=list(spec["sections"]), observed=list(order)))
                 continue
             position = later[0] if spec["ordered"] else matches[0]
             if spec["ordered"]:

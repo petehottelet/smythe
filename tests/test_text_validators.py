@@ -195,6 +195,31 @@ def test_sections_out_of_order_are_rejected_unless_order_is_not_required():
     assert check(ARGUMENT_AND_CRITIQUE, output + "\n\n## Critique\nStill weak.").passed
 
 
+def test_out_of_order_findings_name_each_required_heading_once():
+    """Each such finding used to list every required heading in the output,
+    so 255 findings over 100,000 repeated headings held 25 million entries."""
+    sections = [f"Part {index}" for index in range(1, 257)]
+    output = "".join(f"# Part {index}\nx\n" for index in range(256, 1, -1)) + "# Part 1\nx\n" * 100_000
+    report = check(TextValidator({"sections": sections}), output)
+    assert codes(report) == ["section_out_of_order"] * 255
+    in_output_order = [section.casefold() for section in reversed(sections)]
+    assert all(finding.observed == in_output_order for finding in report.findings)
+    repeated = check(ARGUMENT_AND_CRITIQUE, "## Critique\nWeak.\n" * 3 + "## Argument\nShip it.\n" * 3)
+    assert codes(repeated) == ["section_out_of_order"]
+    assert repeated.findings[0].observed == ["critique", "argument"]
+
+
+def test_changing_a_finding_does_not_change_the_validator():
+    validator = TextValidator({"sections": ["Argument", "Critique"]})
+    output = "## Critique\nWeak.\n\n## Argument\nShip it."
+    first = check(validator, output).findings[0]
+    first.expected.append("Sources")
+    first.observed.append("sources")
+    assert validator.spec["sections"] == ["Argument", "Critique"]
+    again = check(validator, output).findings[0]
+    assert (again.expected, again.observed) == (["Argument", "Critique"], ["critique", "argument"])
+
+
 @pytest.mark.parametrize("heading", [
     "## Argument", "# argument", "###### ARGUMENT", "   ## Argument", "## **Argument**",
     "## Argument:", "## __Argument__:", "## **Argument**:", "## Argument ##", "##\tArgument",

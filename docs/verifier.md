@@ -509,7 +509,8 @@ Headings compare ignoring case, spacing, `*` and `_` emphasis and a final
 colon, so `## **Critique:**` is the section `Critique`; a bold line or a
 heading inside a code block is not a heading. Findings are `text_too_short`,
 `text_too_long`, `section_missing`, `section_out_of_order`, `section_empty`
-and `not_utf8`.
+and `not_utf8`; a `section_out_of_order` finding observes each required
+heading once, in the order it first appears.
 
 A sections check is how strict acceptance holds a run to its whole
 deliverable. With the policy above, a final step that returns only its own
