@@ -607,7 +607,10 @@ No public method starts a successor yet.
 - **Recovery.** A process lost after a reuse operation commits replays it on
   resume without reading the predecessor; one lost before it commits checks
   the predecessor again first. Refreshing an unfinished successor's sources
-  runs its kept nodes again, like every other node.
+  runs its kept nodes again, like every other node, even when it was lost
+  before it saved any of them; their reuse operations then stay unapplied.
+  A kept result is never used once a source its record or source evidence
+  names is removed from the successor itself.
 - **Records.** The successor's graph holds one planning record, `repair`:
   the predecessor, the plan digest and the reason. Its
   [lineage](lineage.md#reuse-in-a-successor-run) names its `predecessor` and

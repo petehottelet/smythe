@@ -1094,10 +1094,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   runs again, and a graph the successor's graph policy, read profiles,
   models or agents cannot run are refused before the successor is created
   or any call is made. A resumed successor replays its reuse operations
-  without reading the predecessor. Its lineage names its `predecessor` and
-  `repair`, each kept node keeps its recorded inputs with `reused_from`, and
-  inspection never returns kept text. A new durable graph cannot carry a
-  `repair` planning record. No public method starts a successor yet. See
+  without reading the predecessor. Refreshing an unfinished successor's
+  sources, even one lost before it saved a kept node, runs its kept nodes
+  again, and a kept result naming a source removed from the successor is
+  never used. Its lineage names its `predecessor` and `repair`, each kept
+  node keeps its recorded inputs with `reused_from`, and inspection never
+  returns kept text. A new durable graph cannot carry a `repair` planning
+  record. No public method starts a successor yet. See
   [reused results](docs/workflow-accounting.md#reused-results).
 
 ### Changed

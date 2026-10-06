@@ -664,14 +664,18 @@ def _reused(predecessor, node_id):
         problem = "its saved result is not the one its lineage records"
     else:
         evidence = source_evidence_result(node.result)["source_evidence"]
-        used = {(item["source_id"], item["sha256"])
-                for item in (*entry["inputs"]["sources"], *(evidence or {}).get("sources", ()))}
-        if used & removed:
+        if _reused_sources(entry, evidence) & removed:
             problem = "a source it used was removed from the run"
     if problem:
         raise WorkflowStateError(
             f"Node {node_id!r} of run {lineage.run['run_id']!r} cannot be reused: {problem}")
     return {"text": node.result, "lineage": _plain(entry), "source_evidence": evidence}
+
+
+def _reused_sources(entry, evidence):
+    """The ``(source_id, sha256)`` of each source a node's lineage *entry* or *evidence* names."""
+    return {(item["source_id"], item["sha256"])
+            for item in (*entry["inputs"]["sources"], *(evidence or {}).get("sources", ()))}
 
 
 def _reuse_digests(result):
@@ -1857,7 +1861,9 @@ class WorkflowRuntime:
         at its next generation, so that resuming runs each node again with a
         new snapshot. Nothing is called now, and earlier snapshots, calls and
         charges stay in the journal. A run whose checkpoint is still
-        ``planned`` has run nothing and only adopts the revision. Sources
+        ``planned`` has run nothing and only adopts the revision, except that
+        a successor run stops reusing its predecessor's results, which were
+        bound to the sources it started with: its nodes run again too. Sources
         equal to the current ones change nothing. Returns the source revision
         the run now uses.
 
@@ -1904,6 +1910,10 @@ class WorkflowRuntime:
                     node.status, node.result = NodeStatus.PENDING, None
                     for key in _GENERATION_KEYS:
                         node.metadata.pop(key, None)
+            for node in self.graph.nodes:
+                # A successor's reused results, whether saved yet or not, were
+                # bound to its earlier sources, so their nodes run again too.
+                node.metadata.pop(LINEAGE_REUSE_KEY, None)
             self.execution_concurrency = state.get("max_concurrency")
             self._save(status)
             return revision
@@ -2188,9 +2198,11 @@ class WorkflowRuntime:
         inputs its ``lineage_reuse`` metadata holds and which the next
         checkpoint consumes. Only a new operation loads and checks the
         predecessor (:func:`_predecessor`, :func:`_reused`); a committed one
-        replays. Raises ``WorkflowStateError`` for a result its inputs do not bind.
+        replays. Either way, the sources removed from this run are checked
+        too. Raises ``WorkflowStateError`` for a result its inputs do not
+        bind or that used a source removed from this run.
         """
-        loaded = []
+        loaded, removed = [], None
 
         async def reuse(inputs):
             if not loaded:
@@ -2206,6 +2218,13 @@ class WorkflowRuntime:
             if not _reuse_matches(node.id, inputs, result):
                 raise WorkflowStateError(
                     f"The saved reuse of node {node.id!r} does not match its inputs")
+            if removed is None:
+                removed = set(_removed_sources(self.store, self.run_id))
+            if _reused_sources(result["lineage"], result["source_evidence"]) & removed:
+                # The run never uses a removed source's text again, kept or not.
+                raise WorkflowStateError(
+                    f"Node {node.id!r} cannot be reused: a source it used was removed from "
+                    "this run")
             node.status, node.result = NodeStatus.COMPLETED, result["text"]
 
     def _artifact_directory(self):

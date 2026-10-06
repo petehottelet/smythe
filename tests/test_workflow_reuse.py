@@ -33,6 +33,7 @@ from smythe.provider import CompletionResult
 from smythe.provider_messages import MODELS, AnthropicMessagesProvider
 from smythe.registry import Registry
 from smythe.reuse import evaluate
+from smythe.workflow import WorkflowRuntime
 from smythe.workflow_store import WorkflowStateError, _canonical, _sha
 
 QUESTION = "Should new subscriptions default to monthly billing?"
@@ -667,3 +668,90 @@ def test_refreshing_an_unfinished_successor_runs_its_reused_nodes_again(
     assert not any("reused_from" in node for node in lineage.to_dict()["nodes"])
     assert lineage.to_dict()["predecessor"]["run_id"] == first.execution_id
     assert {node["generation"] for node in lineage.to_dict()["nodes"][:-1]} == {1}
+
+
+def stopped_before_running(swarm, store, run_id, reuse, monkeypatch) -> str:
+    """Start a successor of *run_id* and lose it after its reuse operations, still ``planned``."""
+    stop = crash_when(monkeypatch, store, "save_checkpoint",
+                      lambda lease, revision, checkpoint, **kwargs:
+                      checkpoint["status"] == "running")
+    with pytest.raises(Crash):
+        successor(swarm, run_id, reuse)
+    stop.restore()
+    (successor_id,) = [run["run_id"] for run in store.list_runs() if run["run_id"] != run_id]
+    assert store.get_checkpoint(successor_id)["checkpoint"]["status"] == "planned"
+    assert {item["state"] for item in store.list_operations(successor_id, "reuse")} == {"completed"}
+    return successor_id
+
+
+def test_refreshing_a_successor_that_ran_nothing_runs_its_reused_nodes_again(
+        store, library, tmp_path, replies, monkeypatch):
+    service, _, endpoint = library
+    swarm = research(store, endpoint, tmp_path)
+    first = swarm.execute(research_graph(endpoint))
+    service.change_source("churn", CHANGED)
+    run_id = stopped_before_running(swarm, store, first.execution_id,
+                                    {node_id: [] for node_id in KEPT}, monkeypatch)
+    # A reused result was bound to the sources the successor started with.
+    swarm.refresh_context(run_id, [ContextSource("notes", "Annual plans were discounted.")])
+    assert all(LINEAGE_REUSE_KEY not in node["metadata"]
+               for node in store.get_checkpoint(run_id)["checkpoint"]["graph"]["nodes"])
+    reads, labels = source_reads(service), len(replies)
+    result = swarm.resume(run_id)
+    assert result.accepted
+    assert source_reads(service) == {source_id: count + 1 for source_id, count in reads.items()}
+    assert sorted(replies[labels:]) == sorted(f"Extract the {source_id} finding"
+                                              for source_id in TEXTS)
+    assert all(LINEAGE_REUSE_KEY not in node.metadata for node in result.graph.nodes)
+    # The reuse operations were never consumed: no checkpoint applied them.
+    for operation in store.list_operations(run_id, "reuse"):
+        assert operation["state"] == "completed"
+        assert applying_checkpoints(store, run_id, operation["operation_id"]) == []
+    lineage = load_lineage(store, run_id)
+    assert not any("reused_from" in node for node in lineage.to_dict()["nodes"])
+    assert lineage.to_dict()["predecessor"]["run_id"] == first.execution_id
+
+
+def library_sources(records) -> list[ContextSource]:
+    return [ContextSource(record.source_id, record.content, str(record.version))
+            for record in records.values()]
+
+
+def test_a_successor_never_delivers_reused_text_of_a_source_removed_from_it(
+        store, library, tmp_path, replies, monkeypatch):
+    service, records, endpoint = library
+    sources = library_sources(records)
+    swarm = research(store, endpoint, tmp_path, context_sources=sources)
+    first = swarm.execute(research_graph(endpoint))
+    run_id = stopped_before_running(swarm, store, first.execution_id, {"read-survey": []},
+                                    monkeypatch)
+    # The survey has a new version, so its old text could reach the output
+    # only through the reused read.
+    newer = service.change_source("survey", "In 2026 most customers preferred monthly billing.")
+    swarm.remove_source(run_id, "survey", "Withdrawn by its owner")
+    swarm.refresh_context(run_id, [source for source in sources if source.source_id != "survey"])
+    result = swarm.resume(run_id)
+    assert result.accepted
+    assert TEXTS["survey"] not in result.output
+    assert results(result.graph)["read-survey"] == newer.content
+    assert [item["state"] for item in store.list_operations(run_id, "reuse")] == ["completed"]
+
+
+def test_reuse_refuses_a_source_removed_from_the_successor_itself(
+        store, library, tmp_path, replies, monkeypatch):
+    service, records, endpoint = library
+    swarm = research(store, endpoint, tmp_path, context_sources=library_sources(records))
+    first = swarm.execute(research_graph(endpoint))
+    run_id = stopped_before_running(swarm, store, first.execution_id, {"read-survey": []},
+                                    monkeypatch)
+    swarm.remove_source(run_id, "survey", "Withdrawn by its owner")
+    # Even when nothing else stops the successor from resuming with the
+    # removed source, its reused result is never delivered.
+    monkeypatch.setattr(WorkflowRuntime, "_refuse_removed", lambda self, sources, advice: None)
+    reads, labels = source_reads(service), list(replies)
+    with pytest.raises(WorkflowStateError,
+                       match="'read-survey' cannot be reused: a source it used was removed"):
+        swarm.resume(run_id)
+    assert calls(store, run_id) == []
+    assert source_reads(service) == reads and replies == labels
+    assert store.get_checkpoint(run_id)["checkpoint"]["status"] == "planned"
