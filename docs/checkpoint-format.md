@@ -184,6 +184,12 @@ object stops resume with `ValueError`. `smythe.RoutingDecision.from_dict()`
 reads the `routing` record back and rejects a version, method or key it does
 not know.
 
+When the [contribution lint](architecture.md#contribution-lint) finds
+parallel siblings in a routed plan that could only repeat each other's work, it
+writes `coordination` beside `routing`, one list of node ids per group:
+`{"version": 1, "duplicate_siblings": [["research-0", "research-1"]]}`. A plan
+it does not flag has no `coordination` key.
+
 ## Verification state
 
 Node metadata carries the generation and disposition of each gating verdict:

@@ -1351,6 +1351,11 @@ class WorkflowRuntime:
                 # The run writes only this key; the architect may have set others.
                 graph.planning = {**(graph.planning or {}), "routing": routing.to_dict()}
             self._prepare_graph(graph, fresh=True)
+            if routing is not None:
+                # Agents are assigned now, so the advisory lint can compare them.
+                from smythe.planner import _record_coordination
+
+                _record_coordination(graph, self.registry)
             result = {"graph": graph_to_dict(graph), "registry": self.registry.workflow_description()}
             if routing is not None:
                 result["routing"] = routing.to_dict()

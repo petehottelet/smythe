@@ -51,6 +51,7 @@
     "test_svg_workflow_chart.py": "SVG workflow chart renderer"
   },
   "excluded_cases": {
+    "test_contribution_lint.py::test_the_example_templates_pass_and_its_repeated_fan_out_is_flagged": "Repository example templates; the lint and recording cases remain enabled",
     "test_evidence_archive.py::test_committed_pointer_pins_a_labeled_release_asset": "Repository archive pointer; archive build and verification cases remain enabled",
     "test_jobs_cli.py::test_committed_offline_manifest_is_a_valid_zero_cost_plan": "Repository example manifest; other Jobs CLI cases remain enabled"
   }

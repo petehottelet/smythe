@@ -230,6 +230,44 @@ instructions in the planning request and saved recipe. Answer requirements
 remain in `Task.constraints`, which reaches every executor.
 [Bounded planning example](workflow-accounting.md#freeze-graph-limits).
 
+### Contribution lint
+
+Parallel workers add value when each receives distinct evidence, a distinct
+capability, a distinct responsibility or an output that can be checked on its
+own. `smythe.lint_contributions(graph, registry=None)` lists the groups of
+parallel siblings that differ in none of these. Nodes share a group when they
+have the same dependency inputs (`depends_on` as a set), so neither can depend
+on the other, and the same label, required capabilities, verification target,
+read step, `attach_dep_artifacts` setting, agent and `metadata["model"]`. An
+agent that `registry` holds compares by what it gives a worker: its persona,
+capabilities and MCP servers. The generalist agents a registry creates for
+unassigned nodes are therefore the same worker. Other agents compare by
+`agent_id`. Each group lists node ids in graph order.
+
+A `Swarm` whose `WhiteRabbit` router records its
+[routing decision](#routing-decisions), ordinary or durable, lints each new
+plan once its agents are assigned and records the groups it finds as
+`graph.planning["coordination"]`:
+
+```json
+"coordination": {
+  "version": 1,
+  "duplicate_siblings": [["research-0", "research-1", "research-2"]]
+}
+```
+
+The lint is advisory: it never changes, refuses or reorders a plan. A plan it
+does not flag records nothing, so that graph is saved as before. Checkpoints
+keep the record, and resume restores it. A durable run's `planning` operation
+saves it in its graph, and resume replays it without linting again.
+
+Contributions are expressed with ordinary node fields in graphs and templates
+you write. The schema of a generated plan is unchanged, so a model cannot
+declare them. The
+[contribution templates example](../examples/17_contribution_templates.py)
+defines `SubGraphTemplate` values whose workers each contribute something
+distinct, and a repeated fan-out that the lint flags.
+
 ## 2. Durable execution envelope
 
 The graph runs through one set of controls regardless of who designed it.

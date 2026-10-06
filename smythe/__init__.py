@@ -25,7 +25,9 @@ from smythe.lineage import ArtifactLineage, LineagePolicy
 from smythe.loader import load_graph
 from smythe.mcp import MCPConfigError, MCPServerSpec, MCPSkillProvider, MCPToolRuntime
 from smythe.memory import PlannerMemory
-from smythe.planner import ArchitectError, DeterministicArchitect, LLMArchitect, SimpleArchitect
+from smythe.planner import (
+    ArchitectError, DeterministicArchitect, LLMArchitect, SimpleArchitect, lint_contributions,
+)
 from smythe.provider import (
     AnthropicProvider,
     Artifact,
@@ -198,6 +200,7 @@ __all__ = [
     "design_verifier",
     "distill_template",
     "inspect_asset",
+    "lint_contributions",
     "load_graph",
 ]
 __version__ = "0.9.1"

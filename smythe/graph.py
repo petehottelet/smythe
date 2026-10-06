@@ -272,7 +272,9 @@ class ExecutionGraph:
         planning: Informational records of how the graph was planned, keyed
             by namespace, each written by one component: a ``Swarm`` with a
             ``WhiteRabbit`` router sets ``routing`` to its
-            ``RoutingDecision.to_dict()``. None when nothing recorded any.
+            ``RoutingDecision.to_dict()``, and ``coordination`` to the groups
+            ``smythe.lint_contributions`` finds, if any. None when nothing
+            recorded any.
     """
 
     topology: list[Topology]

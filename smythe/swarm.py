@@ -64,7 +64,9 @@ from smythe.graph import SYNTHESIS_NODE_ID, ExecutionGraph, NodeStatus
 from smythe.lineage import LineagePolicy, snapshot_lineage_policy
 from smythe.memory import PlannerMemory
 from smythe.tools import ToolRuntime
-from smythe.planner import Architect, DeterministicArchitect, LLMArchitect, SimpleArchitect
+from smythe.planner import (
+    Architect, DeterministicArchitect, LLMArchitect, SimpleArchitect, _record_coordination,
+)
 from smythe.constrained_planner import ConstrainedArchitect
 from smythe.router import RoutingDecision, WhiteRabbit
 from smythe.provider import (
@@ -778,7 +780,9 @@ class Swarm:
         call. An ``LLM_MERGE`` synthesis, which no node estimate covers, is
         still refused before planning. With a ``WhiteRabbit`` router, the
         graph's ``planning["routing"]`` records the
-        :class:`~smythe.router.RoutingDecision` that chose its architect.
+        :class:`~smythe.router.RoutingDecision` that chose its architect, and
+        ``planning["coordination"]`` any parallel siblings that
+        :func:`~smythe.planner.lint_contributions` flags.
         """
         if self._run_store is not None:
             return asyncio.run(self._workflow_runtime().plan(task))
@@ -965,7 +969,8 @@ class Swarm:
         call. Under a strict policy, each gate of a plan that *architect*
         generated rather than built from developer code is marked with
         ``GENERATED_GATE_KEY``, so that gate does not accept output on its own.
-        A *routing* decision becomes ``graph.planning["routing"]``.
+        A *routing* decision becomes ``graph.planning["routing"]``, and the
+        groups the contribution lint finds, if any, ``graph.planning["coordination"]``.
         """
         self._refuse_read_steps(graph)
         for agent in architect_registry.list_agents():
@@ -980,6 +985,8 @@ class Swarm:
         if routing is not None:
             # The Swarm writes only this key; the architect may have set others.
             graph.planning = {**(graph.planning or {}), "routing": routing.to_dict()}
+            # Agents are assigned, so the advisory lint can compare them.
+            _record_coordination(graph, self._registry)
         return graph
 
     @staticmethod

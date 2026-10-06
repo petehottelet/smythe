@@ -833,6 +833,19 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   bytes with `SQLiteRunStore.adopt_published_attempt()`; the Jobs schema
   stays at version 4. See
   [adopt published bytes](docs/jobs.md#adopt-published-bytes).
+- Contribution lint. `lint_contributions(graph, registry=None)` lists the
+  groups of parallel siblings that could only repeat each other's work: the
+  same dependency inputs, label, agent, model, required capabilities,
+  verification target, read step and image inputs. With a registry, agents
+  compare by persona, capabilities and MCP servers. A `Swarm` with a
+  `WhiteRabbit` router, ordinary or durable, records the groups of each new
+  plan as `graph.planning["coordination"]`; checkpoints and durable replay
+  keep the record. The lint is advisory and never changes a plan, and a plan
+  it does not flag records nothing. The generated-plan schema is unchanged.
+  [`examples/17_contribution_templates.py`](examples/17_contribution_templates.py)
+  defines `SubGraphTemplate` values whose workers each contribute distinct
+  evidence, capabilities, responsibilities or checkable outputs, and runs
+  offline. See [contribution lint](docs/architecture.md#contribution-lint).
 
 ### Changed
 
