@@ -420,6 +420,142 @@ async def test_a_rate_limit_without_retry_after_sets_no_cooldown():
     assert provider.starts == [("a", 0), ("b", 0)]
 
 
+async def settle() -> None:
+    """Let every task that can run go as far as it can."""
+    for _ in range(10):
+        await asyncio.sleep(0)
+
+
+class Timers:
+    """An injected sleep on a manual clock: a sleep ends once the test moves the clock to its end."""
+
+    def __init__(self, clock: ManualClock) -> None:
+        self.clock = clock
+        self.sleeping: list[tuple[float, asyncio.Future]] = []
+
+    async def sleep(self, seconds: float) -> None:
+        ended = asyncio.get_running_loop().create_future()
+        self.sleeping.append((self.clock.monotonic() + seconds, ended))
+        await ended
+
+    async def advance_to(self, when: float) -> None:
+        """Move the clock to *when* and end every sleep due by then."""
+        self.clock.advance(when - self.clock.monotonic())
+        for end, ended in self.sleeping:
+            if end <= when and not ended.done():
+                ended.set_result(None)
+        await settle()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("waiting,cancelled,starts,waited_ms", [
+    (["b"], "b", [("a", 0), ("d", 1)], 1000),
+    (["b", "c"], "b", [("a", 0), ("c", 1), ("d", 2)], 3000),
+    (["b", "c"], "c", [("a", 0), ("b", 1), ("d", 2)], 3000),
+], ids=["only-waiting", "first-in-line", "second-in-line"])
+async def test_a_call_cancelled_while_it_waits_its_turn_claims_no_start(
+    waiting, cancelled, starts, waited_ms,
+):
+    """Later calls are spaced from the calls that started, never from the cancelled one."""
+    clock, tracer = manual_tracer()
+    timers = Timers(clock)
+    limiter = _CapacityLimiter(limits(min_interval_s=1), tracer, timers.sleep)
+    provider = Clocked(clock)
+
+    async def call(label):
+        async with limiter.call(provider, "m"):
+            await provider.complete("system", label, "m")
+
+    await call("a")
+    calls = {label: asyncio.create_task(call(label)) for label in waiting}
+    await settle()
+    gone = calls.pop(cancelled)
+    gone.cancel()
+    await settle()
+    calls["d"] = asyncio.create_task(call("d"))
+    await settle()
+    for second in (1, 2, 3):
+        await timers.advance_to(second)
+    await asyncio.wait_for(asyncio.gather(*calls.values()), 10)
+
+    assert gone.cancelled()
+    assert provider.starts == starts
+    assert tracer.timing()["waiting_ms"]["capacity"] == waited_ms
+
+
+def test_a_sleep_that_ends_late_spaces_the_next_call_from_the_actual_start():
+    clock, tracer = manual_tracer()
+
+    def oversleep(seconds):
+        clock.advance(seconds + 0.25)
+
+    limiter = _CapacityLimiter(limits(min_interval_s=1), tracer, oversleep)
+    provider = Clocked(clock)
+
+    async def run():
+        for label in "abc":
+            async with limiter.call(provider, "m"):
+                await provider.complete("system", label, "m")
+
+    asyncio.run(run())
+
+    assert provider.starts == [("a", 0), ("b", 1.25), ("c", 2.5)]
+
+
+@pytest.mark.asyncio
+async def test_calls_queued_behind_a_cooldown_each_record_their_wait():
+    """Without an interval, b and c both start when the cooldown ends; each waited 4s."""
+    clock, tracer = manual_tracer()
+    timers = Timers(clock)
+    limiter = _CapacityLimiter(CapacityPolicy(), tracer, timers.sleep)
+    limited = HttpError(429, "rate_limit_error", retry_after_s=4).exception()
+    provider = Clocked(clock, fail={"a": limited})
+
+    async def call(label):
+        async with limiter.call(provider, "m"):
+            await provider.complete("system", label, "m")
+
+    with pytest.raises(type(limited)):
+        await call("a")
+    calls = [asyncio.create_task(call(label)) for label in "bc"]
+    await settle()
+    await timers.advance_to(4)
+    await asyncio.wait_for(asyncio.gather(*calls), 10)
+
+    assert provider.starts == [("a", 0), ("b", 4), ("c", 4)]
+    assert tracer.timing()["waiting_ms"]["capacity"] == 8000
+
+
+@pytest.mark.asyncio
+async def test_a_node_that_times_out_waiting_its_turn_retries_at_the_next_free_start():
+    """c's first wait outlasts its timeout, and so would any wait past 2s, where c's turn is.
+
+    Its retry starts at 2s, 1s after b, the last call that started.
+    """
+    clock, tracer = manual_tracer()
+    sleeps = 0
+
+    async def sleep(seconds):
+        nonlocal sleeps
+        sleeps += 1
+        if sleeps == 2 or clock.monotonic() + seconds > 2:
+            await asyncio.Event().wait()  # Until c's timeout cancels it.
+        clock.advance(seconds)
+
+    provider = Clocked(clock)
+    executor = async_executor(provider, tracer, max_concurrency=3, sleep=sleep,
+                              capacity_policy=limits(min_interval_s=1))
+    work = graph(node("a"), node("b"),
+                 node("c", timeout_s=0.25, failure_policy=FailurePolicy.RETRY, max_retries=1))
+
+    await executor.run(work)
+
+    assert [item.status for item in work.nodes] == [NodeStatus.COMPLETED] * 3
+    assert provider.starts == [("a", 0), ("b", 1), ("c", 2)]
+    assert sleeps == 3
+    assert tracer.timing()["waiting_ms"]["capacity"] == 2000
+
+
 # ---------------------------------------------------------------------------
 # Round-robin turns across branches
 # ---------------------------------------------------------------------------

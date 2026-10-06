@@ -994,9 +994,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   passes over a ready node whose model has no free slot, still ready and with
   nothing reserved, to admit other ready work, so a full limit never stops the
   run; a budget reservation that fails still does. Every node call, including
-  tool turns and retries, and an `LLM_MERGE` synthesis start at least
-  `min_interval_s` apart and wait out the cooldown that a transient status
-  error's `Retry-After` starts, at most `cooldown_max_s`.
+  tool turns and retries, and an `LLM_MERGE` synthesis take turns in the order
+  they ask, start at least `min_interval_s` after the previous call that
+  started, and wait out the cooldown that a transient status error's
+  `Retry-After` starts, at most `cooldown_max_s`. A call that a timeout or a
+  cancellation stops while it waits takes no turn.
   `round_robin=True` admits ready nodes in turn across branches, so one wide
   fan-out cannot hold back another's work. Timing reports these waits as
   `waiting_ms["capacity"]`, a key every timing record now has. A hint that is

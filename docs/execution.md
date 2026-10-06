@@ -343,13 +343,17 @@ started, and not during a cooldown. A transient status error whose
 `Retry-After` asks for a wait (read as under a [retry policy](#retry-policy))
 starts a cooldown: no call to that provider type and model starts for that
 long, at most `cooldown_max_s` (default 60; 0 turns cooldowns off). A call
-already waiting its turn waits for the cooldown too. The wait is measured on
-the tracer's clock and made with the executor's `sleep` when one is given. It
-happens inside the attempt, so it is part of the attempt's span and counts
-toward the node's `timeout_s` and a retry policy's deadline. An `LLM_MERGE`
-synthesis by the built-in `Synthesizer` takes its turn the same way; it runs
-after every node has settled, so it is the only call in flight. Routing,
-planning and supervisor reviews are not limited.
+already waiting its turn waits for the cooldown too. Calls take their turns in
+the order they ask for them. The wait is measured on the tracer's clock and
+made with the executor's `sleep` when one is given. It happens inside the
+attempt, so it is part of the attempt's span and counts toward the node's
+`timeout_s` and a retry policy's deadline. A call that a timeout, a deadline
+or a cancellation stops while it waits gives up its turn without starting: the
+next call is spaced from the last call that did start, so a retry waits only
+for the next free turn. An `LLM_MERGE` synthesis by the built-in `Synthesizer`
+takes its turn the same way; it runs after every node has settled, so it is
+the only call in flight. Routing, planning and supervisor reviews are not
+limited.
 
 With `round_robin=True`, the async executor admits ready nodes in turn across
 branches. A branch is the ready nodes that share a first dependency, and

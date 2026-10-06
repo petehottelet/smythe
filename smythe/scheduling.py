@@ -11,6 +11,7 @@ branches. The validators here check every policy's fields the same way.
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import math
 import re
@@ -280,15 +281,16 @@ def _retry_after_s(error: BaseException) -> float | None:
 class _Bucket:
     """One provider type and model: its limit, the slots in use, and its next call start."""
 
-    __slots__ = ("limit", "in_flight", "not_before", "cooldowns")
+    __slots__ = ("limit", "in_flight", "not_before", "turn")
 
     def __init__(self, limit: CapacityLimit) -> None:
         self.limit = limit
         self.in_flight = 0
         # No call starts before this reading of the tracer's clock.
         self.not_before = -math.inf
-        # Counts cooldowns, so that a call that waited through one waits again.
-        self.cooldowns = 0
+        # Held by the one call waiting for its start; the others queue in order.
+        # Only calls in one async run's event loop ever queue for it.
+        self.turn = asyncio.Lock()
 
 
 class _CapacityLimiter:
@@ -330,25 +332,31 @@ class _CapacityLimiter:
         """Make one call to *model* on *provider* once its turn comes.
 
         The call starts no sooner than ``min_interval_s`` after the previous
-        call's start and after any cooldown. A transient status error it
+        call's start and after any cooldown, and calls take their turns in
+        the order they ask. A call claims its start only once it begins, so a
+        call cancelled while it waits claims none and the next call's turn is
+        spaced from the calls that started. A transient status error it
         raises whose ``Retry-After`` asks for a wait starts a cooldown of that
         length, at most the policy's ``cooldown_max_s``.
         """
         bucket = self.bucket(provider, model)
-        started, waited = self._tracer.now(), False
+        started, waited = self._tracer.now(), bucket.turn.locked()
         try:
-            while True:
-                cooldowns, now = bucket.cooldowns, self._tracer.now()
-                start = max(now, bucket.not_before)
-                # Reserve this start, so that a concurrent call takes the next.
-                bucket.not_before = start + (bucket.limit.min_interval_s or 0.0)
-                if start > now:
+            async with bucket.turn:
+                while True:
+                    now = self._tracer.now()
+                    start = max(now, bucket.not_before)
+                    if start <= now:
+                        break
                     waited = True
                     pause = self._sleep(start - now)
                     if inspect.isawaitable(pause):
                         await pause
-                if bucket.cooldowns == cooldowns:
-                    break
+                    # Only a cooldown that began during the wait moves the start.
+                    if bucket.not_before <= start:
+                        break
+                bucket.not_before = (max(start, self._tracer.now())
+                                     + (bucket.limit.min_interval_s or 0.0))
         finally:
             if waited:
                 self._tracer.on_wait("capacity", self._tracer.since(started), node)
@@ -359,7 +367,6 @@ class _CapacityLimiter:
             if asked is not None and self.policy.cooldown_max_s:
                 until = self._tracer.now() + min(asked, self.policy.cooldown_max_s)
                 bucket.not_before = max(bucket.not_before, until)
-                bucket.cooldowns += 1
             raise
 
 
