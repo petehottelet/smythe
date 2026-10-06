@@ -405,6 +405,30 @@ def test_each_node_follows_the_nodes_it_depends_on(change, message):
         ArtifactLineage.from_dict(data)
 
 
+# Each places one blank id everywhere it is used, so that only its blankness is wrong.
+BLANK_IDS = {
+    "store": [("run", "store_id"), ("predecessor", "store_id")],
+    "run": [("run", "run_id")],
+    "node": [("nodes", 1, "id"), ("nodes", 2, "depends_on", 0)],
+    "source": [("nodes", 1, "inputs", "sources", 0, "source_id")],
+    "predecessor": [("predecessor", "run_id"), ("nodes", 1, "reused_from", "run_id")],
+}
+
+
+@pytest.mark.parametrize("place", sorted(BLANK_IDS))
+@pytest.mark.parametrize("blank", [" ", "  "], ids=["space", "unicode-space"])
+def test_ids_must_not_be_blank(place, blank):
+    data = successor_data()
+    for path in BLANK_IDS[place]:
+        at(data, path[:-1])[path[-1]] = blank
+    with pytest.raises(ValueError, match="blank"):
+        ArtifactLineage.from_dict(data)
+    # The same record with a visible id is valid.
+    for path in BLANK_IDS[place]:
+        at(data, path[:-1])[path[-1]] = "x" + blank
+    ArtifactLineage.from_dict(data)
+
+
 def test_a_declared_node_names_what_it_was_given():
     data = record_data()
     del data["nodes"][1]["inputs"]["context"]

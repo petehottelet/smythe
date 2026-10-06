@@ -137,6 +137,13 @@ def _text(value: Any, what: str, limit: int = 256) -> str:
     return str.__str__(value)
 
 
+def _id(value: Any, what: str) -> str:
+    """An id: text that is not only whitespace."""
+    if not _text(value, what).strip():
+        raise ValueError(f"{what} must not be blank")
+    return str.__str__(value)
+
+
 def _long(value: Any, what: str) -> str:
     return _text(value, what, 512)
 
@@ -197,7 +204,7 @@ def _object(fields: dict[str, _Check], optional: dict[str, _Check] | None = None
     return check
 
 
-_RUN = _object({"store_id": _text, "run_id": _text, "recipe_sha256": _sha,
+_RUN = _object({"store_id": _id, "run_id": _id, "recipe_sha256": _sha,
                 "task_sha256": _nullable(_sha)})
 _ARTIFACT = _nullable(_object({
     "relative_path": _path, "sha256": _sha, "size_bytes": _count, "media_type": _text,
@@ -208,7 +215,7 @@ _ACCEPTANCE = _object({
                           if item is not AcceptanceDecision.NOT_EVALUATED)),
     "validator_set_sha256": _sha,
     "validators": _list(lambda value, what: ValidatorIdentity.from_dict(value))})
-_INPUTS = _object({"sources": _list(_object({"source_id": _text, "version": _nullable(_text),
+_INPUTS = _object({"sources": _list(_object({"source_id": _id, "version": _nullable(_text),
                                              "sha256": _sha}))}, {
     "context": _object({"snapshot_key": _long,
                         "assembly_version": lambda value, what: _count(value, what, 1)}),
@@ -216,11 +223,11 @@ _INPUTS = _object({"sources": _list(_object({"source_id": _text, "version": _nul
     "component": _object({"name": _text, "version": _text}),
     "agent_sha256": _sha})
 _NODE = _object({
-    "id": _text, "generation": _count, "kind": _pattern(_KIND), "depends_on": _list(_text),
+    "id": _id, "generation": _count, "kind": _pattern(_KIND), "depends_on": _list(_id),
     "result_sha256": _nullable(_sha), "inputs": _INPUTS,
     "coverage": _choice("declared", "undeclared")},
-    {"reused_from": _object({"run_id": _text, "generation": _count})})
-_PREDECESSOR = _nullable(_object({"store_id": _text, "run_id": _text, "lineage_sha256": _sha}))
+    {"reused_from": _object({"run_id": _id, "generation": _count})})
+_PREDECESSOR = _nullable(_object({"store_id": _id, "run_id": _id, "lineage_sha256": _sha}))
 _REPAIR = _nullable(_object({"plan_sha256": _sha, "reason": _text}))
 
 

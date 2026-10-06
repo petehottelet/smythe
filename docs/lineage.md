@@ -114,7 +114,8 @@ form:
 
 - **Ids, versions and digests only.** A record holds no source text, prompt
   or output. A source reference given with its text is refused, and a node
-  lists each reference, its id, version and digest, once. Digests are
+  lists each reference, its id, version and digest, once. Store, run, node
+  and source ids are never blank, that is, only whitespace. Digests are
   64 lowercase hexadecimal characters; `task_sha256` and a node's
   `result_sha256` may be null for a run without a task or a node without a
   result. The artifact's path is relative to the artifact directory, so the
