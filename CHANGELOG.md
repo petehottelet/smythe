@@ -632,9 +632,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   own. Built-in providers declare it, and `AnthropicProvider` takes
   `max_retries`, passed to the SDK only when set. Ordinary checkpoints record
   the policy only with `persist_attempts`; durable runs record it in their
-  recipe, as described below. Executors
-  also take `sleep` and `rng`, which replace the retry wait and its jitter.
-  Without a policy, retries are unchanged. See
+  recipe, as described below. Executors also take `sleep` and `rng`, which
+  replace the retry wait and its jitter. Without a policy, retries are
+  unchanged. See
   [retry policy](docs/execution.md#retry-policy).
 - `RetryPolicy(persist_attempts=True)` keeps a node's allowance of attempts
   across crashes and resumes. Each attempt is saved as spent before its call,
@@ -652,9 +652,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   property, and `smythe.checkpoint.attempt_allowance_from_state()` reads the
   record. Other runs keep writing version 4. See
   [persisted attempts](docs/execution.md#persisted-attempts).
-  policy, and checkpoints do not record it. Executors also take `sleep` and
-  `rng`, which replace the retry wait and its jitter. Without a policy,
-  retries are unchanged. See [retry policy](docs/execution.md#retry-policy).
 - Under a `RetryPolicy`, an ordinary run classifies the native providers'
   failures as a durable journal does. A 401, 403, 404, 413 or 429 response
   from `OpenAIResponsesProvider` or `AnthropicMessagesProvider` whose body is
