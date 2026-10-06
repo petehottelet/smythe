@@ -243,8 +243,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   awaitables, and async protocol methods: `submit()`, `lookup()` and `read()`
   on a connector, whose `profile` must be a `ConnectorProfile`, and `verify()`
   and `still_authorized()` on a verifier, whose `identity` must be a name
-  without control characters. Other methods are not checked. Smythe calls no
-  connector itself yet. See [external actions](docs/actions.md).
+  without control characters. Other methods are not checked. See
+  [external actions](docs/actions.md).
 - Version 2 workflow journals have four tables for external actions:
   `workflow_actions`, `workflow_action_attempts`, `workflow_action_approvals`
   and the append-only `workflow_action_records`.
@@ -301,6 +301,24 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   model-call latches do not block actions. The audit also checks that at
   most one attempt is in flight and that a refused attempt never consumes an
   approval. See [the dispatch journal](docs/actions.md#dispatch-journal).
+- `ActionRunner` in `smythe.actions` dispatches a run's prepared actions
+  through a connector, serially and under the run's lease, as the only retry
+  owner. `dispatch()` recovers what a stopped worker left in flight, checks
+  the approval and begins an attempt, reads the payload once and refuses
+  bytes that are not the bound content before the claim, then submits once
+  with the action's key and records the receipt, refusal or ambiguous
+  outcome; a receipt for another key or target is ambiguous. A receipt alone
+  never makes an action observed: `readback()` reads the receipt's object at
+  most `readback_reads` times per attempt, at the declared interval, and
+  records each read with its cost and a `smythe.action-readback` validation
+  report. Only the receipt's target holding the bound digest, the action's
+  key where exposed and at least the receipt's version makes the action
+  `observed`; a contradiction makes it `compensation_required`, and reads
+  that decide nothing leave it dispatched with `reconcile` next. Nothing is
+  resubmitted. `record_notice()` keeps a relayed service callback as an
+  untrusted record that can only prompt a readback. A connector whose profile
+  differs from the action's, or that retries on its own, is refused. See
+  [the action runner](docs/actions.md#action-runner).
 - Jobs operations have a semantic input digest.
   `smythe.jobs.operation_input_digest()` hashes the provider kind and its
   adapter version (`smythe.jobs.providers.ADAPTER_VERSIONS`), the model,

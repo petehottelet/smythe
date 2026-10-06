@@ -830,10 +830,12 @@ digest; and `workflow_action_records` its readbacks, lookups, notices, late
 receipts, findings, decisions and evidence. Records are append-only: SQLite
 refuses to update or delete them. In this release, `smythe.actions` writes
 [prepared actions](actions.md#prepared-actions) and their
-[approvals, rejections and revocations](actions.md#approvals), and
+[approvals, rejections and revocations](actions.md#approvals);
 `smythe.workflow_actions` writes their attempts and late receipts in the
-[dispatch journal](actions.md#dispatch-journal); nothing writes other records
-yet.
+[dispatch journal](actions.md#dispatch-journal); the
+[action runner](actions.md#readback) writes readback records, each charged
+its read's cost; and [`record_notice()`](actions.md#notices) keeps notices,
+marked untrusted. Nothing writes other records yet.
 
 Action money is its own accounting scope, `external_actions`, in whole
 nanoUSD. It never enters a run's balances or `workflow_accounting`, which stay

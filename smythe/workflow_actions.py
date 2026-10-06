@@ -14,10 +14,11 @@ A version 2 journal keeps each run's external actions in four tables:
 Action money is the ``external_actions`` accounting scope: whole nanoUSD kept
 on these rows, never in a run's balances, which stay equal to its call ledger.
 :func:`audit_actions` runs inside a ``SQLiteWorkflowStore`` transaction; the
-other functions open their own. Preparation, verdicts and revocations need no
-run lease and are called by ``smythe.actions``. The dispatch journal,
-:func:`begin_attempt` to :func:`recover_actions`, is fenced by the run's
-lease. ``import smythe`` does not load this module.
+other functions open their own. Preparation, verdicts, revocations and
+notices need no run lease and are called by ``smythe.actions``. The dispatch
+journal, :func:`begin_attempt` to :func:`recover_actions`, and the runner's
+releases and readback records are fenced by the run's lease.
+``import smythe`` does not load this module.
 """
 
 from __future__ import annotations
@@ -625,3 +626,98 @@ def recover_actions(store, lease):
                         error="recovered after dispatch", action_state="outcome_unknown")
                 result["outcome_unknown"].append(attempt["attempt_id"])
     return result
+
+
+# The runner's journal: releases before a claim, readback records and untrusted notices.
+
+
+def release_attempt(store, lease, attempt_id, error):
+    """Release a prepared attempt with its reservation, before its dispatch is claimed.
+
+    The caller holds the run's lease. Nothing was sent, so the attempt does
+    not count toward ``max_attempts``. *error* is kept redacted. Returns the
+    attempt's projection; raises ``ActionStateError`` unless it is prepared.
+    """
+    with store._transaction() as db:
+        attempt = _attempt(db, attempt_id)
+        _owned(store, db, lease, attempt["action_id"])
+        if attempt["state"] != "prepared":
+            raise ActionStateError(f"Attempt {attempt_id!r} is {attempt['state']}; only a prepared attempt "
+                                   "is released")
+        _finish(store, db, attempt, "released", error=_error(error))
+        return _attempt_item(_attempt(db, attempt_id))
+
+
+def attempt_status(store, action_id):
+    """An action, its attempts' projections, its latest attempt's receipt and that attempt's reads.
+
+    The receipt is None unless the latest attempt has one; reads counts its
+    ``readback`` records. Only reads are made, after the run's actions pass
+    the audit.
+    """
+    if store.store_version < 2:
+        raise WorkflowNotFoundError(action_id)  # Version 1 journals have no action tables.
+    with store._transaction(write=False) as db:
+        row = _row(db, action_id)
+        audit_actions(store, db, row["run_id"])
+        attempts = db.execute("SELECT * FROM workflow_action_attempts WHERE action_id=? ORDER BY number",
+                              (action_id,)).fetchall()
+        latest = attempts[-1] if attempts else None
+        receipt = latest and latest["receipt_json"] and _stored(latest["receipt_json"], ConnectorReceipt.from_dict)
+        reads = 0
+        for record in db.execute("SELECT payload_json FROM workflow_action_records WHERE action_id=? "
+                                 "AND kind='readback'", (action_id,)):
+            payload = _loads(record[0], stored=True)
+            reads += latest is not None and type(payload) is dict and payload.get("attempt_id") == latest["attempt_id"]
+        return _prepared(row), [_attempt_item(attempt) for attempt in attempts], receipt or None, reads
+
+
+def record_readback(store, lease, attempt_id, payload, cost, state):
+    """Append one read of an acknowledged attempt's object as a ``readback`` record.
+
+    The caller holds the run's lease, and the attempt's action must still be
+    ``dispatched``. *cost* is the read's nanoUSD, confirmed against the
+    action; *state* is the action's state after the read: ``dispatched``,
+    ``observed`` or ``compensation_required``. Returns the record ID.
+    """
+    if state not in ("dispatched", "observed", "compensation_required") or type(cost) is not int or cost < 0:
+        raise WorkflowValidationError("A read leaves its action dispatched, observed or compensation_required "
+                                      "at a non-negative integer cost")
+    payload_json = _canonical(payload)
+    with store._transaction() as db:
+        attempt = _attempt(db, attempt_id)
+        _, action = _owned(store, db, lease, attempt["action_id"])
+        if (attempt["state"], action["state"]) != ("acknowledged", "dispatched"):
+            raise ActionStateError(f"Attempt {attempt_id!r} is {attempt['state']} and its action {action['state']}; "
+                                   "only an acknowledged attempt of a dispatched action is read back")
+        record_id, now = uuid4().hex, store._clock_ns()
+        db.execute("""INSERT INTO workflow_action_records(record_id,action_id,kind,payload_json,payload_sha,
+          trusted,cost,created) VALUES (?,?,'readback',?,?,1,?,?)""",
+                   (record_id, action["action_id"], payload_json, _sha(payload_json), str(cost), now))
+        db.execute("UPDATE workflow_actions SET confirmed=?,state=?,updated=? WHERE action_id=?",
+                   (str(_amount(action["confirmed"]) + cost), state, now, action["action_id"]))
+        store._event(db, lease.run_id, "action_readback",
+                     payload={"action_id": action["action_id"], "record_id": record_id, "state": state})
+    return record_id
+
+
+def keep_notice(store, key, payload):
+    """Keep *payload* as an untrusted ``notice`` record of the action keyed *key*; return that action.
+
+    A notice that names no action of the journal is not kept, and None is
+    returned. Keeping a notice changes no state.
+    """
+    payload_json = _canonical(payload)
+    if store.store_version < 2:
+        return None
+    with store._transaction() as db:
+        row = db.execute("SELECT * FROM workflow_actions WHERE action_key=?", (key,)).fetchone()
+        if row is None:
+            return None
+        record_id = uuid4().hex
+        db.execute("""INSERT INTO workflow_action_records(record_id,action_id,kind,payload_json,payload_sha,
+          trusted,created) VALUES (?,?,'notice',?,?,0,?)""",
+                   (record_id, row["action_id"], payload_json, _sha(payload_json), store._clock_ns()))
+        store._event(db, row["run_id"], "action_notice",
+                     payload={"action_id": row["action_id"], "record_id": record_id})
+        return _prepared(row)

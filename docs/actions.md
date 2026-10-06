@@ -6,9 +6,11 @@ It [prepares actions](#prepared-actions) in a durable run's
 [journal](workflow-accounting.md#external-action-records), bound to the run's
 accepted content, and records [verified approvals](#approvals) of them.
 `smythe.workflow_actions` keeps the [dispatch journal](#dispatch-journal) of
-each attempt that your host code makes. Smythe does not yet call connectors
-itself, and these types and functions may change before it does.
-`import smythe` loads neither module; import them explicitly.
+each attempt, and the [action runner](#action-runner) makes those attempts
+through your connector, reads their results back and keeps the service's
+[notices](#notices) as untrusted records. These types and functions may
+change before they leave preview. `import smythe` loads neither module;
+import them explicitly.
 
 An external action has three parts that this page describes:
 
@@ -330,8 +332,9 @@ never assertions or revocation reasons.
 
 `smythe.workflow_actions` records each attempt of an action in the run's
 journal, so that a worker that stops part way leaves a state that another
-can recover. Your host code dispatches, holding the run's lease, which fences
-dispatch on the completed run:
+can recover. The [action runner](#action-runner) makes these calls for you;
+host code that dispatches by itself makes them in this order, holding the
+run's lease, which fences dispatch on the completed run:
 
 ```python
 from smythe.actions import ConnectorRefused, check_authority
@@ -475,3 +478,141 @@ receipt digest and balances, and each late receipt by its digest. It never
 shows dispatch tokens, receipts or error text. Each transition adds an
 `action_attempt` event, and each late receipt an `action_late_receipt`
 event, carrying only identifiers and the new state.
+
+## Action runner
+
+`ActionRunner` dispatches a run's prepared actions through your connector,
+one at a time, and reads their results back:
+
+```python
+from smythe.actions import ActionRunner
+
+runner = ActionRunner(store, connector, identity_host, lease_ttl_s=60)
+progress = runner.dispatch(run_id, action.action_id)       # one submission
+if progress.next_action == "readback":
+    progress = runner.readback(run_id, action.action_id)   # independent reads
+print(progress.state, progress.next_action)
+```
+
+`ActionRunner(store, connector, verifier, *, owner_id=None, lease_ttl_s=60,
+sleep=time.sleep, clock=time.monotonic)` checks the connector and verifier
+as `check_connector()` and `check_verifier()` do. The runner is the only
+retry owner: each attempt submits once, and the runner never submits again
+on its own. Your connector must make one request per call, with any client
+retries turned off; a connector that exposes `max_retries` must set it to 0,
+or `TypeError` is raised. Each step holds the run's lease as `owner_id`, a
+new name by default, and releases it when the step ends. Before submitting,
+and before each read and the wait that precedes it, it renews the lease for
+`lease_ttl_s` beyond the connector's timeout and that wait, up to a day, so a
+wait longer than the lease does not lose it. Each step first
+[recovers](#recovery) whatever a stopped worker left in flight. While
+another worker's lease is live, a step raises `WorkflowLeaseError`. `sleep`
+and `clock`, in seconds, space the reads. Dispatch is serial and runs
+outside the asynchronous node executor, so its scheduling and drain policies
+never apply to writes.
+
+Both steps refuse, with `WorkflowConflictError`, an action of another run
+and a connector whose `profile` is not exactly the one the action was
+prepared with.
+
+### Dispatch
+
+`runner.dispatch(run_id, action_id)` makes the action's next attempt:
+
+1. It checks the approval with `check_authority()`, including a security
+   stop on the run, and begins the attempt under it with `begin_attempt()`.
+2. It reads the payload once: the run's current
+   [published document](workflow-accounting.md#published-documents), or its
+   output text as UTF-8 for a run without a renderer. The bytes must have
+   exactly the SHA-256 and size of the intent's content. Otherwise the
+   attempt is released, unclaimed, and `ActionNotAuthorized` is raised:
+   nothing is sent.
+3. It claims the dispatch and calls the connector's `submit()` once, with the
+   action's key, intent and the bytes it checked, which it never reads
+   again. A change to the file after the check cannot reach the service.
+4. It records the outcome. A receipt is recorded with `record_receipt()`, a
+   `ConnectorRefused` with `record_refused()`, and any other exception with
+   `record_ambiguous()`. A receipt that names another key or target, or a
+   value that is not a `ConnectorReceipt`, is recorded as ambiguous.
+
+A refusal leaves the action `not_dispatched` under the same, unconsumed
+approval, so `dispatch()` can try again while attempts remain. An ambiguous
+outcome is never sent again. A receipt never shows the result by itself: the
+action stays `dispatched` until a read does.
+
+### Readback
+
+`runner.readback(run_id, action_id)` reads the object an acknowledged attempt
+committed, at the target its receipt names, with the connector's `read()`. It
+makes at most the profile's `readback_reads` reads per attempt in all,
+however often it is called, `readback_interval_s` apart, and only when the
+profile declares `lookup_by_object`. Each read is appended as a `readback`
+record, charged the profile's `read_ceiling_nanousd` as confirmed cost
+against the action. Without an acknowledged attempt, it reads nothing.
+
+Each read's verdict is a `ValidationReport` from the validator
+`READBACK_VALIDATOR` (`smythe.action-readback`, version 1), whose path names
+the object as `tenant/collection/object_id`:
+
+| Read | Outcome | Action |
+|---|---|---|
+| The object is the receipt's target, holds bytes whose SHA-256 is the intent's content digest, carries the action's key when the connector exposes one, and has at least the receipt's version | `passed` | `observed` |
+| Another tenant's, collection's or object's target (`target_mismatch`), other bytes (`content_mismatch`) or another key (`key_mismatch`) | `rejected` | `compensation_required` |
+| No object (`not_visible`), a failed read (`read_failed`) or a version older than the receipt's (`stale_version`) | `error` | stays `dispatched` |
+
+The digest is recomputed from the bytes the read returned, never taken from
+the service. For an intent without content, the bytes must be the canonical
+JSON of its parameters. The first passed or rejected read settles the action.
+Reads that decide nothing leave the attempt acknowledged but unverified; once
+none are left, the next action is `reconcile`. An empty read alone never
+shows that nothing was written, and nothing is submitted again.
+
+Each record holds the attempt, the read's number, the report and, for an
+object, its target, content digest, size, media type, version and key; a
+failed read's error text is kept with account identifiers redacted. Records
+never hold the object's bytes. `inspect_run()` shows them by kind and digest,
+and each read adds an `action_readback` event with the record's identifier
+and the action's state.
+
+### Notices
+
+A service may report its commits with callbacks. `record_notice(store,
+payload)` keeps one that your host relays:
+
+```python
+from smythe.actions import record_notice
+
+action = record_notice(store, {"key": key, "target": {"tenant": "acme", "collection": "posts"},
+                               "notice": callback_body})
+if action is not None:
+    runner.readback(action.run_id, action.action_id)
+```
+
+The payload is a JSON object of at most 64 KiB as canonical JSON, which names
+the action key it reports as `key` and the action's target as `target`;
+other fields are kept as they are. A notice whose key names an action of the
+journal is kept with that action as an untrusted `notice` record, with an
+`action_notice` event; a notice under any other key is not kept. It returns
+the action only when the action is `dispatched` and the notice names its
+tenant and collection, and None otherwise. A notice never changes an action's
+state: anyone can send one, so it can only prompt a readback, which reads the
+object the receipt names and decides by itself. A notice for another tenant,
+for an action not yet dispatched or for one already settled prompts nothing.
+It needs no lease.
+
+### Progress
+
+Both steps return an `ActionProgress`: the `action_id`, its `state`, its
+latest `attempt` as `inspect_run()` shows it, the `report` of the step's
+last read, or None, and the `next_action`:
+
+| `next_action` | When |
+|---|---|
+| `dispatch` | The action is `not_dispatched` and attempts remain. |
+| `readback` | An acknowledged attempt has reads left. |
+| `reconcile` | The outcome is unknown, or the reads did not settle it. |
+| `compensate` | The action is `compensation_required`. |
+| None | The action is settled, or has used every attempt. |
+
+Errors from the journal's checks, such as `ActionNotAuthorized`,
+`ActionStateError` and `WorkflowBudgetError`, propagate unchanged.

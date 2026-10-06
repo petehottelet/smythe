@@ -10,8 +10,10 @@ protocols, checked only structurally: a caller contract, not a sandbox.
 to a completed run's accepted content; :func:`approve`, :func:`reject` and
 :func:`revoke` record verified approvals and controls; :func:`check_authority`
 checks them again; and ``smythe.workflow_actions`` journals each attempt's
-dispatch and outcome. Only trusted host code calls these functions. Smythe
-calls no connector itself yet, and ``import smythe`` does not load this module.
+dispatch and outcome. :class:`ActionRunner` submits each attempt once through
+a connector and reads the result back, and :func:`record_notice` keeps a
+service's callbacks as untrusted records. Only trusted host code calls these
+functions, and ``import smythe`` does not load this module.
 """
 
 from __future__ import annotations
@@ -20,16 +22,26 @@ import hashlib
 import inspect
 import json
 import math
+import time
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager, suppress
 from dataclasses import KW_ONLY, MISSING, dataclass, field, fields
 from typing import Any, Protocol, Self
+from uuid import uuid4
 
 from smythe._canonical import canonical_bytes, sha256_hex
 from smythe._redact import redact_account_identifiers
 from smythe.acceptance import _calls_async, _is_async
 from smythe.provider import Provider
-from smythe.validation import _require_keys, _require_sha256
+from smythe.validation import (
+    ValidationOutcome, ValidationReport, ValidatorIdentity, _require_keys, _require_sha256,
+    advisory_finding, hard_finding,
+)
 from smythe.workflow_binding import WorkflowBindingError, json_snapshot
-from smythe.workflow_store import WorkflowStateError, WorkflowValidationError, _text
+from smythe.workflow_store import (
+    WorkflowConflictError, WorkflowLeaseError, WorkflowStateError, WorkflowValidationError,
+    _canonical, _text,
+)
 
 ACTION_CONTRACT_VERSION = "smythe.action.v1"
 _CONTRACT_VERSIONS = (ACTION_CONTRACT_VERSION,)
@@ -47,6 +59,10 @@ _CLOSED = (*_FINISHED, "compensation_required")
 # A run blocked for this reason authorizes no action.
 _SECURITY_STOP = "security_stop"
 _COMPENSATION = ("new_action", "unsupported")
+# The validator whose report records the verdict of each readback read.
+READBACK_VALIDATOR = ValidatorIdentity.for_config("smythe.action-readback", "1")
+# The largest notice, as canonical JSON, that record_notice keeps.
+_NOTICE_BYTES = 65_536
 
 
 class ConnectorRefused(Exception):
@@ -751,11 +767,274 @@ def check_authority(store: Any, action_id: str, verifier: Any) -> ActionApproval
                           approval["expires_at_ns"])
 
 
+def record_notice(store: Any, payload: Any) -> PreparedAction | None:
+    """Keep a callback the host relays as an untrusted record; return the action to read back.
+
+    *payload* is a JSON object of at most 64 KiB as canonical JSON. It names
+    the action key it reports as ``key`` and the action's target as
+    ``target``, an object with ``tenant`` and ``collection``; other fields are
+    kept as they are. A notice whose key names an action of the journal is
+    kept with that action, marked untrusted; any other is not kept. The action
+    is returned, so that the host can call :meth:`ActionRunner.readback`, only
+    when it is ``dispatched`` and the notice names its tenant and collection;
+    otherwise None is. A notice never changes an action: only a read the
+    runner makes can show its result. No lease is needed.
+    """
+    from smythe.workflow_actions import keep_notice
+
+    if type(payload) is not dict:
+        raise WorkflowValidationError("A notice is a JSON object")
+    if len(_canonical(payload).encode("utf-8")) > _NOTICE_BYTES:
+        raise WorkflowValidationError(f"A notice is at most {_NOTICE_BYTES} bytes of JSON")
+    key, target = payload.get("key"), payload.get("target")
+    action = keep_notice(store, key, payload) if type(key) is str else None
+    if (action is None or action.state != "dispatched" or type(target) is not dict
+            or (target.get("tenant"), target.get("collection"))
+            != (action.intent.target.tenant, action.intent.target.collection)):
+        return None
+    return action
+
+
+def _payload(store: Any, action: PreparedAction) -> bytes | None:
+    """The bytes *action* delivers, read once; None unless they are exactly its bound content.
+
+    They are the run's current published document, found through
+    ``current_artifact``, or else its output text as UTF-8.
+    """
+    from smythe.workflow_artifact import current_artifact, read_published
+
+    content = action.intent.content
+    if content is None:
+        return None
+    current = current_artifact(store, action.run_id)
+    data = (store.get_checkpoint(action.run_id)["checkpoint"]["output"].encode("utf-8")
+            if current is None else read_published(current.publication))
+    if data is None or (hashlib.sha256(data).hexdigest(), len(data)) != (content.sha256,
+                                                                          content.size_bytes):
+        return None
+    return data
+
+
+def _verdict(action: PreparedAction, receipt: ConnectorReceipt, observed: Any,
+             error: str | None) -> ValidationReport:
+    """The readback report on one read of the object *receipt* names.
+
+    A read that fails, finds no object or finds a version older than the
+    receipt's decides nothing: its outcome is ``error``. Otherwise the object
+    must be the receipt's target, hold the bound content (the canonical JSON
+    of the parameters for an intent without content) and, when the connector
+    exposes it, carry the action's key.
+    """
+    target, content = receipt.target, action.intent.content
+    path = f"{target.tenant}/{target.collection}/{target.object_id}"
+
+    def undecided(code: str, message: str, **values: Any) -> ValidationReport:
+        return ValidationReport(path, (advisory_finding(code, message, **values),),
+                                ValidationOutcome.ERROR, READBACK_VALIDATOR)
+
+    if not isinstance(observed, ObservedObject):
+        return undecided("read_failed" if error else "not_visible", error or "The read found no object")
+    findings = [] if observed.target == target else [hard_finding(
+        "target_mismatch", "The object read is not the receipt's target",
+        expected=target.to_dict(), observed=observed.target.to_dict())]
+    if (not findings and None not in (observed.version, receipt.object_version)
+            and observed.version < receipt.object_version):
+        return undecided("stale_version", "The object read is older than the receipt's version",
+                         expected=receipt.object_version, observed=observed.version)
+    digest = (content.sha256 if content is not None
+              else hashlib.sha256(canonical_bytes(action.intent.parameters)).hexdigest())
+    for code, message, expected, seen in (
+            ("content_mismatch", "The object does not hold the bound content", digest,
+             observed.content_ref.sha256),
+            ("key_mismatch", "The object was written under another key", action.action_key,
+             action.action_key if observed.key is None else observed.key)):
+        if seen != expected:
+            findings.append(hard_finding(code, message, expected=expected, observed=seen))
+    return ValidationReport(path, tuple(findings), validator=READBACK_VALIDATOR)
+
+
+@dataclass(frozen=True)
+class ActionProgress:
+    """Where an action stands after an :class:`ActionRunner` step, and what it needs next.
+
+    ``attempt`` is its latest attempt as ``inspect_run()`` shows it, or None.
+    ``report`` is the verdict of the step's last read, or None when it made
+    none. ``next_action`` is ``dispatch`` for an action not dispatched with
+    attempts left, ``readback`` while an acknowledged attempt has reads left,
+    ``reconcile`` for an outcome the reads have not settled, ``compensate``
+    for ``compensation_required``, and None when the runner can do nothing
+    more.
+    """
+
+    action_id: str
+    state: str
+    attempt: dict[str, Any] | None
+    report: ValidationReport | None
+    next_action: str | None
+
+
+class ActionRunner:
+    """Dispatch a durable run's prepared actions and read back their results, one at a time.
+
+    The runner is the only retry owner: each attempt submits once, and it
+    never submits again on its own. *connector* must make one request per
+    call; one exposing ``max_retries`` must set it to 0. Each step holds the
+    run's lease as *owner_id* (a new name by default) for *lease_ttl_s*,
+    renewed beyond the submission's timeout or the wait before the next read,
+    and settles first what a stopped worker left in flight. *sleep* and
+    *clock*, in seconds, space the reads. Dispatch is serial and independent
+    of the asynchronous executor.
+    """
+
+    def __init__(self, store: Any, connector: Any, verifier: Any, *, owner_id: str | None = None,
+                 lease_ttl_s: float = 60.0, sleep: Callable[[float], Any] = time.sleep,
+                 clock: Callable[[], float] = time.monotonic) -> None:
+        check_connector(connector)
+        if getattr(connector, "max_retries", 0) != 0:
+            raise TypeError("A connector must not retry on its own: set its max_retries to 0")
+        check_verifier(verifier)
+        store._ttl(lease_ttl_s)
+        self.store, self.connector, self.verifier = store, connector, verifier
+        self.owner_id = (f"action-runner-{uuid4().hex}" if owner_id is None
+                         else _text(owner_id, "owner_id"))
+        self.lease_ttl_s, self._sleep, self._clock = lease_ttl_s, sleep, clock
+
+    def _action(self, run_id: str, action_id: str) -> PreparedAction:
+        """The action, once it is *run_id*'s and the connector's profile is the one it binds."""
+        action = load_action(self.store, action_id)
+        if action.run_id != run_id:
+            raise WorkflowConflictError(f"Action {action_id!r} belongs to another workflow run")
+        if check_connector(self.connector) != action.profile:
+            raise WorkflowConflictError(
+                f"The connector's profile is not the one action {action_id!r} was prepared with")
+        return action
+
+    @contextmanager
+    def _leased(self, run_id: str) -> Iterator[Any]:
+        from smythe.workflow_actions import recover_actions
+
+        lease = self.store.acquire_lease(run_id, self.owner_id, ttl_s=self.lease_ttl_s)
+        try:
+            recover_actions(self.store, lease)
+            yield lease
+        finally:
+            with suppress(WorkflowLeaseError):
+                self.store.release_lease(lease)
+
+    def _renew(self, lease: Any, seconds: float) -> None:
+        """Hold the lease for *seconds* more than its usual duration, up to a day."""
+        self.store.heartbeat(lease, min(86_400.0, self.lease_ttl_s + seconds))
+
+    def dispatch(self, run_id: str, action_id: str) -> ActionProgress:
+        """Make the action's next attempt: exactly one submission under its current approval.
+
+        Under the run's lease, :func:`check_authority` and ``begin_attempt``
+        check the approval and content. The payload is then read once and must
+        be exactly the bound content, or the attempt is released and
+        ``ActionNotAuthorized`` raised before anything is sent. After the
+        claim, the connector's ``submit()`` is called once with the action's
+        key and those bytes, and its receipt, refusal or ambiguous outcome is
+        recorded; an unusable receipt is ambiguous. A receipt never shows the
+        result: call :meth:`readback`. Raises what the journal's checks raise.
+        """
+        from smythe import workflow_actions as journal
+
+        action = self._action(run_id, action_id)
+        with self._leased(run_id) as lease:
+            approval = check_authority(self.store, action_id, self.verifier)
+            attempt = journal.begin_attempt(self.store, lease, action_id, approval.approval_id)
+            payload = _payload(self.store, action)
+            if payload is None and action.intent.content is not None:
+                problem = "the bytes read for delivery are not its bound content"
+                journal.release_attempt(self.store, lease, attempt["attempt_id"], problem)
+                raise ActionNotAuthorized(f"Action {action_id!r} is not authorized: {problem}")
+            self._renew(lease, action.profile.timeout_s)
+            permit = journal.claim_dispatch(self.store, lease, attempt["attempt_id"])
+            try:
+                receipt = self.connector.submit(action.action_key, action.intent, payload,
+                                                action.profile.timeout_s)
+            except ConnectorRefused as error:
+                journal.record_refused(self.store, permit, error)
+            except Exception as error:  # anything else may follow a commit
+                journal.record_ambiguous(self.store, permit, error)
+            else:
+                try:
+                    journal.record_receipt(self.store, permit, receipt)
+                except WorkflowValidationError as error:
+                    journal.record_ambiguous(self.store, permit, error)
+        return self._progress(action_id)
+
+    def readback(self, run_id: str, action_id: str) -> ActionProgress:
+        """Read the object an acknowledged attempt committed, to find whether it holds the intent.
+
+        Under the run's lease, the connector's ``read()`` is called for the
+        receipt's target at most ``readback_reads`` times per attempt in all,
+        ``readback_interval_s`` apart, and only when the profile declares
+        ``lookup_by_object``. Each read is a ``readback`` record charged the
+        profile's ``read_ceiling_nanousd`` and holding its
+        :data:`READBACK_VALIDATOR` report. A passed report makes the action
+        ``observed``, a rejected one ``compensation_required``; reads that
+        decide nothing leave it ``dispatched``, with ``reconcile`` next once
+        none are left. Without an acknowledged attempt nothing is read.
+        """
+        from smythe import workflow_actions as journal
+
+        action, report = self._action(run_id, action_id), None
+        profile = action.profile
+        with self._leased(run_id) as lease:
+            current, attempts, receipt, reads = journal.attempt_status(self.store, action_id)
+            readable = (current.state == "dispatched" and receipt is not None
+                        and attempts[-1]["state"] == "acknowledged" and profile.lookup_by_object)
+            started = None
+            for number in range(reads + 1, profile.readback_reads + 1 if readable else 0):
+                wait = 0.0 if started is None else max(
+                    0.0, started + profile.readback_interval_s - self._clock())
+                self._renew(lease, wait + profile.timeout_s)
+                if wait:
+                    self._sleep(wait)
+                started, observed, error = self._clock(), None, None
+                try:
+                    observed = self.connector.read(receipt.target, profile.timeout_s)
+                except Exception as exc:  # a failed read proves nothing
+                    error = journal._error(exc)
+                report = _verdict(action, receipt, observed, error)
+                state = {ValidationOutcome.PASSED: "observed",
+                         ValidationOutcome.REJECTED: "compensation_required"}.get(
+                             report.outcome, "dispatched")
+                seen = observed if isinstance(observed, ObservedObject) else None
+                journal.record_readback(self.store, lease, attempts[-1]["attempt_id"], {
+                    "attempt_id": attempts[-1]["attempt_id"], "read": number, "error": error,
+                    "observed": seen and {"target": seen.target.to_dict(),
+                                          "content": seen.content_ref.to_dict(),
+                                          "version": seen.version, "key": seen.key},
+                    "report": report.to_dict()}, profile.read_ceiling_nanousd, state)
+                if state != "dispatched":
+                    break
+        return self._progress(action_id, report)
+
+    def _progress(self, action_id: str, report: ValidationReport | None = None) -> ActionProgress:
+        from smythe.workflow_actions import attempt_status
+
+        action, attempts, _, reads = attempt_status(self.store, action_id)
+        profile, latest = action.profile, attempts[-1] if attempts else None
+        claimed = sum(attempt["state"] not in ("prepared", "released") for attempt in attempts)
+        next_action = {"outcome_unknown": "reconcile", "compensation_required": "compensate"}.get(
+            action.state)
+        if action.state == "not_dispatched" and claimed < profile.max_attempts:
+            next_action = "dispatch"
+        elif action.state == "dispatched":
+            next_action = ("readback" if latest["state"] == "acknowledged"
+                           and profile.lookup_by_object and reads < profile.readback_reads
+                           else "reconcile")
+        return ActionProgress(action_id, action.state, latest, report, next_action)
+
+
 __all__ = [
-    "ACTION_CONTRACT_VERSION", "ACTION_STATES", "ActionApproval",
-    "ActionIntent", "ActionNotAuthorized", "ActionStateError", "ActionTarget", "ApprovalRejected",
-    "ApprovalVerifier", "ConnectorAmbiguous", "ConnectorProfile", "ConnectorReceipt",
-    "ConnectorRefused", "ContentRef", "ObservedObject", "PreparedAction", "Principal",
-    "WriteConnector", "action_key", "approve", "check_authority", "check_connector",
-    "check_verifier", "load_action", "prepare_action", "reject", "revoke",
+    "ACTION_CONTRACT_VERSION", "ACTION_STATES", "READBACK_VALIDATOR", "ActionApproval",
+    "ActionIntent", "ActionNotAuthorized", "ActionProgress", "ActionRunner", "ActionStateError",
+    "ActionTarget", "ApprovalRejected", "ApprovalVerifier", "ConnectorAmbiguous",
+    "ConnectorProfile", "ConnectorReceipt", "ConnectorRefused", "ContentRef", "ObservedObject",
+    "PreparedAction", "Principal", "WriteConnector", "action_key", "approve", "check_authority",
+    "check_connector", "check_verifier", "load_action", "prepare_action", "record_notice",
+    "reject", "revoke",
 ]
