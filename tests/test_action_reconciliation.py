@@ -550,6 +550,44 @@ def test_lookups_and_reads_stop_at_the_approvals_ceiling(
     assert balances(after) == (2 * READ, 0, WRITE) and sum(balances(after)) == action.ceiling_nanousd
 
 
+@pytest.mark.parametrize("lookups", [2, 1], ids=["two-lookups-leave-no-read", "one-lookup-leaves-one-read"])
+def test_an_attempt_made_after_a_not_executed_finding_reads_only_within_the_ceiling(
+        store, tmp_path, replies, host, clock, lookups):  # noqa: F811
+    # The lookups that showed the write was not made used reads the approval's ceiling covers.
+    service = FixtureService(clock_ns=clock, visibility_delay_s=5)
+    connector = Reconciling(service, readback_interval_s=1 if lookups == 2 else 5)
+    action, approval = unknown(store, tmp_path, replies, host, clock, connector, committed=False)
+    assert approval.ceiling_nanousd == action.ceiling_nanousd == 2 * WRITE + 2 * READ
+    # With two lookups, the first comes a second before the bound has passed.
+    clock.advance(5 + TIMEOUT - (lookups - 1))
+    worker = runner(store, connector, host, clock)
+    assert worker.reconcile(action.run_id, action.action_id).next_action == "dispatch"
+    assert connector.made("lookup") == lookups and findings(store, action)[0]["finding"] == "not_executed"
+
+    dispatched = worker.dispatch(action.run_id, action.action_id)
+
+    assert dispatched.attempt["state"] == "acknowledged"
+    assert dispatched.next_action == ("readback" if lookups == 1 else "reconcile")
+    # The new commit is not visible yet: a read that fits decides nothing, and none is made past the ceiling.
+    progress = worker.readback(action.run_id, action.action_id)
+    after = item(store, action)
+    assert sum(balances(after)) <= approval.ceiling_nanousd
+    assert balances(after) == (2 * READ, 0, 2 * WRITE) and connector.made("read") == 2 - lookups
+    assert (progress.state, progress.next_action) == ("dispatched", "reconcile")
+
+    # Even once the commit is visible, no read fits: the result goes to an operator, unread.
+    clock.advance(10)
+    reviewed = worker.reconcile(action.run_id, action.action_id)
+    assert (reviewed.state, reviewed.attempt["state"], reviewed.next_action) == (
+        "dispatched", "acknowledged", "operator_review")
+    assert findings(store, action)[-1]["reason"] == "the approval's ceiling leaves no room for another read"
+    assert worker.readback(action.run_id, action.action_id).next_action == "operator_review"
+    assert (connector.made("read"), connector.made("submit")) == (2 - lookups, 2)
+    assert counts(service, action) == (1, 1, 0)
+    final = intact(store, action, after)
+    assert balances(final) == balances(after) and store.audit(action.run_id)["ok"]
+
+
 # ---------------------------------------------------------------------------
 # Acknowledged but unverified results
 # ---------------------------------------------------------------------------

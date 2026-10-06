@@ -920,8 +920,10 @@ looks it up, reads it back, retries it under deduplication or finds that it
 was not made, and after the action is reconciled: only a receipt that
 reports the write's cost turns that exposure into the attempt's confirmed
 cost. Each lookup and read is confirmed at the profile's read ceiling, and
-reconciliation makes none that would take the action past the ceiling of the
-attempt's approval. A reconciled action can therefore still carry unknown
+the action runner makes none that would take the action past the ceiling of
+the attempt's approval, including the reads of an attempt dispatched after
+reconciliation found that the write was not made, which share that budget
+with its lookups. A reconciled action can therefore still carry unknown
 exposure, and no attempt, cost or record is removed when its outcome is
 settled.
 

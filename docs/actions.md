@@ -228,8 +228,11 @@ its operations. A refusal raises `ActionNotAuthorized` and records nothing.
 
 `prepare_action()` returns a `PreparedAction`: its `action_id`, `run_id`,
 `slot`, `sequence`, `action_key`, `intent`, `profile`, `state` and
-`ceiling_nanousd`, the most its attempts and readback may cost:
-`max_attempts` writes and `readback_reads` reads at the profile's ceilings.
+`ceiling_nanousd`: the cost of `max_attempts` writes and `readback_reads`
+reads at the profile's ceilings, which an [approval](#approvals) must cover.
+No attempt, read or [reconciliation](#reconciliation) lookup is made that
+would take the action's confirmed, reserved and unknown nanoUSD past its
+approval's ceiling, so lookups share the budget of the reads.
 `load_action(store, action_id)` reads it again.
 
 A slot names one place an action goes in a run. Its first action has
@@ -561,7 +564,9 @@ makes at most the profile's `readback_reads` reads per attempt in all,
 however often it is called, `readback_interval_s` apart, and only when the
 profile declares `lookup_by_object`. Each read is appended as a `readback`
 record, charged the profile's `read_ceiling_nanousd` as confirmed cost
-against the action. Without an acknowledged attempt, it reads nothing.
+against the action, and no read is made that would take the action's
+confirmed, reserved and unknown nanoUSD past the ceiling of the attempt's
+approval. Without an acknowledged attempt, it reads nothing.
 
 Each read's verdict is a `ValidationReport` from the validator
 `READBACK_VALIDATOR` (`smythe.action-readback`, version 1), whose path names
@@ -577,8 +582,9 @@ The digest is recomputed from the bytes the read returned, never taken from
 the service. For an intent without content, the bytes must be the canonical
 JSON of its parameters. The first passed or rejected read settles the action.
 Reads that decide nothing leave the attempt acknowledged but unverified; once
-none are left, the next action is `reconcile`. An empty read alone never
-shows that nothing was written, and nothing is submitted again.
+none are left, or none fits under the approval's ceiling, the next action is
+`reconcile`. An empty read alone never shows that nothing was written, and
+nothing is submitted again.
 
 Each record holds the attempt, the read's number, the report and, for an
 object, its target, content digest, size, media type, version and key; a
@@ -639,9 +645,10 @@ window means that nothing is sent.
 **Unresolved outcomes.** What reconciliation cannot settle gets an
 `unresolved` finding with its reason, and the next action is
 `operator_review` until another attempt begins. An acknowledged attempt
-whose reads are used up without confirming the receipt is unresolved in the
-same way. Reconciling again makes no lookup or read beyond the bounds and
-records no duplicate finding.
+whose reads are used up, or no longer fit under the approval's ceiling,
+without confirming the receipt is unresolved in the same way. Reconciling
+again makes no lookup or read beyond the bounds and records no duplicate
+finding.
 
 **Records and accounting.** Each lookup is a `lookup` record holding the
 attempt, the lookup's number and the receipt it found, or a failed lookup's
@@ -650,9 +657,13 @@ or object proves nothing. Reads are `readback` records as above. Each lookup
 and read is charged the profile's `read_ceiling_nanousd` as confirmed cost
 against the action, and none is made that would take the action's
 confirmed, reserved and unknown nanoUSD past the ceiling of the attempt's
-approval. Findings are `finding` records holding the attempt, the finding,
-its reason, the records it rests on and the number of attempts. Each lookup
-adds an `action_lookup` event and each finding an `action_finding` event.
+approval. Lookups and reads share that budget: an attempt dispatched after a
+`not_executed` finding has only the room that the lookups left for its
+reads, and once no read fits, its next action is `reconcile`, which records
+an `unresolved` finding. Findings are `finding` records holding the
+attempt, the finding, its reason, the records it rests on and the number of
+attempts. Each lookup adds an `action_lookup` event and each finding an
+`action_finding` event.
 The ambiguous attempt keeps its write ceiling as unknown exposure, even once
 the action is reconciled or found not executed, until a receipt that reports
 a cost confirms it: state and accounting are separate. No attempt or record
@@ -696,7 +707,7 @@ last read, or None, and the `next_action`:
 | `next_action` | When |
 |---|---|
 | `dispatch` | The action is `not_dispatched` and attempts remain. |
-| `readback` | An acknowledged attempt has reads left. |
+| `readback` | An acknowledged attempt has reads left that fit under its approval's ceiling. |
 | `reconcile` | The outcome is unknown, or the reads did not settle it. |
 | `operator_review` | Reconciliation found it can do no more: the outcome stays unknown or unverified. |
 | `compensate` | The action is `compensation_required`. |

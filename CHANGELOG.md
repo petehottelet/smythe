@@ -333,11 +333,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   open and the approval and content still hold; a refused retry leaves the
   outcome unknown. Anything else, including a connector with neither
   declaration, records an `unresolved` finding with `operator_review` next
-  and sends nothing. Lookups and reads are charged against the ceiling of the
-  attempt's approval, and the uncertain write keeps its unknown exposure
-  until a receipt reports its cost. `smythe.workflow_actions` gains
-  `record_lookup()`, `claim_retry()` and `record_finding()`. See
-  [reconciliation](docs/actions.md#reconciliation).
+  and sends nothing. Lookups and reads, including the readback of an attempt
+  dispatched after a `not_executed` finding, are charged against the ceiling
+  of the attempt's approval and never made past it, and the uncertain write
+  keeps its unknown exposure until a receipt reports its cost.
+  `smythe.workflow_actions` gains `record_lookup()`, `claim_retry()` and
+  `record_finding()`. See [reconciliation](docs/actions.md#reconciliation).
 - Jobs operations have a semantic input digest.
   `smythe.jobs.operation_input_digest()` hashes the provider kind and its
   adapter version (`smythe.jobs.providers.ADAPTER_VERSIONS`), the model,

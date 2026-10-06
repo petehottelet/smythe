@@ -569,9 +569,11 @@ class PreparedAction:
     """A logical action a run's journal records, with the intent and profile it is bound to.
 
     ``sequence`` counts the actions of ``slot`` in the run from 1.
-    ``ceiling_nanousd`` is the most its attempts and readback may cost:
-    ``max_attempts`` writes and ``readback_reads`` reads at the profile's
-    ceilings. An approval must cover it.
+    ``ceiling_nanousd`` is the cost of ``max_attempts`` writes and
+    ``readback_reads`` reads at the profile's ceilings, and an approval must
+    cover it. No attempt, read or reconciliation lookup is made that would
+    take the action's confirmed, reserved and unknown nanoUSD past the
+    approval's ceiling, so lookups share the budget of the reads.
     """
 
     action_id: str
@@ -903,8 +905,9 @@ class ActionProgress:
     ``attempt`` is its latest attempt as ``inspect_run()`` shows it, or None.
     ``report`` is the verdict of the step's last read, or None when it made
     none. ``next_action`` is ``dispatch`` for an action not dispatched with
-    attempts left, ``readback`` while an acknowledged attempt has reads left,
-    ``reconcile`` for an outcome the reads have not settled,
+    attempts left, ``readback`` while an acknowledged attempt has reads left
+    that fit its approval's ceiling, ``reconcile`` for an outcome the reads
+    have not settled,
     ``operator_review`` once reconciliation has found it can do no more,
     ``compensate`` for ``compensation_required``, and None when the runner
     can do nothing more.
@@ -1025,19 +1028,24 @@ class ActionRunner:
         profile's ``read_ceiling_nanousd`` and holding its
         :data:`READBACK_VALIDATOR` report. A passed report makes the action
         ``observed``, or ``reconciled`` when an earlier attempt's outcome is
-        still unknown, and a rejected one ``compensation_required``; reads that
-        decide nothing leave it ``dispatched``, with ``reconcile`` next once
-        none are left. Without an acknowledged attempt nothing is read.
+        still unknown, and a rejected one ``compensation_required``. No read
+        is made that would take the action past the ceiling of the attempt's
+        approval, which lookups by :meth:`reconcile` share. Reads that decide
+        nothing leave it ``dispatched``, with ``reconcile`` next once none are
+        left or none fits. Without an acknowledged attempt nothing is read.
         """
         from smythe import workflow_actions as journal
 
         action, report = self._action(run_id, action_id), None
         with self._leased(run_id) as lease:
-            current, attempts, receipt, reads = journal.attempt_status(self.store, action_id)
-            if (current.state == "dispatched" and receipt is not None
-                    and attempts[-1]["state"] == "acknowledged" and action.profile.lookup_by_object):
-                report = self._read_back(lease, action, attempts[-1]["attempt_id"], receipt, reads,
-                                         "dispatched")[0]
+            status = journal.reconcile_status(self.store, action_id)
+            latest = status["attempts"][-1] if status["attempts"] else None
+            if (status["action"].state == "dispatched" and status["receipt"] is not None
+                    and latest["state"] == "acknowledged" and action.profile.lookup_by_object):
+                attempt_id = latest["attempt_id"]
+                report = self._read_back(lease, action, attempt_id, status["receipt"],
+                                         status["reads"].get(attempt_id, 0), "dispatched",
+                                         self._room(status, attempt_id))[0]
         return self._progress(action_id, report)
 
     def _pace(self, lease: Any, profile: ConnectorProfile, started: float | None) -> None:
@@ -1241,6 +1249,7 @@ class ActionRunner:
         elif action.state == "dispatched":
             next_action = ("readback" if latest["state"] == "acknowledged" and profile.lookup_by_object
                            and status["reads"].get(latest["attempt_id"], 0) < profile.readback_reads
+                           and self._room(status, latest["attempt_id"]) >= profile.read_ceiling_nanousd
                            else review)
         return ActionProgress(action_id, action.state, latest, report, next_action)
 
