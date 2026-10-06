@@ -123,7 +123,8 @@ def test_registry_agents_compare_by_what_they_give_a_worker():
     a.agent_id, b.agent_id = "one", "two"
     assert lint_contributions(graph, same) == [["a", "b"]]
 
-    for other in (agent("two", "You audit vendor security."),
+    # Each agent differs from "one" in one field a worker receives.
+    for other in (agent("two", "You audit vendor security.", ["research"]),
                   agent("two", "You research vendors.", ["research", "finance"]),
                   agent("two", "You research vendors.", ["research"],
                         [MCPServerSpec("search", "stdio", command="search-server")])):
