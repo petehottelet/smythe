@@ -248,8 +248,8 @@ class ArtifactLineage:
     published document by its path relative to the artifact directory,
     digest, size, media type and renderer, or None for a run that published
     none. ``acceptance`` binds the delivery decision, its policy and its
-    validator set (:func:`validator_set_sha256`). ``nodes`` follow the
-    graph's order, each with the inputs it was given; a ``declared`` node
+    validator set (:func:`validator_set_sha256`). ``nodes`` each follow the
+    nodes they depend on, each with the inputs it was given; a ``declared`` node
     names a context snapshot, read tool or component, and ``coverage`` is
     ``complete`` only when every node is declared, else ``partial``. A run
     that reused results names its ``predecessor`` in the same store, the
@@ -292,12 +292,17 @@ class ArtifactLineage:
         ids = [node["id"] for node in nodes]
         if not ids or len(set(ids)) != len(ids):
             raise ValueError("lineage nodes must be a non-empty list of distinct nodes")
+        listed: set[str] = set()
         for node in nodes:
-            problem = _node_problem(node)
-            if problem is None and not set(node["depends_on"]) <= set(ids):
+            # Each node follows the nodes it depends on, so no dependency is a cycle.
+            problem, later = _node_problem(node), set(node["depends_on"]) - listed
+            if problem is None and later - set(ids):
                 problem = "depends on a node the record does not list"
+            elif problem is None and later:
+                problem = "depends on a node listed after it"
             if problem is not None:
                 raise ValueError(f"lineage node {node['id']!r} {problem}")
+            listed.add(node["id"])
         declared = all(node["coverage"] == "declared" for node in nodes)
         if checked["coverage"] != ("complete" if declared else "partial"):
             raise ValueError("lineage coverage is 'complete' only when every node is declared")

@@ -390,6 +390,21 @@ def test_records_are_hashable_by_their_digest():
     assert hash(replace(record, access_scope="tenant-b")) != hash(record)
 
 
+@pytest.mark.parametrize("change,message", [
+    pytest.param(set_at(("nodes", 0, "depends_on"), ["write"]), "after it", id="cycle"),
+    pytest.param(lambda data: data["nodes"].reverse(), "after it", id="reverse-order"),
+    pytest.param(lambda data: data["nodes"].insert(0, data["nodes"].pop(1)), "after it",
+                 id="before-its-dependency"),
+    pytest.param(set_at(("nodes", 1, "depends_on"), ["missing"]), "does not list",
+                 id="unknown-dependency"),
+])
+def test_each_node_follows_the_nodes_it_depends_on(change, message):
+    data = record_data()
+    change(data)
+    with pytest.raises(ValueError, match=message):
+        ArtifactLineage.from_dict(data)
+
+
 def test_a_declared_node_names_what_it_was_given():
     data = record_data()
     del data["nodes"][1]["inputs"]["context"]

@@ -125,8 +125,9 @@ form:
   validator identities, each once, sorted by name, version and configuration
   digest, and `validator_set_sha256` must be
   `smythe.lineage.validator_set_sha256(validators)`, the digest of that list.
-- **Nodes.** Nodes follow the graph's order, each id once, and depend only on
-  nodes the record lists. `kind` is a short lowercase label for what produced
+- **Nodes.** Each id is listed once, after every node it depends on, so a
+  record holds no dependency cycle, and a node depends only on nodes the
+  record lists. `kind` is a short lowercase label for what produced
   the result, such as `model` or `read`. A node is `declared` only when its
   inputs name a context snapshot, a read tool or a component; `coverage` is
   `complete` when every node is declared and `partial` otherwise.
