@@ -703,9 +703,14 @@ or `changed` and the others are `verified`. Bytes that all verify are refused,
 so a verified success still cannot be rerolled. A file that is unreadable or
 unsafe, such as a symbolic link or a directory, an exhausted attempt allowance
 and another worker's lease also refuse it with exit code 6, and a budget
-overrun with exit code 5. A refused repair queues nothing and changes no
-operation, attempt or artifact record. `--repair-integrity` cannot be combined
-with `--acknowledge-unknown`.
+overrun with exit code 5. Before hashing, the runner claims the run's artifact
+directory as execution does, so a directory that holds files without its owner
+marker, or whose marker names another run, refuses the repair. A
+[migrated run](#jobs-database-upgrades) whose directory has not been claimed
+yet verifies its accepted bytes in that first claim: like a resume, its repair
+is refused until the original bytes are restored. A refused repair queues
+nothing and changes no operation, attempt or artifact record.
+`--repair-integrity` cannot be combined with `--acknowledge-unknown`.
 
 A repair uses the run's original approval and attempt allowance; it needs no
 new approval. The `integrity_repair_queued` event records the reason and each

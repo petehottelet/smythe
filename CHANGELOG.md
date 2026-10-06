@@ -979,8 +979,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   or `changed` and the rest verify, so a verified success still cannot be
   rerolled. Verified bytes, an unreadable or unsafe file and an exhausted
   attempt allowance refuse the repair with exit code 6, and a budget overrun
-  with exit code 5. The repair uses the run's original approval and attempt
-  allowance. An
+  with exit code 5. The run's artifact directory is claimed first, so one that
+  cannot be claimed also refuses it; a refused repair queues nothing. The
+  repair uses the run's original approval and attempt allowance. An
   `integrity_repair_queued` event records the reason and each file's finding,
   and the new attempt, linked to the one it replaces, records the reason. The
   operation keeps naming its accepted attempt until a new attempt is accepted,

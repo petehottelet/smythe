@@ -275,10 +275,11 @@ class JobRunner:
 
         Failed and rejected operations are rerolled; an unknown outcome also
         needs ``acknowledge_unknown``. With ``repair_integrity`` the selected
-        operations are succeeded ones instead: under the run's lease, every
-        accepted file of each one's accepted attempt is hashed again just
-        before :meth:`SQLiteRunStore.queue_integrity_repair` queues it, which
-        refuses verified bytes with ``InvalidTransitionError``.
+        operations are succeeded ones instead: under the run's lease, the
+        run's artifact directory is claimed, then every accepted file of each
+        one's accepted attempt is hashed again just before
+        :meth:`SQLiteRunStore.queue_integrity_repair` queues it, which refuses
+        verified bytes with ``InvalidTransitionError``.
         """
         _validate_run_id(run_id)
         if type(repair_integrity) is not bool:
@@ -403,6 +404,12 @@ class JobRunner:
         try:
             if reroll is not None and repair:
                 operation_keys, reason, _acknowledge_unknown = reroll
+                # Execution claims the artifact directory after the repair is
+                # queued. Claim it first, so a directory that cannot be claimed
+                # refuses the repair with nothing queued.
+                await asyncio.to_thread(
+                    self._claim_artifact_directory, self.store.snapshot(run_id), root,
+                )
                 findings = await asyncio.to_thread(self._integrity_findings, run_id, operation_keys)
                 self.store.queue_integrity_repair(
                     run_id, operation_keys, reason=reason, findings=findings, lease=lease,
