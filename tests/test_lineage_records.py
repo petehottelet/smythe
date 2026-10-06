@@ -374,6 +374,14 @@ def test_a_source_listed_twice_is_refused_whatever_its_key_order():
     assert len(ArtifactLineage.from_dict(data).nodes[1]["inputs"]["sources"]) == 2
 
 
+def test_each_node_id_is_listed_once():
+    data = record_data()
+    # A second, otherwise valid entry for "write": only its id is wrong.
+    data["nodes"].append(deepcopy(data["nodes"][2]))
+    with pytest.raises(ValueError, match="distinct"):
+        ArtifactLineage.from_dict(data)
+
+
 def test_a_declared_node_names_what_it_was_given():
     data = record_data()
     del data["nodes"][1]["inputs"]["context"]
