@@ -31,6 +31,7 @@ from smythe.workflow import current_decision
 from smythe.workflow_artifact import current_artifact
 from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_store import WorkflowStateError
+from test_acceptance_operator_decision import RecordingHost, durable_operator
 from test_source_evidence import CLAIM, KEPT, MISLEADING, SOURCES, STRONG, artifact
 
 REASON = "deleted at the owner's request"
@@ -217,6 +218,21 @@ def test_a_new_decision_that_holds_the_tombstone_stands(store, replies):
     # The re-evaluation came after the removal, so resuming keeps it.
     assert durable(store).resume(run_id).acceptance == again.acceptance
 
+
+
+def test_an_operator_decision_made_after_a_removal_holds_on_resume(store, replies):
+    replies["Write"] = artifact(KEPT)
+    run_id = durable(store).execute(single()).execution_id
+    remove(store, run_id)
+    left = durable(store).reevaluate(run_id, acceptance=policy(MISLEADING, tombstone_of(STRONG)))
+    assert left.acceptance.decision is AcceptanceDecision.INDETERMINATE
+
+    decided = durable(store).reevaluate(
+        run_id, operator=durable_operator(RecordingHost(), store, run_id))
+    assert decided.accepted
+    # The operator decided under the removal, so resuming keeps the decision.
+    resumed = durable(store).resume(run_id)
+    assert resumed.accepted and resumed.acceptance == decided.acceptance
 
 def test_a_published_document_is_delivered_under_a_decision_that_holds_the_tombstone(
     tmp_path, replies, capsys,
