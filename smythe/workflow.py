@@ -178,10 +178,15 @@ def _snapshot_behavior_settings(settings):
 
 def _supported_behavior(name, value):
     if name == "retry_policy":
+        if value is None:
+            return True
         try:
-            return value is None or _canonical(_retry_record(RetryPolicy.from_dict(value))) == _canonical(value)
+            policy = RetryPolicy.from_dict(value)
         except ValueError:  # Including a field a newer release records.
             return False
+        # The journal keeps a sent call's exposure itself, never the executor.
+        return (not policy.retain_uncertain_dispatch
+                and _canonical(_retry_record(policy)) == _canonical(value))
     versions = _BEHAVIOR_VERSIONS.get(name)
     # Versions are integers; a bool or float equal to one is not a version.
     return versions is None or (type(value) is int and value in versions)
@@ -640,6 +645,11 @@ class WorkflowRuntime:
         if retry_policy is not None and not isinstance(retry_policy, RetryPolicy):
             raise WorkflowBindingError(
                 f"retry_policy must be a RetryPolicy or None, not {type(retry_policy).__name__}"
+            )
+        if retry_policy is not None and retry_policy.retain_uncertain_dispatch:
+            raise WorkflowBindingError(
+                "retry_policy with retain_uncertain_dispatch is not supported by durable text "
+                "workflows, whose journal keeps the exposure of every call it sends itself"
             )
         if reserve_for_checks:
             raise WorkflowBindingError(

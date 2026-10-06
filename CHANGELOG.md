@@ -701,8 +701,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   and a different policy, or one for a run that started without, raises
   `WorkflowConflictError` before any call. Recipes without a policy keep
   their bytes and their retries. The journal keeps no response headers, so a
-  durable run waits its backoff, never a `Retry-After`, and every provider it
-  can call must declare `sdk_retries=0`.
+  durable run waits its backoff, never a `Retry-After`; every provider it
+  can call must declare `sdk_retries=0`, and a policy with
+  `retain_uncertain_dispatch` is refused, since the journal keeps every sent
+  call's exposure itself.
   `SQLiteWorkflowStore.node_generation_calls()` lists a node generation's
   settled calls, and executors take `attempts_spent=`, which journal-managed
   calls need under a policy. See

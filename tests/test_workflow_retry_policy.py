@@ -422,6 +422,19 @@ def test_a_provider_whose_sdk_may_retry_is_refused_before_any_call(tmp_path, mon
     assert outcomes(wire) == ["http_429"]
 
 
+
+def test_a_policy_that_keeps_unanswered_exposure_is_refused_before_any_call(tmp_path, wire):
+    """The journal keeps every sent call's exposure itself, so the option is not taken."""
+    with SQLiteWorkflowStore(tmp_path / "runs.db") as store:
+        policy = RetryPolicy(retain_uncertain_dispatch=True)
+        with pytest.raises(WorkflowBindingError, match="^retry_policy with retain_uncertain_dispatch"):
+            durable(store, policy).execute(draft())
+        with pytest.raises(WorkflowBindingError, match="retry_policy"):
+            durable(store)._workflow_runtime(
+                behavior_settings={"retry_policy": {**RECORD, "retain_uncertain_dispatch": True}})
+        assert store.list_runs() == []
+    assert outcomes(wire) == []
+
 def test_a_policy_this_release_cannot_read_is_refused_before_any_call(tmp_path, wire):
     newer = {**RECORD, "jitter": "full"}  # A field a newer release might record.
     with SQLiteWorkflowStore(tmp_path / "runs.db") as store:

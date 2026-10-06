@@ -244,7 +244,8 @@ that started without one, and a saved policy this release cannot read raise
 `WorkflowConflictError` before any call. Every provider the run can call must
 declare `sdk_retries=0`, as the native and offline providers do; otherwise
 the run is refused with `WorkflowBindingError` before it is created or, on
-resume, before any call.
+resume, before any call. A policy with `retain_uncertain_dispatch` is refused
+the same way: the journal keeps the exposure of every call it sends itself.
 
 ### Money units
 
