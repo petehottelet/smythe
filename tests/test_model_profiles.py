@@ -5,9 +5,10 @@ the features its provider must declare. A node that names one in
 ``metadata["profile"]`` calls that provider with that model, whether a graph,
 an architect or a developer supervisor's revision added it; every other node
 and synthesis call the run's provider. Only developer code can name a
-profile: a generated plan cannot. A profile that cannot serve its nodes, or a
-node that names a profile the run does not allow, is refused with
-``NoAllowedProfileError`` before any provider call, planning included.
+profile: a generated plan cannot. A profile that cannot serve its nodes, a
+node that names a profile the run does not allow, and a model-less
+``LLMSupervisor`` that would review with another provider's model are refused
+with ``NoAllowedProfileError`` before any provider call, planning included.
 Checkpoints of a run with profiled nodes are version 5 and list
 ``model_profiles``, so a reader that would call the run's provider instead
 refuses them.
@@ -44,7 +45,7 @@ from smythe.provider import (
 from smythe.provider_messages import AnthropicMessagesProvider
 from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.registry import Registry
-from smythe.supervisor import Supervisor
+from smythe.supervisor import LLMSupervisor, Supervisor
 from smythe.tools import ToolRuntime, ToolSession
 from smythe.tracer import Tracer
 from smythe.workflow_binding import WorkflowBindingError
@@ -362,6 +363,49 @@ def test_a_supervisor_addition_whose_profile_cannot_serve_it_is_refused_before_i
     assert [node.id for node in result.graph.nodes] == ["draft"]
     assert default.calls == [("default-model", "Draft")] and fast.calls == []
     assert result.output == "default wrote Draft"
+
+
+@pytest.mark.parametrize("entry", ["execute", "execute-async", "graph"])
+def test_a_model_less_llm_supervisor_with_another_providers_profile_is_refused_before_any_call(
+    entry,
+):
+    # It would review a profiled node with the profile's model on its own provider.
+    default, fast = Recorder("default"), Recorder("fast")
+    swarm = build(default, fast_profile(fast), supervisor=LLMSupervisor(default),
+                  max_revisions=1)
+    with pytest.raises(NoAllowedProfileError, match=r"LLMSupervisor\(provider, model="):
+        enter(swarm, entry)
+    # Planning included: the run's own provider plans the generated runs.
+    assert default.calls == [] and fast.calls == []
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_an_executor_refuses_a_model_less_llm_supervisor_with_another_providers_profile(mode):
+    default, fast = Recorder("default"), Recorder("fast")
+    executor_class = AsyncExecutor if mode == "parallel" else Executor
+    executor = executor_class(provider=default, registry=Registry(), tracer=Tracer(),
+                              artifact_dir=None, supervisor=LLMSupervisor(default),
+                              max_revisions=1, profiles=[fast_profile(fast)])
+    run_graph = graph()
+    run_graph.nodes[0].metadata["model"] = "default-model"
+    with pytest.raises(NoAllowedProfileError, match="LLMSupervisor"):
+        asyncio.run(executor.run(run_graph)) if mode == "parallel" else executor.run(run_graph)
+    assert default.calls == [] and fast.calls == []
+
+
+@pytest.mark.parametrize("case", ["own-model", "same-provider", "no-revisions"])
+def test_an_llm_supervisor_reviews_profiled_nodes_with_a_model_its_provider_serves(case):
+    default, fast = Recorder("default"), Recorder("fast")
+    profile = (ModelProfile("fast", default, "fast-model", 0.25) if case == "same-provider"
+               else fast_profile(fast))
+    supervisor = LLMSupervisor(default, model="review-model" if case == "own-model" else None)
+    build(default, profile, supervisor=supervisor,
+          max_revisions=0 if case == "no-revisions" else 1).execute(graph())
+
+    reviews = [model for model, step in default.calls if step == "Original task:"]
+    assert reviews == {"own-model": ["review-model"], "same-provider": ["fast-model"],
+                       "no-revisions": []}[case]
+    assert ("fast-model", "Polish") in (default if case == "same-provider" else fast).calls
 
 
 def test_a_generated_plan_cannot_name_a_profile():

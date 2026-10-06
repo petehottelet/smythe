@@ -973,9 +973,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   support its model or prices the model as retired, or cannot call tools in
   a run with a `tool_runtime`, and a node that names a profile the run does
   not allow or sets another model than its profile's; a revision that adds
-  such a node is refused before it applies. Under a `RetryPolicy` each
-  profile's provider must declare `sdk_retries=0`.
-  `ProviderFeatures.exact_accounting` is new: the native
+  such a node is refused before it applies. While revisions remain, a
+  model-less `LLMSupervisor`, which reviews with the reviewed node's model,
+  is refused the same way when a profile calls another provider than its
+  own. Under a `RetryPolicy` each profile's provider must declare
+  `sdk_retries=0`. `ProviderFeatures.exact_accounting` is new: the native
   providers declare `True`, the other built-in providers `False`.
   Checkpoints of a run with a profiled node are version 5 and list
   `model_profiles` in `requires`, so older readers refuse them instead of

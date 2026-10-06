@@ -381,6 +381,14 @@ its profile's, is refused before it applies and traced as
 node metadata but `role`, and an `LLMSupervisor` proposes nodes without
 metadata, so model output cannot choose a profile.
 
+An `LLMSupervisor` without a `model` of its own reviews a node with that
+node's model on its own provider, and a profiled node's model is its
+profile's. So while `max_revisions` lets such a supervisor review, every
+profile must call the supervisor's provider object; otherwise the run is
+refused with `NoAllowedProfileError` before routing, planning or any call.
+Give the supervisor a model, `LLMSupervisor(provider, model=...)`, to review
+with that model whatever the node's profile.
+
 `requires` lists the features that the profile's provider must declare
 `True` for its model through `Provider.feature_support()`: `tools`,
 `attachments`, `image_output` and `exact_accounting`. A feature the provider
@@ -399,8 +407,10 @@ does not declare does not count. A run raises `NoAllowedProfileError`, a
 call, and check each unfinished profiled node's image inputs and ceiling
 against its profile's provider. Under a [retry policy](#retry-policy) each
 profile's provider must declare `sdk_retries=0`. `Executor` and
-`AsyncExecutor` take `profiles` too, and fail a node that names any other
-profile or sets another model than its profile's before its call.
+`AsyncExecutor` take `profiles` too, fail a node that names any other
+profile or sets another model than its profile's before its call, and
+refuse a model-less `LLMSupervisor` with another provider's profile before
+their first call while revisions remain.
 
 A run with a profiled node writes
 [version 5 checkpoints](checkpoint-format.md#model-profiles-version-5) that

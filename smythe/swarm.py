@@ -59,6 +59,7 @@ from smythe.executor_base import (
     check_pending_nodes,
     check_profile_support,
     check_provider_support,
+    check_supervisor_profiles,
     validate_max_concurrency,
     validate_max_revisions,
     validate_retry_backoff_s,
@@ -426,13 +427,15 @@ class Swarm:
     run's provider. Before routing or planning, and before any node call,
     each profile must fit: its provider declares ``True`` every feature it
     requires, supports its model, does not price the model as retired, and
-    can call tools in a run with a ``tool_runtime``. A node that names a
-    profile the run does not allow, or sets another model than its
-    profile's, is refused as well, all with ``NoAllowedProfileError``. A
-    revision that adds such a node is refused before it applies, like any
-    invalid revision. Checkpoints of a run with profiled nodes are version 5,
-    and resume routes them to the resuming Swarm's profiles of the same
-    names. Durable runs refuse profiles.
+    can call tools in a run with a ``tool_runtime``. While ``max_revisions``
+    lets an ``LLMSupervisor`` without a model of its own review, every
+    profile must call the supervisor's provider. A node that names a profile
+    the run does not allow, or sets another model than its profile's, is
+    refused as well, all with ``NoAllowedProfileError``. A revision that adds
+    such a node is refused before it applies, like any invalid revision.
+    Checkpoints of a run with profiled nodes are version 5, and resume routes
+    them to the resuming Swarm's profiles of the same names. Durable runs
+    refuse profiles.
     """
 
     def __init__(
@@ -858,9 +861,15 @@ class Swarm:
         self._admit_profiles()
 
     def _admit_profiles(self) -> None:
-        """Refuse, with ``NoAllowedProfileError``, a profile that could not serve its nodes."""
+        """Refuse, with ``NoAllowedProfileError``, a profile that could not serve its nodes.
+
+        While ``max_revisions`` lets an ``LLMSupervisor`` review, so is one it
+        could not review its nodes with (see ``check_supervisor_profiles``).
+        """
         for profile in self._profiles.values():
             check_profile_support(profile, tools=self._tool_runtime is not None)
+        if self.max_revisions > 0:
+            check_supervisor_profiles(self.supervisor, self._profiles)
 
     def _check_retry_owners(
         self, graph: ExecutionGraph | None = None, *, planning: bool = False,

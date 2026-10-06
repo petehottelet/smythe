@@ -216,7 +216,9 @@ class NoAllowedProfileError(ValueError):
     A node names a profile the run does not allow or sets a model other than
     its profile's, or a profile's provider does not support its model, does
     not declare a feature the profile requires, or prices the model with a
-    table that retires it.
+    table that retires it. It is raised too for an ``LLMSupervisor`` without
+    a model of its own that could review a node whose profile calls another
+    provider than the supervisor's.
     """
 
 

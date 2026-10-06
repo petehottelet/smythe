@@ -86,7 +86,8 @@ Tests:
   refused before any provider call, planning included,
   `tests/test_model_profiles.py::test_a_profile_that_does_not_fit_is_refused_before_any_call`,
   `tests/test_model_profiles.py::test_a_tool_run_refuses_a_profile_that_cannot_call_tools_before_any_call`,
-  `tests/test_model_profiles.py::test_an_unknown_profile_name_is_refused_before_any_call` and
+  `tests/test_model_profiles.py::test_an_unknown_profile_name_is_refused_before_any_call`,
+  `tests/test_model_profiles.py::test_a_model_less_llm_supervisor_with_another_providers_profile_is_refused_before_any_call` and
   `tests/test_model_profiles.py::test_a_profile_naming_a_retired_model_is_refused_at_admission`;
   durable runs `tests/test_model_profiles.py::test_durable_runs_refuse_profiles`.
 - `OfflineProvider`: text `tests/test_offline_provider.py::test_full_swarm_pipeline_runs_offline`;

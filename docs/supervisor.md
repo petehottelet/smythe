@@ -201,7 +201,10 @@ A node you add can name one of the run's [model
 profiles](execution.md#model-profiles) in `metadata["profile"]`. It then
 takes that profile's model and calls its provider. A revision that adds a
 node naming a profile the run does not allow, or setting another model than
-its profile's, is refused before it applies.
+its profile's, is refused before it applies. An `LLMSupervisor` without a
+`model` reviews with the reviewed node's model, so a run whose profiles call
+another provider than the supervisor's needs `LLMSupervisor(provider,
+model=...)`.
 
 ## Observability
 

@@ -230,6 +230,30 @@ def check_profile_support(profile: ModelProfile, *, tools: bool = False) -> None
         )
 
 
+def check_supervisor_profiles(
+    supervisor: Supervisor | None, profiles: dict[str, ModelProfile],
+) -> None:
+    """Raise ``NoAllowedProfileError``, before any call, for a review sent to the wrong provider.
+
+    Without a model of its own, an ``LLMSupervisor`` reviews a node with that
+    node's model on its own provider, and a profiled node's model is its
+    profile's. Each of *profiles* must therefore call the supervisor's
+    provider. Callers check only while the supervisor may still review.
+    """
+    from smythe.supervisor import LLMSupervisor
+
+    if not isinstance(supervisor, LLMSupervisor) or supervisor._model:
+        return
+    for profile in profiles.values():
+        if profile.provider is not supervisor._provider:
+            raise NoAllowedProfileError(
+                f"LLMSupervisor reviews a node with that node's model, but model profile "
+                f"{profile.name!r} calls {profile.model!r} on {type(profile.provider).__name__}, "
+                "not on the supervisor's provider; give the supervisor its own model with "
+                "LLMSupervisor(provider, model=...)"
+            )
+
+
 class NodeFinalizationError(PicklableError, RuntimeError):
     """Raised after a billed response cannot be persisted safely.
 
@@ -408,6 +432,9 @@ class ExecutorBase:
     a node is refused before it applies. Every other node calls *provider*
     with its own model, and a node a supervisor adds without a profile takes
     the model of the first such node that has one, or else ``default_model``.
+    While revisions remain, a run refuses with ``NoAllowedProfileError``,
+    before any call, an ``LLMSupervisor`` without a model of its own and a
+    profile that calls another provider than the supervisor's.
     """
 
     def __init__(
@@ -1403,6 +1430,8 @@ class ExecutorBase:
                 if ("workflow_accounting_invalid" in node.metadata
                         or node.metadata.get("accounting_invalid") and "response_error" not in node.metadata):
                     raise BudgetValidationError("Unjournaled accounting requires reconciliation")
+        if self._max_revisions > self._revisions_used:
+            check_supervisor_profiles(self._supervisor, self._profiles)
         if self._retry_policy is not None:
             pending = [node for node in graph.nodes
                        if node.status not in (NodeStatus.COMPLETED, NodeStatus.SKIPPED)]
