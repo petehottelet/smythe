@@ -90,7 +90,7 @@ def _rules() -> tuple[tuple[type[BaseException], str | None, bool], ...]:
         IncompleteOutputError, NativeOutputDefectError, ProviderAccountingError,
         ProviderResponseError,
     )
-    from smythe.scheduling import RetryDeadlineError
+    from smythe.scheduling import RetryDeadlineError, UncertainDispatchError
     from smythe.tools import ToolLoopLimitError
     from smythe.verifier import VerificationRecoveryError
     from smythe.workflow_binding import WorkflowBindingError
@@ -119,6 +119,8 @@ def _rules() -> tuple[tuple[type[BaseException], str | None, bool], ...]:
         (BudgetEstimateRequired, INPUT_ERROR, False),
         (ArtifactIntegrityError, INPUT_ERROR, False),
         (RetryDeadlineError, DEADLINE, False),
+        # A call sent and never answered; its reservation is kept as unknown cost.
+        (UncertainDispatchError, UNKNOWN_OUTCOME, False),
     )
 
 

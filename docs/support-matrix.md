@@ -137,7 +137,13 @@ Each path keeps money in its own unit:
   serial node whose own or provider estimate is set; a serial `execute()`
   node without one reserves nothing (see [cost guardrails](budgets.md)). A
   call to one of them that raises or times out releases its reservation and
-  records no cost. With `reserve_for_checks=True`, the run first holds what
+  records no cost, unless a `RetryPolicy` with
+  `retain_uncertain_dispatch=True` applies: then a call that a timeout or a
+  cancellation ends after it was sent, before the provider answered, keeps
+  its reservation as the node's unknown, estimated cost, which checkpoints
+  save and resume restores (see
+  [calls without an answer](execution.md#calls-without-an-answer)).
+  With `reserve_for_checks=True`, the run first holds what
   its pending verifiers and an `LLM_MERGE` synthesis will reserve, and other
   nodes cannot reserve that allowance (see
   [held allowance](budgets.md#held-allowance-for-checks)).
@@ -234,7 +240,13 @@ Tests:
   `tests/test_execution_failure_policies.py::test_terminal_failure_stops_queued_work_and_preserves_original_exception`,
   `tests/test_execution_failure_policies.py::test_timeout_obeys_failure_policy_and_settles_before_return`
   and, for the native providers,
-  `tests/test_native_response_accounting.py::test_native_failure_is_terminal_and_preserves_exposure`.
+  `tests/test_native_response_accounting.py::test_native_failure_is_terminal_and_preserves_exposure`;
+  kept under `retain_uncertain_dispatch`
+  `tests/test_uncertain_dispatch.py::test_a_timeout_after_dispatch_keeps_the_reservation_as_unknown_cost`,
+  `tests/test_uncertain_dispatch.py::test_a_cancelled_in_flight_sibling_keeps_its_exposure_under_the_option`
+  and `tests/test_uncertain_dispatch.py::test_a_checkpoint_keeps_the_exposure_and_resume_restores_it`;
+  still released before the call is sent
+  `tests/test_uncertain_dispatch.py::test_a_failure_while_no_call_is_unanswered_still_releases`.
 - Price ceilings for capped runs: `tests/test_provider.py::test_openai_image_hard_budget_requires_inclusive_call_ceiling`,
   `tests/test_provider.py::test_gemini_hard_budget_uses_only_inclusive_call_ceiling`,
   `tests/test_provider_responses.py::test_legacy_budget_requires_inclusive_explicit_ceiling`;

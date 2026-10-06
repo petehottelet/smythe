@@ -33,6 +33,16 @@ class RetryDeadlineError(TimeoutError):
     """
 
 
+class UncertainDispatchError(TimeoutError):
+    """A node attempt timed out after its provider call was sent.
+
+    Raised in place of the node's ``TimeoutError`` under a retry policy with
+    ``retain_uncertain_dispatch``, when the call had not answered: it may
+    still be charged, so the node keeps its reservation as unknown cost. Its
+    class is ``unknown_outcome``, retried only when the policy lists it.
+    """
+
+
 def validate_seconds(value: object, name: str, *, positive: bool = False) -> float:
     """Accept a finite number of seconds, non-negative or, with *positive*, above zero.
 
@@ -74,6 +84,13 @@ class RetryPolicy:
     allowance in its ``execution_generation`` instead of refilling it, and
     resumes only under an equal policy. Its deadline starts again in each
     process.
+
+    With ``retain_uncertain_dispatch``, a node call that the executor's
+    timeout, a cancellation or an interruption ends after it was sent, before
+    the provider answered, keeps its reservation as the node's recorded cost,
+    marked unknown and, with an amount, estimated, instead of releasing it,
+    so checkpoints save the exposure and resume restores it. Such a timeout
+    raises ``UncertainDispatchError``, class ``unknown_outcome``.
     """
 
     retry_classes: frozenset[str] = frozenset({TRANSIENT})
@@ -81,12 +98,19 @@ class RetryPolicy:
     backoff_max_s: float = 60.0
     deadline_s: float | None = None
     persist_attempts: bool = False
+    retain_uncertain_dispatch: bool = False
 
     def to_dict(self) -> dict:
-        """The policy's fields as JSON-ready values, as a checkpoint records them."""
-        return {"retry_classes": sorted(self.retry_classes),
+        """The policy's fields as JSON-ready values, as a checkpoint records them.
+
+        ``retain_uncertain_dispatch`` is recorded only when set.
+        """
+        data = {"retry_classes": sorted(self.retry_classes),
                 "honor_retry_after": self.honor_retry_after, "backoff_max_s": self.backoff_max_s,
                 "deadline_s": self.deadline_s, "persist_attempts": self.persist_attempts}
+        if self.retain_uncertain_dispatch:
+            data["retain_uncertain_dispatch"] = True
+        return data
 
     @classmethod
     def from_dict(cls, data: object) -> RetryPolicy:
@@ -111,7 +135,7 @@ class RetryPolicy:
             raise ValueError(
                 f"retry_classes may list only {sorted(RETRYABLE_CLASSES)}, not {unknown}"
             )
-        for name in ("honor_retry_after", "persist_attempts"):
+        for name in ("honor_retry_after", "persist_attempts", "retain_uncertain_dispatch"):
             if type(getattr(self, name)) is not bool:
                 raise ValueError(f"{name} must be a bool, got {getattr(self, name)!r}")
         deadline = self.deadline_s

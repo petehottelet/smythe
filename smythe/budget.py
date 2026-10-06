@@ -154,7 +154,9 @@ class Sentinel:
     pre-commits estimated cost so concurrent admissions cannot collectively
     exceed the budget. ``record()`` reconciles the reservation with the
     provider-reported cost or configured estimate once the node completes.
-    ``release()`` frees a reservation if the node fails before ``record()``.
+    ``release()`` frees a reservation if the node fails before ``record()``;
+    ``retain_unknown()`` keeps it as unknown cost instead, for a call that was
+    sent and may still be charged.
 
     ``hold()`` sets allowance aside for a later call, such as a verifier or
     an ``LLM_MERGE`` synthesis. Holds count toward every other admission,
@@ -326,6 +328,33 @@ class Sentinel:
         self._reservations = reservations
         self._hard_reservations.discard(node_id)
         self._spent = total
+
+    def retain_unknown(self, node_id: str) -> float | None:
+        """Keep the charge of a sent call whose outcome is unknown; return the amount kept.
+
+        The node's reservation, when it has one, moves into its recorded cost
+        instead of being released, so ``total_cost_usd`` is unchanged and
+        checkpoints, which record costs but not reservations, keep it. The
+        node is reported as unknown (``cost_is_complete`` is False) and, with
+        a reservation, as estimated: a reservation estimates the charge and
+        does not confirm it. Without one nothing is added: the node's recorded
+        cost, 0.0 if it has none, is only marked unknown, and None is
+        returned. A reservation converted from a hold is kept the same way;
+        other holds are untouched.
+        """
+        reservations = dict(self._reservations)
+        kept = reservations.pop(node_id, None)
+        node_costs = dict(self._node_costs)
+        node_costs[node_id] = _sum_costs((node_costs.get(node_id, 0.0), kept or 0.0))
+        total = _sum_costs(chain(node_costs.values(), reservations.values()))
+        self._node_costs = node_costs
+        self._reservations = reservations
+        self._hard_reservations.discard(node_id)
+        self._spent = total
+        self._unknown_cost_nodes = self._unknown_cost_nodes | {node_id}
+        if kept is not None:
+            self._estimated_cost_nodes = self._estimated_cost_nodes | {node_id}
+        return kept
 
     def _cost_of(self, result: CompletionResult) -> float:
         """Price a provider call: explicit provider cost wins over token math.

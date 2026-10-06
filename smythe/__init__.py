@@ -57,7 +57,7 @@ from smythe.workflow_policy import WorkflowGraphPolicy
 from smythe.workflow_store import SQLiteWorkflowStore, WorkflowError
 from smythe.workflow_tools import ReadProfile, ReadToolError
 from smythe.router import RoutingDecision, RoutingRule, WhiteRabbit
-from smythe.scheduling import RetryDeadlineError, RetryPolicy
+from smythe.scheduling import RetryDeadlineError, RetryPolicy, UncertainDispatchError
 from smythe.skills import (
     CapabilityHydrationMode,
     CapabilityMapper,
@@ -192,6 +192,7 @@ __all__ = [
     "TextValidator",
     "TokenVerifier",
     "ToolSpec",
+    "UncertainDispatchError",
     "ValidationFinding",
     "ValidationOutcome",
     "ValidationReport",

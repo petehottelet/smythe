@@ -124,6 +124,7 @@ Notes:
   handoff. Both are `null` for a caller-built graph that carries no task.
 - Node `result` values that aren't JSON-serializable are stored as their `str()` form.
 - `budget.max_budget_usd` is the cap the execution started with; resume honors it, not whatever the resuming Swarm was constructed with.
+- `budget.node_costs` records costs, never reservations. A node whose sent call never answered under a retry policy with `retain_uncertain_dispatch` holds that call's reservation here as recorded cost, with `cost_usd_unknown` and `cost_usd_is_estimate` in its `metadata`, so resume restores the exposure without a new version ([calls without an answer](execution.md#calls-without-an-answer)).
 - `budget.token_estimate_nodes` lists the nodes, including `__synthesis__` for an `LLM_MERGE` synthesis, whose recorded cost prices tokens at the blended `cost_per_token` rate. Resume restores them, so `Sentinel.cost_contains_token_estimates` still reports costs priced before the checkpoint. A value other than a list of node IDs stops resume with `BudgetValidationError`.
 - `control.revisions_used` is how much of the supervisor's `max_revisions` allowance the run has already spent. Resume seeds the executor from it, so the cap bounds the **run**, not each attempt: a crash-resume cycle cannot refill the allowance and revise past the limit the caller set.
 - `control.retry_policy` and `control.attempts_used` appear only for a run whose retry policy persists attempts, which makes the checkpoint version 5; see [attempt allowance](#attempt-allowance-version-5).
@@ -407,7 +408,8 @@ and each node's spent attempts in `control`:
 ```
 
 - `retry_policy` holds the policy's fields (`RetryPolicy.to_dict()`); its
-  `persist_attempts` is `true`.
+  `persist_attempts` is `true`. `retain_uncertain_dispatch` appears, as
+  `true`, only when the policy sets it.
 - `attempts_used` maps a node ID to the `execution_generation` it last
   attempted and how many attempts it started there. Each attempt is saved
   before its call, so a crash during a call still counts it. A node whose

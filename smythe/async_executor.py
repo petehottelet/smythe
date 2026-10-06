@@ -48,7 +48,9 @@ class AsyncExecutor(ExecutorBase):
     Budget safety: estimated cost is reserved before each node is admitted,
     so concurrent admissions cannot collectively exceed the configured policy.
     Reservations are reconciled with reported cost or configured estimates on
-    completion, or released on failure/cancellation.
+    completion, or released on failure/cancellation; under a retry policy
+    with ``retain_uncertain_dispatch``, a sent call that never answered keeps
+    its reservation as unknown cost instead.
 
     Concurrency safety: ``max_concurrency`` caps in-flight provider
     calls, so a wide broadcast doesn't fire every call

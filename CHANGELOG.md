@@ -667,6 +667,23 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   stops the run. Neither leaves an unresolved marker, so the run resumes like
   any other failure. Without a policy, native failures still stop the run.
   See [retry policy](docs/execution.md#retry-policy).
+- `RetryPolicy(retain_uncertain_dispatch=True)` keeps the exposure of an
+  ordinary run's node call that was sent and never answered. When the node's
+  timeout, the policy's deadline or a cancellation, such as a `HALT`
+  sibling's failure or a run stopping on an interrupt, ends a call from
+  `AnthropicProvider`, `OpenAIProvider`, `OpenAIImageProvider`,
+  `GeminiProvider` or a custom provider before it answered, its reservation
+  becomes the node's recorded cost, flagged `cost_usd_unknown` and
+  `cost_usd_is_estimate`, instead of being released, so the run reports
+  `cost_is_complete=False` and version 4 checkpoints and resume keep the
+  amount and flags. `Sentinel.retain_unknown()` makes the transfer, also for
+  a verifier's reservation converted from a hold. Such a timeout raises the
+  new `UncertainDispatchError`, a `TimeoutError` of class `unknown_outcome`,
+  which the policy retries only when it lists that class; a retry reserves
+  again beside the kept exposure. A failure before the call is sent, or an
+  error the provider raises itself, still releases the reservation, native
+  providers keep their own settlement, and without the option nothing
+  changes. See [calls without an answer](docs/execution.md#calls-without-an-answer).
 - `jobs stop --drain-timeout-s SECONDS` bounds a pause's drain. That long
   after the request, the worker cancels each call still awaiting its provider
   and records it as `unknown_outcome`, keeping its full per-call ceiling as

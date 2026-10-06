@@ -78,10 +78,10 @@ policy decides every other one.
 |---|---|---|
 | `input_error` | HTTP 404 or 413 `ProviderRequestRejectedError`; any other 4xx status error not listed below; `WorkflowBindingError`, `BudgetEstimateRequired` and `ArtifactIntegrityError` | No |
 | `authority_denied` | HTTP 401 or 403 `ProviderRequestRejectedError` or status error | No |
-| `transient` | HTTP 429 `ProviderRequestRejectedError`; 408, 409, 429, 499 and 5xx status errors; timeouts; any exception this table does not list | No |
+| `transient` | HTTP 429 `ProviderRequestRejectedError`; 408, 409, 429, 499 and 5xx status errors; timeouts other than those below; any exception this table does not list | No |
 | `provider_rejected` | `ProviderResponseError`: the provider answered and the charge is known, but the response cannot be used. Also `OutputTruncatedError`, `OutputRefusedError` and `ReadToolError` | `ProviderResponseError` only |
 | `quality_defect` | `ToolLoopLimitError`; `NativeOutputDefectError`, a native refusal or truncation with a known charge under a retry policy that lists this class | No |
-| `unknown_outcome` | `ProviderAccountingError`: a native call's charge is unresolved | Yes |
+| `unknown_outcome` | `ProviderAccountingError`: a native call's charge is unresolved. `UncertainDispatchError`: a node timed out with its call sent and unanswered, under a policy with `retain_uncertain_dispatch` | `ProviderAccountingError` only |
 | `terminal_accounting` | `BudgetValidationError`, `SentinelAlert` and `BudgetReconciliationError` | Yes |
 | `persistence` | `NodeFinalizationError` and `VerificationRecoveryError` | Yes |
 | `workflow` | `WorkflowError` and its subclasses, such as `WorkflowQuoteError` | Yes |
@@ -122,6 +122,7 @@ calls. A `RetryPolicy` is frozen and checks its fields when built:
 | `backoff_max_s` | `60.0` | The longest wait before any retry; a longer `Retry-After` is cut to it |
 | `deadline_s` | `None` | Seconds that one node's attempts and waits share, from the start of its first attempt |
 | `persist_attempts` | `False` | Save each attempt as spent before its call, so resume continues each node's allowance instead of refilling it (see [persisted attempts](#persisted-attempts)) |
+| `retain_uncertain_dispatch` | `False` | Keep the reservation of a node call that was sent and never answered as unknown cost, instead of releasing it (see [calls without an answer](#calls-without-an-answer)) |
 
 Under the default policy, a 401 or 403 (`authority_denied`), a 404 or 413
 (`input_error`), a refused or truncated reply (`provider_rejected`) and
@@ -223,6 +224,45 @@ any policy. Each executor takes the saved allowance as `attempts_used=` and
 reports its own as the `attempts_used` property, in the same shape. The saved
 allowance applies to the executor's first run only: running another graph on
 the same executor starts a new run, with a fresh allowance for every node.
+
+### Calls without an answer
+
+By default, when a node's timeout or a cancellation ends a call that
+`AnthropicProvider`, `OpenAIProvider`, `OpenAIImageProvider`,
+`GeminiProvider` or a custom provider has sent, the executor releases the
+call's reservation and records no cost, although the provider may still
+charge for it. `RetryPolicy(retain_uncertain_dispatch=True)` keeps that
+exposure instead. A call counts as sent from the moment the executor hands it
+to the provider, and is answered once the provider returns a result or raises
+an error of its own, including its client's own timeout. A call that the
+node's `timeout_s`, the policy's deadline or a cancellation (a `HALT`
+sibling's failure, a regeneration reset, or a run stopping on an exception
+or interrupt) ends before then keeps its reservation as the node's recorded
+cost, with `cost_usd_unknown` and `cost_usd_is_estimate` set on the node.
+`total_cost_usd` is unchanged by the transfer, `cost_is_complete` becomes
+`False` and `cost_contains_estimates` `True`: the reservation, whether a
+node's estimate, a provider's ceiling or the async executor's token default
+(`estimated_tokens_per_node`), estimates the charge and does not confirm
+it. A serial node that reserved nothing is marked unknown at no amount. See
+[cost guardrails](budgets.md#calls-sent-without-an-answer).
+
+A timeout of such a call raises `UncertainDispatchError`, a `TimeoutError`
+whose class is `unknown_outcome`, so the default policy does not call again:
+another call could be charged as well. A policy that lists `unknown_outcome`
+retries it, and each retry reserves again beside the kept exposure, so a
+budget that cannot hold both stops the run with `SentinelAlert` before the
+retry's call. When the deadline ends the call, the node still fails with
+`RetryDeadlineError` and keeps the exposure. A timeout or cancellation
+before the call is sent, such as during a tool call or before a tool session
+opens, releases the reservation as before.
+
+The kept cost is ordinary recorded cost: a version 4 checkpoint carries it,
+and resume restores the amount and both flags, as releases before this
+option do. With `persist_attempts` the checkpoint is version 5 and records
+the option with the policy, so the run resumes only under an equal policy. A
+process that is killed outright runs no handler, so a call in flight when it
+dies is not recorded. Native providers keep their own settlement: an
+unresolved native bill stays terminal with its live reservation.
 
 ## Concurrency
 
@@ -366,7 +406,9 @@ A queued node's policy does not override an earlier node's halt.
 In parallel execution, calls already in flight can finish before a failure is
 observed. The executor cancels and awaits the remaining active tasks, settles
 completed work, and starts no queued sibling after observing the failure.
-Cancellation does not establish that a remote provider issued no charge.
+Cancellation does not establish that a remote provider issued no charge: a
+retry policy with `retain_uncertain_dispatch` keeps a cancelled call's
+reservation as unknown cost (see [calls without an answer](#calls-without-an-answer)).
 
 An explicit [resume](checkpoint-format.md#resume-semantics) preserves completed
 nodes and their costs, resets failed or interrupted nodes, and continues the

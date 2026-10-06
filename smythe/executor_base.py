@@ -41,7 +41,9 @@ from smythe.provider import (
 )
 from smythe.provider_responses import RawResponseEnvelope
 from smythe.registry import Registry
-from smythe.scheduling import RetryDeadlineError, RetryPolicy, _attempt_records, _retry_after_s
+from smythe.scheduling import (
+    RetryDeadlineError, RetryPolicy, UncertainDispatchError, _attempt_records, _retry_after_s,
+)
 from smythe.task import _prompt_json, render_task, snapshot_task
 from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
 from smythe.tracer import Tracer
@@ -320,7 +322,11 @@ class ExecutorBase:
     ``attempts_used``, as a checkpoint saved it, seeds the attempts each node
     has already used in its current ``execution_generation``. The seed applies
     to the executor's first run only: a later run is a new run, with a fresh
-    allowance for every node.
+    allowance for every node. Under a policy with
+    ``retain_uncertain_dispatch``, a node call that is sent and never
+    answered, because the node's timeout, a cancellation or an interruption
+    ended it, keeps its reservation as the node's unknown, estimated cost
+    (``Sentinel.retain_unknown``) instead of releasing it.
     """
 
     def __init__(
@@ -376,6 +382,10 @@ class ExecutorBase:
         # only the first run; a reused executor's next run starts empty.
         self._attempts_used = _attempt_records(attempts_used or {})
         self._attempts_seed = dict(self._attempts_used)
+        self._retain_dispatch = retry_policy is not None and retry_policy.retain_uncertain_dispatch
+        # Under retain_uncertain_dispatch, the nodes whose call was sent and
+        # has not answered: in flight, or ended by a timeout or cancellation.
+        self._dispatched: set[str] = set()
         if acceptance is not None and not isinstance(acceptance, AcceptancePolicy):
             raise TypeError(
                 f"acceptance must be an AcceptancePolicy or None, not {type(acceptance).__name__}"
@@ -1242,6 +1252,7 @@ class ExecutorBase:
                 check_provider_support(provider, model, node_id=None, check_model=False,
                                        retry_owner=True)
         self._reserved_node_ids.clear()
+        self._dispatched.clear()
         self._call_attempts.clear()
         self._deadlines.clear()
         self._attempts_used, self._attempts_seed = self._attempts_seed, {}
@@ -1351,7 +1362,10 @@ class ExecutorBase:
         a retry deadline the timeout is at most the time left, and reaching
         it raises ``RetryDeadlineError``. A ``TimeoutError`` the conversation
         raises itself, such as an HTTP client's own timeout, is an ordinary
-        timeout even then.
+        timeout even then. Under ``retain_uncertain_dispatch``, a timeout
+        while a provider call is unanswered raises ``UncertainDispatchError``
+        (the deadline's still raises ``RetryDeadlineError``), and however the
+        attempt ends, such a call keeps its reservation as unknown cost.
         """
         timeout, by_deadline = self._attempt_timeout(node)
         coro = self._run_node_conversation(node, graph)
@@ -1387,12 +1401,19 @@ class ExecutorBase:
                 raise exc.__cause__
             if deadline_timer is not None and deadline_timer.expired():
                 raise self._deadline_error(node) from None
+            if node.id in self._dispatched:
+                raise UncertainDispatchError(
+                    f"Node {node.id!r} timed out after {node.timeout_s}s with its provider call "
+                    "unanswered; the call's outcome and charge are unknown"
+                ) from None
             raise TimeoutError(
                 f"Node {node.id!r} timed out after {node.timeout_s}s"
             ) from None
         except Exception:
             self._raise_unresolved_response(node)
             raise
+        finally:
+            self._retain_uncertain_dispatch(node)
 
     async def _run_node_conversation(
         self, node: Node, graph: ExecutionGraph,
@@ -1550,8 +1571,8 @@ class ExecutorBase:
                 raise WorkflowError("The provider call factory must return a journal-managed provider")
         try:
             if tools is None:
-                return await provider.chat(system, messages, model)
-            return await provider.chat(system, messages, model, tools=tools)
+                return await self._send(node, provider.chat(system, messages, model))
+            return await self._send(node, provider.chat(system, messages, model, tools=tools))
         except BaseExceptionGroup as exc:
             if not _native_response_errors(exc):
                 _raise_workflow_error(exc)
@@ -1569,6 +1590,46 @@ class ExecutorBase:
             if defect is not None:
                 raise defect from None
             raise
+
+    async def _send(self, node, call):
+        """Await a provider *call*, marking *node* dispatched until the provider answers.
+
+        Only under ``retain_uncertain_dispatch``. A result or an exception the
+        provider raises, such as its own error or its client's timeout,
+        answers the call. A cancellation, from the node's timeout or
+        otherwise, or an interruption leaves the node marked, and the attempt
+        then keeps its reservation (:meth:`_retain_uncertain_dispatch`).
+        """
+        if not self._retain_dispatch:
+            return await call
+        self._dispatched.add(node.id)
+        try:
+            result = await call
+        except Exception:
+            self._dispatched.discard(node.id)
+            raise
+        self._dispatched.discard(node.id)
+        return result
+
+    def _retain_uncertain_dispatch(self, node: Node) -> None:
+        """Keep the reservation of *node*'s sent and unanswered call as unknown cost.
+
+        The reservation becomes the node's recorded cost, flagged
+        ``cost_usd_unknown`` and, with an amount, ``cost_usd_is_estimate``, so
+        a checkpoint keeps it and resume restores it; the next call reserves
+        again. Does nothing unless such a call is marked (see :meth:`_send`).
+        """
+        if node.id not in self._dispatched:
+            return
+        self._dispatched.discard(node.id)
+        if self._budget is None:
+            return
+        kept = self._budget.retain_unknown(node.id)
+        self._reserved_node_ids.discard(node.id)
+        node.metadata["cost_usd_unknown"] = True
+        if kept is not None:
+            node.metadata["cost_usd_is_estimate"] = True
+        node.metadata["cost_usd"] = self._budget.breakdown()[node.id]
 
     def _settle_rejection(self, node, error, phase):
         """Under a retry policy, settle a native plain HTTP rejection at zero cost.
@@ -1654,6 +1715,8 @@ class ExecutorBase:
         return None
 
     def release_node_budget(self, node: Node) -> None:
+        """Release the node's reservation, except a sent, unanswered call's, which is kept."""
+        self._retain_uncertain_dispatch(node)
         if self._budget is not None and not self._workflow_managed:
             self._budget.release(node.id)
 
