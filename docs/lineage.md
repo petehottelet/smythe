@@ -17,10 +17,10 @@ and the work that would take, [repair in place](#repair-a-run-in-place),
 which decides a run again or publishes its damaged document again without
 running a node, the records of a
 [successor run](#reuse-in-a-successor-run) that reuses a completed run's
-results, and [source restriction](#restrict-a-source), which withdraws a
+results, [applying a plan](#apply-a-repair-plan) under an explicit
+allowance, and [source restriction](#restrict-a-source), which withdraws a
 source's text from every run that used it and can delete their published
-documents. Nothing applies a whole plan, and no public method starts a
-successor, yet.
+documents.
 
 ## Opt a run in
 
@@ -291,7 +291,8 @@ print(decision.action, decision.reasons)
 
 The evaluator is a pure function. It opens no store, reads no file and
 calls nothing but the catalog's `describe`; equal inputs give equal
-decisions. Nothing applies a decision yet: it says what a record calls for.
+decisions. It only says what a record calls for;
+[applying a plan](#apply-a-repair-plan) carries decisions out.
 
 ### The current state
 
@@ -465,6 +466,7 @@ calls for, or None where the policy's `undeclared_coverage` decides.
 | `validator_set_changed` | `recheck` | The validator set differs. |
 | `policy_changed` | `recheck` | The acceptance policy differs. |
 | `run_in_progress` | `review` | The run has not completed, so it has no record yet; only a [repair plan](#plan-a-repair) gives it. |
+| `repair_in_progress` | `review` | A successor that has not completed is repairing the run; only a [repair plan](#plan-a-repair) gives it. |
 
 ## Plan a repair
 
@@ -512,6 +514,12 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
 - **Runs in progress.** A run that has not completed has no record yet. Its
   item needs `review` with `run_in_progress`, and has no status, no nodes
   and no work.
+- **Repairs in progress.** A run that a successor which has not completed
+  is repairing, such as one a lost process left, needs `review` with
+  `repair_in_progress` added to its decision's reasons, so the plan never
+  starts that repair again. Its item keeps its status and nodes, predicts
+  no work, and names the successors in `repairs_in_progress`; resuming one
+  finishes the repair.
 
 `smythe.reuse.repair_plan(store, recipe, catalog, run_ids=None)` does the
 same for a `WorkflowRuntime`'s `recipe` and a store the caller opened.
@@ -529,8 +537,11 @@ repairs.
   predecessor, which is no longer a head.
 - A successor whose decision is not `accepted` supersedes nothing and is not
   a head itself, so its predecessor stays the head.
-- A run that has not completed has no record yet, so it supersedes nothing
-  and is a head.
+- A successor that has not completed, which its saved graph's `repair`
+  record links to its predecessor, is a repair in progress: it supersedes
+  nothing and is not a head, and resumes as any durable run does.
+- Any other run that has not completed has no record yet, so it supersedes
+  nothing and is a head.
 - A run whose record or decision cannot be read links nothing.
 
 ### The plan
@@ -548,7 +559,8 @@ repairs.
              "work": {"nodes_reused": {kind: count}, "nodes_regenerated": {kind: count},
                       "read_calls", "model_steps", "publications",
                       "acceptance_evaluations", "new_runs",
-                      "may_incur_charges", "allowance_required"}}],
+                      "may_incur_charges", "allowance_required"},
+             "repairs_in_progress": [run ids]}],
   "plan_sha256": "..."
 }
 ```
@@ -557,6 +569,8 @@ repairs.
   `authority` are the evaluator's [decision](#the-decision);
   `lineage_sha256` names the record it was made from (null without one) and
   `status` is the run's [derived status](#derived-status).
+  `repairs_in_progress` appears only on a run that a
+  [repair in progress](#plan-a-repair) holds.
 - **Sources.** What the catalog said about each source the planned records
   name, sorted by id. A source the catalog does not know is `available:
   false` with a null `version` and `sha256`.
@@ -654,7 +668,7 @@ swarm.reevaluate(run_id, acceptance=policy)  # a validator's version changed
   publication, the decision and the record together, and `load_lineage`
   returns the new record, so a plan made afterwards finds nothing left to
   recheck or rerender.
-- **The plan's reason.** A repair applied from a [plan](#plan-a-repair)
+- **The plan's reason.** A repair [applied from a plan](#apply-a-repair-plan)
   binds `repair`, the plan's `plan_sha256` and its reason, into the inputs of
   the publication, the decision and the lineage record. A run without a
   lineage policy records none and republishes as before: the same bytes
@@ -680,7 +694,8 @@ Gates, the nodes they judge or depend on, and nodes that depend on a node
 that runs again are never kept. The successor holds its predecessor's source
 tombstones from its first checkpoint, so text
 [withdrawn](#restrict-a-source) from the predecessor is withdrawn from it
-too. No public method starts a successor yet.
+too. [Applying a plan](#apply-a-repair-plan) starts one for each
+`regenerate` item.
 
 When the successor completes, its record shows what it kept:
 
@@ -695,6 +710,124 @@ When the successor completes, its record shows what it kept:
 Nodes that ran again are recorded from the successor's own snapshots and
 reads. A kept node is always `declared`, because a node whose inputs are
 undeclared is never kept.
+
+## Apply a repair plan
+
+`Swarm.repair(plan, *, plan_sha256, max_total_budget_usd, reason, sources)`
+applies a [plan](#plan-a-repair) that a person reviewed, item by item, and
+returns a `RepairResult`; `await swarm.arepair(...)` does the same in a
+running event loop. *plan_sha256* is the digest the plan was approved by,
+*max_total_budget_usd* the allowance for the new runs it starts, *reason*
+(1-256 characters without control characters) why it is applied, and
+*sources* the same [source catalog](#the-source-catalog) the plan was made
+with:
+
+```python
+plan = swarm.plan_repair(sources=LocalIndex(entries))
+approved = plan.plan_sha256  # after a person has reviewed plan.to_dict()
+result = swarm.repair(plan, plan_sha256=approved, max_total_budget_usd=5.0,
+                      reason="The handbook has a new edition",
+                      sources=LocalIndex(entries))
+for item in result.to_dict()["items"]:
+    print(item["run_id"], item["action"], item["outcome"], item.get("successor_run_id"))
+```
+
+- **Never stale.** The plan is made again for the same runs, from the
+  catalog's answers now, and must still have `plan_sha256`. A source, run,
+  document or configuration that changed after the preview changes the
+  digest, and the plan is refused with `WorkflowConflictError`; make and
+  review a new one. *plan_sha256* must also be the given plan's own digest
+  (`ValueError`).
+- **Durable only.** Repair needs a durable `run_store` and a lineage policy,
+  or raises `ValueError`, so the ordinary path, which keeps no lineage, is
+  refused. A configured `supervisor` is refused with `WorkflowBindingError`,
+  because a revision could change the graph a successor keeps results in.
+- **An explicit allowance.** Each `regenerate` item starts one new run under
+  the Swarm's `max_budget_usd`, which the run's journal enforces. Their
+  number times `max_budget_usd` must not exceed *max_total_budget_usd*, and
+  an unbounded `max_budget_usd` is refused when any of them
+  [may incur charges](#predicted-work); both raise `WorkflowBudgetError`.
+  Items that repair a run in place call nothing and need no allowance, so
+  `max_total_budget_usd=0` applies a plan without new runs.
+- **Checked first.** Every refusal above comes before anything is written,
+  read or called, and before any run is created.
+
+Items are applied in plan order, each once:
+
+| Action | What applying it does |
+|---|---|
+| `reuse` | Nothing. |
+| `recheck` | [Decides the run again](#repair-a-run-in-place) under the Swarm's policy, binding the plan's digest and reason. |
+| `rerender` | [Publishes the run's document again](#repair-a-run-in-place) and decides the new bytes, binding the plan's digest and reason. |
+| `regenerate` | Starts a [successor run](#reuse-in-a-successor-run) of the run's task and graph that keeps each node the plan marks `reuse` and runs the others, and records the plan's digest and reason in its lineage. |
+| `review` | Nothing: it is reported for a person. |
+
+- **One retry owner.** An item whose step raises, or ends with a decision
+  other than `accepted`, stops the repair. It is never retried, and every
+  later item is reported `unapplied`. Retries happen only inside each
+  successor run, under its own node and retry policies.
+- **Earlier versions stay.** A successor never changes the run it repairs:
+  that run's calls, balances, events, checkpoints and published document
+  stay as they were, and each successor's calls and costs are its own. When
+  the successor completes with an `accepted` decision it
+  [supersedes](#archive-heads) the run; one whose decision is not accepted
+  supersedes nothing.
+
+### The result
+
+`RepairResult` (exported from `smythe`) is frozen. `to_dict()` returns:
+
+```text
+{
+  "plan_sha256": "...",
+  "items": [{"run_id", "action", "outcome", "decision", "successor_run_id", "error",
+             "work": {"new_runs", "read_calls", "model_calls", "reused_nodes",
+                      "publications", "acceptance_evaluations"}}],
+  "successor_run_ids": [run ids],
+  "decisions": {run id: delivery acceptance record},
+  "work": {the items' work, summed}
+}
+```
+
+| Outcome | Meaning |
+|---|---|
+| `kept` | A `reuse` item. |
+| `reported` | A `review` item, left for a person. |
+| `applied` | The item's step ended with an `accepted` decision. |
+| `failed` | The step raised, named in `error` as the exception's type and message, or ended with another decision. |
+| `unapplied` | An item after a failure. |
+
+An item that decided names its `decision`, and `decisions` maps the run that
+holds each decision, the run itself or its successor, to its
+`DeliveryAcceptance`. A `regenerate` item names the `successor_run_id` of
+the run it created, even one that then failed. `work` counts what each item
+added to the journal: the new runs it started, and the read calls, model
+calls, `reuse` operations, publications and acceptance decisions of the run
+it repaired in place or the successor it started. Offline runs cost nothing,
+so these counts, not money, compare a selective repair with computing again
+in full.
+
+### A repair in progress
+
+A successor that a lost process left, or that failed, is a repair in
+progress: it is not an [archive head](#archive-heads), and a plan made
+afterwards gives the run it repairs `review` (`repair_in_progress`) and names
+the successor in `repairs_in_progress`, so applying a plan never starts that
+repair again. Resume the successor like any durable run with
+`swarm.resume(successor_run_id)`: the reuse operations it committed are
+replayed rather than run again, and the nodes, reads and model calls it
+completed are not repeated. Once it completes with an `accepted` decision,
+it is the head.
+
+### The reuse switch
+
+`LineagePolicy(reuse=False)`, under the same access scope, turns reuse off
+for new work without touching what was recorded. Its plans
+[regenerate](#rules) every item that is not a `recheck` or a `review`, with
+`reuse_disabled`, so applying one computes each such item again in full: no
+`reuse` operation is written, every node of each successor runs, and the
+documents are byte for byte those of a new run. Every lineage record stays
+readable, and turning reuse on again makes later plans keep results again.
 
 ## Restrict a source
 

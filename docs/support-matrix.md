@@ -389,6 +389,7 @@ constructed with a `run_store`.
 | Architects and other components | Built-in components and `LocalOnly` factories | Subclasses and unjournaled dependencies |
 | Node inputs | Plain text | `attach_dep_artifacts`, `attachments` and `artifacts` |
 | Resume | The saved recipe: components, models, budget, `retry_backoff_s`, concurrency, gate validator, acceptance policy, read profiles, renderer and lineage policy | Any change raises `WorkflowConflictError`, including a lineage policy added, removed or changed |
+| Repair (`Swarm.repair`) | A [repair plan](lineage.md#apply-a-repair-plan) that is still current when applied, with a `run_store` and a lineage policy, whose new runs fit `max_total_budget_usd` at `max_budget_usd` each | Before anything is created or called: no `run_store`, which is the ordinary path, or no lineage policy (`ValueError`); a configured `supervisor` (`WorkflowBindingError`); a stale plan (`WorkflowConflictError`); new runs beyond the allowance, or an unbounded `max_budget_usd` when one may incur charges (`WorkflowBudgetError`) |
 | `max_budget_usd=None` | Runs without a budget | |
 | `artifact_dir` | Where a `renderer` publishes; ignored without one | |
 | `max_tool_iterations` | Ignored | |
@@ -463,6 +464,17 @@ Tests:
   and `tests/test_workflow_lineage.py::test_lineage_runs_refuse_node_ids_their_record_cannot_hold_before_any_call`;
   recorded `tests/test_workflow_lineage.py::test_lineage_lists_what_each_node_read_and_binds_the_document_and_decision`
   and `tests/test_workflow_lineage.py::test_nodes_without_a_snapshot_are_undeclared_and_the_run_partial`.
+- Repair: refused `tests/test_workflow_repair.py::test_a_repair_is_refused_before_anything_is_written_or_called[ordinary]`,
+  `tests/test_workflow_repair.py::test_a_repair_is_refused_before_anything_is_written_or_called[lineage]`,
+  `tests/test_workflow_repair.py::test_a_repair_is_refused_before_anything_is_written_or_called[supervisor]`,
+  `tests/test_workflow_repair.py::test_a_repair_is_refused_before_anything_is_written_or_called[stale]`,
+  `tests/test_workflow_repair.py::test_a_repair_is_refused_before_anything_is_written_or_called[allowance]`
+  and `tests/test_workflow_repair.py::test_a_repair_is_refused_before_anything_is_written_or_called[unbounded]`;
+  applied `tests/test_workflow_repair.py::test_a_plan_is_applied_item_by_item_by_each_action`,
+  `tests/test_workflow_repair.py::test_a_failed_item_stops_the_repair_and_later_items_stay_unapplied`
+  and `tests/test_workflow_repair.py::test_with_reuse_off_a_repair_runs_every_affected_node_with_identical_bytes`;
+  recovery `tests/test_workflow_repair.py::test_a_lost_successor_is_a_repair_in_progress_that_resumes_rather_than_restarts`
+  and `tests/test_workflow_repair_process_loss.py::test_a_killed_repair_leaves_its_predecessor_intact_and_resumes_without_repeating_work`.
 - Plain-text nodes: `tests/test_support_matrix.py::test_durable_run_rejects_image_inputs_on_a_caller_graph_before_any_call`,
   `tests/test_workflow_native_runtime.py::test_plan_the_run_cannot_execute_is_repaired_as_an_additional_paid_attempt`
   and `tests/test_workflow_provider.py::test_unsupported_input_rejected_before_journal_or_http`.

@@ -395,13 +395,15 @@ connector or paid run.
    rechecked or regenerated before dispatch. In progress: strict durable runs
    opt into [lineage records](docs/lineage.md) of ids, versions and digests;
    a pure evaluator says what each record calls for under the current
-   sources, tools and validators; and a read-only
+   sources, tools and validators; a read-only
    [repair plan](docs/lineage.md#plan-a-repair) lists each run's decision,
    derived status and predicted work, which `smythe runs inspect`
-   summarizes without a source catalog; and a
+   summarizes without a source catalog; `Swarm.repair`
+   [applies a reviewed plan](docs/lineage.md#apply-a-repair-plan) under an
+   explicit allowance, regenerating affected work in successor runs; and a
    [source restriction](docs/lineage.md#restrict-a-source) withdraws a
    source's text from every run that used it, optionally deleting their
-   published documents. Applying a plan is not built yet
+   published documents
 6. **Integrate asset policy with Jobs v1** — manifest-native production brand
    masters, OCR and perceptual brand validators, select-from-N curation, and
    deterministic export bundles built from accepted attempt pointers

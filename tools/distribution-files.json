@@ -288,6 +288,7 @@
     "tests/test_workflow_provider.py",
     "tests/test_workflow_read_tool.py",
     "tests/test_workflow_repair.py",
+    "tests/test_workflow_repair_process_loss.py",
     "tests/test_workflow_reservation_recovery.py",
     "tests/test_workflow_retry_policy.py",
     "tests/test_workflow_reuse.py",

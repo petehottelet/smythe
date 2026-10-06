@@ -558,8 +558,10 @@ def lineage_view(store: SQLiteWorkflowStore, run_id: str, recipe: dict[str, Any]
         return None
     record = load_lineage(store, run_id)
     _, links = _archive(store, policy["access_scope"])
+    # A successor that has not completed has no record to name the run yet.
     successors = [{"run_id": successor, "supersedes": accepted}
-                  for successor, (predecessor, accepted) in links.items() if predecessor == run_id]
+                  for successor, (predecessor, accepted) in links.items()
+                  if predecessor == run_id and accepted is not None]
     view: dict[str, Any] = {
         "access_scope": policy["access_scope"], "recorded": record is not None,
         "lineage_sha256": None, "coverage": None, "nodes": {}, "undeclared": [], "sources": [],

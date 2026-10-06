@@ -18,12 +18,14 @@ import shutil
 
 import pytest
 
+import test_workflow_reuse as successors
 from fixture_service import FixtureService, serve_http
 from smythe import (
     AcceptancePolicy, ContextSource, CurrentState, LineagePolicy, OfflineProvider, RepairPlan,
     SimpleArchitect, SourceStatus, SQLiteWorkflowStore, Swarm, Task, TextValidator, archive_heads,
 )
 from smythe._canonical import sha256_hex
+from smythe._run_inspection import inspect_journal
 from smythe.graph import ExecutionGraph
 from smythe.lineage import load_lineage
 from smythe.reuse import STATUSES, derived_status, evaluate
@@ -379,3 +381,52 @@ def test_planning_needs_a_durable_store_and_a_lineage_policy(tmp_path):
         # An empty archive plans nothing.
         plan = lineage_swarm(store).plan_repair(sources=ServiceCatalog(FixtureService()))
     assert plan.to_dict()["items"] == [] and plan.to_dict()["sources"] == []
+
+
+# ---------------------------------------------------------------------------
+# Repairs in progress
+# ---------------------------------------------------------------------------
+
+
+def test_a_successor_that_has_not_completed_holds_its_predecessor_for_review(
+        tmp_path, monkeypatch):
+    # The three-source research of test_workflow_reuse, whose successors keep results.
+    service, log = FixtureService(), []
+    for source_id, text in successors.TEXTS.items():
+        service.add_source(source_id, text)
+    successors.install_replies(monkeypatch, log)
+    with serve_http(service) as endpoint, SQLiteWorkflowStore(tmp_path / "runs.db") as store:
+        swarm = successors.research(store, endpoint, tmp_path)
+        first = swarm.execute(successors.research_graph(endpoint)).execution_id
+        service.change_source("churn", successors.CHANGED)
+        catalog = successors.Catalog(service)
+        earlier = swarm.plan_repair(sources=catalog)
+        (before,) = earlier.to_dict()["items"]
+        assert before["action"] == "regenerate" and "repairs_in_progress" not in before
+        successor = successors.stopped_before_running(
+            swarm, store, first, {node_id: [] for node_id in successors.KEPT}, monkeypatch)
+
+        # The successor is not a head, and the run it repairs needs review
+        # rather than a second successor.
+        assert archive_heads(store, SCOPE) == [first]
+        plan = swarm.plan_repair(sources=catalog)
+        (item,) = plan.to_dict()["items"]
+        assert (item["run_id"], item["action"]) == (first, "review")
+        assert item["reasons"] == sorted([*before["reasons"], "repair_in_progress"])
+        assert item["repairs_in_progress"] == [successor]
+        # It keeps its own status and nodes, and predicts no work.
+        assert (item["status"], item["nodes"]) == (before["status"], before["nodes"])
+        assert item["work"] == ZERO and plan.plan_sha256 != earlier.plan_sha256
+        # Named, the successor is a run in progress; inspection names no
+        # successor until one has a record.
+        (named,) = swarm.plan_repair([successor], sources=catalog).to_dict()["items"]
+        assert (named["action"], named["reasons"]) == ("review", ["run_in_progress"])
+        assert inspect_journal(store, first)["lineage"]["successors"] == []
+
+        # Once resumed to completion, the successor supersedes its predecessor.
+        assert swarm.resume(successor).accepted
+        assert archive_heads(store, SCOPE) == [successor]
+        (done,) = swarm.plan_repair(sources=catalog).to_dict()["items"]
+        assert (done["run_id"], done["action"], done["status"]) == (successor, "reuse", "current")
+        assert inspect_journal(store, first)["lineage"]["successors"] == [
+            {"run_id": successor, "supersedes": True}]

@@ -30,7 +30,7 @@ from smythe.acceptance import (
     text_sha256,
     validate_acceptance_obligations,
 )
-from smythe.budget import BudgetValidationError, Sentinel
+from smythe.budget import BudgetValidationError, Sentinel, _validate_usd
 from smythe.context import ContextSource, snapshot_sources
 from smythe.evidence import SourceRecord
 from smythe.checkpoint import (
@@ -85,7 +85,7 @@ from smythe.provider import (
     _response_error_marker,
 )
 from smythe.registry import Registry
-from smythe.reuse import RepairPlan, SourceCatalog, repair_plan
+from smythe.reuse import RepairPlan, RepairResult, SourceCatalog, _journal_work, repair_plan
 from smythe.scheduling import (
     ModelProfile, RetryPolicy, node_profile, profile_map,
 )
@@ -104,7 +104,7 @@ from smythe.verifier import (
 from smythe.workflow_artifact import MarkdownRenderer, PublishedArtifact
 from smythe.workflow_binding import LocalOnly, WorkflowBindingError, _BoundLocal
 from smythe.workflow_policy import WorkflowGraphPolicy, snapshot_graph_policy
-from smythe.workflow_store import SQLiteWorkflowStore
+from smythe.workflow_store import SQLiteWorkflowStore, WorkflowBudgetError, WorkflowConflictError
 from smythe.workflow_tools import READ_STEP_KEY, ReadProfile
 
 logger = logging.getLogger("smythe.swarm")
@@ -1535,6 +1535,122 @@ class Swarm:
         recipe = self._workflow_runtime().recipe
         with SQLiteWorkflowStore(self._run_store.path, read_only=True) as store:
             return repair_plan(store, recipe, sources, execution_ids)
+
+    def repair(self, plan: RepairPlan, *, plan_sha256: str, max_total_budget_usd: float,
+               reason: str, sources: SourceCatalog) -> RepairResult:
+        """Apply a repair plan.  Sync wrapper around arepair()."""
+        return asyncio.run(self.arepair(plan, plan_sha256=plan_sha256, reason=reason,
+                                        max_total_budget_usd=max_total_budget_usd,
+                                        sources=sources))
+
+    async def arepair(self, plan: RepairPlan, *, plan_sha256: str, max_total_budget_usd: float,
+                      reason: str, sources: SourceCatalog) -> RepairResult:
+        """Apply a repair plan's items in order, each once, under an explicit allowance.
+
+        *plan* comes from :meth:`plan_repair`, approved by *plan_sha256*. It
+        is made again from *sources* for the same runs and must still have
+        that digest, or ``WorkflowConflictError`` is raised. Repair needs a
+        ``run_store`` and a lineage policy (``ValueError``) and refuses a
+        supervisor (``WorkflowBindingError``). The ``regenerate`` items' new
+        runs, at ``max_budget_usd`` each, must fit *max_total_budget_usd*,
+        and an unbounded ``max_budget_usd`` is refused when any may incur
+        charges (``WorkflowBudgetError``). Refusals precede any write or call.
+
+        ``recheck`` decides the run again and ``rerender`` publishes its
+        document again, binding the digest and *reason*; ``regenerate``
+        starts a successor run that keeps the nodes marked ``reuse``, leaving
+        the repaired run as it is; ``reuse`` and ``review`` change nothing.
+        The first item that raises or is not ``accepted`` stops the repair,
+        unretried. A successor left unfinished is a repair in progress that
+        :meth:`resume` finishes. Returns a :class:`~smythe.reuse.RepairResult`;
+        see the lineage guide.
+        """
+        from smythe.workflow import _nanousd, _repair_record
+
+        if self._run_store is None:
+            raise ValueError("repair needs a durable run_store; ordinary runs have no lineage")
+        if self._lineage is None:
+            raise ValueError("repair needs a lineage policy, whose access scope it repairs in")
+        if self.supervisor is not None:
+            raise WorkflowBindingError(
+                "repair refuses a supervisor, which could change the graph a successor reuses")
+        if not isinstance(plan, RepairPlan):
+            raise TypeError(f"plan must be a RepairPlan, not {type(plan).__name__}")
+        _repair_record(plan_sha256, reason)
+        if plan.plan_sha256 != plan_sha256:
+            raise ValueError("plan_sha256 is not the digest of the plan given")
+        allowance = _nanousd(_validate_usd(max_total_budget_usd, "max_total_budget_usd"))
+        self._check_run_control()
+        items = plan.to_dict()["items"]
+        if self.plan_repair([item["run_id"] for item in items],
+                            sources=sources).plan_sha256 != plan_sha256:
+            raise WorkflowConflictError(
+                "The repair plan is stale: planned again now, it calls for other work")
+        new = [item["work"] for item in items if item["action"] == "regenerate"]
+        if self.max_budget_usd is None and any(work["may_incur_charges"] for work in new):
+            raise WorkflowBudgetError(
+                "A repair whose new runs may incur charges needs max_budget_usd for each run")
+        runs = sum(work["new_runs"] for work in new)
+        if self.max_budget_usd is not None and runs * _nanousd(self.max_budget_usd) > allowance:
+            raise WorkflowBudgetError(
+                f"The repair starts {runs} new runs of up to {self.max_budget_usd} USD each, "
+                f"more than max_total_budget_usd={max_total_budget_usd}")
+        entries, successors, decisions, stopped = [], [], {}, False
+        for item in items:
+            entry = {"run_id": item["run_id"], "action": item["action"]}
+            if stopped or item["action"] in ("reuse", "review"):
+                outcome = {"reuse": "kept", "review": "reported"}.get(item["action"])
+                entries.append({**entry, "outcome": "unapplied" if stopped else outcome,
+                                "work": _journal_work(None, None)})
+                continue
+            entry.update(await self._repair_item(item, plan_sha256, reason))
+            decision = entry.pop("record", None)
+            if "successor_run_id" in entry:
+                successors.append(entry["successor_run_id"])
+            if decision is not None:
+                decisions[entry.get("successor_run_id", item["run_id"])] = decision
+                entry["decision"] = decision.decision.value
+            entry["outcome"] = "applied" if decision is not None and decision.accepted else "failed"
+            stopped = entry["outcome"] == "failed"
+            entries.append(entry)
+        return RepairResult(plan_sha256, entries, successors, decisions)
+
+    async def _repair_item(self, item: dict[str, Any], plan_sha256: str,
+                           reason: str) -> dict[str, Any]:
+        """Apply one ``recheck``, ``rerender`` or ``regenerate`` item, once.
+
+        Returns its decision as ``record`` (absent when it raised, with its
+        ``error``), the run a ``regenerate`` item started, and its ``work``.
+        """
+        from smythe.workflow import current_decision
+
+        store, run_id, action = self._run_store, item["run_id"], item["action"]
+        runtime, done = self._workflow_runtime(), {}
+        before = _journal_work(store, None if action == "regenerate" else run_id)
+        try:
+            if action == "recheck":
+                done["record"] = (await self._arecheck(
+                    run_id, plan_sha256=plan_sha256, reason=reason)).acceptance
+            elif action == "rerender":
+                await self._arerender(run_id, plan_sha256=plan_sha256, reason=reason)
+                done["record"] = current_decision(store, run_id)["record"]
+            else:
+                done["record"] = (await runtime._run_successor(
+                    run_id, lineage_sha256=item["lineage_sha256"],
+                    reuse={node["id"]: node["reasons"] for node in item["nodes"]
+                           if node["action"] == "reuse"},
+                    plan_sha256=plan_sha256, reason=reason,
+                    max_concurrency=self._execution_concurrency())).acceptance
+        except Exception as error:  # The item failed; nothing retries it.
+            done["error"] = f"{type(error).__name__}: {error}"
+        # A successor exists once its run was created, even when it then failed.
+        target = getattr(runtime, "run_id", None) if action == "regenerate" else run_id
+        if action == "regenerate" and target is not None:
+            done["successor_run_id"] = target
+        after = _journal_work(store, target)
+        done["work"] = {unit: after[unit] - before[unit] for unit in after}
+        done["work"]["new_runs"] = int("successor_run_id" in done)
+        return done
 
     def _load_checkpoint(self, execution_id: str) -> dict[str, Any]:
         """The saved state of *execution_id*, at a checkpoint version this build reads."""

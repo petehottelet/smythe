@@ -1089,7 +1089,7 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   record in another access scope is invisible before any digest is
   compared. A catalog that declares itself metered is refused. The
   evaluator reads no store or file and its output is deterministic JSON
-  data; nothing applies decisions yet. See
+  data; `Swarm.repair()` applies the plans made from it. See
   [reuse decisions](docs/lineage.md#reuse-decisions).
 - A supervisor revision records what it changed. Its trace span's `revision`
   record adds the completed results the run `retained`, the delivered results
@@ -1224,7 +1224,7 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   never used. Its lineage names its `predecessor` and `repair`, each kept
   node keeps its recorded inputs with `reused_from`, and inspection never
   returns kept text. A new durable graph cannot carry a `repair` planning
-  record. No public method starts a successor yet. See
+  record. `Swarm.repair()` starts successors. See
   [reused results](docs/workflow-accounting.md#reused-results).
 - `EvidenceTriggeredSupervisor(inner, triggers, on_trigger=None)` reviews only
   when a `ReviewTriggers` check fires after a completed node; otherwise it
@@ -1368,6 +1368,29 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   raises `WorkflowConflictError`. Unknown model-call exposure still has no
   reconciliation path; a run it blocks needs a new run. See
   [draining in-flight calls](docs/workflow-accounting.md#draining-in-flight-calls).
+- Applying a repair plan. `Swarm.repair(plan, *, plan_sha256,
+  max_total_budget_usd, reason, sources)` (and `arepair()`) makes the plan
+  again for the same runs and refuses it with `WorkflowConflictError`
+  unless it still has the approved digest. It needs a durable `run_store`
+  and a lineage policy, refuses a configured supervisor, and admits the new
+  runs only when their number times `max_budget_usd` fits
+  `max_total_budget_usd`, refusing an unbounded per-run budget when any may
+  incur charges (`WorkflowBudgetError`); every refusal comes before any run
+  is created or call made. Items are applied in plan order, each once:
+  `recheck` decides the run again and `rerender` publishes its document
+  again, both binding the plan's digest and reason, `regenerate` starts a
+  successor run that keeps the nodes the plan reuses and leaves the
+  repaired run's rows untouched, and `review` is reported. The first item
+  that raises or is not accepted stops the repair without a retry. A
+  `RepairResult` lists each item's outcome, decision, successor and work
+  (new runs, read and model calls, reused nodes, publications and
+  decisions). A successor that has not completed is a repair in progress:
+  it is no archive head, and a plan gives the run it repairs `review`
+  (`repair_in_progress`), naming it in `repairs_in_progress`, until
+  ordinary resume finishes it. Under `LineagePolicy(reuse=False)` a
+  regenerated item keeps no result and runs every node, and its document is
+  byte for byte a new run's. See
+  [apply a repair plan](docs/lineage.md#apply-a-repair-plan).
 
 ### Changed
 

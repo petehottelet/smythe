@@ -679,7 +679,9 @@ A successor of a completed lineage run is a new run, under its own recipe and
 budget, of the predecessor's task and completed graph: every node starts
 pending without its result or history, the inherited planning records are
 dropped, and each node either keeps the predecessor's result or runs again.
-No public method starts a successor yet.
+`Swarm.repair()` starts one for each `regenerate` item of a
+[repair plan](lineage.md#apply-a-repair-plan), under an explicit allowance
+for its budget.
 
 - **Reuse operations.** Before any node runs, each kept node completes from a
   `reuse` operation keyed `reuse/<node id>`. Its inputs name the predecessor

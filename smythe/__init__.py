@@ -51,7 +51,8 @@ from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.provider_messages import AnthropicMessagesProvider
 from smythe.pricing import NativeReceipt
 from smythe.reuse import (
-    CurrentState, ItemDecision, RepairPlan, SourceCatalog, SourceStatus, archive_heads,
+    CurrentState, ItemDecision, RepairPlan, RepairResult, SourceCatalog, SourceStatus,
+    archive_heads,
 )
 from smythe.workflow_artifact import MarkdownRenderer, PublishedArtifact
 from smythe.workflow_binding import LocalOnly, WorkflowBindingError
@@ -182,6 +183,7 @@ __all__ = [
     "Revision",
     "RevisionError",
     "RepairPlan",
+    "RepairResult",
     "RoutingDecision",
     "RoutingRule",
     "RunControl",

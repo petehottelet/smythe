@@ -13,7 +13,8 @@ equal inputs, whatever their order.
 :func:`repair_plan` applies it to the runs of a durable journal, by default
 the heads that :func:`archive_heads` finds, and returns a :class:`RepairPlan`
 with each run's decision, derived status and predicted work. Both only read
-the journal: nothing is dispatched or written.
+the journal: nothing is dispatched or written. ``Swarm.repair`` applies a
+plan and returns a :class:`RepairResult`.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ from types import MappingProxyType
 from typing import Any, Protocol
 
 from smythe._canonical import sha256_hex
-from smythe.acceptance import AcceptanceDecision, _calls_async
+from smythe.acceptance import AcceptanceDecision, DeliveryAcceptance, _calls_async
 from smythe.context import CONTEXT_ASSEMBLY_VERSION
 from smythe.evidence import load_source_tombstones
 from smythe.lineage import (
@@ -41,8 +42,8 @@ from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_store import WorkflowError, WorkflowNotFoundError
 
 __all__ = ["ACTIONS", "REASONS", "REPAIR_PLAN_VERSION", "STATUSES", "CurrentState",
-           "ItemDecision", "NodeDecision", "RepairPlan", "SourceCatalog", "SourceStatus",
-           "archive_heads", "derived_status", "evaluate", "repair_plan"]
+           "ItemDecision", "NodeDecision", "RepairPlan", "RepairResult", "SourceCatalog",
+           "SourceStatus", "archive_heads", "derived_status", "evaluate", "repair_plan"]
 
 # Every action, from least to most conservative. An item or node takes the most
 # conservative action any of its reasons calls for.
@@ -63,7 +64,7 @@ REASONS = MappingProxyType({
     "gate_pair": "regenerate", "reuse_disabled": "regenerate",
     "artifact_missing": "rerender", "artifact_changed": "rerender",
     "validator_set_changed": "recheck", "policy_changed": "recheck",
-    "run_in_progress": "review",
+    "run_in_progress": "review", "repair_in_progress": "review",
 })
 
 # The reason each published-file integrity status gives, if any.
@@ -431,13 +432,15 @@ def derived_status(reasons: Iterable[str], *, superseded: bool = False,
     return "stale" if reasons else "current"
 
 
-def _archive(store: Any, scope: str) -> tuple[dict[str, str], dict[str, tuple[str, bool]]]:
+def _archive(store: Any, scope: str) -> tuple[dict[str, str], dict[str, tuple[str, bool | None]]]:
     """The runs in *scope* with their journal status, in journal order, and their links.
 
     A run is in a scope when its recipe records a lineage policy with that
     access scope. Each completed run in the scope whose lineage names a
     predecessor in the scope is linked to it, with whether its current
-    decision is ``accepted``. A run whose record or decision cannot be read
+    decision is ``accepted``. A successor that has not completed, whose saved
+    graph names the predecessor it repairs, is linked to it with None: the
+    repair is in progress. A run whose record or decision cannot be read
     links nothing; reading that run itself reports why.
     """
     from smythe.workflow import current_decision
@@ -447,16 +450,23 @@ def _archive(store: Any, scope: str) -> tuple[dict[str, str], dict[str, tuple[st
         policy = store.load_run(run["run_id"])["config"].get("lineage")
         if isinstance(policy, dict) and policy.get("access_scope") == scope:
             runs[run["run_id"]] = run["status"]
-    links = {}
+    links: dict[str, tuple[str, bool | None]] = {}
     for run_id, status in runs.items():
         try:
-            record = load_lineage(store, run_id) if status == "completed" else None
+            if status != "completed":
+                saved = store.get_checkpoint(run_id)
+                repair = (saved["checkpoint"]["graph"].get("planning") or {}).get(
+                    "repair") if saved else None
+                if isinstance(repair, dict) and repair["predecessor"]["run_id"] in runs:
+                    links[run_id] = (repair["predecessor"]["run_id"], None)
+                continue
+            record = load_lineage(store, run_id)
             predecessor = (record.predecessor or {}).get("run_id") if record else None
             if predecessor in runs:
                 decision = current_decision(store, run_id)
                 links[run_id] = (predecessor, decision is not None
                                  and decision["record"].decision is AcceptanceDecision.ACCEPTED)
-        except (ValueError, WorkflowError):
+        except (ValueError, TypeError, KeyError, AttributeError, WorkflowError):
             continue
     return runs, links
 
@@ -469,14 +479,16 @@ def archive_heads(store: Any, scope: str) -> list[str]:
     lineage are never listed. Predecessor links come from lineage records:
     a completed successor whose current decision is ``accepted`` supersedes
     its predecessor, and a successor whose decision is not supersedes nothing
-    and is not a head itself, so its predecessor stays the head. A run that
-    has not completed has no record yet, so it is a head. Only reads are
-    made, so a store opened read-only will do.
+    and is not a head itself, so its predecessor stays the head. A successor
+    that has not completed, such as one a lost process left, is a repair in
+    progress: it is not a head either, and resumes as any durable run does.
+    Any other run that has not completed has no record yet, so it is a head.
+    Only reads are made, so a store opened read-only will do.
     """
     return _heads(*_archive(store, scope))
 
 
-def _heads(runs: Mapping[str, str], links: Mapping[str, tuple[str, bool]]) -> list[str]:
+def _heads(runs: Mapping[str, str], links: Mapping[str, tuple[str, bool | None]]) -> list[str]:
     superseded = {predecessor for predecessor, accepted in links.values() if accepted}
     return [run_id for run_id in runs
             if run_id not in superseded and links.get(run_id, (None, True))[1]]
@@ -575,9 +587,11 @@ class RepairPlan:
     ``items`` hold one entry per run, in the order planned: its ``run_id``,
     the ``lineage_sha256`` of its record (None without one), its derived
     ``status`` (:func:`derived_status`), the ``action``, ``reasons``,
-    ``nodes`` and ``authority`` of its :class:`ItemDecision`, and its
-    predicted ``work``. ``sources`` is what the catalog said about each
-    source the records name, described once for the whole plan.
+    ``nodes`` and ``authority`` of its :class:`ItemDecision`, its predicted
+    ``work`` and, only while successors that have not completed repair it,
+    their run ids in ``repairs_in_progress``. ``sources`` is what the
+    catalog said about each source the records name, described once for the
+    whole plan.
     :attr:`plan_sha256` is the digest of :meth:`to_dict` without itself,
     which holds no time: equal states give equal digests, and a changed
     decision or source description changes it. It guards against applying
@@ -632,8 +646,12 @@ def repair_plan(store: Any, recipe: Mapping[str, Any], catalog: SourceCatalog,
     once each, in the order given, and a run outside the scope raises
     :class:`~smythe.workflow_store.WorkflowNotFoundError` as an unknown one
     does. A run that has not completed needs ``review``
-    (``run_in_progress``). Each completed run's published document is
-    checked through :func:`~smythe.workflow_artifact.current_artifact`. A
+    (``run_in_progress``), and so does a run that a successor which has not
+    completed repairs (``repair_in_progress``): its item keeps its status and
+    names the successor in ``repairs_in_progress``, since that repair
+    resumes rather than starting again. Each completed run's published
+    document is checked through
+    :func:`~smythe.workflow_artifact.current_artifact`. A
     source text that a tombstone in a run's journal withdrew
     (:func:`~smythe.lineage.restrict_source`) is never available to that
     run: it needs ``review`` (``source_tombstoned``) until the catalog
@@ -677,10 +695,82 @@ def repair_plan(store: Any, recipe: Mapping[str, Any], catalog: SourceCatalog,
         superseded = any(accepted and predecessor == run_id
                          for predecessor, accepted in links.values())
         reasons = [*decision.reasons, *(["source_tombstoned"] if restricted else [])]
+        status = derived_status(reasons, superseded=superseded)
+        repairing = [successor for successor, (predecessor, accepted) in links.items()
+                     if predecessor == run_id and accepted is None]
+        if repairing:
+            decision = replace(decision, action="review",
+                               reasons=tuple(sorted({*decision.reasons, "repair_in_progress"})))
         planned.append({"run_id": run_id,
                         "lineage_sha256": None if record is None else record.sha256,
-                        "status": derived_status(reasons, superseded=superseded),
-                        **decision.to_dict(), "work": _work(record, decision, free)})
+                        "status": status, **decision.to_dict(),
+                        "work": _work(record, decision, free),
+                        **({"repairs_in_progress": repairing} if repairing else {})})
     return RepairPlan(store.store_id, state.access_scope, planned,
                       [_source(source_id, described.seen[source_id])
                        for source_id in sorted(described.seen)])
+
+
+# What applying a plan counts as each item's work, in this order.
+_UNITS = ("new_runs", "read_calls", "model_calls", "reused_nodes", "publications",
+          "acceptance_evaluations")
+
+
+def _journal_work(store: Any, run_id: str | None) -> dict[str, int]:
+    """The work in a run's journal: calls by kind, and reuse, publication and decision
+    operations. None, for no run, has none."""
+    if run_id is None:
+        return dict.fromkeys(_UNITS, 0)
+    phases = [call["key"]["phase"] for call in store.inspect_run(run_id)["calls"]]
+    return {"new_runs": 0, "read_calls": phases.count("tool"),
+            "model_calls": len(phases) - phases.count("tool"),
+            **{unit: len(store.list_operations(run_id, kind)) for unit, kind in (
+                ("reused_nodes", "reuse"), ("publications", "publication"),
+                ("acceptance_evaluations", "acceptance"))}}
+
+
+@dataclass(frozen=True)
+class RepairResult:
+    """What applying a :class:`RepairPlan` did, item by item (``Swarm.repair``).
+
+    ``items`` hold one entry per plan item, in plan order: its ``run_id``,
+    ``action`` and ``outcome``, and the ``work`` it did. The outcome is
+    ``kept`` for ``reuse``, ``reported`` for ``review``, ``applied`` when the
+    item's step ended with an ``accepted`` decision, ``failed`` when it
+    raised or ended with another decision, and ``unapplied`` for each item
+    after a failure. An item that decided names its ``decision``, a
+    ``regenerate`` item the ``successor_run_id`` of the run it started, and
+    one that raised its ``error``. ``work`` counts the ``new_runs`` an item
+    started and the ``read_calls``, ``model_calls``, ``reused_nodes``,
+    ``publications`` and ``acceptance_evaluations`` it added to the journal.
+    ``successor_run_ids`` lists the runs started, in order, and
+    ``decisions`` maps each run that decided to its new
+    :class:`~smythe.acceptance.DeliveryAcceptance`. Every part is read-only.
+    """
+
+    plan_sha256: str
+    items: tuple[Mapping[str, Any], ...]
+    successor_run_ids: tuple[str, ...] = ()
+    decisions: Mapping[str, DeliveryAcceptance] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "items", _frozen(_plain(list(self.items))))
+        object.__setattr__(self, "successor_run_ids", tuple(self.successor_run_ids))
+        object.__setattr__(self, "decisions", MappingProxyType(dict(self.decisions)))
+
+    def __hash__(self) -> int:
+        # The generated hash would hash the read-only mappings, which cannot be hashed.
+        return hash((self.plan_sha256, self.successor_run_ids))
+
+    @property
+    def work(self) -> dict[str, int]:
+        """Every item's work, summed."""
+        return {unit: sum(item["work"][unit] for item in self.items) for unit in _UNITS}
+
+    def to_dict(self) -> dict[str, Any]:
+        """The result as JSON data."""
+        return {"plan_sha256": self.plan_sha256, "items": _plain(self.items),
+                "successor_run_ids": list(self.successor_run_ids),
+                "decisions": {run_id: record.to_dict()
+                              for run_id, record in self.decisions.items()},
+                "work": self.work}

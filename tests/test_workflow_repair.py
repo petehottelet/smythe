@@ -6,6 +6,9 @@ node given a context snapshot, and publish a brief written by local code. A
 damaged document is rendered again from the run's saved synthesis and decided
 again; a changed validator gets a new decision. Neither reads a source, calls
 a model or runs a node, and every earlier record stays in the journal.
+
+The last section applies whole repair plans with ``Swarm.repair``, including
+items that regenerate in a successor run.
 """
 
 from __future__ import annotations
@@ -13,15 +16,19 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+import smythe
+import test_workflow_reuse as successors
 from fakes import Crash, crash_when
 from fixture_connector import HmacApprovalHost
 from fixture_service import FixtureService, serve_http
 from smythe import (
-    AcceptancePolicy, LocalOnly, MarkdownRenderer, OfflineProvider, SimpleArchitect, SourceStatus,
-    SQLiteWorkflowStore, Swarm, ValidationReport, ValidatorIdentity, WorkflowBindingError,
+    AcceptancePolicy, LineagePolicy, LocalOnly, MarkdownRenderer, OfflineProvider, RepairResult,
+    SimpleArchitect, SourceStatus, SQLiteWorkflowStore, Swarm, Task, ValidationReport,
+    ValidatorIdentity, WorkflowBindingError, archive_heads,
 )
 from smythe._canonical import sha256_hex
 from smythe.acceptance import OperatorDecision, operator_decision_sha256
@@ -30,7 +37,9 @@ from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.lineage import load_lineage, validator_set_sha256
 from smythe.workflow import current_decision, decision_history
 from smythe.workflow_artifact import current_artifact
-from smythe.workflow_store import WorkflowConflictError, WorkflowStateError, _canonical, _sha
+from smythe.workflow_store import (
+    WorkflowBudgetError, WorkflowConflictError, WorkflowStateError, _canonical, _sha,
+)
 from test_workflow_lineage import TEXTS, Brief, research, research_graph
 
 PLAN = sha256_hex("repair plan")
@@ -646,3 +655,320 @@ def test_inspection_shows_the_publication_a_republication_superseded(
     text = capsys.readouterr().out
     assert "(publication 1)" in text
     assert "  Supersedes: publication 0 (document.md)" in text
+
+
+# ---------------------------------------------------------------------------
+# Applying a repair plan
+# ---------------------------------------------------------------------------
+#
+# The runs below are the three-source research of ``test_workflow_reuse``:
+# each source is read and then extracted by a model node whose reply names its
+# step and the digest of its prompt, and local code writes the brief. They
+# are decided under the counted validator, so its version bump calls for a
+# recheck.
+
+SCOPE = "research-team"
+IDLE = {"new_runs": 0, "read_calls": 0, "model_calls": 0, "reused_nodes": 0, "publications": 0,
+        "acceptance_evaluations": 0}
+
+
+@pytest.fixture
+def archive_sources():
+    """The three sources the research reads, served over loopback HTTP."""
+    service = FixtureService()
+    for source_id, text in successors.TEXTS.items():
+        service.add_source(source_id, text)
+    with serve_http(service) as endpoint:
+        yield service, endpoint
+
+
+@pytest.fixture
+def replies(monkeypatch) -> list[str]:
+    """The label of each model step, answered with its label and its prompt's digest."""
+    log: list[str] = []
+    successors.install_replies(monkeypatch, log)
+    return log
+
+
+def maintained(store, endpoint, tmp_path, **options) -> Swarm:
+    """A Swarm that runs and repairs the three-source research under the counted policy."""
+    options.setdefault("acceptance", policy())
+    return successors.research(store, endpoint, tmp_path, **options)
+
+
+def survey_only(endpoint) -> ExecutionGraph:
+    graph = successors.research_graph(endpoint)
+    graph.nodes = [node for node in graph.nodes if node.id.endswith("survey")]
+    return graph
+
+
+def run_rows(store, run_id) -> list[str]:
+    """The run's rows in the journal's SQL dump: its run, calls and their evidence,
+    checkpoints, operations, invocations and events."""
+    calls = [row[0] for row in store._db.execute(
+        "SELECT call_id FROM workflow_calls WHERE run_id=?", (run_id,))]
+    values = [f"'{value}'" for value in (run_id, *calls)]
+    return [line for line in store._db.iterdump()
+            if line.startswith("INSERT") and any(value in line for value in values)]
+
+
+def journal_calls(store, run_id) -> list[tuple[str, str]]:
+    return [(call["key"]["phase"], call["key"]["scope_id"])
+            for call in store.inspect_run(run_id)["calls"]]
+
+
+def repair(swarm: Swarm, plan, catalog, **changes) -> RepairResult:
+    """Apply *plan* as approved, with an allowance for one new run at the research budget."""
+    arguments = {"plan_sha256": plan.plan_sha256, "max_total_budget_usd": 1, "reason": REASON,
+                 "sources": catalog, **changes}
+    return swarm.repair(plan, **arguments)
+
+
+def test_a_plan_is_applied_item_by_item_by_each_action(
+        store, archive_sources, tmp_path, replies):
+    service, endpoint = archive_sources
+    swarm = maintained(store, endpoint, tmp_path)
+    full = swarm.execute(successors.research_graph(endpoint)).execution_id
+    damaged = swarm.execute(survey_only(endpoint)).execution_id
+    intact = swarm.execute(survey_only(endpoint)).execution_id
+    waiting = swarm.plan(Task(successors.QUESTION)).run_ref["run_id"]
+    damage(current_artifact(store, damaged).publication.path, "flip")
+    service.change_source("churn", successors.CHANGED)
+    # The counted validator's version was bumped, too.
+    bumped = maintained(store, endpoint, tmp_path, acceptance=policy("2"))
+    catalog = successors.Catalog(service)
+    plan = bumped.plan_repair(sources=catalog)
+    assert [(item["run_id"], item["action"]) for item in plan.to_dict()["items"]] == [
+        (full, "regenerate"), (damaged, "rerender"), (intact, "recheck"), (waiting, "review")]
+    rows, reads, labels = run_rows(store, full), source_reads(service), len(replies)
+    Counted.checked = []
+
+    result = repair(bumped, plan, catalog)
+
+    (successor,) = result.successor_run_ids
+    items = result.to_dict()["items"]
+    assert [(item["run_id"], item["action"], item["outcome"]) for item in items] == [
+        (full, "regenerate", "applied"), (damaged, "rerender", "applied"),
+        (intact, "recheck", "applied"), (waiting, "review", "reported")]
+    assert items[0]["successor_run_id"] == successor and "successor_run_id" not in items[1]
+    assert [item.get("decision") for item in items] == ["accepted", "accepted", "accepted", None]
+    # Each item's work, from the journal: the successor read and extracted one
+    # source and kept four results; the in-place repairs ran no node.
+    assert [item["work"] for item in items] == [
+        IDLE | {"new_runs": 1, "read_calls": 1, "model_calls": 1, "reused_nodes": 4,
+                "publications": 1, "acceptance_evaluations": 1},
+        IDLE | {"publications": 1, "acceptance_evaluations": 1},
+        IDLE | {"acceptance_evaluations": 1}, IDLE]
+    assert result.work == IDLE | {"new_runs": 1, "read_calls": 1, "model_calls": 1,
+                                  "reused_nodes": 4, "publications": 2,
+                                  "acceptance_evaluations": 3}
+    assert replies[labels:] == ["Extract the churn finding"]
+    assert source_reads(service) == {**reads, "churn": reads["churn"] + 1}
+    assert journal_calls(store, successor) == [("tool", "node/read-churn"),
+                                               ("execution", "node/extract-churn")]
+    # Every decision is a new one under the bumped policy, binding the plan.
+    assert set(result.decisions) == {successor, damaged, intact} and len(Counted.checked) == 3
+    assert all(record.accepted and record.policy_sha256 == policy("2").sha256
+               for record in result.decisions.values())
+    bound = {"plan_sha256": plan.plan_sha256, "reason": REASON}
+    for run_id in (damaged, intact):
+        decision = current_decision(store, run_id)
+        assert decision["record"] == result.decisions[run_id]
+        assert decision["inputs"]["repair"] == bound
+    assert load_lineage(store, successor).to_dict()["repair"] == bound
+    assert result.to_dict()["decisions"][successor] == result.decisions[successor].to_dict()
+    # The regenerated run's rows are as they were: the successor's calls and costs are its own.
+    assert run_rows(store, full) == rows
+    # Only the run that has not completed is left; the successor replaced its predecessor.
+    after = bumped.plan_repair(sources=catalog).to_dict()["items"]
+    assert [(item["run_id"], item["action"]) for item in after] == [
+        (damaged, "reuse"), (intact, "reuse"), (waiting, "review"), (successor, "reuse")]
+    assert isinstance(result, RepairResult) and "RepairResult" in smythe.__all__
+    # The result is read-only, and compares and hashes like any record.
+    copy = RepairResult(result.plan_sha256, items, result.successor_run_ids, result.decisions)
+    assert copy == result and hash(copy) == hash(result)
+    with pytest.raises(TypeError):
+        result.items[0]["outcome"] = "failed"
+
+
+@pytest.fixture(scope="module")
+def affected(tmp_path_factory):
+    """A completed run, a plan made before its churn source changed and one made after."""
+    root = tmp_path_factory.mktemp("affected")
+    service = FixtureService()
+    for source_id, text in successors.TEXTS.items():
+        service.add_source(source_id, text)
+    log: list[str] = []
+    with (pytest.MonkeyPatch.context() as patch, serve_http(service) as endpoint,
+          SQLiteWorkflowStore(root / "runs.db") as store):
+        successors.install_replies(patch, log)
+        swarm = maintained(store, endpoint, root)
+        first = swarm.execute(successors.research_graph(endpoint)).execution_id
+        catalog = successors.Catalog(service)
+        earlier = swarm.plan_repair(sources=catalog)
+        service.change_source("churn", successors.CHANGED)
+        plan = swarm.plan_repair(sources=catalog)
+        assert plan.to_dict()["items"][0]["work"]["may_incur_charges"]
+        yield SimpleNamespace(store=store, service=service, endpoint=endpoint, root=root,
+                              log=log, first=first, catalog=catalog, earlier=earlier, plan=plan)
+
+
+def configured(affected, **options) -> Swarm:
+    return maintained(affected.store, affected.endpoint, affected.root, **options)
+
+
+REFUSALS = {
+    # The ordinary path has no journal, no lineage and no successor runs.
+    "ordinary": (ValueError, "durable run_store", lambda case: (Swarm(
+        model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+        max_budget_usd=1, acceptance=policy()), {})),
+    "lineage": (ValueError, "lineage policy", lambda case: (configured(case, lineage=None), {})),
+    "supervisor": (WorkflowBindingError, "supervisor", lambda case: (configured(
+        case, supervisor=LocalOnly(successors.Reviewer, "reviewer", "1", role="supervisor")), {})),
+    "plan": (TypeError, "RepairPlan", lambda case: (configured(case),
+                                                    {"plan": case.plan.to_dict()})),
+    "digest": (ValueError, "not the digest", lambda case: (
+        configured(case), {"plan_sha256": sha256_hex("another plan")})),
+    "reason": (WorkflowBindingError, "reason", lambda case: (configured(case),
+                                                             {"reason": "line\nbreak"})),
+    # Previewed before the churn source changed: planned again now, it differs.
+    "stale": (WorkflowConflictError, "stale", lambda case: (configured(case), {
+        "plan": case.earlier, "plan_sha256": case.earlier.plan_sha256})),
+    "allowance": (WorkflowBudgetError, "more than max_total_budget_usd", lambda case: (
+        configured(case), {"max_total_budget_usd": 0.999999999})),
+    "unbounded": (WorkflowBudgetError, "needs max_budget_usd", lambda case: (
+        configured(case, max_budget_usd=None), {"max_total_budget_usd": 100})),
+}
+
+
+@pytest.mark.parametrize("case", sorted(REFUSALS))
+def test_a_repair_is_refused_before_anything_is_written_or_called(affected, case):
+    error, match, build = REFUSALS[case]
+    swarm, changes = build(affected)
+    store, service = affected.store, affected.service
+    arguments = {"plan": affected.plan, "plan_sha256": affected.plan.plan_sha256,
+                 "max_total_budget_usd": 1, "reason": REASON, "sources": affected.catalog,
+                 **changes}
+    runs, rows = store.list_runs(), run_rows(store, affected.first)
+    reads, labels = source_reads(service), list(affected.log)
+    with pytest.raises(error, match=match):
+        swarm.repair(arguments.pop("plan"), **arguments)
+    # No run was created or changed, and nothing was read or called.
+    assert store.list_runs() == runs and run_rows(store, affected.first) == rows
+    assert source_reads(service) == reads and affected.log == labels
+
+
+def test_a_failed_item_stops_the_repair_and_later_items_stay_unapplied(
+        store, archive_sources, tmp_path, replies):
+    service, endpoint = archive_sources
+    swarm, catalog = maintained(store, endpoint, tmp_path), successors.Catalog(service)
+    first = swarm.execute(survey_only(endpoint)).execution_id
+    second = swarm.execute(survey_only(endpoint)).execution_id
+    for run_id in (first, second):
+        damage(current_artifact(store, run_id).publication.path, "delete")
+    # Another file already holds the name the first run's republication takes.
+    taken = current_artifact(store, first).publication.path.with_name("document-p1.md")
+    taken.write_bytes(b"another document\n")
+    plan = swarm.plan_repair(sources=catalog)
+    assert [item["action"] for item in plan.to_dict()["items"]] == ["rerender", "rerender"]
+    untouched, labels = journal_rows(store, second), len(replies)
+
+    # Rendering again needs no new run, so no allowance.
+    result = repair(swarm, plan, catalog, max_total_budget_usd=0)
+
+    failed, unapplied = result.to_dict()["items"]
+    assert (failed["run_id"], failed["outcome"]) == (first, "failed")
+    assert failed["error"].startswith("WorkflowStateError") and "document-p1.md" in failed["error"]
+    assert "decision" not in failed and failed["work"]["new_runs"] == 0
+    assert unapplied == {"run_id": second, "action": "rerender", "outcome": "unapplied",
+                         "work": IDLE}
+    assert result.successor_run_ids == () and dict(result.decisions) == {}
+    # The failure was not retried, and the second run was never touched.
+    assert taken.read_bytes() == b"another document\n"
+    assert journal_rows(store, second) == untouched
+    assert not current_artifact(store, second).eligible and replies[labels:] == []
+    # Once the name is free, the plan made now repairs both runs.
+    taken.unlink()
+    again = swarm.plan_repair(sources=catalog)
+    fixed = repair(swarm, again, catalog, max_total_budget_usd=0)
+    assert [item["outcome"] for item in fixed.to_dict()["items"]] == ["applied", "applied"]
+    assert all(current_artifact(store, run_id).eligible for run_id in (first, second))
+
+
+def test_with_reuse_off_a_repair_runs_every_affected_node_with_identical_bytes(
+        store, archive_sources, tmp_path, replies):
+    service, endpoint = archive_sources
+    first = maintained(store, endpoint, tmp_path).execute(
+        successors.research_graph(endpoint)).execution_id
+    service.change_source("churn", successors.CHANGED)
+    # The rollback switch: the same scope with reuse turned off.
+    off = maintained(store, endpoint, tmp_path,
+                     lineage=LineagePolicy(access_scope=SCOPE, reuse=False))
+    catalog = successors.Catalog(service)
+    plan = off.plan_repair(sources=catalog)
+    (item,) = plan.to_dict()["items"]
+    assert item["action"] == "regenerate" and "reuse_disabled" in item["reasons"]
+    assert {node["action"] for node in item["nodes"]} == {"regenerate"}
+    assert item["work"]["nodes_reused"] == {}
+    labels = len(replies)
+
+    result = repair(off, plan, catalog)
+
+    (successor,) = result.successor_run_ids
+    assert result.to_dict()["items"][0]["outcome"] == "applied"
+    # Nothing is reused: every read and every extraction runs again.
+    assert store.list_operations(successor, "reuse") == []
+    assert sorted(replies[labels:]) == sorted(f"Extract the {source_id} finding"
+                                              for source_id in successors.TEXTS)
+    assert result.work == IDLE | {"new_runs": 1, "read_calls": 3, "model_calls": 3,
+                                  "publications": 1, "acceptance_evaluations": 1}
+    # The document is byte for byte what a new run of the changed sources publishes.
+    full = maintained(store, endpoint, tmp_path).execute(successors.research_graph(endpoint))
+    published = current_artifact(store, successor).publication.path.read_bytes()
+    assert published == current_artifact(store, full.execution_id).publication.path.read_bytes()
+    assert published == full.output.encode("utf-8")
+    # Lineage stays readable: the successor names its predecessor and reuses nothing.
+    lineage = load_lineage(store, successor).to_dict()
+    assert lineage["predecessor"]["run_id"] == first
+    assert not any("reused_from" in node for node in lineage["nodes"])
+    assert load_lineage(store, first) is not None
+
+
+def test_a_lost_successor_is_a_repair_in_progress_that_resumes_rather_than_restarts(
+        store, archive_sources, tmp_path, replies, monkeypatch):
+    service, endpoint = archive_sources
+    swarm, catalog = maintained(store, endpoint, tmp_path), successors.Catalog(service)
+    first = swarm.execute(successors.research_graph(endpoint)).execution_id
+    service.change_source("churn", successors.CHANGED)
+    plan = swarm.plan_repair(sources=catalog)
+    # Lost after the successor's reuse operations committed, before it ran a node.
+    stop = crash_when(monkeypatch, store, "save_checkpoint",
+                      lambda lease, revision, checkpoint, **kwargs:
+                      checkpoint["status"] == "running")
+    with pytest.raises(Crash):
+        repair(swarm, plan, catalog)
+    stop.restore()
+    (successor,) = [run["run_id"] for run in store.list_runs() if run["run_id"] != first]
+
+    # The lost successor is no head; the run it repairs waits for it.
+    assert archive_heads(store, SCOPE) == [first]
+    again = swarm.plan_repair(sources=catalog)
+    (item,) = again.to_dict()["items"]
+    assert (item["run_id"], item["action"], item["status"]) == (first, "review", "stale")
+    assert "repair_in_progress" in item["reasons"] and item["repairs_in_progress"] == [successor]
+    assert item["work"]["new_runs"] == 0
+    # The plan applied before is stale now, and the new one starts nothing.
+    with pytest.raises(WorkflowConflictError, match="stale"):
+        repair(swarm, plan, catalog)
+    reported = repair(swarm, again, catalog, max_total_budget_usd=0)
+    assert [entry["outcome"] for entry in reported.to_dict()["items"]] == ["reported"]
+    assert len(store.list_runs()) == 2
+
+    # Ordinary resume finishes the repair, and the successor replaces its predecessor.
+    labels = len(replies)
+    resumed = swarm.resume(successor)
+    assert resumed.accepted and replies[labels:] == ["Extract the churn finding"]
+    assert archive_heads(store, SCOPE) == [successor]
+    (item,) = swarm.plan_repair(sources=catalog).to_dict()["items"]
+    assert (item["run_id"], item["action"], item["status"]) == (successor, "reuse", "current")
+    assert "repairs_in_progress" not in item
