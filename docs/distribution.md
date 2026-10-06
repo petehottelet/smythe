@@ -66,7 +66,9 @@ python -m pytest tests/ --distribution -q
 The explicit profile excludes repository-only test modules before importing
 them and deselects the committed example-manifest case. Its complete inventory
 and reasons are in [the profile manifest](../tests/distribution_profile.json).
-Library behavior, budgets, recovery, journals, tools and CLI tests remain
+A module entry is an exact file name or a glob pattern, so one entry can cover
+a family of repository-only modules; each entry must name at least one test
+module. Library behavior, budgets, recovery, journals, tools and CLI tests remain
 enabled. Unknown missing imports still fail collection.
 
 Normal `python -m pytest tests/ -q` requires the full repository and preserves

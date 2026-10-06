@@ -1005,6 +1005,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   not valid is refused before any call. Durable runs refuse the policy, and
   checkpoints do not record it. Without a policy, admission and calls are
   unchanged. See [provider capacity](docs/execution.md#provider-capacity).
+- A module entry in `tests/distribution_profile.json` can be a glob pattern,
+  so one entry excludes a family of repository-only test modules from the
+  source-archive profile. Every entry must still name an existing module.
 
 ### Changed
 

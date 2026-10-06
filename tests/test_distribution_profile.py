@@ -58,10 +58,33 @@ def test_distribution_does_not_hide_an_unlisted_missing_import(profile_project):
     assert "unknown_missing_module" in result.stdout
 
 
+def test_distribution_excludes_every_module_a_glob_entry_matches(profile_project):
+    manifest = profile_project / "tests/distribution_profile.json"
+    profile = json.loads(manifest.read_text(encoding="utf-8"))
+    profile["excluded_modules"]["test_*_comparison.py"] = "Needs absent harness code"
+    manifest.write_text(json.dumps(profile), encoding="utf-8")
+    for name in ("test_arm_comparison.py", "test_trigger_comparison.py"):
+        (profile_project / "tests" / name).write_text("import absent_harness\n", encoding="utf-8")
+    # A module the pattern does not match is still collected and still fails.
+    (profile_project / "tests/test_comparison_notes.py").write_text(
+        "import unmatched_missing_module\n", encoding="utf-8")
+
+    result = invoke(profile_project, "--distribution")
+    assert result.returncode == 2
+    assert "unmatched_missing_module" in result.stdout
+    assert "absent_harness" not in result.stdout
+
+    (profile_project / "tests/test_comparison_notes.py").unlink()
+    result = invoke(profile_project, "--distribution")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "1 passed, 1 deselected" in result.stdout
+
+
 def test_manifest_names_existing_tests_and_explains_every_exclusion():
     profile = json.loads((SOURCE / "distribution_profile.json").read_text(encoding="utf-8"))
     for name, reason in profile["excluded_modules"].items():
-        assert (SOURCE / name).is_file(), name
+        # An exact name or a glob pattern, each naming at least one test module.
+        assert any(path.is_file() for path in SOURCE.glob(name)), name
         assert reason.strip()
     for node, reason in profile["excluded_cases"].items():
         filename, name = node.split("::")
