@@ -35,7 +35,7 @@ PHASES = (
     "synthesis", "supervision", "checkpoint", "waiting",
 )
 _STAGES = frozenset({"routing", "planning", "recovery", "synthesis"})
-WAIT_REASONS = ("retry_backoff", "admission", "supervision", "capacity")
+WAIT_REASONS = ("retry_backoff", "admission", "supervision", "capacity", "drain")
 _OUTCOMES = {
     NodeStatus.COMPLETED: "completed", NodeStatus.FAILED: "failed",
     NodeStatus.SKIPPED: "skipped", NodeStatus.PENDING: "cancelled",

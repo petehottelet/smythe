@@ -6,7 +6,9 @@ deadline that bounds a node's attempts and waits together. ``ModelProfile``
 routes the nodes that name it to a developer-approved provider and model.
 ``CapacityPolicy`` limits how many calls each provider type and model takes
 at once and how often one starts, and can admit ready work in turn across
-branches. The validators here check every policy's fields the same way.
+branches. ``TerminationPolicy`` lets the async executor drain the nodes in
+flight when a failure stops a run, instead of cancelling them at once. The
+validators here check every policy's fields the same way.
 """
 
 from __future__ import annotations
@@ -254,6 +256,29 @@ def _capacity_limit(policy: CapacityPolicy, provider: Any, model: str) -> Capaci
                          if layer is not None and getattr(layer, item.name) is not None), None)
         for item in fields(CapacityLimit)
     })
+
+
+@dataclass(frozen=True)
+class TerminationPolicy:
+    """How the async executor stops a run after a failure: drain, then cancel.
+
+    Without a policy, a failure cancels every node in flight at once. Under
+    one, a failure that stops the run, or a node the budget refuses to admit,
+    stops admission: no queued node starts. The nodes already in flight run
+    on for up to ``drain_timeout_s`` seconds, and each one that finishes
+    keeps and saves its result and cost as usual, without supervision or
+    regeneration. Those still in flight at the deadline are cancelled, as
+    without a policy, and the run raises its original error. A cancellation,
+    an interrupt such as ``KeyboardInterrupt``, and a failure of class
+    ``security_stop`` never drain. The serial executor has nothing in flight
+    to drain.
+    """
+
+    drain_timeout_s: float
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "drain_timeout_s",
+                           validate_seconds(self.drain_timeout_s, "drain_timeout_s", positive=True))
 
 
 def _retry_after_s(error: BaseException) -> float | None:

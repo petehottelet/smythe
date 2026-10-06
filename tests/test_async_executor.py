@@ -752,7 +752,7 @@ async def test_supervisor_review_that_holds_ready_work_is_a_supervision_wait():
     # Both reviews take 5s; only the first held B, which was ready to start.
     assert timing["phases_ms"]["supervision"] == 10000
     assert timing["waiting_ms"] == {
-        "retry_backoff": 0, "admission": 0, "supervision": 5000, "capacity": 0,
+        "retry_backoff": 0, "admission": 0, "supervision": 5000, "capacity": 0, "drain": 0,
     }
     assert timing["elapsed_ms"] == 12000
 
@@ -786,7 +786,7 @@ async def test_review_that_holds_a_node_never_makes_its_admission_wait_negative(
 
     assert [node.status for node in graph.nodes] == [NodeStatus.COMPLETED] * 2
     assert tracer.timing()["waiting_ms"] == {
-        "retry_backoff": 0, "admission": 0, "supervision": review_s * 1000, "capacity": 0,
+        "retry_backoff": 0, "admission": 0, "supervision": review_s * 1000, "capacity": 0, "drain": 0,
     }
 
 
@@ -827,7 +827,7 @@ async def test_node_blocked_again_by_a_regeneration_records_no_admission_wait():
     timing = tracer.timing()
     assert timing["elapsed_ms"] == timing["summed_node_ms"] == 6500
     assert timing["waiting_ms"] == {
-        "retry_backoff": 0, "admission": 0, "supervision": 0, "capacity": 0,
+        "retry_backoff": 0, "admission": 0, "supervision": 0, "capacity": 0, "drain": 0,
     }
     assert timing["phases_ms"]["waiting"] == 0
 
@@ -858,7 +858,7 @@ async def test_node_rewired_behind_an_inserted_step_records_no_admission_wait():
     timing = tracer.timing()
     assert timing["elapsed_ms"] == timing["summed_node_ms"] == 6000
     assert timing["waiting_ms"] == {
-        "retry_backoff": 0, "admission": 0, "supervision": 0, "capacity": 0,
+        "retry_backoff": 0, "admission": 0, "supervision": 0, "capacity": 0, "drain": 0,
     }
     assert timing["phases_ms"]["waiting"] == 0
 
@@ -886,7 +886,7 @@ async def test_node_still_ready_after_a_revision_keeps_its_admission_wait():
     timing = tracer.timing()
     # C waits 1s behind A; Extra, ready at 1s, waits 2s behind C.
     assert timing["waiting_ms"] == {
-        "retry_backoff": 0, "admission": 3000, "supervision": 0, "capacity": 0,
+        "retry_backoff": 0, "admission": 3000, "supervision": 0, "capacity": 0, "drain": 0,
     }
     assert timing["elapsed_ms"] == 4000
 
@@ -925,5 +925,5 @@ async def test_clock_stepping_backwards_during_a_review_does_not_fail_the_run():
     timing = tracer.timing()
     assert timing["phases_ms"]["supervision"] == 0
     assert timing["waiting_ms"] == {
-        "retry_backoff": 0, "admission": 0, "supervision": 0, "capacity": 0,
+        "retry_backoff": 0, "admission": 0, "supervision": 0, "capacity": 0, "drain": 0,
     }

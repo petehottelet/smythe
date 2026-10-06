@@ -10,7 +10,7 @@ from itertools import islice, zip_longest
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
-from smythe._failures import is_terminal
+from smythe._failures import SECURITY_STOP, classify_failure, is_terminal
 from smythe._redact import error_text
 from smythe.budget import BudgetValidationError, Sentinel, validate_token_count
 from smythe.executor_base import (
@@ -23,7 +23,7 @@ from smythe.executor_base import (
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
 from smythe.provider import Provider
 from smythe.registry import Registry
-from smythe.scheduling import RetryDeadlineError
+from smythe.scheduling import RetryDeadlineError, TerminationPolicy
 from smythe.tools import ToolRuntime
 from smythe.tracer import Tracer
 from smythe.verifier import VerificationRecoveryError
@@ -80,6 +80,13 @@ class AsyncExecutor(ExecutorBase):
     provider type and model run at once: a ready node whose model has no
     free slot is passed over, still ready, for work behind it, and never
     stops the run. With ``round_robin``, ready nodes take turns by branch.
+
+    Termination: a failure that stops the run, or a node refused at
+    admission, cancels the nodes in flight at once. Under ``termination``, a
+    :class:`~smythe.scheduling.TerminationPolicy`, the executor first stops
+    admission and lets them finish for up to ``drain_timeout_s``, then cancels
+    the rest and raises the original error; :attr:`drain_record` reports how
+    the drain ended. ``sleep``, when given, also times the drain's deadline.
     """
 
     DEFAULT_ESTIMATED_TOKENS = 2000
@@ -119,6 +126,7 @@ class AsyncExecutor(ExecutorBase):
         profiles: tuple[ModelProfile, ...] | list[ModelProfile] = (),
         default_model: str | None = None,
         capacity_policy: CapacityPolicy | None = None,
+        termination: TerminationPolicy | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         super().__init__(
@@ -148,6 +156,29 @@ class AsyncExecutor(ExecutorBase):
             estimated_tokens_per_node, "estimated_tokens_per_node",
         )
         self._max_concurrency = validate_max_concurrency(max_concurrency)
+        if termination is not None and not isinstance(termination, TerminationPolicy):
+            raise TypeError(
+                f"termination must be a TerminationPolicy or None, not {type(termination).__name__}"
+            )
+        self._termination = termination
+        # The last run's drain: settled and cancelled node ids, and whether
+        # its deadline ended it.
+        self._drained: tuple[tuple[str, ...], tuple[str, ...], bool] | None = None
+
+    @property
+    def drain_record(self) -> dict[str, Any] | None:
+        """How the last run drained after a failure, or None when it did not drain.
+
+        ``settled`` names the nodes in flight whose work ended during the
+        drain, ``cancelled`` those still in flight when it ended, and
+        ``deadline_hit`` whether ``drain_timeout_s`` ended it. A Swarm's
+        checkpoints save it as ``control["drain"]``.
+        """
+        if self._drained is None:
+            return None
+        settled, cancelled, deadline_hit = self._drained
+        return {"settled": list(settled), "cancelled": list(cancelled),
+                "deadline_hit": deadline_hit}
 
     def _schedule_state(
         self, graph: ExecutionGraph, active: dict[asyncio.Task[None], Node],
@@ -190,6 +221,7 @@ class AsyncExecutor(ExecutorBase):
 
     async def run(self, graph: ExecutionGraph) -> ExecutionGraph:
         """Execute every node, fanning out independent nodes concurrently."""
+        self._drained = None
         self.prepare_execution(graph)
         with self._tracer.phase("verification"):
             self.recover_verification(graph)
@@ -268,7 +300,7 @@ class AsyncExecutor(ExecutorBase):
                 ready.extendleft(reversed(passed))
 
                 if admission_error is not None:
-                    await self._cancel_and_settle(active)
+                    await self._stop_after(admission_error, active)
                     raise admission_error
                 if not active:
                     break
@@ -327,9 +359,10 @@ class AsyncExecutor(ExecutorBase):
 
                 if first_error is not None:
                     # HALT means no queued sibling may start after the error
-                    # is observed. Cancel in-flight siblings and always await
-                    # them so no provider task escapes the failed run.
-                    await self._cancel_and_settle(active)
+                    # is observed. Cancel in-flight siblings, after a drain
+                    # policy has let them finish, and always await them so no
+                    # provider task escapes the failed run.
+                    await self._stop_after(first_error, active)
                     raise first_error
         except BaseException:
             await self._cancel_and_settle(active)
@@ -367,6 +400,61 @@ class AsyncExecutor(ExecutorBase):
         self.reserve_node_budget(
             node, default_estimated_tokens=self._estimated_tokens_per_node,
         )
+
+    async def _stop_after(self, error: Exception, active: dict[asyncio.Task[None], Node]) -> None:
+        """Cancel and settle the nodes in flight; under a drain policy, let them finish first.
+
+        A failure of class ``security_stop`` cancels them at once. A node
+        admitted in the same pass as a refused one has not begun an attempt,
+        so it has no call to finish: it is cancelled before it starts.
+        """
+        if self._termination is not None and active and classify_failure(error) != SECURITY_STOP:
+            unstarted = {node.id for node in active.values() if node.status is NodeStatus.PENDING}
+            if (await self._cancel_and_settle(active, unstarted))[1]:
+                raise asyncio.CancelledError  # A cancelled run never drains.
+            await self._drain(active)
+        await self._cancel_and_settle(active)
+
+    async def _drain(self, active: dict[asyncio.Task[None], Node]) -> None:
+        """Let the nodes in flight finish, for up to the policy's ``drain_timeout_s``.
+
+        Nothing is admitted meanwhile. A node that finishes has already saved
+        its result, cost and status through its own completion path; it is
+        neither supervised nor regenerated, and its own failure does not
+        replace the run's. Nodes still in flight when the drain ends stay in
+        *active* to be cancelled. A cancellation of the run, or a node that
+        ends cancelled, ends the drain at once.
+        """
+        settled: list[str] = []
+        started = self._tracer.now()
+        deadline = asyncio.create_task(self._drain_wait(self._termination.drain_timeout_s))
+        try:
+            while active and not deadline.done():
+                done, _ = await asyncio.wait(
+                    {deadline, *active}, return_when=asyncio.FIRST_COMPLETED,
+                )
+                for task in done - {deadline}:
+                    settled.append(active.pop(task).id)
+                    try:
+                        task.result()
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception:
+                        continue  # The node settled its own failure.
+        finally:
+            deadline_hit = deadline.done() and bool(active)
+            if deadline.done() and not deadline.cancelled():
+                deadline.exception()  # A wait that failed ends the drain like its deadline.
+            deadline.cancel()
+            self._tracer.on_wait("drain", self._tracer.since(started))
+            self._drained = (tuple(sorted(settled)),
+                             tuple(sorted(node.id for node in active.values())), deadline_hit)
+
+    async def _drain_wait(self, seconds: float) -> None:
+        """Wait out a drain's timeout with the executor's ``sleep``, or ``asyncio.sleep``."""
+        waited = (self._sleep or asyncio.sleep)(seconds)
+        if inspect.isawaitable(waited):
+            await waited
 
     async def _cancel_and_settle(
         self, active: dict[asyncio.Task[None], Node],

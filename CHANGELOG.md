@@ -725,6 +725,26 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   settled calls, and executors take `attempts_spent=`, which journal-managed
   calls need under a policy. See
   [durable retry policy](docs/workflow-accounting.md#retry-policy).
+- `Swarm(termination=TerminationPolicy(drain_timeout_s=...))`, or
+  `termination=` on `AsyncExecutor`, drains the nodes in flight when a
+  failure stops a run or the budget refuses a ready node at admission: no
+  queued node starts, the nodes already in flight run on for up to
+  `drain_timeout_s`, and each one that finishes keeps and checkpoints its
+  result and cost, without supervision or regeneration. Those still in
+  flight are then cancelled as before and the original error is raised. A
+  cancelled call keeps its exposure as without a policy: a native
+  provider's unresolved bill stays terminal, and another provider's call
+  keeps its reservation as unknown cost only under
+  `RetryPolicy(retain_uncertain_dispatch=True)`. A cancellation, an
+  interrupt and a failure of class `security_stop` never drain, the serial
+  executor has nothing in flight to drain, and durable runs refuse a policy
+  with `WorkflowBindingError`. `AsyncExecutor.drain_record` and a failed
+  checkpoint's `control.drain` name the nodes the drain settled or
+  cancelled and whether its deadline ended it; the record is informational,
+  so checkpoints stay version 4. The time spent is the new `drain` wait in
+  `SwarmResult.timing` and `Tracer.timing()`. Without a policy, a failure
+  still cancels the nodes in flight at once. See
+  [draining in-flight work](docs/execution.md#draining-in-flight-work).
 - `jobs stop --drain-timeout-s SECONDS` bounds a pause's drain. That long
   after the request, the worker cancels each call still awaiting its provider
   and records it as `unknown_outcome`, keeping its full per-call ceiling as

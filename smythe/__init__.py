@@ -59,7 +59,7 @@ from smythe.workflow_tools import ReadProfile, ReadToolError
 from smythe.router import RoutingDecision, RoutingRule, WhiteRabbit
 from smythe.scheduling import (
     CapacityLimit, CapacityPolicy, ModelProfile, NoAllowedProfileError, RetryDeadlineError,
-    RetryPolicy, UncertainDispatchError,
+    RetryPolicy, TerminationPolicy, UncertainDispatchError,
 )
 from smythe.skills import (
     CapabilityHydrationMode,
@@ -191,6 +191,7 @@ __all__ = [
     "Synthesizer",
     "SynthesisStrategy",
     "Task",
+    "TerminationPolicy",
     "ToolCall",
     "ToolLoopLimitError",
     "ToolResult",

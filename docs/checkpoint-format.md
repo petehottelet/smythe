@@ -111,7 +111,7 @@ and recovery controls.
         "elapsed_ms": 42500.0,
         "summed_node_ms": 61200.0,
         "phases_ms": {"routing": null, "planning": 3100.0, "execution": 52000.0, "…": "…"},
-        "waiting_ms": {"retry_backoff": 0.0, "admission": 900.0, "supervision": 0.0, "capacity": 0.0}
+        "waiting_ms": {"retry_backoff": 0.0, "admission": 900.0, "supervision": 0.0, "capacity": 0.0, "drain": 0.0}
       }
     ]
   }
@@ -129,6 +129,7 @@ Notes:
 - `control.revisions_used` is how much of the supervisor's `max_revisions` allowance the run has already spent. Resume seeds the executor from it, so the cap bounds the **run**, not each attempt: a crash-resume cycle cannot refill the allowance and revise past the limit the caller set.
 - `control.retry_policy` and `control.attempts_used` appear only for a run whose retry policy persists attempts, which makes the checkpoint version 5; see [attempt allowance](#attempt-allowance-version-5).
 - `control.revision_log`, present once a supervisor made a decision, lists the run's latest supervisor decisions; see [revision log](#revision-log).
+- `control.drain` appears in the failed checkpoint of a run that [drained its in-flight nodes](execution.md#draining-in-flight-work) under a termination policy: `{"settled": [...], "cancelled": [...], "deadline_hit": false}`. It is informational within version 4: resume does not read it, and a resumed run's checkpoints record only a drain of their own.
 - A node that a revision added carries `"added_by_revision": true` in its `metadata` (from 0.8.2). `LLMSupervisor` counts these nodes against `max_total_added_nodes`, so resume does not reset the count ([what the cap limits](supervisor.md#safety)). Nodes added before 0.8.2 have no marker and are not counted.
 - `task.done_when` carries the acceptance criteria forward. A resumed run that had forgotten them could not hold its own output to them.
 - `timing` records how long each call that worked on the execution took; see [timing segments](#timing-segments).

@@ -37,7 +37,7 @@ from smythe.tracer import Tracer
 from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_store import SQLiteWorkflowStore
 
-NO_WAITS = {"retry_backoff": 0, "admission": 0, "supervision": 0, "capacity": 0}
+NO_WAITS = {"retry_backoff": 0, "admission": 0, "supervision": 0, "capacity": 0, "drain": 0}
 
 
 def manual_tracer() -> tuple[ManualClock, Tracer]:

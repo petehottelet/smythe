@@ -87,6 +87,7 @@ from smythe.scheduling import (
     ModelProfile, RetryPolicy, node_profile, profile_map,
 )
 from smythe.scheduling import CapacityPolicy, _capacity_limit
+from smythe.scheduling import TerminationPolicy
 from smythe.supervisor import LLMSupervisor, Supervisor
 from smythe.synthesizer import SynthesisStrategy, Synthesizer, deliverable_sources
 from smythe.task import Task, snapshot_task, task_snapshots_equal, task_to_dict
@@ -404,6 +405,14 @@ class Swarm:
     A durable run records the policy in its recipe and counts each node's
     attempts from its journal, so its resume continues them too.
 
+    ``termination``, a :class:`~smythe.scheduling.TerminationPolicy`, has the
+    async executor drain the nodes in flight when a failure stops the run:
+    no queued node starts, those in flight may finish and save their results
+    until ``drain_timeout_s``, and the rest are cancelled before the original
+    error is raised. The failed checkpoint records how the drain ended under
+    ``control["drain"]``, for information only. Serial ``execute()`` has
+    nothing in flight to drain, and durable runs refuse a policy.
+
     ``lineage``, a :class:`~smythe.lineage.LineagePolicy`, opts each durable
     run into artifact lineage under a declared access scope. It needs a
     ``run_store`` and a strict ``acceptance`` policy, and is refused without
@@ -483,6 +492,7 @@ class Swarm:
         reserve_for_checks: bool = False,
         profiles: Sequence[ModelProfile] = (),
         capacity_policy: CapacityPolicy | None = None,
+        termination: TerminationPolicy | None = None,
     ) -> None:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
         self._profiles = profile_map(profiles)
@@ -516,6 +526,16 @@ class Swarm:
                 f"retry_policy must be a RetryPolicy or None, not {type(retry_policy).__name__}"
             )
         self.retry_policy = retry_policy
+        if termination is not None and not isinstance(termination, TerminationPolicy):
+            raise TypeError(
+                f"termination must be a TerminationPolicy or None, not {type(termination).__name__}"
+            )
+        if termination is not None and run_store is not None:
+            raise WorkflowBindingError(
+                "termination is not supported by durable text workflows; draining in-flight "
+                "nodes needs an ordinary Swarm run without run_store"
+            )
+        self.termination = termination
         if graph_policy is not None and run_store is None:
             raise WorkflowBindingError("graph_policy requires a durable run_store")
         if lineage is not None and run_store is None:
@@ -1173,6 +1193,7 @@ class Swarm:
             retry_policy=self.retry_policy,
             profiles=tuple(self._profiles.values()), default_model=self.model,
             capacity_policy=self.capacity_policy,
+            termination=self.termination,
         )
         self._active_executor = executor
         try:
@@ -1296,6 +1317,8 @@ class Swarm:
         persists attempts, which record it and each node's attempts used.
         A run's supervisor decisions, once there are any, add the bounded
         ``revision_log`` to ``control``, which keeps the version.
+        A run that drained after a failure records how under ``drain``,
+        which is informational and leaves the version unchanged.
         """
         if self._checkpoint_store is None:
             return
@@ -1309,6 +1332,9 @@ class Swarm:
             revision_log = getattr(self._active_executor, "revision_log", None)
             if revision_log:
                 control["revision_log"] = revision_log
+            drain = getattr(self._active_executor, "drain_record", None)
+            if drain is not None:
+                control["drain"] = drain
             state = build_state(
                 control=control,
                 execution_id=execution_id,
@@ -1753,6 +1779,7 @@ class Swarm:
             attempts_used=allowance[1] if allowance is not None else None,
             profiles=tuple(self._profiles.values()), default_model=self.model,
             capacity_policy=self.capacity_policy,
+            termination=self.termination,
         )
         # Informational: decisions after resume extend the log the run saved.
         executor.revision_log = revision_log_from_state(state)

@@ -368,6 +368,7 @@ argument's name; a different `retry_policy` on resume raises
 `WorkflowConflictError`.
 A `capacity_policy` raises the same error sooner, when the `Swarm` is
 constructed with a `run_store`.
+A `termination` policy is refused the same way when the `Swarm` is built.
 
 | Component | Accepted | Rejected |
 |---|---|---|
@@ -383,6 +384,7 @@ constructed with a `run_store`.
 | `retry_policy` | `None`, where the node failure policy decides each retry, or a `RetryPolicy`, which the recipe records and whose attempts the journal counts across resume ([durable retry policy](workflow-accounting.md#retry-policy)) | A provider that does not declare `sdk_retries=0`; a policy with `retain_uncertain_dispatch`; on resume, a policy other than the one the run started with |
 | `reserve_for_checks` | `False`; the journal admits each call against the run's budget | `True` |
 | `capacity_policy` | `None`; the journal admits each call when it is made | Any `CapacityPolicy`, when the `Swarm` is constructed |
+| `termination` | `None`; a failure cancels the calls in flight | A `TerminationPolicy` ([draining in-flight work](execution.md#draining-in-flight-work)) |
 | Architects and other components | Built-in components and `LocalOnly` factories | Subclasses and unjournaled dependencies |
 | Node inputs | Plain text | `attach_dep_artifacts`, `attachments` and `artifacts` |
 | Resume | The saved recipe: components, models, budget, `retry_backoff_s`, concurrency, gate validator, acceptance policy, read profiles, renderer and lineage policy | Any change raises `WorkflowConflictError`, including a lineage policy added, removed or changed |

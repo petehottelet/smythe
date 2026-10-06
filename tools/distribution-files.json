@@ -143,6 +143,7 @@
     "tests/test_distill.py",
     "tests/test_distribution.py",
     "tests/test_distribution_profile.py",
+    "tests/test_drain_policy.py",
     "tests/test_durability_benchmark.py",
     "tests/test_evidence_archive.py",
     "tests/test_examples_smoke.py",

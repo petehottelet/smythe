@@ -224,7 +224,7 @@ def test_clock_stepping_backwards_does_not_fail_a_serial_run(monkeypatch):
     timing = tracer.timing()
     assert timing["phases_ms"]["supervision"] == 0
     assert timing["waiting_ms"] == {
-        "retry_backoff": 0, "admission": 0, "supervision": 0, "capacity": 0,
+        "retry_backoff": 0, "admission": 0, "supervision": 0, "capacity": 0, "drain": 0,
     }
 
 
