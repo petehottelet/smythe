@@ -363,6 +363,17 @@ def test_record_values_are_validated(change):
         ArtifactLineage.from_dict(data)
 
 
+def test_a_source_listed_twice_is_refused_whatever_its_key_order():
+    data = record_data()
+    again = {key: SOURCE[key] for key in reversed(list(SOURCE))}
+    data["nodes"][1]["inputs"]["sources"] = [dict(SOURCE), again]
+    with pytest.raises(ValueError, match="more than once"):
+        ArtifactLineage.from_dict(data)
+    # Another version of the same source is another reference.
+    data["nodes"][1]["inputs"]["sources"] = [dict(SOURCE), {**again, "version": "v4"}]
+    assert len(ArtifactLineage.from_dict(data).nodes[1]["inputs"]["sources"]) == 2
+
+
 def test_a_declared_node_names_what_it_was_given():
     data = record_data()
     del data["nodes"][1]["inputs"]["context"]

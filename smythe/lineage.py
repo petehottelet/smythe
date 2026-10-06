@@ -229,7 +229,9 @@ def _node_problem(node: dict[str, Any]) -> str | None:
     depends_on, inputs = node["depends_on"], node["inputs"]
     if len(set(depends_on)) != len(depends_on) or node["id"] in depends_on:
         return "must depend on distinct other nodes"
-    if len({tuple(item.values()) for item in inputs["sources"]}) != len(inputs["sources"]):
+    # A reference is its id, version and digest, whatever order its keys came in.
+    sources = {(item["source_id"], item["version"], item["sha256"]) for item in inputs["sources"]}
+    if len(sources) != len(inputs["sources"]):
         return "lists a source more than once"
     if node["coverage"] == "declared" and not inputs.keys() & {"context", "tool", "component"}:
         return "is declared without a recorded context, tool or component"
