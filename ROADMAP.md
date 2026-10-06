@@ -376,7 +376,14 @@ connector or paid run.
    with deterministic stage and anomaly triggers; reserve LLM review for a
    result that supplies evidence the pending plan should change. A replan
    records what it keeps, invalidates and adds, and cannot bypass final
-   acceptance
+   acceptance. In progress: an opt-in
+   [evidence-triggered supervisor](docs/supervisor.md#evidence-triggered-review)
+   reviews only when a declared stage or an anomaly in the run's recorded state
+   fires, such as a skipped input, an exhausted gate, listed contradictions or
+   empty output, and gives the reviewer that evidence; a developer action can
+   replan with no model call. Every replan is logged with the triggers that
+   prompted it and keeps gate protection and strict acceptance. A default
+   change waits for an ablation that shows no loss of accepted outcomes
 4. **Failure-aware scheduling** — classify failures before retrying, with one
    retry owner and a shared deadline per operation; an opt-in drain policy
    that stops new paid work while in-flight results settle; and admission that

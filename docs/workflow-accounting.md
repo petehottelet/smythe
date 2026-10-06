@@ -766,7 +766,8 @@ native `OpenAIResponsesProvider` for `gpt-6-astra` and `gpt-5.6-sol`, native
 `AnthropicMessagesProvider` for `claude-fable-5-1`, and stateless
 `OfflineProvider` plan/echo fixtures. Both native providers use their global
 endpoints. The path binds the built-in simple, LLM, and constrained architects,
-WhiteRabbit routing, static registries, LLM supervision, synthesis strategies,
+WhiteRabbit routing, static registries, LLM and
+[evidence-triggered](supervisor.md#evidence-triggered-review) supervision, synthesis strategies,
 token verification, gates judged by a
 [registered validator](verifier.md#gate-validators-in-durable-workflows)
 declared with `LocalOnly(..., role="validator")`,

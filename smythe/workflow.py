@@ -55,7 +55,8 @@ from smythe.reuse import REASONS
 from smythe.scheduling import PROFILE_KEY, RetryPolicy
 from smythe.task import Task, snapshot_task, task_from_dict, task_to_dict
 from smythe.tracer import (
-    REVISION_LOG_LIMIT, Tracer, revision_context, revision_log_entry, revision_record,
+    REVIEW_TRIGGER, REVISION_LOG_LIMIT, Tracer, revision_context, revision_log_entry,
+    revision_record,
 )
 from smythe.validation import ValidationOutcome, _json_sha256
 from smythe.validators import SourceEvidenceValidator
@@ -462,13 +463,17 @@ def revision_log(store, run_id):
     proposed no change, None or an empty revision, is not listed, and one
     whose supervisor raised is listed as refused. At most
     ``REVISION_LOG_LIMIT`` entries, the latest, are returned. Only reads are
-    made, so a store opened read-only will do.
+    made, so a store opened read-only will do. An evidence-triggered
+    supervisor's ``trigger`` is read again, from the reviewed graph, with the
+    triggers the run's recipe records.
     """
     operations = [operation for operation in store.list_operations(run_id, "supervision")
                   if operation["applied_revision"] is not None]
     saved = store.get_checkpoint(run_id)
     used = None if saved is None else saved["checkpoint"].get("revisions_used")
-    allowed = store.load_run(run_id)["config"].get("max_revisions")
+    config = store.load_run(run_id)["config"]
+    allowed = config.get("max_revisions")
+    triggers = _recipe_triggers(config)
     remaining = [operation["inputs"].get("revisions_remaining") for operation in operations]
     remaining.append(allowed - used if type(allowed) is int and type(used) is int else None)
     entries = []
@@ -484,6 +489,8 @@ def revision_log(store, run_id):
                    and before - after in (0, 1) else None)
         graph = graph_from_dict(inputs["graph"])
         delivered = _deliverable_ids(graph.nodes)
+        reviewed = next((item for item in graph.nodes if item.id == inputs["node_id"]), None)
+        fired = triggers.fired(graph, reviewed) if triggers and reviewed is not None else ()
         revision = None if proposal is None else Revision(
             add_nodes=tuple(node_from_dict(item) for item in proposal["add_nodes"]),
             drop_node_ids=tuple(proposal["drop_node_ids"]),
@@ -500,13 +507,27 @@ def revision_log(store, run_id):
             for item in graph.nodes:
                 item.depends_on = list(revision.rewire.get(item.id, item.depends_on))
         context = revision_context(graph, revisions_remaining_after=after,
-                                   delivered_before=delivered, added=added)
+                                   delivered_before=delivered, added=added,
+                                   trigger=",".join(item.name for item in fired) or REVIEW_TRIGGER)
         record = revision_record(Node(label="", id=str(inputs["node_id"])), revision, context)
         entries.append(revision_log_entry(
             record, applied=applied, reason=None if proposal is None else proposal.get("reason"),
             detail=None if error is None else f"supervisor raised {error}",
         ))
     return entries[-REVISION_LOG_LIMIT:]
+
+
+def _recipe_triggers(config):
+    """The evidence triggers a run's recipe records for its supervisor, or None."""
+    from smythe.supervisor import ReviewTriggers
+
+    described = (config.get("components") or {}).get("supervisor") or {}
+    if described.get("type") != "evidence_triggered_supervisor":
+        return None
+    try:
+        return ReviewTriggers.from_dict(described.get("triggers"))
+    except (TypeError, ValueError):  # Informational: an unreadable record names no trigger.
+        return None
 
 
 def _reevaluation_policies(store, run_id):
@@ -2704,6 +2725,11 @@ class WorkflowRuntime:
 class _WorkflowSupervisor:
     def __init__(self, runtime):
         self.runtime = runtime
+
+    @property
+    def triggers(self):
+        """The bound supervisor's evidence triggers, which the executor traces; None without."""
+        return getattr(self.runtime.bound["supervisor"], "triggers", None)
 
     async def review(self, graph, node, *, task, revisions_remaining):
         runtime = self.runtime

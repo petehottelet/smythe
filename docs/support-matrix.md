@@ -385,6 +385,7 @@ A `termination` policy is refused the same way when the `Swarm` is built.
 | `reserve_for_checks` | `False`; the journal admits each call against the run's budget | `True` |
 | `capacity_policy` | `None`; the journal admits each call when it is made | Any `CapacityPolicy`, when the `Swarm` is constructed |
 | `termination` | `None`; a failure cancels the calls in flight | A `TerminationPolicy` ([draining in-flight work](execution.md#draining-in-flight-work)) |
+| `supervisor` | `None`, `LLMSupervisor`, a supervisor declared with `LocalOnly(..., role="supervisor")`, or an `EvidenceTriggeredSupervisor` around either, whose recipe records its triggers | Subclasses; an `EvidenceTriggeredSupervisor` with `on_trigger` |
 | Architects and other components | Built-in components and `LocalOnly` factories | Subclasses and unjournaled dependencies |
 | Node inputs | Plain text | `attach_dep_artifacts`, `attachments` and `artifacts` |
 | Resume | The saved recipe: components, models, budget, `retry_backoff_s`, concurrency, gate validator, acceptance policy, read profiles, renderer and lineage policy | Any change raises `WorkflowConflictError`, including a lineage policy added, removed or changed |
@@ -468,6 +469,9 @@ Tests:
 - Built-in components: `tests/test_workflow_binding.py::test_local_only_factory_creates_independent_local_architects`,
   `tests/test_workflow_binding.py::test_custom_subclass_cannot_silently_inherit_builtin_binding`,
   `tests/test_workflow_binding.py::test_preflight_rejects_unjournaled_dependencies`.
+- Evidence-triggered supervisors: `tests/test_evidence_triggers.py::test_durable_replay_of_triggered_supervision_makes_no_new_calls`,
+  `tests/test_evidence_triggers.py::test_the_supervisor_describes_and_binds_its_inner_supervisor`
+  and `tests/test_evidence_triggers.py::test_durable_runs_refuse_an_action_no_recipe_can_name`.
 - Resume: `tests/test_support_matrix.py::test_durable_run_rejects_a_changed_retry_backoff_before_any_call`,
   `tests/test_workflow_runtime.py::test_changed_handoff_binding_rejected_before_calls`,
   `tests/test_lineage_records.py::test_an_in_flight_run_keeps_its_lineage_policy`

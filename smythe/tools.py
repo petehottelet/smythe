@@ -24,6 +24,10 @@ if TYPE_CHECKING:
 # Strictest naming rule across the three vendors, applied to the wire form.
 _WIRE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
+# Node metadata counting the tool calls of the node's latest attempt that
+# returned an error; absent when none did.
+TOOL_ERRORS_KEY = "tool_errors"
+
 
 class ToolLoopLimitError(Exception):
     """Raised when a node's tool loop hits max_tool_iterations."""

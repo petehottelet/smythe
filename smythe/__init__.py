@@ -70,7 +70,9 @@ from smythe.skills import (
     SkillProvider,
     SkillRef,
 )
-from smythe.supervisor import LLMSupervisor, Supervisor
+from smythe.supervisor import (
+    EvidenceTriggeredSupervisor, FiredTrigger, LLMSupervisor, ReviewTriggers, Supervisor,
+)
 from smythe.swarm import Swarm, SwarmResult
 from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.task import Task
@@ -129,7 +131,9 @@ __all__ = [
     "DesignSystem",
     "DeterministicArchitect",
     "DistillationError",
+    "EvidenceTriggeredSupervisor",
     "FailurePolicy",
+    "FiredTrigger",
     "FileCheckpointStore",
     "Finding",
     "FindingSeverity",
@@ -172,6 +176,7 @@ __all__ = [
     "ReadToolError",
     "RetryDeadlineError",
     "RetryPolicy",
+    "ReviewTriggers",
     "Revision",
     "RevisionError",
     "RepairPlan",

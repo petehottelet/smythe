@@ -17,7 +17,8 @@ from smythe.graph import REVISION_ADDED_KEY, ExecutionGraph, Node, NodeStatus, _
 
 logger = logging.getLogger("smythe.tracer")
 
-# What prompted a supervisor review: each review follows a completed node.
+# What prompted a supervisor review: each review follows a completed node. A
+# supervisor with evidence triggers names the triggers that fired instead.
 REVIEW_TRIGGER = "node_completed"
 # The revision log an ordinary checkpoint keeps (see revision_log_entry): its
 # latest entries, at most this many ids in each of an entry's id lists, and at
@@ -239,6 +240,27 @@ class Tracer:
             "applied" if applied else "rejected", node.id, span.label,
         )
 
+    def on_review_trigger(self, node: Node, triggers: Iterable[Any]) -> None:
+        """Record the evidence triggers that called for a supervisor review after *node*.
+
+        The span's status is ``review_triggered``, and its ``review_trigger``
+        record names the node and each trigger; their evidence, which may
+        quote output, goes to the supervisor, not the trace.
+        """
+        names = [str(getattr(trigger, "name", trigger)) for trigger in triggers]
+        now = self._wall_clock()
+        span = Span(
+            node_id=f"supervisor:{node.id}",
+            label=", ".join(names),
+            agent_id=None,
+            start_time=now,
+            end_time=now,
+            status="review_triggered",
+        )
+        span.metadata["review_trigger"] = {"after_node": node.id, "triggers": names}
+        self.spans.append(span)
+        logger.info("Review triggered after node %s: %s", node.id, span.label)
+
     def on_regeneration(
         self,
         verifier_node: Node,
@@ -364,6 +386,8 @@ class Tracer:
                 entry["tool_calls"] = s.metadata["tool_calls"]
             if "revision" in s.metadata:
                 entry["revision"] = s.metadata["revision"]
+            if "review_trigger" in s.metadata:
+                entry["review_trigger"] = s.metadata["review_trigger"]
             if "regeneration" in s.metadata:
                 entry["regeneration"] = s.metadata["regeneration"]
             if "native_receipts" in s.metadata:

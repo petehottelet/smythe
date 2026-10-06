@@ -320,12 +320,13 @@ def _supported_types():
     from smythe.planner import LLMArchitect, SimpleArchitect
     from smythe.registry import Registry
     from smythe.router import WhiteRabbit
-    from smythe.supervisor import LLMSupervisor
+    from smythe.supervisor import EvidenceTriggeredSupervisor, LLMSupervisor
     from smythe.synthesizer import Synthesizer
     from smythe.workflow_artifact import MarkdownRenderer
 
     return (LLMArchitect, SimpleArchitect, ConstrainedArchitect, Registry,
-            WhiteRabbit, LLMSupervisor, Synthesizer, MarkdownRenderer, LocalOnly, _BoundLocal)
+            WhiteRabbit, LLMSupervisor, EvidenceTriggeredSupervisor, Synthesizer,
+            MarkdownRenderer, LocalOnly, _BoundLocal)
 
 
 def describe_component(component, *, role=None, default_provider=None, default_model="") -> dict:
@@ -341,7 +342,8 @@ def describe_component(component, *, role=None, default_provider=None, default_m
     roles = {
         "architect": {"llm_architect", "simple_architect", "constrained_architect"},
         "router": {"white_rabbit"}, "registry": {"registry"},
-        "supervisor": {"llm_supervisor"}, "synthesizer": {"synthesizer"},
+        "supervisor": {"llm_supervisor", "evidence_triggered_supervisor"},
+        "synthesizer": {"synthesizer"},
         "template_builder": set(), "validator": set(), "renderer": {"markdown_renderer"},
     }
     if role is not None and (

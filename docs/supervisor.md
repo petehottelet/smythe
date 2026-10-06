@@ -10,6 +10,9 @@ stage boundaries. For a well-specified task with no evidence-driven branch,
 the generated plan can run directly. Explicit review points and fan-in
 triggers concentrate model review where new evidence can change the plan.
 [Measured control scope](../benchmarks/control_ablation.md).
+[Evidence-triggered review](#evidence-triggered-review) goes further: it calls
+a model only when a declared stage or an anomaly in the run's recorded state
+calls for it.
 
 A **supervisor** closes the loop. After a node completes it reviews the
 work so far against the goal and may revise the *unexecuted* remainder.
@@ -168,7 +171,94 @@ LLMSupervisor(provider, only_terminal=False)      # after every node
 The strongest default is an evidence-bearing stage boundary named in
 `review_after`. Deterministic supervisors can narrow this further by checking
 an anomaly first and calling a model only when the result gives the remaining
-plan something to reconsider.
+plan something to reconsider. `EvidenceTriggeredSupervisor` does that for you.
+
+## Evidence-triggered review
+
+Routine model review rarely changes a plan: in the
+[control ablation](../benchmarks/control_ablation.md), 30 supervised runs made
+94 reviews and no proposal. `EvidenceTriggeredSupervisor` replaces that
+schedule with deterministic triggers. After each completed node it reads the
+graph and the node's recorded state; when no trigger fires it returns no change
+without calling anything, and when one fires its supervisor reviews with what
+the triggers found.
+
+```python
+from smythe import EvidenceTriggeredSupervisor, LLMSupervisor, ReviewTriggers
+
+supervisor = EvidenceTriggeredSupervisor(
+    LLMSupervisor(provider, model="claude-opus-5-5"),
+    ReviewTriggers(review_after={"research"}, cost_over_estimate=3.0),
+)
+swarm = Swarm(model="claude-opus-5-5", supervisor=supervisor, max_revisions=2)
+```
+
+`ReviewTriggers` declares stages, which are off by default, and anomalies,
+which are on unless they need a threshold. Each reads the node that just
+completed:
+
+| Trigger | Fires when |
+|---|---|
+| `review_after` | The node is one of these ids |
+| `fan_in` | A pending node that depends on it and on other work is now ready |
+| `final` | No node is pending or running |
+| `failed_or_skipped` | A node it depends on directly failed or was skipped, so it ran without that input |
+| `verifier_rejected_or_exhausted` | It is a gate whose recorded final verdict did not pass its target: it used every regeneration or, with none, a [strict policy](verifier.md#strict-delivery-acceptance) recorded a rejection |
+| `acceptance_not_accepted` | It is a gate whose verdict strict delivery acceptance would not accept: rejected, or undecided because the verdict could not be read |
+| `contradiction_records` | Its output carries [source evidence](source-evidence.md) with a claim that has contradicting passages |
+| `incomplete_output` | A node it depends on directly ended because its provider truncated, refused or filtered the response |
+| `empty_or_short_output` | It is not a gate and returned fewer than `min_output_chars` characters, surrounding whitespace aside; the default, 1, fires on empty output |
+| `cost_over_estimate` | Its recorded cost is more than this ratio times its `estimated_cost_usd`. Off by default; costs are recorded under `max_budget_usd` |
+| `tool_errors` | At least `min_tool_errors` of its tool calls in its last attempt returned errors, which the node counts in `metadata["tool_errors"]`. Off by default |
+
+Set a switch to `False`, or a threshold to `None`, to turn an anomaly off.
+`ReviewTriggers.fired(graph, node)` returns the triggers that fire, each a
+`FiredTrigger` with its `name` and one line of `evidence` per finding.
+
+When a trigger fires, the supervisor acts in this order:
+
+- `on_trigger(graph, node, fired)`, when given, is your code. A `Revision` it
+  returns, or awaits, applies without a model call; `None` hands the review to
+  the inner supervisor, or, without one, keeps the plan.
+- An inner `LLMSupervisor` reviews with the triggers and their evidence ahead
+  of its usual prompt (`EVIDENCE_REVIEW_PROMPT`; `REVIEW_PROMPT` is unchanged),
+  with its own model, caps and strict reading of the reply. The triggers
+  decide when it reviews, so its `review_after` and `only_terminal` are not
+  consulted. Output, error and verdict text in the evidence is run data, cut
+  to 300 characters.
+- Any other inner supervisor reviews as usual.
+
+```python
+from smythe import Revision
+from smythe.graph import Node
+
+def recheck(graph, node, fired):
+    return Revision(add_nodes=(Node(id=f"recheck-{node.id}", label="Redo this step in full",
+                                    depends_on=[node.id]),),
+                    reason="; ".join(line for trigger in fired for line in trigger.evidence))
+
+EvidenceTriggeredSupervisor(None, ReviewTriggers(), on_trigger=recheck)  # no model at all
+```
+
+Every revision still goes through the executor: `max_revisions`,
+[gate protection](#what-a-revision-may-change) and, under a strict policy, the
+[acceptance obligations](#steps-added-after-a-gate) apply, and final validators
+check whatever output a triggered step delivers. Each review a trigger starts
+adds a `review_triggered` trace span whose `review_trigger` record names the
+node and the triggers, without their evidence, and a decision's `trigger`
+names them too. While revisions remain, a run refuses an inner
+`LLMSupervisor` whose provider may retry under a
+[retry policy](execution.md#retry-policy), or that has no model of its own
+and a [model profile](execution.md#model-profiles) on another provider, as it
+refuses one on its own.
+
+As with any supervisor, in ordinary runs without `run_store` a successful
+review call stays outside the [execution ledger](budgets.md#current-scope).
+[Durable runs](workflow-accounting.md) journal every review: their recipe
+records the triggers and the inner supervisor, an `LLMSupervisor` or one
+declared with `LocalOnly(..., role="supervisor")`, and resume replays a
+journaled review instead of sending it again. `on_trigger` is code that no
+recipe can name, so durable runs refuse it.
 
 ## Writing your own
 
@@ -237,7 +327,7 @@ graph after it:
 | `preserved_gates` | The verification gates the graph kept. No revision can drop a gate or cut it off from its target; a gate the revision added is listed under `added` |
 | `revisions_remaining_after` | How much of `max_revisions` is left |
 | `added_total` | The revision-added nodes the graph holds, which `max_total_added_nodes` limits |
-| `trigger` | What prompted the review: `node_completed` |
+| `trigger` | What prompted the review: `node_completed`, or the [evidence triggers](#evidence-triggered-review) that fired, comma-separated, such as `final,failed_or_skipped` |
 
 A refused revision leaves the graph as it was, so its record shows the plan
 the run kept: nothing `invalidated` and the allowance unchanged. Under a strict
@@ -266,4 +356,6 @@ operations the run applied: each holds the graph the supervisor reviewed, the
 revisions it had left and its proposal. A decision was applied when the next
 review, or else the run's checkpoint, has one revision fewer left. The journal
 keeps no refusal's reason, so a durable refusal's `detail` is null, and a
-review whose supervisor raised names only the error's type.
+review whose supervisor raised names only the error's type. For an
+`EvidenceTriggeredSupervisor`, the `trigger` is read again from the reviewed
+graph with the triggers the run's recipe records.

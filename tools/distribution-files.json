@@ -149,6 +149,7 @@
     "tests/test_drain_policy.py",
     "tests/test_durability_benchmark.py",
     "tests/test_evidence_archive.py",
+    "tests/test_evidence_triggers.py",
     "tests/test_examples_smoke.py",
     "tests/test_exception_pickling.py",
     "tests/test_execution_budget_validation.py",

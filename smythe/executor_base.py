@@ -50,10 +50,10 @@ from smythe.scheduling import (
 )
 from smythe.scheduling import CapacityPolicy, _CapacityLimiter
 from smythe.task import _prompt_json, render_task, snapshot_task
-from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
+from smythe.tools import TOOL_ERRORS_KEY, ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
 from smythe.tracer import (
-    REVISION_LOG_LIMIT, Tracer, read_revision_log, revision_context, revision_log_entry,
-    revision_record,
+    REVIEW_TRIGGER, REVISION_LOG_LIMIT, Tracer, read_revision_log, revision_context,
+    revision_log_entry, revision_record,
 )
 from smythe.verifier import (
     ADVISORY_VERDICT_KEY, TokenVerifier, Verifier, VerificationRecoveryError, node_generation,
@@ -243,10 +243,12 @@ def check_supervisor_profiles(
     node's model on its own provider, and a profiled node's model is its
     profile's. Each of *profiles* must therefore call the supervisor's
     provider. Callers check only while the supervisor may still review.
+    So does one inside an ``EvidenceTriggeredSupervisor``.
     """
-    from smythe.supervisor import LLMSupervisor
+    from smythe.supervisor import _model_reviewer
 
-    if not isinstance(supervisor, LLMSupervisor) or supervisor._model:
+    supervisor = _model_reviewer(supervisor)
+    if supervisor is None or supervisor._model:
         return
     for profile in profiles.values():
         if profile.provider is not supervisor._provider:
@@ -596,6 +598,8 @@ class ExecutorBase:
         # per-run guarantee, so a crash must not refill the allowance.
         self._revisions_used = revisions_used
         self._revision_log: list[dict[str, Any]] = []
+        # What prompted the current review, for its trace span and log entry.
+        self._review_trigger = REVIEW_TRIGGER
         self._verifier = verifier or TokenVerifier()
 
     @property
@@ -636,7 +640,9 @@ class ExecutorBase:
 
         Each decision that the trace records, applied or refused, also
         joins :attr:`revision_log` with its effect on the graph (see
-        :func:`~smythe.tracer.revision_context`).
+        :func:`~smythe.tracer.revision_context`). For a supervisor with
+        evidence triggers, the triggers that fire are traced before its
+        review and named as the decision's ``trigger``.
         """
         if self._supervisor is None or node.status is not NodeStatus.COMPLETED:
             return False
@@ -645,6 +651,10 @@ class ExecutorBase:
             return False
 
         started = self._tracer.now()
+        fired = self._fired_triggers(graph, node)
+        self._review_trigger = ",".join(trigger.name for trigger in fired) or REVIEW_TRIGGER
+        if fired:
+            self._tracer.on_review_trigger(node, fired)
         try:
             revision = await self._supervisor.review(
                 graph, node, task=snapshot_task(self._task) if self._task is not None else None,
@@ -702,6 +712,21 @@ class ExecutorBase:
         self.notify_supervision_update(node, True)
         return True
 
+    def _fired_triggers(self, graph: ExecutionGraph, node: Node) -> tuple:
+        """The evidence triggers that call for a review after *node*; none without any.
+
+        Read from the graph before the review, as the supervisor reads them.
+        """
+        from smythe.supervisor import ReviewTriggers
+
+        triggers = getattr(self._supervisor, "triggers", None)
+        if not isinstance(triggers, ReviewTriggers):
+            return ()
+        try:
+            return triggers.fired(graph, node)
+        except Exception:  # The review reads them again and its error is contained.
+            return ()
+
     def _trace_revision(
         self, node: Node, graph: ExecutionGraph, revision: Revision | None, *, applied: bool,
         detail: str = "", delivered: set[str] | None = None,
@@ -715,6 +740,7 @@ class ExecutorBase:
             graph, revisions_remaining_after=self._max_revisions - self._revisions_used,
             delivered_before=delivered,
             added=[added.id for added in revision.add_nodes] if applied and revision else (),
+            trigger=self._review_trigger,
         )
         self._tracer.on_revision(node, revision, applied=applied, detail=detail, context=context)
         entry = revision_log_entry(revision_record(node, revision, context), applied=applied,
@@ -1480,12 +1506,12 @@ class ExecutorBase:
                 {str(model) for _, model, profile in routes if profile is None})]
             # Every profile, not only those pending nodes name: a supervisor may add one.
             calls += [(profile.provider, profile.model) for profile in self._profiles.values()]
-            from smythe.supervisor import LLMSupervisor
+            from smythe.supervisor import _model_reviewer
 
             # A supervisor that may still revise reviews with its own model or
             # else the reviewed node's, which can be any node of the graph.
-            supervisor = self._supervisor
-            if isinstance(supervisor, LLMSupervisor) and self._max_revisions > self._revisions_used:
+            supervisor = _model_reviewer(self._supervisor)
+            if supervisor is not None and self._max_revisions > self._revisions_used:
                 models = {supervisor._model} if supervisor._model else {
                     str(node.metadata.get("model", "")) for node in graph.nodes}
                 calls += [(supervisor._provider, model) for model in sorted(models)]
@@ -1701,6 +1727,9 @@ class ExecutorBase:
             return result
 
         collected_artifacts: list = []
+        # Counted per attempt, for supervisor triggers that read the node.
+        tool_errors = 0
+        node.metadata.pop(TOOL_ERRORS_KEY, None)
         async with self._tool_runtime.open(agent) as session:
             tools = list(session.tools) or None
             limit = node.max_tool_iterations or self._max_tool_iterations
@@ -1763,6 +1792,9 @@ class ExecutorBase:
                         )
                     duration_ms = (time.monotonic() - started) * 1000
                     self._tracer.on_tool_call(node, tc.name, duration_ms, outcome.is_error)
+                    if outcome.is_error:
+                        tool_errors += 1
+                        node.metadata[TOOL_ERRORS_KEY] = tool_errors
                     if self._context_assembler is not None:
                         # What a tool returns is material, like a source.
                         outcome = ToolResult(

@@ -1138,6 +1138,23 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   returns kept text. A new durable graph cannot carry a `repair` planning
   record. No public method starts a successor yet. See
   [reused results](docs/workflow-accounting.md#reused-results).
+- `EvidenceTriggeredSupervisor(inner, triggers, on_trigger=None)` reviews only
+  when a `ReviewTriggers` check fires after a completed node; otherwise it
+  returns no change without any call. Triggers read the graph and the node's
+  recorded state: the stages `review_after`, `fan_in` and `final`, and the
+  anomalies `failed_or_skipped`, `verifier_rejected_or_exhausted`,
+  `acceptance_not_accepted`, `contradiction_records`, `incomplete_output`,
+  `empty_or_short_output` (`min_output_chars`), `cost_over_estimate` and
+  `tool_errors` (`min_tool_errors`). A developer `on_trigger` can return a
+  `Revision` with no model call; an inner `LLMSupervisor` reviews with the
+  fired triggers and their evidence ahead of its unchanged prompt. Revisions
+  keep gate protection and strict acceptance obligations. Each triggered review
+  adds a `review_triggered` trace span, and a decision's `trigger` names the
+  triggers. Durable recipes record the triggers and replay journaled reviews;
+  they refuse `on_trigger`. Retry-owner and model-profile checks apply to a
+  wrapped `LLMSupervisor`. A node's tool calls that return errors are counted
+  in `metadata["tool_errors"]`. See
+  [evidence-triggered review](docs/supervisor.md#evidence-triggered-review).
 
 ### Changed
 

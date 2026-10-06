@@ -89,7 +89,7 @@ from smythe.scheduling import (
 )
 from smythe.scheduling import CapacityPolicy, _capacity_limit
 from smythe.scheduling import TerminationPolicy
-from smythe.supervisor import LLMSupervisor, Supervisor
+from smythe.supervisor import Supervisor, _model_reviewer
 from smythe.synthesizer import SynthesisStrategy, Synthesizer, deliverable_sources
 from smythe.task import Task, snapshot_task, task_snapshots_equal, task_to_dict
 from smythe.tracer import Tracer
@@ -922,7 +922,8 @@ class Swarm:
         """Under a retry policy, refuse every call the run can make that an SDK may send again.
 
         Nodes and synthesis call the run's provider, and profiled nodes their
-        profile's. An ``LLMSupervisor`` that ``max_revisions`` lets review
+        profile's. An ``LLMSupervisor`` that ``max_revisions`` lets review,
+        on its own or inside an ``EvidenceTriggeredSupervisor``,
         calls its own provider, with its model or else the reviewed node's:
         the run's model before a plan exists, then each of *graph*'s. With
         *planning*, so are the calls routing and planning could make (see
@@ -934,8 +935,8 @@ class Swarm:
         calls += [(profile.provider, profile.model) for profile in self._profiles.values()]
         if planning:
             calls += _planning_calls(self._router, self._architect)
-        supervisor = self.supervisor
-        if isinstance(supervisor, LLMSupervisor) and self.max_revisions > 0:
+        supervisor = _model_reviewer(self.supervisor)
+        if supervisor is not None and self.max_revisions > 0:
             if supervisor._model:
                 models = {supervisor._model}
             elif graph is None:
