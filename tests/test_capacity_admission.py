@@ -20,7 +20,7 @@ import pytest
 
 import smythe.executor_base as executor_base
 from fakes import RATE_LIMITED, Gate, HttpError, ManualClock
-from smythe import CapacityLimit, CapacityPolicy
+from smythe import CapacityLimit, CapacityPolicy, ModelProfile
 from smythe.async_executor import AsyncExecutor
 from smythe.budget import Sentinel, SentinelAlert
 from smythe.checkpoint import CheckpointStore
@@ -653,6 +653,45 @@ def test_a_bad_hint_stops_the_run_before_any_call(hint):
 
     assert provider.calls == []
 
+
+
+class BadHintFor(Overlapping):
+    """Hints nothing for every model but ``bad``, whose hint is not valid."""
+
+    def capacity_hint(self, model):
+        return {"max_in_flight": 0} if model == "bad" else None
+
+
+@pytest.mark.parametrize("parallel", [True, False], ids=["async", "serial"])
+def test_a_later_node_s_bad_hint_stops_the_run_before_any_call(parallel):
+    provider = BadHintFor()
+    work = graph(node("a"), node("b", "bad", depends_on=["a"]))
+
+    with pytest.raises(ValueError, match="capacity_hint"):
+        if parallel:
+            asyncio.run(async_executor(provider, capacity_policy=CapacityPolicy()).run(work))
+        else:
+            Executor(provider=provider, registry=Registry(), tracer=Tracer(), artifact_dir=None,
+                     capacity_policy=CapacityPolicy()).run(work)
+
+    # The first node's call is never made: every hint is read before any call.
+    assert provider.calls == []
+
+
+@pytest.mark.asyncio
+async def test_a_profiled_node_takes_the_limit_of_its_profile_s_provider_and_model():
+    run_provider, routed = Overlapping(), Overlapping(hint={"max_in_flight": 1})
+    executor = async_executor(run_provider, max_concurrency=8, capacity_policy=CapacityPolicy(),
+                              profiles=[ModelProfile("fast", routed, "p", 0.01)])
+    work = graph(*(Node(id=f"p{i}", label=f"p{i}", metadata={"profile": "fast"})
+                   for i in range(4)))
+
+    await executor.run(work)
+
+    assert all(item.status is NodeStatus.COMPLETED for item in work.nodes)
+    assert run_provider.calls == [] and len(routed.calls) == 4
+    # The profile's provider hints one call at a time for its model.
+    assert routed.peak["p"] == 1
 
 def test_a_swarm_refuses_a_bad_hint_before_planning():
     provider = Overlapping(hint={"max_in_flight": -1})
