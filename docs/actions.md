@@ -9,7 +9,8 @@ accepted content, and records [verified approvals](#approvals) of them.
 each attempt, and the [action runner](#action-runner) makes those attempts
 through your connector, reads their results back,
 [reconciles](#reconciliation) outcomes a dispatch left unknown and keeps the
-service's [notices](#notices) as untrusted records. These types and functions may
+service's [notices](#notices) as untrusted records.
+[Revocation](#revocation) takes precedence over dispatch. These types and functions may
 change before they leave preview. `import smythe` loads neither module;
 import them explicitly.
 
@@ -302,7 +303,9 @@ approval of an action, and returns the IDs it revoked. It is a fail-safe
 control: it needs no principal and no lease. The reason is stored with
 account identifiers redacted. A revoked approval never authorizes the action
 again, and its assertion cannot be recorded again; only a new approval
-reopens the action.
+reopens the action. Revoking never undoes an effect, and
+[`stop_actions()`](#stopping-a-runs-actions) revokes the approvals of
+every action of a run at once.
 
 `check_authority(store, action_id, verifier)` returns the approval that
 authorizes the action now, or raises `ActionNotAuthorized` naming why not. It
@@ -333,8 +336,9 @@ can happen in different processes, so check again immediately before acting.
 
 The journal keeps each assertion so that it can be verified again; protect
 the journal accordingly. `inspect_run()` shows each approval's principal,
-verifier identity, ceiling, expiry, consumption and revocation time, and
-never assertions or revocation reasons.
+verifier identity, ceiling, expiry, consumption and revocation time, and for
+a revoked approval when the [revocation](#revoking-after-dispatch) came. It
+never shows assertions or revocation reasons.
 
 ## Dispatch journal
 
@@ -529,8 +533,10 @@ wait longer than the lease does not lose it. Each step first
 [recovers](#recovery) whatever a stopped worker left in flight. While
 another worker's lease is live, a step raises `WorkflowLeaseError`. `sleep`
 and `clock`, in seconds, space the reads and lookups. Dispatch is serial and
-runs outside the asynchronous node executor, so its scheduling and drain
-policies never apply to writes.
+runs outside the asynchronous node executor, so its scheduling and
+[drain](execution.md#draining-in-flight-work) policies never apply to writes:
+the runner takes no termination policy, and a
+[revocation](#revocation) refuses the next claim at once.
 
 Every step refuses, with `WorkflowConflictError`, an action of another run
 and a connector whose `profile` is not exactly the one the action was
@@ -561,6 +567,20 @@ approval, so `dispatch()` can try again while attempts remain. `dispatch()`
 never sends an ambiguous outcome again; only
 [reconciliation](#reconciliation) can. A receipt never shows the result by
 itself: the action stays `dispatched` until a read does.
+
+### Pending actions
+
+`runner.dispatch_pending(run_id)` dispatches each of the run's actions that
+waits for dispatch, one at a time, under one lease: its `not_dispatched`
+actions with attempts left that were prepared with the connector's profile,
+in slot and sequence order. Actions of another profile are left to a runner
+with that connector. Each is dispatched as `dispatch()` does, so its
+authority is checked again before each claim, and once more in the claim's
+transaction. It returns one `ActionProgress` per action. An action that is
+refused, because its approval was revoked or is missing, a security stop
+holds the run, its content is no longer deliverable or its ceiling leaves no
+room, has `refusal` set to the reason and `next_action` None, and nothing is
+sent for it; the others go on.
 
 ### Readback
 
@@ -708,7 +728,8 @@ It needs no lease.
 
 Every step returns an `ActionProgress`: the `action_id`, its `state`, its
 latest `attempt` as `inspect_run()` shows it, the `report` of the step's
-last read, or None, and the `next_action`:
+last read, or None, the `next_action`, and the `refusal` of an action that
+[`dispatch_pending()`](#pending-actions) refused, or None:
 
 | `next_action` | When |
 |---|---|
@@ -717,7 +738,60 @@ last read, or None, and the `next_action`:
 | `reconcile` | The outcome is unknown, or the reads did not settle it. |
 | `operator_review` | Reconciliation found it can do no more: the outcome stays unknown or unverified. |
 | `compensate` | The action is `compensation_required`. |
-| None | The action is settled, or has used every attempt. |
+| None | The action is settled, has used every attempt, or `dispatch_pending()` refused it. |
 
 Errors from the journal's checks, such as `ActionNotAuthorized`,
-`ActionStateError` and `WorkflowBudgetError`, propagate unchanged.
+`ActionStateError` and `WorkflowBudgetError`, propagate unchanged from every
+step but `dispatch_pending()`, which reports them as refusals.
+
+## Revocation
+
+Revoked authority takes precedence over dispatch, and never undoes an
+effect. A submission whose dispatch was claimed has left, or may have left,
+for the service, and no revocation can recall it: its receipt, refusal or
+ambiguous outcome is still recorded when it arrives, and the reads and
+lookups that settle it go on, since they send no write. Every later claim
+is refused.
+
+### Stopping a run's actions
+
+```python
+from smythe.actions import stop_actions
+
+revoked = stop_actions(store, run_id, "approver access withdrawn")
+```
+
+`stop_actions(store, run_id, reason)` revokes every approval of every
+action of the run, in one transaction, and returns the IDs it revoked. Like
+`revoke()`, it is a fail-safe control that needs no principal and no lease,
+so it works while a worker holds the run's lease with a submission in
+flight. The reason is stored with account identifiers redacted on each
+revoked approval, and an `actions_stopped` event lists their IDs.
+
+Nothing clears the stop: no resume of the run, new lease, recovery or
+reopened journal makes a revoked approval authorize again. Each action is
+refused, by `check_authority()`, `begin_attempt()` and the claim's own
+transaction, until it gets a new approval, which reopens that action only.
+An action prepared after the stop needs its first approval as usual.
+Stopping again revokes the approvals recorded since the last stop.
+
+A [security stop](workflow-accounting.md#security-stops) is different: it
+blocks the whole run, and every action of it, for good, and leaves the
+approvals as they were.
+
+### Revoking after dispatch
+
+A revocation changes no action state: an `observed` action stays
+`observed`, and an unknown outcome keeps its exposure. `inspect_run()`
+shows when each revoked approval was revoked, as its `revocation`:
+
+| `revocation` | Meaning |
+|---|---|
+| `before_dispatch` | No attempt under the approval may have taken effect. |
+| `after_dispatch` | An attempt under it had been dispatched, and its outcome is unknown. |
+| `after_effect` | A receipt, the attempt's own or one a lookup found, shows that a write under it took effect, which the revocation does not undo. |
+
+A claim checks revocation in its own transaction, so an attempt dispatched
+under a revoked approval was always dispatched before the revocation. To
+undo an effect, a connector that supports it takes a new, separately
+approved action.

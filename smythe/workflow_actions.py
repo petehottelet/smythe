@@ -14,8 +14,9 @@ A version 2 journal keeps each run's external actions in four tables:
 Action money is the ``external_actions`` accounting scope: whole nanoUSD kept
 on these rows, never in a run's balances, which stay equal to its call ledger.
 :func:`audit_actions` runs inside a ``SQLiteWorkflowStore`` transaction; the
-other functions open their own. Preparation, verdicts, revocations and
-notices need no run lease and are called by ``smythe.actions``. The dispatch
+other functions open their own. Preparation, verdicts, revocations, a run's
+action stop and notices need no run lease and are called by
+``smythe.actions``. The dispatch
 journal, :func:`begin_attempt` to :func:`recover_actions`, the runner's
 releases and readback records, and reconciliation's lookups, same-key
 retries and findings are fenced by the run's lease.
@@ -88,7 +89,8 @@ def audit_actions(store, db, run_id):
     ``WorkflowCorruptionError``.
 
     The projection never includes parameters, assertions, receipts, record
-    payloads or error text: only identities, digests, states and balances.
+    payloads or error text: only identities, digests, states and balances. A
+    revoked approval also shows its ``revocation`` (see :func:`_revocation`).
     """
     rows = db.execute("SELECT * FROM workflow_actions WHERE run_id=? ORDER BY slot,sequence",
                       (run_id,)).fetchall()
@@ -155,7 +157,8 @@ def _action(store, db, row, run_actions):
             "intent_sha256": approval["intent_sha"], "principal": principal.to_dict(), "verifier": verifier,
             "ceiling_nanousd": _money(approval["ceiling"]), "expires_at_ns": approval["expires_at_ns"],
             "consumed_by_attempt": consumed, "revoked_at_ns": approval["revoked_at_ns"],
-            "duplicate_risk": approval["duplicate_risk"] == 1})
+            "duplicate_risk": approval["duplicate_risk"] == 1,
+            **({} if approval["revoked_at_ns"] is None else {"revocation": _revocation(db, approval, attempts)})})
     record_items = []
     for record in db.execute("SELECT * FROM workflow_action_records WHERE action_id=? ORDER BY rowid",
                              (action_id,)):
@@ -176,6 +179,23 @@ def _action(store, db, row, run_actions):
             "compensates_action_id": row["compensates_action_id"], "ceiling_nanousd": _amount(row["ceiling"]),
             **dict(zip(_BALANCES, balances)),
             "attempts": attempt_items, "approvals": approval_items, "records": record_items}
+
+
+def _revocation(db, approval, attempts):
+    """When a revoked approval was revoked, as the journal shows it.
+
+    ``before_dispatch``: no attempt under it may have taken effect.
+    ``after_dispatch``: one had been dispatched, since a claim checks
+    revocation in its own transaction, and its outcome is unknown.
+    ``after_effect``: a receipt, the attempt's own or one a lookup found,
+    shows that a write under it took effect, which revoking never undoes.
+    """
+    sent = {attempt["attempt_id"] for attempt in attempts
+            if attempt["approval_id"] == approval["approval_id"] and attempt["state"] in _EFFECTS}
+    if not sent:
+        return "before_dispatch"
+    shown = approval["consumed_by_attempt"] is not None or sent & _found(db, approval["action_id"]).keys()
+    return "after_effect" if shown else "after_dispatch"
 
 
 def _attempt_item(attempt):
@@ -293,6 +313,24 @@ def revoke_approvals(store, target_id, reason):
             f"SELECT approval_id FROM workflow_action_approvals {where} ORDER BY rowid", (target_id,)))
         db.execute(f"UPDATE workflow_action_approvals SET revoked_at_ns=?,revoked_reason=? {where}",
                    (store._clock_ns(), reason, target_id))
+        return revoked
+
+
+def stop_run(store, run_id, reason):
+    """Revoke every approval of a run's actions and record an ``actions_stopped`` event.
+
+    Returns the IDs of the approvals this call revoked, which the event
+    lists; an earlier revocation is kept as it was.
+    """
+    with store._transaction() as db:
+        store._run(db, run_id)
+        where = ("WHERE verdict='approved' AND revoked_at_ns IS NULL AND action_id IN "
+                 "(SELECT action_id FROM workflow_actions WHERE run_id=?)")
+        revoked = tuple(item[0] for item in db.execute(
+            f"SELECT approval_id FROM workflow_action_approvals {where} ORDER BY rowid", (run_id,)))
+        db.execute(f"UPDATE workflow_action_approvals SET revoked_at_ns=?,revoked_reason=? {where}",
+                   (store._clock_ns(), reason, run_id))
+        store._event(db, run_id, "actions_stopped", payload={"revoked": list(revoked)})
         return revoked
 
 
@@ -641,7 +679,28 @@ def recover_actions(store, lease):
     return result
 
 
-# The runner's journal: releases before a claim, readback records and untrusted notices.
+# The runner's journal: pending actions, releases before a claim, readback records and untrusted notices.
+
+
+def pending(store, run_id):
+    """A run's ``not_dispatched`` actions with attempts left, by slot and sequence.
+
+    Only reads are made, after the run's actions pass the audit.
+    """
+    if store.store_version < 2:
+        return []  # Version 1 journals have no action tables.
+    with store._transaction(write=False) as db:
+        store._run(db, run_id)
+        audit_actions(store, db, run_id)
+        result = []
+        for row in db.execute("SELECT * FROM workflow_actions WHERE run_id=? AND state='not_dispatched' "
+                              "ORDER BY slot,sequence", (run_id,)).fetchall():
+            action = _prepared(row)
+            states = db.execute("SELECT state FROM workflow_action_attempts WHERE action_id=?",
+                                (action.action_id,)).fetchall()
+            if sum(state[0] in _CLAIMED for state in states) < action.profile.max_attempts:
+                result.append(action)
+        return result
 
 
 def release_attempt(store, lease, attempt_id, error):

@@ -339,6 +339,21 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   keeps its unknown exposure until a receipt reports its cost.
   `smythe.workflow_actions` gains `record_lookup()`, `claim_retry()` and
   `record_finding()`. See [reconciliation](docs/actions.md#reconciliation).
+- Revoked authority takes precedence over external action dispatch.
+  `stop_actions(store, run_id, reason)` in `smythe.actions` is a fail-safe
+  control that needs no principal or lease: it revokes every approval of the
+  run's actions, storing the reason redacted, and records an
+  `actions_stopped` event. No resume, recovery, lease or reopened journal
+  clears it; only a new approval reopens an action. A submission already
+  claimed still records its outcome, and reads and lookups that settle it go
+  on. `ActionRunner.dispatch_pending(run_id)` dispatches a run's waiting
+  actions serially under one lease, checking each action's authority again
+  before its claim and in the claim's transaction, so a revocation during a
+  submission refuses every later claim; a refused action is returned with
+  its `ActionProgress.refusal`. Action dispatch takes no drain policy.
+  Revoking never changes an action's state, and `inspect_run()` shows each
+  revoked approval's `revocation`: `before_dispatch`, `after_dispatch` or
+  `after_effect`. See [revocation](docs/actions.md#revocation).
 - Jobs operations have a semantic input digest.
   `smythe.jobs.operation_input_digest()` hashes the provider kind and its
   adapter version (`smythe.jobs.providers.ADAPTER_VERSIONS`), the model,

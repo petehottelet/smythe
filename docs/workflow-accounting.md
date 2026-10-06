@@ -892,8 +892,9 @@ digest; and `workflow_action_records` its readbacks, lookups, notices, late
 receipts, findings, decisions and evidence. Records are append-only: SQLite
 refuses to update or delete them. In this release, `smythe.actions` writes
 [prepared actions](actions.md#prepared-actions) and their
-[approvals, rejections and revocations](actions.md#approvals);
-`smythe.workflow_actions` writes their attempts and late receipts in the
+[approvals, rejections and revocations](actions.md#approvals), including a
+run's [action stop](actions.md#stopping-a-runs-actions), which also adds an
+`actions_stopped` event; `smythe.workflow_actions` writes their attempts and late receipts in the
 [dispatch journal](actions.md#dispatch-journal); the
 [action runner](actions.md#readback) writes readback records, each charged
 its read's cost, and its [reconciliation](actions.md#reconciliation) writes
@@ -930,10 +931,12 @@ settled.
 For a run with actions, `inspect_run()` adds an `actions` block after its
 other keys: the scope's totals and, for each action, its identity, intent
 digest, operation and target, state and balances, with its attempts,
-approvals (principal, verifier, ceiling, expiry, consumption and revocation
-time) and records by digest. It never includes parameters, approval
-assertions, revocation reasons, receipts, record payloads or error text. A
-run without actions inspects exactly as before.
+approvals (principal, verifier, ceiling, expiry, consumption, revocation time
+and, for a revoked approval, whether the
+[revocation](actions.md#revoking-after-dispatch) came before any dispatch,
+after one or after its effect) and records by digest. It never includes
+parameters, approval assertions, revocation reasons, receipts, record
+payloads or error text. A run without actions inspects exactly as before.
 
 ## Journal upgrades
 

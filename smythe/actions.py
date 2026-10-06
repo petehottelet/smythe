@@ -7,9 +7,10 @@ Connectors and approval verifiers are trusted host code with synchronous
 protocols, checked only structurally: a caller contract, not a sandbox.
 
 :func:`prepare_action` records a logical action in the workflow journal, bound
-to a completed run's accepted content; :func:`approve`, :func:`reject` and
-:func:`revoke` record verified approvals and controls; :func:`check_authority`
-checks them again; and ``smythe.workflow_actions`` journals each attempt's
+to a completed run's accepted content; :func:`approve`, :func:`reject`,
+:func:`revoke` and :func:`stop_actions` record verified approvals and
+controls; :func:`check_authority` checks them again; and
+``smythe.workflow_actions`` journals each attempt's
 dispatch and outcome. :class:`ActionRunner` submits each attempt once through
 a connector, reads the result back and reconciles an unknown outcome as the
 connector's declarations allow, and :func:`record_notice` keeps a
@@ -26,7 +27,7 @@ import math
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager, suppress
-from dataclasses import KW_ONLY, MISSING, dataclass, field, fields
+from dataclasses import KW_ONLY, MISSING, dataclass, field, fields, replace
 from typing import Any, Protocol, Self
 from uuid import uuid4
 
@@ -775,6 +776,25 @@ def revoke(store: Any, action_or_approval_id: str, reason: str) -> tuple[str, ..
     return revoke_approvals(store, _text(action_or_approval_id, "action or approval id"), reason)
 
 
+def stop_actions(store: Any, run_id: str, reason: str) -> tuple[str, ...]:
+    """Stop every action of a run from being dispatched; return the approval IDs it revoked.
+
+    A fail-safe control, like :func:`revoke`: it needs no principal and no
+    lease. Every approval of the run's actions is revoked with *reason*,
+    stored redacted, and an ``actions_stopped`` event lists them. Nothing
+    clears it: no resume, recovery, lease or reopened journal makes a revoked
+    approval authorize again, so each action is refused until it gets a new
+    approval. A submission already claimed is not recalled; its outcome is
+    recorded when it arrives, and reads and lookups that settle an outcome go
+    on. Stopping again revokes the approvals recorded since.
+    """
+    from smythe.workflow_actions import stop_run
+
+    reason = _text(redact_account_identifiers(reason) if isinstance(reason, str) else reason,
+                   "reason")
+    return stop_run(store, _text(run_id, "run_id"), reason)
+
+
 def check_authority(store: Any, action_id: str, verifier: Any) -> ActionApproval:
     """The approval that authorizes an action now; raises ``ActionNotAuthorized`` otherwise.
 
@@ -910,7 +930,9 @@ class ActionProgress:
     have not settled,
     ``operator_review`` once reconciliation has found it can do no more,
     ``compensate`` for ``compensation_required``, and None when the runner
-    can do nothing more.
+    can do nothing more. ``refusal`` is None, or says why
+    :meth:`ActionRunner.dispatch_pending` sent nothing for the action; its
+    ``next_action`` is then None.
     """
 
     action_id: str
@@ -918,6 +940,7 @@ class ActionProgress:
     attempt: dict[str, Any] | None
     report: ValidationReport | None
     next_action: str | None
+    refusal: str | None = None
 
 
 class ActionRunner:
@@ -931,7 +954,8 @@ class ActionRunner:
     *lease_ttl_s*, renewed beyond the submission's timeout or the wait before
     the next read, and settles first what a stopped worker left in flight.
     *sleep* and *clock*, in seconds, space the reads and lookups. Dispatch is
-    serial and independent of the asynchronous executor.
+    serial and independent of the asynchronous executor and its drain policy:
+    a revocation refuses the next claim at once.
     """
 
     def __init__(self, store: Any, connector: Any, verifier: Any, *, owner_id: str | None = None,
@@ -985,21 +1009,54 @@ class ActionRunner:
         recorded; an unusable receipt is ambiguous. A receipt never shows the
         result: call :meth:`readback`. Raises what the journal's checks raise.
         """
-        from smythe import workflow_actions as journal
-
         action = self._action(run_id, action_id)
         with self._leased(run_id) as lease:
-            approval = check_authority(self.store, action_id, self.verifier)
-            attempt = journal.begin_attempt(self.store, lease, action_id, approval.approval_id)
-            payload = _payload(self.store, action)
-            if payload is None and action.intent.content is not None:
-                problem = "the bytes read for delivery are not its bound content"
-                journal.release_attempt(self.store, lease, attempt["attempt_id"], problem)
-                raise ActionNotAuthorized(f"Action {action_id!r} is not authorized: {problem}")
-            self._renew(lease, action.profile.timeout_s)
-            permit = journal.claim_dispatch(self.store, lease, attempt["attempt_id"])
-            self._submit(action, permit, payload)
+            self._dispatch(lease, action)
         return self._progress(action_id)
+
+    def _dispatch(self, lease: Any, action: PreparedAction) -> None:
+        """Check the action's authority and content, then claim and submit one attempt."""
+        from smythe import workflow_actions as journal
+
+        approval = check_authority(self.store, action.action_id, self.verifier)
+        attempt = journal.begin_attempt(self.store, lease, action.action_id, approval.approval_id)
+        payload = _payload(self.store, action)
+        if payload is None and action.intent.content is not None:
+            problem = "the bytes read for delivery are not its bound content"
+            journal.release_attempt(self.store, lease, attempt["attempt_id"], problem)
+            raise ActionNotAuthorized(f"Action {action.action_id!r} is not authorized: {problem}")
+        self._renew(lease, action.profile.timeout_s)
+        permit = journal.claim_dispatch(self.store, lease, attempt["attempt_id"])
+        self._submit(action, permit, payload)
+
+    def dispatch_pending(self, run_id: str) -> tuple[ActionProgress, ...]:
+        """Dispatch the run's actions that wait for dispatch, one at a time, under one lease.
+
+        They are its ``not_dispatched`` actions with attempts left that were
+        prepared with the connector's profile, by slot and sequence. Each is
+        dispatched as :meth:`dispatch` does, so its authority is checked again
+        before each claim, and in the claim's transaction: a :func:`revoke` or
+        :func:`stop_actions` made while an earlier submission was in flight
+        refuses every later claim, while that submission's outcome is still
+        recorded. A refused action, such as one whose approval was revoked or
+        whose run a security stop holds, is returned with ``refusal`` saying
+        why, and nothing is sent for it. Returns one progress per action.
+        """
+        from smythe.workflow_actions import pending
+
+        results, profile = [], check_connector(self.connector)
+        with self._leased(run_id) as lease:
+            for action in pending(self.store, run_id):
+                if action.profile != profile:
+                    continue
+                try:
+                    self._dispatch(lease, action)
+                except (ActionStateError, WorkflowBudgetError) as error:
+                    results.append(replace(self._progress(action.action_id), next_action=None,
+                                           refusal=str(error)))
+                else:
+                    results.append(self._progress(action.action_id))
+        return tuple(results)
 
     def _submit(self, action: PreparedAction, permit: Any, payload: bytes | None) -> None:
         """Submit once under a claimed *permit* and record the receipt, refusal or ambiguous outcome."""
@@ -1261,5 +1318,5 @@ __all__ = [
     "ConnectorProfile", "ConnectorReceipt", "ConnectorRefused", "ContentRef", "ObservedObject",
     "PreparedAction", "Principal", "WriteConnector", "action_key", "approve", "check_authority",
     "check_connector", "check_verifier", "load_action", "prepare_action", "record_notice",
-    "reject", "revoke",
+    "reject", "revoke", "stop_actions",
 ]
