@@ -364,11 +364,10 @@ A durable run checks its provider and components each time `plan()`,
 `run_store`, `verifier`, `memory`, `tool_runtime`, `checkpoint_store`,
 `retry_policy`, `reserve_for_checks` or `lineage` raises
 `WorkflowBindingError`, a `ValueError` whose message starts with the
-argument's name; a different `retry_policy` on resume raises
-`WorkflowConflictError`.
+argument's name; a different `retry_policy` or `termination` policy on resume
+raises `WorkflowConflictError`.
 A `capacity_policy` raises the same error sooner, when the `Swarm` is
 constructed with a `run_store`.
-A `termination` policy is refused the same way when the `Swarm` is built.
 
 | Component | Accepted | Rejected |
 |---|---|---|
@@ -384,7 +383,7 @@ A `termination` policy is refused the same way when the `Swarm` is built.
 | `retry_policy` | `None`, where the node failure policy decides each retry, or a `RetryPolicy`, which the recipe records and whose attempts the journal counts across resume ([durable retry policy](workflow-accounting.md#retry-policy)) | A provider that does not declare `sdk_retries=0`; a policy with `retain_uncertain_dispatch`; on resume, a policy other than the one the run started with |
 | `reserve_for_checks` | `False`; the journal admits each call against the run's budget | `True` |
 | `capacity_policy` | `None`; the journal admits each call when it is made | Any `CapacityPolicy`, when the `Swarm` is constructed |
-| `termination` | `None`; a failure cancels the calls in flight | A `TerminationPolicy` ([draining in-flight work](execution.md#draining-in-flight-work)) |
+| `termination` | `None`, where a failure cancels the calls in flight, or a `TerminationPolicy`, which the recipe records; calls answered within its deadline keep their known charge ([draining in-flight calls](workflow-accounting.md#draining-in-flight-calls)) | Other objects, with `TypeError` when the `Swarm` is constructed; on resume, a policy other than the one the run started with |
 | `supervisor` | `None`, `LLMSupervisor`, a supervisor declared with `LocalOnly(..., role="supervisor")`, or an `EvidenceTriggeredSupervisor` around either, whose recipe records its triggers | Subclasses; an `EvidenceTriggeredSupervisor` with `on_trigger` |
 | `run_control` | `None`, or a `RunControl` that is not part of the recipe; a [security stop](workflow-accounting.md#security-stops) blocks the run with `security_stop` | Other objects, with `TypeError` when the `Swarm` is constructed |
 | Architects and other components | Built-in components and `LocalOnly` factories | Subclasses and unjournaled dependencies |

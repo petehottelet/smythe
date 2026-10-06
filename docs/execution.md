@@ -686,15 +686,17 @@ A cancellation of the run, an interrupt such as `KeyboardInterrupt`, and a
 the policy, and so does a cancellation or a revocation during a drain. The serial executor
 behind `execute()` with `parallel=False` runs one node at a time, so it has
 nothing in flight to drain, nor does the async executor at a concurrency of
-one. A durable `run_store` run refuses a policy with `WorkflowBindingError`
-when the `Swarm` is built.
+one. A durable `run_store` run records the policy in its recipe and drains its
+journaled calls the same way: a call answered within the deadline keeps its
+known charge, and one still unanswered holds unknown exposure (see [draining
+in-flight calls](workflow-accounting.md#draining-in-flight-calls)).
 
 `AsyncExecutor.drain_record` reports how the last run drained: `settled` names
 the nodes in flight whose work ended during the drain, `cancelled` those it
 stopped, still in flight when it ended or before a retry, and `deadline_hit`
-whether the deadline ended it. It is `None` when the run did not drain. A
-`Swarm` saves it in the failed checkpoint as `control.drain`, for information
-only: the checkpoint stays version 4, and resume keeps the nodes the drain
+whether the deadline ended it. It is `None` when the run did not drain. An
+ordinary `Swarm` run saves it in the failed checkpoint as `control.drain`, for
+information only: the checkpoint stays version 4, and resume keeps the nodes the drain
 completed, runs the failed, cancelled and never-started ones, and follows the
 resuming `Swarm`'s own policy. The time spent draining is the `drain` wait in
 [timing](#timing). The executor's `sleep`, when given, times the drain's

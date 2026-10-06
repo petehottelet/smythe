@@ -277,6 +277,7 @@
     "tests/test_workflow_acceptance.py",
     "tests/test_workflow_artifact.py",
     "tests/test_workflow_binding.py",
+    "tests/test_workflow_drain.py",
     "tests/test_workflow_executor.py",
     "tests/test_workflow_handoff.py",
     "tests/test_workflow_lineage.py",

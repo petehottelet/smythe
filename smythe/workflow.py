@@ -53,7 +53,7 @@ from smythe.lineage import _id as _lineage_id
 from smythe.registry import Registry
 from smythe.provider import ProviderResponseError
 from smythe.reuse import REASONS
-from smythe.scheduling import PROFILE_KEY, RetryPolicy
+from smythe.scheduling import PROFILE_KEY, RetryPolicy, TerminationPolicy
 from smythe.task import Task, snapshot_task, task_from_dict, task_to_dict
 from smythe.tracer import (
     REVIEW_TRIGGER, REVISION_LOG_LIMIT, Tracer, revision_context, revision_log_entry,
@@ -131,8 +131,15 @@ MAX_NODE_ID_CHARS = 256
 # policy, CallKey.attempt continues from the attempts the journal shows a
 # node's generation used (WorkflowRuntime._attempts_used), so a run keeps the
 # policy it started with.
+#
+# termination is the run's TerminationPolicy as _termination_record gives it,
+# or None, which recipes without the field mean: a failure that stops the run
+# cancels the calls in flight at once. Under a policy the executor first
+# drains them until the deadline, so a sibling answered in time keeps its
+# known charge instead of becoming unknown exposure.
 RECIPE_BEHAVIOR_FIELDS = MappingProxyType({"prompt_assembly": (1, 1), "context_assembly": (0, 0),
-                                           "retry_policy": (None, None)})
+                                           "retry_policy": (None, None),
+                                           "termination": (None, None)})
 # The values this release supports for a behavior-version field. A configured
 # value outside them is refused, and so is a saved recipe that records one,
 # for example a recipe a newer release wrote.
@@ -207,6 +214,14 @@ def _supported_behavior(name, value):
         # The journal keeps a sent call's exposure itself, never the executor.
         return (not policy.retain_uncertain_dispatch
                 and _canonical(_retry_record(policy)) == _canonical(value))
+    if name == "termination":
+        if value is None:
+            return True
+        try:
+            policy = TerminationPolicy(**value)
+        except (TypeError, ValueError):  # Including a field a newer release records.
+            return False
+        return _canonical(_termination_record(policy)) == _canonical(value)
     versions = _BEHAVIOR_VERSIONS.get(name)
     # Versions are integers; a bool or float equal to one is not a version.
     return versions is None or (type(value) is int and value in versions)
@@ -221,6 +236,11 @@ def _retry_record(policy):
     record = policy.to_dict()
     del record["persist_attempts"]
     return record
+
+
+def _termination_record(policy):
+    """The recipe's record of a durable run's TerminationPolicy."""
+    return {"drain_timeout_s": policy.drain_timeout_s}
 
 
 def _snapshot_read_tools(read_tools):
@@ -902,6 +922,15 @@ class WorkflowRuntime:
     Each later decision, which :meth:`reevaluate` or :meth:`republish` makes,
     journals a record that supersedes it.
 
+    ``termination``, a :class:`~smythe.scheduling.TerminationPolicy`, has the
+    executor drain the nodes in flight when a failure stops the run: a call
+    answered before ``drain_timeout_s`` settles its known charge, and the
+    failed checkpoint consumes its node's result, so resume does not call it
+    again. A call still unanswered at the deadline is cancelled and keeps its
+    unknown exposure, as without a policy. The recipe records the policy only
+    when one is configured, and a run keeps it: resume uses the saved one and
+    refuses a different one.
+
     ``run_control``, a :class:`~smythe._failures.RunControl`, is not part of
     the recipe. Once it is revoked, the run's executor admits no node and
     sends no call, and synthesis is not called. A run that a security stop
@@ -919,7 +948,7 @@ class WorkflowRuntime:
                  max_concurrency, graph_policy=None, behavior_settings=None, acceptance=None,
                  read_tools=(), context_sources=None, renderer=None, artifact_dir=None,
                  retry_policy=None, lineage=None,
-                 reserve_for_checks=False, run_control=None):
+                 reserve_for_checks=False, run_control=None, termination=None):
         if type(store) is not SQLiteWorkflowStore:
             raise WorkflowBindingError(
                 f"run_store must be SQLiteWorkflowStore itself, not {type(store).__name__}"
@@ -940,6 +969,10 @@ class WorkflowRuntime:
                 f"run_control must be a RunControl or None, not {type(run_control).__name__}"
             )
         self.run_control = run_control
+        if termination is not None and not isinstance(termination, TerminationPolicy):
+            raise WorkflowBindingError(
+                f"termination must be a TerminationPolicy or None, not {type(termination).__name__}"
+            )
         if reserve_for_checks:
             raise WorkflowBindingError(
                 "reserve_for_checks is not supported by durable text workflows, whose journal "
@@ -1049,6 +1082,9 @@ class WorkflowRuntime:
         _check_lineage_sources(lineage, context_sources)
         if retry_policy is not None:
             settings = MappingProxyType({**settings, "retry_policy": _retry_record(retry_policy)})
+        if termination is not None:
+            settings = MappingProxyType({**settings,
+                                         "termination": _termination_record(termination)})
         self._behavior_settings = settings
         # The sources a run that has recorded none records as revision 0;
         # None when this runtime configures no context assembly.
@@ -2313,6 +2349,8 @@ class WorkflowRuntime:
         await self._seed_reuse()
         saved_policy = self.behavior.get("retry_policy")
         retry_policy = None if saved_policy is None else RetryPolicy.from_dict(saved_policy)
+        saved_termination = self.behavior.get("termination")
+        termination = None if saved_termination is None else TerminationPolicy(**saved_termination)
         self.executor = AsyncExecutor(
             provider=self.execution_provider, registry=self.registry, tracer=self.trace,
             budget=self.budget, max_concurrency=self.execution_concurrency, artifact_dir=None,
@@ -2330,6 +2368,9 @@ class WorkflowRuntime:
             retry_policy=retry_policy,
             attempts_spent=None if retry_policy is None else self._attempts_used,
             run_control=self.run_control,
+            # A node that settles during a drain saves through its own
+            # update, and the failed checkpoint below consumes its calls too.
+            termination=termination,
         )
         self._save()
         try:

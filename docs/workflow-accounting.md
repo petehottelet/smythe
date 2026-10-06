@@ -187,9 +187,13 @@ running. A zero-cost rejection fails its node under `HALT`, the default, and
 under `RETRY` once the final attempt is rejected. A node that `SKIP` skips
 cancels nothing. A cancelled node whose generation request was already sent
 holds unknown exposure at its quoted ceiling, so the run is blocked with
-`unknown_exposure` and resuming it fails. A [security stop](#security-stops)
-cancels the running nodes the same way and blocks the run with `security_stop`
-instead. Runs that execute one node at a time
+`unknown_exposure` and resuming it fails. Under a [termination
+policy](#draining-in-flight-calls) the run first waits for those requests: a
+node answered within the deadline keeps its known charge and its result, and
+only a request still unanswered at the deadline holds unknown exposure. A
+[security stop](#security-stops) cancels the running nodes at once, with or
+without a policy, and blocks the run with `security_stop` instead. Runs that
+execute one node at a time
 (`parallel=False`, the default, or `max_concurrency=1`) have no other call in
 flight. A node's `timeout_s` also cancels a call that was already sent, with
 the same result, even in a serial run. A generated plan cannot set a timeout
@@ -248,6 +252,46 @@ declare `sdk_retries=0`, as the native and offline providers do; otherwise
 the run is refused with `WorkflowBindingError` before it is created or, on
 resume, before any call. A policy with `retain_uncertain_dispatch` is refused
 the same way: the journal keeps the exposure of every call it sends itself.
+
+### Draining in-flight calls
+
+`Swarm(run_store=store, parallel=True, termination=TerminationPolicy(drain_timeout_s=30))`
+has a durable run [drain the nodes in flight](execution.md#draining-in-flight-work)
+when a failure stops it, such as a `HALT` node's zero-cost rejection. No node
+is admitted and no retry is sent, and each node in flight may finish its
+current call for up to `drain_timeout_s` seconds:
+
+- A node whose response arrives within the deadline settles its known charge
+  and keeps its result, and the failed checkpoint consumes its call. The run
+  is not blocked: resuming it runs the failed node and the nodes that never
+  started, and never calls the settled node again.
+- A node whose request is still unanswered at the deadline is cancelled, as
+  without a policy. The request was sent, so it holds unknown exposure at its
+  quoted ceiling and the run is blocked with `unknown_exposure`. A node
+  cancelled before its request was sent, such as one still counting its
+  input tokens, holds nothing, and resuming the run sends it.
+- A [security stop](#security-stops) never waits: a revocation during the
+  drain cancels the nodes in flight at once.
+
+The journal's calls record how each node's call ended; a durable checkpoint
+keeps no `control.drain` summary. A call claims its dispatch right after its
+reservation, so a drain never leaves a call reserved but unsent. A process
+lost during a drain can: resuming sends that call under its reservation, as
+[recovery boundaries](#recovery-boundaries) describe, and recovery holds each
+call the lost process sent without a saved response as unknown exposure.
+
+The recipe records the policy under `termination`, as
+`{"drain_timeout_s": ...}`, only when one is configured, so a recipe without
+one keeps its bytes. A run keeps the policy it started with: resuming with a
+`Swarm` that sets no `termination` uses the saved one, and a different policy,
+or a policy for a run that started without one, raises
+`WorkflowConflictError` before any call.
+
+A drain only reduces what becomes unknown. The journal has no way to
+reconcile unknown model-call exposure: a run blocked with `unknown_exposure`,
+whether a drain's deadline or a cancellation without a policy left it, stays
+blocked, and its exposure stays recorded as unknown. Once the cause is
+resolved, run the task again as a new run.
 
 ### Security stops
 

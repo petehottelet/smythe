@@ -40,7 +40,6 @@ from smythe.supervisor import Supervisor
 from smythe.swarm import Swarm
 from smythe.tools import ToolCall, ToolResult, ToolRuntime, ToolSession, ToolSpec
 from smythe.tracer import WAIT_REASONS, Tracer
-from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_store import SQLiteWorkflowStore
 
 ESTIMATE = 0.25
@@ -170,15 +169,18 @@ def test_a_drain_needs_a_finite_positive_timeout_and_the_policy_is_frozen():
     assert "drain" in WAIT_REASONS
 
 
-def test_only_a_termination_policy_is_accepted_and_durable_runs_refuse_one(tmp_path):
+def test_only_a_termination_policy_is_accepted_and_durable_runs_take_one(tmp_path):
     with pytest.raises(TypeError, match="termination must be a TerminationPolicy"):
         make(Script(), termination={"drain_timeout_s": 5})
     with pytest.raises(TypeError, match="termination must be a TerminationPolicy"):
         Swarm(model="test-model", provider=Script(), termination=5)
     store = SQLiteWorkflowStore(tmp_path / "runs.sqlite")
     try:
-        with pytest.raises(WorkflowBindingError, match="^termination is not supported"):
-            Swarm(model="test-model", provider=Script(), run_store=store, termination=DRAIN)
+        with pytest.raises(TypeError, match="termination must be a TerminationPolicy"):
+            Swarm(model="test-model", provider=Script(), run_store=store, termination=5)
+        # A durable run records the policy in its recipe (tests/test_workflow_drain.py).
+        durable = Swarm(model="test-model", provider=Script(), run_store=store, termination=DRAIN)
+        assert durable.termination is DRAIN
     finally:
         store.close()
 

@@ -208,6 +208,7 @@ jobs:
           tests/test_sqlite_initialization.py
           tests/test_jobs_workflow_initialization.py
           tests/test_workflow_process_loss.py
+          tests/test_workflow_drain.py
           tests/test_action_process_loss.py
           tests/test_optimize_lease.py
           tests/test_memory.py

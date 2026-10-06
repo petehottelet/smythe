@@ -830,9 +830,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   a policy: a native provider's unresolved bill stays terminal, and another
   provider's call keeps its reservation as unknown cost only under
   `RetryPolicy(retain_uncertain_dispatch=True)`. A cancellation, an
-  interrupt and a failure of class `security_stop` never drain, the serial
-  executor has nothing in flight to drain, and durable runs refuse a policy
-  with `WorkflowBindingError`. `AsyncExecutor.drain_record` and a failed
+  interrupt and a failure of class `security_stop` never drain, and the
+  serial executor has nothing in flight to drain.
+  `AsyncExecutor.drain_record` and a failed
   checkpoint's `control.drain` name the nodes the drain settled or
   cancelled and whether its deadline ended it; the record is informational,
   so checkpoints stay version 4. The time spent is the new `drain` wait in
@@ -1350,6 +1350,21 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   and purged files. Text copied into journal checkpoints and provider
   responses is not scrubbed. See
   [restrict a source](docs/lineage.md#restrict-a-source).
+- Durable runs drain their in-flight calls under
+  `Swarm(run_store=store, termination=TerminationPolicy(drain_timeout_s=...))`.
+  When a failure stops the run, such as a `HALT` node's zero-cost rejection,
+  nothing more is admitted and the requests already sent may finish until
+  the deadline: a node answered in time settles its known charge and keeps
+  its result, the failed checkpoint consumes its call, and resume never
+  calls it again, so the run is not blocked. A request still unanswered at
+  the deadline is cancelled and keeps unknown exposure at its quoted
+  ceiling, as without a policy, and a security stop still cancels at once.
+  The recipe records the policy under `termination` only when one is
+  configured, so existing recipes keep their bytes, and a run keeps its
+  policy: resuming without one uses the saved policy, and a different one
+  raises `WorkflowConflictError`. Unknown model-call exposure still has no
+  reconciliation path; a run it blocks needs a new run. See
+  [draining in-flight calls](docs/workflow-accounting.md#draining-in-flight-calls).
 
 ### Changed
 
