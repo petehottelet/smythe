@@ -586,9 +586,11 @@ def record_refused(store, permit, error):
     """Record that the service definitely did not commit a dispatched attempt.
 
     The attempt is ``refused`` at zero cost, its reservation is given back
-    and the action is ``not_dispatched`` again, its approval unconsumed. The
-    refusal still counts toward ``max_attempts``. *error* is kept with
-    account identifiers redacted. Permits are fenced as for
+    and the action is ``not_dispatched`` again, its approval unconsumed. A
+    refused same-key retry (see :func:`claim_retry`) leaves the action
+    ``outcome_unknown`` instead, since it says nothing of the earlier
+    attempt. The refusal still counts toward ``max_attempts``. *error* is
+    kept with account identifiers redacted. Permits are fenced as for
     :func:`record_receipt`.
     """
     return _record(store, permit, "refused", error=_error(error))
@@ -598,9 +600,13 @@ def record_ambiguous(store, permit, error):
     """Record that a dispatched attempt may or may not have taken effect.
 
     The attempt and its action become ``outcome_unknown``, and the write
-    ceiling it reserved becomes unknown exposure, which nothing here
-    releases. *error* is kept with account identifiers redacted. Permits are
-    fenced as for :func:`record_receipt`.
+    ceiling it reserved becomes unknown exposure. :func:`begin_attempt` then
+    refuses the action: only reconciliation makes another attempt, a
+    same-key retry (:func:`claim_retry`), or allows one, by finding that the
+    write was not made (:func:`record_finding`). The exposure stays until a
+    receipt that a lookup finds reports the write's cost (see
+    :func:`record_lookup`). *error* is kept with account identifiers
+    redacted. Permits are fenced as for :func:`record_receipt`.
     """
     return _record(store, permit, "outcome_unknown", error=_error(error))
 

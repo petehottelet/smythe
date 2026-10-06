@@ -178,7 +178,7 @@ synchronous host code that misbehaves.
 
 | State | Meaning |
 |---|---|
-| `not_dispatched` | No attempt has been sent, or the last one was refused. |
+| `not_dispatched` | No attempt has been sent, the last one was refused, or [reconciliation](#reconciliation) found that the last one was never made. |
 | `dispatched` | An attempt was sent, and no read has confirmed its result yet. |
 | `outcome_unknown` | An attempt may or may not have taken effect. |
 | `observed` | A read of the target showed the intended result. |
@@ -426,7 +426,13 @@ The permit then records the outcome of the one submission:
   instead, since it says nothing about the earlier attempt.
 - `record_ambiguous(store, permit, error)`: the attempt and its action are
   `outcome_unknown`, and the reserved write ceiling becomes unknown exposure.
-  No attempt begins after it, and nothing releases its exposure.
+  `begin_attempt()` then refuses the action, so dispatch never sends the
+  write again. Only [reconciliation](#reconciliation) makes another attempt
+  possible: `claim_retry()` claims a same-key retry, and a `not_executed`
+  finding from `record_finding()` returns the action to `not_dispatched`, so
+  that the next attempt can begin. The attempt keeps its exposure until a
+  receipt that a lookup finds reports the write's cost, which
+  `record_lookup()` confirms.
 
 Connector error text is stored with account identifiers redacted, at most
 500 characters. Recording the same outcome again returns it. An approval is
