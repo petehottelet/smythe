@@ -943,6 +943,19 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   defines `SubGraphTemplate` values whose workers each contribute distinct
   evidence, capabilities, responsibilities or checkable outputs, and runs
   offline. See [contribution lint](docs/architecture.md#contribution-lint).
+- Opt-in claim exchange between workers. A node in a graph you write that
+  sets `metadata["exchange"] = "claims"` is given, for each dependency whose
+  output carries a `source-evidence` block with a claim, a compact record in
+  place of that output: every claim with its supporting and contradicting
+  passages, scope, unresolved questions and conclusion, and each source's id,
+  version and digest without its text. Other dependencies, and the prompts
+  of nodes that do not opt in, are unchanged.
+  `smythe.evidence.claim_exchange(output)` makes the record. A durable run's
+  journaled request holds the compact records, so a resumed call is given
+  the same bytes; its context snapshot records their digests, and artifact
+  lineage declares the node's inputs. Another `exchange` value is refused
+  before any node call, and a generated plan cannot set the key. See
+  [claim exchange](docs/architecture.md#claim-exchange).
 - Reuse decisions for artifact lineage. `smythe.reuse.evaluate(record,
   state)` compares an `ArtifactLineage` record, or None, with a
   `CurrentState` (a developer's zero-cost `SourceCatalog`, the validator

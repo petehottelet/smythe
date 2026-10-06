@@ -19,7 +19,8 @@ is its body (:func:`read_source_evidence`).
 mechanically against the sources a run was given and the body. Whether a
 passage really supports its claim is a judgement those checks do not make.
 :func:`render_contradictions` writes a section for each listed contradiction
-a body leaves out.
+a body leaves out. :func:`claim_exchange` makes the compact record a step
+that exchanges claims receives in place of a dependency's full output.
 
 A durable text workflow whose strict acceptance policy has such a validator
 journals the evidence its delivered output carries as a ``source_evidence``
@@ -49,11 +50,12 @@ from smythe.context import (
 from smythe.validation import _require_keys, _require_sha256
 
 __all__ = [
-    "EVIDENCE_BLOCK", "SOURCE_EVIDENCE_OPERATION", "SOURCE_EVIDENCE_VERSION",
-    "SOURCE_TOMBSTONE_OPERATION", "ClaimPassage", "ClaimRecord", "SourceEvidence",
-    "SourceRecord", "load_source_evidence", "load_source_tombstones", "read_source_evidence",
-    "render_contradictions", "render_source_evidence", "source_evidence_inputs",
-    "source_evidence_key", "source_evidence_result", "source_tombstone_key",
+    "CLAIM_EXCHANGE_NOTE", "EVIDENCE_BLOCK", "SOURCE_EVIDENCE_OPERATION",
+    "SOURCE_EVIDENCE_VERSION", "SOURCE_TOMBSTONE_OPERATION", "ClaimPassage", "ClaimRecord",
+    "SourceEvidence", "SourceRecord", "claim_exchange", "load_source_evidence",
+    "load_source_tombstones", "read_source_evidence", "render_contradictions",
+    "render_source_evidence", "source_evidence_inputs", "source_evidence_key",
+    "source_evidence_result", "source_tombstone_key",
 ]
 
 # The record version every source, claim and evidence record carries.
@@ -64,6 +66,9 @@ EVIDENCE_BLOCK = "source-evidence"
 SOURCE_EVIDENCE_OPERATION = "source_evidence"
 # The durable journal operation kind that records a source removed from a run.
 SOURCE_TOMBSTONE_OPERATION = "source_tombstone"
+# Leads the compact record a step that exchanges claims receives for a dependency.
+CLAIM_EXCHANGE_NOTE = ("Claims, citations and unresolved questions from this step, "
+                       "in place of its full output:")
 RETAINED, REFERENCE, TOMBSTONED = "retained", "reference", "tombstoned"
 
 _LINE = re.compile(r"[^\r\n]*")
@@ -435,6 +440,28 @@ def read_source_evidence(text: str) -> tuple[SourceEvidence | None, str]:
         return SourceEvidence.from_dict(data), body
     except RecursionError as error:
         raise ValueError(f"the {EVIDENCE_BLOCK} block is nested too deeply") from error
+
+
+def claim_exchange(output: Any) -> str | None:
+    """The compact record a step that exchanges claims receives in place of *output*.
+
+    It is ``CLAIM_EXCHANGE_NOTE`` and *output*'s evidence block rendered
+    again with every claim, its passages, scope, unresolved questions and
+    conclusion, and each source record without its text; the body is left
+    out. None, so that the full output is given, when *output* is not text or
+    carries no readable evidence block with a claim.
+    """
+    if not isinstance(output, str):
+        return None
+    try:
+        evidence, _ = read_source_evidence(output)
+    except ValueError:
+        return None
+    if evidence is None or not evidence.claims:
+        return None
+    compact = SourceEvidence(tuple(source.without_text() for source in evidence.sources),
+                             evidence.claims)
+    return f"{CLAIM_EXCHANGE_NOTE}\n{render_source_evidence(compact)}"
 
 
 def source_evidence_inputs(output: str, context_sources: dict[str, Any] | None) -> dict[str, Any]:

@@ -20,7 +20,7 @@ verification, trace, artifact, and recovery controls.
 
 ## Plan and execute graphs
 
-- [Architecture](architecture.md) — planning tiers, declarative routing rules and a single-worker tier, routing decision records, the contribution lint that records parallel workers given identical work, execution flow, and validated planner history with summed node timing
+- [Architecture](architecture.md) — planning tiers, declarative routing rules and a single-worker tier, routing decision records, the contribution lint that records parallel workers given identical work, opt-in claim exchange that gives a worker its dependencies' claims in place of their full output, execution flow, and validated planner history with summed node timing
 - [Tasks and handoffs](tasks.md) — complete task snapshots across planning, inspected graphs, synthesis, memory, and resume, immutable context snapshots that keep sources as untrusted data in durable runs, and removing a source with a tombstone
 - [Execution policies](execution.md) — halt, retry, skip, timeouts, an opt-in retry policy with one retry owner, `Retry-After`, capped backoff, a shared deadline, attempts that resume cannot refill and kept exposure for calls sent without an answer, an opt-in drain of in-flight work after a failure, opt-in capacity limits per provider type and model with call spacing, `Retry-After` cooldowns, deferred admission and round-robin turns across branches, queued work, provider checks before any call, developer-declared model profiles that route nodes to approved providers and models, and 5,000-node deep-graph checks
 - [YAML and jobs](jobs.md) — declarative artifact work and the installed CLI

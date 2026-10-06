@@ -231,7 +231,9 @@ A node is `declared` only when the record knows its inputs:
 
 - a model node or gate given a context snapshot at its final generation
   whose dependency outputs are the results the record lists for those
-  dependencies;
+  dependencies, or, for a node that
+  [exchanges claims](architecture.md#claim-exchange), the compact claim
+  records of those results;
 - a read step with an accepted read at its final generation whose source
   can be named;
 - the synthesis, when its synthesizer calls no model.

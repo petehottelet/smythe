@@ -74,6 +74,10 @@ renewals show that 71% chose monthly billing.
 ```
 ````
 
+A step that builds on another step's evidence can be given only that step's
+claims, citations and unresolved questions, in place of its full output:
+see [claim exchange](architecture.md#claim-exchange).
+
 ## Check evidence mechanically
 
 `SourceEvidenceValidator(sources)` (in `smythe.validators`, also exported

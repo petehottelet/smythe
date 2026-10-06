@@ -32,6 +32,7 @@ from smythe.budget import (
 from smythe.context import (
     CONTEXT_SNAPSHOT_KEY, UNTRUSTED_DATA_NOTE, ContextSnapshot, text_sha256, untrusted_block,
 )
+from smythe.evidence import claim_exchange
 from smythe.graph import (
     REVISION_ADDED_KEY, ExecutionGraph, Node, NodeStatus, Revision, RevisionError, _deliverable_ids,
 )
@@ -170,6 +171,7 @@ def check_pending_nodes(
     for node in graph.nodes:
         if node.status in (NodeStatus.COMPLETED, NodeStatus.SKIPPED):
             continue
+        _exchanges_claims(node)
         profile = node_profile(node, profiles or {})
         estimate = node.metadata.get("estimated_cost_usd")
         if profile is not None and estimate is None:
@@ -340,6 +342,22 @@ SUPPORTED_PROMPT_ASSEMBLY_VERSIONS = (1, 2)
 # the terminal note above would ask the model to carry it into the
 # deliverable.
 SKIPPED_DEPENDENCY_RESULT = "[skipped: this step did not complete]"
+
+# A node whose metadata sets this key to "claims" is given, for each dependency
+# whose output carries source evidence with claims, the compact record
+# smythe.evidence.claim_exchange makes in place of that output.
+EXCHANGE_KEY = "exchange"
+
+
+def _exchanges_claims(node: Node) -> bool:
+    """Whether *node* exchanges claims; another ``exchange`` value raises ValueError."""
+    if EXCHANGE_KEY not in node.metadata:
+        return False
+    if node.metadata[EXCHANGE_KEY] != "claims":
+        raise ValueError(f"Node {node.id!r} metadata {EXCHANGE_KEY!r} must be 'claims', not "
+                         f"{node.metadata[EXCHANGE_KEY]!r}")
+    return True
+
 
 # Under a strict acceptance policy, a regeneration moves each discarded
 # generation's result and artifact records into a list under this node
@@ -2157,8 +2175,11 @@ class ExecutorBase:
         JSON results stay parseable); they are appended here so
         downstream nodes can reference the files.  A SKIPPED dependency
         contributes only ``SKIPPED_DEPENDENCY_RESULT``: its recorded
-        result is an error message, not output.
+        result is an error message, not output.  A node that exchanges
+        claims (``EXCHANGE_KEY``) is given a dependency's compact claim
+        record, when its output carries one, in place of the output.
         """
+        claims = _exchanges_claims(node)
         dep_results: dict[str, Any] = {}
         for dep_id in node.depends_on:
             dep_node = self._cached_node_by_id(dep_id, graph)
@@ -2168,6 +2189,8 @@ class ExecutorBase:
                 dep_results[dep_id] = SKIPPED_DEPENDENCY_RESULT
                 continue
             value = dep_node.result
+            if claims:
+                value = claim_exchange(value) or value
             records = dep_node.metadata.get("artifacts") or []
             if records and isinstance(value, str) and records[0]["path"] not in value:
                 listing = "\n".join(

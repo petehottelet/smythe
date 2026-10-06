@@ -36,7 +36,8 @@ from smythe.evidence import (
     source_tombstone_key,
 )
 from smythe.executor_base import (
-    REJECTED_GENERATIONS_KEY, SUPPORTED_PROMPT_ASSEMBLY_VERSIONS, ExecutorBase, check_provider_support,
+    REJECTED_GENERATIONS_KEY, SUPPORTED_PROMPT_ASSEMBLY_VERSIONS, ExecutorBase, _exchanges_claims,
+    check_provider_support,
 )
 from smythe.graph import (
     REVISION_ADDED_KEY, ExecutionGraph, Node, NodeStatus, Revision, _deliverable_ids,
@@ -1306,6 +1307,12 @@ class WorkflowRuntime:
                 raise WorkflowBindingError("A new workflow requires pending nodes without prior results")
             if fresh and any(key in node.metadata for key in _HISTORY_KEYS):
                 raise WorkflowBindingError("A new workflow cannot inherit execution or accounting history")
+            # Claim exchange is a developer setting: a generated plan's metadata
+            # holds only a role (smythe.loader), so no plan can set it.
+            try:
+                _exchanges_claims(node)
+            except ValueError as error:
+                raise WorkflowBindingError(str(error)) from error
             if self._context_version and graph.task is None and "task_context" in node.metadata:
                 # Snapshots carry a run's Task, never text a graph supplies in its place.
                 raise WorkflowBindingError(

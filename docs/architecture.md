@@ -268,6 +268,60 @@ declare them. The
 defines `SubGraphTemplate` values whose workers each contribute something
 distinct, and a repeated fan-out that the lint flags.
 
+### Claim exchange
+
+A worker that builds on other workers' findings may need their claims, their
+citations and the questions they leave open, but not their full output. A
+node in a graph you write opts into claim exchange with
+`metadata["exchange"] = "claims"`:
+
+```python
+from smythe.graph import ExecutionGraph, Node, Topology
+
+graph = ExecutionGraph([Topology.FORK_JOIN], [
+    Node(id="poll", label="Extract the claims of the 2019 poll"),
+    Node(id="audit", label="Extract the claims of the 2026 audit"),
+    Node(id="brief", label="Write the billing brief", depends_on=["poll", "audit"],
+         metadata={"exchange": "claims"}),
+])
+```
+
+For each dependency whose output carries a
+[`source-evidence` block](source-evidence.md#carry-evidence-in-an-artifact)
+with at least one claim, the node is given a compact record in place of that
+output: `smythe.evidence.CLAIM_EXCHANGE_NOTE`, then the block rendered again
+with every claim, its supporting and contradicting passages, scope,
+unresolved questions and proposed conclusion, and each source record's id,
+version and digest without its text. The rest of the output is left out.
+Artifact files a dependency produced are still listed after the record.
+A dependency without such a block, or whose block cannot be read or holds no
+claim, is given in full, and a skipped one as before.
+`smythe.evidence.claim_exchange(output)` returns the record, or `None` when
+the output is given in full.
+
+Prompts change only for nodes that opt in; every other node, including a
+sibling of one that does, is sent the same bytes as before. A node that opts
+in gives up context: it no longer sees a dependency's reasoning or any text
+outside its claims. A final
+[`SourceEvidenceValidator`](source-evidence.md#check-evidence-mechanically)
+checks the delivered artifact as before, so the node's own output needs its
+own evidence block; the exchanged records keep the exact quotes, source ids,
+versions and digests those checks compare.
+
+The value must be `"claims"`. A `Swarm` refuses any other value with
+`ValueError` before any node call, and a durable run with
+`WorkflowBindingError` before it saves its graph; an executor used directly
+raises the `ValueError` when the node starts. In a durable run, the node's
+journaled request holds the compact records, so a resumed call is given the
+same bytes, and with [context assembly](tasks.md#context-snapshots) its
+snapshot holds each record's digest as the text the node saw. Artifact
+[lineage](lineage.md#coverage) declares such a node's inputs when each digest
+is that of the dependency's recorded result or, for a result that carries a
+claim record, of its compact record.
+
+Claim exchange is developer configuration. A generated plan's node metadata
+may hold only `role`, so a model cannot opt a node in.
+
 ## 2. Durable execution envelope
 
 The graph runs through one set of controls regardless of who designed it.

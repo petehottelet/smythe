@@ -20,6 +20,8 @@ from typing import Any
 from smythe._canonical import sha256_hex
 from smythe.acceptance import AcceptanceDecision, DeliveryAcceptance, task_sha256
 from smythe.context import ContextSnapshot, ContextSource, context_key, text_sha256
+from smythe.evidence import claim_exchange
+from smythe.executor_base import _exchanges_claims
 from smythe.graph import ExecutionGraph, Node, NodeStatus
 from smythe.validation import ValidatorIdentity, _require_keys, _require_sha256
 from smythe.verifier import node_generation
@@ -455,13 +457,21 @@ def _read_source(node: Node, text: str, sources: tuple[ContextSource, ...]) -> d
 
 
 def _given(snapshot: ContextSnapshot, node: Node, results: Mapping[str, tuple]) -> bool:
-    """Whether *snapshot* gave *node* exactly the dependency results already recorded."""
+    """Whether *snapshot* gave *node* exactly the dependency results already recorded.
+
+    A node that exchanges claims is given the compact claim record of a
+    result that carries one (:func:`~smythe.evidence.claim_exchange`).
+    """
     given = {item.node_id: item for item in snapshot.dependencies}
     if given.keys() != set(node.depends_on):
         return False
+    claims = _exchanges_claims(node)
     for dep_id, item in given.items():
-        status, generation, result = results[dep_id]
+        status, generation, result, text = results[dep_id]
         skipped = status is NodeStatus.SKIPPED
+        exchanged = claim_exchange(text) if claims and not skipped else None
+        if exchanged is not None:
+            result = text_sha256(exchanged)
         if (item.generation != generation or item.status != ("skipped" if skipped else "completed")
                 or not skipped and item.output_sha256 != result):
             return False
@@ -509,10 +519,11 @@ def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
     Nodes are listed after their dependencies, then the synthesis, kind
     ``synthesis``, which depends on them all. A node is ``declared`` only
     when its inputs are known: a model or gate node given a snapshot whose
-    dependency digests are the recorded results; a read step whose accepted
-    read names its source; or a synthesis by local code or a built-in
-    strategy that calls no model. Any other node is ``undeclared``, which
-    makes the coverage ``partial``.
+    dependency digests are the recorded results (for a node that exchanges
+    claims, their compact claim records); a read step whose accepted read
+    names its source; or a synthesis by local code or a built-in strategy
+    that calls no model. Any other node is ``undeclared``, which makes the
+    coverage ``partial``.
     """
     run, sources = graph.run_ref, tuple(sources)
     agents = {entry["id"]: sha256_hex({key: value for key, value in entry.items() if key != "id"})
@@ -548,7 +559,7 @@ def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
                 declared = _given(snapshot, node, results)
             if node.agent_id in agents:
                 inputs["agent_sha256"] = agents[node.agent_id]
-        results[node.id] = (node.status, generation, result)
+        results[node.id] = (node.status, generation, result, node.result)
         entries.append({"id": node.id, "generation": generation, "kind": kind,
                         "depends_on": list(dict.fromkeys(node.depends_on)), "result_sha256": result,
                         "inputs": inputs, "coverage": "declared" if declared else "undeclared"})
