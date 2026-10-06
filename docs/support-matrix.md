@@ -366,6 +366,8 @@ A durable run checks its provider and components each time `plan()`,
 `WorkflowBindingError`, a `ValueError` whose message starts with the
 argument's name; a different `retry_policy` on resume raises
 `WorkflowConflictError`.
+A `capacity_policy` raises the same error sooner, when the `Swarm` is
+constructed with a `run_store`.
 
 | Component | Accepted | Rejected |
 |---|---|---|
@@ -380,6 +382,7 @@ argument's name; a different `retry_policy` on resume raises
 | `lineage` | `None`, or a `LineagePolicy` with a strict `acceptance` policy; the completed run [records its lineage](lineage.md#the-record-a-run-writes) | Other objects and `LineagePolicy` subclasses; `lineage` without `run_store` or with no or an advisory `acceptance` policy; node or source ids a record cannot hold, blank or with DEL (U+007F); a new graph whose nodes carry `lineage_reuse` metadata |
 | `retry_policy` | `None`, where the node failure policy decides each retry, or a `RetryPolicy`, which the recipe records and whose attempts the journal counts across resume ([durable retry policy](workflow-accounting.md#retry-policy)) | A provider that does not declare `sdk_retries=0`; a policy with `retain_uncertain_dispatch`; on resume, a policy other than the one the run started with |
 | `reserve_for_checks` | `False`; the journal admits each call against the run's budget | `True` |
+| `capacity_policy` | `None`; the journal admits each call when it is made | Any `CapacityPolicy`, when the `Swarm` is constructed |
 | Architects and other components | Built-in components and `LocalOnly` factories | Subclasses and unjournaled dependencies |
 | Node inputs | Plain text | `attach_dep_artifacts`, `attachments` and `artifacts` |
 | Resume | The saved recipe: components, models, budget, `retry_backoff_s`, concurrency, gate validator, acceptance policy, read profiles, renderer and lineage policy | Any change raises `WorkflowConflictError`, including a lineage policy added, removed or changed |
@@ -406,7 +409,8 @@ Tests:
   `tests/test_workflow_acceptance.py::test_durable_runs_refuse_unregistered_verifier_code_before_any_call`,
   `tests/test_workflow_retry_policy.py::test_a_provider_whose_sdk_may_retry_is_refused_before_any_call`,
   `tests/test_workflow_retry_policy.py::test_resume_refuses_a_different_explicit_policy_and_keeps_the_saved_one`,
-  `tests/test_budget_holds.py::test_durable_runs_refuse_reserve_for_checks_by_name_before_any_call`.
+  `tests/test_budget_holds.py::test_durable_runs_refuse_reserve_for_checks_by_name_before_any_call`,
+  `tests/test_capacity_admission.py::test_executors_and_swarm_check_the_policy_and_durable_runs_refuse_it`.
 - Gate validators: `tests/test_workflow_acceptance.py::test_registered_validator_judges_durable_gates_from_the_exact_target_text`,
   `tests/test_workflow_acceptance.py::test_a_changed_validator_configuration_or_version_refuses_resume_before_any_call`,
   `tests/test_workflow_acceptance.py::test_a_validator_that_cannot_decide_ends_its_gate_without_regeneration`,
