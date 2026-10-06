@@ -324,8 +324,9 @@ Tests:
 A durable run checks its provider and components each time `plan()`,
 `execute()` or `resume()` starts, before routing or planning. A rejected
 `run_store`, `verifier`, `memory`, `tool_runtime`, `checkpoint_store`,
-`retry_policy` or `reserve_for_checks` raises `WorkflowBindingError`, a
-`ValueError` whose message starts with the argument's name.
+`retry_policy`, `reserve_for_checks` or `lineage` raises
+`WorkflowBindingError`, a `ValueError` whose message starts with the
+argument's name.
 
 | Component | Accepted | Rejected |
 |---|---|---|
@@ -337,11 +338,12 @@ A durable run checks its provider and components each time `plan()`,
 | `read_tools` | `ReadProfile` declarations, named by read steps in graphs and templates you write | Other objects, duplicate names and `read_tools` without `run_store`; read steps naming an undeclared profile, with invalid input or judging another node; read steps on ordinary runs |
 | `checkpoint_store` | `None`; the journal holds checkpoints | Any checkpoint store |
 | `renderer` | `None`, `MarkdownRenderer`, or a renderer declared with `LocalOnly(..., role="renderer")` whose `render()` is synchronous; it [publishes the delivered document](workflow-accounting.md#published-documents) into `artifact_dir` | Other objects and other `LocalOnly` roles; `renderer` without `run_store` or `artifact_dir`; a strict policy without final validators; an `async` `render()` or an invalid `filename` or `media_type`; a run directory that another run owns or that holds files the run does not own |
+| `lineage` | `None`, or a `LineagePolicy` with a strict `acceptance` policy; the completed run [records its lineage](lineage.md#the-record-a-run-writes) | Other objects and `LineagePolicy` subclasses; `lineage` without `run_store` or with no or an advisory `acceptance` policy; blank node or source ids; a new graph whose nodes carry `lineage_reuse` metadata |
 | `retry_policy` | `None`; the node failure policy decides each retry | Any `RetryPolicy` |
 | `reserve_for_checks` | `False`; the journal admits each call against the run's budget | `True` |
 | Architects and other components | Built-in components and `LocalOnly` factories | Subclasses and unjournaled dependencies |
 | Node inputs | Plain text | `attach_dep_artifacts`, `attachments` and `artifacts` |
-| Resume | The saved recipe: components, models, budget, `retry_backoff_s`, concurrency, gate validator, acceptance policy, read profiles and renderer | Any change raises `WorkflowConflictError` |
+| Resume | The saved recipe: components, models, budget, `retry_backoff_s`, concurrency, gate validator, acceptance policy, read profiles, renderer and lineage policy | Any change raises `WorkflowConflictError`, including a lineage policy added, removed or changed |
 | `max_budget_usd=None` | Runs without a budget | |
 | `artifact_dir` | Where a `renderer` publishes; ignored without one | |
 | `max_tool_iterations` | Ignored | |
@@ -405,14 +407,24 @@ Tests:
   `tests/test_workflow_read_tool.py::test_a_saved_read_response_is_used_on_resume_without_reading_again`,
   `tests/test_workflow_read_tool.py::test_a_lost_read_response_is_read_again_only_when_free_and_repeat_safe`
   and `tests/test_workflow_read_tool.py::test_killed_read_resumes_without_a_duplicate_read`.
+- Lineage: refused `tests/test_support_matrix.py::test_lineage_is_refused_without_a_durable_store_or_strict_policy_before_any_call`,
+  `tests/test_lineage_records.py::test_swarm_lineage_needs_a_durable_store_before_any_call`,
+  `tests/test_lineage_records.py::test_lineage_needs_a_strict_acceptance_policy`,
+  `tests/test_lineage_records.py::test_policy_rejects_subclasses_and_impostors`,
+  `tests/test_lineage_records.py::test_a_new_graph_cannot_carry_reused_results`
+  and `tests/test_workflow_lineage.py::test_lineage_runs_refuse_blank_ids_before_any_call`;
+  recorded `tests/test_workflow_lineage.py::test_lineage_lists_what_each_node_read_and_binds_the_document_and_decision`
+  and `tests/test_workflow_lineage.py::test_nodes_without_a_snapshot_are_undeclared_and_the_run_partial`.
 - Plain-text nodes: `tests/test_support_matrix.py::test_durable_run_rejects_image_inputs_on_a_caller_graph_before_any_call`,
   `tests/test_workflow_native_runtime.py::test_plan_the_run_cannot_execute_is_repaired_as_an_additional_paid_attempt`
   and `tests/test_workflow_provider.py::test_unsupported_input_rejected_before_journal_or_http`.
 - Built-in components: `tests/test_workflow_binding.py::test_local_only_factory_creates_independent_local_architects`,
   `tests/test_workflow_binding.py::test_custom_subclass_cannot_silently_inherit_builtin_binding`,
   `tests/test_workflow_binding.py::test_preflight_rejects_unjournaled_dependencies`.
-- Resume: `tests/test_support_matrix.py::test_durable_run_rejects_a_changed_retry_backoff_before_any_call`
-  and `tests/test_workflow_runtime.py::test_changed_handoff_binding_rejected_before_calls`.
+- Resume: `tests/test_support_matrix.py::test_durable_run_rejects_a_changed_retry_backoff_before_any_call`,
+  `tests/test_workflow_runtime.py::test_changed_handoff_binding_rejected_before_calls`,
+  `tests/test_lineage_records.py::test_an_in_flight_run_keeps_its_lineage_policy`
+  and `tests/test_lineage_records.py::test_a_completed_lineage_run_is_re_evaluated_only_under_its_policy`.
 - No budget and ignored options: `tests/test_support_matrix.py::test_durable_run_ignores_artifact_dir_and_tool_iterations_and_allows_no_budget`.
 
 ## Jobs
