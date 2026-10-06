@@ -429,11 +429,12 @@ every read and never written back; recorded statuses and `accepted` flags are
 unchanged. The HTML report shows it in a Delivery column, with the decision
 and validator results beside each attempt.
 
-`resume` and `reroll` recheck the SHA-256 of every accepted artifact in the run
-after execution, without the 64 MiB inspection limit, and return the same
-fields with an `artifact_integrity` summary. A changed or missing accepted file
-is reported there and makes its operation ineligible; the run's status and
-the operation's recorded acceptance stay as they were.
+`resume` and `reroll` recheck the SHA-256 of every file of each operation's
+accepted attempt after execution, without the 64 MiB inspection limit, and
+return the same fields with an `artifact_integrity` summary. A changed or
+missing accepted file is reported there and makes its operation ineligible;
+the run's status and the operation's recorded acceptance stay as they were.
+[Repair](#repair-corrupted-accepted-outputs) regenerates such an operation.
 
 ## List and inspect runs
 
@@ -684,6 +685,42 @@ and attempts recorded by earlier versions keep an empty reason.
 Successful operations cannot be casually rerolled, which preserves accepted
 outputs byte-for-byte.
 
+### Repair corrupted accepted outputs
+
+A succeeded operation whose accepted file was later deleted, truncated or
+overwritten is not delivered: its [delivery eligibility](#delivery-eligibility)
+reports `artifact_missing` or `artifact_changed`. Regenerate it with an
+integrity repair:
+
+```bash
+smythe jobs reroll RUN_ID "tile[3]" --repair-integrity --reason "tile.png was overwritten"
+```
+
+Under the run's lease, immediately before queueing, the runner hashes every
+file of the operation's accepted attempt again, without the 64 MiB inspection
+limit. The repair is queued only when at least one of those files is `missing`
+or `changed` and the others are `verified`. Bytes that all verify are refused,
+so a verified success still cannot be rerolled. A file that is unreadable or
+unsafe, such as a symbolic link or a directory, an exhausted attempt allowance
+and another worker's lease also refuse it with exit code 6, and a budget
+overrun with exit code 5. A refused repair queues nothing and changes no
+operation, attempt or artifact record. `--repair-integrity` cannot be combined
+with `--acknowledge-unknown`.
+
+A repair uses the run's original approval and attempt allowance; it needs no
+new approval. The `integrity_repair_queued` event records the reason and each
+accepted file's finding: its `artifact_id`, `relative_path` and recorded
+`sha256`, and the observed `status` and `detail`. The new attempt is linked to
+the accepted attempt it replaces and records the reason. The operation keeps
+naming that accepted attempt until a new attempt is accepted: a rejected or
+failed repair attempt leaves it ineligible, and a reroll tries again. Earlier
+artifact rows and their `accepted` flags never change. `resume` and `reroll`
+recheck only each operation's current accepted attempt, so the files a repair
+replaced are not reported again; `jobs inspect` still shows their integrity.
+In Python, pass `repair_integrity=True` to `JobRunner.reroll`; it records the
+findings with `SQLiteRunStore.queue_integrity_repair`. The Jobs schema stays at
+version 4.
+
 ## Adopt published bytes
 
 A response's bytes are published before its call settles in the journal. A
@@ -772,7 +809,7 @@ and output charge that one request can incur.
 | 3 | provider configuration or optional dependency failure |
 | 4 | approval mismatch, or an already used approval without `--new-run` |
 | 5 | budget admission failure |
-| 6 | unknown run, invalid state transition, or refused adoption |
+| 6 | unknown run, invalid state transition, or refused adoption or repair |
 | 7 | local SQLite/filesystem failure, detached startup failure, or attachment detects a failed worker or expired lease |
 | 130 | detached startup interrupted, or attachment disconnected with Ctrl+C |
 

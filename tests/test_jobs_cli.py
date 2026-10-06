@@ -399,3 +399,50 @@ def test_export_rejects_invalid_recorded_directory_without_legacy_fallback(direc
     with pytest.raises(ValueError, match="artifact directory"):
         _portable_export({"manifest_root": "/source", "output_directory": "outputs",
                           "run_id": "legacy", "artifact_directory": directory})
+
+
+# ---------------------------------------------------------------------------
+# Integrity repair
+# ---------------------------------------------------------------------------
+
+
+def test_reroll_repair_integrity_regenerates_a_deleted_accepted_file(tmp_path, capsys):
+    manifest = _manifest(tmp_path, attempts=2)
+    store = tmp_path / "jobs.sqlite3"
+    assert main(["jobs", "plan", str(manifest), "--json"]) == EXIT_OK
+    token = _json_output(capsys)["plan"]["approval"]["token"]
+    assert main(["jobs", "run", str(manifest), "--approve", token, "--store", str(store),
+                 "--json"]) == EXIT_OK
+    run = _json_output(capsys)["run"]
+    [artifact] = run["artifacts"]
+    command = ["jobs", "reroll", run["run_id"], "glyph[0]", "--reason", "accepted file deleted",
+               "--store", str(store), "--json"]
+
+    for arguments, code, error in (
+        ([], EXIT_JOB_STATE, "cannot be rerolled"),
+        (["--repair-integrity"], EXIT_JOB_STATE, "no missing or changed accepted file"),
+        (["--repair-integrity", "--acknowledge-unknown"], EXIT_INVALID_INPUT, "unknown outcome"),
+    ):
+        assert main([*command, *arguments]) == code
+        refused = _json_output(capsys)
+        assert refused["ok"] is False and refused["command"] == "reroll"
+        assert error in refused["error"]["message"]
+
+    (tmp_path / "outputs" / run["artifact_directory"] / artifact["relative_path"]).unlink()
+    assert main([*command, "--repair-integrity"]) == EXIT_OK
+    repaired = _json_output(capsys)["reroll"]
+    assert repaired["status"] == "completed" and repaired["counts"] == {"succeeded": 1}
+    [operation] = repaired["operations"]
+    assert [attempt["reason"] for attempt in repaired["attempts"]] == [None, "accepted file deleted"]
+    assert operation["accepted_attempt_id"] == repaired["attempts"][1]["attempt_id"]
+    assert operation["delivery_eligibility"] == {"eligible": True, "reasons": []}
+    assert main(["jobs", "status", run["run_id"], "--events", "--store", str(store), "--json"]) == EXIT_OK
+    [queued] = [event for event in _json_output(capsys)["status"]["events"]
+                if event["event_type"] == "integrity_repair_queued"]
+    assert queued["payload"]["reason"] == "accepted file deleted"
+    assert [finding["status"] for finding in queued["payload"]["findings"]] == ["missing"]
+
+    with pytest.raises(SystemExit):
+        main(["jobs", "reroll", "--help"])
+    help_text = " ".join(capsys.readouterr().out.split())
+    assert "--repair-integrity rerun succeeded operations whose accepted files are missing or changed" in help_text

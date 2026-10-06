@@ -260,6 +260,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="acknowledge possible duplicate spend for unknown outcomes",
     )
+    reroll.add_argument(
+        "--repair-integrity",
+        action="store_true",
+        help="rerun succeeded operations whose accepted files are missing or changed",
+    )
     _add_output_options(reroll, inherited=True)
 
     adopt = commands.add_parser(
@@ -1323,6 +1328,7 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
                     args.operation_keys,
                     reason=args.reason,
                     acknowledge_unknown=args.acknowledge_unknown,
+                    repair_integrity=args.repair_integrity,
                 )
             )
         elif command == "adopt":

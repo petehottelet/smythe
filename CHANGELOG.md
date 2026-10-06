@@ -972,6 +972,25 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   bytes with `SQLiteRunStore.adopt_published_attempt()`; the Jobs schema
   stays at version 4. See
   [adopt published bytes](docs/jobs.md#adopt-published-bytes).
+- `jobs reroll RUN_ID OPERATION --repair-integrity --reason TEXT` regenerates
+  a succeeded operation whose accepted file was deleted, truncated or
+  overwritten. Under the run's lease, the runner hashes every file of the
+  accepted attempt again and queues the operation only when one is `missing`
+  or `changed` and the rest verify, so a verified success still cannot be
+  rerolled. Verified bytes, an unreadable or unsafe file and an exhausted
+  attempt allowance refuse the repair with exit code 6, and a budget overrun
+  with exit code 5. The repair uses the run's original approval and attempt
+  allowance. An
+  `integrity_repair_queued` event records the reason and each file's finding,
+  and the new attempt, linked to the one it replaces, records the reason. The
+  operation keeps naming its accepted attempt until a new attempt is accepted,
+  even when the repair attempt is rejected; artifact rows and their `accepted`
+  flags never change, and `resume` and `reroll` recheck only each operation's
+  current accepted attempt. In Python, `JobRunner.reroll(...,
+  repair_integrity=True)` records the findings with
+  `SQLiteRunStore.queue_integrity_repair()`; the Jobs schema stays at
+  version 4. See
+  [repair corrupted accepted outputs](docs/jobs.md#repair-corrupted-accepted-outputs).
 - Contribution lint. `lint_contributions(graph, registry=None)` lists the
   groups of parallel siblings that could only repeat each other's work: the
   same dependency inputs, label, agent, model, required capabilities,

@@ -49,7 +49,12 @@ _FENCING_COLUMNS = {"runs": {"lease_epoch"}, "attempts": {"lease_owner_id", "lea
                     "run_leases": {"epoch"}}
 _ARTIFACT_COLUMNS = {"artifact_namespace", "artifact_owner_id"}
 # Events whose text ``reason`` explains the next attempt of their operation.
-_QUEUED_REASON_EVENTS = ("reroll_queued",)
+_QUEUED_REASON_EVENTS = ("reroll_queued", "integrity_repair_queued")
+# Integrity statuses of an accepted file. A repair needs a missing or changed
+# file; any status but these and ``verified`` leaves the bytes unknown.
+_REPAIRABLE_INTEGRITY = frozenset({"missing", "changed"})
+_INTEGRITY_STATUSES = _REPAIRABLE_INTEGRITY | {"verified", "unreadable", "unsafe", "not_checked"}
+_FINDING_KEYS = frozenset({"artifact_id", "relative_path", "sha256", "status", "detail"})
 # Events that carry a call's delivery decision when one was recorded: its
 # completion, or the adoption of bytes its unknown-outcome attempt published.
 _COMPLETION_EVENTS = ("call_completed", "artifact_rejected", "unknown_outcome_adopted")
@@ -253,6 +258,28 @@ def _delivery_decision(record: object, accepted: bool,
            for artifact in artifacts):
         raise ValueError("delivery_acceptance needs a published subject for every artifact")
     return decision
+
+
+def _repair_findings(findings: object) -> dict[str, dict[str, Any]]:
+    """Index a repair's integrity observations by artifact ID, refusing malformed ones."""
+    if not isinstance(findings, (list, tuple)):
+        raise ValueError("integrity findings must be a list of observations")
+    indexed: dict[str, dict[str, Any]] = {}
+    for item in findings:
+        if type(item) is not dict or set(item) != _FINDING_KEYS:
+            raise ValueError("each integrity finding needs exactly the keys "
+                             + ", ".join(sorted(_FINDING_KEYS)))
+        if any(type(item[key]) is not str for key in ("artifact_id", "relative_path", "sha256")):
+            raise ValueError("integrity finding artifact identities must be text")
+        if type(item["status"]) is not str or item["status"] not in _INTEGRITY_STATUSES:
+            raise ValueError("integrity finding status must be one of "
+                             + ", ".join(sorted(_INTEGRITY_STATUSES)))
+        if type(item["detail"]) is not str or len(item["detail"]) > 1024:
+            raise ValueError("integrity finding detail must be text of at most 1024 characters")
+        if item["artifact_id"] in indexed:
+            raise ValueError("an integrity finding names an artifact more than once")
+        indexed[item["artifact_id"]] = dict(item)
+    return indexed
 
 
 def _check_artifacts(artifacts: Sequence[dict[str, Any]]) -> None:
@@ -1427,8 +1454,11 @@ class SQLiteRunStore:
                    completed_at_ns = ? WHERE attempt_id = ?""",
                 (operation_status.value, result_text, error, now, attempt["attempt_id"]),
             )
+            # Only an accepted attempt moves the pointer. A rejected attempt
+            # queued by an integrity repair leaves it on the attempt it replaces.
             cursor.execute(
-                """UPDATE operations SET status = ?, accepted_attempt_id = ?,
+                """UPDATE operations SET status = ?,
+                   accepted_attempt_id = COALESCE(?, accepted_attempt_id),
                    result_text = ?, error = ?, updated_at_ns = ?
                    WHERE run_id = ? AND operation_id = ?""",
                 (
@@ -1628,6 +1658,102 @@ class SQLiteRunStore:
                     run_id,
                     RunStatus.BUDGET_OVERRUN.value,
                 ),
+            )
+        return queued
+
+    def queue_integrity_repair(
+        self,
+        run_id: str,
+        operation_keys: Iterable[str],
+        *,
+        reason: str,
+        findings: Sequence[dict[str, Any]],
+        lease: RunLease | None = None,
+    ) -> list[str]:
+        """Queue succeeded operations whose accepted files are missing or changed.
+
+        ``findings`` are the caller's observations, made under the current
+        lease, of every accepted artifact of each operation's accepted
+        attempt: its ``artifact_id``, ``relative_path`` and ``sha256`` as
+        recorded, and the ``status`` and ``detail`` of the shared integrity
+        check. An operation is queued only when it is ``succeeded``, has an
+        attempt left, and at least one of those files is ``missing`` or
+        ``changed`` while the rest are ``verified``; otherwise nothing is
+        queued and ``InvalidTransitionError`` is raised. Each operation's
+        ``integrity_repair_queued`` event records the reason and its
+        findings, and its next attempt records the reason. A repair uses the
+        run's original approval and attempt allowance. The accepted attempt,
+        its artifact rows and their accepted flags stay as they are until a
+        new attempt is accepted.
+        """
+        keys = list(dict.fromkeys(operation_keys))
+        if not keys:
+            raise ValueError("at least one operation key is required")
+        if not isinstance(reason, str) or not reason.strip() or len(reason) > 2048:
+            raise ValueError("repair reason must be nonempty text of at most 2048 characters")
+        observed = _repair_findings(findings)
+        queued: list[str] = []
+        with self._transaction() as cursor:
+            now = self._clock_ns()
+            self._assert_write_owner(cursor, run_id, lease, now)
+            self._assert_budget_open(cursor, run_id, now)
+            for key in keys:
+                operation = cursor.execute(
+                    """SELECT * FROM operations WHERE run_id = ?
+                       AND (operation_key = ? OR operation_id = ?)""",
+                    (run_id, key, key),
+                ).fetchone()
+                if operation is None:
+                    raise JobNotFoundError(f"{run_id}:{key}")
+                name = operation["operation_key"]
+                if operation["status"] != OperationStatus.SUCCEEDED.value:
+                    raise InvalidTransitionError(
+                        f"operation {name} in state {operation['status']} cannot be repaired"
+                    )
+                if operation["attempt_count"] >= operation["max_attempts"]:
+                    raise InvalidTransitionError(f"operation {name} exhausted attempts")
+                rows = cursor.execute(
+                    """SELECT artifact_id, relative_path, sha256 FROM artifacts
+                       WHERE run_id = ? AND attempt_id = ? AND accepted = 1
+                       ORDER BY relative_path, artifact_id""",
+                    (run_id, operation["accepted_attempt_id"]),
+                ).fetchall()
+                found = [observed.pop(row["artifact_id"], None) for row in rows]
+                if any(item is None or (item["relative_path"], item["sha256"])
+                       != (row["relative_path"], row["sha256"]) for item, row in zip(found, rows)):
+                    raise ValueError(
+                        f"integrity findings must observe every accepted artifact of "
+                        f"operation {name} as recorded"
+                    )
+                statuses = sorted({item["status"] for item in found})
+                unknown = [status for status in statuses
+                           if status not in _REPAIRABLE_INTEGRITY and status != "verified"]
+                if unknown:
+                    raise InvalidTransitionError(
+                        f"operation {name} cannot be repaired while an accepted file is {unknown[0]}"
+                    )
+                if not _REPAIRABLE_INTEGRITY.intersection(statuses):
+                    raise InvalidTransitionError(
+                        f"operation {name} has no missing or changed accepted file to repair; "
+                        "a succeeded operation cannot be rerolled"
+                    )
+                cursor.execute(
+                    """UPDATE operations SET status = ?, error = NULL,
+                       updated_at_ns = ? WHERE run_id = ? AND operation_id = ?""",
+                    (OperationStatus.PENDING.value, now, run_id, operation["operation_id"]),
+                )
+                self._event(cursor, run_id, operation["operation_id"], "integrity_repair_queued",
+                            {"version": 1, "reason": reason, "findings": found}, now)
+                queued.append(name)
+            if observed:
+                raise ValueError(
+                    "an integrity finding names a file that is not an accepted artifact "
+                    "of a selected operation"
+                )
+            cursor.execute(
+                """UPDATE runs SET status = ?, updated_at_ns = ?
+                   WHERE run_id = ? AND status != ?""",
+                (RunStatus.APPROVED.value, now, run_id, RunStatus.BUDGET_OVERRUN.value),
             )
         return queued
 

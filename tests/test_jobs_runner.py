@@ -1351,3 +1351,222 @@ def test_slow_artifact_finalizer_does_not_starve_lease_heartbeat(
                 store.close()
 
     asyncio.run(scenario())
+
+
+# ---------------------------------------------------------------------------
+# Integrity repair of corrupted accepted artifacts
+# ---------------------------------------------------------------------------
+
+
+def _damage(path, change):
+    if change == "flip":
+        data = bytearray(path.read_bytes())
+        data[-1] ^= 0xFF
+        path.write_bytes(bytes(data))
+    elif change == "truncate":
+        path.write_bytes(path.read_bytes()[:-1])
+    else:
+        path.unlink()
+
+
+def _artifact_dump(store):
+    return [line for line in store._connection.iterdump() if line.startswith('INSERT INTO "artifacts"')]
+
+
+def _accepted_file(tmp_path, result, artifact):
+    return tmp_path / "outputs" / result["artifact_directory"] / artifact["relative_path"]
+
+
+def _owner(result, artifact):
+    return next(item for item in result["operations"]
+                if item["accepted_attempt_id"] == artifact["attempt_id"])
+
+
+@pytest.mark.parametrize("change,status", [("flip", "changed"), ("truncate", "changed"),
+                                           ("delete", "missing")])
+def test_integrity_repair_regenerates_a_corrupted_accepted_png(tmp_path, store_factory, change, status):
+    from smythe.jobs.inspection import inspect_job
+
+    plan = preflight_job(_manifest(count=2, attempts=2), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    runner = JobRunner(store)
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path, run_id="repair"))
+    corrupted, intact = first["artifacts"]
+    key = _owner(first, corrupted)["operation_key"]
+    _damage(_accepted_file(tmp_path, first, corrupted), change)
+
+    with SQLiteRunStore(tmp_path / "jobs.db", read_only=True) as reader:
+        inspected = {item["operation_key"]: item for item in inspect_job(reader, "repair")["operations"]}
+    assert inspected[key]["delivery_eligibility"] == {"eligible": False, "reasons": [f"artifact_{status}"]}
+    assert inspected[_owner(first, intact)["operation_key"]]["delivery_eligibility"]["eligible"]
+    dump = _artifact_dump(store)
+
+    repaired = asyncio.run(runner.reroll("repair", [key], reason="accepted PNG damaged",
+                                         repair_integrity=True))
+
+    assert repaired["status"] == RunStatus.COMPLETED.value
+    assert repaired["counts"] == {OperationStatus.SUCCEEDED.value: 2}
+    assert repaired["execution_metrics"]["operations_started"] == 1
+    operation = next(item for item in repaired["operations"] if item["operation_key"] == key)
+    attempts = [item for item in repaired["attempts"] if item["operation_id"] == operation["operation_id"]]
+    # The new attempt alone records the reason, linked to the attempt it replaces.
+    assert [(item["attempt_number"], item["reason"]) for item in attempts] == [
+        (1, None), (2, "accepted PNG damaged")]
+    assert attempts[1]["parent_attempt_id"] == corrupted["attempt_id"]
+    assert operation["accepted_attempt_id"] == attempts[1]["attempt_id"]
+    assert operation["attempt_count"] == 2
+    assert operation["delivery_eligibility"] == {"eligible": True, "reasons": []}
+    assert [item["reason"] for item in repaired["attempts"]
+            if item["operation_id"] != operation["operation_id"]] == [None]
+    # New artifact rows are added; the earlier rows stay byte-identical.
+    after = _artifact_dump(store)
+    assert set(dump) < set(after) and len(after) == len(dump) + 1
+    [new] = [item for item in repaired["artifacts"] if item["attempt_id"] == attempts[1]["attempt_id"]]
+    assert new["accepted"] == 1 and "/attempt-0002/" in new["relative_path"]
+    assert hashlib.sha256(_accepted_file(tmp_path, repaired, new).read_bytes()).hexdigest() == new["sha256"]
+    # Totals stay consistent: one more settled call and nothing reserved or exposed.
+    calls = store._call_rows("repair")
+    assert len(calls) == 3 and {call["status"] for call in calls} == {"succeeded"}
+    assert repaired["cost"]["confirmed_microusd"] == sum(call["confirmed_microusd"] for call in calls)
+    assert (repaired["cost"]["reserved_microusd"], repaired["cost"]["exposure_microusd"]) == (0, 0)
+    # The returned recheck covers each operation's accepted attempt.
+    assert repaired["artifact_integrity"]["counts"] == {"verified": 2}
+    [event] = _events(store, "repair", "integrity_repair_queued")
+    [finding] = event["payload"]["findings"]
+    assert (event["payload"]["version"], event["payload"]["reason"]) == (1, "accepted PNG damaged")
+    assert {name: finding[name] for name in ("artifact_id", "relative_path", "sha256", "status")} == {
+        "artifact_id": corrupted["artifact_id"], "relative_path": corrupted["relative_path"],
+        "sha256": corrupted["sha256"], "status": status}
+    with SQLiteRunStore(tmp_path / "jobs.db", read_only=True) as reader:
+        report = inspect_job(reader, "repair")
+    assert all(item["delivery_eligibility"]["eligible"] for item in report["operations"])
+
+
+def test_integrity_repair_uses_the_original_approval_and_attempt_allowance(tmp_path, store_factory):
+    data = _priced_manifest().to_dict()
+    data["execution"].update(max_attempts=2, max_budget_usd="0.20")
+    plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    provider = _PricedArtifactProvider([Artifact(PNG_1X1, "image/png")])
+    runner = JobRunner(store, provider_pool=_FixedPool(provider))
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path))
+    [artifact] = first["artifacts"]
+    key = first["operations"][0]["operation_key"]
+    _accepted_file(tmp_path, first, artifact).unlink()
+
+    repaired = asyncio.run(runner.reroll(first["run_id"], [key], reason="file deleted",
+                                         repair_integrity=True))
+
+    assert provider.calls == 2
+    assert repaired["cost"]["approved_microusd"] == first["cost"]["approved_microusd"] == 200_000
+    assert repaired["cost"]["confirmed_microusd"] == 80_000
+    assert sum(call["confirmed_microusd"] for call in store._call_rows(first["run_id"])) == 80_000
+    # A second repair needs an attempt the plan no longer allows.
+    [_old, new] = repaired["artifacts"]
+    _accepted_file(tmp_path, repaired, new).unlink()
+    with pytest.raises(InvalidTransitionError, match="exhausted"):
+        asyncio.run(runner.reroll(first["run_id"], [key], reason="deleted again",
+                                  repair_integrity=True))
+    assert provider.calls == 2
+    assert store.snapshot(first["run_id"])["counts"] == {OperationStatus.SUCCEEDED.value: 1}
+
+
+def test_integrity_repair_refuses_verified_or_unsafe_bytes_and_other_owners(tmp_path, store_factory):
+    plan = preflight_job(_manifest(count=1, attempts=2), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    runner = JobRunner(store)
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path, run_id="kept"))
+    [artifact] = first["artifacts"]
+    key = first["operations"][0]["operation_key"]
+    before = store.snapshot("kept")
+
+    def unchanged():
+        after = store.snapshot("kept", include_events=True)
+        assert [after[name] for name in ("operations", "attempts", "artifacts")] == [
+            before[name] for name in ("operations", "attempts", "artifacts")]
+        assert not _events(store, "kept", "integrity_repair_queued")
+
+    with pytest.raises(InvalidTransitionError, match="no missing or changed accepted file"):
+        asyncio.run(runner.reroll("kept", [key], reason="looks off", repair_integrity=True))
+    # A casual reroll of a verified success stays refused.
+    with pytest.raises(InvalidTransitionError, match="cannot be rerolled"):
+        asyncio.run(runner.reroll("kept", [key], reason="looks off"))
+    with pytest.raises(ValueError, match="unknown outcome"):
+        asyncio.run(runner.reroll("kept", [key], reason="r", repair_integrity=True,
+                                  acknowledge_unknown=True))
+    with pytest.raises(TypeError, match="repair_integrity"):
+        asyncio.run(runner.reroll("kept", [key], reason="r", repair_integrity=1))
+    unchanged()
+
+    path = _accepted_file(tmp_path, first, artifact)
+    path.unlink()
+    path.mkdir()  # Not a regular file: the bytes cannot be known.
+    with pytest.raises(InvalidTransitionError, match="is unsafe"):
+        asyncio.run(runner.reroll("kept", [key], reason="replaced", repair_integrity=True))
+    unchanged()
+
+    path.rmdir()
+    lease = store.acquire_run_lease("kept", "other-worker", ttl_s=30)
+    with pytest.raises(RunLeaseError, match="other-worker"):
+        asyncio.run(runner.reroll("kept", [key], reason="file deleted", repair_integrity=True))
+    store.release_run_lease("kept", "other-worker", lease=lease)
+    unchanged()
+
+
+def test_integrity_repair_refuses_a_lease_lost_while_hashing(tmp_path, monkeypatch):
+    from fakes import ManualClock
+
+    clock = ManualClock.after(0)
+    plan = preflight_job(_manifest(count=1, attempts=2), manifest_root=tmp_path)
+    with SQLiteRunStore(tmp_path / "jobs.db", clock_ns=clock) as store, \
+            SQLiteRunStore(tmp_path / "jobs.db", clock_ns=clock) as intruder:
+        runner = JobRunner(store)
+        first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path, run_id="lost"))
+        _accepted_file(tmp_path, first, first["artifacts"][0]).unlink()
+        check = runner_module.check_artifact_integrity
+
+        def expire_during_check(*args, **kwargs):
+            # The files are hashed while this runner holds the run's lease.
+            assert store.get_run_lease("lost").owner_id.startswith("runner-")
+            summary = check(*args, **kwargs)
+            clock.expire_lease(runner.lease_ttl_s)
+            intruder.acquire_run_lease("lost", "intruder")
+            return summary
+
+        monkeypatch.setattr(runner_module, "check_artifact_integrity", expire_during_check)
+        with pytest.raises(RunLeaseError, match="intruder"):
+            asyncio.run(runner.reroll("lost", [first["operations"][0]["operation_key"]],
+                                      reason="file deleted", repair_integrity=True))
+        assert store.snapshot("lost")["counts"] == {OperationStatus.SUCCEEDED.value: 1}
+        assert not _events(store, "lost", "integrity_repair_queued")
+
+
+def test_resume_reports_a_corrupted_file_a_rejected_repair_left_accepted(tmp_path, store_factory):
+    plan = preflight_job(_manifest(count=1, attempts=3), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    provider = _PricedArtifactProvider([Artifact(PNG_1X1, "image/png")], [], cost_usd=None)
+    runner = JobRunner(store, provider_pool=_FixedPool(provider))
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path, run_id="kept"))
+    [artifact] = first["artifacts"]
+    key = first["operations"][0]["operation_key"]
+    _damage(_accepted_file(tmp_path, first, artifact), "flip")
+
+    rejected = asyncio.run(runner.reroll("kept", [key], reason="flipped byte", repair_integrity=True))
+
+    assert rejected["status"] == RunStatus.FAILED.value
+    [operation] = rejected["operations"]
+    assert operation["status"] == OperationStatus.REJECTED.value
+    # The accepted attempt stays named until a new attempt is accepted.
+    assert operation["accepted_attempt_id"] == artifact["attempt_id"]
+    assert operation["delivery_eligibility"] == {"eligible": False, "reasons": ["artifact_changed"]}
+    before = store.snapshot("kept", include_events=True)
+
+    resumed = asyncio.run(runner.resume("kept"))
+
+    assert resumed["status"] == RunStatus.FAILED.value
+    assert resumed["execution_metrics"]["operations_started"] == 0
+    assert resumed["artifact_integrity"]["counts"] == {"changed": 1}
+    assert resumed["operations"][0]["delivery_eligibility"]["reasons"] == ["artifact_changed"]
+    after = store.snapshot("kept", include_events=True)
+    assert after["operations"] == before["operations"] and after["artifacts"] == before["artifacts"]
+    assert provider.calls == 2

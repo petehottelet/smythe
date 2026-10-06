@@ -269,8 +269,22 @@ class JobRunner:
         *,
         reason: str,
         acknowledge_unknown: bool = False,
+        repair_integrity: bool = False,
     ) -> dict[str, Any]:
+        """Run selected operations again under the run's original approval.
+
+        Failed and rejected operations are rerolled; an unknown outcome also
+        needs ``acknowledge_unknown``. With ``repair_integrity`` the selected
+        operations are succeeded ones instead: under the run's lease, every
+        accepted file of each one's accepted attempt is hashed again just
+        before :meth:`SQLiteRunStore.queue_integrity_repair` queues it, which
+        refuses verified bytes with ``InvalidTransitionError``.
+        """
         _validate_run_id(run_id)
+        if type(repair_integrity) is not bool:
+            raise TypeError("repair_integrity must be a boolean")
+        if repair_integrity and acknowledge_unknown:
+            raise ValueError("an integrity repair cannot acknowledge an unknown outcome")
         record = self.store.manifest_record(run_id)
         root = Path(record["manifest_root"])
         manifest = JobManifestV1.from_json(record["manifest_json"])
@@ -284,6 +298,7 @@ class JobRunner:
             root,
             recover=True,
             reroll=(operation_keys, reason, acknowledge_unknown),
+            repair=repair_integrity,
         )
         return await asyncio.to_thread(self._delivery_view, result)
 
@@ -307,19 +322,41 @@ class JobRunner:
         return await asyncio.to_thread(self._delivery_view, result)
 
     def _delivery_view(self, snapshot: dict[str, Any]) -> dict[str, Any]:
-        """Recheck every accepted artifact's bytes and derive delivery eligibility.
+        """Recheck each accepted attempt's bytes and derive delivery eligibility.
 
         A resumed run's earlier outputs are delivered only if their bytes still
         match the recorded SHA-256. A changed, missing or unreadable file is
         reported in ``artifact_integrity`` and makes its operation ineligible;
-        recorded statuses and acceptance flags are never changed.
+        recorded statuses and acceptance flags are never changed. Files of an
+        attempt that an integrity repair replaced are not rechecked.
         """
-        accepted = [artifact for artifact in snapshot["artifacts"] if artifact["accepted"]]
+        attempts = {item["accepted_attempt_id"] for item in snapshot["operations"]}
+        accepted = [artifact for artifact in snapshot["artifacts"]
+                    if artifact["accepted"] and artifact["attempt_id"] in attempts]
         summary = check_artifact_integrity(snapshot, accepted, byte_limit=None)
         snapshot["artifact_integrity"] = summary | {
             "scope": "accepted artifact bytes after resume; acceptance is unchanged",
         }
         return annotate_delivery(snapshot, self.store.delivery_records(snapshot["run_id"]))
+
+    def _integrity_findings(self, run_id: str, operation_keys: Sequence[str]) -> list[dict[str, Any]]:
+        """Hash every accepted file of the selected succeeded operations again.
+
+        Each file of an operation's accepted attempt is read whole, without the
+        inspection byte limit. Operations in other states get no findings; the
+        store refuses them by their state.
+        """
+        snapshot = self.store.snapshot(run_id)
+        selected = set(operation_keys)
+        attempts = {item["accepted_attempt_id"] for item in snapshot["operations"]
+                    if item["status"] == OperationStatus.SUCCEEDED.value
+                    and selected & {item["operation_key"], item["operation_id"]}}
+        artifacts = [artifact for artifact in snapshot["artifacts"]
+                     if artifact["accepted"] and artifact["attempt_id"] in attempts]
+        check_artifact_integrity(snapshot, artifacts, byte_limit=None)
+        return [{"artifact_id": artifact["artifact_id"], "relative_path": artifact["relative_path"],
+                 "sha256": artifact["sha256"], "status": artifact["integrity"]["status"],
+                 "detail": artifact["integrity"]["detail"][:1024]} for artifact in artifacts]
 
     def _preflight(self, manifest: JobManifestV1, root: Path) -> JobPlanV1:
         """Rebuild a stored run's plan with this runner's registered validators."""
@@ -352,6 +389,7 @@ class JobRunner:
         reroll: tuple[list[str], str, bool] | None = None,
         pause_generation: int | None = None,
         adopt: tuple[str, str] | None = None,
+        repair: bool = False,
     ) -> dict[str, Any]:
         """Own the run for recovery, state transitions, and provider execution or adoption."""
 
@@ -363,7 +401,13 @@ class JobRunner:
         heartbeat_task: asyncio.Task[None] | None = None
         primary_error: BaseException | None = None
         try:
-            if reroll is not None:
+            if reroll is not None and repair:
+                operation_keys, reason, _acknowledge_unknown = reroll
+                findings = await asyncio.to_thread(self._integrity_findings, run_id, operation_keys)
+                self.store.queue_integrity_repair(
+                    run_id, operation_keys, reason=reason, findings=findings, lease=lease,
+                )
+            elif reroll is not None:
                 operation_keys, reason, acknowledge_unknown = reroll
                 self.store.queue_reroll(
                     run_id,
