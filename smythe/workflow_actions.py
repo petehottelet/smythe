@@ -238,10 +238,12 @@ def prepare(store, run_id, slot, intent, profile):
 
 
 def record_verdict(store, action, verdict, principal, identity, assertion, ceiling, expires_at_ns):
-    """Record a verified approval or rejection of *action*; return its row. A rejection cancels it.
+    """Record a verified approval or rejection of *action*; return its row.
 
-    An assertion is recorded once in a journal: the same verdict on the same
-    action again returns its row, and anything else raises ``ApprovalRejected``.
+    A rejection cancels the action and releases, with its reservation, an
+    attempt prepared but not claimed: nothing was sent. An assertion is
+    recorded once in a journal: the same verdict on the same action again
+    returns its row, and anything else raises ``ApprovalRejected``.
     """
     assertion_sha, ceiling = _sha(assertion), None if ceiling is None else str(ceiling)
     with store._transaction() as db:
@@ -264,6 +266,9 @@ def record_verdict(store, action, verdict, principal, identity, assertion, ceili
                    (approval_id, action.action_id, row["intent_sha"], verdict, _canonical(principal.to_dict()),
                     _canonical({"identity": identity}), assertion, assertion_sha, ceiling, expires_at_ns, now))
         if verdict == "rejected":
+            for attempt in db.execute("SELECT * FROM workflow_action_attempts WHERE action_id=? "
+                                      "AND state='prepared'", (action.action_id,)).fetchall():
+                _finish(store, db, attempt, "released", error="the action was rejected")
             db.execute("UPDATE workflow_actions SET state='canceled',updated=? WHERE action_id=?",
                        (now, action.action_id))
         return db.execute("SELECT * FROM workflow_action_approvals WHERE approval_id=?", (approval_id,)).fetchone()

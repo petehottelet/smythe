@@ -540,6 +540,34 @@ def test_a_canceled_action_begins_no_attempt(store, tmp_path, replies, host, clo
     assert rows(store.path, "workflow_action_attempts") == []
 
 
+def test_rejecting_an_action_releases_its_prepared_attempt(
+        store, tmp_path, replies, host, clock, service):  # noqa: F811
+    action, approval, lease = ready(store, tmp_path, replies, host, clock)
+    # A worker began an attempt, and may have stopped, before claiming its dispatch.
+    attempt = begin_attempt(store, lease, action.action_id, approval.approval_id)
+
+    canceled = reject(store, action.action_id, sign(host, action), host)
+
+    # Nothing was sent, so the rejection releases the attempt and its reservation.
+    assert canceled.state == "canceled"
+    assert store.audit(action.run_id)["ok"]
+    current = item(store, action)
+    assert current["attempts"] == [{**attempt, "state": "released", "reserved_nanousd": 0}]
+    assert (current["state"], balances(current)) == ("canceled", (0, 0, 0))
+    (row,) = rows(store.path, "workflow_action_attempts")
+    assert row["error"] == "the action was rejected"
+    with pytest.raises(ActionStateError, match="is released"):
+        claim_dispatch(store, lease, attempt["attempt_id"])
+    with pytest.raises(ActionNotAuthorized, match="it is canceled"):
+        begin_attempt(store, lease, action.action_id, approval.approval_id)
+    assert recover_actions(store, lease) == {"released": [], "outcome_unknown": []}
+    events = [event["data"]["state"] for event in store.inspect_run(action.run_id)["events"]
+              if event["type"] == "action_attempt"]
+    assert events == ["prepared", "released"]
+    assert service.snapshot()["deliveries"] == []
+    assert store.audit(action.run_id)["ok"]
+
+
 def test_a_removed_source_stops_a_dispatch(store, tmp_path, replies, host, clock):  # noqa: F811
     replies[0]["Write"] = [artifact(KEPT)]
     publishing = {"renderer": MarkdownRenderer(), "artifact_dir": tmp_path / "artifacts"}

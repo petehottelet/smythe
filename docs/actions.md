@@ -285,7 +285,9 @@ manifest can compute. It names no principal and has no expiry or revocation.
 never dispatched. Its assertion is verified as an approval's is, and the
 rejection is recorded with the principal. The action is `canceled` for good,
 across restarts: preparing the same intent in its slot returns it, and it can
-no longer be approved. Rejecting it again changes nothing.
+no longer be approved. An attempt begun in the
+[dispatch journal](#dispatch-journal) but not yet claimed is released with
+its reservation, since nothing was sent. Rejecting it again changes nothing.
 
 `revoke(store, action_or_approval_id, reason)` revokes one approval, or every
 approval of an action, and returns the IDs it revoked. It is a fail-safe
@@ -381,8 +383,9 @@ action's confirmed, reserved and unknown nanoUSD plus the write ceiling must
 fit the approval's ceiling, or `WorkflowBudgetError` is raised. It does not
 call the verifier: call `check_authority()` first. It returns the attempt as
 `inspect_run()` shows it. Beginning again under the same approval returns the
-same prepared attempt, and a newer approval releases an attempt prepared
-under an older one.
+same prepared attempt, a newer approval releases an attempt prepared under an
+older one, and `reject()` releases a prepared attempt as it cancels the
+action.
 
 `claim_dispatch(store, lease, attempt_id)` checks the same conditions again
 and commits the attempt and its action as `dispatched`, with the lease's

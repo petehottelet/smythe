@@ -680,9 +680,10 @@ def reject(store: Any, action_id: str, assertion: str, verifier: Any) -> Prepare
 
     The assertion is verified as for :func:`approve`. The rejection is
     recorded with the principal and the action is ``canceled`` for good:
-    preparing the same intent in its slot returns it. Rejecting a canceled
-    action again changes nothing. Raises ``ActionStateError`` once the action
-    has been dispatched.
+    preparing the same intent in its slot returns it. An attempt begun but
+    not yet claimed is released with its reservation, since nothing was sent.
+    Rejecting a canceled action again changes nothing. Raises
+    ``ActionStateError`` once the action has been dispatched.
     """
     from smythe.workflow_actions import load, record_verdict
 

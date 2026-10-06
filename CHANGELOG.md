@@ -296,7 +296,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   redacted. A permit from a superseded lease session, or for an attempt
   already settled, changes nothing and is kept as a `late_receipt` record.
   `recover_actions()` releases prepared attempts and turns dispatched ones
-  into `outcome_unknown` without resending or releasing exposure. A run's
+  into `outcome_unknown` without resending or releasing exposure, and
+  `reject()` releases an attempt prepared but not yet claimed. A run's
   model-call latches do not block actions. The audit also checks that at
   most one attempt is in flight and that a refused attempt never consumes an
   approval. See [the dispatch journal](docs/actions.md#dispatch-journal).
