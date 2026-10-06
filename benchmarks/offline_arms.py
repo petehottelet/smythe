@@ -6,15 +6,17 @@ identities that decide each run are identical across arms. A cell is one
 task, arm and repetition with a matched allowance of attempts: an attempt
 that raises, or whose output the policy does not accept, is recorded and
 charged, and another follows until one is accepted or the allowance is
-spent. Every attempt, failed ones included, stays in the cell.
+spent. Every attempt, failed ones included, stays in the cell. A harness
+with arms of its own runs its attempts with :func:`execute_attempt`, records
+them with :func:`attempt_record` and passes its runner to :func:`run_cell`.
 
 The only providers are the fixture model and the scripted classifier
-defined here, and the runner builds them itself, so a record's
-``api_calls`` is 0 by construction. Their answers are fixture content
-written for the tasks and their usage is declared, not billed: a run
-establishes harness mechanics (routing, planning, acceptance, accounting,
-timing and attempt records), never model quality, real cost or latency, or
-an arm ranking.
+defined here, or a harness's own deterministic fixtures, and each attempt
+builds them itself, so a record's ``api_calls`` is 0 by construction.
+Their answers are fixture content written for the tasks and their usage
+is declared, not billed: a run establishes harness mechanics (routing,
+planning, acceptance, accounting, timing and attempt records), never model
+quality, real cost or latency, or an arm ranking.
 """
 
 from __future__ import annotations
@@ -232,21 +234,33 @@ def _graph_shape(graph: dict[str, Any] | None) -> dict[str, Any] | None:
             "node_statuses": dict(sorted(statuses.items()))}
 
 
-def run_attempt(arm_task: ArmTask, arm: str, policy: AcceptancePolicy, *, attempt: int) -> dict:
-    """Run one attempt of *arm* on *arm_task* and record it, whatever its outcome."""
-    if arm not in ARMS:
-        raise ValueError(f"Unknown arm {arm!r}; expected one of {ARMS}")
-    planted = arm_task.planted if attempt == 1 else None
-    model = FixtureModel(arm_task.defect if planted == "defect" else arm_task.deliverable,
-                         plan=OFFLINE_DYNAMIC_PLAN, fail_first=planted == "fault")
-    classifier = ScriptedClassifier()
+@dataclass(frozen=True)
+class AttemptRun:
+    """What one executed attempt left behind, whatever its outcome.
+
+    ``result`` is the run's ``SwarmResult``, or None when the run raised
+    ``error``. A raised attempt's ``acceptance`` (its undecided record),
+    ``graph`` and ``timing`` come from the checkpoint it saved as it failed.
+    ``output`` is the delivered text, a rejected one included.
+    """
+
+    result: Any
+    error: Exception | None
+    acceptance: dict[str, Any] | None
+    output: str | None
+    graph: dict[str, Any] | None
+    timing: dict[str, Any] | None
+    elapsed_ms: float
+    latency_source: str
+
+
+def execute_attempt(build: Callable[[CheckpointStore], Any], task: Task) -> AttemptRun:
+    """Run *task* once on the Swarm that *build* makes around in-memory checkpoints."""
     checkpoints = _AttemptCheckpoints()
-    swarm = make_swarm(ARM_BASELINES[arm], model, FIXTURE_MODEL,
-                       classifier=classifier, classifier_model=CLASSIFIER_MODEL,
-                       acceptance=policy, checkpoint_store=checkpoints)
+    swarm = build(checkpoints)
     started = time.perf_counter()
     try:
-        result, error = swarm.execute(snapshot_task(arm_task.task)), None
+        result, error = swarm.execute(snapshot_task(task)), None
     except Exception as exc:  # every failed attempt is recorded, not raised
         result, error = None, exc
     measured_ms = round((time.perf_counter() - started) * 1000, 1)
@@ -268,12 +282,32 @@ def run_attempt(arm_task: ArmTask, arm: str, policy: AcceptancePolicy, *, attemp
         timing = segments[-1] if segments else None
         elapsed = measured_ms if timing is None else timing["elapsed_ms"]
         latency_source = "harness_clock" if timing is None else "failed_checkpoint_timing"
+    return AttemptRun(result, error, acceptance, output, graph, timing, elapsed, latency_source)
+
+
+def attempt_record(
+    arm_task: ArmTask,
+    run: AttemptRun,
+    model: Provider,
+    *,
+    attempt: int,
+    planted: str | None,
+    charges: dict[str, dict[str, Any] | None] | None = None,
+) -> dict:
+    """The record of one attempt: its outcome, acceptance, calls, cost and timing.
+
+    *model* is the fixture model whose ``calls`` the attempt made. Each of
+    *charges* names a further charge beside the model's, such as a selector's
+    or a supervisor's: a dict whose ``cost_microusd`` joins the attempt's
+    cost, or None when the arm has none.
+    """
+    acceptance, output, error, timing = run.acceptance, run.output, run.error, run.timing
+    charges = dict(charges or {})
     decision = None if acceptance is None else acceptance["decision"]
     outcome = "error" if error is not None else decision
     tokens = sum(call["tokens"] for call in model.calls)
-    selector = (_selection((graph or {}).get("planning"), timing, classifier)
-                if arm == ADAPTIVE_SELECTION else None)
-    cost = tokens * MICROUSD_PER_TOKEN + (selector["cost_microusd"] if selector else 0)
+    cost = tokens * MICROUSD_PER_TOKEN + sum(
+        charge["cost_microusd"] for charge in charges.values() if charge)
     record = {
         "attempt": attempt,
         "planted": planted,
@@ -294,17 +328,36 @@ def run_attempt(arm_task: ArmTask, arm: str, policy: AcceptancePolicy, *, attemp
         "planning_calls": sum(call["planning"] for call in model.calls),
         "tokens": tokens,
         "model_cost_microusd": tokens * MICROUSD_PER_TOKEN,
-        "selector": selector,
+        **charges,
         "cost_microusd": cost,
         # The fixture providers declare every call's usage, so each charge is known.
         "cost_known": True,
         "cost_is_estimate": False,
-        "elapsed_ms": elapsed,
-        "latency_source": latency_source,
+        "elapsed_ms": run.elapsed_ms,
+        "latency_source": run.latency_source,
         "phases_ms": None if timing is None else timing.get("phases_ms"),
-        "graph": _graph_shape(graph),
+        "graph": _graph_shape(run.graph),
     }
     return scrub_record(record)
+
+
+def run_attempt(arm_task: ArmTask, arm: str, policy: AcceptancePolicy, *, attempt: int) -> dict:
+    """Run one attempt of *arm* on *arm_task* and record it, whatever its outcome."""
+    if arm not in ARMS:
+        raise ValueError(f"Unknown arm {arm!r}; expected one of {ARMS}")
+    planted = arm_task.planted if attempt == 1 else None
+    model = FixtureModel(arm_task.defect if planted == "defect" else arm_task.deliverable,
+                         plan=OFFLINE_DYNAMIC_PLAN, fail_first=planted == "fault")
+    classifier = ScriptedClassifier()
+    run = execute_attempt(
+        lambda checkpoints: make_swarm(ARM_BASELINES[arm], model, FIXTURE_MODEL,
+                                       classifier=classifier, classifier_model=CLASSIFIER_MODEL,
+                                       acceptance=policy, checkpoint_store=checkpoints),
+        arm_task.task)
+    selector = (_selection((run.graph or {}).get("planning"), run.timing, classifier)
+                if arm == ADAPTIVE_SELECTION else None)
+    return attempt_record(arm_task, run, model, attempt=attempt, planted=planted,
+                          charges={"selector": selector})
 
 
 def run_cell(
@@ -314,17 +367,20 @@ def run_cell(
     *,
     allowance: int = 2,
     repetition: int = 1,
+    attempt_runner: Callable[..., dict] = run_attempt,
 ) -> dict:
     """Run *arm* on *arm_task* until an attempt is accepted or *allowance* attempts are spent.
 
     The cell is accepted only when its last attempt is. Its cost and
     elapsed time cover every attempt, and so does its selector charge.
+    *attempt_runner* runs and records one attempt, called as
+    :func:`run_attempt` is; a harness with arms of its own passes its own.
     """
     if type(allowance) is not int or allowance < 1:
         raise ValueError("allowance must be a positive integer")
     attempts = []
     for number in range(1, allowance + 1):
-        attempts.append(run_attempt(arm_task, arm, policy, attempt=number))
+        attempts.append(attempt_runner(arm_task, arm, policy, attempt=number))
         if attempts[-1]["outcome"] == "accepted":
             break
     cell = {

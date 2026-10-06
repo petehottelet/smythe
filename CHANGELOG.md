@@ -1175,6 +1175,26 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   before any call. Checkpoints are unchanged, and a resumed node's first
   attempt calls the profile it names. See
   [profile fallback](docs/execution.md#profile-fallback).
+- An offline trigger ablation harness, `benchmarks/run_trigger_ablation.py`.
+  Three arms (routine `LLMSupervisor` review on its default schedule,
+  `EvidenceTriggeredSupervisor` around the same reviewer with the default
+  `ReviewTriggers`, and no supervisor) run the same generated plans on four
+  clean fixture tasks and five that each plant an anomaly of a kind the
+  default triggers detect, under one strict acceptance policy with one
+  attempt per cell. A scripted reviewer decides each review from the run
+  state, never from trigger evidence. Task by task, the record keeps each
+  arm's supervision calls and their declared cost, the triggers that fired,
+  the revisions applied and the accepted outcomes. An Autotune campaign then
+  compares routine review (incumbent) with triggered review (challenger),
+  with no supervision as a reference arm, minimizing supervision calls while
+  the accepted-outcome rate must not regress. `run_cell` in
+  `benchmarks/offline_arms.py` takes an `attempt_runner`, so a harness with
+  arms of its own reuses the shared runner, with `execute_attempt` and
+  `attempt_record`. The committed record,
+  `benchmarks/results/trigger_ablation_offline.json`, is labeled offline
+  mechanics, not claimable, with zero API calls: fixtures show no measured
+  benefit and change no default. See
+  [trigger ablation](benchmarks/README.md#trigger-ablation-offline-mechanics).
 
 ### Changed
 
