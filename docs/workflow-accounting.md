@@ -896,8 +896,10 @@ refuses to update or delete them. In this release, `smythe.actions` writes
 `smythe.workflow_actions` writes their attempts and late receipts in the
 [dispatch journal](actions.md#dispatch-journal); the
 [action runner](actions.md#readback) writes readback records, each charged
-its read's cost; and [`record_notice()`](actions.md#notices) keeps notices,
-marked untrusted. Nothing writes other records yet.
+its read's cost, and its [reconciliation](actions.md#reconciliation) writes
+lookup records, each charged its lookup's cost, and finding records; and
+[`record_notice()`](actions.md#notices) keeps notices, marked untrusted.
+Nothing writes decision or evidence records yet.
 
 Action money is its own accounting scope, `external_actions`, in whole
 nanoUSD. It never enters a run's balances or `workflow_accounting`, which stay
@@ -911,6 +913,17 @@ with it, only an attempt that may have taken effect consumes an approval,
 and an action's confirmed, reserved and unknown amounts equal the sums of its
 attempts' costs, reservations and exposure and its records' costs. A
 mismatch raises `WorkflowCorruptionError`.
+
+An action's state and its accounting are kept apart. A write whose outcome
+is unknown keeps its write ceiling as unknown exposure while reconciliation
+looks it up, reads it back, retries it under deduplication or finds that it
+was not made, and after the action is reconciled: only a receipt that
+reports the write's cost turns that exposure into the attempt's confirmed
+cost. Each lookup and read is confirmed at the profile's read ceiling, and
+reconciliation makes none that would take the action past the ceiling of the
+attempt's approval. A reconciled action can therefore still carry unknown
+exposure, and no attempt, cost or record is removed when its outcome is
+settled.
 
 For a run with actions, `inspect_run()` adds an `actions` block after its
 other keys: the scope's totals and, for each action, its identity, intent

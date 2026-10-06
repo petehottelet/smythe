@@ -7,8 +7,9 @@ It [prepares actions](#prepared-actions) in a durable run's
 accepted content, and records [verified approvals](#approvals) of them.
 `smythe.workflow_actions` keeps the [dispatch journal](#dispatch-journal) of
 each attempt, and the [action runner](#action-runner) makes those attempts
-through your connector, reads their results back and keeps the service's
-[notices](#notices) as untrusted records. These types and functions may
+through your connector, reads their results back,
+[reconciles](#reconciliation) outcomes a dispatch left unknown and keeps the
+service's [notices](#notices) as untrusted records. These types and functions may
 change before they leave preview. `import smythe` loads neither module;
 import them explicitly.
 
@@ -106,7 +107,7 @@ profile = ConnectorProfile(
 | `operations` | required | At least one distinct operation name; stored sorted. |
 | `deduplicates` | `False` | The service answers a repeated key from its earlier commit. |
 | `dedupe_window_s` | `None` | How long the service remembers a key, in positive seconds; `None` declares no expiry. Only with `deduplicates=True`. |
-| `lookup_by_key` | `False` | `lookup()` finds an earlier submission by its key. |
+| `lookup_by_key` | `False` | `lookup()` finds an earlier submission by its key: within `dedupe_window_s` when the service deduplicates, and without expiry when it does not. |
 | `lookup_by_object` | `False` | `read()` returns an object's current bytes. |
 | `visibility_bound_s` | `None` | The longest a commit can stay invisible to lookups and reads; `None` means unbounded. |
 | `cancellation` | `"unsupported"` | A submitted write cannot be canceled; no other value is accepted. |
@@ -417,7 +418,9 @@ The permit then records the outcome of the one submission:
 - `record_refused(store, permit, error)`: the attempt is `refused` at zero
   cost. Its reservation is given back, and the action is `not_dispatched`
   again with its approval unconsumed, so the same approval can authorize the
-  next attempt. The refusal counts toward `max_attempts`.
+  next attempt. The refusal counts toward `max_attempts`. A refused
+  [same-key retry](#reconciliation) leaves the action `outcome_unknown`
+  instead, since it says nothing about the earlier attempt.
 - `record_ambiguous(store, permit, error)`: the attempt and its action are
   `outcome_unknown`, and the reserved write ceiling becomes unknown exposure.
   No attempt begins after it, and nothing releases its exposure.
@@ -450,8 +453,9 @@ count toward `max_attempts`. A dispatched attempt without an outcome may have
 reached the service, so it and its action become `outcome_unknown` with the
 reason `recovered after dispatch`, and its write ceiling becomes unknown
 exposure. Recovery audits the run's actions first and sends nothing. Neither
-recovery nor a stopped worker ever releases unknown exposure; Smythe does not
-yet resolve an unknown outcome.
+recovery nor a stopped worker ever releases unknown exposure;
+[reconciliation](#reconciliation) resolves an unknown outcome as far as the
+connector's declarations allow.
 
 ### The local transaction boundary
 
@@ -486,7 +490,7 @@ event, carrying only identifiers and the new state.
 ## Action runner
 
 `ActionRunner` dispatches a run's prepared actions through your connector,
-one at a time, and reads their results back:
+one at a time, reads their results back and reconciles unknown outcomes:
 
 ```python
 from smythe.actions import ActionRunner
@@ -495,27 +499,31 @@ runner = ActionRunner(store, connector, identity_host, lease_ttl_s=60)
 progress = runner.dispatch(run_id, action.action_id)       # one submission
 if progress.next_action == "readback":
     progress = runner.readback(run_id, action.action_id)   # independent reads
+if progress.next_action == "reconcile":
+    progress = runner.reconcile(run_id, action.action_id)  # lookups or a same-key retry
 print(progress.state, progress.next_action)
 ```
 
 `ActionRunner(store, connector, verifier, *, owner_id=None, lease_ttl_s=60,
 sleep=time.sleep, clock=time.monotonic)` checks the connector and verifier
 as `check_connector()` and `check_verifier()` do. The runner is the only
-retry owner: each attempt submits once, and the runner never submits again
-on its own. Your connector must make one request per call, with any client
-retries turned off; a connector that exposes `max_retries` must set it to 0,
-or `TypeError` is raised. Each step holds the run's lease as `owner_id`, a
-new name by default, and releases it when the step ends. Before submitting,
-and before each read and the wait that precedes it, it renews the lease for
+retry owner: each attempt submits once, and only
+[reconciliation](#reconciliation) submits again, with the same key, to a
+service that deduplicates it, within `max_attempts`. Your connector must
+make one request per call, with any client retries turned off; a connector
+that exposes `max_retries` must set it to 0, or `TypeError` is raised. Each
+step holds the run's lease as `owner_id`, a new name by default, and
+releases it when the step ends. Before submitting, and before each read or
+lookup and the wait that precedes it, it renews the lease for
 `lease_ttl_s` beyond the connector's timeout and that wait, up to a day, so a
 wait longer than the lease does not lose it. Each step first
 [recovers](#recovery) whatever a stopped worker left in flight. While
 another worker's lease is live, a step raises `WorkflowLeaseError`. `sleep`
-and `clock`, in seconds, space the reads. Dispatch is serial and runs
-outside the asynchronous node executor, so its scheduling and drain policies
-never apply to writes.
+and `clock`, in seconds, space the reads and lookups. Dispatch is serial and
+runs outside the asynchronous node executor, so its scheduling and drain
+policies never apply to writes.
 
-Both steps refuse, with `WorkflowConflictError`, an action of another run
+Every step refuses, with `WorkflowConflictError`, an action of another run
 and a connector whose `profile` is not exactly the one the action was
 prepared with.
 
@@ -540,9 +548,10 @@ prepared with.
    value that is not a `ConnectorReceipt`, is recorded as ambiguous.
 
 A refusal leaves the action `not_dispatched` under the same, unconsumed
-approval, so `dispatch()` can try again while attempts remain. An ambiguous
-outcome is never sent again. A receipt never shows the result by itself: the
-action stays `dispatched` until a read does.
+approval, so `dispatch()` can try again while attempts remain. `dispatch()`
+never sends an ambiguous outcome again; only
+[reconciliation](#reconciliation) can. A receipt never shows the result by
+itself: the action stays `dispatched` until a read does.
 
 ### Readback
 
@@ -560,7 +569,7 @@ the object as `tenant/collection/object_id`:
 
 | Read | Outcome | Action |
 |---|---|---|
-| The object is the receipt's target, holds bytes whose SHA-256 is the intent's content digest, carries the action's key when the connector exposes one, and has at least the receipt's version | `passed` | `observed` |
+| The object is the receipt's target, holds bytes whose SHA-256 is the intent's content digest, carries the action's key when the connector exposes one, and has at least the receipt's version | `passed` | `observed`, or `reconciled` when an earlier attempt's outcome is still unknown |
 | Another tenant's, collection's or object's target (`target_mismatch`), other bytes (`content_mismatch`) or another key (`key_mismatch`) | `rejected` | `compensation_required` |
 | No object (`not_visible`), a failed read (`read_failed`) or a version older than the receipt's (`stale_version`) | `error` | stays `dispatched` |
 
@@ -577,6 +586,80 @@ failed read's error text is kept with account identifiers redacted. Records
 never hold the object's bytes. `inspect_run()` shows them by kind and digest,
 and each read adds an `action_readback` event with the record's identifier
 and the action's state.
+
+### Reconciliation
+
+A lost acknowledgement, or a worker that stopped after its claim, leaves an
+action `outcome_unknown`: the service may or may not have committed the
+write. `runner.reconcile(run_id, action_id)` settles that outcome only as far
+as the connector's profile allows, and never by guessing:
+
+```python
+progress = runner.reconcile(run_id, action.action_id)
+if progress.next_action == "dispatch":           # the write was shown not to have been made
+    progress = runner.dispatch(run_id, action.action_id)
+elif progress.next_action == "operator_review":  # the outcome stays unknown
+    notify_an_operator(action.action_id)         # your host's escalation
+```
+
+| The profile declares | `reconcile()` | Results |
+|---|---|---|
+| `lookup_by_key` | Calls `lookup()` with the action's key, at most `readback_reads` times per attempt in all, `readback_interval_s` apart, until one finds the receipt. Reads the receipt's object back with `read()`, which needs `lookup_by_object`. Never submits. | `reconciled` when a read shows the intended result, `compensation_required` when it shows another; `not_dispatched` when an empty lookup proves the write was not made; otherwise `outcome_unknown`, with `operator_review` next. |
+| `deduplicates`, without `lookup_by_key` | Submits once more with the same key, as the action's next attempt, while the key's window is open, and reads its receipt back. | `reconciled` or `compensation_required`; `outcome_unknown` after a refused or ambiguous retry, with `reconcile` next, which retries again while attempts remain; otherwise `operator_review`. |
+| Neither | Sends nothing. | `outcome_unknown`, with `operator_review` next, at once. |
+
+**An empty lookup is not proof.** An empty lookup never causes a submission.
+It shows that the write was not made only when all of these hold on the
+journal's clock: the profile declares `visibility_bound_s`; that bound plus
+the connector's `timeout_s` has passed since the latest dispatch claim, so a
+commit would be visible by now; and the key is still inside its window. The
+finding is then `not_executed`, and the action returns to `not_dispatched`
+under its unconsumed approval, so `dispatch()` can send it again while
+attempts remain; that attempt counts toward `max_attempts`. Without a
+declared bound, before the bound has passed, or once the key's window may
+have closed, empty lookups leave the outcome unknown.
+
+**The key's window** is `dedupe_window_s` from the action's first dispatch
+claim, the earliest the service can have committed the key; `None` declares
+no expiry. A call made now may take up to `timeout_s` to reach the service,
+so the window counts as open only while now plus `timeout_s` is still inside
+it. A connector should declare `lookup_by_key` only when `lookup()` finds a
+key for that long: for a service that does not deduplicate, without expiry.
+
+**A same-key retry** is made only while the key's window is open, when
+attempts remain under `max_attempts` and when `check_authority()` and the
+payload check pass, as for `dispatch()`. `claim_retry()` in
+`smythe.workflow_actions` checks again in the journal and claims the retry
+as `dispatched` before it is sent. A deduplicating service answers it from
+the earlier commit, and that receipt is read back. A refused retry says
+nothing about the earlier attempt, so the action stays `outcome_unknown`. A
+revoked or expired approval, a security stop, changed content or a closed
+window means that nothing is sent.
+
+**Unresolved outcomes.** What reconciliation cannot settle gets an
+`unresolved` finding with its reason, and the next action is
+`operator_review` until another attempt begins. An acknowledged attempt
+whose reads are used up without confirming the receipt is unresolved in the
+same way. Reconciling again makes no lookup or read beyond the bounds and
+records no duplicate finding.
+
+**Records and accounting.** Each lookup is a `lookup` record holding the
+attempt, the lookup's number and the receipt it found, or a failed lookup's
+error text, redacted; an answer that names another key, tenant, collection
+or object proves nothing. Reads are `readback` records as above. Each lookup
+and read is charged the profile's `read_ceiling_nanousd` as confirmed cost
+against the action, and none is made that would take the action's
+confirmed, reserved and unknown nanoUSD past the ceiling of the attempt's
+approval. Findings are `finding` records holding the attempt, the finding,
+its reason, the records it rests on and the number of attempts. Each lookup
+adds an `action_lookup` event and each finding an `action_finding` event.
+The ambiguous attempt keeps its write ceiling as unknown exposure, even once
+the action is reconciled or found not executed, until a receipt that reports
+a cost confirms it: state and accounting are separate. No attempt or record
+is removed, and no confirmed cost is reduced.
+
+Host code that reconciles by itself calls `record_lookup()`, `claim_retry()`
+and `record_finding()` in `smythe.workflow_actions` under the run's lease.
 
 ### Notices
 
@@ -606,7 +689,7 @@ It needs no lease.
 
 ### Progress
 
-Both steps return an `ActionProgress`: the `action_id`, its `state`, its
+Every step returns an `ActionProgress`: the `action_id`, its `state`, its
 latest `attempt` as `inspect_run()` shows it, the `report` of the step's
 last read, or None, and the `next_action`:
 
@@ -615,6 +698,7 @@ last read, or None, and the `next_action`:
 | `dispatch` | The action is `not_dispatched` and attempts remain. |
 | `readback` | An acknowledged attempt has reads left. |
 | `reconcile` | The outcome is unknown, or the reads did not settle it. |
+| `operator_review` | Reconciliation found it can do no more: the outcome stays unknown or unverified. |
 | `compensate` | The action is `compensation_required`. |
 | None | The action is settled, or has used every attempt. |
 

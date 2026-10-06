@@ -319,6 +319,25 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   untrusted record that can only prompt a readback. A connector whose profile
   differs from the action's, or that retries on its own, is refused. See
   [the action runner](docs/actions.md#action-runner).
+- `ActionRunner.reconcile()` settles an external action whose outcome a
+  dispatch left unknown, only as its connector profile declares. With
+  `lookup_by_key` it looks the action's key up, at most `readback_reads`
+  times per attempt, and reads back the receipt a lookup finds, making the
+  action `reconciled` or `compensation_required`. An empty lookup never
+  causes a submission, and shows that the write was not made only once a
+  declared `visibility_bound_s` plus the connector's timeout has passed since
+  the dispatch while the key is still inside its window; the action is then
+  `not_dispatched` again under its unconsumed approval. A deduplicating
+  service without lookups gets one same-key retry within `max_attempts`,
+  only while `dedupe_window_s` from the first dispatch, less the timeout, is
+  open and the approval and content still hold; a refused retry leaves the
+  outcome unknown. Anything else, including a connector with neither
+  declaration, records an `unresolved` finding with `operator_review` next
+  and sends nothing. Lookups and reads are charged against the ceiling of the
+  attempt's approval, and the uncertain write keeps its unknown exposure
+  until a receipt reports its cost. `smythe.workflow_actions` gains
+  `record_lookup()`, `claim_retry()` and `record_finding()`. See
+  [reconciliation](docs/actions.md#reconciliation).
 - Jobs operations have a semantic input digest.
   `smythe.jobs.operation_input_digest()` hashes the provider kind and its
   adapter version (`smythe.jobs.providers.ADAPTER_VERSIONS`), the model,

@@ -16,8 +16,9 @@ on these rows, never in a run's balances, which stay equal to its call ledger.
 :func:`audit_actions` runs inside a ``SQLiteWorkflowStore`` transaction; the
 other functions open their own. Preparation, verdicts, revocations and
 notices need no run lease and are called by ``smythe.actions``. The dispatch
-journal, :func:`begin_attempt` to :func:`recover_actions`, and the runner's
-releases and readback records are fenced by the run's lease.
+journal, :func:`begin_attempt` to :func:`recover_actions`, the runner's
+releases and readback records, and reconciliation's lookups, same-key
+retries and findings are fenced by the run's lease.
 ``import smythe`` does not load this module.
 """
 
@@ -32,7 +33,7 @@ from smythe._redact import redact_account_identifiers
 from smythe.actions import (
     _CLOSED, _FINISHED, _SECURITY_STOP, ACTION_STATES, ActionIntent, ActionNotAuthorized,
     ActionStateError, ApprovalRejected, ConnectorProfile, ConnectorReceipt, PreparedAction, Principal,
-    _undeliverable, action_key,
+    _receipt_of, _undeliverable, _window_open, action_key,
 )
 from smythe.workflow_store import (
     WorkflowBudgetError, WorkflowConflictError, WorkflowCorruptionError, WorkflowLeaseError,
@@ -404,6 +405,20 @@ def _error(error):
     return redact_account_identifiers(text)[:500]
 
 
+def _admit(db, action_id, approval, attempts):
+    """The action row and the write ceiling one more attempt reserves, once its attempts and approval allow it."""
+    action = _row(db, action_id)
+    profile = _stored(action["profile_json"], ConnectorProfile.from_dict)
+    if sum(attempt["state"] in _CLAIMED for attempt in attempts) >= profile.max_attempts:
+        raise ActionStateError(f"Action {action_id!r} has made all {profile.max_attempts} of its attempts")
+    ceiling = profile.write_ceiling_nanousd
+    if sum(_amount(action[name]) for name in ("confirmed", "reserved", "unknown")) + ceiling > _amount(
+            approval["ceiling"]):
+        raise WorkflowBudgetError(f"Another attempt of action {action_id!r} could exceed its "
+                                  "approval's ceiling")
+    return action, ceiling
+
+
 def begin_attempt(store, lease, action_id, approval_id):
     """Prepare an action's next attempt under its approval and reserve its write ceiling.
 
@@ -438,14 +453,7 @@ def begin_attempt(store, lease, action_id, approval_id):
                 if attempt["approval_id"] == approval_id:
                     return _attempt_item(attempt)
                 _finish(store, db, attempt, "released", error="a newer approval superseded its own")
-        profile = _stored(action["profile_json"], ConnectorProfile.from_dict)
-        if sum(attempt["state"] in _CLAIMED for attempt in attempts) >= profile.max_attempts:
-            raise ActionStateError(f"Action {action_id!r} has made all {profile.max_attempts} of its attempts")
-        action, ceiling = _row(db, action_id), profile.write_ceiling_nanousd
-        if sum(_amount(action[name]) for name in ("confirmed", "reserved", "unknown")) + ceiling > _amount(
-                approval["ceiling"]):
-            raise WorkflowBudgetError(f"Another attempt of action {action_id!r} could exceed its "
-                                      "approval's ceiling")
+        action, ceiling = _admit(db, action_id, approval, attempts)
         attempt_id, now = uuid4().hex, store._clock_ns()
         db.execute("""INSERT INTO workflow_action_attempts(attempt_id,action_id,number,approval_id,state,
           reserved,unknown,created,updated) VALUES (?,?,?,?,'prepared',?,'0',?,?)""",
@@ -507,13 +515,10 @@ def _record(store, permit, state, receipt=None, error=None):
         if (action["run_id"], attempt["dispatch_token_sha"], attempt["dispatch_epoch"]) != (
                 permit.run_id, _sha(permit.token), permit.epoch):
             raise WorkflowConflictError("The permit does not match the attempt's dispatch claim")
-        if receipt is not None:
-            intent = _stored(action["intent_json"], ActionIntent.from_dict)
-            if (receipt.key != action["action_key"] or receipt.target.tenant != intent.target.tenant
-                    or receipt.target.collection != intent.target.collection
-                    or intent.target.object_id not in (None, receipt.target.object_id)):
-                raise WorkflowValidationError("The receipt names another key or target than the action's; "
-                                              "record the attempt as ambiguous")
+        if receipt is not None and not _receipt_of(
+                action["action_key"], _stored(action["intent_json"], ActionIntent.from_dict), receipt):
+            raise WorkflowValidationError("The receipt names another key or target than the action's; "
+                                          "record the attempt as ambiguous")
         if store._run(db, permit.run_id)["epoch"] != permit.epoch:
             late = WorkflowLeaseError(f"Attempt {permit.attempt_id!r} was claimed under lease epoch "
                                       f"{permit.epoch}, since superseded; its outcome is kept as a late "
@@ -541,7 +546,9 @@ def _record(store, permit, state, receipt=None, error=None):
             db.execute("UPDATE workflow_action_approvals SET consumed_by_attempt=? WHERE approval_id=? "
                        "AND consumed_by_attempt IS NULL", (permit.attempt_id, attempt["approval_id"]))
         elif state == "refused":
-            _finish(store, db, attempt, state, cost=0, error=error, action_state="not_dispatched")
+            # A refused retry says nothing of the earlier attempt whose outcome is still unknown.
+            _finish(store, db, attempt, state, cost=0, error=error,
+                    action_state="outcome_unknown" if _unsettled(db, action["action_id"]) else "not_dispatched")
         else:
             _finish(store, db, attempt, state, unknown=_amount(attempt["reserved"]), error=error,
                     action_state="outcome_unknown")
@@ -673,23 +680,34 @@ def attempt_status(store, action_id):
 
 
 def record_readback(store, lease, attempt_id, payload, cost, state):
-    """Append one read of an acknowledged attempt's object as a ``readback`` record.
+    """Append one read of an attempt's object as a ``readback`` record.
 
-    The caller holds the run's lease, and the attempt's action must still be
-    ``dispatched``. *cost* is the read's nanoUSD, confirmed against the
-    action; *state* is the action's state after the read: ``dispatched``,
-    ``observed`` or ``compensation_required``. Returns the record ID.
+    The caller holds the run's lease. The attempt is acknowledged and its
+    action still ``dispatched``; or both are ``outcome_unknown`` and a lookup
+    found the attempt's receipt. *cost* is the read's nanoUSD, confirmed
+    against the action; *state* is the action's state after the read:
+    unchanged when the read decides nothing, ``observed`` or
+    ``compensation_required``. An action with an unknown outcome that no
+    finding settled becomes ``reconciled`` instead of ``observed``. Returns
+    the record ID.
     """
-    if state not in ("dispatched", "observed", "compensation_required") or type(cost) is not int or cost < 0:
-        raise WorkflowValidationError("A read leaves its action dispatched, observed or compensation_required "
+    if (state not in ("dispatched", "outcome_unknown", "observed", "compensation_required")
+            or type(cost) is not int or cost < 0):
+        raise WorkflowValidationError("A read leaves its action unchanged, observed or compensation_required "
                                       "at a non-negative integer cost")
     payload_json = _canonical(payload)
     with store._transaction() as db:
         attempt = _attempt(db, attempt_id)
         _, action = _owned(store, db, lease, attempt["action_id"])
-        if (attempt["state"], action["state"]) != ("acknowledged", "dispatched"):
+        undecided = {("acknowledged", "dispatched"): "dispatched",
+                     ("outcome_unknown", "outcome_unknown"): "outcome_unknown"}.get((attempt["state"], action["state"]))
+        if (undecided is None or state not in (undecided, "observed", "compensation_required")
+                or undecided == "outcome_unknown" and attempt_id not in _found(db, action["action_id"])):
             raise ActionStateError(f"Attempt {attempt_id!r} is {attempt['state']} and its action {action['state']}; "
-                                   "only an acknowledged attempt of a dispatched action is read back")
+                                   "only an acknowledged attempt of a dispatched action, or an attempt whose receipt a "
+                                   "lookup found, is read back")
+        if state == "observed" and _unsettled(db, action["action_id"]):
+            state = "reconciled"
         record_id, now = uuid4().hex, store._clock_ns()
         db.execute("""INSERT INTO workflow_action_records(record_id,action_id,kind,payload_json,payload_sha,
           trusted,cost,created) VALUES (?,?,'readback',?,?,1,?,?)""",
@@ -721,3 +739,230 @@ def keep_notice(store, key, payload):
         store._event(db, row["run_id"], "action_notice",
                      payload={"action_id": row["action_id"], "record_id": record_id})
         return _prepared(row)
+
+
+# Reconciliation: lookups by key, same-key retries and findings on unknown outcomes.
+
+FINDINGS = ("not_executed", "unresolved")
+
+
+def _payloads(db, action_id, kind):
+    """The action's records of *kind*, oldest first, as (record ID, payload object) pairs."""
+    rows = db.execute("SELECT record_id,payload_json FROM workflow_action_records WHERE action_id=? AND kind=? "
+                      "ORDER BY rowid", (action_id, kind)).fetchall()
+    pairs = [(row[0], _loads(row[1], stored=True)) for row in rows]
+    return [(record_id, payload) for record_id, payload in pairs if type(payload) is dict]
+
+
+def _found(db, action_id):
+    """The receipt the first successful lookup of each attempt found, by attempt ID."""
+    found = {}
+    for _, payload in _payloads(db, action_id, "lookup"):
+        if payload.get("receipt") is not None:
+            found.setdefault(payload.get("attempt_id"), payload["receipt"])
+    return found
+
+
+def _unsettled(db, action_id):
+    """IDs of the action's ``outcome_unknown`` attempts that no ``not_executed`` finding settled."""
+    settled = {payload.get("attempt_id") for _, payload in _payloads(db, action_id, "finding")
+               if payload.get("finding") == "not_executed"}
+    rows = db.execute("SELECT attempt_id FROM workflow_action_attempts WHERE action_id=? AND state='outcome_unknown' "
+                      "ORDER BY number", (action_id,)).fetchall()
+    return [row[0] for row in rows if row[0] not in settled]
+
+
+def _append(store, db, action, kind, payload, cost=None):
+    """Insert one trusted record of *action*, charging *cost* as confirmed nanoUSD; return its ID."""
+    payload_json, record_id, now = _canonical(payload), uuid4().hex, store._clock_ns()
+    db.execute("""INSERT INTO workflow_action_records(record_id,action_id,kind,payload_json,payload_sha,
+      trusted,cost,created) VALUES (?,?,?,?,?,1,?,?)""",
+               (record_id, action["action_id"], kind, payload_json, _sha(payload_json),
+                None if cost is None else str(cost), now))
+    if cost:
+        db.execute("UPDATE workflow_actions SET confirmed=?,updated=? WHERE action_id=?",
+                   (str(_amount(action["confirmed"]) + cost), now, action["action_id"]))
+    return record_id
+
+
+def reconcile_status(store, action_id):
+    """What reconciling an action needs to know; only reads are made, after the audit.
+
+    Returns a dict: the ``action``; its ``attempts`` as :func:`audit_actions`
+    projects them; ``receipt``, the latest attempt's receipt or None;
+    ``claims``, each claimed attempt's dispatch time on the journal clock;
+    ``ceilings``, each approval's nanoUSD ceiling; ``spent``, the action's
+    confirmed, reserved and unknown nanoUSD together; ``unsettled``, the
+    ``outcome_unknown`` attempts no ``not_executed`` finding settled, oldest
+    first; ``lookups`` and ``reads``, the number of lookup and readback
+    records of each attempt; ``found``, the receipt a lookup found for an
+    attempt; and ``finding``, the payload of the latest finding, or None.
+    Attempts and approvals are keyed by ID.
+    """
+    if store.store_version < 2:
+        raise WorkflowNotFoundError(action_id)  # Version 1 journals have no action tables.
+    with store._transaction(write=False) as db:
+        row = _row(db, action_id)
+        audit_actions(store, db, row["run_id"])
+        attempts = db.execute("SELECT * FROM workflow_action_attempts WHERE action_id=? ORDER BY number",
+                              (action_id,)).fetchall()
+        latest = attempts[-1] if attempts else None
+        receipt = latest and latest["receipt_json"] and _stored(latest["receipt_json"], ConnectorReceipt.from_dict)
+        counts = {"lookup": {}, "readback": {}}
+        for kind, tally in counts.items():
+            for _, payload in _payloads(db, action_id, kind):
+                tally[payload.get("attempt_id")] = tally.get(payload.get("attempt_id"), 0) + 1
+        findings = _payloads(db, action_id, "finding")
+        return {
+            "action": _prepared(row), "attempts": [_attempt_item(attempt) for attempt in attempts],
+            "receipt": receipt or None,
+            "claims": {attempt["attempt_id"]: attempt["dispatched"] for attempt in attempts
+                       if attempt["dispatched"] is not None},
+            "ceilings": {approval["approval_id"]: _amount(approval["ceiling"]) for approval in db.execute(
+                "SELECT approval_id,ceiling FROM workflow_action_approvals WHERE action_id=? AND verdict='approved'",
+                (action_id,))},
+            "spent": sum(_amount(row[name]) for name in ("confirmed", "reserved", "unknown")),
+            "unsettled": _unsettled(db, action_id), "lookups": counts["lookup"], "reads": counts["readback"],
+            "found": {attempt_id: _stored(_canonical(found), ConnectorReceipt.from_dict)
+                      for attempt_id, found in _found(db, action_id).items()},
+            "finding": findings[-1][1] if findings else None,
+        }
+
+
+def _unknown_attempt(store, db, lease, attempt_id):
+    """The attempt and its action rows, once both are ``outcome_unknown`` and *lease* is the run's."""
+    attempt = _attempt(db, attempt_id)
+    _, action = _owned(store, db, lease, attempt["action_id"])
+    if (attempt["state"], action["state"]) != ("outcome_unknown", "outcome_unknown"):
+        raise ActionStateError(f"Attempt {attempt_id!r} is {attempt['state']} and its action {action['state']}; "
+                               "only an unknown outcome is reconciled")
+    return attempt, action
+
+
+def record_lookup(store, lease, attempt_id, number, receipt, error, cost):
+    """Append one lookup by key for an attempt whose outcome is unknown, as a ``lookup`` record.
+
+    The caller holds the run's lease, and the attempt and its action must be
+    ``outcome_unknown``. *number* counts the attempt's lookups from 1;
+    *receipt* is what the lookup found, or None, and *error* a failed
+    lookup's text, kept redacted. A receipt must name the action's key,
+    tenant, collection and object, as for :func:`record_receipt`; otherwise
+    ``WorkflowValidationError`` is raised and nothing changes. *cost* is the
+    lookup's nanoUSD, confirmed against the action. A receipt that reports a
+    cost confirms it as the attempt's own and releases the attempt's unknown
+    exposure; without one, the exposure stays. Returns the record ID.
+    """
+    if type(cost) is not int or cost < 0 or type(number) is not int or number < 1:
+        raise WorkflowValidationError("A lookup has a number from 1 and a non-negative integer cost")
+    if receipt is not None and not isinstance(receipt, ConnectorReceipt):
+        raise WorkflowValidationError("Expected a ConnectorReceipt or None")
+    with store._transaction() as db:
+        attempt, action = _unknown_attempt(store, db, lease, attempt_id)
+        if receipt is not None and not _receipt_of(
+                action["action_key"], _stored(action["intent_json"], ActionIntent.from_dict), receipt):
+            raise WorkflowValidationError("The lookup answered another key or target than the action's")
+        record_id = _append(store, db, action, "lookup", {
+            "attempt_id": attempt_id, "lookup": number, "receipt": receipt and receipt.to_dict(),
+            "error": None if error is None else _error(error)}, cost)
+        if receipt is not None and receipt.cost_nanousd is not None and attempt["cost"] is None:
+            action, unknown = _row(db, action["action_id"]), _amount(attempt["unknown"])
+            db.execute("UPDATE workflow_action_attempts SET cost=?,unknown='0',updated=? WHERE attempt_id=?",
+                       (str(receipt.cost_nanousd), store._clock_ns(), attempt_id))
+            db.execute("UPDATE workflow_actions SET confirmed=?,unknown=? WHERE action_id=?",
+                       (str(_amount(action["confirmed"]) + receipt.cost_nanousd),
+                        str(_amount(action["unknown"]) - unknown), action["action_id"]))
+        store._event(db, lease.run_id, "action_lookup", payload={
+            "action_id": action["action_id"], "record_id": record_id, "found": receipt is not None})
+    return record_id
+
+
+def claim_retry(store, lease, action_id, approval_id):
+    """Claim one same-key retry of an action whose outcome is unknown; return its permit.
+
+    The retry is the action's next attempt. It is committed as ``dispatched``
+    under *approval_id*, with its write ceiling reserved, before anything is
+    sent, so it is never ``prepared``. Its outcome is recorded with the
+    permit, as for :func:`claim_dispatch`; a refusal leaves the action
+    ``outcome_unknown``, since it says nothing of the earlier attempt. The
+    action must be ``outcome_unknown`` with an attempt no finding settled,
+    and its profile must deduplicate, with the key's window open on the
+    journal's clock until the retry arrives (see ``smythe.actions``). The
+    content, run, approval, ``max_attempts`` and the approval's ceiling are
+    checked as for :func:`begin_attempt`. Raises ``ActionNotAuthorized``,
+    ``ActionStateError``, ``WorkflowBudgetError`` or ``WorkflowLeaseError``.
+    """
+    refusal, token = _deliverable(store, action_id), secrets.token_hex(32)
+    if refusal:
+        raise refusal
+    with store._transaction() as db:
+        run, action = _owned(store, db, lease, action_id)
+        if action["state"] != "outcome_unknown" or not _unsettled(db, action_id):
+            raise ActionStateError(f"Action {action_id!r} is {action['state']}; only an unknown outcome is retried")
+        approval = _authorized(store, db, run, action, approval_id)
+        profile = _stored(action["profile_json"], ConnectorProfile.from_dict)
+        attempts = db.execute("SELECT * FROM workflow_action_attempts WHERE action_id=? ORDER BY number",
+                              (action_id,)).fetchall()
+        now = store._clock_ns()
+        first = min(attempt["dispatched"] for attempt in attempts if attempt["dispatched"] is not None)
+        if not profile.deduplicates or not _window_open(profile, first, now):
+            raise ActionStateError(f"Action {action_id!r} cannot be retried: its service may not deduplicate "
+                                   "the retry by its key")
+        action, ceiling = _admit(db, action_id, approval, attempts)
+        attempt_id = uuid4().hex
+        db.execute("""INSERT INTO workflow_action_attempts(attempt_id,action_id,number,approval_id,state,
+          dispatch_token_sha,dispatch_epoch,reserved,unknown,created,dispatched,updated)
+          VALUES (?,?,?,?,'dispatched',?,?,?,'0',?,?,?)""",
+                   (attempt_id, action_id, len(attempts) + 1, approval_id, _sha(token), lease.epoch, str(ceiling),
+                    now, now, now))
+        db.execute("UPDATE workflow_actions SET state='dispatched',reserved=?,updated=? WHERE action_id=?",
+                   (str(_amount(action["reserved"]) + ceiling), now, action_id))
+        _note(store, db, action, attempt_id, "dispatched")
+    return ActionDispatchPermit(attempt_id, lease.run_id, token, lease.epoch)
+
+
+def record_finding(store, lease, attempt_id, finding, reason, evidence=()):
+    """Append what reconciliation found about an attempt as a ``finding`` record.
+
+    ``not_executed`` says the attempt never took effect: it and its action
+    must be ``outcome_unknown``, and the action returns to ``not_dispatched``
+    under its unconsumed approval, while the attempt keeps its unknown
+    exposure. ``unresolved`` says that reconciliation can do no more and
+    changes no state: the attempt must be ``outcome_unknown`` with its action,
+    or acknowledged with its action ``dispatched``. The caller holds the run's
+    lease. *reason* is kept redacted and *evidence* names the action's records
+    the finding rests on. Returns the record ID, or None for an unresolved
+    finding without evidence when the action's latest finding is already
+    unresolved on this attempt and no attempt has begun since.
+    """
+    if finding not in FINDINGS:
+        raise WorkflowValidationError(f"A finding is one of {FINDINGS}")
+    evidence = list(evidence)
+    with store._transaction() as db:
+        attempt = _attempt(db, attempt_id)
+        _, action = _owned(store, db, lease, attempt["action_id"])
+        states = (attempt["state"], action["state"])
+        if states != ("outcome_unknown", "outcome_unknown") and (
+                finding == "not_executed" or states != ("acknowledged", "dispatched")):
+            raise ActionStateError(f"Attempt {attempt_id!r} is {attempt['state']} and its action {action['state']}; "
+                                   f"no {finding} finding applies")
+        known = {row[0] for row in db.execute("SELECT record_id FROM workflow_action_records WHERE action_id=?",
+                                              (action["action_id"],))}
+        if not all(type(item) is str and item in known for item in evidence):
+            raise WorkflowValidationError("A finding's evidence names records of its action")
+        count = db.execute("SELECT count(*) FROM workflow_action_attempts WHERE action_id=?",
+                           (action["action_id"],)).fetchone()[0]
+        latest = _payloads(db, action["action_id"], "finding")
+        previous = latest[-1][1] if latest else {}
+        if finding == "unresolved" and not evidence and (
+                previous.get("finding"), previous.get("attempt_id"), previous.get("attempts")) == (
+                    "unresolved", attempt_id, count):
+            return None
+        record_id = _append(store, db, action, "finding", {
+            "attempt_id": attempt_id, "finding": finding, "reason": _error(reason), "evidence": evidence,
+            "attempts": count})
+        state = "not_dispatched" if finding == "not_executed" else action["state"]
+        db.execute("UPDATE workflow_actions SET state=?,updated=? WHERE action_id=?",
+                   (state, store._clock_ns(), action["action_id"]))
+        store._event(db, lease.run_id, "action_finding", payload={
+            "action_id": action["action_id"], "record_id": record_id, "finding": finding, "state": state})
+    return record_id

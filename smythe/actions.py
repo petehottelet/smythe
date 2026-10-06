@@ -11,7 +11,8 @@ to a completed run's accepted content; :func:`approve`, :func:`reject` and
 :func:`revoke` record verified approvals and controls; :func:`check_authority`
 checks them again; and ``smythe.workflow_actions`` journals each attempt's
 dispatch and outcome. :class:`ActionRunner` submits each attempt once through
-a connector and reads the result back, and :func:`record_notice` keeps a
+a connector, reads the result back and reconciles an unknown outcome as the
+connector's declarations allow, and :func:`record_notice` keeps a
 service's callbacks as untrusted records. Only trusted host code calls these
 functions, and ``import smythe`` does not load this module.
 """
@@ -39,8 +40,8 @@ from smythe.validation import (
 )
 from smythe.workflow_binding import WorkflowBindingError, json_snapshot
 from smythe.workflow_store import (
-    WorkflowConflictError, WorkflowLeaseError, WorkflowStateError, WorkflowValidationError,
-    _canonical, _text,
+    WorkflowBudgetError, WorkflowConflictError, WorkflowLeaseError, WorkflowStateError,
+    WorkflowValidationError, _canonical, _text,
 )
 
 ACTION_CONTRACT_VERSION = "smythe.action.v1"
@@ -368,6 +369,48 @@ class ConnectorReceipt:
     def from_dict(cls, data: Any) -> ConnectorReceipt:
         _require_keys(data, "connector receipt", frozenset(item.name for item in fields(cls)))
         return cls(**{**data, "target": ActionTarget.from_dict(data["target"])})
+
+
+def _receipt_of(key: str, intent: ActionIntent, receipt: Any) -> bool:
+    """Whether *receipt* names the action's *key*, its target's tenant and collection and its object."""
+    target = intent.target
+    return (isinstance(receipt, ConnectorReceipt) and receipt.key == key
+            and (receipt.target.tenant, receipt.target.collection) == (target.tenant, target.collection)
+            and target.object_id in (None, receipt.target.object_id))
+
+
+def _ns(seconds: float, *, up: bool = False) -> int:
+    nanoseconds = seconds * 1_000_000_000
+    return math.ceil(nanoseconds) if up else math.floor(nanoseconds)
+
+
+def _window_open(profile: ConnectorProfile, first_claim_ns: int, now_ns: int) -> bool:
+    """Whether a call sent at *now_ns* surely reaches the service inside the key's window.
+
+    The window is ``dedupe_window_s`` (``None`` has no expiry), counted from
+    the action's first dispatch claim, the earliest its key can have been
+    committed. A call may take ``timeout_s`` to arrive: that is the margin.
+    """
+    window = profile.dedupe_window_s
+    return window is None or now_ns + _ns(profile.timeout_s, up=True) < first_claim_ns + _ns(window)
+
+
+def _absence_unproven(profile: ConnectorProfile, first_claim_ns: int, last_claim_ns: int,
+                      now_ns: int) -> str | None:
+    """Why an empty lookup sent at *now_ns* does not show that the key was never committed, or None.
+
+    Only a declared ``visibility_bound_s`` that has passed since the latest
+    dispatch claim plus the connector's timeout, while the key's window is
+    still open, makes it proof.
+    """
+    bound = profile.visibility_bound_s
+    if bound is None:
+        return "the connector declares no visibility bound, so an empty lookup proves nothing"
+    if now_ns < last_claim_ns + _ns(bound + profile.timeout_s, up=True):
+        return "the visibility bound had not passed since the dispatch, so an empty lookup proves nothing"
+    if not _window_open(profile, first_claim_ns, now_ns):
+        return "the key's window may have closed, so an empty lookup proves nothing"
+    return None
 
 
 @dataclass(frozen=True)
@@ -861,9 +904,10 @@ class ActionProgress:
     ``report`` is the verdict of the step's last read, or None when it made
     none. ``next_action`` is ``dispatch`` for an action not dispatched with
     attempts left, ``readback`` while an acknowledged attempt has reads left,
-    ``reconcile`` for an outcome the reads have not settled, ``compensate``
-    for ``compensation_required``, and None when the runner can do nothing
-    more.
+    ``reconcile`` for an outcome the reads have not settled,
+    ``operator_review`` once reconciliation has found it can do no more,
+    ``compensate`` for ``compensation_required``, and None when the runner
+    can do nothing more.
     """
 
     action_id: str
@@ -874,16 +918,17 @@ class ActionProgress:
 
 
 class ActionRunner:
-    """Dispatch a durable run's prepared actions and read back their results, one at a time.
+    """Dispatch a durable run's prepared actions, read back and reconcile their results, one at a time.
 
-    The runner is the only retry owner: each attempt submits once, and it
-    never submits again on its own. *connector* must make one request per
-    call; one exposing ``max_retries`` must set it to 0. Each step holds the
-    run's lease as *owner_id* (a new name by default) for *lease_ttl_s*,
-    renewed beyond the submission's timeout or the wait before the next read,
-    and settles first what a stopped worker left in flight. *sleep* and
-    *clock*, in seconds, space the reads. Dispatch is serial and independent
-    of the asynchronous executor.
+    The runner is the only retry owner: each attempt submits once, and only
+    :meth:`reconcile` submits again, with the same key, where the service
+    deduplicates it, within ``max_attempts``. *connector* must make one
+    request per call; one exposing ``max_retries`` must set it to 0. Each
+    step holds the run's lease as *owner_id* (a new name by default) for
+    *lease_ttl_s*, renewed beyond the submission's timeout or the wait before
+    the next read, and settles first what a stopped worker left in flight.
+    *sleep* and *clock*, in seconds, space the reads and lookups. Dispatch is
+    serial and independent of the asynchronous executor.
     """
 
     def __init__(self, store: Any, connector: Any, verifier: Any, *, owner_id: str | None = None,
@@ -950,19 +995,25 @@ class ActionRunner:
                 raise ActionNotAuthorized(f"Action {action_id!r} is not authorized: {problem}")
             self._renew(lease, action.profile.timeout_s)
             permit = journal.claim_dispatch(self.store, lease, attempt["attempt_id"])
-            try:
-                receipt = self.connector.submit(action.action_key, action.intent, payload,
-                                                action.profile.timeout_s)
-            except ConnectorRefused as error:
-                journal.record_refused(self.store, permit, error)
-            except Exception as error:  # anything else may follow a commit
-                journal.record_ambiguous(self.store, permit, error)
-            else:
-                try:
-                    journal.record_receipt(self.store, permit, receipt)
-                except WorkflowValidationError as error:
-                    journal.record_ambiguous(self.store, permit, error)
+            self._submit(action, permit, payload)
         return self._progress(action_id)
+
+    def _submit(self, action: PreparedAction, permit: Any, payload: bytes | None) -> None:
+        """Submit once under a claimed *permit* and record the receipt, refusal or ambiguous outcome."""
+        from smythe import workflow_actions as journal
+
+        try:
+            receipt = self.connector.submit(action.action_key, action.intent, payload,
+                                            action.profile.timeout_s)
+        except ConnectorRefused as error:
+            journal.record_refused(self.store, permit, error)
+        except Exception as error:  # anything else may follow a commit
+            journal.record_ambiguous(self.store, permit, error)
+        else:
+            try:
+                journal.record_receipt(self.store, permit, receipt)
+            except WorkflowValidationError as error:
+                journal.record_ambiguous(self.store, permit, error)
 
     def readback(self, run_id: str, action_id: str) -> ActionProgress:
         """Read the object an acknowledged attempt committed, to find whether it holds the intent.
@@ -973,59 +1024,224 @@ class ActionRunner:
         ``lookup_by_object``. Each read is a ``readback`` record charged the
         profile's ``read_ceiling_nanousd`` and holding its
         :data:`READBACK_VALIDATOR` report. A passed report makes the action
-        ``observed``, a rejected one ``compensation_required``; reads that
+        ``observed``, or ``reconciled`` when an earlier attempt's outcome is
+        still unknown, and a rejected one ``compensation_required``; reads that
         decide nothing leave it ``dispatched``, with ``reconcile`` next once
         none are left. Without an acknowledged attempt nothing is read.
         """
         from smythe import workflow_actions as journal
 
         action, report = self._action(run_id, action_id), None
-        profile = action.profile
         with self._leased(run_id) as lease:
             current, attempts, receipt, reads = journal.attempt_status(self.store, action_id)
-            readable = (current.state == "dispatched" and receipt is not None
-                        and attempts[-1]["state"] == "acknowledged" and profile.lookup_by_object)
-            started = None
-            for number in range(reads + 1, profile.readback_reads + 1 if readable else 0):
-                wait = 0.0 if started is None else max(
-                    0.0, started + profile.readback_interval_s - self._clock())
-                self._renew(lease, wait + profile.timeout_s)
-                if wait:
-                    self._sleep(wait)
-                started, observed, error = self._clock(), None, None
-                try:
-                    observed = self.connector.read(receipt.target, profile.timeout_s)
-                except Exception as exc:  # a failed read proves nothing
-                    error = journal._error(exc)
-                report = _verdict(action, receipt, observed, error)
-                state = {ValidationOutcome.PASSED: "observed",
-                         ValidationOutcome.REJECTED: "compensation_required"}.get(
-                             report.outcome, "dispatched")
-                seen = observed if isinstance(observed, ObservedObject) else None
-                journal.record_readback(self.store, lease, attempts[-1]["attempt_id"], {
-                    "attempt_id": attempts[-1]["attempt_id"], "read": number, "error": error,
-                    "observed": seen and {"target": seen.target.to_dict(),
-                                          "content": seen.content_ref.to_dict(),
-                                          "version": seen.version, "key": seen.key},
-                    "report": report.to_dict()}, profile.read_ceiling_nanousd, state)
-                if state != "dispatched":
-                    break
+            if (current.state == "dispatched" and receipt is not None
+                    and attempts[-1]["state"] == "acknowledged" and action.profile.lookup_by_object):
+                report = self._read_back(lease, action, attempts[-1]["attempt_id"], receipt, reads,
+                                         "dispatched")[0]
         return self._progress(action_id, report)
 
-    def _progress(self, action_id: str, report: ValidationReport | None = None) -> ActionProgress:
-        from smythe.workflow_actions import attempt_status
+    def _pace(self, lease: Any, profile: ConnectorProfile, started: float | None) -> None:
+        """Wait out ``readback_interval_s`` since the call made at *started*, holding the lease past the next."""
+        wait = 0.0 if started is None else max(0.0, started + profile.readback_interval_s - self._clock())
+        self._renew(lease, wait + profile.timeout_s)
+        if wait:
+            self._sleep(wait)
 
-        action, attempts, _, reads = attempt_status(self.store, action_id)
+    def _read_back(self, lease: Any, action: PreparedAction, attempt_id: str, receipt: ConnectorReceipt,
+                   done: int, undecided: str, room: int | None = None) -> tuple[Any, list[str], bool]:
+        """Read the object *receipt* names until a read decides; *done* reads were made before.
+
+        *undecided* is the action's state while reads decide nothing. With
+        *room*, the nanoUSD the approval's ceiling has left, a read that would
+        not fit is not made. Returns the last report, or None; the readback
+        record IDs; and whether the ceiling stopped the reads.
+        """
+        from smythe import workflow_actions as journal
+
+        profile, report, records, started = action.profile, None, [], None
+        for number in range(done + 1, profile.readback_reads + 1):
+            if room is not None:
+                if room < profile.read_ceiling_nanousd:
+                    return report, records, True
+                room -= profile.read_ceiling_nanousd
+            self._pace(lease, profile, started)
+            started, observed, error = self._clock(), None, None
+            try:
+                observed = self.connector.read(receipt.target, profile.timeout_s)
+            except Exception as exc:  # a failed read proves nothing
+                error = journal._error(exc)
+            report = _verdict(action, receipt, observed, error)
+            state = {ValidationOutcome.PASSED: "observed",
+                     ValidationOutcome.REJECTED: "compensation_required"}.get(report.outcome, undecided)
+            seen = observed if isinstance(observed, ObservedObject) else None
+            records.append(journal.record_readback(self.store, lease, attempt_id, {
+                "attempt_id": attempt_id, "read": number, "error": error,
+                "observed": seen and {"target": seen.target.to_dict(),
+                                      "content": seen.content_ref.to_dict(),
+                                      "version": seen.version, "key": seen.key},
+                "report": report.to_dict()}, profile.read_ceiling_nanousd, state))
+            if state != undecided:
+                break
+        return report, records, False
+
+    def reconcile(self, run_id: str, action_id: str) -> ActionProgress:
+        """Settle an outcome that dispatch left unknown, only as the connector's profile declares.
+
+        Under the run's lease, after recovery: with ``lookup_by_key`` the key
+        is looked up at most ``readback_reads`` times per attempt,
+        ``readback_interval_s`` apart, and a receipt found is read back,
+        making the action ``reconciled`` or ``compensation_required``. An
+        empty lookup never causes a submission. It proves the write was not
+        made (``not_executed``; the action is ``not_dispatched`` again) only
+        once a declared ``visibility_bound_s`` plus ``timeout_s`` has passed
+        since the latest dispatch claim while the key's window is open. With
+        ``deduplicates`` alone, one same-key retry is made within
+        ``max_attempts`` while the window is open and :func:`check_authority`
+        passes, and its receipt is read back; with neither, nothing is sent.
+        An acknowledged attempt with reads left is read back. What cannot be
+        settled gets an ``unresolved`` finding, with ``operator_review`` next.
+        Lookups and reads are charged ``read_ceiling_nanousd`` within the
+        ceiling of the attempt's approval; times are the journal's clock.
+        """
+        from smythe import workflow_actions as journal
+
+        action, report = self._action(run_id, action_id), None
+        profile = action.profile
+        with self._leased(run_id) as lease:
+            status = journal.reconcile_status(self.store, action_id)
+            state, latest = status["action"].state, status["attempts"][-1] if status["attempts"] else None
+            if state == "outcome_unknown" and status["unsettled"]:
+                attempt_id = status["unsettled"][-1]
+                if profile.lookup_by_key:
+                    report = self._look_up(lease, action, status, attempt_id)
+                elif profile.deduplicates:
+                    report = self._retry(lease, action, status, attempt_id)
+                else:
+                    journal.record_finding(self.store, lease, attempt_id, "unresolved",
+                                           "the connector declares neither lookup by key nor deduplication, "
+                                           "so nothing can show whether the write took effect")
+            elif state == "dispatched" and latest["state"] == "acknowledged":
+                report = self._confirm(lease, action, status, latest["attempt_id"], status["receipt"], [],
+                                       "dispatched")
+        return self._progress(action_id, report)
+
+    def _room(self, status: dict[str, Any], attempt_id: str) -> int:
+        """The nanoUSD the ceiling of *attempt_id*'s approval leaves for the action."""
+        (approval_id,) = [item["approval_id"] for item in status["attempts"] if item["attempt_id"] == attempt_id]
+        return status["ceilings"][approval_id] - status["spent"]
+
+    def _look_up(self, lease: Any, action: PreparedAction, status: dict[str, Any],
+                 attempt_id: str) -> ValidationReport | None:
+        """Look the action's key up until a lookup finds its receipt or proves it absent."""
+        from smythe import workflow_actions as journal
+
+        profile, evidence, reason, started = action.profile, [], None, None
+        room, found = self._room(status, attempt_id), status["found"].get(attempt_id)
+        first, last = min(status["claims"].values()), max(status["claims"].values())
+        for number in range(status["lookups"].get(attempt_id, 0) + 1,
+                            profile.readback_reads + 1 if found is None else 0):
+            if room < profile.read_ceiling_nanousd:
+                reason = "the approval's ceiling leaves no room for another lookup"
+                break
+            self._pace(lease, profile, started)
+            started, now, receipt, error = self._clock(), self.store._clock_ns(), None, None
+            try:
+                answer = self.connector.lookup(action.action_key, action.intent.target, profile.timeout_s)
+            except Exception as exc:  # a failed lookup proves nothing
+                error = journal._error(exc)
+            else:
+                if answer is None or _receipt_of(action.action_key, action.intent, answer):
+                    receipt = answer
+                else:
+                    error = "The lookup answered with something other than the action's receipt"
+            evidence.append(journal.record_lookup(self.store, lease, attempt_id, number, receipt, error,
+                                                  profile.read_ceiling_nanousd))
+            room -= profile.read_ceiling_nanousd
+            if receipt is not None:
+                found = receipt
+                break
+            reason = ("no lookup answered" if error is not None
+                      else _absence_unproven(profile, first, last, now))
+            if reason is None:
+                journal.record_finding(self.store, lease, attempt_id, "not_executed",
+                                       "an empty lookup after the visibility bound, inside the key's window, "
+                                       "shows that the write was not made", evidence)
+                return None
+        if found is None:
+            journal.record_finding(self.store, lease, attempt_id, "unresolved",
+                                   reason or "no lookup is left, and none found the key", evidence)
+            return None
+        return self._confirm(lease, action, status, attempt_id, found, evidence, "outcome_unknown", room)
+
+    def _retry(self, lease: Any, action: PreparedAction, status: dict[str, Any],
+               attempt_id: str) -> ValidationReport | None:
+        """Submit once more with the same key while the service still deduplicates it; read the receipt back."""
+        from smythe import workflow_actions as journal
+
+        profile, payload, permit = action.profile, None, None
+        claimed = sum(item["state"] not in ("prepared", "released") for item in status["attempts"])
+        problem = (None if _window_open(profile, min(status["claims"].values()), self.store._clock_ns())
+                   else "the key's deduplication window may have closed, so a retry could take effect twice")
+        if problem is None and claimed >= profile.max_attempts:
+            problem = f"the action has made all {profile.max_attempts} of its attempts"
+        if problem is None:
+            try:
+                approval = check_authority(self.store, action.action_id, self.verifier)
+                payload = _payload(self.store, action)
+                if payload is None and action.intent.content is not None:
+                    raise ActionNotAuthorized("the bytes read for delivery are not its bound content")
+                self._renew(lease, profile.timeout_s)
+                permit = journal.claim_retry(self.store, lease, action.action_id, approval.approval_id)
+            except (ActionStateError, WorkflowBudgetError) as error:
+                problem = f"no retry is allowed: {error}"
+        if problem is not None:
+            journal.record_finding(self.store, lease, attempt_id, "unresolved", problem)
+            return None
+        self._submit(action, permit, payload)
+        status = journal.reconcile_status(self.store, action.action_id)
+        retry = status["attempts"][-1]
+        if retry["state"] != "acknowledged":
+            return None
+        return self._confirm(lease, action, status, retry["attempt_id"], status["receipt"], [], "dispatched")
+
+    def _confirm(self, lease: Any, action: PreparedAction, status: dict[str, Any], attempt_id: str,
+                 receipt: ConnectorReceipt, evidence: list[str], undecided: str,
+                 room: int | None = None) -> ValidationReport | None:
+        """Read back the object *receipt* names; record an unresolved finding when no read decides."""
+        from smythe import workflow_actions as journal
+
+        report, full = None, False
+        if action.profile.lookup_by_object:
+            report, records, full = self._read_back(
+                lease, action, attempt_id, receipt, status["reads"].get(attempt_id, 0), undecided,
+                self._room(status, attempt_id) if room is None else room)
+            evidence = [*evidence, *records]
+        if report is None or report.outcome is ValidationOutcome.ERROR:
+            journal.record_finding(
+                self.store, lease, attempt_id, "unresolved",
+                "the connector declares no lookup by object, so no read can confirm the receipt"
+                if not action.profile.lookup_by_object
+                else "the approval's ceiling leaves no room for another read" if full
+                else "no read confirmed the receipt's object within the read bound", evidence)
+        return report
+
+    def _progress(self, action_id: str, report: ValidationReport | None = None) -> ActionProgress:
+        from smythe.workflow_actions import reconcile_status
+
+        status = reconcile_status(self.store, action_id)
+        action, attempts, finding = status["action"], status["attempts"], status["finding"]
         profile, latest = action.profile, attempts[-1] if attempts else None
         claimed = sum(attempt["state"] not in ("prepared", "released") for attempt in attempts)
-        next_action = {"outcome_unknown": "reconcile", "compensation_required": "compensate"}.get(
-            action.state)
+        # An unresolved finding stands until another attempt begins.
+        review = ("operator_review" if finding is not None and finding.get("finding") == "unresolved"
+                  and finding.get("attempts") == len(attempts) else "reconcile")
+        next_action = {"outcome_unknown": review, "compensation_required": "compensate"}.get(action.state)
         if action.state == "not_dispatched" and claimed < profile.max_attempts:
             next_action = "dispatch"
         elif action.state == "dispatched":
-            next_action = ("readback" if latest["state"] == "acknowledged"
-                           and profile.lookup_by_object and reads < profile.readback_reads
-                           else "reconcile")
+            next_action = ("readback" if latest["state"] == "acknowledged" and profile.lookup_by_object
+                           and status["reads"].get(latest["attempt_id"], 0) < profile.readback_reads
+                           else review)
         return ActionProgress(action_id, action.state, latest, report, next_action)
 
 
