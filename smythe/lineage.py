@@ -7,31 +7,41 @@ so a run never changes its access scope or reuse mode while in flight.
 ids, versions and SHA-256 digests (:mod:`smythe._canonical`) and never text.
 A run with a policy writes its record once, when it completes, as a
 ``lineage`` journal operation (:func:`build_lineage`, :func:`load_lineage`).
+:func:`restrict_source` withdraws a source's text from every completed run
+whose record names it, which restricts what those runs derived.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
 import re
 from types import MappingProxyType
 from typing import Any
+from uuid import uuid4
 
 from smythe._canonical import sha256_hex
+from smythe._publish import _fsync_directory, _regular_path
 from smythe.acceptance import AcceptanceDecision, DeliveryAcceptance, task_sha256
 from smythe.context import ContextSnapshot, ContextSource, context_key, text_sha256
-from smythe.evidence import claim_exchange
+from smythe.evidence import (
+    SourceRecord, _journal_tombstone, claim_exchange, load_source_tombstones,
+)
 from smythe.executor_base import _exchanges_claims
 from smythe.graph import ExecutionGraph, Node, NodeStatus
 from smythe.validation import ValidatorIdentity, _require_keys, _require_sha256
 from smythe.verifier import node_generation
-from smythe.workflow_artifact import PublishedArtifact
+from smythe.workflow_artifact import PublishedArtifact, publications, read_publication
 from smythe.workflow_binding import WorkflowBindingError
+from smythe.workflow_store import WorkflowStateError
 from smythe.workflow_tools import READ_STEP_KEY
 
 __all__ = [
     "LINEAGE_OPERATION", "LINEAGE_POLICY_VERSION", "LINEAGE_RECORD_VERSION", "LINEAGE_REUSE_KEY",
-    "ArtifactLineage", "LineagePolicy", "build_lineage", "lineage_key", "load_lineage",
+    "PURGE_OPERATION", "ArtifactLineage", "LineagePolicy", "build_lineage", "lineage_key",
+    "load_lineage", "purged_artifacts", "restrict_source", "restricted_sources",
     "validator_set_sha256",
 ]
 
@@ -606,3 +616,193 @@ def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
         else "partial",
         predecessor=predecessor, repair=repair,
     )
+
+
+# ---------------------------------------------------------------------------
+# Restricting a source: retention and access changes
+# ---------------------------------------------------------------------------
+
+# The journal operation kind of a published file deleted from a restricted
+# run; its key is ``artifact-purge/<publication sequence>``.
+PURGE_OPERATION = "artifact_purge"
+
+
+def _named(record: ArtifactLineage | None) -> set[tuple[str, str]]:
+    """The ``(source_id, sha256)`` of each source text *record*'s nodes name as inputs."""
+    return set() if record is None else {(ref["source_id"], ref["sha256"])
+                                         for node in record.nodes for ref in node["inputs"]["sources"]}
+
+
+def restricted_sources(store: Any, run_id: str) -> tuple[SourceRecord, ...]:
+    """The tombstones that restrict a durable run: each withdraws a source text its lineage names.
+
+    A tombstone, which :func:`restrict_source` or
+    :meth:`~smythe.workflow.WorkflowRuntime.remove_source` journals,
+    withdraws one source text, by id and SHA-256, from one run. It restricts
+    a run whose applied lineage record names that text as any node's input:
+    whatever decision follows, what the run derived is never delivered,
+    reused, re-evaluated or published again. A run without a record has
+    none, and every tombstone of a run whose record cannot be read counts.
+    Only reads are made.
+    """
+    tombstones = load_source_tombstones(store, run_id)
+    if not tombstones:
+        return ()
+    try:
+        named = _named(load_lineage(store, run_id))
+    except ValueError:
+        return tombstones
+    return tuple(item for item in tombstones if (item.source_id, item.sha256) in named)
+
+
+def purged_artifacts(store: Any, run_id: str) -> list[dict[str, Any]]:
+    """The published files a restriction deleted from a durable run, in publication order.
+
+    Each is ``{"relative_path", "sha256", "reason", "purged_at"}``: the
+    file's path under the artifact directory, the SHA-256 its publication
+    recorded, and why and when it was deleted. Only reads are made.
+    """
+    done = [item for item in store.list_operations(run_id, PURGE_OPERATION)
+            if item["state"] != "started"]
+    done.sort(key=lambda item: int(item["operation_key"].rpartition("/")[2]))
+    return [item["result"]["purge"] for item in done]
+
+
+def _stamp(store: Any) -> str:
+    """The journal clock's time, in UTC to the second."""
+    return datetime.fromtimestamp(store._clock_ns() // 1_000_000_000,
+                                  timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _purge(store: Any, lease: Any, publication: PublishedArtifact, reason: str,
+           stamp: str) -> dict[str, Any]:
+    """Delete one file the leased run published, as an ``artifact_purge`` operation."""
+    key = f"artifact-purge/{publication.sequence}"
+    operation = store.load_operation(lease.run_id, key)
+    if operation is None:
+        operation = store.begin_operation(lease, key, PURGE_OPERATION, {"purge": {
+            "relative_path": f"{lease.run_id}/{publication.name}", "sha256": publication.sha256,
+            "reason": reason, "purged_at": stamp}})
+    if operation["state"] == "started":
+        directory = Path(publication.directory)
+        try:
+            # Never through a symbolic link or junction, and only a regular file.
+            path = _regular_path(directory.parent, f"{directory.name}/{publication.name}")
+            path.unlink()
+            _fsync_directory(path.parent)
+        except FileNotFoundError:
+            pass  # Already gone, as when a lost process deleted it before recording it.
+        except ValueError as error:
+            raise WorkflowStateError(
+                f"Cannot purge {publication.name!r} of run {lease.run_id!r}: {error}") from error
+        operation = store.complete_operation(lease, key, operation["inputs"])
+    return operation
+
+
+def _restrict(store: Any, run_id: str, texts: Mapping[str, str | None], source_id: str,
+              reason: str, stamp: str, purge: bool) -> dict[str, Any]:
+    """Tombstone *texts* (SHA-256 to version) in one completed run, and purge its files."""
+    lease = store.acquire_lease(run_id, uuid4().hex, ttl_s=60)
+    try:
+        operations = [_journal_tombstone(store, lease, SourceRecord(
+            source_id, source_version=version, sha256=sha256, tombstone=reason, removed_at=stamp))
+            for sha256, version in sorted(texts.items())]
+        if purge:
+            operations += [_purge(store, lease, read_publication(operation, sequence), reason, stamp)
+                           for sequence, operation in enumerate(publications(store, run_id))
+                           if operation["state"] != "started"]
+        pending = [item["operation_id"] for item in operations if item["state"] != "applied"]
+        if pending:
+            # A copy of the completed checkpoint applies them; nothing else changes.
+            saved = store.get_checkpoint(run_id)
+            store.save_checkpoint(lease, saved["revision"], saved["checkpoint"],
+                                  consumed_operation_ids=sorted(pending),
+                                  transition_kind="completed")
+    finally:
+        store.release_lease(lease)
+    return {"run_id": run_id,
+            "tombstones": [item["result"]["tombstone"] for item in operations
+                           if item["kind"] != PURGE_OPERATION],
+            "purged": purged_artifacts(store, run_id)}
+
+
+def restrict_source(store: Any, source_id: str, *, version: str | None = None,
+                    scope: str | None = None, reason: str,
+                    purge: bool = False) -> list[dict[str, Any]]:
+    """Withdraw a source's text from every completed lineage run whose record names it.
+
+    *version*, when given, withdraws only the references recorded with that
+    version. *scope*, when given, limits the runs to that access scope,
+    compared before any record or digest is read, so a run in another scope
+    is never touched however exactly its digests match; None covers every
+    scope. Each completed run whose applied :class:`ArtifactLineage` names
+    the text as a node's input journals a tombstone of it under the run's
+    lease: the :class:`~smythe.evidence.SourceRecord` and
+    ``source_tombstone`` operation that
+    :meth:`~smythe.workflow.WorkflowRuntime.remove_source` writes, with the
+    source's id, version and SHA-256, *reason* (1-500 characters) and
+    ``removed_at`` from the journal's clock, and none of its text. A copy of
+    the run's completed checkpoint applies it, and nothing is called. The
+    run is then restricted (:func:`restricted_sources`).
+
+    With *purge*, every file the run published is deleted, never through a
+    symbolic link, and an ``artifact_purge`` operation records its path
+    under the artifact directory, the SHA-256 its publication recorded,
+    *reason* and the time. Tombstones and purge records always remain. Text
+    the journal's checkpoints, snapshots and provider responses copied is
+    not removed.
+
+    Returns one entry per restricted run, in journal order: ``run_id``, the
+    ``tombstones`` of the withdrawn text as JSON records, and the run's
+    ``purged`` files (:func:`purged_artifacts`). A text a run already holds
+    a tombstone of keeps its first one, so calling this again, for example
+    after another process released a run, finishes a restriction without
+    changing what it recorded. A run that has not completed has no record
+    and is not changed.
+
+    Raises ``WorkflowBindingError`` for a blank or overlong source id,
+    version or reason, a scope that is not an access scope label, or a
+    *purge* that is not True or False; ``WorkflowStateError``, before
+    anything is written, for a run in scope whose record cannot be read,
+    and for a store opened read-only; and ``WorkflowLeaseError`` for a run
+    another process holds.
+    """
+    try:
+        _id(source_id, "source_id")
+        if version is not None:
+            _text(version, "version")
+        if not _text(reason, "reason", 500).strip():
+            raise ValueError("reason must not be blank")
+    except ValueError as error:
+        raise WorkflowBindingError(str(error)) from error
+    if scope is not None and (type(scope) is not str or _SCOPE.fullmatch(scope) is None):
+        raise WorkflowBindingError("scope must be an access scope label, or None for every scope")
+    if type(purge) is not bool:
+        raise WorkflowBindingError("purge must be True or False")
+    if store.read_only:
+        raise WorkflowStateError("Workflow store is read-only")
+    affected = []
+    for run in store.list_runs():
+        run_id = run["run_id"]
+        policy = store.load_run(run_id)["config"].get("lineage") \
+            if run["status"] == "completed" else None
+        # The scope is compared before any record or digest is read.
+        if not isinstance(policy, dict) or scope not in (None, policy.get("access_scope")):
+            continue
+        try:
+            record = load_lineage(store, run_id)
+        except ValueError as error:
+            raise WorkflowStateError(
+                f"Run {run_id!r} holds an invalid lineage record, so the sources it used are "
+                "unknown") from error
+        texts: dict[str, str | None] = {}
+        for node in record.nodes if record is not None else ():
+            for ref in node["inputs"]["sources"]:
+                if ref["source_id"] == source_id and version in (None, ref["version"]):
+                    # One tombstone per text; it keeps a version a reference recorded.
+                    texts[ref["sha256"]] = texts.get(ref["sha256"]) or ref["version"]
+        if texts:
+            affected.append((run_id, texts))
+    stamp = _stamp(store)
+    return [_restrict(store, run_id, texts, source_id, reason, stamp, purge)
+            for run_id, texts in affected]

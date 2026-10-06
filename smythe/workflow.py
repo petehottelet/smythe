@@ -32,9 +32,9 @@ from smythe.context import (
     sources_key, sources_sha256, text_sha256 as output_sha256,
 )
 from smythe.evidence import (
-    SOURCE_EVIDENCE_OPERATION, SOURCE_TOMBSTONE_OPERATION, SourceRecord, _removed_sources,
-    _tombstone_operations, source_evidence_inputs, source_evidence_key, source_evidence_result,
-    source_tombstone_key,
+    SOURCE_EVIDENCE_OPERATION, SOURCE_TOMBSTONE_OPERATION, SourceRecord, _journal_tombstone,
+    _removed_sources, _tombstone_operations, load_source_tombstones, source_evidence_inputs,
+    source_evidence_key, source_evidence_result, source_tombstone_key,
 )
 from smythe.executor_base import (
     REJECTED_GENERATIONS_KEY, SUPPORTED_PROMPT_ASSEMBLY_VERSIONS, ExecutorBase, _exchanges_claims,
@@ -46,7 +46,7 @@ from smythe.graph import (
 )
 from smythe.lineage import (
     LINEAGE_OPERATION, LINEAGE_RECORD_VERSION, LINEAGE_REUSE_KEY, ArtifactLineage, build_lineage,
-    lineage_key, load_lineage, snapshot_lineage_policy,
+    lineage_key, load_lineage, restricted_sources, snapshot_lineage_policy,
 )
 from smythe.lineage import _REPAIR, _plain
 from smythe.lineage import _id as _lineage_id
@@ -603,28 +603,51 @@ def _held_record(record, output, problems, task_digest):
     )
 
 
+def _restricted(record):
+    """The reason a tombstone that restricts a lineage run gives."""
+    return (f"source {record.source_id!r} that the run's lineage records was withdrawn "
+            f"({record.tombstone}); the output derived from it is restricted")
+
+
+def _restriction_problems(store, run_id):
+    """Why a lineage run's derived output is restricted, one reason each; empty when it is not.
+
+    Each tombstone that withdraws a source text the run's lineage record
+    names (:func:`~smythe.lineage.restricted_sources`) restricts the run
+    whatever decision follows it, so completed resume, external actions,
+    reuse, re-evaluation and republication all refuse its output. Only
+    reads are made.
+    """
+    return [_restricted(record) for record in restricted_sources(store, run_id)]
+
+
 def _removal_problems(store, run_id, considered):
     """The sources a completed run delivered from that were removed after its decision.
 
     *considered* holds the tombstone keys the decision binds (see
     :func:`_decision_inputs`), empty without a decision. Any other tombstone
-    came after the decision, whichever checkpoint applied either. One reason
-    each; only reads are made.
+    came after the decision, whichever checkpoint applied either. A
+    tombstone that restricts a lineage run (:func:`_restriction_problems`)
+    is a problem whatever decision followed it. One reason each; only reads
+    are made.
     """
+    restricted = restricted_sources(store, run_id)
+    problems = [_restricted(record) for record in restricted]
     saved = store.get_checkpoint(run_id)
     binding = None if saved is None else saved["checkpoint"].get("context_sources")
     if not isinstance(binding, dict) or type(binding.get("revision")) is not int:
-        return []
+        return problems
     operation = store.load_operation(run_id, sources_key(binding["revision"]))
     if operation is None:
-        return []
+        return problems
     delivered = {(source.source_id, source.sha256)
                  for source in sources_from_operation(operation, binding["revision"])}
-    return [f"source {record.source_id!r} was removed from the run after this decision "
-            f"({record.tombstone}); re-evaluate the run"
-            for record, _ in _tombstone_operations(store, run_id)
-            if (record.source_id, record.sha256) in delivered
-            and source_tombstone_key(record.source_id, record.sha256) not in considered]
+    delivered -= {(record.source_id, record.sha256) for record in restricted}
+    return problems + [f"source {record.source_id!r} was removed from the run after this decision "
+                       f"({record.tombstone}); re-evaluate the run"
+                       for record, _ in _tombstone_operations(store, run_id)
+                       if (record.source_id, record.sha256) in delivered
+                       and source_tombstone_key(record.source_id, record.sha256) not in considered]
 
 
 def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha256,
@@ -637,7 +660,8 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
     (*policy_sha256*) or, for a re-evaluation, the policy it names, and under
     tombstones the journal holds. With *removed*, a source the run delivered
     from that was removed after the decision
-    (:meth:`WorkflowRuntime.remove_source`) is a problem too. An empty list
+    (:meth:`WorkflowRuntime.remove_source`), and any tombstone that restricts
+    a lineage run (:func:`_restriction_problems`), is a problem too. An empty list
     means the record holds. Only reads are made, so a store opened read-only
     will do.
     """
@@ -1873,8 +1897,11 @@ class WorkflowRuntime:
         predecessor in this store and access scope whose lineage record has
         *lineage_sha256* (:func:`_predecessor`); reused nodes that
         :func:`_reused` allows, that depend only on reused nodes, and that are
-        no gate or node a gate judges or depends on; and a graph this
-        runtime's configuration can run (:meth:`_check_successor_graph`).
+        no gate or node a gate judges or depends on; context sources that hold
+        no text removed from the predecessor; and a graph this runtime's
+        configuration can run (:meth:`_check_successor_graph`). The successor
+        holds the predecessor's source tombstones from its first checkpoint,
+        so it never derives from withdrawn text again, even one it reads anew.
         Raises ``WorkflowBindingError`` for a request that breaks these rules,
         ``WorkflowStateError`` for predecessor records that refuse it, and
         ``ValueError``, as for any graph, for a node model the provider does
@@ -1909,6 +1936,12 @@ class WorkflowRuntime:
                     "on, and nodes depending on a node that runs again always run again"
                 )
         results = {node_id: _reused(predecessor, node_id) for node_id in reuse}
+        inherited = load_source_tombstones(self.store, predecessor_id)
+        for source in self._supplied_sources or ():
+            if (source.source_id, source.sha256) in predecessor[3]:
+                raise WorkflowStateError(
+                    f"Source {source.source_id!r} was removed from run {predecessor_id!r}; a "
+                    "successor is never given its text")
         _successor_graph(graph)
         self._check_obligations(graph)
         self._check_successor_graph(graph, registry)
@@ -1918,6 +1951,10 @@ class WorkflowRuntime:
                 if self.registry.get(agent.id) is None:
                     self.registry.register(agent)
             self._prepare_graph(graph, fresh=True)
+            # Text withdrawn from the predecessor is withdrawn from its successor too.
+            for record in inherited:
+                self._pending_operations.add(
+                    _journal_tombstone(self.store, self.context.lease, record)["operation_id"])
             graph.planning = {"repair": {"predecessor": reference, "plan_sha256": plan_sha256,
                                          "reason": reason}}
             for node in graph.nodes:
@@ -2040,7 +2077,10 @@ class WorkflowRuntime:
         - a completed run's decision, made before the removal, no longer
           holds: resuming or inspecting the run gives ``indeterminate``, and
           :meth:`reevaluate` decides again, under a source evidence
-          validator that holds the tombstone rather than the text.
+          validator that holds the tombstone rather than the text;
+        - a lineage run whose record names the source is restricted instead
+          (:func:`~smythe.lineage.restricted_sources`): no decision delivers
+          its output again.
 
         Earlier records keep what they hold: the journal's requests, read
         responses, snapshots and outputs, and a published document. Removing
@@ -2137,9 +2177,11 @@ class WorkflowRuntime:
         strict policy, or no lineage policy when given a plan, an unfinished
         run, unresolved accounting, a saved output, task, source generation,
         record or lineage that no longer matches the journal, so changed
-        output is never accepted, a run with a renderer whose published
-        document is missing or changed (:meth:`republish` publishes it again
-        first), or a current decision an operator cannot resolve;
+        output is never accepted, a lineage run that a source tombstone
+        restricts (:func:`~smythe.lineage.restricted_sources`), a run with a
+        renderer whose published document is missing or changed
+        (:meth:`republish` publishes it again first), or a current decision an
+        operator cannot resolve;
         ``WorkflowConflictError`` for a recipe that differs in anything else;
         and whatever the operator's verifier raises, such as
         ``ApprovalRejected``, before anything is journaled.
@@ -2219,6 +2261,9 @@ class WorkflowRuntime:
         if ([AcceptanceSource(node.id, node_generation(node)) for node in sources]
                 != list(record.sources) or used_fallback != record.used_fallback):
             problems.append("the saved graph no longer delivers the sources its record bound")
+        # No new decision or publication delivers what a lineage run derived
+        # from withdrawn text.
+        problems += _restriction_problems(self.store, self.run_id)
         if problems:
             raise WorkflowStateError(f"Workflow cannot be {action}: " + "; ".join(problems))
         return output, record
@@ -2329,11 +2374,15 @@ class WorkflowRuntime:
                 self.store.security_stop(self.run_id, stop["reason_code"])
             self._save("failed")
             raise
-        if self.renderer is not None and acceptance is not None:
+        if acceptance is not None:
             # As on completed resume, delivery needs the published file
-            # intact, including one a lost process published before.
-            acceptance = self._held(acceptance, output, artifact_problems(
-                current_artifact(self.store, self.run_id), output))
+            # intact, including one a lost process published before, and a
+            # lineage run must hold no text withdrawn from it before it ended.
+            problems = [] if self.renderer is None else artifact_problems(
+                current_artifact(self.store, self.run_id), output)
+            if self.lineage is not None:
+                problems += _restriction_problems(self.store, self.run_id)
+            acceptance = self._held(acceptance, output, problems)
         return self._result(output, acceptance)
 
     async def _seed_reuse(self):
@@ -2476,9 +2525,10 @@ class WorkflowRuntime:
 
         Raises ``WorkflowBindingError`` for *plan_sha256* or *reason* without
         the other, or invalid, and ``WorkflowStateError`` for a run without a
-        renderer, a run that has not completed or published, a saved output
-        that is not the published document, and a plan for a run without a
-        lineage policy.
+        renderer, a run that has not completed or published, a lineage run that
+        a source tombstone restricts (:func:`~smythe.lineage.restricted_sources`),
+        a saved output that is not the published document, and a plan for a run
+        without a lineage policy.
         """
         repair = _repair_record(plan_sha256, reason)
         run = self.store.load_run(run_id)
@@ -2493,6 +2543,10 @@ class WorkflowRuntime:
             state = self._restore()
             if state is None or state["status"] != "completed":
                 raise WorkflowStateError("Only a completed workflow can publish its document again")
+            restricted = _restriction_problems(self.store, self.run_id)
+            if restricted:
+                raise WorkflowStateError("Workflow cannot publish its document again: "
+                                         + "; ".join(restricted))
             current, output = current_artifact(self.store, self.run_id), state["output"]
             if current is None:
                 raise WorkflowStateError("Workflow has no published document to publish again")

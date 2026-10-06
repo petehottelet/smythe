@@ -1282,8 +1282,8 @@ def test_a_lineage_run_shows_a_damaged_artifact_and_its_lineage_without_text(
         "undeclared": [], "sources": served,
         "artifact": {"relative_path": f"{run_id}/document.md", "sha256": record.artifact["sha256"],
                      "size_bytes": record.artifact["size_bytes"], "integrity": "changed"},
-        "predecessor": None, "successors": [], "status": "invalid",
-        "reasons": ["artifact_changed", "decision_not_accepted"]}
+        "predecessor": None, "successors": [], "tombstones": [], "purged": [],
+        "status": "invalid", "reasons": ["artifact_changed", "decision_not_accepted"]}
     assert main(["runs", "--journal", str(path), "inspect", run_id]) == code
     text = capsys.readouterr().out
     assert (f"Lineage: complete coverage; scope research-team; nodes model 2, read 2, "

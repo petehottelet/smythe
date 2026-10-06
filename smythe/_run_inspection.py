@@ -54,7 +54,7 @@ from smythe.context import (
 )
 from smythe.evidence import load_source_evidence, load_source_tombstones
 from smythe.graph import ExecutionGraph
-from smythe.lineage import load_lineage
+from smythe.lineage import load_lineage, purged_artifacts, restricted_sources
 from smythe.reuse import _INTEGRITY, _archive, _kinds, derived_status
 from smythe.validation import _json_sha256
 from smythe.workflow_artifact import CurrentArtifact, artifact_problems, current_artifact
@@ -544,9 +544,12 @@ def lineage_view(store: SQLiteWorkflowStore, run_id: str, recipe: dict[str, Any]
     nodes, each source reference the nodes read, by id, version and digest,
     the published document the record binds and whether the run's current
     publication still holds its bytes, the predecessor, and each successor in
-    the run's access scope with whether it supersedes the run. ``status`` is
+    the run's access scope with whether it supersedes the run. ``tombstones``
+    are those that withdraw a text the record names, by id, version, digest,
+    reason and time, and ``purged`` the published files a restriction
+    deleted (:func:`~smythe.lineage.purged_artifacts`). ``status`` is
     :func:`~smythe.reuse.derived_status` of what can be found without a
-    source catalog: supersession, sources removed from the run, the
+    source catalog: supersession, sources withdrawn from the run, the
     document's integrity and the current decision; it is never ``current``
     or ``stale``, which only a repair plan can tell. No text is read out.
     """
@@ -560,13 +563,18 @@ def lineage_view(store: SQLiteWorkflowStore, run_id: str, recipe: dict[str, Any]
     view: dict[str, Any] = {
         "access_scope": policy["access_scope"], "recorded": record is not None,
         "lineage_sha256": None, "coverage": None, "nodes": {}, "undeclared": [], "sources": [],
-        "artifact": None, "predecessor": None, "successors": successors}
+        "artifact": None, "predecessor": None, "successors": successors, "tombstones": [],
+        "purged": purged_artifacts(store, run_id)}
     reasons = set() if completed else {"run_in_progress"}
     if record is not None:
         references = {(ref["source_id"], ref["version"] or "", ref["sha256"]): dict(ref)
                       for node in record.nodes for ref in node["inputs"]["sources"]}
-        removed = {(item.source_id, item.sha256) for item in load_source_tombstones(store, run_id)}
-        if any((ref["source_id"], ref["sha256"]) in removed for ref in references.values()):
+        named = {(ref["source_id"], ref["sha256"]) for ref in references.values()}
+        view["tombstones"] = [
+            {"source_id": item.source_id, "version": item.source_version, "sha256": item.sha256,
+             "reason": item.tombstone, "removed_at": item.removed_at}
+            for item in load_source_tombstones(store, run_id) if (item.source_id, item.sha256) in named]
+        if view["tombstones"]:
             reasons.add("source_tombstoned")
         if delivery["decision"] != AcceptanceDecision.ACCEPTED.value:
             reasons.add("decision_not_accepted")
@@ -694,6 +702,8 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str, *, lineage: bool = Tr
         resume += f", including the strict acceptance policy whose sha256 is {policy_sha256}"
     tool_calls = tool_calls_view(store, run_id, inspected["calls"])
     evidence = evidence_view(store, run_id)
+    # A restricted run's document is never published again, so its decision says why.
+    published = None if artifact is None or restricted_sources(store, run_id) else artifact.to_dict()
     return {
         "run_id": run_id,
         "store": "journal",
@@ -717,8 +727,7 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str, *, lineage: bool = Tr
         "next_action": next_action(
             state, delivery, cost_is_complete=accounting["cost_is_complete"],
             unresolved=accounting["unresolved"], blocked_reason=blocked,
-            resume=resume + ", once no worker holds its lease.",
-            artifact=None if artifact is None else artifact.to_dict(),
+            resume=resume + ", once no worker holds its lease.", artifact=published,
         ),
     }
 

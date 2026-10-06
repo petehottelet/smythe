@@ -181,16 +181,20 @@ ids, versions and digests, never source text, node inputs or results:
 | `artifact` | The published document the record binds, by `relative_path`, `sha256` and `size_bytes`, and its `integrity`: the status of the run's current publication when it holds those bytes, `changed` when it holds others, `not_checked` without one; null for a run that publishes none |
 | `predecessor` | The run this run's record names as its predecessor, with that run's record digest; null for none |
 | `successors` | Each run in the same access scope whose record names this run as its predecessor, and whether it `supersedes` it: only a completed successor whose current decision is `accepted` does |
+| `tombstones` | Each tombstone that withdraws a source text the record names, by `source_id`, `version`, `sha256`, `reason` and `removed_at` |
+| `purged` | Each published file a [restriction](lineage.md#restrict-a-source) deleted, by `relative_path`, `sha256`, `reason` and `purged_at` |
 | `status`, `reasons` | The run's [derived status](lineage.md#derived-status) and the reason codes behind it |
 
 Freshness depends on the sources, which only the application's source
 catalog can describe, so `status` here is `superseded`, `restricted` (a
-source the record names was [removed from the run](tasks.md#remove-a-source)),
+source the record names was [restricted](lineage.md#restrict-a-source) or
+[removed from the run](tasks.md#remove-a-source)),
 `invalid` (the document no longer holds the decided bytes, or the current
 decision is not `accepted`) or null, never `current` or `stale`; plan a
 repair with [`Swarm.plan_repair`](lineage.md#plan-a-repair) to see those.
 The summary reads every run in the run's access scope to find its
-successors; `list` leaves it out. It adds no exit code.
+successors; `list` leaves it out. It adds no exit code. A restricted run's
+next action is never `republish`, which it refuses.
 
 ```text
 Lineage: complete coverage; scope research-team; nodes model 2, read 2, synthesis 1; record sha256 5f0c...
@@ -199,6 +203,13 @@ Lineage: complete coverage; scope research-team; nodes model 2, read 2, synthesi
   Artifact 3f9c2d0e8b4a/document.md: sha256 b84c1d2e3f40; integrity changed
   Predecessor: none; successors: none
   Derived status: invalid (artifact_changed, decision_not_accepted)
+```
+
+A restricted run adds a line for each tombstone and purged file:
+
+```text
+  Tombstone renewals version 1: sha256 7d1e0f3a9b2c; withdrawn by its owner (2026-10-01T09:00:00Z)
+  Purged 3f9c2d0e8b4a/document.md: sha256 b84c1d2e3f40; withdrawn by its owner (2026-10-01T09:00:00Z)
 ```
 
 ### Research runs

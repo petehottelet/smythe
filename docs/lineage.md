@@ -15,9 +15,11 @@ sources, tools and validators, [repair plans](#plan-a-repair), which
 show before anything is dispatched what each run of an archive calls for
 and the work that would take, [repair in place](#repair-a-run-in-place),
 which decides a run again or publishes its damaged document again without
-running a node, and the records of a
+running a node, the records of a
 [successor run](#reuse-in-a-successor-run) that reuses a completed run's
-results. Nothing applies a whole plan, and no public method starts a
+results, and [source restriction](#restrict-a-source), which withdraws a
+source's text from every run that used it and can delete their published
+documents. Nothing applies a whole plan, and no public method starts a
 successor, yet.
 
 ## Opt a run in
@@ -593,7 +595,7 @@ superseded=False, sources_checked=True)` gives the first that applies:
 | Status | When |
 |---|---|
 | `superseded` | A completed successor whose current decision is `accepted` names the run as its predecessor |
-| `restricted` | A source the run used was withdrawn: the catalog reports it tombstoned, or, in `smythe runs inspect`, it was removed from the run |
+| `restricted` | A source the run used was withdrawn: the catalog reports it tombstoned, or a tombstone in the run's journal withdraws a text its record names (see [restrict a source](#restrict-a-source)) |
 | `invalid` | The published document is missing, changed, unsafe or unreadable, or the decision is not `accepted` |
 | `current` | Nothing calls for work: the item is reused as it is |
 | `stale` | Anything else does: an input, validator or policy changed, coverage is partial or a source is unknown |
@@ -675,7 +677,10 @@ from a run in the same store and the same access scope, compared before any
 digest, and only nodes the predecessor's record declares, whose saved
 results still have their recorded digests and whose sources were not removed.
 Gates, the nodes they judge or depend on, and nodes that depend on a node
-that runs again are never kept. No public method starts a successor yet.
+that runs again are never kept. The successor holds its predecessor's source
+tombstones from its first checkpoint, so text
+[withdrawn](#restrict-a-source) from the predecessor is withdrawn from it
+too. No public method starts a successor yet.
 
 When the successor completes, its record shows what it kept:
 
@@ -690,3 +695,102 @@ When the successor completes, its record shows what it kept:
 Nodes that ran again are recorded from the successor's own snapshots and
 reads. A kept node is always `declared`, because a node whose inputs are
 undeclared is never kept.
+
+## Restrict a source
+
+When a source's retention ends, or access to it is revoked, withdraw its
+text from every run that used it with `smythe.lineage.restrict_source`:
+
+```python
+from smythe.lineage import restrict_source
+
+with SQLiteWorkflowStore("smythe-runs.db") as store:
+    restricted = restrict_source(store, "handbook", scope="research-team",
+                                 reason="withdrawn by its owner", purge=True)
+    for item in restricted:
+        print(item["run_id"], [record["sha256"] for record in item["tombstones"]],
+              item["purged"])
+```
+
+- **Which runs.** Every completed run whose recipe records a lineage policy
+  and whose applied record names the source as any node's input, in journal
+  order. `version` limits it to the references recorded with that version.
+  `scope` limits it to the runs in that access scope, compared before any
+  record or digest is read, so a run in another scope is never touched
+  however exactly its digests match; without it, every scope is covered.
+- **What it records.** Each such run journals a tombstone of each withdrawn
+  text under the run's lease: the same `SourceRecord` and
+  `source_tombstone` operation that
+  [removing a source](tasks.md#remove-a-source) writes, with the source's id,
+  version and SHA-256, the reason (1-500 characters) and `removed_at` from
+  the journal's clock (the store's `clock_ns`), and none of the text. A copy
+  of the run's completed checkpoint applies it; nothing is called. A text a
+  run already holds a tombstone of keeps its first one, so calling
+  `restrict_source` again, for example after another process released a run
+  whose lease it held (`WorkflowLeaseError`), finishes a restriction without
+  changing what it recorded.
+- **Purge.** With `purge=True`, every file the run published is deleted,
+  never through a symbolic link or junction, and an `artifact_purge`
+  operation, keyed `artifact-purge/<publication sequence>`, records its path
+  under the artifact directory, the SHA-256 its publication recorded, the
+  reason and the time; `smythe.lineage.purged_artifacts(store, run_id)`
+  reads them. Accepted documents are deleted only by an explicit purge, and
+  tombstones and purge records always remain.
+- **What it returns.** One entry per restricted run: its `run_id`, the
+  `tombstones` of the withdrawn text as JSON records, and its `purged`
+  files.
+- **Refusals.** A blank or overlong source id or version, a reason that is
+  not 1-500 characters without control characters, a scope that is not an
+  access-scope label and a `purge` that is not `True` or `False` raise
+  `WorkflowBindingError`. A run in scope whose record cannot be read raises
+  `WorkflowStateError` before anything is written, and so does a journal
+  opened read-only.
+
+### A restricted run
+
+`smythe.lineage.restricted_sources(store, run_id)` returns the tombstones
+that restrict a run: each withdraws a text the run's record names, whether
+`restrict_source` or `remove_source` journaled it. While any does, whatever
+decision follows it:
+
+- **No delivery.** Resuming the completed run, inspecting it and its
+  published document's eligibility give `indeterminate`, naming the
+  withdrawn source, and the output moves to `rejected_output`.
+  `reevaluate` refuses the run, so no new decision, by a policy or an
+  operator, delivers it again.
+- **No reuse.** A successor never reuses a node whose inputs name a
+  withdrawn text, nor a node that depends on one.
+- **No republication.** `republish` refuses the run, so a purged document is
+  never published again.
+- **No external delivery.** Republication outside the journal goes through
+  the [governed action path](actions.md), whose `prepare_action`, `approve`
+  and `check_authority` refuse the content as unavailable.
+- **Inspection.** [`smythe runs inspect`](runs.md#lineage) shows the derived
+  status `restricted`, each tombstone by source id, version, digest, reason
+  and time, and each purged file, without text.
+- **Repair plans.** A text withdrawn from a run is never available to it: a
+  [plan](#plan-a-repair) describes the source as withdrawn for that run, so
+  the run needs `review` (`source_tombstoned`) while the catalog still
+  describes that text. Once the catalog describes another text, such as a
+  new version, the run can `regenerate`; its status stays `restricted`.
+- **Successors.** A successor holds its predecessor's tombstones from its
+  first checkpoint. One given such a text as a context source is refused
+  before it is created, and one that reads such a text again is restricted
+  when it completes.
+
+### Limits
+
+- **Scope is declared, not authenticated.** Restricting one
+  [access scope](#access-scope) leaves the runs under every other label as
+  they are; the label says whose runs these are, not who may read the
+  journal.
+- **Copies in the journal.** A tombstone is not an erasure. Text that the
+  journal's checkpoints, context snapshots, saved requests and provider or
+  read responses copied, including a completed run's output, is not
+  scrubbed: those records are bound by their digests. Protect or delete the
+  journal itself when those copies must go.
+- **Runs in progress.** Only a run that has completed with a record is
+  restricted. Call `restrict_source` again after a run in progress
+  completes.
+- **Files elsewhere.** Only the files a run published into its artifact
+  directory are purged, never copies made elsewhere.

@@ -314,8 +314,10 @@ checks that:
 - the content is still deliverable, as for `prepare_action()`: no security
   stop holds the run, the run's current decision is still `accepted`, the
   published file still holds the bound bytes, and no source the accepted
-  output came from has been [removed](tasks.md#remove-a-source) since, which
-  makes the content unavailable.
+  output came from has been [removed](tasks.md#remove-a-source) since, and no
+  source a lineage run's record names has been
+  [restricted](lineage.md#restrict-a-source), either of which makes the
+  content unavailable.
 
 An approval row written into the journal by other means never authorizes
 anything: the verifier must vouch for its assertion. `check_authority()` only

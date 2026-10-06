@@ -813,6 +813,14 @@ def _emit_lineage(lineage: dict[str, Any]) -> None:
         if artifact is not None:
             print(f"  Artifact {_terminal_text(artifact['relative_path'])}: sha256 "
                   f"{artifact['sha256'][:12]}; integrity {artifact['integrity']}")
+        for item in lineage["tombstones"]:
+            version = f" version {_terminal_text(item['version'])}" if item["version"] else ""
+            when = f" ({_terminal_text(item['removed_at'])})" if item["removed_at"] else ""
+            print(f"  Tombstone {_terminal_text(item['source_id'])}{version}: sha256 "
+                  f"{item['sha256'][:12]}; {_terminal_text(item['reason'])}{when}")
+        for item in lineage["purged"]:
+            print(f"  Purged {_terminal_text(item['relative_path'])}: sha256 {item['sha256'][:12]}; "
+                  f"{_terminal_text(item['reason'])} ({_terminal_text(item['purged_at'])})")
     predecessor = lineage["predecessor"]
     successors = ", ".join(
         _terminal_text(item["run_id"]) + ("" if item["supersedes"] else " (does not supersede)")

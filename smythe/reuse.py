@@ -30,8 +30,9 @@ from typing import Any, Protocol
 from smythe._canonical import sha256_hex
 from smythe.acceptance import AcceptanceDecision, _calls_async
 from smythe.context import CONTEXT_ASSEMBLY_VERSION
+from smythe.evidence import load_source_tombstones
 from smythe.lineage import (
-    ArtifactLineage, LineagePolicy, _count, _frozen, _label, _plain, _synthesizer, _text,
+    ArtifactLineage, LineagePolicy, _count, _frozen, _label, _named, _plain, _synthesizer, _text,
     _validator_set, load_lineage, validator_set_sha256,
 )
 from smythe.validation import ValidatorIdentity, _json_sha256, _require_keys, _require_sha256
@@ -495,6 +496,26 @@ class _Described:
         return self.seen[source_id]
 
 
+class _Withdrawn:
+    """One run's view of a plan's catalog: text withdrawn from the run is not available to it.
+
+    A source whose current text a tombstone in the run's journal withdrew is
+    described as withdrawn, with the tombstone's reason; a newer text is
+    described as the catalog has it, so the run can regenerate from it.
+    """
+
+    metered = False
+
+    def __init__(self, catalog: SourceCatalog, tombstones: Iterable[Any]) -> None:
+        self.catalog = catalog
+        self.reasons = {(item.source_id, item.sha256): item.tombstone for item in tombstones}
+
+    def describe(self, source_id: str) -> SourceStatus | None:
+        status = self.catalog.describe(source_id)
+        reason = None if status is None else self.reasons.get((source_id, status.sha256))
+        return status if reason is None else SourceStatus(available=False, tombstone_reason=reason)
+
+
 def _agents(entries: Iterable[Mapping[str, Any]]) -> set[str]:
     """The digests a lineage record gives the agents of these registry entries."""
     return {sha256_hex({key: value for key, value in entry.items() if key != "id"})
@@ -612,8 +633,12 @@ def repair_plan(store: Any, recipe: Mapping[str, Any], catalog: SourceCatalog,
     :class:`~smythe.workflow_store.WorkflowNotFoundError` as an unknown one
     does. A run that has not completed needs ``review``
     (``run_in_progress``). Each completed run's published document is
-    checked through :func:`~smythe.workflow_artifact.current_artifact`.
-    Only reads are made.
+    checked through :func:`~smythe.workflow_artifact.current_artifact`. A
+    source text that a tombstone in a run's journal withdrew
+    (:func:`~smythe.lineage.restrict_source`) is never available to that
+    run: it needs ``review`` (``source_tombstoned``) until the catalog
+    describes another text, which it may regenerate from, and its status
+    stays ``restricted``. Only reads are made.
     """
     if not isinstance(recipe, Mapping) or recipe.get("lineage") is None:
         raise ValueError("A repair plan needs a lineage policy, whose access scope it plans in")
@@ -633,22 +658,28 @@ def repair_plan(store: Any, recipe: Mapping[str, Any], catalog: SourceCatalog,
         if run_id not in runs:
             raise WorkflowNotFoundError(
                 f"No durable run {run_id!r} in access scope {state.access_scope!r}")
-        record = None
+        record, restricted = None, False
         if runs[run_id] != "completed":
             decision = replace(evaluate(None, state), action="review", reasons=("run_in_progress",))
         else:
             record = load_lineage(store, run_id)
             recorded = store.get_checkpoint(run_id)["checkpoint"]["registry"]["agents"]
             current = current_artifact(store, run_id)
+            tombstones = load_source_tombstones(store, run_id)
+            # Text withdrawn from the run restricts it, whatever is available now.
+            restricted = bool({(item.source_id, item.sha256) for item in tombstones}
+                              & _named(record))
             decision = evaluate(record, replace(
-                state, agents=state.agents | _agents(
+                state, catalog=_Withdrawn(described, tombstones),
+                agents=state.agents | _agents(
                     entry for entry in recorded if entry["id"] not in configured),
                 integrity={} if current is None else {run_id: current.integrity["status"]}))
         superseded = any(accepted and predecessor == run_id
                          for predecessor, accepted in links.values())
+        reasons = [*decision.reasons, *(["source_tombstoned"] if restricted else [])]
         planned.append({"run_id": run_id,
                         "lineage_sha256": None if record is None else record.sha256,
-                        "status": derived_status(decision.reasons, superseded=superseded),
+                        "status": derived_status(reasons, superseded=superseded),
                         **decision.to_dict(), "work": _work(record, decision, free)})
     return RepairPlan(store.store_id, state.access_scope, planned,
                       [_source(source_id, described.seen[source_id])

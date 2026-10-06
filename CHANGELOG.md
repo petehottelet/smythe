@@ -1257,6 +1257,30 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   reason. `smythe runs inspect` lists superseded publications under
   `artifact.superseded`. See
   [repair a run in place](docs/lineage.md#repair-a-run-in-place).
+- Source restriction for artifact lineage.
+  `smythe.lineage.restrict_source(store, source_id, *, version=None,
+  scope=None, reason, purge=False)` withdraws a source's text from every
+  completed lineage run whose record names it, optionally only one version
+  or one access scope, compared before any digest. Each run journals the
+  same `source_tombstone` record that `remove_source` writes (identity,
+  digest, reason and the journal clock's time, no text) under its lease,
+  and a copy of its completed checkpoint applies it. `purge=True` deletes
+  each file the run published and records its path, SHA-256, reason and
+  time as an `artifact_purge` operation (`purged_artifacts()` reads them);
+  tombstones and purge records always remain. A run restricted this way,
+  or by a source removed from a lineage run
+  (`smythe.lineage.restricted_sources()`), never delivers its output again:
+  completed resume, inspection and document eligibility give
+  `indeterminate`, external actions refuse it as unavailable, and
+  `reevaluate`, `republish` and reuse in a successor refuse it. A repair
+  plan needs `review` for it while the catalog describes the withdrawn
+  text and allows `regenerate` from another version; its derived status
+  stays `restricted`. A successor holds its predecessor's tombstones, so it
+  is refused a withdrawn text as a context source and is restricted if it
+  reads one again. `smythe runs inspect` lists a lineage run's tombstones
+  and purged files. Text copied into journal checkpoints and provider
+  responses is not scrubbed. See
+  [restrict a source](docs/lineage.md#restrict-a-source).
 
 ### Changed
 

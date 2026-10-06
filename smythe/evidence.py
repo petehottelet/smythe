@@ -505,6 +505,22 @@ def source_tombstone_key(source_id: str, sha256: str) -> str:
     return "source-tombstone/" + sha256_hex({"source_id": source_id, "sha256": sha256})
 
 
+def _journal_tombstone(store: Any, lease: Any, record: SourceRecord) -> dict[str, Any]:
+    """Journal *record* as the leased run's tombstone of its text; return the operation.
+
+    A text the run already holds a tombstone of keeps that first one, and a
+    tombstone left started is finished as it began. A checkpoint applies it.
+    """
+    key = source_tombstone_key(record.source_id, record.sha256)
+    operation = store.load_operation(lease.run_id, key)
+    if operation is None:
+        operation = store.begin_operation(lease, key, SOURCE_TOMBSTONE_OPERATION,
+                                          {"tombstone": record.to_dict()})
+    if operation["state"] == "started":
+        operation = store.complete_operation(lease, key, operation["inputs"])
+    return operation
+
+
 def _tombstone_operations(store: Any, run_id: str) -> list[tuple[SourceRecord, int | None]]:
     """Each tombstone a durable run committed, with the revision of the checkpoint that applied it.
 

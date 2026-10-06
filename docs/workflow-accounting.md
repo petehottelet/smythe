@@ -665,6 +665,21 @@ No public method starts a successor yet.
   A new graph that carries a `repair` planning record, or `lineage_reuse`
   node metadata, is refused. `inspect_run()`, `list_runs()`, journal events
   and `smythe runs inspect` never return kept text.
+- **Withdrawn text.** The successor's first checkpoint applies a copy of each
+  of the predecessor's `source_tombstone` operations, so text
+  [withdrawn](lineage.md#restrict-a-source) from the predecessor is withdrawn
+  from the successor too.
+
+## Restricted runs
+
+`smythe.lineage.restrict_source` journals a `source_tombstone` operation in
+each completed lineage run whose record names the withdrawn text, and, with
+`purge=True`, an `artifact_purge` operation keyed
+`artifact-purge/<publication sequence>` for each published file it deletes. A
+copy of the run's completed checkpoint applies them under the run's lease;
+they hold no calls, no cost and no source text, and the run's calls,
+balances and earlier checkpoints are unchanged
+([restrict a source](lineage.md#restrict-a-source)).
 
 ## Recorded read steps
 

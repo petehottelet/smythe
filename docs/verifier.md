@@ -861,6 +861,8 @@ policy, and records the decision in its journal:
   [lineage policy](lineage.md#repair-a-run-in-place), each new decision also
   journals a lineage record that supersedes the run's earlier one, in the
   same checkpoint.
+  A lineage run whose source was [restricted](lineage.md#a-restricted-run)
+  is never decided again, by a policy or an operator.
 - **Synthesis keys.** Such a run journals its synthesis under `synthesis`
   while every node is at generation 0, and otherwise under
   `synthesis/<digest>`, the first 16 hex digits of the SHA-256 of every node

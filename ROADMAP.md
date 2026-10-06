@@ -398,7 +398,10 @@ connector or paid run.
    sources, tools and validators; and a read-only
    [repair plan](docs/lineage.md#plan-a-repair) lists each run's decision,
    derived status and predicted work, which `smythe runs inspect`
-   summarizes without a source catalog. Applying a plan is not built yet
+   summarizes without a source catalog; and a
+   [source restriction](docs/lineage.md#restrict-a-source) withdraws a
+   source's text from every run that used it, optionally deleting their
+   published documents. Applying a plan is not built yet
 6. **Integrate asset policy with Jobs v1** — manifest-native production brand
    masters, OCR and perceptual brand validators, select-from-N curation, and
    deterministic export bundles built from accepted attempt pointers
