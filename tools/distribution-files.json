@@ -262,6 +262,7 @@
     "tests/test_workflow_binding.py",
     "tests/test_workflow_executor.py",
     "tests/test_workflow_handoff.py",
+    "tests/test_workflow_lineage.py",
     "tests/test_workflow_native_runtime.py",
     "tests/test_workflow_policy.py",
     "tests/test_workflow_policy_recovery.py",

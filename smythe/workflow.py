@@ -37,7 +37,10 @@ from smythe.evidence import (
 )
 from smythe.executor_base import REJECTED_GENERATIONS_KEY, SUPPORTED_PROMPT_ASSEMBLY_VERSIONS, ExecutorBase
 from smythe.graph import ExecutionGraph, NodeStatus, Revision, snapshot_run_ref
-from smythe.lineage import LINEAGE_REUSE_KEY, snapshot_lineage_policy
+from smythe.lineage import (
+    LINEAGE_OPERATION, LINEAGE_RECORD_VERSION, LINEAGE_REUSE_KEY, ArtifactLineage, build_lineage,
+    lineage_key, snapshot_lineage_policy,
+)
 from smythe.registry import Registry
 from smythe.provider import ProviderResponseError
 from smythe.task import Task, snapshot_task, task_from_dict, task_to_dict
@@ -182,6 +185,12 @@ def _snapshot_read_tools(read_tools):
             raise WorkflowBindingError(f"read_tools declares {profile.name!r} more than once")
         profiles[profile.name] = profile
     return MappingProxyType(profiles)
+
+
+def _check_lineage_sources(lineage, sources):
+    """Refuse, under a lineage policy, sources whose blank ids its record could not hold."""
+    if lineage is not None and any(not source.source_id.strip() for source in sources or ()):
+        raise WorkflowBindingError("lineage records sources by id, so a source id cannot be blank")
 
 
 def _hash(value):
@@ -568,7 +577,9 @@ class WorkflowRuntime:
 
     ``lineage``, a :class:`~smythe.lineage.LineagePolicy`, needs a strict
     ``acceptance`` policy. The recipe records it only when it is configured,
-    and compares it exactly on every entry, like ``graph_policy``.
+    and compares it exactly on every entry, like ``graph_policy``. The run
+    then journals its :class:`~smythe.lineage.ArtifactLineage` once, after
+    its decision, and the completed checkpoint applies it with the decision.
     """
 
     def __init__(self, *, store, model, max_budget_usd, provider, architect, registry,
@@ -669,7 +680,8 @@ class WorkflowRuntime:
         self.max_revisions, self.verifier = max_revisions, verifier
         self.gate_validator = verifier if validator else None
         self.acceptance = acceptance
-        self.undecided = self.saved_acceptance = None
+        # decision_key is the acceptance operation this session's run decided under.
+        self.undecided = self.saved_acceptance = self.decision_key = None
         # The strict policy the bound run's recipe records, by digest.
         self.run_policy_sha256 = None
         self.max_concurrency = max_concurrency
@@ -694,6 +706,7 @@ class WorkflowRuntime:
             settings = MappingProxyType({**settings, "context_assembly": version})
         elif settings.get("context_assembly", 0):
             context_sources = ()
+        _check_lineage_sources(lineage, context_sources)
         self._behavior_settings = settings
         # The sources a run that has recorded none records as revision 0;
         # None when this runtime configures no context assembly.
@@ -1015,6 +1028,9 @@ class WorkflowRuntime:
                     f"Node id {shown!r} cannot key the workflow journal: node ids must be "
                     f"at most {MAX_NODE_ID_CHARS} characters, with no control characters"
                 ) from error
+            if self.lineage is not None and not node.id.strip():
+                raise WorkflowBindingError(
+                    f"Node id {node.id!r} is blank; lineage records each node by its id")
             if fresh and (node.status is not NodeStatus.PENDING or node.result is not None):
                 raise WorkflowBindingError("A new workflow requires pending nodes without prior results")
             if fresh and any(key in node.metadata for key in (
@@ -1482,6 +1498,7 @@ class WorkflowRuntime:
         accounting is unresolved.
         """
         sources = snapshot_sources(sources)
+        _check_lineage_sources(self.lineage, sources)
         async with self._session(self.store.load_run(run_id)):
             if not self._context_version:
                 raise WorkflowStateError("Workflow does not use context assembly; it has no sources")
@@ -1769,13 +1786,16 @@ class WorkflowRuntime:
             final = await self._operation_result(
                 key, "synthesis", {"graph": graph_to_dict(self.graph)}, synthesize,
             )
-            output = final["output"]
+            output, publication = final["output"], None
             if self.renderer is not None:
                 # The published document is the output delivered and decided.
-                output = await self._publish_output(key, output)
+                output, publication = await self._publish_output(key, output)
             await self._record_source_evidence(output)
             acceptance = None if self.acceptance is None else await self._decide(key, output)
-            # The completed checkpoint consumes the synthesis and the decision together.
+            if self.lineage is not None:
+                await self._record_lineage(key, publication)
+            # The completed checkpoint consumes the synthesis, the decision and
+            # the lineage together.
             self._save("completed", output=output, acceptance=acceptance)
         except BaseException:
             self._save("failed")
@@ -1820,7 +1840,7 @@ class WorkflowRuntime:
                                 sequence)
 
     async def _publish_output(self, synthesis_key, text):
-        """Render the synthesized *text* and publish the document; return the document's text.
+        """Render the synthesized *text* and publish it; return the document's text and record.
 
         A ``publication`` operation keyed ``publication/<sequence>`` records
         the file, bound to the synthesis it rendered. A process lost after
@@ -1857,7 +1877,7 @@ class WorkflowRuntime:
                     f"The published document {record.name!r} is missing or changed, and the "
                     "renderer no longer makes its bytes from the saved synthesis"
                 )
-        return data.decode("utf-8")
+        return data.decode("utf-8"), record
 
     async def republish(self, run_id):
         """Publish a completed run's document again, as a new file; return the current record.
@@ -1940,6 +1960,82 @@ class WorkflowRuntime:
 
         await self._operation_result(source_evidence_key(inputs), SOURCE_EVIDENCE_OPERATION,
                                      inputs, read)
+
+    async def _record_lineage(self, synthesis_key, publication):
+        """Journal the completed run's lineage once, as a ``lineage`` operation.
+
+        Its key follows the synthesis key (:func:`~smythe.lineage.lineage_key`)
+        and its inputs name the synthesis, decision and publication it binds;
+        the completed checkpoint consumes it with them. A committed record
+        replays and is never assembled again.
+        """
+        inputs = {"version": LINEAGE_RECORD_VERSION, "synthesis": synthesis_key,
+                  "acceptance": self.decision_key,
+                  "publication": None if publication is None else publication.sequence}
+
+        async def assemble(saved):
+            return {"lineage": self._lineage(saved).to_dict()}
+
+        await self._operation_result(lineage_key(synthesis_key), LINEAGE_OPERATION, inputs,
+                                     assemble)
+
+    def _lineage(self, inputs):
+        """The bound run's lineage, assembled from the journal records *inputs* name.
+
+        Targeted loads read the synthesis, decision and publication
+        operations, each node's snapshot at its final generation and the read
+        behind each read step's result (named by the node's receipt). Nothing
+        is called or written.
+        """
+        def completed(key, kind):
+            operation = self.store.load_operation(self.run_id, key) if type(key) is str else None
+            if operation is None or operation["kind"] != kind or operation["state"] == "started":
+                raise WorkflowStateError(f"Lineage names a {kind} operation the journal does not hold")
+            return operation
+
+        decision = DeliveryAcceptance.from_dict(
+            completed(inputs["acceptance"], "acceptance")["result"].get("delivery_acceptance"))
+        publication = inputs["publication"]
+        if publication is not None:
+            publication = read_publication(
+                completed(publication_key(publication), PUBLICATION_OPERATION), publication)
+        snapshots, reads = {}, {}
+        for node in self.graph.nodes:
+            if READ_STEP_KEY in node.metadata:
+                receipts = [entry.get("receipt") for entry in node.metadata.get("native_receipts", ())
+                            if isinstance(entry, dict) and entry.get("phase") == "tool"]
+                call_id = receipts[-1].get("workflow_call_id") if receipts and isinstance(
+                    receipts[-1], dict) else None
+                if type(call_id) is str:
+                    reads[node.id] = self.store.load_replay(call_id)
+            elif self._context_version:
+                operation = self.store.load_operation(
+                    self.run_id, context_key(node.id, node_generation(node)))
+                if operation is not None and operation["kind"] == "context":
+                    snapshots[node.id] = ContextSnapshot.from_dict(operation["inputs"].get("snapshot"))
+        return build_lineage(
+            self.graph, self.run["config"], snapshots, reads, publication,
+            (inputs["acceptance"], decision), self.registry.workflow_description(),
+            synthesis=(inputs["synthesis"],
+                       completed(inputs["synthesis"], "synthesis")["result"]["output"]),
+            sources=self.context_sources,
+        )
+
+    def _lineage_problems(self):
+        """Why a completed run's applied lineage no longer matches its journal; empty when it does.
+
+        The record is assembled again from the records its operation names
+        and must have the saved record's digest.
+        """
+        operation = self.store.load_operation(self.run_id, lineage_key(self._synthesis_key()))
+        if operation is None or operation["kind"] != LINEAGE_OPERATION or operation["state"] != "applied":
+            return ["the journal holds no applied lineage record for the run"]
+        try:
+            saved = ArtifactLineage.from_dict(operation["result"].get("lineage"))
+            holds = saved.sha256 == self._lineage(operation["inputs"]).sha256
+        except (TypeError, ValueError, KeyError, WorkflowError):
+            holds = False
+        return [] if holds else ["the run's lineage record does not match its journal"]
 
     def _unusable_evidence_validators(self):
         """Why each source evidence validator of the strict policy cannot check this run, by identity.
@@ -2039,7 +2135,8 @@ class WorkflowRuntime:
             )
             return {"delivery_acceptance": record.to_dict()}
 
-        result = await self._operation_result(_decision_key(inputs), "acceptance", inputs, decide)
+        self.decision_key = _decision_key(inputs)
+        result = await self._operation_result(self.decision_key, "acceptance", inputs, decide)
         try:
             record = DeliveryAcceptance.from_dict(result.get("delivery_acceptance"))
         except (TypeError, ValueError) as error:
@@ -2090,9 +2187,10 @@ class WorkflowRuntime:
         The saved output must match the record's digest, the task and source
         generations must be those it binds, and the record must be the
         journal's current decision (see :func:`_decision_problems`), which a
-        re-evaluation may have made under another policy. A mismatch gives an
-        ``indeterminate`` record for the saved output, never acceptance. Runs
-        without a strict policy have no record.
+        re-evaluation may have made under another policy. A run with a lineage
+        policy must also hold its applied lineage record, as its journal still
+        makes it. A mismatch gives an ``indeterminate`` record for the saved
+        output, never acceptance. Runs without a strict policy have no record.
         """
         record = self.saved_acceptance
         if record is None:
@@ -2105,6 +2203,9 @@ class WorkflowRuntime:
         if self.renderer is not None:
             # The delivered document must also be published intact.
             problems += artifact_problems(current_artifact(self.store, self.run_id), output)
+        if self.lineage is not None:
+            # So must the lineage that records how it was made.
+            problems += self._lineage_problems()
         return self._held(record, output, problems)
 
     def _held(self, record, output, problems):

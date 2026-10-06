@@ -5,6 +5,8 @@ only when it is configured, and is compared exactly, like ``graph_policy``,
 so a run never changes its access scope or reuse mode while in flight.
 :class:`ArtifactLineage` records how one run's accepted artifact was made, by
 ids, versions and SHA-256 digests (:mod:`smythe._canonical`) and never text.
+A run with a policy writes its record once, when it completes, as a
+``lineage`` journal operation (:func:`build_lineage`, :func:`load_lineage`).
 """
 
 from __future__ import annotations
@@ -16,17 +18,25 @@ from types import MappingProxyType
 from typing import Any
 
 from smythe._canonical import sha256_hex
-from smythe.acceptance import AcceptanceDecision
+from smythe.acceptance import AcceptanceDecision, DeliveryAcceptance, task_sha256
+from smythe.context import ContextSnapshot, ContextSource, context_key, text_sha256
+from smythe.graph import ExecutionGraph, Node, NodeStatus
 from smythe.validation import ValidatorIdentity, _require_keys, _require_sha256
+from smythe.verifier import node_generation
+from smythe.workflow_artifact import PublishedArtifact
 from smythe.workflow_binding import WorkflowBindingError
+from smythe.workflow_tools import READ_STEP_KEY
 
 __all__ = [
-    "LINEAGE_POLICY_VERSION", "LINEAGE_RECORD_VERSION", "LINEAGE_REUSE_KEY", "ArtifactLineage",
-    "LineagePolicy", "validator_set_sha256",
+    "LINEAGE_OPERATION", "LINEAGE_POLICY_VERSION", "LINEAGE_RECORD_VERSION", "LINEAGE_REUSE_KEY",
+    "ArtifactLineage", "LineagePolicy", "build_lineage", "lineage_key", "load_lineage",
+    "validator_set_sha256",
 ]
 
 LINEAGE_POLICY_VERSION = 1
 LINEAGE_RECORD_VERSION = 1
+# The journal operation kind, and key prefix, of a run's lineage record.
+LINEAGE_OPERATION = "lineage"
 # Node metadata marking a result reused from an earlier run; a new graph cannot carry it.
 LINEAGE_REUSE_KEY = "lineage_reuse"
 _SCOPE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,63}")
@@ -351,3 +361,216 @@ class ArtifactLineage:
         if data.get("predecessor", {}) is None or data.get("repair", {}) is None:
             raise ValueError("lineage predecessor and repair are omitted when absent, never null")
         return cls(**data)
+
+
+def lineage_key(synthesis_key: str) -> str:
+    """The journal key of the lineage a run writes when it completes after *synthesis_key*.
+
+    ``lineage`` follows the synthesis keyed ``synthesis``, and
+    ``lineage/<digest>`` the one keyed ``synthesis/<digest>``, so a run whose
+    nodes ran again never replays the lineage of an earlier graph state.
+    """
+    return LINEAGE_OPERATION + synthesis_key.removeprefix("synthesis")
+
+
+def load_lineage(store: Any, run_id: str) -> ArtifactLineage | None:
+    """The record of a durable run's latest applied ``lineage`` operation, or None.
+
+    A record left unapplied by a process lost before its completed
+    checkpoint is not returned. Only reads are made, so a store opened
+    read-only will do. Raises ValueError for a saved record that is invalid.
+    """
+    applied = [item for item in store.list_operations(run_id, LINEAGE_OPERATION)
+               if item["applied_revision"] is not None]
+    return ArtifactLineage.from_dict(applied[-1]["result"].get("lineage")) if applied else None
+
+
+def _fits(value: Any) -> bool:
+    try:
+        _text(value, "")
+    except ValueError:
+        return False
+    return True
+
+
+def _label(value: Any) -> str:
+    """*value* as a record label: itself when it fits, else the digest of its text."""
+    return value if _fits(value) else "sha256:" + text_sha256(str(value))
+
+
+def _reference(source: ContextSource) -> dict[str, Any]:
+    return {"source_id": source.source_id, "version": source.version, "sha256": source.sha256}
+
+
+def _dependency_order(nodes: Iterable[Node]) -> list[Node]:
+    """*nodes* with each after the nodes it depends on, otherwise in their given order."""
+    ordered: list[Node] = []
+    placed: set[str] = set()
+    pending = list(nodes)
+    while pending:
+        waiting = []
+        for node in pending:
+            if set(node.depends_on) <= placed:
+                ordered.append(node)
+                placed.add(node.id)
+            else:
+                waiting.append(node)
+        if len(waiting) == len(pending):
+            raise ValueError("graph dependencies form a cycle or name a missing node")
+        pending = waiting
+    return ordered
+
+
+def _read_text(call: Any, node: Node, generation: int, run_id: str) -> str | None:
+    """The text of *call* when it is *node*'s accepted read at *generation* in this run."""
+    if not isinstance(call, Mapping):
+        return None
+    key, decoded = call.get("key"), call.get("decoded_result")
+    if (call.get("run_id") != run_id or not isinstance(key, Mapping)
+            or (key.get("phase"), key.get("scope_id"), key.get("generation"))
+            != ("tool", f"node/{node.id}", generation)
+            or (call.get("provider") or {}).get("kind") != "read_tool"
+            or call.get("result_state") not in ("accepted", "applied")
+            or not isinstance(decoded, Mapping) or type(decoded.get("text")) is not str):
+        return None
+    return decoded["text"]
+
+
+def _read_source(node: Node, text: str, sources: tuple[ContextSource, ...]) -> dict | None:
+    """The reference of the source a read step returned, or None when it cannot be named.
+
+    Text that is exactly one of the run's sources, under the ``source_id``
+    the step's input names when it names one, is that source at its version.
+    Other text read under a named ``source_id`` is that source at an unknown
+    version.
+    """
+    named = (node.metadata[READ_STEP_KEY].get("input") or {}).get("source_id")
+    named = named if _fits(named) and named.strip() else None
+    digest = text_sha256(text)
+    matches = [source for source in sources
+               if source.sha256 == digest and named in (None, source.source_id)]
+    if len(matches) == 1:
+        return _reference(matches[0])
+    return None if named is None else {"source_id": named, "version": None, "sha256": digest}
+
+
+def _given(snapshot: ContextSnapshot, node: Node, results: Mapping[str, tuple]) -> bool:
+    """Whether *snapshot* gave *node* exactly the dependency results already recorded."""
+    given = {item.node_id: item for item in snapshot.dependencies}
+    if given.keys() != set(node.depends_on):
+        return False
+    for dep_id, item in given.items():
+        status, generation, result = results[dep_id]
+        skipped = status is NodeStatus.SKIPPED
+        if (item.generation != generation or item.status != ("skipped" if skipped else "completed")
+                or not skipped and item.output_sha256 != result):
+            return False
+    return True
+
+
+def _synthesizer(description: Mapping[str, Any]) -> dict[str, str] | None:
+    """The identity of a synthesizer that calls no model, or None for any other."""
+    if description.get("type") == "local_only":
+        identity = {"name": description.get("identity"), "version": description.get("version")}
+    elif description.get("type") == "synthesizer" and description.get("completion") is None:
+        retains = "+retain_contradictions" if description.get("retain_contradictions") else ""
+        identity = {"name": f"synthesizer/{description.get('strategy')}",
+                    "version": f"{description.get('version')}{retains}"}
+    else:
+        return None
+    return identity if all(_fits(value) for value in identity.values()) else None
+
+
+def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
+                  snapshots: Mapping[str, ContextSnapshot], read_calls: Mapping[str, Any],
+                  publication: PublishedArtifact | None,
+                  acceptance: tuple[str, DeliveryAcceptance],
+                  registry_description: Mapping[str, Any], *, synthesis: tuple[str, str],
+                  sources: Iterable[ContextSource] = ()) -> ArtifactLineage:
+    """The lineage of a completed durable run, from that run's own records only.
+
+    *graph* is the completed graph, whose ``run_ref`` names the run, and
+    *recipe* the run's saved recipe. *snapshots* holds the context snapshot
+    each node was given at its final generation, by node id, and
+    *read_calls* the journal call record behind each read step's result.
+    *publication* is the run's published document or None, *acceptance* the
+    decision's operation key and record, *registry_description* the run's
+    agents, *synthesis* the synthesis operation's key and output, and
+    *sources* the run's context sources. Nothing is read or written.
+
+    Nodes are listed after their dependencies, then the synthesis, kind
+    ``synthesis``, which depends on them all. A node is ``declared`` only
+    when its inputs are known: a model or gate node given a snapshot whose
+    dependency digests are the recorded results; a read step whose accepted
+    read names its source; or a synthesis by local code or a built-in
+    strategy that calls no model. Any other node is ``undeclared``, which
+    makes the coverage ``partial``.
+    """
+    run, sources = graph.run_ref, tuple(sources)
+    agents = {entry["id"]: sha256_hex({key: value for key, value in entry.items() if key != "id"})
+              for entry in registry_description["agents"]}
+    entries: list[dict[str, Any]] = []
+    results: dict[str, tuple] = {}
+    for node in _dependency_order(graph.nodes):
+        generation = node_generation(node)
+        result = (text_sha256(str(node.result))
+                  if node.status is NodeStatus.COMPLETED and node.result is not None else None)
+        inputs: dict[str, Any] = {"sources": []}
+        declared, kind = False, "gate" if node.verifies else "model"
+        if READ_STEP_KEY in node.metadata:
+            kind, call = "read", read_calls.get(node.id)
+            text = _read_text(call, node, generation, run["run_id"])
+            if text is not None and text_sha256(text) == result:
+                inputs["tool"] = {"name": _label(call["provider"].get("name")),
+                                  "version": _label(call["provider"].get("version")),
+                                  "decoder_version": _label(call.get("decoder_version"))}
+                reference = _read_source(node, text, sources)
+                inputs["sources"], declared = [reference] if reference else [], bool(reference)
+        else:
+            snapshot = snapshots.get(node.id)
+            if snapshot is not None and (snapshot.node_id, snapshot.generation) == (node.id, generation):
+                inputs["sources"] = [_reference(source) for source in snapshot.sources]
+                inputs["context"] = {"snapshot_key": context_key(node.id, generation),
+                                     "assembly_version": snapshot.context_assembly}
+                declared = _given(snapshot, node, results)
+            if node.agent_id in agents:
+                inputs["agent_sha256"] = agents[node.agent_id]
+        results[node.id] = (node.status, generation, result)
+        entries.append({"id": node.id, "generation": generation, "kind": kind,
+                        "depends_on": list(dict.fromkeys(node.depends_on)), "result_sha256": result,
+                        "inputs": inputs, "coverage": "declared" if declared else "undeclared"})
+    key, output = synthesis
+    ids = [entry["id"] for entry in entries]
+    component = _synthesizer(recipe["components"]["synthesizer"])
+    name, number = key, 1
+    while name in ids:  # A graph node may already have the synthesis key as its id.
+        number += 1
+        name = f"{key}#{number}"
+    entries.append({"id": name, "generation": 0, "kind": "synthesis", "depends_on": ids,
+                    "result_sha256": text_sha256(output),
+                    "inputs": {"sources": [], **({"component": component} if component else {})},
+                    "coverage": "declared" if component else "undeclared"})
+    artifact = None
+    if publication is not None:
+        renderer = publication.renderer
+        artifact = {"relative_path": f"{run['run_id']}/{publication.name}",
+                    "sha256": publication.sha256, "size_bytes": publication.size_bytes,
+                    "media_type": publication.media_type,
+                    "renderer": {"name": _label(renderer.get("identity", renderer.get("type"))),
+                                 "version": _label(str(renderer.get("version"))),
+                                 "spec_sha256": sha256_hex(renderer)}}
+    operation_key, record = acceptance
+    validators = [ValidatorIdentity.from_dict(item)
+                  for item in recipe["acceptance"]["final_validators"]]
+    return ArtifactLineage(
+        run={"store_id": run["store_id"], "run_id": run["run_id"],
+             "recipe_sha256": run["recipe_sha256"], "task_sha256": task_sha256(graph.task)},
+        access_scope=recipe["lineage"]["access_scope"], artifact=artifact,
+        acceptance={"operation_key": operation_key, "record_sha256": sha256_hex(record.to_dict()),
+                    "decision": record.decision.value, "policy_sha256": record.policy_sha256,
+                    "validator_set_sha256": validator_set_sha256(validators),
+                    "validators": [item.to_dict() for item in validators]},
+        nodes=tuple(entries),
+        coverage="complete" if all(entry["coverage"] == "declared" for entry in entries)
+        else "partial",
+    )

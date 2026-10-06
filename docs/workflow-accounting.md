@@ -315,8 +315,8 @@ existing evidence and read-only inspection retain their behavior.
 
 Resume requires the same component descriptions, model configuration, budget,
 retry backoff, concurrency policy, gate validator,
-[acceptance policy](#strict-delivery-acceptance) and
-[renderer](#published-documents), apart from the
+[acceptance policy](#strict-delivery-acceptance),
+[renderer](#published-documents) and [lineage policy](lineage.md), apart from the
 [price versions](#price-versions) of saved provider descriptions. It does not
 refill allowances. An
 inspected pending plan can be edited before execution; a stale graph from an
@@ -506,6 +506,23 @@ operation, applied by a new completed checkpoint, becomes current. It calls no
 provider, runs no validator and leaves the decision as it is, since that binds
 the same bytes. A run whose current file is intact is left as it is. Operation
 kinds are free text, so publication needs no journal upgrade.
+
+## Lineage records
+
+A run with a [lineage policy](lineage.md) journals one more operation when it
+completes. After the `acceptance` operation, a `lineage` operation records the
+run's [lineage](lineage.md#the-record-a-run-writes): its published document,
+its decision, and each node's result and inputs as ids, versions and digests.
+It is keyed `lineage` while every node is at generation 0 and
+`lineage/<digest>` after that, following the synthesis key, and the completed
+checkpoint consumes it with the synthesis, publication and decision in one
+transaction. It is assembled once, from targeted loads of the operations and
+snapshots it names, so checkpoint saves read what they did before; it holds
+no calls and no cost. `inspect_run()`, `list_runs()` and journal events never
+return it, and `smythe.lineage.load_lineage(store, run_id)` reads it.
+Resuming a completed run assembles it again and gives an `indeterminate`
+decision when the saved record no longer matches. Operation kinds are free
+text, so lineage needs no journal upgrade.
 
 ## Recorded read steps
 

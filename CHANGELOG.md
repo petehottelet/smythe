@@ -787,9 +787,20 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   versions and digests, with no source text; its reader rejects unknown
   versions and keys, blank ids, a node that lists a source reference twice,
   in any key order, and a node listed before a node it depends on, which also
-  rules out dependency cycles. Records hash by their digest. Runs do not write lineage records
-  yet. See
-  [artifact lineage](docs/lineage.md).
+  rules out dependency cycles. Records hash by their digest. A run with a
+  policy writes its record once when it completes, as a `lineage` journal
+  operation that the completed checkpoint applies with its decision:
+  `smythe.lineage.load_lineage()` reads it, and inspection never returns it.
+  Each read step names its read profile and the source version and digest it
+  read, each model node or gate the context snapshot and sources it was
+  given and its agent's digest, and the synthesis its synthesizer; the
+  record also binds the published bytes' digest and the decision. A node
+  whose inputs are not all known, such as a model node without a context
+  snapshot, is `undeclared` and makes the coverage `partial`. A process lost
+  before the record commits writes it on resume without a call, one lost
+  after it replays it, and resuming a completed run whose record no longer
+  matches its journal gives `indeterminate`. Lineage runs refuse blank node
+  and source ids before any call. See [artifact lineage](docs/lineage.md).
 - `Swarm(reserve_for_checks=True)` holds allowance for a run's verifiers and
   its `LLM_MERGE` synthesis so other nodes cannot spend it. Under
   `max_budget_usd`, before any node runs, the run holds what each pending

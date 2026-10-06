@@ -6,11 +6,13 @@ and the inputs it was given, as ids, versions and SHA-256 digests. A run opts
 in with a `LineagePolicy`, which also declares the access scope its results
 belong to and whether they may be reused.
 
-This release adds the policy, the recipe opt-in and the versioned record
-format, `ArtifactLineage`. Completed runs do not write lineage records yet,
-and nothing reuses or repairs work from them yet. It also adds
-[reuse decisions](#reuse-decisions): a pure evaluator that says what a
-record calls for under the current sources, tools and validators.
+This release adds the policy, the recipe opt-in, the versioned record
+format, `ArtifactLineage`, and the record each opted-in run
+[writes when it completes](#the-record-a-run-writes), with its
+[coverage](#coverage). It also adds [reuse decisions](#reuse-decisions):
+a pure evaluator that says what a record calls for under the current
+sources, tools and validators. Nothing reuses or repairs work from
+records yet.
 
 ## Opt a run in
 
@@ -129,9 +131,10 @@ form:
 - **Nodes.** Each id is listed once, after every node it depends on, so a
   record holds no dependency cycle, and a node depends only on nodes the
   record lists. `kind` is a short lowercase label for what produced
-  the result, such as `model` or `read`. A node is `declared` only when its
-  inputs name a context snapshot, a read tool or a component; `coverage` is
-  `complete` when every node is declared and `partial` otherwise.
+  the result: a run writes `read`, `model`, `gate` and `synthesis`. A node
+  is `declared` only when its inputs name a context snapshot, a read tool or
+  a component; `coverage` is `complete` when every node is declared and
+  `partial` otherwise.
 - **Optional blocks.** `context`, `tool`, `component`, `agent_sha256`,
   `reused_from`, `predecessor` and `repair` appear only when present, never
   as null. `predecessor` is another run in the same store, and every
@@ -146,6 +149,90 @@ form:
 A record grows with its nodes and their source references, not with the
 run's calls or events: a 256-node record with two source references per node
 stays under 256 KiB.
+
+## The record a run writes
+
+A run with a lineage policy writes its record once, when it completes:
+after its synthesis, its [published document](workflow-accounting.md#published-documents)
+and its decision, it journals the record as a `lineage` operation, and the
+completed checkpoint applies all of them together. Read it with
+`smythe.lineage.load_lineage`:
+
+```python
+from smythe.lineage import load_lineage
+
+lineage = load_lineage(store, result.execution_id)
+print(lineage.coverage, [(node["id"], node["kind"]) for node in lineage.nodes])
+```
+
+- **What it binds.** `run` names the store, the run, the digest of its
+  recipe and of its task. `artifact` is the published document: its path
+  under `artifact_dir` (`<run id>/<file name>`), the SHA-256 and size of the
+  published bytes, its media type, and the renderer's name, version and the
+  digest of its recipe description; it is null without a renderer.
+  `acceptance` is the decision the run completed with: the key of its
+  `acceptance` operation, the digest of the decision record, the decision,
+  the policy digest and the policy's final validators.
+- **Nodes.** The graph's nodes come first, each after the nodes it depends
+  on and otherwise in graph order, at their final generations, each with the
+  digest of its result:
+  - A read step (`read`) names the read profile's name, version and decoder
+    version, and the source its accepted read returned. Text that is exactly
+    one of the run's `context_sources`, under the `source_id` the step's
+    input names when it names one, is that source at its version. Other text
+    read under a named `source_id` is that source with a null `version` and
+    the digest of the text read.
+  - A model node (`model`) or a gate (`gate`) names the context snapshot it
+    was given, by its journal key (`context/<node>/<generation>`) and
+    context-assembly version, the run's sources the snapshot held, and
+    `agent_sha256`, the digest of its agent's registry description without
+    the agent's id.
+  - The synthesis (`synthesis`) comes last and depends on every node. Its id
+    is the synthesis operation's key, its result the digest of the
+    synthesized text, and a synthesizer that calls no model is its
+    `component`: a `LocalOnly` synthesizer by its identity and version, a
+    built-in one as `synthesizer/<strategy>`, version `1`, with
+    `+retain_contradictions` when set.
+
+  A label longer than 256 characters, or with control characters, is
+  recorded as `sha256:` and the digest of its text. A lineage run refuses
+  blank node ids and source ids, which a record cannot hold, before any call.
+- **Written once.** The record is assembled from targeted loads of the
+  records it names (the synthesis, decision and publication operations, each
+  node's snapshot and the read behind each read step), never from the whole
+  journal, so checkpoint saves cost what they did. Its operation is keyed
+  `lineage` while every node is at generation 0 and `lineage/<digest>` after
+  that, following the synthesis key, so a run whose nodes ran again never
+  replays an earlier graph state's record. A process lost before the record
+  commits writes it on resume, without a provider call or a read; one lost
+  after it commits and before the completed checkpoint replays it, never
+  assembling it again.
+- **Checked on resume.** Resuming a completed run assembles the record again
+  from the records its operation names; a record that is missing or has
+  another digest makes the decision `indeterminate`, and the output moves to
+  `rejected_output`. Re-evaluating the run or publishing its document again
+  leaves the record as it is: it names the decision and publication the run
+  completed with.
+- **Not in inspection.** `inspect_run()`, `list_runs()`, journal events and
+  `smythe runs inspect` never return the record. Operation kinds are free
+  text, so lineage needs no journal upgrade.
+
+## Coverage
+
+A node is `declared` only when the record knows its inputs:
+
+- a model node or gate given a context snapshot at its final generation
+  whose dependency outputs are the results the record lists for those
+  dependencies;
+- a read step with an accepted read at its final generation whose source
+  can be named;
+- the synthesis, when its synthesizer calls no model.
+
+Every other node is `undeclared`, which makes the run's coverage `partial`.
+Model nodes of a run without `context_sources` are given no snapshot, so
+such a run's lineage is partial. Coverage never changes the run's decision;
+the policy's `undeclared_coverage` says what a later reuse of a partial
+record calls for.
 
 ## Reuse decisions
 
