@@ -904,6 +904,32 @@ class SQLiteWorkflowStore:
                 ORDER BY created,call_id""", (run_id,))
                 if self._superseded(self._stored_key(row["key_json"]), generations)]
 
+    def node_generation_calls(self, run_id, node_id, generation):
+        """The settled calls a graph node made at one generation, with their results.
+
+        Lists the execution, verification and read (``tool``) calls scoped
+        ``node/<node_id>`` at *generation* whose billing is known, each as
+        ``{"key": {...}, "result_state": ...}``, ordered by phase,
+        invocation, attempt and turn. Only that scope's keys are parsed, so
+        the cost barely grows with other nodes' calls. A durable retry policy
+        counts a node's rejected calls here, on every invocation, as the
+        attempts its generation used.
+        """
+        scope = CallKey("execution", f"node/{node_id}", _integer(generation, "generation"))
+        with self._transaction(write=False) as db:
+            self._run(db, run_id)
+            try:
+                rows = db.execute(
+                    """SELECT key_json,result_state FROM workflow_calls WHERE run_id=? AND
+                    billing_state='known' AND json_extract(key_json,'$.scope_id')=?""",
+                    (run_id, scope.scope_id)).fetchall()
+            except sqlite3.DatabaseError as exc:  # A key that is not JSON.
+                raise WorkflowCorruptionError("Call key is invalid") from exc
+            calls = [(self._stored_key(row["key_json"]), row["result_state"]) for row in rows]
+        return [{"key": asdict(key), "result_state": state} for key, state in sorted(
+            calls, key=lambda call: (call[0].phase, call[0].invocation, call[0].attempt, call[0].turn))
+            if key.generation == generation and key.phase in ("execution", "verification", "tool")]
+
     @staticmethod
     def _call_record(row):
         request = _loads(row["request_json"], stored=True)

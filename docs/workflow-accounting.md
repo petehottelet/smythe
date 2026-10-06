@@ -179,7 +179,8 @@ rejection that a later attempt already followed. Replayed retries still wait
 their backoff. A rejected call that nothing followed is sent again as a new
 call. Resuming a halted run therefore gives the rejected step one new call,
 and a `RETRY` node whose attempts were all rejected gets one new call, for its
-final attempt.
+final attempt. A run under a [retry policy](#retry-policy) continues each
+node's attempts instead of refilling them.
 
 In a parallel run, a node that fails cancels the other nodes that are still
 running. A zero-cost rejection fails its node under `HALT`, the default, and
@@ -199,6 +200,46 @@ below 60 seconds.
 all recorded phases and failed attempts, using the adapter's dated published
 token prices. It does not represent a reconciled account invoice or hardware,
 human, and external service costs. No historical benchmark is repriced.
+
+### Retry policy
+
+`Swarm(run_store=store, retry_policy=RetryPolicy(...))` puts a durable run's
+node calls under a [retry policy](execution.md#retry-policy). A `RETRY` node
+then calls again only after a failure whose class the policy lists,
+`transient` by default: a 429 rejection is retried, and a 401, 403, 404 or 413
+rejection is not. A refused or `max_tokens` reply keeps its known charge in
+the journal, as a rejected call, and is retried only when the policy lists
+`quality_defect`; otherwise it still stops the run. The recipe records the
+policy's fields under `retry_policy`, except `persist_attempts`, and a recipe
+without a policy keeps its bytes and the retries described above.
+
+The journal is the record of each node's attempts. Each time a node starts,
+it continues from the attempts its current generation has used: every call
+of that generation that the journal settled as rejected counts, on whichever
+invocation it was made. A crash, a halted run and every resume therefore
+share the node's `1 + max_retries` attempts (one without `RETRY`) instead of
+refilling them, and an attempt whose call was rejected is never made again.
+A node with no attempt left fails without a call, with a `RuntimeError` that
+names its allowance, and its failure policy settles it; a new run starts
+fresh. A call that was accepted, reserved but never sent, or sent without a
+known charge is not counted, so entering its attempt again replays, sends or
+refuses it as before. A regenerated node starts a new generation with a fresh
+allowance. `persist_attempts` makes no difference: the journal keeps every
+attempt.
+
+The journal keeps no response headers, so a durable run never reads a
+`Retry-After`: the wait before a retry is the jittered backoff that doubles
+from `retry_backoff_s`, at most `backoff_max_s`, and no wait with the default
+`retry_backoff_s=0`. `deadline_s` is measured within one process and starts
+again when the run resumes.
+
+A run keeps the policy it started with. Resuming with a `Swarm` that sets no
+`retry_policy` uses the saved one. A different policy, a policy for a run
+that started without one, and a saved policy this release cannot read raise
+`WorkflowConflictError` before any call. Every provider the run can call must
+declare `sdk_retries=0`, as the native and offline providers do; otherwise
+the run is refused with `WorkflowBindingError` before it is created or, on
+resume, before any call.
 
 ### Money units
 

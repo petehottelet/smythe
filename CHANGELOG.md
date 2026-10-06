@@ -630,8 +630,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `planning_provider`, and an `LLMSupervisor`'s when `max_revisions` lets it
   review; `Executor` and `AsyncExecutor` check the supervisor's with their
   own. Built-in providers declare it, and `AnthropicProvider` takes
-  `max_retries`, passed to the SDK only when set. Durable runs refuse the
-  policy, and checkpoints record it only with `persist_attempts`. Executors
+  `max_retries`, passed to the SDK only when set. Ordinary checkpoints record
+  the policy only with `persist_attempts`; durable runs record it in their
+  recipe, as described below. Executors
   also take `sleep` and `rng`, which replace the retry wait and its jitter.
   Without a policy, retries are unchanged. See
   [retry policy](docs/execution.md#retry-policy).
@@ -684,6 +685,25 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   error the provider raises itself, still releases the reservation, native
   providers keep their own settlement, and without the option nothing
   changes. See [calls without an answer](docs/execution.md#calls-without-an-answer).
+- Durable runs take a `RetryPolicy`. `Swarm(run_store=..., retry_policy=...)`
+  retries a node only after a failure whose class the policy lists, so a 429
+  rejection is retried and a 401, 403, 404 or 413 is not, and a refused or
+  truncated reply, whose known charge the journal keeps, only when it lists
+  `quality_defect`. Each node starts from the attempts its current generation
+  has used, counted from the journal's rejected calls on every invocation, so
+  a crash or resume continues its `1 + max_retries` attempts instead of
+  refilling them, and a node with none left fails without a call. The recipe
+  records the policy under `retry_policy`, without `persist_attempts`, so a
+  run resumes under the policy it started with: a `Swarm` without one uses
+  the saved policy, and a different policy, or one for a run that started
+  without, raises `WorkflowConflictError` before any call. Recipes without a
+  policy keep their bytes and their retries. The journal keeps no response
+  headers, so a durable run waits its backoff, never a `Retry-After`, and
+  every provider it can call must declare `sdk_retries=0`.
+  `SQLiteWorkflowStore.node_generation_calls()` lists a node generation's
+  settled calls, and executors take `attempts_spent=`, which journal-managed
+  calls need under a policy. See
+  [durable retry policy](docs/workflow-accounting.md#retry-policy).
 - `jobs stop --drain-timeout-s SECONDS` bounds a pause's drain. That long
   after the request, the worker cancels each call still awaiting its provider
   and records it as `unknown_outcome`, keeping its full per-call ceiling as

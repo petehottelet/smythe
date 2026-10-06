@@ -489,7 +489,7 @@ def test_durable_run_opts_into_prompt_assembly_2_through_its_recipe(store):
     # A runtime that configures nothing resumes it under its saved version.
     later = swarm(store)._workflow_runtime()
     asyncio.run(later.resume(run_id, max_concurrency=1))
-    assert later.behavior == {"prompt_assembly": 2, "context_assembly": 0}
+    assert later.behavior == {"prompt_assembly": 2, "context_assembly": 0, "retry_policy": None}
     # A configured version must equal the saved one, here a legacy run's 1.
     legacy = swarm(store).plan(Task("Report")).run_ref["run_id"]
     with pytest.raises(WorkflowConflictError, match="prompt_assembly"):

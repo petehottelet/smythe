@@ -49,7 +49,6 @@ from smythe.synthesizer import SynthesisStrategy, Synthesizer
 from smythe.task import Task
 from smythe.tools import ToolCall, ToolRuntime, ToolSession, ToolSpec
 from smythe.tracer import Tracer
-from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_store import SQLiteWorkflowStore
 
 MODES = ["serial", "parallel"]
@@ -208,10 +207,20 @@ def test_executor_options_are_checked_when_built():
         Executor(**options, sleep=5)
     with pytest.raises(TypeError, match="rng"):
         Executor(**options, rng=object())
-    # Durable runs keep their journal-derived retries.
+    # Durable runs keep their journal-derived retries: journal-managed calls
+    # take a policy only with the journal's count of each node's attempts.
     with pytest.raises(ValueError, match="retry_policy"):
         AsyncExecutor(**options, retry_policy=RetryPolicy(),
                       provider_call_factory=lambda node, phase, attempt, turn: None)
+    with pytest.raises(TypeError, match="attempts_spent"):
+        AsyncExecutor(**options, attempts_spent=lambda node: 0)  # No policy to count for.
+    with pytest.raises(TypeError, match="attempts_spent"):
+        AsyncExecutor(**options, retry_policy=RetryPolicy(), attempts_spent=0)
+    with pytest.raises(ValueError, match="attempts_used"):
+        AsyncExecutor(**options, retry_policy=RetryPolicy(persist_attempts=True),
+                      attempts_spent=lambda node: 0, attempts_used={})
+    AsyncExecutor(**options, retry_policy=RetryPolicy(), attempts_spent=lambda node: 0,
+                  provider_call_factory=lambda node, phase, attempt, turn: None)
 
 
 # ---------------------------------------------------------------------------
@@ -950,14 +959,13 @@ def test_resume_keeps_the_policy(tmp_path):
     assert len(provider.started) == 2
 
 
-def test_durable_runs_refuse_a_retry_policy_by_name_before_any_call(tmp_path, monkeypatch):
-    calls = forbid_calls(monkeypatch, OfflineProvider)
+def test_durable_runs_record_the_policy_in_their_recipe(tmp_path):
+    # tests/test_workflow_retry_policy.py covers the journal-derived allowance.
     with SQLiteWorkflowStore(tmp_path / "runs.db") as store:
-        swarm = Swarm(model="offline", provider=OfflineProvider(), run_store=store,
-                      max_budget_usd=1, retry_policy=RetryPolicy())
-        for entry in (swarm.plan, swarm.execute):
-            with pytest.raises(WorkflowBindingError) as caught:
-                entry(Task("Report"))
-            assert str(caught.value).startswith("retry_policy "), caught.value
-        assert store.list_runs() == []
-    assert calls == []
+        swarm = Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+                      run_store=store, max_budget_usd=1, retry_policy=RetryPolicy(deadline_s=30))
+        result = swarm.execute(Task("Report"))
+        assert result.output and result.cost_is_complete
+        recorded = store.load_run(result.execution_id)["config"]["retry_policy"]
+        assert recorded == {key: value for key, value in RetryPolicy(deadline_s=30).to_dict().items()
+                            if key != "persist_attempts"}

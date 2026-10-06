@@ -186,8 +186,11 @@ call, even when only synthesis is left to run, and so do `Executor` and
 | Custom `Provider` | Nothing unless its `feature_support()` declares it |
 
 So `AnthropicProvider(max_retries=0)` and `OpenAIProvider(max_retries=0)` run
-under a policy, and both providers at their SDK defaults are refused. Durable
-`run_store` runs refuse `retry_policy` with `WorkflowBindingError`. Without
+under a policy, and both providers at their SDK defaults are refused. A
+durable `run_store` run records the policy in its recipe and counts each
+node's attempts from its journal, so resume continues them; it waits its
+backoff, never a `Retry-After` ([durable retry
+policy](workflow-accounting.md#retry-policy)). On an ordinary run without
 `persist_attempts` a policy is not saved in checkpoints: a resumed run follows
 the policy of the Swarm that resumes it, with a fresh allowance of attempts.
 `Executor` and `AsyncExecutor` also take `sleep`, which replaces the wait
@@ -224,6 +227,12 @@ any policy. Each executor takes the saved allowance as `attempts_used=` and
 reports its own as the `attempts_used` property, in the same shape. The saved
 allowance applies to the executor's first run only: running another graph on
 the same executor starts a new run, with a fresh allowance for every node.
+
+A durable run's journal records every attempt as its call, so its executor
+takes `attempts_spent=` instead: a callable that returns the attempts a
+node's current generation has used, which each node reads when it starts.
+An executor whose calls are journal-managed takes a policy only with it. See
+[durable retry policy](workflow-accounting.md#retry-policy).
 
 ### Calls without an answer
 

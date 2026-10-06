@@ -270,6 +270,7 @@
     "tests/test_workflow_provider.py",
     "tests/test_workflow_read_tool.py",
     "tests/test_workflow_reservation_recovery.py",
+    "tests/test_workflow_retry_policy.py",
     "tests/test_workflow_runtime.py",
     "tests/test_workflow_runtime_control.py",
     "tests/test_workflow_runtime_regeneration.py",

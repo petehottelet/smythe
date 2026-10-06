@@ -35,7 +35,9 @@ from smythe.evidence import (
     _tombstone_operations, source_evidence_inputs, source_evidence_key, source_evidence_result,
     source_tombstone_key,
 )
-from smythe.executor_base import REJECTED_GENERATIONS_KEY, SUPPORTED_PROMPT_ASSEMBLY_VERSIONS, ExecutorBase
+from smythe.executor_base import (
+    REJECTED_GENERATIONS_KEY, SUPPORTED_PROMPT_ASSEMBLY_VERSIONS, ExecutorBase, check_provider_support,
+)
 from smythe.graph import ExecutionGraph, NodeStatus, Revision, snapshot_run_ref
 from smythe.lineage import (
     LINEAGE_OPERATION, LINEAGE_RECORD_VERSION, LINEAGE_REUSE_KEY, ArtifactLineage, build_lineage,
@@ -44,6 +46,7 @@ from smythe.lineage import (
 from smythe.lineage import _id as _lineage_id
 from smythe.registry import Registry
 from smythe.provider import ProviderResponseError
+from smythe.scheduling import RetryPolicy
 from smythe.task import Task, snapshot_task, task_from_dict, task_to_dict
 from smythe.tracer import Tracer
 from smythe.validation import ValidationOutcome, _json_sha256
@@ -110,7 +113,15 @@ MAX_NODE_ID_CHARS = 256
 # 1, which context_sources selects, records each call's context snapshot and
 # renders its prompt from it, with sources and dependency outputs marked as
 # untrusted data.
-RECIPE_BEHAVIOR_FIELDS = MappingProxyType({"prompt_assembly": (1, 1), "context_assembly": (0, 0)})
+#
+# retry_policy is the run's RetryPolicy as _retry_record gives it, or None,
+# which recipes without the field mean: node failure policies retry every
+# failure that is not terminal and resume refills each node's retries. Under a
+# policy, CallKey.attempt continues from the attempts the journal shows a
+# node's generation used (WorkflowRuntime._attempts_used), so a run keeps the
+# policy it started with.
+RECIPE_BEHAVIOR_FIELDS = MappingProxyType({"prompt_assembly": (1, 1), "context_assembly": (0, 0),
+                                           "retry_policy": (None, None)})
 # The values this release supports for a behavior-version field. A configured
 # value outside them is refused, and so is a saved recipe that records one,
 # for example a recipe a newer release wrote.
@@ -166,9 +177,25 @@ def _snapshot_behavior_settings(settings):
 
 
 def _supported_behavior(name, value):
+    if name == "retry_policy":
+        try:
+            return value is None or _canonical(_retry_record(RetryPolicy.from_dict(value))) == _canonical(value)
+        except ValueError:  # Including a field a newer release records.
+            return False
     versions = _BEHAVIOR_VERSIONS.get(name)
     # Versions are integers; a bool or float equal to one is not a version.
     return versions is None or (type(value) is int and value in versions)
+
+
+def _retry_record(policy):
+    """The recipe's record of a durable run's RetryPolicy.
+
+    ``persist_attempts`` is left out: the journal records every attempt of a
+    durable run, with or without it.
+    """
+    record = policy.to_dict()
+    del record["persist_attempts"]
+    return record
 
 
 def _snapshot_read_tools(read_tools):
@@ -610,10 +637,9 @@ class WorkflowRuntime:
             )
         Sentinel(max_budget_usd)
         # Each unsupported argument is named, so a caller knows what to remove.
-        if retry_policy is not None:
+        if retry_policy is not None and not isinstance(retry_policy, RetryPolicy):
             raise WorkflowBindingError(
-                "retry_policy is not supported by durable text workflows, whose journal "
-                "settles rejected calls; use node failure policies and retry_backoff_s"
+                f"retry_policy must be a RetryPolicy or None, not {type(retry_policy).__name__}"
             )
         if reserve_for_checks:
             raise WorkflowBindingError(
@@ -722,12 +748,19 @@ class WorkflowRuntime:
         elif settings.get("context_assembly", 0):
             context_sources = ()
         _check_lineage_sources(lineage, context_sources)
+        if retry_policy is not None:
+            settings = MappingProxyType({**settings, "retry_policy": _retry_record(retry_policy)})
         self._behavior_settings = settings
         # The sources a run that has recorded none records as revision 0;
         # None when this runtime configures no context assembly.
         self._supplied_sources = context_sources
         self.behavior = {}
         self.recipe = self._describe()
+        if settings.get("retry_policy") is not None:
+            # Refused before a run exists; each session checks its bound providers too.
+            self._check_retry_owner([self.provider, *(
+                provider for component in self.sources.values() if component is not None
+                for provider in component.workflow_providers())])
         self.checkpoint_version = _checkpoint_version(self.recipe)
         self.graph = None
         self.executor = None
@@ -849,6 +882,15 @@ class WorkflowRuntime:
         return {"version": 1, "store_id": self.store.store_id, "run_id": self.run_id,
                 "recipe_sha256": self.run["config_sha256"]}
 
+    def _check_retry_owner(self, providers):
+        """Under a retry policy, refuse a provider whose SDK may send a call again unseen."""
+        for provider in providers:
+            try:
+                check_provider_support(provider, self.model, node_id=None, check_model=False,
+                                       retry_owner=True)
+            except ValueError as error:
+                raise WorkflowBindingError(str(error)) from error
+
     def _bind(self):
         # Planners run _check_plan on each candidate inside their retry loops.
         binding = ComponentBinding(self.run_id, "workflow", "execution", self._component_call,
@@ -929,6 +971,18 @@ class WorkflowRuntime:
         self._worker_keys.setdefault((node.id, node_generation(node)), set()).add(result.key)
         return result
 
+    def _attempts_used(self, node):
+        """The attempts *node*'s current generation used, as its journal shows: its rejected calls.
+
+        A rejection counts on any invocation, including one that a resume
+        moved past to a new invocation, so resume continues a retry policy's
+        cap instead of refilling it. A call that is not settled, or whose
+        result was accepted, is not counted: entering its attempt again sends,
+        refuses or replays it as before.
+        """
+        return sum(call["result_state"] == "rejected" for call in self.store.node_generation_calls(
+            self.run_id, node.id, node_generation(node)))
+
     def _read_call(self, node, attempt):
         """Bind a read step's attempt to its journal call, in the ``tool`` phase.
 
@@ -976,6 +1030,9 @@ class WorkflowRuntime:
                 task_sha256=task_sha256(task_from_dict(run["task"])),
             )
         self._bind()
+        if self.behavior.get("retry_policy") is not None:
+            # A resumed run keeps its saved policy, configured here or not.
+            self._check_retry_owner(self.providers.values())
         lease = self.store.acquire_lease(self.run_id, uuid4().hex, ttl_s=60)
         self.context = WorkflowProviderContext(self.store, lease, self.providers)
         self.budget = WorkflowBudget(self.store, self.run_id, self.max_budget_usd)
@@ -1763,6 +1820,8 @@ class WorkflowRuntime:
             raise WorkflowBindingError("Execution concurrency exceeds the saved workflow policy")
         validate_verification_checkpoint(self.graph, version=3, completed=False)
         reset_incomplete_nodes(self.graph)
+        saved_policy = self.behavior.get("retry_policy")
+        retry_policy = None if saved_policy is None else RetryPolicy.from_dict(saved_policy)
         self.executor = AsyncExecutor(
             provider=self.execution_provider, registry=self.registry, tracer=self.trace,
             budget=self.budget, max_concurrency=self.execution_concurrency, artifact_dir=None,
@@ -1776,6 +1835,9 @@ class WorkflowRuntime:
             prompt_assembly=self.behavior.get("prompt_assembly", 1),
             acceptance=self.acceptance, read_call_factory=self._read_call,
             context_assembler=self._context_snapshot if self._context_version else None,
+            # Under the run's policy each node starts from the attempts its journal shows.
+            retry_policy=retry_policy,
+            attempts_spent=None if retry_policy is None else self._attempts_used,
         )
         self._save()
         try:

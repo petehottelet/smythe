@@ -391,9 +391,11 @@ class Swarm:
     ``WhiteRabbit`` classifier's, each ``LLMArchitect`` or
     ``ConstrainedArchitect`` that could plan it, and an ``LLMSupervisor``'s
     when ``max_revisions`` allows a review. Otherwise the run is refused
-    before routing, planning or any node call. Durable runs refuse it. A policy
-    with ``persist_attempts`` is saved with the run's checkpoints, with each
+    before routing, planning or any node call. A policy with
+    ``persist_attempts`` is saved with the run's checkpoints, with each
     node's attempts, so resume continues the allowance instead of refilling it.
+    A durable run records the policy in its recipe and counts each node's
+    attempts from its journal, so its resume continues them too.
 
     ``lineage``, a :class:`~smythe.lineage.LineagePolicy`, opts each durable
     run into artifact lineage under a declared access scope. It needs a

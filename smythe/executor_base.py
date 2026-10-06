@@ -327,6 +327,11 @@ class ExecutorBase:
     answered, because the node's timeout, a cancellation or an interruption
     ended it, keeps its reservation as the node's unknown, estimated cost
     (``Sentinel.retain_unknown``) instead of releasing it.
+    A durable journal records each attempt as its
+    call, so journal-managed calls take a policy only with
+    ``attempts_spent(node)``, which returns the attempts the node's current
+    generation has already used each time the node starts; nothing is saved
+    through the control hook for an attempt.
     """
 
     def __init__(
@@ -358,6 +363,7 @@ class ExecutorBase:
         sleep: Callable[[float], Any] | None = None,
         rng: Any = None,
         attempts_used: dict[str, dict[str, int]] | None = None,
+        attempts_spent: Callable[[Node], int] | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         if context_assembler is not None and not callable(context_assembler):
@@ -374,7 +380,12 @@ class ExecutorBase:
         self._retry_policy, self._sleep, self._rng = retry_policy, sleep, rng
         # When each node's retry deadline passes, on the tracer's clock.
         self._deadlines: dict[str, float] = {}
-        self._persist_attempts = retry_policy is not None and retry_policy.persist_attempts
+        if attempts_spent is not None and (not callable(attempts_spent) or retry_policy is None):
+            raise TypeError("attempts_spent must be callable, and needs a retry_policy")
+        # A journal's count of each node's attempts, which no checkpoint duplicates.
+        self._journal_attempts = attempts_spent
+        self._persist_attempts = (retry_policy is not None and retry_policy.persist_attempts
+                                  and attempts_spent is None)
         if attempts_used is not None and not self._persist_attempts:
             raise ValueError("attempts_used needs a retry_policy with persist_attempts")
         # Like revisions_used, a per-run allowance: each node's generation and
@@ -404,8 +415,11 @@ class ExecutorBase:
         self._workflow_managed = (
             provider_call_factory is not None or getattr(provider, "workflow_managed", False) is True
         )
-        if retry_policy is not None and self._workflow_managed:
-            raise ValueError("retry_policy is not supported with journal-managed provider calls")
+        if retry_policy is not None and self._workflow_managed and attempts_spent is None:
+            raise ValueError(
+                "retry_policy with journal-managed provider calls needs attempts_spent, "
+                "the attempts the journal records"
+            )
         self._call_attempts: dict[str, int] = {}
         self._reserved_node_ids: set[str] = set()
         self._settled_response_errors: list[tuple[str, Exception]] = []
@@ -1014,7 +1028,12 @@ class ExecutorBase:
         )
 
     def _attempts_spent(self, node: Node) -> int:
-        """The attempts *node* already used in its current generation, under ``persist_attempts``."""
+        """The attempts *node* already used in its current generation, under ``persist_attempts``.
+
+        With ``attempts_spent``, the journal's count, read each time the node starts.
+        """
+        if self._journal_attempts is not None:
+            return self._journal_attempts(node)
         generation, used = self._attempts_used.get(node.id, (None, 0))
         return used if self._persist_attempts and generation == node_generation(node) else 0
 

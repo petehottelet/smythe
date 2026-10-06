@@ -184,7 +184,11 @@ Who calls again after a failure depends on the path and the provider:
 - **Durable text workflows**: a 401, 403, 404, 413 or 429 response settles at
   zero cost, and the node failure policy decides whether to call again.
   Other HTTP or transport failures leave the bill unknown and block the run;
-  a refusal or truncation is terminal.
+  a refusal or truncation is terminal. Under a `RetryPolicy`, only the
+  classes it lists are retried, a refusal or truncation too when it lists
+  `quality_defect`, and each node's attempts are counted from the journal,
+  so resume continues them instead of refilling them. See
+  [durable retry policy](workflow-accounting.md#retry-policy).
 - **Durable read steps** make one request per journaled call. A failed free
   read settles at zero cost and the node failure policy decides whether to
   read again, unless no response arrived and its profile does not declare it
@@ -309,7 +313,12 @@ Tests:
   `tests/test_workflow_store.py::test_uncertain_http_outcomes_keep_unknown_exposure`,
   `tests/test_native_messages.py::test_server_errors_including_overloaded_keep_unknown_exposure`,
   `tests/test_native_messages.py::test_truncations_refusals_keep_their_known_charge`,
-  `tests/test_workflow_provider.py::test_known_bad_output_is_paid_terminal_and_replayed_locally`.
+  `tests/test_workflow_provider.py::test_known_bad_output_is_paid_terminal_and_replayed_locally`;
+  under a `RetryPolicy`, classes `tests/test_workflow_retry_policy.py::test_authority_and_input_rejections_are_not_retried_under_the_policy`
+  and `tests/test_workflow_retry_policy.py::test_a_refusal_with_a_known_charge_is_retried_only_when_its_class_is_listed`,
+  the journal-derived cap `tests/test_workflow_retry_policy.py::test_a_rate_limited_node_is_capped_and_resume_makes_no_call_beyond_the_cap`
+  and `tests/test_workflow_retry_policy.py::test_a_crash_after_the_first_rejected_attempt_resumes_within_the_cap`,
+  waits `tests/test_workflow_retry_policy.py::test_a_journaled_rejection_waits_its_backoff_not_retry_after`.
 - Durable read steps: `tests/test_workflow_read_tool.py::test_a_failed_read_follows_its_node_failure_policy`,
   `tests/test_workflow_read_tool.py::test_reads_settle_by_their_declared_charge_and_outcome`.
 - Jobs: `tests/test_jobs_runner.py::test_selective_reroll_replaces_only_rejected_operation`.
@@ -326,7 +335,8 @@ A durable run checks its provider and components each time `plan()`,
 `run_store`, `verifier`, `memory`, `tool_runtime`, `checkpoint_store`,
 `retry_policy`, `reserve_for_checks` or `lineage` raises
 `WorkflowBindingError`, a `ValueError` whose message starts with the
-argument's name.
+argument's name; a different `retry_policy` on resume raises
+`WorkflowConflictError`.
 
 | Component | Accepted | Rejected |
 |---|---|---|
@@ -339,7 +349,7 @@ argument's name.
 | `checkpoint_store` | `None`; the journal holds checkpoints | Any checkpoint store |
 | `renderer` | `None`, `MarkdownRenderer`, or a renderer declared with `LocalOnly(..., role="renderer")` whose `render()` is synchronous; it [publishes the delivered document](workflow-accounting.md#published-documents) into `artifact_dir` | Other objects and other `LocalOnly` roles; `renderer` without `run_store` or `artifact_dir`; a strict policy without final validators; an `async` `render()` or an invalid `filename` or `media_type`; a run directory that another run owns or that holds files the run does not own |
 | `lineage` | `None`, or a `LineagePolicy` with a strict `acceptance` policy; the completed run [records its lineage](lineage.md#the-record-a-run-writes) | Other objects and `LineagePolicy` subclasses; `lineage` without `run_store` or with no or an advisory `acceptance` policy; node or source ids a record cannot hold, blank or with DEL (U+007F); a new graph whose nodes carry `lineage_reuse` metadata |
-| `retry_policy` | `None`; the node failure policy decides each retry | Any `RetryPolicy` |
+| `retry_policy` | `None`, where the node failure policy decides each retry, or a `RetryPolicy`, which the recipe records and whose attempts the journal counts across resume ([durable retry policy](workflow-accounting.md#retry-policy)) | A provider that does not declare `sdk_retries=0`; on resume, a policy other than the one the run started with |
 | `reserve_for_checks` | `False`; the journal admits each call against the run's budget | `True` |
 | Architects and other components | Built-in components and `LocalOnly` factories | Subclasses and unjournaled dependencies |
 | Node inputs | Plain text | `attach_dep_artifacts`, `attachments` and `artifacts` |
@@ -365,7 +375,8 @@ Tests:
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[tool-runtime]`,
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[checkpoint-store]`,
   `tests/test_workflow_acceptance.py::test_durable_runs_refuse_unregistered_verifier_code_before_any_call`,
-  `tests/test_retry_policy.py::test_durable_runs_refuse_a_retry_policy_by_name_before_any_call`,
+  `tests/test_workflow_retry_policy.py::test_a_provider_whose_sdk_may_retry_is_refused_before_any_call`,
+  `tests/test_workflow_retry_policy.py::test_resume_refuses_a_different_explicit_policy_and_keeps_the_saved_one`,
   `tests/test_budget_holds.py::test_durable_runs_refuse_reserve_for_checks_by_name_before_any_call`.
 - Gate validators: `tests/test_workflow_acceptance.py::test_registered_validator_judges_durable_gates_from_the_exact_target_text`,
   `tests/test_workflow_acceptance.py::test_a_changed_validator_configuration_or_version_refuses_resume_before_any_call`,

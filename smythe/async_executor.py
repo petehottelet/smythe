@@ -90,6 +90,7 @@ class AsyncExecutor(ExecutorBase):
         sleep: Callable[[float], Any] | None = None,
         rng: Any = None,
         attempts_used: dict[str, dict[str, int]] | None = None,
+        attempts_spent: Callable[[Node], int] | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         super().__init__(
@@ -110,6 +111,7 @@ class AsyncExecutor(ExecutorBase):
             sleep=sleep,
             rng=rng,
             attempts_used=attempts_used,
+            attempts_spent=attempts_spent,
         )
         self._estimated_tokens_per_node = validate_token_count(
             estimated_tokens_per_node, "estimated_tokens_per_node",
