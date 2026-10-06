@@ -786,7 +786,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   accepted artifact, delivery decision and each node's inputs as ids,
   versions and digests, with no source text; its reader rejects unknown
   versions and keys, and a node that lists a source reference twice, in any
-  key order. Runs do not write lineage records yet. See
+  key order. Records hash by their digest. Runs do not write lineage records
+  yet. See
   [artifact lineage](docs/lineage.md).
 - `Swarm(reserve_for_checks=True)` holds allowance for a run's verifiers and
   its `LLM_MERGE` synthesis so other nodes cannot spend it. Under

@@ -138,7 +138,8 @@ form:
   version and any missing or unknown key at every level, rather than
   guessing. `to_dict()` returns detached JSON data; the record's parts are
   read-only. `sha256` is the digest of `to_dict()` as canonical JSON, so it
-  does not depend on key order.
+  does not depend on key order. Records compare by value and hash by
+  `sha256`, so they can be set members and dictionary keys.
 
 A record grows with its nodes and their source references, not with the
 run's calls or events: a 256-node record with two source references per node

@@ -256,7 +256,9 @@ class ArtifactLineage:
     ``repair`` that made it, and, on each reused node, ``reused_from``.
 
     Every part is read-only. :meth:`from_dict` rejects unknown versions and
-    keys at every level; optional blocks are omitted, never null.
+    keys at every level; optional blocks are omitted, never null. Records
+    compare by value and hash by :attr:`sha256`, so equal records are one
+    set member or dictionary key.
     """
 
     run: Mapping[str, Any]
@@ -323,6 +325,10 @@ class ArtifactLineage:
     def sha256(self) -> str:
         """The SHA-256 of :meth:`to_dict` as canonical JSON."""
         return sha256_hex(self.to_dict())
+
+    def __hash__(self) -> int:
+        # The generated hash would hash the read-only mappings, which cannot be hashed.
+        return hash(self.sha256)
 
     @classmethod
     def from_dict(cls, data: Any) -> ArtifactLineage:

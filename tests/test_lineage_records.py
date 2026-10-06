@@ -382,6 +382,14 @@ def test_each_node_id_is_listed_once():
         ArtifactLineage.from_dict(data)
 
 
+def test_records_are_hashable_by_their_digest():
+    record = ArtifactLineage.from_dict(record_data())
+    shuffled = ArtifactLineage.from_dict(reordered(record_data()))
+    assert hash(record) == hash(shuffled) == hash(record.sha256)
+    assert {record, shuffled} == {record} and {record: 1}[shuffled] == 1
+    assert hash(replace(record, access_scope="tenant-b")) != hash(record)
+
+
 def test_a_declared_node_names_what_it_was_given():
     data = record_data()
     del data["nodes"][1]["inputs"]["context"]
