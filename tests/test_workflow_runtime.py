@@ -19,7 +19,7 @@ from smythe.graph import ExecutionGraph, Node, NodeStatus, Revision, Topology
 from smythe.pricing import PRICE_VERSION, price_table
 from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.registry import Registry
-from smythe.router import WhiteRabbit
+from smythe.router import RoutingRule, WhiteRabbit
 from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.workflow import WorkflowRuntime, _nanousd
 from smythe.workflow_binding import WorkflowBindingError
@@ -779,6 +779,69 @@ def test_a_planning_operation_saved_without_routing_restores_no_record(tmp_path,
     assert calls == []
     assert resumed.graph.planning is None
     assert "planning" not in checkpoint["graph"]
+
+
+TRANSLATE = RoutingRule("stable-transform", "single", "a stable transformation needs one worker",
+                        goal_any=("translate",))
+
+
+def ruled(store, *rules, single=True):
+    """A durable Swarm whose router applies *rules* before its offline classifier."""
+    router = WhiteRabbit(classifier_provider=OfflineProvider(), classifier_model="offline",
+                         autonomous=SimpleArchitect(), single=SimpleArchitect() if single else None,
+                         rules=rules)
+    return Swarm(model="offline", provider=OfflineProvider(), router=router, run_store=store,
+                 max_budget_usd=1)
+
+
+def test_routing_rules_and_a_single_tier_enter_the_recipe_only_when_configured(store):
+    legacy = routed(store)._workflow_runtime().recipe
+    assert ruled(store, single=False)._workflow_runtime().recipe == legacy
+
+    recipe = ruled(store, TRANSLATE)._workflow_runtime().recipe
+
+    assert recipe["components"]["router"] == {
+        **legacy["components"]["router"], "single": {"type": "simple_architect", "version": 1},
+        "rules": [{"name": "stable-transform", "tier": "single",
+                   "reason": "a stable transformation needs one worker", "goal_any": ["translate"]}],
+        "routing_policy_version": 2,
+    }
+    assert {**recipe, "components": legacy["components"]} == legacy
+
+
+def test_a_rule_decision_replays_on_resume_and_changed_rules_conflict(store, monkeypatch):
+    restore = crash_checkpoints(monkeypatch, store, lambda state, _: state["status"] == "planned")
+    with pytest.raises(Crash):
+        ruled(store, TRANSLATE).plan(Task("Translate the release notes"))
+    restore()
+    (run,) = store.list_runs()
+    run_id = run["run_id"]
+    recorded = store.load_operation(run_id, "planning")["result"]["routing"]
+    assert (recorded["tier"], recorded["method"], recorded["policy_version"]) == ("single", "rule", 2)
+    assert recorded["reasons"] == ["the rule 'stable-transform' chose single",
+                                   "a stable transformation needs one worker"]
+    assert routing_call_ids(store, run_id) == []
+    calls_before = store.inspect_run(run_id)["call_count"]
+    decided, adecide = [], WhiteRabbit.adecide
+
+    async def recording(self, task):
+        decided.append(task.goal)
+        return await adecide(self, task)
+
+    monkeypatch.setattr(WhiteRabbit, "adecide", recording)
+    other = RoutingRule("other", "single", "a second rule", goal_any=("notes",))
+    for changed in (ruled(store, replace(TRANSLATE, tier="autonomous")), ruled(store),
+                    ruled(store, TRANSLATE, other), ruled(store, single=False)):
+        with pytest.raises(WorkflowConflictError, match="differ from the saved recipe"):
+            changed.resume(run_id)
+    assert store.inspect_run(run_id)["call_count"] == calls_before
+
+    resumed = ruled(store, TRANSLATE).resume(run_id)
+
+    assert decided == []
+    assert resumed.graph.planning == {"routing": recorded}
+    assert store.get_checkpoint(run_id)["checkpoint"]["graph"]["planning"] == {"routing": recorded}
+    assert routing_call_ids(store, run_id) == []
 
 
 def test_routing_records_leave_the_recipe_and_unrouted_runs_unchanged(store):

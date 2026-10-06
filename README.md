@@ -196,7 +196,7 @@ memo. Its saved graph, trace, and expected output make the workflow inspectable.
 
 | You need to… | Smythe provides |
 |---|---|
-| Adapt the workflow to the task | Generated graphs, approved templates, and deterministic planning |
+| Adapt the workflow to the task | Generated graphs, approved templates, deterministic planning, and [routing rules](docs/architecture.md#routing-rules) that send stable tasks to a single worker |
 | Control spending and parallel work | Request reservations and bounded concurrency |
 | Recover interrupted work | Checkpoints, native response replay, [recorded read steps](docs/workflow-accounting.md#recorded-read-steps), and durable job journals |
 | Check the deliverable | Output verification, opt-in strict acceptance of the exact output returned, [source-evidence checks](docs/source-evidence.md) that quotes and listed contradictions hold, and artifact receipts |

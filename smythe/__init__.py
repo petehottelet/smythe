@@ -53,7 +53,7 @@ from smythe.workflow_provider import ProviderRequestRejectedError
 from smythe.workflow_policy import WorkflowGraphPolicy
 from smythe.workflow_store import SQLiteWorkflowStore, WorkflowError
 from smythe.workflow_tools import ReadProfile, ReadToolError
-from smythe.router import RoutingDecision, WhiteRabbit
+from smythe.router import RoutingDecision, RoutingRule, WhiteRabbit
 from smythe.scheduling import RetryDeadlineError, RetryPolicy
 from smythe.skills import (
     CapabilityHydrationMode,
@@ -161,6 +161,7 @@ __all__ = [
     "Revision",
     "RevisionError",
     "RoutingDecision",
+    "RoutingRule",
     "Sentinel",
     "SentinelAlert",
     "SimpleArchitect",

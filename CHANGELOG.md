@@ -737,6 +737,23 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   under `routing`; resume restores `graph.planning` from the saved plan
   without classifying again. The classifier prompt and durable recipes are
   unchanged. See [routing decisions](docs/architecture.md#routing-decisions).
+- Declarative routing rules and a single-worker tier.
+  `WhiteRabbit(single=..., rules=[...])` takes a single-worker architect, such
+  as `SimpleArchitect`, which the classifier is offered as `single`, and
+  `RoutingRule` values evaluated in order on the submitted Task before any
+  classifier call: the first that matches chooses its tier, and the decision
+  records the method `rule` with the rule's name and reason. Conditions read
+  only the goal (`goal_any`, `goal_none`), the number of constraints and
+  acceptance criteria (`max_constraints`, `max_done_when`), and context keys
+  and sizes (`context_keys`, `min_items`), never model output; Task data
+  cannot add or change a rule. A rule naming a tier the router does not
+  configure raises `ValueError` when the router is built, and without a
+  matching rule routing is unchanged. Such a router records routing policy
+  version 2. A durable recipe adds `single`, `rules` and
+  `routing_policy_version` only when they are configured, so a router without
+  them keeps its classifier prompt and recipe bytes; resuming with other rules
+  raises `WorkflowConflictError`, and a planned run replays its saved
+  decision. See [routing rules](docs/architecture.md#routing-rules).
 - `LineagePolicy` opts a durable run into artifact lineage:
   `Swarm(run_store=..., acceptance=<strict policy>, lineage=LineagePolicy())`,
   `Swarm.from_yaml(..., lineage=...)` and `WorkflowRuntime` take one. It
