@@ -129,12 +129,13 @@ Notes:
 - `control.revisions_used` is how much of the supervisor's `max_revisions` allowance the run has already spent. Resume seeds the executor from it, so the cap bounds the **run**, not each attempt: a crash-resume cycle cannot refill the allowance and revise past the limit the caller set.
 - `control.retry_policy` and `control.attempts_used` appear only for a run whose retry policy persists attempts, which makes the checkpoint version 5; see [attempt allowance](#attempt-allowance-version-5).
 - `control.revision_log`, present once a supervisor made a decision, lists the run's latest supervisor decisions; see [revision log](#revision-log).
+- `control.security_stop` appears once a [security stop](execution.md#security-stops) ended the run, which makes the checkpoint version 5; see [security stop](#security-stop-version-5).
 - `control.drain` appears in the failed checkpoint of a run that [drained its in-flight nodes](execution.md#draining-in-flight-work) under a termination policy: `{"settled": [...], "cancelled": [...], "deadline_hit": false}`. It is informational within version 4: resume does not read it, and a resumed run's checkpoints record only a drain of their own.
 - A node that a revision added carries `"added_by_revision": true` in its `metadata` (from 0.8.2). `LLMSupervisor` counts these nodes against `max_total_added_nodes`, so resume does not reset the count ([what the cap limits](supervisor.md#safety)). Nodes added before 0.8.2 have no marker and are not counted.
 - `task.done_when` carries the acceptance criteria forward. A resumed run that had forgotten them could not hold its own output to them.
 - `timing` records how long each call that worked on the execution took; see [timing segments](#timing-segments).
 - `graph.planning`, present only when a component recorded how the graph was planned, holds informational records keyed by namespace; see [graph planning records](#graph-planning-records).
-- A version 5 checkpoint adds a top-level `requires` list and the state it names, such as a `delivery_acceptance` record, an attempt allowance or nodes that name model profiles; see [required state features](#required-state-features-version-5).
+- A version 5 checkpoint adds a top-level `requires` list and the state it names, such as a `delivery_acceptance` record, an attempt allowance, nodes that name model profiles or a security stop; see [required state features](#required-state-features-version-5).
 - A completed version 5 checkpoint that was [re-evaluated](verifier.md#re-evaluation) adds `delivery_acceptance_history`, the decisions its current record superseded; see [decision history](#decision-history).
 
 ## Timing segments
@@ -296,13 +297,14 @@ the state features its reader must understand:
 "requires": ["delivery_acceptance"]
 ```
 
-This build knows four features: [`delivery_acceptance`](#delivery-acceptance-version-5),
+This build knows five features: [`delivery_acceptance`](#delivery-acceptance-version-5),
 [`attempt_allowance`](#attempt-allowance-version-5),
-[`model_profiles`](#model-profiles-version-5), and `operator_decision`,
+[`model_profiles`](#model-profiles-version-5), `operator_decision`,
 which a completed state lists while its record or a kept
 [earlier decision](#decision-history) is an
-[operator's decision](verifier.md#operator-decisions). A state lists those it
-needs in that order. A reader refuses, with
+[operator's decision](verifier.md#operator-decisions), and
+[`security_stop`](#security-stop-version-5). A state lists those it needs in
+that order. A reader refuses, with
 `ValueError` and before any provider call, a version 5 checkpoint whose
 `requires` is missing or is not a list of strings, or that lists a feature it
 does not know, whether the run finished or not. A later feature can therefore
@@ -504,6 +506,31 @@ result without them. Runs without a profiled node keep writing version 4.
 `smythe.checkpoint.model_profiles_from_state(state)` returns the profile each
 node names, by node ID, after these checks.
 
+## Security stop (version 5)
+
+A run that a [security stop](execution.md#security-stops) ended writes its
+failed checkpoint, and any later one, as version 5, lists `security_stop` in
+`requires`, and records the stop in `control`:
+
+```json
+"control": {
+  "revisions_used": 0,
+  "security_stop": {"reason_code": "credential_leak", "at": 1751600042.5}
+}
+```
+
+`reason_code` is the developer's code (1-64 letters, digits, `.`, `_`, `:`
+or `-`), and `at` the wall time, in seconds since the epoch, when the
+executor met the stop. A run with a stop never resumes: this build raises its
+`SecurityStop` on resume and on re-evaluation, finished or not, before any
+provider call, and leaves the checkpoint as it is. Builds that read only
+versions 1 through 4 refuse it, and so does a version 5 reader that does not
+know `security_stop`, instead of resuming a run that was stopped. A version 5
+state that records a stop without listing it, lists it without one, or holds
+a stop that is not exactly a valid `reason_code` and a finite `at` is refused
+with `ValueError`. `smythe.checkpoint.security_stop_from_state(state)` returns
+the stop after these checks, or `None` without one.
+
 ## Resume semantics
 
 `swarm.resume(execution_id)` (or `await swarm.aresume(...)`):
@@ -529,10 +556,12 @@ resume. See [Cost guardrails](budgets.md).
 This build writes version `4` and reads versions `1` through `5`. It writes
 version `5` only for a state with a [delivery acceptance
 record](#delivery-acceptance-version-5), an [attempt
-allowance](#attempt-allowance-version-5) or a node that names a [model
-profile](#model-profiles-version-5), so builds that read only versions 1
+allowance](#attempt-allowance-version-5), a node that names a [model
+profile](#model-profiles-version-5) or a [security
+stop](#security-stop-version-5), so builds that read only versions 1
 through 4 refuse it instead of delivering output they cannot check,
-refilling attempts the run has spent or calling the wrong provider. A version
+refilling attempts the run has spent, calling the wrong provider or resuming
+a stopped run. A version
 5 reader also refuses any [required state feature](#required-state-features-version-5)
 it does not know.
 Version 2 added `control` and `task.done_when`; version 1 loads their original

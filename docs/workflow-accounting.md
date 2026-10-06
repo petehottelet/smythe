@@ -187,7 +187,9 @@ running. A zero-cost rejection fails its node under `HALT`, the default, and
 under `RETRY` once the final attempt is rejected. A node that `SKIP` skips
 cancels nothing. A cancelled node whose generation request was already sent
 holds unknown exposure at its quoted ceiling, so the run is blocked with
-`unknown_exposure` and resuming it fails. Runs that execute one node at a time
+`unknown_exposure` and resuming it fails. A [security stop](#security-stops)
+cancels the running nodes the same way and blocks the run with `security_stop`
+instead. Runs that execute one node at a time
 (`parallel=False`, the default, or `max_concurrency=1`) have no other call in
 flight. A node's `timeout_s` also cancels a call that was already sent, with
 the same result, even in a serial run. A generated plan cannot set a timeout
@@ -246,6 +248,42 @@ declare `sdk_retries=0`, as the native and offline providers do; otherwise
 the run is refused with `WorkflowBindingError` before it is created or, on
 resume, before any call. A policy with `retain_uncertain_dispatch` is refused
 the same way: the journal keeps the exposure of every call it sends itself.
+
+### Security stops
+
+A durable run takes a [run control](execution.md#security-stops) as ordinary
+runs do: `Swarm(run_store=store, run_control=control)`. The control is not
+part of the recipe. Once it is revoked, or a tool runtime raises
+`SecurityStop`, the run admits no node and sends no call, its synthesis is not
+called, and the nodes in flight are cancelled at once. A cancelled call that
+was already sent holds unknown exposure at its quoted ceiling, as after a
+`HALT`. The run is then blocked in the journal before its failed checkpoint
+is saved: its status becomes `blocked`, its `blocked_reason` becomes
+`security_stop`, and a `security_stop` event records the reason code, never
+provider text.
+
+`store.security_stop(run_id, reason_code)` does the same for any run,
+unfinished or completed, without a lease, from any process that can open the
+journal. The first stop stands: stopping a stopped run again records nothing
+and returns the first stop, and `store.load_security_stop(run_id)` returns it
+as `{"reason_code", "at_ns"}`, on the journal's clock, or `None`. After a
+stop no new call is prepared and no call is reserved or dispatched. Calls
+already dispatched still settle when their evidence arrives, and keep unknown
+exposure without it; neither an overrun, unknown exposure nor conflicting
+evidence replaces the reason, and no method clears it. Resuming, executing,
+re-evaluating or republishing a stopped run raises its `SecurityStop` before
+any lease is taken, whatever the resuming Swarm's control. A successor run
+never reuses a stopped run's results, and its output cannot be prepared or
+approved as an [external action](actions.md), whose authority check refuses
+it too. Earlier releases admit no new call for a stopped run either, since
+any `blocked_reason` closes admission, but they still return a completed
+run's saved result.
+
+`store.inspect_run(run_id)` and `smythe runs inspect` show the reason and the
+unknown exposure, and the next action is `rerun`. The journal has no way to
+reconcile unknown model-call exposure, so a stopped run's exposure stays
+recorded as unknown: once the cause is resolved, run the task again as a new
+run.
 
 ### Money units
 

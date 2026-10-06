@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Callable
 from uuid import uuid4
 
+from smythe._failures import RunControl, SecurityStop
 from smythe._run_inspection import result_view
 from smythe.acceptance import (
     GENERATED_GATE_KEY,
@@ -48,6 +49,7 @@ from smythe.checkpoint import (
     model_profiles_from_state,
     reset_incomplete_nodes,
     revision_log_from_state,
+    security_stop_from_state,
     supersede_delivery_acceptance,
     task_from_dict,
     timing_segments,
@@ -458,6 +460,17 @@ class Swarm:
     passing over a ready node that has no free slot instead of stopping the
     run. Capacity waits are reported under ``timing["waiting_ms"]["capacity"]``.
     Nothing about it is saved. Durable runs refuse it.
+
+    ``run_control``, a :class:`~smythe._failures.RunControl`, stops this
+    Swarm's runs for security once it is revoked: ``plan``, ``execute`` and
+    ``resume`` refuse to start, and a run in progress admits no node and
+    sends no call after it, including supervision and synthesis. The async
+    executor cancels the calls in flight at once, without a ``termination``
+    drain, and a call that was sent and not answered keeps its reservation
+    as unknown cost. The run raises ``SecurityStop``, as it does when a tool
+    runtime raises one. An ordinary run's failed checkpoint records the stop
+    under ``control["security_stop"]`` as version 5, and a durable run's
+    journal blocks it with ``security_stop``; neither ever resumes.
     """
 
     def __init__(
@@ -496,8 +509,14 @@ class Swarm:
         profiles: Sequence[ModelProfile] = (),
         capacity_policy: CapacityPolicy | None = None,
         termination: TerminationPolicy | None = None,
+        run_control: RunControl | None = None,
     ) -> None:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
+        if run_control is not None and not isinstance(run_control, RunControl):
+            raise TypeError(
+                f"run_control must be a RunControl or None, not {type(run_control).__name__}"
+            )
+        self.run_control = run_control
         self._profiles = profile_map(profiles)
         if self._profiles and run_store is not None:
             raise WorkflowBindingError(
@@ -862,9 +881,15 @@ class Swarm:
         ``planning["coordination"]`` any parallel siblings that
         :func:`~smythe.planner.lint_contributions` flags.
         """
+        self._check_run_control()
         if self._run_store is not None:
             return asyncio.run(self._workflow_runtime().plan(task))
         return self._plan(task, Tracer(), executing=False)
+
+    def _check_run_control(self) -> None:
+        """Refuse to start or resume any run once this Swarm's run control is revoked."""
+        if self.run_control is not None:
+            self.run_control.check()
 
     def _plan_for_execution(self, task: Task, tracer: Tracer) -> ExecutionGraph:
         """Plan *task* for execute(); a subclass's plan() stays authoritative."""
@@ -1047,6 +1072,7 @@ class Swarm:
 
     async def aplan(self, task: Task) -> ExecutionGraph:
         """Async variant of plan() — safe to call from a running event loop."""
+        self._check_run_control()
         if self._run_store is not None:
             return await self._workflow_runtime().plan(task)
         return await self._aplan(task, Tracer(), executing=False)
@@ -1126,6 +1152,7 @@ class Swarm:
         was loaded via from_yaml().
         If parallel=True, uses the async executor for concurrent nodes.
         """
+        self._check_run_control()
         task_or_graph = self._resolve_input(task_or_graph)
         if self._run_store is not None:
             return asyncio.run(self._workflow_runtime().execute(
@@ -1151,6 +1178,7 @@ class Swarm:
         Admits up to ``max_concurrency`` ready nodes at once when
         ``parallel=True``, and one node at a time otherwise.
         """
+        self._check_run_control()
         task_or_graph = self._resolve_input(task_or_graph)
         if self._run_store is not None:
             return await self._workflow_runtime().execute(
@@ -1198,12 +1226,14 @@ class Swarm:
             profiles=tuple(self._profiles.values()), default_model=self.model,
             capacity_policy=self.capacity_policy,
             termination=self.termination,
+            run_control=self.run_control,
         )
         self._active_executor = executor
         try:
             self._check_dispatch_support(graph, budget)
             self._hold_check_budget(executor, graph, budget)
             graph = await executor.run(graph)
+            executor.check_run_control()
             with tracer.phase("synthesis"):
                 output = await self._synthesizer.asynthesize(
                     graph,
@@ -1269,12 +1299,14 @@ class Swarm:
             retry_policy=self.retry_policy,
             profiles=tuple(self._profiles.values()), default_model=self.model,
             capacity_policy=self.capacity_policy,
+            run_control=self.run_control,
         )
         self._active_executor = executor
         try:
             self._check_dispatch_support(graph, budget)
             self._hold_check_budget(executor, graph, budget)
             graph = executor.run(graph)
+            executor.check_run_control()
             with tracer.phase("synthesis"):
                 output = self._synthesizer.synthesize(
                     graph,
@@ -1322,7 +1354,9 @@ class Swarm:
         A run's supervisor decisions, once there are any, add the bounded
         ``revision_log`` to ``control``, which keeps the version.
         A run that drained after a failure records how under ``drain``,
-        which is informational and leaves the version unchanged.
+        which is informational and leaves the version unchanged. A run that a
+        security stop ended records it under ``security_stop``, which makes
+        the state version 5, so that no build resumes it.
         """
         if self._checkpoint_store is None:
             return
@@ -1339,6 +1373,9 @@ class Swarm:
             drain = getattr(self._active_executor, "drain_record", None)
             if drain is not None:
                 control["drain"] = drain
+            stop = getattr(self._active_executor, "security_stop", None)
+            if stop is not None:
+                control["security_stop"] = stop
             state = build_state(
                 control=control,
                 execution_id=execution_id,
@@ -1507,13 +1544,17 @@ class Swarm:
     ) -> tuple[DeliveryAcceptance | None, ExecutionGraph, Task | None, Sentinel]:
         """A saved state's delivery acceptance record, graph, task and restored costs.
 
-        Refuses a durable run's graph, conflicting task copies, model profiles
-        its ``requires`` list does not match, and accounting that resume
-        cannot continue: invalid usage, an accounting error or an unresolved
-        native response failure.
+        Refuses a run a security stop ended with its ``SecurityStop``, a
+        durable run's graph, conflicting task copies, model profiles its
+        ``requires`` list does not match, and accounting that resume cannot
+        continue: invalid usage, an accounting error or an unresolved native
+        response failure.
         """
         acceptance = delivery_acceptance_from_state(state)
         model_profiles_from_state(state)
+        stop = security_stop_from_state(state)
+        if stop is not None:
+            raise SecurityStop(stop["reason_code"])
 
         graph = graph_from_dict(state["graph"])
         if graph.run_ref is not None:
@@ -1716,8 +1757,11 @@ class Swarm:
         without one. Resumed work runs one node at a time
         unless this Swarm has ``parallel=True``; a durable ``run_store``
         run keeps the concurrency its first execution recorded and resumes
-        only under the acceptance policy its recipe records.
+        only under the acceptance policy its recipe records. A run that a
+        security stop ended never resumes: its ``SecurityStop`` is raised
+        before anything runs, whatever this Swarm's ``run_control``.
         """
+        self._check_run_control()
         if self._run_store is not None:
             return await self._workflow_runtime().resume(
                 execution_id, max_concurrency=self._execution_concurrency(),
@@ -1808,6 +1852,7 @@ class Swarm:
             profiles=tuple(self._profiles.values()), default_model=self.model,
             capacity_policy=self.capacity_policy,
             termination=self.termination,
+            run_control=self.run_control,
         )
         # Informational: decisions after resume extend the log the run saved.
         executor.revision_log = revision_log_from_state(state)
@@ -1818,6 +1863,7 @@ class Swarm:
             # Holds are not saved, so a resumed run holds again.
             self._hold_check_budget(executor, graph, budget)
             graph = await executor.run(graph)
+            executor.check_run_control()
             with tracer.phase("synthesis"):
                 output = await self._synthesizer.asynthesize(
                     graph,
@@ -1986,4 +2032,5 @@ class Swarm:
             artifact_dir=self.artifact_dir, retry_policy=self.retry_policy,
             lineage=self._lineage,
             reserve_for_checks=self.reserve_for_checks,
+            run_control=self.run_control,
         )

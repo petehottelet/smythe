@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from smythe._errors import PicklableError
-from smythe._failures import QUALITY_DEFECT, classify_failure
+from smythe._failures import QUALITY_DEFECT, RunControl, SecurityStop, classify_failure
 from smythe._http_rejection import _http_rejection_receipt
 from smythe._publish import publish_unique
 from smythe.acceptance import AcceptanceMode, AcceptancePolicy, _unmet_obligations, task_sha256
@@ -81,6 +81,18 @@ def _raise_workflow_error(error: BaseException) -> None:
                 _raise_workflow_error(child)
             except WorkflowError as found:
                 raise found from error
+
+
+def _security_stop_in(error: BaseException) -> SecurityStop | None:
+    """The first ``SecurityStop`` in *error*, or in the groups that wrap it; None without one."""
+    if isinstance(error, SecurityStop):
+        return error
+    if isinstance(error, BaseExceptionGroup):
+        for child in error.exceptions:
+            found = _security_stop_in(child)
+            if found is not None:
+                return found
+    return None
 
 
 def validate_retry_backoff_s(value: float) -> float:
@@ -473,6 +485,15 @@ class ExecutorBase:
     also admits at most ``max_in_flight`` nodes of a model at once. Each run
     starts with fresh limits, and every provider hint the run's pending nodes
     need is read before any node call.
+
+    ``run_control``, a :class:`~smythe._failures.RunControl`, is checked
+    before each node is admitted and before each provider or read call, tool
+    turns and supervisor reviews included: once it is revoked, the run raises
+    ``SecurityStop``. A ``SecurityStop`` that a tool runtime raises stops the
+    run the same way, never as a tool result for the model. Either way, a
+    call that was sent and not answered keeps its reservation as unknown
+    cost, as under ``retain_uncertain_dispatch``, and :attr:`security_stop`
+    records the stop.
     """
 
     def __init__(
@@ -508,10 +529,18 @@ class ExecutorBase:
         profiles: tuple[ModelProfile, ...] | list[ModelProfile] = (),
         default_model: str | None = None,
         capacity_policy: CapacityPolicy | None = None,
+        run_control: RunControl | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         if context_assembler is not None and not callable(context_assembler):
             raise TypeError("context_assembler must be callable or None")
+        if run_control is not None and not isinstance(run_control, RunControl):
+            raise TypeError(
+                f"run_control must be a RunControl or None, not {type(run_control).__name__}"
+            )
+        self._run_control = run_control
+        # The stop that ended the current run: its reason code and wall time.
+        self._security_stop: dict[str, Any] | None = None
         self._profiles = profile_map(profiles)
         # The profile that each node's running attempt fell back to.
         self._fallbacks: dict[str, ModelProfile] = {}
@@ -542,8 +571,8 @@ class ExecutorBase:
         self._attempts_used = _attempt_records(attempts_used or {})
         self._attempts_seed = dict(self._attempts_used)
         self._retain_dispatch = retry_policy is not None and retry_policy.retain_uncertain_dispatch
-        # Under retain_uncertain_dispatch, the nodes whose call was sent and
-        # has not answered: in flight, or ended by a timeout or cancellation.
+        # The nodes whose call was sent and has not answered: in flight, or
+        # ended by a timeout or cancellation.
         self._dispatched: set[str] = set()
         if acceptance is not None and not isinstance(acceptance, AcceptancePolicy):
             raise TypeError(
@@ -636,6 +665,29 @@ class ExecutorBase:
         return {node_id: {"execution_generation": generation, "attempts": used}
                 for node_id, (generation, used) in self._attempts_used.items()}
 
+    @property
+    def security_stop(self) -> dict[str, Any] | None:
+        """The security stop that ended the last run, or None.
+
+        ``reason_code`` is the stop's code and ``at`` the tracer's wall time,
+        in seconds since the epoch, when the executor met it. A Swarm's
+        checkpoints save it as ``control["security_stop"]``.
+        """
+        return None if self._security_stop is None else dict(self._security_stop)
+
+    def check_run_control(self) -> None:
+        """Raise ``SecurityStop``, and record it, once the run control is revoked."""
+        if self._run_control is not None and self._run_control.revoked:
+            stop = SecurityStop(self._run_control.reason_code)
+            self._record_security_stop(stop)
+            raise stop
+
+    def _record_security_stop(self, stop: SecurityStop) -> None:
+        """Record the run's first security stop, before any call in flight is cancelled."""
+        if self._security_stop is None:
+            self._security_stop = {"reason_code": stop.reason_code,
+                                   "at": self._tracer.wall_time()}
+
     async def maybe_revise(self, node: Node, graph: ExecutionGraph) -> bool:
         """Let the supervisor revise the plan after *node* completed.
 
@@ -658,6 +710,7 @@ class ExecutorBase:
         remaining = self._max_revisions - self._revisions_used
         if remaining <= 0:
             return False
+        self.check_run_control()
 
         started = self._tracer.now()
         fired = self._fired_triggers(graph, node)
@@ -1574,6 +1627,7 @@ class ExecutorBase:
                         self._capacity.bucket(fallback.provider, fallback.model)
         self._reserved_node_ids.clear()
         self._dispatched.clear()
+        self._security_stop = None
         self._call_attempts.clear()
         self._deadlines.clear()
         self._attempts_used, self._attempts_seed = self._attempts_seed, {}
@@ -1686,7 +1740,9 @@ class ExecutorBase:
         timeout even then. Under ``retain_uncertain_dispatch``, a timeout
         while a provider call is unanswered raises ``UncertainDispatchError``
         (the deadline's still raises ``RetryDeadlineError``), and however the
-        attempt ends, such a call keeps its reservation as unknown cost.
+        attempt ends, such a call keeps its reservation as unknown cost. A
+        ``SecurityStop``, plain or in a group, is recorded and raised, with the
+        node's reservation released.
         """
         timeout, by_deadline = self._attempt_timeout(node)
         coro = self._run_node_conversation(node, graph)
@@ -1701,7 +1757,14 @@ class ExecutorBase:
             async with asyncio.timeout(timeout) as deadline_timer:
                 return await coro
         except BaseExceptionGroup as exc:
+            stop = _security_stop_in(exc)
+            if stop is not None:
+                # Grouped native failures still settle first; the stop holds either way.
+                self._record_security_stop(stop)
             if not _native_response_errors(exc):
+                if stop is not None:
+                    self.release_node_budget(node)
+                    raise stop from exc
                 _raise_workflow_error(exc)
                 self._raise_unresolved_response(node)
             _settle_response_group(
@@ -1722,7 +1785,7 @@ class ExecutorBase:
                 raise exc.__cause__
             if deadline_timer is not None and deadline_timer.expired():
                 raise self._deadline_error(node) from None
-            if node.id in self._dispatched:
+            if self._retain_dispatch and node.id in self._dispatched:
                 raise UncertainDispatchError(
                     f"Node {node.id!r} timed out after {node.timeout_s}s with its provider call "
                     "unanswered; the call's outcome and charge are unknown"
@@ -1730,6 +1793,10 @@ class ExecutorBase:
             raise TimeoutError(
                 f"Node {node.id!r} timed out after {node.timeout_s}s"
             ) from None
+        except SecurityStop as stop:
+            self._record_security_stop(stop)
+            self.release_node_budget(node)
+            raise
         except Exception:
             self._raise_unresolved_response(node)
             raise
@@ -1814,8 +1881,8 @@ class ExecutorBase:
                     try:
                         outcome = await session.call(tc)
                     except BaseExceptionGroup as exc:
-                        if _native_response_errors(exc):
-                            raise  # acall_node settles grouped accounting.
+                        if _native_response_errors(exc) or _security_stop_in(exc):
+                            raise  # acall_node settles grouped accounting and stops.
                         _raise_workflow_error(exc)
                         outcome = ToolResult(tool_call_id=tc.id, content=str(exc), is_error=True)
                     except ProviderResponseError as exc:
@@ -1827,6 +1894,9 @@ class ExecutorBase:
                         # feedback that dispatches another provider turn.
                         raise
                     except WorkflowError:
+                        raise
+                    except SecurityStop:
+                        # The developer's tool stopped the run; the model never sees it.
                         raise
                     except Exception as exc:
                         # Tool failures go back to the model, not up the stack —
@@ -1865,6 +1935,7 @@ class ExecutorBase:
                 f"Node {node.id!r} declares a read step, which runs only in a durable "
                 "workflow: pass run_store and read_tools to Swarm"
             )
+        self.check_run_control()
         step = node.metadata[READ_STEP_KEY]
         name = step.get("profile") if isinstance(step, dict) else None
         read = self._read_call_factory(node, self._call_attempts.get(node.id, 0))
@@ -1889,6 +1960,7 @@ class ExecutorBase:
             self._reserve_node(node)
 
     async def _provider_chat(self, node, system, messages, model, tools=None, *, turn=0):
+        self.check_run_control()
         self._raise_unresolved_response(node)
         phase = "verification" if node.verifies else "execution"
         provider = self._node_route(node)[0]
@@ -1898,6 +1970,9 @@ class ExecutorBase:
                 raise WorkflowError("The provider call factory must return a journal-managed provider")
         try:
             async with self._capacity_call(node, provider, model):
+                if self._capacity is not None:
+                    # A revocation during the capacity wait sends nothing.
+                    self.check_run_control()
                 if tools is None:
                     return await self._send(node, provider.chat(system, messages, model))
                 return await self._send(
@@ -1923,14 +1998,13 @@ class ExecutorBase:
     async def _send(self, node, call):
         """Await a provider *call*, marking *node* dispatched until the provider answers.
 
-        Only under ``retain_uncertain_dispatch``. A result or an exception the
-        provider raises, such as its own error or its client's timeout,
-        answers the call. A cancellation, from the node's timeout or
-        otherwise, or an interruption leaves the node marked, and the attempt
-        then keeps its reservation (:meth:`_retain_uncertain_dispatch`).
+        A result or an exception the provider raises, such as its own error
+        or its client's timeout, answers the call. A cancellation, from the
+        node's timeout or otherwise, or an interruption leaves the node
+        marked, and the attempt then keeps its reservation under
+        ``retain_uncertain_dispatch`` or a security stop
+        (:meth:`_retain_uncertain_dispatch`).
         """
-        if not self._retain_dispatch:
-            return await call
         self._dispatched.add(node.id)
         try:
             result = await call
@@ -1943,15 +2017,18 @@ class ExecutorBase:
     def _retain_uncertain_dispatch(self, node: Node) -> None:
         """Keep the reservation of *node*'s sent and unanswered call as unknown cost.
 
-        The reservation becomes the node's recorded cost, flagged
+        Under ``retain_uncertain_dispatch``, or once a security stop ended
+        the run, the reservation becomes the node's recorded cost, flagged
         ``cost_usd_unknown`` and, with an amount, ``cost_usd_is_estimate``, so
         a checkpoint keeps it and resume restores it; the next call reserves
-        again. Does nothing unless such a call is marked (see :meth:`_send`).
+        again. Does nothing unless such a call is marked (see :meth:`_send`),
+        and leaves journal-managed calls to their journal.
         """
         if node.id not in self._dispatched:
             return
         self._dispatched.discard(node.id)
-        if self._budget is None:
+        if (self._budget is None or self._workflow_managed
+                or not (self._retain_dispatch or self._security_stop is not None)):
             return
         kept = self._budget.retain_unknown(node.id)
         self._reserved_node_ids.discard(node.id)

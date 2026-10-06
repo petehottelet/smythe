@@ -1,5 +1,6 @@
 """Smythe: task-based personalized agent swarms with dynamic execution topology."""
 
+from smythe._failures import RunControl, SecurityStop
 from smythe.acceptance import (
     AcceptanceDecision,
     AcceptancePolicy,
@@ -161,6 +162,7 @@ __all__ = [
     "NativeReceipt",
     "LocalOnly",
     "SQLiteWorkflowStore",
+    "SecurityStop",
     "WorkflowBindingError",
     "WorkflowGraphPolicy",
     "WorkflowError",
@@ -182,6 +184,7 @@ __all__ = [
     "RepairPlan",
     "RoutingDecision",
     "RoutingRule",
+    "RunControl",
     "Sentinel",
     "SentinelAlert",
     "SimpleArchitect",

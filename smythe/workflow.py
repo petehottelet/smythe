@@ -15,6 +15,7 @@ from pathlib import Path
 from types import MappingProxyType
 from uuid import uuid4
 
+from smythe._failures import SECURITY_STOP, RunControl, SecurityStop
 from smythe._money import FLOOR, NANOUSD, to_units
 from smythe.acceptance import (
     AcceptanceDecision, AcceptanceMode, AcceptancePolicy, AcceptanceSource, DeliveryAcceptance,
@@ -643,11 +644,14 @@ def _predecessor(store, reference, scope):
 
     *reference* is ``{"store_id", "run_id", "lineage_sha256"}``. The run must
     have completed with an applied lineage record in access *scope*,
-    compared first, whose digest is ``lineage_sha256``. Returns its saved
-    graph and registry description, the record, and the ``(source_id,
-    sha256)`` of each source removed from it.
+    compared first, whose digest is ``lineage_sha256``, and no security stop
+    may hold it. Returns its saved graph and registry description, the
+    record, and the ``(source_id, sha256)`` of each source removed from it.
     """
     run_id = reference["run_id"]
+    if store.load_run(run_id)["blocked_reason"] == SECURITY_STOP:
+        raise WorkflowStateError(
+            f"Run {run_id!r} is held by a security stop; nothing is reused from it")
     saved = store.get_checkpoint(run_id)
     try:
         lineage, removed = load_lineage(store, run_id), set(_removed_sources(store, run_id))
@@ -718,6 +722,12 @@ def _reuse_matches(node_id, inputs, result):
                     "generation", "result_sha256", "records")})
     except (KeyError, TypeError):
         return False
+
+
+def _refuse_security_stop(store, run):
+    """Raise the ``SecurityStop`` that blocks *run*, a ``load_run`` record, if any."""
+    if run["blocked_reason"] == SECURITY_STOP:
+        raise SecurityStop(store.load_security_stop(run["run_id"])["reason_code"])
 
 
 class WorkflowBudget:
@@ -820,6 +830,16 @@ class WorkflowRuntime:
     and compares it exactly on every entry, like ``graph_policy``. The run
     then journals its :class:`~smythe.lineage.ArtifactLineage` once, after
     its decision, and the completed checkpoint applies it with the decision.
+
+    ``run_control``, a :class:`~smythe._failures.RunControl`, is not part of
+    the recipe. Once it is revoked, the run's executor admits no node and
+    sends no call, and synthesis is not called. A run that a security stop
+    ends, from the control or a tool runtime, is blocked in the journal with
+    ``security_stop`` (:meth:`SQLiteWorkflowStore.security_stop
+    <smythe.workflow_store.SQLiteWorkflowStore.security_stop>`) before its
+    failed checkpoint is saved. Resuming, executing, re-evaluating or
+    republishing a run so blocked raises its ``SecurityStop`` before any
+    lease is taken.
     """
 
     def __init__(self, *, store, model, max_budget_usd, provider, architect, registry,
@@ -828,7 +848,7 @@ class WorkflowRuntime:
                  max_concurrency, graph_policy=None, behavior_settings=None, acceptance=None,
                  read_tools=(), context_sources=None, renderer=None, artifact_dir=None,
                  retry_policy=None, lineage=None,
-                 reserve_for_checks=False):
+                 reserve_for_checks=False, run_control=None):
         if type(store) is not SQLiteWorkflowStore:
             raise WorkflowBindingError(
                 f"run_store must be SQLiteWorkflowStore itself, not {type(store).__name__}"
@@ -844,6 +864,11 @@ class WorkflowRuntime:
                 "retry_policy with retain_uncertain_dispatch is not supported by durable text "
                 "workflows, whose journal keeps the exposure of every call it sends itself"
             )
+        if run_control is not None and not isinstance(run_control, RunControl):
+            raise WorkflowBindingError(
+                f"run_control must be a RunControl or None, not {type(run_control).__name__}"
+            )
+        self.run_control = run_control
         if reserve_for_checks:
             raise WorkflowBindingError(
                 "reserve_for_checks is not supported by durable text workflows, whose journal "
@@ -1718,6 +1743,7 @@ class WorkflowRuntime:
         if reference["store_id"] != self.store.store_id:
             raise WorkflowConflictError("Graph belongs to a different workflow store")
         run = self.store.load_run(reference["run_id"])
+        _refuse_security_stop(self.store, run)
         if (reference["recipe_sha256"] != run["config_sha256"]
                 or _canonical(task_to_dict(value.task)) != _canonical(run["task"])):
             raise WorkflowConflictError("Graph Task or recipe differs from its durable run")
@@ -1770,7 +1796,9 @@ class WorkflowRuntime:
                                   self.undecided.task_sha256)
 
     async def resume(self, run_id, *, max_concurrency):
-        async with self._session(self.store.load_run(run_id)):
+        run = self.store.load_run(run_id)
+        _refuse_security_stop(self.store, run)
+        async with self._session(run):
             state = self._restore()
             if state is None:
                 task = task_from_dict(self.run["task"])
@@ -2066,6 +2094,7 @@ class WorkflowRuntime:
         if self.acceptance is None and operator is None:
             raise WorkflowBindingError("reevaluate needs a strict acceptance policy")
         run = self.store.load_run(run_id)
+        _refuse_security_stop(self.store, run)
         if "acceptance" not in run["config"]:
             raise WorkflowStateError(
                 "Workflow ran without a strict acceptance policy, so it has no delivery decision "
@@ -2173,6 +2202,7 @@ class WorkflowRuntime:
             # Under the run's policy each node starts from the attempts its journal shows.
             retry_policy=retry_policy,
             attempts_spent=None if retry_policy is None else self._attempts_used,
+            run_control=self.run_control,
         )
         self._save()
         try:
@@ -2195,6 +2225,7 @@ class WorkflowRuntime:
                 return {"output": output}
 
             key = self._synthesis_key()
+            self.executor.check_run_control()
             final = await self._operation_result(
                 key, "synthesis", {"graph": graph_to_dict(self.graph)}, synthesize,
             )
@@ -2210,6 +2241,10 @@ class WorkflowRuntime:
             # the lineage together.
             self._save("completed", output=output, acceptance=acceptance)
         except BaseException:
+            stop = self.executor.security_stop
+            if stop is not None:
+                # Before the failed checkpoint, so the stop holds whatever follows.
+                self.store.security_stop(self.run_id, stop["reason_code"])
             self._save("failed")
             raise
         if self.renderer is not None and acceptance is not None:
@@ -2345,7 +2380,9 @@ class WorkflowRuntime:
         has not completed or published, and a saved output that is not the
         published document.
         """
-        async with self._session(self.store.load_run(run_id)):
+        run = self.store.load_run(run_id)
+        _refuse_security_stop(self.store, run)
+        async with self._session(run):
             if self.renderer is None:
                 raise WorkflowStateError("Workflow has no renderer, so it publishes no artifact")
             state = self._restore()

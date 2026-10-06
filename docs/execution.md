@@ -86,7 +86,7 @@ policy decides every other one.
 | `persistence` | `NodeFinalizationError` and `VerificationRecoveryError` | Yes |
 | `workflow` | `WorkflowError` and its subclasses, such as `WorkflowQuoteError` | Yes |
 | `validator_error` | None: the class of a validator outcome `error` | |
-| `security_stop` | None yet: reserved for an explicit security stop | |
+| `security_stop` | `SecurityStop`: developer code stopped the run, through a revoked `RunControl` or a tool runtime; see [security stops](#security-stops) | Yes |
 | `deadline` | `RetryDeadlineError`: a retry policy's `deadline_s` ran out | No |
 
 A failed or skipped node keeps its last error's message as its result, which
@@ -267,6 +267,9 @@ retry's call. When the deadline ends the call, the node still fails with
 `RetryDeadlineError` and keeps the exposure. A timeout or cancellation
 before the call is sent, such as during a tool call or before a tool session
 opens, releases the reservation as before.
+
+A [security stop](#security-stops) keeps such a call's reservation the same
+way, with or without the option.
 
 The kept cost is ordinary recorded cost: a version 4 checkpoint carries it,
 and resume restores the amount and both flags, as releases before this
@@ -679,8 +682,8 @@ a ready node's budget reservation is refused at admission, the async executor:
 4. Raises the original error.
 
 A cancellation of the run, an interrupt such as `KeyboardInterrupt`, and a
-failure of class `security_stop` cancel the nodes in flight at once whatever
-the policy, and so does a cancellation during a drain. The serial executor
+[security stop](#security-stops) cancel the nodes in flight at once whatever
+the policy, and so does a cancellation or a revocation during a drain. The serial executor
 behind `execute()` with `parallel=False` runs one node at a time, so it has
 nothing in flight to drain, nor does the async executor at a concurrency of
 one. A durable `run_store` run refuses a policy with `WorkflowBindingError`
@@ -696,6 +699,47 @@ completed, runs the failed, cancelled and never-started ones, and follows the
 resuming `Swarm`'s own policy. The time spent draining is the `drain` wait in
 [timing](#timing). The executor's `sleep`, when given, times the drain's
 deadline, so tests can end it from a manual clock.
+
+### Security stops
+
+`Swarm(run_control=RunControl())`, or `run_control=` on either executor, gives
+developer code a switch that stops runs for security. `control.revoke(code)`
+may be called from any thread or task, before or during a run, with a short
+reason code: 1-64 letters, digits, `.`, `_`, `:` or `-`, starting with a
+letter or digit, so it never carries provider or service error text. A
+revoked control stays revoked, with its first code.
+
+- `plan()`, `execute()` and `resume()` under a revoked control raise
+  `SecurityStop` before any routing, planning or provider call, and save
+  nothing.
+- A run in progress admits no node and sends no call after the revocation:
+  the executors check the control before each node is admitted and before
+  each provider or read call, tool turns, supervisor reviews and synthesis
+  included.
+- The async executor cancels the nodes in flight at once. It never drains,
+  and a revocation during a [drain](#draining-in-flight-work) ends it
+  without waiting for the deadline; the run then raises `SecurityStop` with
+  its original error as the cause.
+- A call that was sent and not answered keeps its reservation as unknown
+  cost, as under `retain_uncertain_dispatch` ([calls without an
+  answer](#calls-without-an-answer)), whatever the retry policy. A native
+  provider's cancelled call keeps its unresolved bill, as always.
+
+A tool runtime's session can stop a run too: a `SecurityStop` it raises,
+alone or in an exception group, goes up the stack instead of back to the
+model as a tool result, and the run stops the same way. Model output and
+generated plans cannot raise one. Its failure class is `security_stop`,
+which is terminal.
+
+`SecurityStop.reason_code` is the code; `executor.security_stop` reports the
+stop that ended the last run as `{"reason_code": ..., "at": ...}`, with the
+tracer's wall time. An ordinary run's checkpoints then record it as
+`control.security_stop` in [version 5](checkpoint-format.md#security-stop-version-5),
+and `resume()` and `reevaluate()` raise its `SecurityStop` before anything
+runs, whatever the resuming Swarm's control: a stopped run never continues.
+A [durable run](workflow-accounting.md#security-stops) is blocked in its
+journal instead. Run the task again as a new run, with a new control, once
+the cause is resolved.
 
 An explicit [resume](checkpoint-format.md#resume-semantics) preserves completed
 nodes and their costs, resets failed or interrupted nodes, and continues the

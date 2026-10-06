@@ -42,6 +42,7 @@ from smythe.checkpoint import (
     delivery_acceptance_sequence,
     graph_from_dict,
     revision_log_from_state,
+    security_stop_from_state,
     task_from_dict,
     timing_segments,
 )
@@ -149,11 +150,16 @@ def next_action(
 ) -> dict[str, str]:
     """The first thing a saved run needs, as a code and a sentence.
 
-    Unresolved accounting comes first, because resume refuses it; then an
-    unfinished run's resume (*resume* says how); then a completed run's
-    published *artifact* whose file is missing or changed; then its withheld
-    output, then its unknown cost.
+    A security stop comes first, because nothing reopens the run; then
+    unresolved accounting, because resume refuses it; then an unfinished
+    run's resume (*resume* says how); then a completed run's published
+    *artifact* whose file is missing or changed; then its withheld output,
+    then its unknown cost.
     """
+    if blocked_reason == "security_stop":
+        return _action("rerun", "A security stop ended the run, which admits no more calls and "
+                                "never resumes; once its cause is resolved, run the task again "
+                                "as a new run.")
     if blocked_reason == "budget_overrun":
         return _action("rerun", "Spending passed the run's budget, so it admits no more calls; "
                                 "run the task again as a new run.")
@@ -345,12 +351,13 @@ def _checkpoint_view(execution_id: str, state: Any) -> dict[str, Any]:
     allowance = attempt_allowance_from_state(state)
     if allowance is not None:
         resume += f" and the retry policy {allowance[0].to_dict()}"
+    blocked = "security_stop" if security_stop_from_state(state) is not None else None
     return {
         "run_id": execution_id,
         "store": "checkpoints",
         "format": {"checkpoint_version": state["version"],
                    "requires": list(checkpoint_requirements(state))},
-        "execution": {"state": status, "blocked_reason": None, "nodes": node_counts(graph)},
+        "execution": {"state": status, "blocked_reason": blocked, "nodes": node_counts(graph)},
         "delivery": delivery,
         "decisions": decisions,
         "revision_log": revision_log_from_state(state),
@@ -366,7 +373,7 @@ def _checkpoint_view(execution_id: str, state: Any) -> dict[str, Any]:
         "timing": checkpoint_timing(state),
         "next_action": next_action(
             status, delivery, cost_is_complete=accounting["cost_is_complete"],
-            unresolved=accounting["unresolved"],
+            unresolved=accounting["unresolved"], blocked_reason=blocked,
             resume=resume + ", once no process is running it.",
         ),
     }

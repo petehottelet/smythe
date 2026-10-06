@@ -386,6 +386,7 @@ A `termination` policy is refused the same way when the `Swarm` is built.
 | `capacity_policy` | `None`; the journal admits each call when it is made | Any `CapacityPolicy`, when the `Swarm` is constructed |
 | `termination` | `None`; a failure cancels the calls in flight | A `TerminationPolicy` ([draining in-flight work](execution.md#draining-in-flight-work)) |
 | `supervisor` | `None`, `LLMSupervisor`, a supervisor declared with `LocalOnly(..., role="supervisor")`, or an `EvidenceTriggeredSupervisor` around either, whose recipe records its triggers | Subclasses; an `EvidenceTriggeredSupervisor` with `on_trigger` |
+| `run_control` | `None`, or a `RunControl` that is not part of the recipe; a [security stop](workflow-accounting.md#security-stops) blocks the run with `security_stop` | Other objects, with `TypeError` when the `Swarm` is constructed |
 | Architects and other components | Built-in components and `LocalOnly` factories | Subclasses and unjournaled dependencies |
 | Node inputs | Plain text | `attach_dep_artifacts`, `attachments` and `artifacts` |
 | Resume | The saved recipe: components, models, budget, `retry_backoff_s`, concurrency, gate validator, acceptance policy, read profiles, renderer and lineage policy | Any change raises `WorkflowConflictError`, including a lineage policy added, removed or changed |

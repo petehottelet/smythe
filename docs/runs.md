@@ -43,7 +43,7 @@ its runs and its recorded version do not change.
 | Block | Contents |
 |---|---|
 | `format` | Checkpoint version and the state features it `requires`; or journal version, durable checkpoint version and revision |
-| `execution` | `state`, `blocked_reason`, and node counts by status. Ordinary states are `running`, `failed` and `completed`; durable runs add `planned` and `blocked`, with the journal's `run_status` and `checkpoint_status` |
+| `execution` | `state`, `blocked_reason`, and node counts by status. Ordinary states are `running`, `failed` and `completed`; durable runs add `planned` and `blocked`, with the journal's `run_status` and `checkpoint_status`. An ordinary run that a [security stop](execution.md#security-stops) ended has `blocked_reason` `security_stop` |
 | `delivery` | The current delivery acceptance decision; see below |
 | `decisions` | The [decision history](#decision-history): the current decision's sequence and the decisions before it |
 | `revision_log` | The run's latest [supervisor decisions](#revision-log), applied or refused; empty without any |
@@ -266,7 +266,7 @@ re-evaluation decides again.
 | `resume` | The run is unfinished; `detail` says how to resume it, including the strict policy's `sha256` that must resume a strict run, ordinary or durable, and the retry policy an ordinary run with [persisted attempts](execution.md#persisted-attempts) records |
 | `republish` | A completed durable run's published document is missing or changed; `Swarm(run_store=...).republish(run_id)` publishes it again without replacing a file |
 | `reconcile_accounting` | Accounting is unresolved (invalid usage, an accounting error, an unresolved native response, or a durable run blocked by `unknown_exposure` or `evidence_conflict`), or a completed run's cost is incomplete |
-| `rerun` | A durable run passed its budget and admits no more calls |
+| `rerun` | A [security stop](execution.md#security-stops) ended the run, ordinary or durable, or a durable run passed its budget: it admits no more calls |
 | `review_output` | The output was `rejected` or `needs_review` and is withheld |
 | `resolve_indeterminate` | No valid decision covers the output, which is withheld |
 

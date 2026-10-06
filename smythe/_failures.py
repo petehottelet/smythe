@@ -7,14 +7,22 @@ decision here. A class describes a failure and does not by itself decide a
 retry: ``RETRY`` retries every exception that is not terminal, whatever its
 class, unless a ``RetryPolicy`` lists the classes it retries.
 
+``SecurityStop`` and ``RunControl`` stop a run for security; see
+``RunControl``.
+
 The exception types are imported on first use, so any module can import this
 one without an import cycle.
 """
 
 from __future__ import annotations
 
+import asyncio
 from functools import cache
+import re
+import threading
 from typing import TYPE_CHECKING, cast
+
+from smythe._errors import PicklableError
 
 if TYPE_CHECKING:
     from smythe.workflow_provider import ProviderRequestRejectedError
@@ -45,7 +53,8 @@ PERSISTENCE = "persistence"
 WORKFLOW = "workflow"
 # A validator could not decide (its outcome is "error"); no exception has it.
 VALIDATOR_ERROR = "validator_error"
-# Reserved for an explicit security stop; no exception has it yet.
+# Developer code stopped the run for security: a revoked RunControl, or a
+# SecurityStop that a tool runtime raised.
 SECURITY_STOP = "security_stop"
 # A retry policy's deadline ran out before an attempt succeeded.
 DEADLINE = "deadline"
@@ -62,6 +71,107 @@ _STATUS_CLASSES = {
     401: AUTHORITY_DENIED, 403: AUTHORITY_DENIED,
     408: TRANSIENT, 409: TRANSIENT, 429: TRANSIENT, 499: TRANSIENT,
 }
+
+
+# A reason code names why a run stopped, never what a provider or service said.
+_REASON_CODE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,63}")
+
+
+def security_reason_code(value: object) -> str:
+    """Accept a security stop's reason code: 1-64 letters, digits, ``.``, ``_``, ``:`` or ``-``.
+
+    It starts with a letter or digit and has no spaces, so it is a short
+    code a developer chose, not provider or service error text.
+    """
+    if not isinstance(value, str):
+        raise TypeError(f"reason_code must be a string, not {type(value).__name__}")
+    if _REASON_CODE.fullmatch(value) is None:
+        raise ValueError(
+            f"reason_code must be 1-64 letters, digits, '.', '_', ':' or '-', starting with a "
+            f"letter or digit, not {value[:80]!r}"
+        )
+    return value
+
+
+class SecurityStop(PicklableError, Exception):
+    """A run stopped for security: no node is admitted and no call is sent after it.
+
+    Only developer code raises one: a revoked :class:`RunControl`, or a tool
+    runtime's session. Its class is ``security_stop``, which is terminal and
+    never drains: the async executor cancels the calls in flight at once. A
+    run that one stops can never resume. ``reason_code`` is the short code
+    the developer gave (see ``security_reason_code``).
+    """
+
+    def __init__(self, reason_code: str) -> None:
+        self.reason_code = security_reason_code(reason_code)
+        super().__init__(
+            f"Run stopped for security ({self.reason_code}); it admits no further work and "
+            "cannot resume"
+        )
+
+
+class RunControl:
+    """A developer's switch that stops runs for security, at once and for good.
+
+    Give it to a ``Swarm`` (``run_control=``) or an executor. ``revoke(reason_code)``
+    may be called from any thread or task, before or during a run. From then
+    on a run under the control admits no node and sends no provider call: the
+    executors check it before each admission and each call, and the async
+    executor cancels the calls in flight at once, even while a
+    ``TerminationPolicy`` drains, keeping what they may cost. The run raises
+    ``SecurityStop``, and its checkpoint or journal records the stop, so it
+    never resumes. A revoked control stays revoked with its first reason
+    code; a new run needs a new control.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._reason_code: str | None = None
+        self._waiters: list[tuple[asyncio.AbstractEventLoop, asyncio.Event]] = []
+
+    @property
+    def revoked(self) -> bool:
+        """Whether the control was revoked."""
+        return self._reason_code is not None
+
+    @property
+    def reason_code(self) -> str | None:
+        """The first revocation's reason code, or None while the control is not revoked."""
+        return self._reason_code
+
+    def revoke(self, reason_code: str) -> None:
+        """Stop every run under this control; a later revocation keeps the first code."""
+        security_reason_code(reason_code)
+        with self._lock:
+            if self._reason_code is None:
+                self._reason_code = reason_code
+            waiters, self._waiters = self._waiters, []
+        for loop, event in waiters:
+            try:
+                loop.call_soon_threadsafe(event.set)
+            except RuntimeError:  # The waiting loop has already closed.
+                pass
+
+    def check(self) -> None:
+        """Raise ``SecurityStop`` once the control is revoked."""
+        if self._reason_code is not None:
+            raise SecurityStop(self._reason_code)
+
+    async def wait(self) -> None:
+        """Return once the control is revoked."""
+        event = asyncio.Event()
+        entry = (asyncio.get_running_loop(), event)
+        with self._lock:
+            if self._reason_code is not None:
+                return
+            self._waiters.append(entry)
+        try:
+            await event.wait()
+        finally:
+            with self._lock:
+                if entry in self._waiters:
+                    self._waiters.remove(entry)
 
 
 def status_failure_class(status: object) -> str | None:
@@ -100,6 +210,8 @@ def _rules() -> tuple[tuple[type[BaseException], str | None, bool], ...]:
     from smythe.workflow_tools import ReadToolError
 
     return (
+        # Developer code stopped the run; nothing may be sent after it.
+        (SecurityStop, SECURITY_STOP, True),
         # Another provider call would compound a spend or abandon an unsettled
         # call rather than repair any of these.
         (VerificationRecoveryError, PERSISTENCE, True),
@@ -155,9 +267,9 @@ def classify_failure(exc: BaseException) -> str:
 def is_terminal(exc: BaseException) -> bool:
     """Whether the executors stop the run at once, whatever the node's failure policy.
 
-    Invalid accounting and budget alerts, unusable or unresolved native
-    responses, persistence failures and journal errors are terminal. Any
-    other exception follows the node's failure policy.
+    A security stop, invalid accounting and budget alerts, unusable or
+    unresolved native responses, persistence failures and journal errors are
+    terminal. Any other exception follows the node's failure policy.
     """
     for kind, _, terminal in _rules():
         if isinstance(exc, kind):

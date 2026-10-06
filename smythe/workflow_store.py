@@ -25,6 +25,7 @@ from typing import Any
 from uuid import uuid4
 
 from smythe import pricing, pricing_anthropic
+from smythe._failures import security_reason_code
 # Recognizing a free HTTP rejection is shared with ordinary runs.
 from smythe._http_rejection import (  # noqa: F401
     _ERROR_BODY_FIELDS, _ERROR_OBJECT_FIELDS, _HTTP_REJECTION_SCOPE, _REJECTION_STATUS_ERRORS,
@@ -1169,7 +1170,9 @@ class SQLiteWorkflowStore:
             evidence_id = self._insert_evidence(db, call, values)
             if call["evidence_id"] not in (None, evidence_id):
                 conflict = True
-                db.execute("UPDATE workflow_runs SET status='blocked',blocked_reason='evidence_conflict' WHERE run_id=?", (permit.run_id,))
+                # A security stop keeps its reason; the event records the conflict.
+                db.execute("UPDATE workflow_runs SET status='blocked',blocked_reason='evidence_conflict' "
+                           "WHERE run_id=? AND blocked_reason IS NOT 'security_stop'", (permit.run_id,))
                 self._event(db, permit.run_id, "evidence_conflict", call_id=permit.call_id)
             elif call["evidence_id"] is None:
                 db.execute("UPDATE workflow_calls SET evidence_id=?,state=CASE WHEN state='dispatched' THEN 'response_saved' ELSE state END,updated=? WHERE call_id=?",
@@ -1177,6 +1180,45 @@ class SQLiteWorkflowStore:
         if conflict:
             raise WorkflowConflictError("Conflicting raw responses retained; workflow admission is closed")
         return evidence_id
+
+    def security_stop(self, run_id, reason_code):
+        """Close a run's admission for good because of a security stop; return the stop.
+
+        The run becomes ``blocked`` with ``blocked_reason`` ``security_stop``,
+        whatever its status or reason was, and a ``security_stop`` event
+        records *reason_code*, a short developer code (see
+        ``smythe._failures.security_reason_code``). No call is admitted or
+        dispatched after it; calls already dispatched still settle, and keep
+        unknown exposure without evidence. The admission latches never replace
+        the reason and no method clears it. No lease is needed. The first stop
+        stands: stopping a stopped run again records nothing and returns it.
+        Returns ``{"reason_code", "at_ns"}``, ``at_ns`` on the journal's clock.
+        """
+        try:
+            security_reason_code(reason_code)
+        except (TypeError, ValueError) as error:
+            raise WorkflowValidationError(str(error)) from None
+        with self._transaction() as db:
+            if self._run(db, run_id)["blocked_reason"] != "security_stop":
+                db.execute("UPDATE workflow_runs SET status='blocked',blocked_reason='security_stop',"
+                           "updated=? WHERE run_id=?", (self._clock_ns(), run_id))
+                self._event(db, run_id, "security_stop", payload={"reason_code": reason_code})
+            return self._security_stop(db, run_id)
+
+    def load_security_stop(self, run_id):
+        """The security stop that holds a run, ``{"reason_code", "at_ns"}``, or None."""
+        with self._transaction(write=False) as db:
+            if self._run(db, run_id)["blocked_reason"] != "security_stop":
+                return None
+            return self._security_stop(db, run_id)
+
+    def _security_stop(self, db, run_id):
+        row = db.execute("SELECT payload_json,created FROM workflow_events WHERE run_id=? AND "
+                         "event_type='security_stop' ORDER BY sequence LIMIT 1", (run_id,)).fetchone()
+        payload = None if row is None else _loads(row["payload_json"], stored=True)
+        if type(payload) is not dict or type(payload.get("reason_code")) is not str:
+            raise WorkflowCorruptionError("A security stop has no readable event")
+        return {"reason_code": payload["reason_code"], "at_ns": row["created"]}
 
     def _update_latch(self, db, run_id):
         run = self._run(db, run_id)

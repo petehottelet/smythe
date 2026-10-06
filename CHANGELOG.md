@@ -605,9 +605,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   cannot check the output. See [source evidence](docs/source-evidence.md).
 - Failure classes. Every exception a node attempt raises has one class:
   `input_error`, `authority_denied`, `quality_defect`, `provider_rejected`,
-  `transient`, `unknown_outcome`, `terminal_accounting`, `persistence` or
-  `workflow`; `validator_error` and `security_stop` are named, but no
-  exception has them. Each failed attempt's trace span records its class as
+  `transient`, `unknown_outcome`, `terminal_accounting`, `persistence`,
+  `workflow` or `security_stop`; `validator_error` is named, but no
+  exception has it. Each failed attempt's trace span records its class as
   `metadata["failure_class"]`, which `Tracer.summary()` leaves out and
   checkpoints do not store. The read-only
   `ProviderRequestRejectedError.failure_class` is `authority_denied` for HTTP
@@ -1213,6 +1213,29 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   mechanics, not claimable, with zero API calls: fixtures show no measured
   benefit and change no default. See
   [trigger ablation](benchmarks/README.md#trigger-ablation-offline-mechanics).
+- Security stops. `RunControl.revoke(reason_code)`, on a control given to
+  `Swarm(run_control=...)` or to either executor, stops runs at once and for
+  good: `plan()`, `execute()` and `resume()` refuse to start under a revoked
+  control, and a run in progress admits no node and sends no call after it,
+  tool turns, supervisor reviews and synthesis included. The async executor
+  cancels the nodes in flight at once and never drains; a revocation during
+  a drain ends it without waiting for the deadline. A call that was sent and
+  not answered keeps its reservation as unknown cost, even without
+  `retain_uncertain_dispatch`. A `SecurityStop` that a tool runtime raises,
+  alone or in an exception group, stops the run the same way instead of
+  going back to the model. `SecurityStop.reason_code` is a short developer
+  code (1-64 letters, digits, `.`, `_`, `:` or `-`), and its failure class,
+  `security_stop`, is terminal. An ordinary run's checkpoints record the
+  stop as `control.security_stop` in version 5, listing `security_stop` in
+  `requires`, and resume and re-evaluation raise its `SecurityStop`. A
+  durable run is blocked in its journal with `blocked_reason`
+  `security_stop` and a `security_stop` event, which no latch or method
+  clears; `SQLiteWorkflowStore.security_stop()` stops any run, a completed
+  one too, without a lease, and `load_security_stop()` reads the stop.
+  Resuming, executing, re-evaluating or republishing a stopped durable run,
+  reusing its results and preparing or approving an external action for it
+  are refused, and `smythe runs inspect` shows the stop with the next action
+  `rerun`. See [security stops](docs/execution.md#security-stops).
 
 ### Changed
 

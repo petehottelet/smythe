@@ -220,7 +220,9 @@ refused too. The intent's content must have exactly the SHA-256 and size of
 the accepted output: the
 [published document](workflow-accounting.md#published-documents) for a run
 with a renderer, whose file must still hold those bytes, and the output text
-as UTF-8 otherwise. The intent must name the profile's connector and one of
+as UTF-8 otherwise. A run that a
+[security stop](workflow-accounting.md#security-stops) holds is refused
+whatever its decision. The intent must name the profile's connector and one of
 its operations. A refusal raises `ActionNotAuthorized` and records nothing.
 
 `prepare_action()` returns a `PreparedAction`: its `action_id`, `run_id`,
@@ -309,11 +311,11 @@ checks that:
   was recorded by this verifier;
 - the verifier accepts the stored assertion again, for the same principal,
   and still authorizes that principal; and
-- the content is still deliverable, as for `prepare_action()`: the run's
-  current decision is still `accepted`, the published file still holds the
-  bound bytes, and no source the accepted output came from has been
-  [removed](tasks.md#remove-a-source) since, which makes the
-  content unavailable.
+- the content is still deliverable, as for `prepare_action()`: no security
+  stop holds the run, the run's current decision is still `accepted`, the
+  published file still holds the bound bytes, and no source the accepted
+  output came from has been [removed](tasks.md#remove-a-source) since, which
+  makes the content unavailable.
 
 An approval row written into the journal by other means never authorizes
 anything: the verifier must vouch for its assertion. `check_authority()` only

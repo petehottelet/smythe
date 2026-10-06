@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
+import math
 import os
 import re
 import tempfile
@@ -24,6 +25,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Iterable
 
+from smythe._failures import security_reason_code
 from smythe.acceptance import AcceptanceDecision, DeliveryAcceptance, text_sha256
 from smythe.agent import Agent, AgentProfile
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology, snapshot_run_ref
@@ -48,14 +50,16 @@ STRICT_CHECKPOINT_VERSION = 5
 SUPPORTED_CHECKPOINT_VERSIONS = (1, 2, 3, 4, 5)
 MCP_TRUSTED_CHECKPOINT_VERSION = 4
 # The version 5 state features this build reads. ``operator_decision`` is
-# listed while the record or a kept earlier one is an operator's decision, and
+# listed while the record or a kept earlier one is an operator's decision,
 # ``model_profiles`` while a node names a model profile, which older builds
-# would ignore and send to the run's provider.
+# would ignore and send to the run's provider, and ``security_stop`` once a
+# security stop ended the run, which older builds would resume.
 OPERATOR_DECISION_REQUIREMENT = "operator_decision"
 MODEL_PROFILES_REQUIREMENT = "model_profiles"
+SECURITY_STOP_REQUIREMENT = "security_stop"
 KNOWN_CHECKPOINT_REQUIREMENTS = frozenset(
     {"delivery_acceptance", "attempt_allowance", MODEL_PROFILES_REQUIREMENT,
-     OPERATOR_DECISION_REQUIREMENT})
+     OPERATOR_DECISION_REQUIREMENT, SECURITY_STOP_REQUIREMENT})
 # The control keys of an attempt allowance (see RetryPolicy.persist_attempts),
 # which older builds would ignore and so refill.
 _ALLOWANCE_KEYS = frozenset({"retry_policy", "attempts_used"})
@@ -350,7 +354,8 @@ def build_state(
     record must hold a decision. A ``control`` block with ``retry_policy``
     and ``attempts_used`` makes it version 5 too, listing ``attempt_allowance``,
     and so does a graph node that names a model profile, listing
-    ``model_profiles``.
+    ``model_profiles``, and a ``control.security_stop`` record, which must hold
+    exactly a ``reason_code`` and a finite ``at``, listing ``security_stop``.
     """
     task_data = task_to_dict(task)
     graph_task_data = task_data if graph.task is task else task_to_dict(graph.task)
@@ -396,6 +401,9 @@ def build_state(
         requires.append(MODEL_PROFILES_REQUIREMENT)
     if delivery_acceptance is not None and delivery_acceptance.operator is not None:
         requires.append(OPERATOR_DECISION_REQUIREMENT)
+    if SECURITY_STOP_REQUIREMENT in state["control"]:
+        _security_stop_record(state["control"][SECURITY_STOP_REQUIREMENT])
+        requires.append(SECURITY_STOP_REQUIREMENT)
     if requires:
         state["version"] = STRICT_CHECKPOINT_VERSION
         state["requires"] = requires
@@ -566,6 +574,44 @@ def model_profiles_from_state(state: dict[str, Any]) -> dict[str, Any]:
             "A checkpoint that requires model_profiles must name a profile on one of its nodes"
         )
     return named
+
+
+def _security_stop_record(record: Any) -> dict[str, Any]:
+    """A copy of a ``control.security_stop`` record; ValueError unless it is well formed."""
+    if not isinstance(record, dict) or set(record) != {"reason_code", "at"}:
+        raise ValueError("control.security_stop must hold exactly reason_code and at")
+    try:
+        security_reason_code(record["reason_code"])
+    except TypeError as error:
+        raise ValueError(str(error)) from None
+    at = record["at"]
+    if type(at) not in (int, float) or not math.isfinite(at):
+        raise ValueError("A security stop's 'at' must be a finite number of seconds")
+    return dict(record)
+
+
+def security_stop_from_state(state: dict[str, Any]) -> dict[str, Any] | None:
+    """The security stop a checkpoint records, ``{"reason_code", "at"}``, or None.
+
+    A version 5 state records one exactly when its ``requires`` list names
+    ``security_stop``, under ``control.security_stop``. Builds that write
+    versions 1-4 never record one. Raises ValueError for an unknown
+    requirement, or a stop that is missing, unlisted or malformed.
+    """
+    requires = checkpoint_requirements(state)
+    if state["version"] < STRICT_CHECKPOINT_VERSION:
+        return None
+    control = state.get("control")
+    present = isinstance(control, dict) and SECURITY_STOP_REQUIREMENT in control
+    if SECURITY_STOP_REQUIREMENT not in requires:
+        if present:
+            raise ValueError("Checkpoint records a security stop that its 'requires' list omits")
+        return None
+    if not present:
+        raise ValueError(
+            "A checkpoint that requires security_stop must record control.security_stop"
+        )
+    return _security_stop_record(control[SECURITY_STOP_REQUIREMENT])
 
 
 def delivery_acceptance_history(
