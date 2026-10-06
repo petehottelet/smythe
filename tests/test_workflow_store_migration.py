@@ -208,13 +208,28 @@ def schema(path):
                       key=lambda row: (row[0], row[1]))
 
 
-def assert_upgraded(path, before_dump):
-    """Every version 1 row is kept, and the empty action tables match a new journal's."""
+def add_foreign_table(path):
+    """Add a table and a row, as a backup or replication tool does."""
+    with closing(CONNECT(path)) as db, db:
+        db.execute("CREATE TABLE _litestream_seq(id INTEGER PRIMARY KEY, seq INTEGER)")
+        db.execute("INSERT INTO _litestream_seq VALUES (1, 7)")
+
+
+FOREIGN_ROW = 'INSERT INTO "_litestream_seq" VALUES(1,7);'
+
+
+def assert_upgraded(path, before_dump, *, foreign=False):
+    """Every version 1 row is kept, and the empty action tables match a new journal's.
+
+    With ``foreign``, the journal also keeps the table ``add_foreign_table`` adds.
+    """
     after = dump(path)
     assert without_actions(after) == migrated(before_dump)
     assert [line for line in after if line.startswith('INSERT INTO "workflow_action')] == []
     fresh = path.parent / "fresh-schema.db"
     SQLiteWorkflowStore(fresh).close()
+    if foreign:
+        add_foreign_table(fresh)
     assert schema(path) == schema(fresh)
     assert recorded_version(path) == [(STORE_VERSION,)]
     assert_integrity(path)
@@ -566,9 +581,8 @@ def test_unsupported_journal_versions_are_refused_without_changes(templates, tmp
 
 
 @pytest.mark.parametrize("read_only", [False, True], ids=["writable", "read-only"])
-@pytest.mark.parametrize("change", ["version-2-missing-a-table", "version-1-with-an-action-table",
-                                    "version-2-with-another-table"])
-def test_journal_tables_must_be_exactly_those_of_its_version(tmp_path, read_only, change):
+@pytest.mark.parametrize("change", ["version-2-missing-a-table", "version-1-with-an-action-table"])
+def test_journal_tables_that_contradict_its_version_are_refused(tmp_path, read_only, change):
     path = tmp_path / "workflow.db"
     with SQLiteWorkflowStore(path) as store:
         store.create_run(None, {}, None, run_id="saved")
@@ -578,14 +592,48 @@ def test_journal_tables_must_be_exactly_those_of_its_version(tmp_path, read_only
         db.execute("PRAGMA journal_mode=DELETE")
         if change == "version-2-missing-a-table":
             db.execute("DROP TABLE workflow_action_records")
-        elif change == "version-1-with-an-action-table":
-            db.execute("CREATE TABLE workflow_actions(action_id TEXT)")
         else:
-            db.execute("CREATE TABLE unrelated(value TEXT)")
+            # An upgrade must not adopt a table of unknown shape as its own.
+            db.execute("CREATE TABLE workflow_actions(action_id TEXT)")
     before = path.read_bytes()
     with pytest.raises(WorkflowCorruptionError, match="tables do not match its version"):
         SQLiteWorkflowStore(path, read_only=read_only)
     assert path.read_bytes() == before
+
+
+def test_a_v1_journal_keeps_tables_other_tools_added_through_its_upgrade(templates, tmp_path):
+    path, clock = v1_journal(templates, tmp_path)
+    add_foreign_table(path)
+    before_dump = dump(path)
+    assert FOREIGN_ROW in before_dump
+    with SQLiteWorkflowStore(path, read_only=True, clock_ns=clock) as reader:
+        assert reader.store_version == 1
+        before = snapshot(reader)
+    assert_fixture_states(before)
+    with SQLiteWorkflowStore(path, clock_ns=clock) as store:
+        assert store.store_version == STORE_VERSION
+        assert snapshot(store) == before
+    # The other tool's table and row are kept, like every version 1 table.
+    assert_upgraded(path, before_dump, foreign=True)
+    with SQLiteWorkflowStore(path, read_only=True, clock_ns=clock) as reader:
+        assert reader.store_version == STORE_VERSION
+        assert snapshot(reader) == before
+
+
+@pytest.mark.parametrize("read_only", [False, True], ids=["writable", "read-only"])
+def test_a_v2_journal_with_tables_other_tools_added_opens(tmp_path, read_only):
+    path = tmp_path / "workflow.db"
+    with SQLiteWorkflowStore(path) as store:
+        store.create_run(None, {}, None, run_id="saved")
+        inspected = store.inspect_run("saved")
+    add_foreign_table(path)
+    before = dump(path)
+    assert FOREIGN_ROW in before
+    with SQLiteWorkflowStore(path, read_only=read_only) as store:
+        assert store.store_version == STORE_VERSION
+        assert store.inspect_run("saved") == inspected
+    assert dump(path) == before
+    assert_integrity(path)
 
 
 @pytest.mark.parametrize("version", [1, STORE_VERSION + 1])

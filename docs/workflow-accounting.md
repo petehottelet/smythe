@@ -743,9 +743,12 @@ The journal records its format version, which `store.store_version` reports.
 This release writes version 2, which adds the `tool` call phase of
 [recorded read steps](#recorded-read-steps) and the
 [external action tables](#external-action-records). Version 1 has every other
-table, and a journal must hold exactly its version's tables: any other set is
-refused with `WorkflowCorruptionError`. Smythe 0.9.x and earlier write
-version 1 and cannot open a version 2 journal, even read-only: they raise
+table. Each version requires its own tables: a journal missing one, or a
+version 1 journal that already has an action table, is refused with
+`WorkflowCorruptionError`. Tables that other tools, such as a backup or
+replication tool, add to the file are kept, including through the upgrade.
+Smythe 0.9.x and earlier write version 1 and cannot open a version 2 journal,
+even read-only: they raise
 `WorkflowCorruptionError("Unsupported workflow journal version")`.
 
 Back up each journal before this release opens it for writing, and keep the

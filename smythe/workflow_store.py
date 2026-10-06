@@ -411,9 +411,10 @@ class SQLiteWorkflowStore:
         if (len(meta) != 1 or meta[0]["kind"] != STORE_KIND
                 or type(version) is not int or version not in _READABLE_VERSIONS):
             raise WorkflowCorruptionError("Unsupported workflow journal version")
-        # A journal holds exactly its version's tables, besides SQLite's own.
-        if {name for name in tables if not name.startswith("sqlite_")} != (
-                _V1_TABLES | _ACTION_TABLES if version > 1 else _V1_TABLES):
+        # Each version requires its own tables, and tables other tools add are
+        # kept. A version 1 journal has no action tables, so that its upgrade
+        # never adopts one of unknown shape.
+        if tables & _ACTION_TABLES != (_ACTION_TABLES if version > 1 else frozenset()):
             raise WorkflowCorruptionError("Workflow journal tables do not match its version")
         store_id = meta[0]["store_id"]
         if type(store_id) is not str or re.fullmatch("[0-9a-f]{32}", store_id) is None:
