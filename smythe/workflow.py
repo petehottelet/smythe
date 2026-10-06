@@ -44,11 +44,13 @@ from smythe.graph import (
 )
 from smythe.lineage import (
     LINEAGE_OPERATION, LINEAGE_RECORD_VERSION, LINEAGE_REUSE_KEY, ArtifactLineage, build_lineage,
-    lineage_key, snapshot_lineage_policy,
+    lineage_key, load_lineage, snapshot_lineage_policy,
 )
+from smythe.lineage import _REPAIR, _plain
 from smythe.lineage import _id as _lineage_id
 from smythe.registry import Registry
 from smythe.provider import ProviderResponseError
+from smythe.reuse import REASONS
 from smythe.scheduling import PROFILE_KEY, RetryPolicy
 from smythe.task import Task, snapshot_task, task_from_dict, task_to_dict
 from smythe.tracer import (
@@ -136,7 +138,16 @@ _BEHAVIOR_VERSIONS = MappingProxyType({"prompt_assembly": SUPPORTED_PROMPT_ASSEM
 # run's sources starts every node's next generation without it.
 _GENERATION_KEYS = ("artifacts", "artifacts_discarded", "verification_receipt",
                     "verification_target_generation", ADVISORY_VERDICT_KEY, "regeneration_intent",
-                    "workflow_supervision", CONTEXT_SNAPSHOT_KEY)
+                    "workflow_supervision", CONTEXT_SNAPSHOT_KEY, LINEAGE_REUSE_KEY)
+# Node metadata recording execution or accounting history, which a new graph
+# cannot carry and a successor's graph starts without.
+_HISTORY_KEYS = ("execution_generation", "regenerations_used", "verification_receipt",
+                 "regeneration_intent", "workflow_supervision", "native_receipts", "response_error",
+                 "accounting_invalid", "accounting_error", "workflow_accounting_invalid", "cost_usd",
+                 "cost_usd_unknown", "cost_usd_is_estimate", ADVISORY_VERDICT_KEY,
+                 REJECTED_GENERATIONS_KEY, CONTEXT_SNAPSHOT_KEY, LINEAGE_REUSE_KEY)
+# The journal operation kind, and key prefix, of a result a successor run reuses.
+_REUSE = "reuse"
 _PROVIDER_FIELDS = frozenset({"kind", "adapter_version", "decoder_version", "endpoint_scope",
                               "price_version", "supported_models", "config"})
 
@@ -590,6 +601,97 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
     if removed:
         problems += _removal_problems(store, run_id, considered)
     return problems
+
+
+def _successor_graph(graph):
+    """Reset a completed run's saved *graph* in place as the graph its successor starts from.
+
+    Nodes become pending without results, history or generation metadata,
+    and the graph loses its run reference and planning records.
+    """
+    graph.run_ref = graph.planning = None
+    for node in graph.nodes:
+        node.status, node.result = NodeStatus.PENDING, None
+        for key in (*_HISTORY_KEYS, *_GENERATION_KEYS):
+            node.metadata.pop(key, None)
+
+
+def _predecessor(store, reference, scope):
+    """Read the records of the run *reference* names, which a successor in *store* reuses.
+
+    *reference* is ``{"store_id", "run_id", "lineage_sha256"}``. The run must
+    have completed with an applied lineage record in access *scope*,
+    compared first, whose digest is ``lineage_sha256``. Returns its saved
+    graph and registry description, the record, and the ``(source_id,
+    sha256)`` of each source removed from it.
+    """
+    run_id = reference["run_id"]
+    saved = store.get_checkpoint(run_id)
+    try:
+        lineage, removed = load_lineage(store, run_id), set(_removed_sources(store, run_id))
+    except ValueError as error:
+        raise WorkflowStateError(f"Run {run_id!r} holds an invalid lineage or tombstone") from error
+    state = {} if saved is None else saved["checkpoint"]
+    if state.get("status") != "completed" or lineage is None:
+        raise WorkflowStateError(f"Run {run_id!r} has not completed with a lineage record")
+    if lineage.access_scope != scope:
+        raise WorkflowStateError(f"Run {run_id!r} has no lineage record in access scope {scope!r}")
+    if lineage.sha256 != reference["lineage_sha256"]:
+        raise WorkflowStateError(f"The lineage record of run {run_id!r} is not the one given")
+    return graph_from_dict(state["graph"]), state["registry"], lineage, removed
+
+
+def _reused(predecessor, node_id):
+    """The ``reuse`` operation result for *node_id* from :func:`_predecessor`'s records.
+
+    It holds the node's ``text``, its ``lineage`` record and the
+    ``source_evidence`` its text carries, or None. The record must declare
+    the node's inputs, the saved result must be the one it records, and no
+    source either names may have been removed. Raises ``WorkflowStateError``
+    otherwise.
+    """
+    graph, _, lineage, removed = predecessor
+    entry = next((item for item in lineage.nodes if item["id"] == node_id), None)
+    node = next((item for item in graph.nodes if item.id == node_id), None)
+    evidence = problem = None
+    if entry is None or node is None:
+        problem = "the run has no such node"
+    elif entry["coverage"] != "declared":
+        problem = "its inputs are undeclared"
+    elif (node.status is not NodeStatus.COMPLETED or not isinstance(node.result, str)
+          or node_generation(node) != entry["generation"]
+          or output_sha256(node.result) != entry["result_sha256"]):
+        problem = "its saved result is not the one its lineage records"
+    else:
+        evidence = source_evidence_result(node.result)["source_evidence"]
+        used = {(item["source_id"], item["sha256"])
+                for item in (*entry["inputs"]["sources"], *(evidence or {}).get("sources", ()))}
+        if used & removed:
+            problem = "a source it used was removed from the run"
+    if problem:
+        raise WorkflowStateError(
+            f"Node {node_id!r} of run {lineage.run['run_id']!r} cannot be reused: {problem}")
+    return {"text": node.result, "lineage": _plain(entry), "source_evidence": evidence}
+
+
+def _reuse_digests(result):
+    """What a ``reuse`` operation's inputs bind of its *result* (see :func:`_reused`)."""
+    entry, evidence = result["lineage"], result["source_evidence"]
+    return {"generation": entry["generation"], "result_sha256": entry["result_sha256"],
+            "records": {"lineage_node": _hash(entry),
+                        "source_evidence": None if evidence is None else _hash(evidence)}}
+
+
+def _reuse_matches(node_id, inputs, result):
+    """Whether a ``reuse`` operation's *result* is node *node_id*'s, as its *inputs* bind it."""
+    try:
+        return (result["lineage"]["id"] == inputs["node_id"] == node_id
+                and isinstance(result["text"], str)
+                and output_sha256(result["text"]) == inputs["result_sha256"]
+                and _reuse_digests(result) == {key: inputs[key] for key in (
+                    "generation", "result_sha256", "records")})
+    except (KeyError, TypeError):
+        return False
 
 
 class WorkflowBudget:
@@ -1174,6 +1276,9 @@ class WorkflowRuntime:
         graph.validate()
         json_snapshot(graph_to_dict(graph))
         self._validate_graph_policy(graph)
+        if fresh and isinstance(graph.planning, dict) and "repair" in graph.planning:
+            # Only a successor run records its predecessor (see _run_successor).
+            raise WorkflowBindingError("A new workflow cannot carry a repair record")
         for node in graph.nodes:
             # The journal keys a node's calls by "node/<id>" and its supervision
             # decisions by "supervision/<id>/<generation>", each at most 512
@@ -1195,13 +1300,7 @@ class WorkflowRuntime:
                 _check_lineage_id(node.id, "Node")
             if fresh and (node.status is not NodeStatus.PENDING or node.result is not None):
                 raise WorkflowBindingError("A new workflow requires pending nodes without prior results")
-            if fresh and any(key in node.metadata for key in (
-                "execution_generation", "regenerations_used", "verification_receipt",
-                "regeneration_intent", "workflow_supervision", "native_receipts", "response_error",
-                "accounting_invalid", "accounting_error", "workflow_accounting_invalid", "cost_usd",
-                "cost_usd_unknown", "cost_usd_is_estimate", ADVISORY_VERDICT_KEY,
-                REJECTED_GENERATIONS_KEY, CONTEXT_SNAPSHOT_KEY, LINEAGE_REUSE_KEY,
-            )):
+            if fresh and any(key in node.metadata for key in _HISTORY_KEYS):
                 raise WorkflowBindingError("A new workflow cannot inherit execution or accounting history")
             if self._context_version and graph.task is None and "task_context" in node.metadata:
                 # Snapshots carry a run's Task, never text a graph supplies in its place.
@@ -1649,6 +1748,76 @@ class WorkflowRuntime:
                 await self._plan(task)
             return await self._execute(max_concurrency, state=state)
 
+    async def _run_successor(self, predecessor_id, *, lineage_sha256, reuse, plan_sha256, reason,
+                             max_concurrency):
+        """Run a successor of the completed lineage run *predecessor_id*, reusing some results.
+
+        The successor is a new run of the predecessor's task and saved graph
+        (:func:`_successor_graph`). Each node in *reuse*, a mapping of node id
+        to the reason codes (:data:`smythe.reuse.REASONS`) of its decision,
+        completes with the predecessor's result (:meth:`_seed_reuse`); every
+        other node runs again. The graph's only planning record, ``repair``,
+        names the predecessor (with *lineage_sha256*), *plan_sha256* and
+        *reason*, as the successor's lineage will.
+
+        Everything is checked before the run is created: a lineage policy
+        (with reuse on to reuse anything) and no supervisor; a completed
+        predecessor in this store and access scope whose lineage record has
+        *lineage_sha256* (:func:`_predecessor`); and reused nodes that
+        :func:`_reused` allows, that depend only on reused nodes, and that are
+        no gate or node a gate judges or depends on. Raises
+        ``WorkflowBindingError`` for a request that breaks these rules and
+        ``WorkflowStateError`` for predecessor records that refuse it.
+        """
+        if self.lineage is None or (reuse and not self.lineage.reuse):
+            raise WorkflowBindingError("Reusing results needs a lineage policy with reuse on")
+        if self.sources["supervisor"] is not None:
+            raise WorkflowBindingError("A successor run cannot have a supervisor review reused results")
+        if not isinstance(reuse, Mapping) or not all(
+                type(node_id) is str and type(codes) in (list, tuple)
+                and all(type(code) is str and code in REASONS for code in codes)
+                for node_id, codes in reuse.items()):
+            raise WorkflowBindingError("reuse must map node ids to lists of reason codes")
+        reference = {"store_id": self.store.store_id, "run_id": predecessor_id,
+                     "lineage_sha256": lineage_sha256}
+        try:
+            _REPAIR({"plan_sha256": plan_sha256, "reason": reason}, "repair")
+        except ValueError as error:
+            raise WorkflowBindingError(str(error)) from error
+        predecessor = _predecessor(self.store, reference, self.lineage.access_scope)
+        graph, registry = predecessor[0], predecessor[1]
+        unknown = sorted(reuse.keys() - {node.id for node in graph.nodes})
+        if unknown:
+            raise WorkflowBindingError(f"Run {predecessor_id!r} has no node {unknown[0]!r} to reuse")
+        gated = {item for node in graph.nodes if node.verifies is not None
+                 for item in (node.id, node.verifies, *node.depends_on)}
+        for node in graph.nodes:
+            if node.id in reuse and (node.id in gated or not reuse.keys() >= set(node.depends_on)):
+                raise WorkflowBindingError(
+                    f"Node {node.id!r} cannot be reused: gates, the nodes they judge or depend "
+                    "on, and nodes depending on a node that runs again always run again"
+                )
+        results = {node_id: _reused(predecessor, node_id) for node_id in reuse}
+        _successor_graph(graph)
+        self._check_obligations(graph)
+        async with self._session(self._new_run(graph.task)):
+            # Agents a plan registered are the predecessor's; configured ones are current.
+            for agent in Registry.from_workflow_description(registry).list_agents():
+                if self.registry.get(agent.id) is None:
+                    self.registry.register(agent)
+            self._prepare_graph(graph, fresh=True)
+            graph.planning = {"repair": {"predecessor": reference, "plan_sha256": plan_sha256,
+                                         "reason": reason}}
+            for node in graph.nodes:
+                if node.id in results:
+                    node.metadata[LINEAGE_REUSE_KEY] = {
+                        "version": 1, "predecessor": reference, "node_id": node.id,
+                        **_reuse_digests(results[node.id]), "reasons": sorted(set(reuse[node.id])),
+                        "plan_sha256": plan_sha256,
+                    }
+            self._save("planned")
+            return await self._execute(max_concurrency)
+
     async def refresh_context(self, run_id, sources):
         """Give an unfinished run new sources, to be re-evaluated when it resumes.
 
@@ -1916,6 +2085,7 @@ class WorkflowRuntime:
             raise WorkflowBindingError("Execution concurrency exceeds the saved workflow policy")
         validate_verification_checkpoint(self.graph, version=3, completed=False)
         reset_incomplete_nodes(self.graph)
+        await self._seed_reuse()
         saved_policy = self.behavior.get("retry_policy")
         retry_policy = None if saved_policy is None else RetryPolicy.from_dict(saved_policy)
         self.executor = AsyncExecutor(
@@ -1979,6 +2149,33 @@ class WorkflowRuntime:
             acceptance = self._held(acceptance, output, artifact_problems(
                 current_artifact(self.store, self.run_id), output))
         return self._result(output, acceptance)
+
+    async def _seed_reuse(self):
+        """Complete each node a successor reuses with its predecessor's result, before any node runs.
+
+        The result comes from the node's ``reuse/<node id>`` operation, whose
+        inputs its ``lineage_reuse`` metadata holds and which the next
+        checkpoint consumes. Only a new operation loads and checks the
+        predecessor (:func:`_predecessor`, :func:`_reused`); a committed one
+        replays. Raises ``WorkflowStateError`` for a result its inputs do not bind.
+        """
+        loaded = []
+
+        async def reuse(inputs):
+            if not loaded:
+                loaded.append(_predecessor(self.store, inputs["predecessor"],
+                                           self.lineage.access_scope))
+            return _reused(loaded[0], inputs["node_id"])
+
+        for node in self.graph.nodes:
+            inputs = node.metadata.get(LINEAGE_REUSE_KEY)
+            if inputs is None or node.status is NodeStatus.COMPLETED:
+                continue
+            result = await self._operation_result(f"{_REUSE}/{node.id}", _REUSE, inputs, reuse)
+            if not _reuse_matches(node.id, inputs, result):
+                raise WorkflowStateError(
+                    f"The saved reuse of node {node.id!r} does not match its inputs")
+            node.status, node.result = NodeStatus.COMPLETED, result["text"]
 
     def _artifact_directory(self):
         """The bound run's own directory, ``<artifact_dir>/<run id>``."""
@@ -2156,9 +2353,10 @@ class WorkflowRuntime:
         """The bound run's lineage, assembled from the journal records *inputs* name.
 
         Targeted loads read the synthesis, decision and publication
-        operations, each node's snapshot at its final generation and the read
-        behind each read step's result (named by the node's receipt). Nothing
-        is called or written.
+        operations, each node's snapshot at its final generation, the read
+        behind each read step's result (named by the node's receipt) and the
+        ``reuse`` operation of each node a successor reused. Nothing is called
+        or written.
         """
         def completed(key, kind):
             operation = self.store.load_operation(self.run_id, key) if type(key) is str else None
@@ -2186,12 +2384,19 @@ class WorkflowRuntime:
                     self.run_id, context_key(node.id, node_generation(node)))
                 if operation is not None and operation["kind"] == "context":
                     snapshots[node.id] = ContextSnapshot.from_dict(operation["inputs"].get("snapshot"))
+        reused = {node.id: (node.metadata[LINEAGE_REUSE_KEY]["predecessor"]["run_id"],
+                            completed(f"{_REUSE}/{node.id}", _REUSE)["result"]["lineage"])
+                  for node in self.graph.nodes if LINEAGE_REUSE_KEY in node.metadata}
+        repair = (self.graph.planning or {}).get("repair")
         return build_lineage(
             self.graph, self.run["config"], snapshots, reads, publication,
             (inputs["acceptance"], decision), self.registry.workflow_description(),
             synthesis=(inputs["synthesis"],
                        completed(inputs["synthesis"], "synthesis")["result"]["output"]),
-            sources=self.context_sources,
+            sources=self.context_sources, reused=reused,
+            predecessor=None if repair is None else repair["predecessor"],
+            repair=None if repair is None else {"plan_sha256": repair["plan_sha256"],
+                                                "reason": repair["reason"]},
         )
 
     def _lineage_problems(self):

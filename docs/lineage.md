@@ -11,10 +11,12 @@ format, `ArtifactLineage`, and the record each opted-in run
 [writes when it completes](#the-record-a-run-writes), with its
 [coverage](#coverage). It also adds [reuse decisions](#reuse-decisions):
 a pure evaluator that says what a record calls for under the current
-sources, tools and validators, and [repair plans](#plan-a-repair), which
+sources, tools and validators, [repair plans](#plan-a-repair), which
 show before anything is dispatched what each run of an archive calls for
-and the work that would take. Nothing applies a plan, or reuses or repairs
-work from records, yet.
+and the work that would take, and the records of a
+[successor run](#reuse-in-a-successor-run) that reuses a completed run's
+results. Nothing applies a plan, and no public method starts a successor
+or repairs work, yet.
 
 ## Opt a run in
 
@@ -595,3 +597,29 @@ A run that has not completed has no status. `smythe runs inspect` has no
 source catalog, which is application code, so it never reports `current`
 or `stale`: without one of the first three statuses, it reports none.
 `smythe.reuse.STATUSES` lists the five.
+
+## Reuse in a successor run
+
+A successor of a completed run is a new run of the same task and graph that
+keeps some of the predecessor's node results, each through a `reuse` journal
+operation, and runs every other node again
+([reused results](workflow-accounting.md#reused-results)). It reuses only
+from a run in the same store and the same access scope, compared before any
+digest, and only nodes the predecessor's record declares, whose saved
+results still have their recorded digests and whose sources were not removed.
+Gates, the nodes they judge or depend on, and nodes that depend on a node
+that runs again are never kept. No public method starts a successor yet.
+
+When the successor completes, its record shows what it kept:
+
+- `predecessor` names the predecessor's `store_id`, `run_id` and the
+  `lineage_sha256` of the record the reuse was checked against;
+- `repair` holds the `plan_sha256` of the repair plan and its `reason`;
+- each kept node copies the `kind`, `inputs` and `coverage` the predecessor
+  recorded for it, has the same `result_sha256`, and adds `reused_from`: the
+  predecessor's `run_id` and the node's `generation` there. Its own
+  `generation` and `depends_on` are the successor's.
+
+Nodes that ran again are recorded from the successor's own snapshots and
+reads. A kept node is always `declared`, because a node whose inputs are
+undeclared is never kept.

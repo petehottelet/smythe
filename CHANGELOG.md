@@ -1077,6 +1077,27 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   source text and no new exit code. See
   [plan a repair](docs/lineage.md#plan-a-repair) and
   [lineage in runs inspect](docs/runs.md#lineage).
+- Reuse operations for durable successor runs. A successor of a completed
+  lineage run runs the predecessor's task and graph again as a new run, but
+  each node it keeps completes first from a `reuse` journal operation, keyed
+  `reuse/<node id>`, with the predecessor's text byte for byte, so one
+  changed source runs only its read, its extraction and what depends on
+  them, and the rerun nodes get the prompts a full recomputation would. Each
+  operation names the predecessor's store, run and lineage digest, the
+  node's generation and result digest, the digests of its lineage record and
+  source evidence, its reason codes and the repair plan's digest; it carries
+  no calls and no cost, and one checkpoint consumes it. Only a completed run
+  in the same store and access scope, whose lineage record has the named
+  digest, is reused from; a node whose saved result no longer has its
+  recorded digest, whose inputs are undeclared or used a removed source, a
+  gate and the nodes it judges or depends on, and a node depending on one
+  that runs again are refused before the successor is created or any call
+  is made. A resumed successor replays its reuse operations without reading
+  the predecessor. Its lineage names its `predecessor` and `repair`, each
+  kept node keeps its recorded inputs with `reused_from`, and inspection
+  never returns kept text. A new durable graph cannot carry a `repair`
+  planning record. No public method starts a successor yet. See
+  [reused results](docs/workflow-accounting.md#reused-results).
 
 ### Changed
 

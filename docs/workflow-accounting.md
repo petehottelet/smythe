@@ -571,6 +571,48 @@ Resuming a completed run assembles it again and gives an `indeterminate`
 decision when the saved record no longer matches. Operation kinds are free
 text, so lineage needs no journal upgrade.
 
+## Reused results
+
+A successor of a completed lineage run is a new run, under its own recipe and
+budget, of the predecessor's task and completed graph: every node starts
+pending without its result or history, the inherited planning records are
+dropped, and each node either keeps the predecessor's result or runs again.
+No public method starts a successor yet.
+
+- **Reuse operations.** Before any node runs, each kept node completes from a
+  `reuse` operation keyed `reuse/<node id>`. Its inputs name the predecessor
+  (`store_id`, `run_id` and the `lineage_sha256` of its record), the node and
+  its `generation` there, the `result_sha256`, the digests of the node's
+  lineage record and of the source evidence its text carries (`records`),
+  the reason codes the reuse was decided with and the repair plan's
+  `plan_sha256`. Its result holds the text and those records. The next
+  checkpoint consumes each operation once, with the completed node. A reuse
+  operation carries no calls and no cost: the successor's accounting holds
+  only the calls of the nodes that run again, and the predecessor's rows are
+  never changed.
+- **Checked before anything is created.** The predecessor must be in the
+  same store, completed, with an applied lineage record in the successor's
+  access scope, compared first, whose digest is the one named. A kept node's
+  saved result must have the digest its record gives, its inputs must be
+  declared, and no source its record or source evidence names may have been
+  [removed](tasks.md#remove-a-source) from the predecessor. Gates, the nodes
+  they judge or depend on, and nodes that depend on a node that runs again
+  are never kept. A refusal creates no run and makes no call.
+- **Same text, same prompts.** A kept result is the predecessor's text byte
+  for byte, so the nodes that run again are given exactly what a full
+  recomputation would give them.
+- **Recovery.** A process lost after a reuse operation commits replays it on
+  resume without reading the predecessor; one lost before it commits checks
+  the predecessor again first. Refreshing an unfinished successor's sources
+  runs its kept nodes again, like every other node.
+- **Records.** The successor's graph holds one planning record, `repair`:
+  the predecessor, the plan digest and the reason. Its
+  [lineage](lineage.md#reuse-in-a-successor-run) names its `predecessor` and
+  `repair`, and each kept node keeps its recorded inputs with `reused_from`.
+  A new graph that carries a `repair` planning record, or `lineage_reuse`
+  node metadata, is refused. `inspect_run()`, `list_runs()`, journal events
+  and `smythe runs inspect` never return kept text.
+
 ## Recorded read steps
 
 A durable run can read a source as a step of its own, without a model call,

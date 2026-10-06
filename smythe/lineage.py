@@ -486,7 +486,10 @@ def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
                   publication: PublishedArtifact | None,
                   acceptance: tuple[str, DeliveryAcceptance],
                   registry_description: Mapping[str, Any], *, synthesis: tuple[str, str],
-                  sources: Iterable[ContextSource] = ()) -> ArtifactLineage:
+                  sources: Iterable[ContextSource] = (),
+                  reused: Mapping[str, tuple[str, Mapping[str, Any]]] = MappingProxyType({}),
+                  predecessor: Mapping[str, Any] | None = None,
+                  repair: Mapping[str, Any] | None = None) -> ArtifactLineage:
     """The lineage of a completed durable run, from that run's own records only.
 
     *graph* is the completed graph, whose ``run_ref`` names the run, and
@@ -496,7 +499,12 @@ def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
     *publication* is the run's published document or None, *acceptance* the
     decision's operation key and record, *registry_description* the run's
     agents, *synthesis* the synthesis operation's key and output, and
-    *sources* the run's context sources. Nothing is read or written.
+    *sources* the run's context sources. A successor run gives its
+    *predecessor* and *repair* blocks, and in *reused*, by node id, the
+    predecessor run and its record of each node whose result it reused: such
+    a node keeps that record's kind, inputs and coverage, and its
+    ``reused_from`` names the run and the node's generation there. Nothing is
+    read or written.
 
     Nodes are listed after their dependencies, then the synthesis, kind
     ``synthesis``, which depends on them all. A node is ``declared`` only
@@ -517,7 +525,12 @@ def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
                   if node.status is NodeStatus.COMPLETED and node.result is not None else None)
         inputs: dict[str, Any] = {"sources": []}
         declared, kind = False, "gate" if node.verifies else "model"
-        if READ_STEP_KEY in node.metadata:
+        origin = reused.get(node.id)
+        if origin is not None:
+            # A reused result keeps the inputs its predecessor recorded for it.
+            inputs, kind = _plain(origin[1]["inputs"]), origin[1]["kind"]
+            declared = origin[1]["coverage"] == "declared"
+        elif READ_STEP_KEY in node.metadata:
             kind, call = "read", read_calls.get(node.id)
             text = _read_text(call, node, generation, run["run_id"])
             if text is not None and text_sha256(text) == result:
@@ -539,6 +552,8 @@ def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
         entries.append({"id": node.id, "generation": generation, "kind": kind,
                         "depends_on": list(dict.fromkeys(node.depends_on)), "result_sha256": result,
                         "inputs": inputs, "coverage": "declared" if declared else "undeclared"})
+        if origin is not None:
+            entries[-1]["reused_from"] = {"run_id": origin[0], "generation": origin[1]["generation"]}
     key, output = synthesis
     ids = [entry["id"] for entry in entries]
     component = _synthesizer(recipe["components"]["synthesizer"])
@@ -573,4 +588,5 @@ def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
         nodes=tuple(entries),
         coverage="complete" if all(entry["coverage"] == "declared" for entry in entries)
         else "partial",
+        predecessor=predecessor, repair=repair,
     )
