@@ -1753,3 +1753,161 @@ def test_a_recheck_is_refused_before_any_validator_decides(tmp_path, store_facto
         asyncio.run(JobRunner(store).recheck(
             "rejected", [rejected["operations"][0]["operation_key"]], reason="check"))
     assert not _events(store, "rejected", "delivery_acceptance_reevaluated")
+
+
+# ---------------------------------------------------------------------------
+# Repair previews
+# ---------------------------------------------------------------------------
+
+
+def _previewed(runner, run_id, keys=None):
+    return {item["operation_key"]: (item["status"], item["action"], item["reasons"],
+                                    item["attempts_remaining"], item["new_plan_required"])
+            for item in runner.repair_preview(run_id, keys)["operations"]}
+
+
+def test_a_repair_preview_matches_integrity_repair_eligibility(tmp_path, store_factory):
+    store = store_factory(tmp_path / "jobs.db")
+    runner = JobRunner(store)
+    plan = preflight_job(_manifest(count=5, attempts=2), manifest_root=tmp_path)
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path,
+                                     run_id="preview"))
+    last = preflight_job(_manifest(count=1, attempts=1), manifest_root=tmp_path)
+    spent = asyncio.run(runner.start(last, make_approval(last), manifest_root=tmp_path,
+                                     run_id="spent"))
+    damage = dict(zip(("intact", "flip", "truncate", "delete", "directory"), first["artifacts"]))
+    keys = {change: _owner(first, artifact)["operation_key"] for change, artifact in damage.items()}
+    for change, artifact in damage.items():
+        path = _accepted_file(tmp_path, first, artifact)
+        if change == "directory":
+            path.unlink()
+            path.mkdir()  # Not a regular file: the bytes cannot be known.
+        elif change != "intact":
+            _damage(path, change)
+    _accepted_file(tmp_path, spent, spent["artifacts"][0]).unlink()
+
+    previews = {run_id: _previewed(runner, run_id) for run_id in ("preview", "spent")}
+
+    assert {change: previews["preview"][key] for change, key in keys.items()} == {
+        "intact": ("succeeded", "reuse", [], 1, False),
+        "flip": ("succeeded", "regenerate", ["artifact_changed"], 1, False),
+        "truncate": ("succeeded", "regenerate", ["artifact_changed"], 1, False),
+        "delete": ("succeeded", "regenerate", ["artifact_missing"], 1, False),
+        "directory": ("succeeded", "review", ["artifact_unsafe"], 1, False),
+    }
+    # No attempt is left, so regenerating it takes a new plan and approval.
+    assert list(previews["spent"].values()) == [
+        ("succeeded", "regenerate", ["artifact_missing"], 0, True)]
+
+    # An integrity repair accepts exactly the operations the preview regenerates in their run.
+    for run_id, items in previews.items():
+        for key, (_status, action, _reasons, _left, new_plan) in items.items():
+            try:
+                asyncio.run(runner.reroll(run_id, [key], reason="preview check",
+                                          repair_integrity=True))
+            except InvalidTransitionError:
+                repaired = False
+            else:
+                repaired = True
+            assert repaired == (action == "regenerate" and not new_plan), key
+
+
+def test_a_repair_preview_reports_states_attempts_and_budget_and_changes_nothing(
+    tmp_path, store_factory,
+):
+    data = _priced_manifest(count=5).to_dict()
+    data["execution"].update(max_attempts=2, max_budget_usd="1.00")
+    plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, make_approval(plan), manifest_root=tmp_path, run_id="states")
+    unknown, rejected, _pending, running, succeeded = store.pending_operations(run_id)
+    lease = store.acquire_run_lease(run_id, "worker-a")
+
+    def dispatched(operation):
+        attempt = store.begin_attempt(run_id, operation["operation_id"], lease=lease)
+        permit = store.prepare_call(attempt["attempt_id"], 100_000, lease=lease)
+        store.mark_call_dispatched(permit.call_id, lease=lease)
+        return permit.call_id
+
+    def settle(call_id, artifacts, accepted):
+        store.complete_call(call_id, cost_microusd=80_000, cost_is_complete=True,
+                            cost_is_estimate=False, artifacts=artifacts, result_text="done",
+                            accepted=accepted, lease=lease)
+
+    store.mark_unknown_outcome(dispatched(unknown), "connection lost", lease=lease)
+    settle(dispatched(rejected), [], False)
+    store.begin_attempt(run_id, running["operation_id"], lease=lease)
+    settle(dispatched(succeeded), [{
+        "relative_path": "artifacts/glyph_4_/attempt-0001/artifact-01.png", "mime_type": "image/png",
+        "sha256": "a" * 64, "size_bytes": 68, "width": 1, "height": 1}], True)
+    before = list(store._connection.iterdump())
+
+    # The worker still holds the run's lease: a preview takes none and writes nothing.
+    preview = JobRunner(store).repair_preview(run_id)
+
+    assert list(store._connection.iterdump()) == before
+    assert store.get_run_lease(run_id).owner_id == "worker-a"
+    assert (preview["version"], preview["run_id"]) == (1, "states")
+    assert preview["status"] == store.get_run(run_id)["status"]
+    assert {item["operation_key"]: (item["status"], item["action"], item["reasons"],
+                                    item["attempts_remaining"], item["new_plan_required"])
+            for item in preview["operations"]} == {
+        "glyph[0]": ("unknown_outcome", "review", ["outcome_unknown"], 1, False),
+        "glyph[1]": ("rejected", "regenerate", ["node_incomplete"], 1, False),
+        "glyph[2]": ("pending", "regenerate", ["node_incomplete"], 2, False),
+        "glyph[3]": ("running", "review", ["run_in_progress"], 1, False),
+        # A legacy decision has no recorded validator, and its file is gone.
+        "glyph[4]": ("succeeded", "regenerate", ["artifact_missing", "validator_set_changed"], 1,
+                     False),
+    }
+    assert preview["counts"] == {"reuse": 0, "recheck": 0, "regenerate": 3, "review": 2}
+    assert preview["budget"] == {
+        "approved_microusd": 1_000_000, "confirmed_microusd": 160_000,
+        "exposure_microusd": 100_000, "reserved_microusd": 0, "remaining_microusd": 740_000,
+        "overrun": False, "unit": "microUSD"}
+    assert preview["attachments"] == []
+
+    assert list(_previewed(JobRunner(store), run_id, ["glyph[1]", rejected["operation_id"]])) == [
+        "glyph[1]"]
+    with pytest.raises(JobNotFoundError):
+        JobRunner(store).repair_preview(run_id, ["missing[0]"])
+    with pytest.raises(JobNotFoundError):
+        JobRunner(store).repair_preview("absent")
+    with pytest.raises(TypeError, match="operation key"):
+        JobRunner(store).repair_preview(run_id, "glyph[1]")
+
+    # After a budget overrun, nothing more is admitted under the run's approval.
+    data["operations"][0]["count"] = 2
+    data["execution"]["max_budget_usd"] = "0.40"
+    overrun_plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
+    overrun = store.create_run(overrun_plan, make_approval(overrun_plan), manifest_root=tmp_path)
+    first_operation = store.pending_operations(overrun)[0]
+    attempt = store.begin_attempt(overrun, first_operation["operation_id"])
+    permit = store.prepare_call(attempt["attempt_id"], 100_000)
+    store.mark_call_dispatched(permit.call_id)
+    store.complete_call(permit.call_id, cost_microusd=150_000, cost_is_complete=True,
+                        cost_is_estimate=False, artifacts=[], result_text="none", accepted=False)
+    latched = JobRunner(store).repair_preview(overrun)
+    assert latched["budget"]["overrun"] is True and latched["status"] == RunStatus.BUDGET_OVERRUN.value
+    assert [(item["action"], item["new_plan_required"]) for item in latched["operations"]] == [
+        ("regenerate", True), ("regenerate", True)]
+
+
+def test_a_repair_preview_offers_a_recheck_for_a_changed_validator(tmp_path, store_factory):
+    store = store_factory(tmp_path / "jobs.db")
+    _, first, _ = _validated_run(tmp_path, store, _PaletteValidator())
+    run_id = first["run_id"]
+    bumped = JobRunner(store, validators=[_PaletteValidator(version="2")])
+
+    assert list(_previewed(bumped, run_id).values()) == [
+        ("succeeded", "recheck", ["validator_set_changed"], 1, False)]
+    assert list(_previewed(JobRunner(store, validators=[_PaletteValidator()]), run_id).values()) == [
+        ("succeeded", "reuse", [], 1, False)]
+
+    asyncio.run(bumped.recheck(run_id, [first["operations"][0]["operation_key"]], reason="v2"))
+    assert list(_previewed(bumped, run_id).values()) == [("succeeded", "reuse", [], 1, False)]
+    stricter = JobRunner(store, validators=[_PaletteValidator(_off_palette, version="3")])
+    asyncio.run(stricter.recheck(run_id, [first["operations"][0]["operation_key"]], reason="v3"))
+    # A rejection of verified bytes is for a person: no repair in the run can replace them.
+    assert list(_previewed(stricter, run_id).values()) == [
+        ("succeeded", "review", ["decision_not_accepted"], 1, False)]

@@ -65,6 +65,8 @@ REASONS = MappingProxyType({
     "artifact_missing": "rerender", "artifact_changed": "rerender",
     "validator_set_changed": "recheck", "policy_changed": "recheck",
     "run_in_progress": "review", "repair_in_progress": "review",
+    # Only the Jobs repair preview gives it: a provider call may have completed.
+    "outcome_unknown": "review",
 })
 
 # The reason each published-file integrity status gives, if any.

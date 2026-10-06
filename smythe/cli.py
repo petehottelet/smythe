@@ -253,8 +253,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     reroll = commands.add_parser("reroll", help="rerun selected rejected operations")
     reroll.add_argument("run_id")
-    reroll.add_argument("operation_keys", nargs="+")
-    reroll.add_argument("--reason", required=True)
+    # Required unless --dry-run; main() checks them.
+    reroll.add_argument("operation_keys", nargs="*")
+    reroll.add_argument("--reason", default=None)
     reroll.add_argument(
         "--acknowledge-unknown",
         action="store_true",
@@ -264,6 +265,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--repair-integrity",
         action="store_true",
         help="rerun succeeded operations whose accepted files are missing or changed",
+    )
+    reroll.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="show what the selected operations, or all of them, call for; changes nothing",
     )
     _add_output_options(reroll, inherited=True)
 
@@ -788,6 +794,23 @@ def _emit_job_inspection(value: dict[str, Any]) -> None:
         print(f"HTML report: {_terminal_text(value['report_path'], limit=1000)}")
 
 
+def _emit_repair_preview(value: dict[str, Any]) -> None:
+    print(f"Run: {_terminal_text(value['run_id'])}")
+    print(f"Status: {_terminal_text(value['status'])}; nothing was changed")
+    budget = value["budget"]
+    print(f"Budget: {_usd(budget['remaining_microusd'])} of {_usd(budget['approved_microusd'])} "
+          f"left{'; overrun' if budget['overrun'] else ''}")
+    for attachment in value["attachments"]:
+        if attachment["status"] != "verified":
+            print(f"Attachment {_terminal_text(attachment['relative_path'])}: {attachment['status']}")
+    for item in value["operations"]:
+        reasons = f" ({', '.join(item['reasons'])})" if item["reasons"] else ""
+        left = item["attempts_remaining"]
+        plan = "; new plan and approval required" if item["new_plan_required"] else ""
+        print(f"{_terminal_text(item['operation_key'])}: {item['action']}{reasons}; "
+              f"{left} attempt{'' if left == 1 else 's'} left{plan}")
+
+
 def _yes(value: Any) -> str:
     return "yes" if value else "no"
 
@@ -1004,6 +1027,8 @@ def _emit(args: argparse.Namespace, command: str, value: Any) -> None:
         print(f"Operations: {len(value['plan']['operations'])}")
         print(f"Worst-case cost: ${value['plan']['worst_case_cost_usd']}")
         print(f"Approval token: {value['approval']['token']}")
+    elif command == "reroll" and getattr(args, "dry_run", False):
+        _emit_repair_preview(value)
     elif command in {"run", "status", "resume", "reroll", "adopt", "recheck"}:
         job = value
         print(f"Run: {_terminal_text(job['run_id'])}")
@@ -1322,6 +1347,12 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
         _emit(args, command, payload)
         return EXIT_OK
 
+    if command == "reroll" and args.dry_run:
+        with SQLiteRunStore(args.store, read_only=True) as store:
+            preview = JobRunner(store).repair_preview(args.run_id, args.operation_keys or None)
+        _emit(args, command, preview)
+        return EXIT_OK
+
     if command == "export" and args.out:
         _report_destination(args.out, args.store)
     with SQLiteRunStore(args.store, read_only=command in {"status", "export"}) as store:
@@ -1406,6 +1437,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(list(argv) if argv is not None else None)
     command = getattr(args, f"{args.root_command}_command", args.root_command)
+    if command == "reroll" and args.root_command == "jobs" and not args.dry_run:
+        missing = [name for name, absent in (("operation_keys", not args.operation_keys),
+                                             ("--reason", args.reason is None)) if absent]
+        if missing:
+            parser.error("the following arguments are required: " + ", ".join(missing))
     try:
         return _dispatch(args)
     except KeyboardInterrupt as exc:

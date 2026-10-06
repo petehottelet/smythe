@@ -73,6 +73,7 @@ from smythe.jobs.store import (
     RunLease,
     RunLeaseError,
     RunPauseRequested,
+    RunStatus,
     RunStoreError,
     SQLiteRunStore,
 )
@@ -86,6 +87,20 @@ _SAFE_RUN_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 MAX_TOTAL_ARTIFACT_BYTES_PER_CALL = 128 * 1024 * 1024
 _INVALID_ACCOUNTING_PREFIX = "invalid provider accounting: "
 _DRAIN_POLL_S = 1.0
+# A repair preview's actions, from least to most conservative. Jobs keep no
+# rendering input, so what the shared vocabulary would rerender regenerates.
+_PREVIEW_ACTIONS = ("reuse", "recheck", "regenerate", "review")
+# The shared reason code for each delivery eligibility reason with another name.
+_PREVIEW_REASONS = {
+    "not_accepted": "decision_not_accepted", "record_invalid": "decision_not_accepted",
+    "record_mismatch": "decision_not_accepted", "validator_unrecorded": "validator_set_changed",
+    "validator_changed": "validator_set_changed", "artifact_not_checked": "artifact_unchecked",
+    "no_decision": "node_incomplete",
+}
+# The reason code for an operation that has not succeeded.
+_STATE_REASONS = {"pending": "node_incomplete", "failed": "node_incomplete",
+                  "rejected": "node_incomplete", "running": "run_in_progress",
+                  "unknown_outcome": "outcome_unknown"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -358,6 +373,106 @@ class JobRunner:
         root = Path(self.store.manifest_record(run_id)["manifest_root"])
         result = await self._execute_with_lease(run_id, None, root, recheck=(keys, reason))
         return await asyncio.to_thread(self._delivery_view, result)
+
+    def repair_preview(
+        self, run_id: str, operation_keys: Sequence[str] | None = None,
+    ) -> dict[str, Any]:
+        """Show what each operation calls for now, before anything is dispatched.
+
+        The Jobs database is opened again read-only, so no lease is taken and
+        nothing is written, even while a worker holds the run. Each selected
+        operation, or every one, gets an ``action`` (``reuse``, ``recheck``,
+        ``regenerate`` or ``review``), its sorted ``reasons`` in the reuse
+        decisions' vocabulary (:data:`smythe.reuse.REASONS`), its
+        ``attempts_remaining`` and ``new_plan_required``: whether its
+        regeneration needs a new plan and approval, because it sends an
+        attachment whose bytes changed since the plan, has no attempt left, or
+        its run's budget overran. Accepted files are hashed again, and every
+        planned attachment is fingerprinted again. The validators are this
+        runner's, as for :meth:`recheck`. Nothing is repaired: an integrity
+        repair, reroll, resume or recheck carries out an action, and no
+        artifact of another run is offered.
+        """
+        _validate_run_id(run_id)
+        if operation_keys is not None and (isinstance(operation_keys, (str, bytes))
+                                           or not isinstance(operation_keys, Sequence)):
+            raise TypeError("operation_keys must be a list of operation keys or IDs")
+        if self.store.read_only:
+            return self._preview(self.store, run_id, operation_keys)
+        with SQLiteRunStore(self.store.path, read_only=True) as store:
+            return self._preview(store, run_id, operation_keys)
+
+    def _preview(
+        self, store: SQLiteRunStore, run_id: str, operation_keys: Sequence[str] | None,
+    ) -> dict[str, Any]:
+        # Imported here, so that Jobs commands without a preview do not load the
+        # durable workflow modules the reuse decisions use.
+        from smythe.reuse import ACTIONS, REASONS
+
+        snapshot = store.snapshot(run_id)
+        if operation_keys is not None:
+            selected: list[dict[str, Any]] = []
+            for key in operation_keys:
+                operation = next((item for item in snapshot["operations"]
+                                  if key in (item["operation_key"], item["operation_id"])), None)
+                if operation is None:
+                    raise JobNotFoundError(f"{run_id}:{key}")
+                if operation not in selected:
+                    selected.append(operation)
+            snapshot["operations"] = selected
+        succeeded = {item["accepted_attempt_id"] for item in snapshot["operations"]
+                     if item["status"] == OperationStatus.SUCCEEDED.value}
+        check_artifact_integrity(snapshot, [row for row in snapshot["artifacts"] if row["accepted"]
+                                            and row["attempt_id"] in succeeded], byte_limit=None)
+        annotate_delivery(snapshot, store.delivery_records(run_id),
+                          store.delivery_reevaluations(run_id), self._registered())
+        root = Path(snapshot["manifest_root"])
+        attachments = [{"relative_path": item["relative_path"], "sha256": item["sha256"],
+                        "status": _attachment_status(item, root)}
+                       for item in store.plan_attachments(run_id)]
+        changed = {item["relative_path"] for item in attachments if item["status"] == "changed"}
+        unavailable = {item["relative_path"] for item in attachments
+                       if item["status"] not in ("verified", "changed")}
+        cost = snapshot["cost"]
+        spent = cost["confirmed_microusd"] + cost["exposure_microusd"]
+        overrun = snapshot["status"] == RunStatus.BUDGET_OVERRUN.value or spent > cost["approved_microusd"]
+        items = []
+        for operation in snapshot["operations"]:
+            status, sent = operation["status"], set(operation["spec"].get("attachments") or ())
+            reasons = {"source_changed"} if sent & changed else set()
+            if sent & unavailable:
+                reasons.add("source_unavailable")
+            if status == OperationStatus.SUCCEEDED.value:
+                reasons.update(_PREVIEW_REASONS.get(code, code)
+                               for code in operation["delivery_eligibility"]["reasons"])
+            elif status in _STATE_REASONS:
+                reasons.add(_STATE_REASONS[status])
+            else:
+                raise RunStoreError("Jobs run has invalid operation status")
+            action = max((REASONS.get(code) or "review" for code in reasons),
+                         key=ACTIONS.index, default="reuse")
+            action = "regenerate" if action == "rerender" else action
+            remaining = max(0, operation["max_attempts"] - operation["attempt_count"])
+            items.append({
+                "operation_key": operation["operation_key"],
+                "operation_id": operation["operation_id"],
+                "status": status, "action": action, "reasons": sorted(reasons),
+                "attempts_remaining": remaining,
+                "new_plan_required": action == "regenerate" and bool(
+                    sent & changed or not remaining or overrun),
+            })
+        counts = dict.fromkeys(_PREVIEW_ACTIONS, 0)
+        for item in items:
+            counts[item["action"]] += 1
+        budget = {key: cost[key] for key in ("approved_microusd", "confirmed_microusd",
+                                             "exposure_microusd", "reserved_microusd")}
+        return {
+            "version": 1, "run_id": run_id, "status": snapshot["status"],
+            "budget": budget | {"remaining_microusd": max(0, cost["approved_microusd"] - spent
+                                                          - cost["reserved_microusd"]),
+                                "overrun": overrun, "unit": cost["unit"]},
+            "attachments": attachments, "counts": counts, "operations": items,
+        }
 
     def _registered(self) -> dict[str, ValidatorIdentity]:
         """The identity this runner registered under each validator name."""
@@ -1397,6 +1512,27 @@ def _read_bound_attachment(fingerprint: Any, root: Path) -> bytes:
             "create a new plan and approval"
         )
     return data
+
+
+def _attachment_status(fingerprint: dict[str, Any], root: Path) -> str:
+    """Whether a planned attachment still holds the bytes its plan fingerprinted.
+
+    ``verified`` or ``changed``, as dispatch would read it, else ``missing``,
+    ``unsafe`` (outside the manifest root, or not a file) or ``unreadable``.
+    """
+    try:
+        resolved_root = root.resolve()
+        path = (resolved_root / fingerprint["relative_path"]).resolve()
+        _confinement_path(path).relative_to(_confinement_path(resolved_root))
+        if not path.is_file():
+            return "unsafe" if path.exists() else "missing"
+        with path.open("rb") as stream:
+            data = stream.read(MAX_ATTACHMENT_BYTES + 1)
+    except ValueError:
+        return "unsafe"
+    except OSError:
+        return "unreadable"
+    return "verified" if hashlib.sha256(data).hexdigest() == fingerprint["sha256"] else "changed"
 
 
 def _confinement_path(path: Path) -> Path:

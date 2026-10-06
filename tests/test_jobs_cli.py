@@ -510,3 +510,85 @@ def test_recheck_decides_accepted_files_again_under_a_newer_built_in_check(
     with pytest.raises(SystemExit):
         main(["jobs", "--help"])
     assert "recheck" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# Repair previews
+# ---------------------------------------------------------------------------
+
+
+def test_reroll_dry_run_names_the_operations_a_changed_attachment_needs_a_new_plan_for(
+    tmp_path, capsys,
+):
+    import sqlite3
+    from contextlib import closing
+
+    (tmp_path / "brand").mkdir()
+    logo, mark = tmp_path / "brand" / "logo.png", tmp_path / "brand" / "mark.png"
+    logo.write_bytes(b"logo-bytes")
+    mark.write_bytes(b"mark-bytes")
+    manifest = _manifest(tmp_path, attempts=2)
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    glyph = data["operations"][0]
+    data["operations"] = [glyph | {"key": "hero", "count": 2, "attachments": ["brand/logo.png"]},
+                          glyph | {"key": "badge", "attachments": ["brand/mark.png"]},
+                          glyph | {"key": "plain"}]
+    manifest.write_text(json.dumps(data), encoding="utf-8")
+    store, run = _completed_run(tmp_path, capsys, manifest)
+    assert run["counts"] == {"succeeded": 4}
+    logo.write_bytes(b"a different logo")
+    mark.unlink()
+
+    def leases():
+        with closing(sqlite3.connect(f"{store.as_uri()}?mode=ro", uri=True)) as db:
+            return db.execute("SELECT * FROM run_leases").fetchall()
+
+    before, held = store.read_bytes(), leases()
+    command = ["jobs", "reroll", run["run_id"], "--dry-run", "--store", str(store)]
+
+    assert main([*command, "--json"]) == EXIT_OK
+
+    payload = _json_output(capsys)
+    assert payload["ok"] is True and payload["command"] == "reroll"
+    preview = payload["reroll"]
+    assert set(preview) == {"version", "run_id", "status", "budget", "attachments", "counts",
+                            "operations"}
+    assert (preview["version"], preview["run_id"], preview["status"]) == (1, run["run_id"],
+                                                                          "completed")
+    assert preview["attachments"] == [
+        {"relative_path": "brand/logo.png", "sha256": hashlib.sha256(b"logo-bytes").hexdigest(),
+         "status": "changed"},
+        {"relative_path": "brand/mark.png", "sha256": hashlib.sha256(b"mark-bytes").hexdigest(),
+         "status": "missing"}]
+    items = {item["operation_key"]: item for item in preview["operations"]}
+    assert all(set(item) == {"operation_key", "operation_id", "status", "action", "reasons",
+                             "attempts_remaining", "new_plan_required"} for item in items.values())
+    assert {key for key, item in items.items() if item["new_plan_required"]} == {"hero[0]", "hero[1]"}
+    assert {key: (item["action"], item["reasons"]) for key, item in items.items()} == {
+        "badge[0]": ("review", ["source_unavailable"]),
+        "hero[0]": ("regenerate", ["source_changed"]),
+        "hero[1]": ("regenerate", ["source_changed"]),
+        "plain[0]": ("reuse", []),
+    }
+    assert preview["counts"] == {"reuse": 1, "recheck": 0, "regenerate": 2, "review": 1}
+    assert preview["budget"]["overrun"] is False and preview["budget"]["unit"] == "microUSD"
+    assert store.read_bytes() == before and leases() == held
+
+    assert main([*command[:3], "hero[0]", *command[3:]]) == EXIT_OK
+    text = capsys.readouterr().out
+    assert "hero[0]: regenerate (source_changed); 1 attempt left; new plan and approval required" in text
+    assert "Attachment brand/logo.png: changed" in text and "plain[0]" not in text
+    assert main(["jobs", "reroll", "missing-run", "--dry-run", "--store", str(store),
+                 "--json"]) == EXIT_JOB_STATE
+    assert _json_output(capsys)["error"]["type"] == "JobNotFoundError"
+    assert store.read_bytes() == before and leases() == held
+
+    # Without --dry-run, a reroll still needs operations and a reason.
+    for arguments in ([run["run_id"]], [run["run_id"], "hero[0]"], [run["run_id"], "--reason", "r"]):
+        with pytest.raises(SystemExit) as refused:
+            main(["jobs", "reroll", *arguments, "--store", str(store)])
+        assert refused.value.code == EXIT_INVALID_INPUT
+    with pytest.raises(SystemExit):
+        main(["jobs", "reroll", "--help"])
+    help_text = " ".join(capsys.readouterr().out.split())
+    assert "--dry-run" in help_text and "changes nothing" in help_text

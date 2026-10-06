@@ -1062,6 +1062,25 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `inspect_job(..., validators=[...])` judges eligibility under the
   validators registered now. The Jobs schema stays at version 4. See
   [recheck accepted outputs](docs/jobs.md#recheck-accepted-outputs).
+- `jobs reroll RUN_ID [OPERATION...] --dry-run` previews what each named
+  operation, or every operation, calls for, before anything is dispatched.
+  It opens the Jobs database read-only, takes no lease, writes nothing,
+  calls no provider and exits 0. Each operation gets `reuse`, `recheck`,
+  `regenerate` or `review` with sorted reason codes from the reuse
+  decisions' vocabulary, its remaining attempts, and `new_plan_required`
+  when its regeneration needs a new plan and approval: it sends an
+  attachment whose bytes changed since the plan, which the preview
+  fingerprints again, has no attempt left, or the run's budget overran. The
+  document also gives each attachment's status, the run's remaining budget
+  and a count per action; a `regenerate` without `new_plan_required` for a
+  missing or changed accepted file is what an integrity repair admits.
+  Nothing is repaired
+  automatically and no other run's artifacts are offered. Without
+  `--dry-run`, `jobs reroll` still needs operations and `--reason`. In
+  Python, `JobRunner.repair_preview(run_id, operation_keys=None)` judges
+  under that runner's validators. `smythe.reuse.REASONS` gains
+  `outcome_unknown` (`review`) for an operation whose provider call may have
+  completed. See [preview repairs](docs/jobs.md#preview-repairs).
 - Contribution lint. `lint_contributions(graph, registry=None)` lists the
   groups of parallel siblings that could only repeat each other's work: the
   same dependency inputs, label, agent, model, required capabilities,

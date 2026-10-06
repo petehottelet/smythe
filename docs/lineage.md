@@ -467,6 +467,7 @@ calls for, or None where the policy's `undeclared_coverage` decides.
 | `policy_changed` | `recheck` | The acceptance policy differs. |
 | `run_in_progress` | `review` | The run has not completed, so it has no record yet; only a [repair plan](#plan-a-repair) gives it. |
 | `repair_in_progress` | `review` | A successor that has not completed is repairing the run; only a [repair plan](#plan-a-repair) gives it. |
+| `outcome_unknown` | `review` | A Jobs provider call's outcome is unknown: it may have completed and been charged. Only the [Jobs repair preview](jobs.md#preview-repairs) gives it. |
 
 ## Plan a repair
 

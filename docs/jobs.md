@@ -689,6 +689,9 @@ smythe jobs reroll RUN_ID "tile[3]" \
   --acknowledge-unknown
 ```
 
+`--dry-run` [previews](#preview-repairs) what each operation calls for
+without changing anything.
+
 Rerolls consume the same original approval and attempt allowance. The selected
 operation receives a new immutable attempt linked to its predecessor that
 records the reroll reason, which `smythe jobs inspect` shows with that attempt;
@@ -858,6 +861,74 @@ shows them beside the attempt. `JobRunner.recheck` records the decisions
 with `SQLiteRunStore.record_reevaluation`. The Jobs schema stays at
 version 4.
 
+## Preview repairs
+
+Before rerolling, repairing or rechecking anything, see what each operation
+calls for:
+
+```bash
+smythe jobs reroll RUN_ID --dry-run
+smythe jobs reroll RUN_ID "tile[3]" "tile[4]" --dry-run --json
+```
+
+`--dry-run` previews the named operations, or every operation of the run
+when none is named; `--reason` and the other reroll options are ignored. It
+opens the Jobs database read-only, takes no lease, writes nothing and calls
+no provider, so it works while a worker holds the run, and it exits 0. It
+hashes every accepted file of the previewed succeeded operations again,
+without the 64 MiB inspection limit, and fingerprints every planned
+attachment again. In Python, `JobRunner(store, validators=[...]).repair_preview(run_id,
+operation_keys=None)` returns the same document, judged under that runner's
+validators; the CLI registers none, so it uses those the plan names.
+
+```text
+{
+  "version": 1,
+  "run_id": "...",
+  "status": "completed",
+  "budget": {"approved_microusd", "confirmed_microusd", "exposure_microusd",
+             "reserved_microusd", "remaining_microusd", "overrun", "unit"},
+  "attachments": [{"relative_path", "sha256", "status"}],
+  "counts": {"reuse": 3, "recheck": 0, "regenerate": 1, "review": 0},
+  "operations": [{"operation_key", "operation_id", "status", "action", "reasons",
+                  "attempts_remaining", "new_plan_required"}]
+}
+```
+
+Each operation's `action` is the most conservative its reasons call for, and
+its `reasons` are sorted codes from the
+[reuse decisions' vocabulary](lineage.md#reason-codes):
+
+| Operation | Action | Reasons | What carries it out |
+|---|---|---|---|
+| Succeeded, its latest decision under the current validators accepted, every accepted file verified | `reuse` | none | Nothing |
+| Succeeded, no decision under the current validators | `recheck` | `validator_set_changed` | [Recheck](#recheck-accepted-outputs) |
+| Succeeded, an accepted file missing or changed and the rest verified | `regenerate` | `artifact_missing`, `artifact_changed` | [Integrity repair](#repair-corrupted-accepted-outputs) |
+| Succeeded, an accepted file unsafe, unreadable or not checked | `review` | `artifact_unsafe`, `artifact_unreadable`, `artifact_unchecked` | A person |
+| Succeeded, its decision under the current validators not `accepted`, malformed, or not about its files | `review` | `decision_not_accepted` | A person; the bytes verify, so no repair in the run replaces them |
+| Pending, failed or rejected | `regenerate` | `node_incomplete` | `resume` for pending work, a [reroll](#selective-rerolls) otherwise |
+| Running | `review` | `run_in_progress` | The worker that holds it, or `resume` |
+| Unknown outcome | `review` | `outcome_unknown` | Investigation, then [adoption](#adopt-published-bytes) or an acknowledged reroll |
+| Sends an attachment whose bytes changed since the plan | `regenerate` | `source_changed` | A new plan and approval |
+| Sends an attachment that is missing, unsafe or unreadable | `review` | `source_unavailable` | Restore it |
+
+Jobs keep no rendering input, so a missing or changed accepted file calls for
+`regenerate`, a new attempt, where a durable run would rerender.
+`attempts_remaining` is the operation's attempt allowance left under the plan.
+`new_plan_required` is true for a `regenerate` that the run's approval cannot
+admit: the operation sends an attachment whose bytes changed, has no attempt
+left, or its run's budget overran. The run's `attachments` give each planned
+attachment's recorded SHA-256 and `status` (`verified`, `changed`, `missing`,
+`unsafe` or `unreadable`); while any is not `verified`, `resume` and
+`reroll` refuse the whole run until it is restored. `budget` is the run's
+cost state with `remaining_microusd` of the approved ceiling and whether it
+`overrun`. While every attachment verifies and the runner registers the
+validators the plan names, a `regenerate` with `new_plan_required` false is
+what an integrity repair, reroll or resume of that operation admits.
+
+The preview repairs nothing and never offers another run's artifacts, even
+when their input digest matches: Jobs reuse nothing across runs.
+
 ## Export
 
 Export includes the manifest and plan hashes, operation and attempt lineage,
@@ -968,7 +1039,9 @@ runner = JobRunner(store, validators=validators)
   pipelines; those policies are not automatically inferred from a generic job
   manifest.
 - Rerolls are operator-selected; there is no automatic vision-judge promotion
-  policy in the runtime.
+  policy in the runtime. Repairs are too: the
+  [repair preview](#preview-repairs) shows what each operation calls for,
+  and nothing repairs an operation automatically.
 - Unknown provider outcomes require human investigation, then explicit
   duplicate acknowledgment or adoption of the bytes the attempt published.
 - Jobs do not read a response's `stop_reason`. A response that the provider
