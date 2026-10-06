@@ -416,14 +416,17 @@ def test_an_instruction_bearing_source_changes_no_capability_budget_or_policy(st
     plain, instructed = run((INSPECTION, BULLETIN)), run(SOURCES)
     plain_run, instructed_run = (store.load_run(item.execution_id) for item in (plain, instructed))
     # The recipe, its budget and its acceptance policy are byte-identical, and
-    # so is the decision on the same delivered bytes.
+    # both runs deliver the same bytes.
     assert instructed_run["config"] == plain_run["config"]
     assert instructed_run["config_sha256"] == plain_run["config_sha256"]
     assert instructed_run["budget_nanousd"] == plain_run["budget_nanousd"] == 1_000_000_000
     assert instructed_run["config"]["acceptance"] == policy.to_dict()
     assert (policy.sha256, json.dumps(policy.to_dict(), sort_keys=True)) == before
-    assert instructed.acceptance.to_dict() == plain.acceptance.to_dict()
-    assert instructed.accepted and instructed.output == plain.output
+    assert instructed.accepted and instructed.output == plain.rejected_output
+    # The policy's evidence validator checks the forum source, which only the
+    # instructed run was given; the run without it is never accepted.
+    assert plain.acceptance.decision is AcceptanceDecision.INDETERMINATE
+    assert "checks other sources than the run's current source set" in plain.acceptance.reasons[0]
     for left, right in zip(plain.graph.nodes, instructed.graph.nodes):
         assert (right.agent_id, right.required_capabilities) == (left.agent_id,
                                                                  left.required_capabilities)
