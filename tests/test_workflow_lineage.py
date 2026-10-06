@@ -402,6 +402,56 @@ def test_a_lineage_written_before_a_lost_checkpoint_is_replayed(
     assert again.accepted and again.acceptance == result.acceptance
 
 
+def test_a_run_whose_nodes_ran_again_never_replays_an_earlier_lineage(
+        store, library, tmp_path, monkeypatch):
+    service, _, _ = library
+    stop = crash_when(monkeypatch, store, "save_checkpoint",
+                      lambda lease, revision, checkpoint, **kwargs:
+                      checkpoint["status"] == "completed")
+    with pytest.raises(Crash):
+        research(store, library, tmp_path).execute(research_graph(library))
+    stop.restore()
+    (run,) = store.list_runs()
+    run_id = run["run_id"]
+    (stale,) = store.list_operations(run_id, "lineage")
+    assert (stale["operation_key"], stale["state"]) == ("lineage", "completed")
+    # The sources changed while the run was stopped, so every node runs again.
+    changed = [service.change_source(source_id, text + " Revised.")
+               for source_id, text in TEXTS.items()]
+    research(store, library, tmp_path).refresh_context(
+        run_id, [ContextSource(record.source_id, record.content, str(record.version))
+                 for record in changed])
+
+    result = research(store, library, tmp_path).resume(run_id)
+    assert result.accepted
+    (synthesis,) = [item["operation_key"] for item in store.list_operations(run_id, "synthesis")
+                    if item["applied_revision"] is not None]
+    assert synthesis.startswith("synthesis/")
+    # The record of this graph state is written under its own key and applied alone.
+    applied = [item for item in store.list_operations(run_id, "lineage")
+               if item["applied_revision"] is not None]
+    assert [item["operation_key"] for item in applied] == [
+        "lineage/" + synthesis.removeprefix("synthesis/")]
+    lineage = load_lineage(store, run_id)
+    # Every graph node is at its second generation; the synthesis is named by its key.
+    assert {node["id"]: node["generation"] for node in lineage.to_dict()["nodes"]} == {
+        node_id: 1 for node_id in NODES[:-1]} | {synthesis: 0}
+    assert lineage.acceptance["operation_key"] == current_decision(store, run_id)["operation_key"]
+    assert lineage.acceptance["operation_key"] != stale["result"]["lineage"]["acceptance"][
+        "operation_key"]
+    nodes = by_id(lineage)
+    for record in changed:
+        assert nodes[f"read-{record.source_id}"]["inputs"]["sources"] == [
+            {"source_id": record.source_id, "version": "2", "sha256": record.sha256}]
+    # The earlier graph state's record stays in the journal, never applied.
+    (kept,) = [item for item in store.list_operations(run_id, "lineage")
+               if item["operation_key"] == "lineage"]
+    assert kept["applied_revision"] is None and kept["result"] == stale["result"]
+    # Resuming the completed run checks the record of its final graph state.
+    again = research(store, library, tmp_path).resume(run_id)
+    assert again.accepted and again.acceptance == result.acceptance
+
+
 def test_a_completed_run_whose_lineage_no_longer_matches_is_not_delivered(store):
     result = durable(store, lineage=LineagePolicy()).execute(serial(2))
     run_id = result.execution_id
