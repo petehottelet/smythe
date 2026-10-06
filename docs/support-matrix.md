@@ -187,7 +187,8 @@ Who calls again after a failure depends on the path and the provider:
   a refusal or truncation is terminal. Under a `RetryPolicy`, only the
   classes it lists are retried, a refusal or truncation too when it lists
   `quality_defect`, and each node's attempts are counted from the journal,
-  so resume continues them instead of refilling them. See
+  so resume continues them instead of refilling them; a reply with a known
+  charge is replayed on resume, never bought again. See
   [durable retry policy](workflow-accounting.md#retry-policy).
 - **Durable read steps** make one request per journaled call. A failed free
   read settles at zero cost and the node failure policy decides whether to
@@ -318,6 +319,8 @@ Tests:
   and `tests/test_workflow_retry_policy.py::test_a_refusal_with_a_known_charge_is_retried_only_when_its_class_is_listed`,
   the journal-derived cap `tests/test_workflow_retry_policy.py::test_a_rate_limited_node_is_capped_and_resume_makes_no_call_beyond_the_cap`
   and `tests/test_workflow_retry_policy.py::test_a_crash_after_the_first_rejected_attempt_resumes_within_the_cap`,
+  replay on resume `tests/test_workflow_retry_policy.py::test_a_paid_rejection_the_policy_does_not_retry_is_replayed_on_resume`
+  and `tests/test_workflow_retry_policy.py::test_refusals_the_policy_retries_are_capped_and_resume_makes_no_call`,
   waits `tests/test_workflow_retry_policy.py::test_a_journaled_rejection_waits_its_backoff_not_retry_after`.
 - Durable read steps: `tests/test_workflow_read_tool.py::test_a_failed_read_follows_its_node_failure_policy`,
   `tests/test_workflow_read_tool.py::test_reads_settle_by_their_declared_charge_and_outcome`.

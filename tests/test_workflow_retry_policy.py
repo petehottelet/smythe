@@ -18,7 +18,7 @@ from fakes import RATE_LIMITED, Crash, HttpError, ManualClock, NativeTransport, 
 from smythe import RetryPolicy, SQLiteWorkflowStore, Swarm, workflow
 from smythe.async_executor import AsyncExecutor
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, Topology
-from smythe.provider import ProviderFeatures, ProviderResponseError
+from smythe.provider import NativeOutputDefectError, ProviderFeatures, ProviderResponseError
 from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.scheduling import _retry_after_s
 from smythe.workflow_binding import WorkflowBindingError
@@ -223,18 +223,28 @@ REFUSAL = {"output": [{"type": "message", "status": "completed", "role": "assist
                        "content": [{"type": "refusal", "refusal": "I can't help."}]}]}
 
 
+# A completed reply whose only text is blank: unusable, though neither refused nor truncated.
+BLANK = {"output": [{"type": "message", "status": "completed", "role": "assistant",
+                     "content": [{"type": "output_text", "text": " "}]}]}
+DEFECT_CLASSES = {"transient", "quality_defect"}
+
+
+def reply(wire, *bodies):
+    """Merge each of *bodies* into the next generation reply, in order; later replies are unchanged."""
+    respond, queued = wire._response, iter(bodies)
+
+    def replaced(sequence, payload, text):
+        return {**respond(sequence, payload, text), **next(queued, {})}
+
+    wire._response = replaced
+
+
 @pytest.mark.parametrize("listed", [False, True], ids=["default-classes", "quality-defect-listed"])
 def test_a_refusal_with_a_known_charge_is_retried_only_when_its_class_is_listed(
     tmp_path, wire, listed,
 ):
-    respond = wire._response
-    replies = iter([REFUSAL])
-
-    def refused_once(sequence, payload, text):
-        return {**respond(sequence, payload, text), **next(replies, {})}
-
-    wire._response = refused_once
-    classes = {"transient", "quality_defect"} if listed else {"transient"}
+    reply(wire, REFUSAL)
+    classes = DEFECT_CLASSES if listed else {"transient"}
     with SQLiteWorkflowStore(tmp_path / "runs.db") as store:
         swarm = durable(store, RetryPolicy(retry_classes=classes))
         if listed:
@@ -255,6 +265,99 @@ def test_a_refusal_with_a_known_charge_is_retried_only_when_its_class_is_listed(
         assert store.inspect_run(run_id)["confirmed_nanousd"] == CHARGE * len(expected)
         assert store.audit(run_id)["ok"]
     assert outcomes(wire) == ["delivered"] * len(expected)
+
+
+@pytest.mark.parametrize("failure_policy", [FailurePolicy.RETRY, FailurePolicy.HALT],
+                         ids=["retry", "halt"])
+@pytest.mark.parametrize(("body", "classes"), [(REFUSAL, {"transient"}), (BLANK, DEFECT_CLASSES)],
+                         ids=["refusal-default-classes", "unusable-quality-defect-listed"])
+def test_a_paid_rejection_the_policy_does_not_retry_is_replayed_on_resume(
+    tmp_path, wire, failure_policy, body, classes,
+):
+    reply(wire, body)
+    with SQLiteWorkflowStore(tmp_path / "runs.db") as store:
+        swarm = durable(store, RetryPolicy(retry_classes=classes))
+        with pytest.raises(ProviderResponseError) as stopped:
+            swarm.execute(draft(failure_policy=failure_policy))
+        (run,) = store.list_runs()
+        run_id = run["run_id"]
+        rejected = [(0, 0, CHARGE, "rejected")]
+        assert draft_calls(store, run_id) == rejected
+        # Resume enters the rejected attempt again, and the journal replays its reply.
+        with pytest.raises(ProviderResponseError) as replayed:
+            swarm.resume(run_id)
+        assert str(replayed.value) == str(stopped.value)
+        assert replayed.value.receipt["workflow_replayed"] is True
+        assert draft_calls(store, run_id) == rejected
+        assert store.inspect_run(run_id)["confirmed_nanousd"] == CHARGE
+        assert store.audit(run_id)["ok"]
+    assert outcomes(wire) == ["delivered"]
+
+
+def test_refusals_the_policy_retries_are_capped_and_resume_makes_no_call(tmp_path, wire):
+    reply(wire, REFUSAL, REFUSAL)
+    with SQLiteWorkflowStore(tmp_path / "runs.db") as store:
+        swarm = durable(store, RetryPolicy(retry_classes=DEFECT_CLASSES))
+        with pytest.raises(NativeOutputDefectError):
+            swarm.execute(draft(max_retries=1))
+        (run,) = store.list_runs()
+        run_id = run["run_id"]
+        refused = [(0, 0, CHARGE, "rejected"), (0, 1, CHARGE, "rejected")]
+        assert draft_calls(store, run_id) == refused
+        # The last attempt's refusal replays, and no attempt is left after it.
+        with pytest.raises(NativeOutputDefectError):
+            swarm.resume(run_id)
+        assert draft_calls(store, run_id) == refused
+        assert store.inspect_run(run_id)["confirmed_nanousd"] == 2 * CHARGE
+        assert store.audit(run_id)["ok"]
+    assert outcomes(wire) == ["delivered"] * 2
+
+
+def test_a_crash_after_a_retried_refusal_resumes_within_the_cap(tmp_path, monkeypatch, wire):
+    reply(wire, REFUSAL)
+    image = tmp_path / "killed.db"
+    with SQLiteWorkflowStore(tmp_path / "live.db") as store:
+        # The process is lost after attempt 0's refusal, before attempt 1 is prepared.
+        point = crash_when(monkeypatch, store, "prepare_call",
+                           lambda lease, key, **_: key.scope_id == "node/draft" and key.attempt == 1,
+                           image=image, connection=store._db)
+        with pytest.raises(Crash):
+            durable(store, RetryPolicy(retry_classes=DEFECT_CLASSES)).execute(draft(max_retries=1))
+        (run,) = store.list_runs()
+    assert point.fired and outcomes(wire) == ["delivered"]
+    with SQLiteWorkflowStore(image, clock_ns=ManualClock.after(120)) as recovered:
+        swarm = durable(recovered, RetryPolicy(retry_classes=DEFECT_CLASSES))
+        # The refusal replays without a call, and attempt 1 is the only new one.
+        assert swarm.resume(run["run_id"]).output == "Draft accepted output."
+        assert draft_calls(recovered, run["run_id"]) == [(0, 0, CHARGE, "rejected"),
+                                                         (0, 1, CHARGE, "applied")]
+        assert recovered.inspect_run(run["run_id"])["confirmed_nanousd"] == 2 * CHARGE
+        assert recovered.audit(run["run_id"])["ok"]
+    assert outcomes(wire) == ["delivered"] * 2
+
+
+def test_a_judge_s_refused_reply_is_replayed_on_resume(tmp_path, wire):
+    graph = draft()
+    graph.nodes.append(Node(id="judge", label="Check", depends_on=["draft"], verifies="draft"))
+    reply(wire, {}, REFUSAL)  # The draft is accepted, and the judge's reply is refused.
+    with SQLiteWorkflowStore(tmp_path / "runs.db") as store:
+        swarm = durable(store, RetryPolicy())
+        with pytest.raises(ProviderResponseError) as stopped:
+            swarm.execute(graph)
+        (run,) = store.list_runs()
+        run_id = run["run_id"]
+
+        def judged():
+            return [(call["key"]["phase"], call["key"]["attempt"], call["result_state"])
+                    for call in store.node_generation_calls(run_id, "judge", 0)]
+
+        assert judged() == [("verification", 0, "rejected")]
+        with pytest.raises(ProviderResponseError) as replayed:
+            swarm.resume(run_id)
+        assert str(replayed.value) == str(stopped.value)
+        assert judged() == [("verification", 0, "rejected")]
+        assert store.inspect_run(run_id)["confirmed_nanousd"] == 2 * CHARGE
+    assert outcomes(wire) == ["delivered"] * 2
 
 
 def test_a_regenerated_node_gets_a_fresh_allowance(tmp_path, wire):

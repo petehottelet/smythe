@@ -218,8 +218,13 @@ it continues from the attempts its current generation has used: every call
 of that generation that the journal settled as rejected counts, on whichever
 invocation it was made. A crash, a halted run and every resume therefore
 share the node's `1 + max_retries` attempts (one without `RETRY`) instead of
-refilling them, and an attempt whose call was rejected is never made again.
-A node with no attempt left fails without a call, with a `RuntimeError` that
+refilling them, and an attempt whose call was rejected is never sent again.
+When the generation's latest call is a refused, truncated or unusable reply,
+whose known charge the journal keeps, the node enters that attempt again
+instead, and the journal replays the reply without a call: a reply the
+policy does not retry stops the run again, as it does without a policy, and
+one it retries is followed by the next attempt, within the cap. A node with
+no attempt left fails without a call, with a `RuntimeError` that
 names its allowance, and its failure policy settles it; a new run starts
 fresh. A call that was accepted, reserved but never sent, or sent without a
 known charge is not counted, so entering its attempt again replays, sends or

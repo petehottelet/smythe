@@ -692,14 +692,17 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `quality_defect`. Each node starts from the attempts its current generation
   has used, counted from the journal's rejected calls on every invocation, so
   a crash or resume continues its `1 + max_retries` attempts instead of
-  refilling them, and a node with none left fails without a call. The recipe
-  records the policy under `retry_policy`, without `persist_attempts`, so a
-  run resumes under the policy it started with: a `Swarm` without one uses
-  the saved policy, and a different policy, or one for a run that started
-  without, raises `WorkflowConflictError` before any call. Recipes without a
-  policy keep their bytes and their retries. The journal keeps no response
-  headers, so a durable run waits its backoff, never a `Retry-After`, and
-  every provider it can call must declare `sdk_retries=0`.
+  refilling them, and a node with none left fails without a call. A node
+  whose latest call is a refused, truncated or unusable reply enters that
+  attempt again, so the journal replays the reply without a new call and the
+  policy decides as it did before the resume. The recipe records the policy
+  under `retry_policy`, without `persist_attempts`, so a run resumes under
+  the policy it started with: a `Swarm` without one uses the saved policy,
+  and a different policy, or one for a run that started without, raises
+  `WorkflowConflictError` before any call. Recipes without a policy keep
+  their bytes and their retries. The journal keeps no response headers, so a
+  durable run waits its backoff, never a `Retry-After`, and every provider it
+  can call must declare `sdk_retries=0`.
   `SQLiteWorkflowStore.node_generation_calls()` lists a node generation's
   settled calls, and executors take `attempts_spent=`, which journal-managed
   calls need under a policy. See

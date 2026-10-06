@@ -978,10 +978,21 @@ class WorkflowRuntime:
         moved past to a new invocation, so resume continues a retry policy's
         cap instead of refilling it. A call that is not settled, or whose
         result was accepted, is not counted: entering its attempt again sends,
-        refuses or replays it as before.
+        refuses or replays it as before. When the latest provider call is a
+        reply rejected with its known charge, such as a refusal, its attempt
+        is entered again so the journal replays the reply without a call: a
+        reply the policy does not retry stops the node again, and one it
+        retries is followed by the next attempt.
         """
-        return sum(call["result_state"] == "rejected" for call in self.store.node_generation_calls(
-            self.run_id, node.id, node_generation(node)))
+        calls = self.store.node_generation_calls(self.run_id, node.id, node_generation(node))
+        replies = [call for call in calls if call["key"]["phase"] in ("execution", "verification")]
+        if replies:
+            latest = max(replies, key=lambda call: (
+                call["key"]["attempt"], call["key"]["invocation"], call["key"]["turn"]))
+            if latest["result_state"] == "rejected" and not _is_http_rejection(
+                    self.store.lookup_call(self.run_id, CallKey(**latest["key"]))):
+                return latest["key"]["attempt"]
+        return sum(call["result_state"] == "rejected" for call in calls)
 
     def _read_call(self, node, attempt):
         """Bind a read step's attempt to its journal call, in the ``tool`` phase.
