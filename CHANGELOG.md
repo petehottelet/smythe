@@ -1019,10 +1019,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   attempt is charged its selector cost and routing time. An Autotune campaign
   then compares the generated plan (incumbent) with adaptive selection
   (challenger), with the other two arms as references, under an evaluator
-  hash from an `EvaluatorManifest` and a `no_new_failures` regression gate. A
-  held-out pack is loaded only by path from outside the repository, verified
-  against its manifest. `benchmarks/offline_arms.py` is the shared runner for
-  offline arm harnesses, and `make_swarm` in `benchmarks/harness.py` builds
+  hash from an `EvaluatorManifest` and a `no_new_failures` regression gate,
+  which fails when a pinned reference output is not accepted or fails the
+  answer key, or a pinned planted defect is accepted. A held-out pack is
+  loaded only by path from outside the repository, verified against its
+  manifest. `benchmarks/offline_arms.py` is the shared runner for offline
+  arm harnesses, and `make_swarm` in `benchmarks/harness.py` builds
   the `adaptive_selection` arm. The committed record,
   `benchmarks/results/selector_comparison_offline.json`, is labeled offline
   mechanics, not claimable, with zero API calls: fixtures rank no arm and

@@ -460,7 +460,9 @@ never an arm ranking, and changes no default.
   trials. Its evaluator hash comes from an
   [evaluator manifest](../docs/optimize.md#evaluator-manifests) that binds the
   split manifests, validator identities and fixture price, and an
-  evaluator-side `no_new_failures` gate checks pinned regression cases. Its
+  evaluator-side `no_new_failures` gate checks pinned regression cases in
+  every arm: a reference output must stay accepted and, where the family has
+  an answer key, pass it, and a planted defect must stay rejected. Its
   thresholds are placeholders.
 - No held-out pack is committed. `--heldout-pack DIR` loads one in the Astra
   pack format from outside the repository, verified against its manifest, as

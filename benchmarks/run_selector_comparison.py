@@ -23,8 +23,9 @@ counterbalanced (Williams) order, with a matched allowance of two attempts
 per cell. One task per family plants a failure in every arm's first attempt
 (a raised fault in task-shapes, a rejected output in supplied-source), so
 the record shows failed attempts kept and charged. Pinned regression cases
-(a reference output that must be accepted, a planted defect that must be
-rejected) give the evaluator's no_new_failures gate. Then an Autotune
+(a reference output that must be accepted and, where the family has an
+answer key, pass it; a planted defect that must be rejected) give the
+evaluator's no_new_failures gate. Then an Autotune
 campaign compares the incumbent generated_plan with the challenger
 adaptive_selection, with single_worker and fixed_template as references, on
 task-indexed trials; its evaluator hash comes from an EvaluatorManifest that
@@ -248,8 +249,9 @@ def load_heldout_pack(directory: str | Path) -> TaskPack:
 def run_regression(family: Family) -> dict:
     """Pinned cases for the no_new_failures gate, run once per arm with one attempt each.
 
-    A case pinned ``accepted`` fails when its output is not accepted; one
-    pinned ``rejected`` fails when its planted defect is accepted.
+    A case pinned ``accepted`` fails when its output is not accepted or,
+    where the family has an answer key, fails adjudication; one pinned
+    ``rejected`` fails when its planted defect is accepted.
     """
     task = next(item for item in family.tasks if item.task_id == family.regression_task)
     cases = (("reference-output", replace(task, planted=None), "accepted"),
@@ -259,11 +261,15 @@ def run_regression(family: Family) -> dict:
         runs = []
         for name, case_task, pinned in cases:
             cell = run_cell(case_task, arm, family.policy, allowance=1)
-            observed = cell["attempts"][-1]["outcome"]
+            attempt = cell["attempts"][-1]
+            observed = attempt["outcome"]
+            adjudicated = (None if attempt["adjudication"] is None
+                           else attempt["adjudication"]["deterministic_passed"])
+            passed = (observed == "accepted" and adjudicated in (None, True)
+                      if pinned == "accepted" else observed != "accepted")
             runs.append({"case": name, "task_id": task.task_id, "pinned": pinned,
-                         "observed": observed,
-                         "passed": (observed == "accepted") == (pinned == "accepted"),
-                         "attempts": cell["attempts"]})
+                         "observed": observed, "adjudication_passed": adjudicated,
+                         "passed": passed, "attempts": cell["attempts"]})
         arms[arm] = {"passed": all(run["passed"] for run in runs), "cases": runs}
     return {"mode": "no_new_failures", "task_id": task.task_id, "arms": arms}
 

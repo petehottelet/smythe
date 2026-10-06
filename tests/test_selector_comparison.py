@@ -22,12 +22,12 @@ from fakes import child_executable, offline_env
 
 from benchmarks.astra_campaign import CampaignPlanError
 from benchmarks.astra_campaign._json import digest
-from benchmarks.astra_campaign.tasks import DATA_DIR
-from benchmarks.offline_arms import ARMS, run_cell, williams_schedule
+from benchmarks.astra_campaign.tasks import DATA_DIR, MAX_OUTPUT_BYTES
+from benchmarks.offline_arms import ARMS, policy_unchanged, run_cell, williams_schedule
 from benchmarks.run_selector_comparison import (
     load_heldout_pack, run_campaign, run_regression, shape_family, supplied_source_family,
 )
-from smythe import Task
+from smythe import AcceptancePolicy, Task, TextValidator
 from smythe.optimize import EvaluatorManifest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -224,6 +224,11 @@ def test_the_regression_gate_pins_reference_and_defect_in_every_arm(offline_run)
             assert entry["passed"] is True
             observed = {case["case"]: case["observed"] for case in entry["cases"]}
             assert observed == {"reference-output": "accepted", "planted-defect": "rejected"}
+            # The reference output also passes the answer key where the family has one.
+            reference = entry["cases"][0]
+            assert reference["case"] == "reference-output"
+            assert reference["adjudication_passed"] is (
+                True if family["adjudication"] else None)
 
 
 def test_the_committed_record_is_labeled_and_never_cited_as_a_claim():
@@ -303,7 +308,60 @@ def test_a_heldout_pack_is_verified_and_kept_outside_the_repository(tmp_path):
     assert proc.returncode == 2 and "outside the repository" in proc.stderr
 
 
-def test_a_challenger_that_passes_confirmation_meets_the_holdout_split():
+def test_the_policy_gate_fails_an_attempt_decided_by_another_policy():
+    family = shape_family()
+    task = next(item for item in family.tasks if item.task_id == "trivial-transform")
+    cell = run_cell(task, "single_worker", family.policy, allowance=1)
+    assert policy_unchanged(cell, family.policy) is True
+    looser = AcceptancePolicy(mode="strict", final_validators=[
+        TextValidator({"min_chars": 1, "max_chars": MAX_OUTPUT_BYTES})])
+    assert policy_unchanged(cell, looser) is False
+    attempt = {**cell["attempts"][0], "policy_sha256": looser.sha256}
+    assert policy_unchanged({**cell, "attempts": [attempt]}, family.policy) is False
+
+
+def _with_regression_task(family, **changes):
+    """*family* with its pinned regression task changed."""
+    tasks = tuple(replace(task, **changes) if task.task_id == family.regression_task else task
+                  for task in family.tasks)
+    return replace(family, tasks=tasks)
+
+
+def _regression_task(family):
+    return next(task for task in family.tasks if task.task_id == family.regression_task)
+
+
+@pytest.mark.parametrize("failure", ["answer-key-failed", "defect-accepted"])
+def test_the_regression_gate_fails_when_a_pinned_case_regresses(failure):
+    family = supplied_source_family()
+    task = _regression_task(family)
+    if failure == "answer-key-failed":
+        # Valid JSON, so strict acceptance takes it, but the answer key does not.
+        pinned = _with_regression_task(family, deliverable='{"answer": "wrong"}')
+        regressed, held = "reference-output", "planted-defect"
+    else:
+        pinned = _with_regression_task(family, defect=task.deliverable)
+        regressed, held = "planted-defect", "reference-output"
+    regression = run_regression(pinned)
+    assert set(regression["arms"]) == set(ARMS)
+    for entry in regression["arms"].values():
+        assert entry["passed"] is False
+        cases = {case["case"]: case for case in entry["cases"]}
+        assert cases[regressed]["observed"] == "accepted" and cases[regressed]["passed"] is False
+        assert cases[held]["passed"] is True
+        assert cases["reference-output"]["adjudication_passed"] is (failure != "answer-key-failed")
+        for case in cases.values():
+            assert case["adjudication_passed"] is (
+                case["attempts"][-1]["adjudication"]["deterministic_passed"])
+
+    # Without an answer key, a pinned accepted case needs only acceptance.
+    shapes = shape_family()
+    assert all(entry["passed"] and entry["cases"][0]["adjudication_passed"] is None
+               for entry in run_regression(shapes)["arms"].values())
+
+
+def _conversions():
+    """Three date conversions on which adaptive selection passes confirmation."""
     shapes = shape_family()
     base = next(item for item in shapes.tasks if item.task_id == "trivial-transform")
     dates = ["March 3 2024", "7/4/1999", "22 Oct 2011", "Jan 1, 2000", "2023-12-31"]
@@ -313,8 +371,44 @@ def test_a_challenger_that_passes_confirmation_meets_the_holdout_split():
                                + "; ".join(dates[:count]), constraints=["Output only JSON"]),
                 deliverable=f"Fixture deliverable for {count} converted dates.")
         for count in (2, 3, 5))
-    family = replace(shapes, name="conversions", tasks=tasks, regression_task="convert-2",
-                     split_manifest={"family": "conversions"})
+    return replace(shapes, name="conversions", tasks=tasks, regression_task="convert-2",
+                   split_manifest={"family": "conversions"})
+
+
+def _exact_answer(expected):
+    def adjudicate(output):
+        return {"deterministic_passed": output == expected}
+    return adjudicate
+
+
+@pytest.mark.parametrize("failure", ["answer-key-failed", "defect-accepted"])
+def test_a_failed_regression_gate_fails_every_trial_and_blocks_promotion(failure):
+    # With its pinned cases holding, this family's challenger passes confirmation
+    # (test_a_challenger_that_passes_confirmation_meets_the_holdout_split).
+    family = _conversions()
+    task = _regression_task(family)
+    if failure == "answer-key-failed":
+        pinned = _with_regression_task(
+            family, adjudicate=_exact_answer(task.deliverable),
+            deliverable="Fixture deliverable that converts none of the dates.")
+    else:
+        pinned = _with_regression_task(family, defect=task.deliverable)
+    regression = run_regression(pinned)
+    assert not any(entry["passed"] for entry in regression["arms"].values())
+
+    campaign = asyncio.run(run_campaign(family, regression, seed=3))
+    assert campaign["trials"]
+    for trial in campaign["trials"]:
+        assert trial["gates"]["regression.no_new_failures"] is False
+        assert trial["gates"]["acceptance.policy_unchanged"] is True
+    decision = campaign["decision"]
+    assert decision["promoted"] is False and decision["confirmation_assessment"] is None
+    assert decision["reason"] == "no candidate passed development gates and hard bounds"
+    assert not any(score["viable"] for score in decision["development_scores"])
+
+
+def test_a_challenger_that_passes_confirmation_meets_the_holdout_split():
+    family = _conversions()
     campaign = asyncio.run(run_campaign(family, run_regression(family), seed=3))
     decision = campaign["decision"]
     # One worker answers what the generated plan spends a planning call on.
