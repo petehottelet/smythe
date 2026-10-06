@@ -1041,6 +1041,27 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `SQLiteRunStore.queue_integrity_repair()`; the Jobs schema stays at
   version 4. See
   [repair corrupted accepted outputs](docs/jobs.md#repair-corrupted-accepted-outputs).
+- `jobs recheck RUN_ID OPERATION... --reason TEXT` decides succeeded
+  operations' accepted files again under the current checks, without a
+  provider call. Delivery eligibility now uses the latest decision made
+  under the validators an operation requires now, the call's own or a
+  recheck's, so a registered validator's new version or configuration, or a
+  newer built-in artifact check, reports `validator_changed`: a recheck is
+  required. `JobRunner.recheck()` runs this release's built-in check and the
+  validators registered under the names the plan gives, at any version, so
+  it works where `resume` and `reroll` are refused. Under the run's lease it
+  hashes every accepted file again, reads each operation's files once into
+  memory, and records a `delivery_acceptance_reevaluated` event with the
+  reason, outcome, each validator's result, the findings and each file's
+  SHA-256 through `SQLiteRunStore.record_reevaluation()`. Statuses, accepted
+  attempts and `accepted` flags never change, so a rejecting recheck leaves
+  the operation succeeded but not eligible. A missing or changed file,
+  another state or another worker's lease refuses it with exit code 6 and
+  nothing recorded. `jobs inspect` lists each attempt's rechecks as
+  `delivery_reevaluations` and the HTML report shows them;
+  `inspect_job(..., validators=[...])` judges eligibility under the
+  validators registered now. The Jobs schema stays at version 4. See
+  [recheck accepted outputs](docs/jobs.md#recheck-accepted-outputs).
 - Contribution lint. `lint_contributions(graph, registry=None)` lists the
   groups of parallel siblings that could only repeat each other's work: the
   same dependency inputs, label, agent, model, required capabilities,

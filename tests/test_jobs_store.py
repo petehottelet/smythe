@@ -1067,3 +1067,128 @@ def test_integrity_repair_reopens_a_version_4_database_without_migration(tmp_pat
     with SQLiteRunStore(database, read_only=True) as store:
         assert store.snapshot(run_id)["version"] == 4
     assert schema() == created
+
+
+# ---------------------------------------------------------------------------
+# Rechecked delivery decisions
+# ---------------------------------------------------------------------------
+
+_PALETTE_V2 = {"name": "brand-palette", "version": "2", "config_sha256": "e" * 64}
+
+
+def _recheck(operation, artifacts, outcome="accepted"):
+    """A recheck of every accepted artifact, shaped as ``JobRunner.recheck`` records it."""
+    result = {"accepted": "passed", "rejected": "rejected", "indeterminate": "error"}[outcome]
+    return {
+        "operation_id": operation["operation_id"],
+        "attempt_id": artifacts[0]["attempt_id"],
+        "outcome": outcome,
+        "validators": [{"validator": _PALETTE_V2, "outcome": result, "reports": []}],
+        "findings": [] if outcome == "accepted" else ["artifact-01.png: brand-palette: off palette"],
+        "artifacts": [{"relative_path": item["relative_path"], "sha256": item["sha256"]}
+                      for item in artifacts],
+    }
+
+
+def test_a_recheck_records_a_decision_and_changes_no_status_pointer_or_flag(tmp_path, store_factory):
+    store, run_id, operation, lease, artifacts = _succeeded(tmp_path, store_factory)
+    before = store.snapshot(run_id, include_events=True)
+    decision = _recheck(operation, artifacts, "rejected")
+
+    [payload] = store.record_reevaluation(run_id, [decision], reason="palette version 2",
+                                          lease=lease)
+
+    assert payload == {"version": 1, "attempt_id": artifacts[0]["attempt_id"],
+                       "reason": "palette version 2", "outcome": "rejected",
+                       "validators": decision["validators"], "findings": decision["findings"],
+                       "artifacts": decision["artifacts"]}
+    after = store.snapshot(run_id, include_events=True)
+    for name in ("status", "counts", "cost", "operations", "attempts", "artifacts", "updated_at_ns"):
+        assert after[name] == before[name]
+    event = after["events"][-1]
+    assert (event["event_type"], event["operation_id"], event["payload"]) == (
+        "delivery_acceptance_reevaluated", operation["operation_id"], payload)
+    [recorded] = store.delivery_reevaluations(run_id)[artifacts[0]["attempt_id"]]
+    assert recorded == payload | {"reevaluated_at_ns": event["created_at_ns"]}
+    [attempt] = store.inspection_snapshot(run_id)["attempts"]
+    assert attempt["delivery_reevaluations"] == [recorded]
+    # A later recheck is kept beside the earlier one, oldest first.
+    store.record_reevaluation(run_id, [_recheck(operation, artifacts)], reason="palette fixed",
+                              lease=lease)
+    assert [item["outcome"] for item in store.delivery_reevaluations(run_id)[
+        artifacts[0]["attempt_id"]]] == ["rejected", "accepted"]
+    assert store.schema_version == 4
+
+
+def test_a_recheck_must_decide_a_succeeded_operations_accepted_files_as_recorded(
+    tmp_path, store_factory,
+):
+    store, run_id, operation, lease, artifacts = _succeeded(tmp_path, store_factory)
+    valid = _recheck(operation, artifacts)
+    first, second = valid["artifacts"]
+    before = store.snapshot(run_id, include_events=True)
+
+    for decision, error, problem in (
+        (dict(valid, artifacts=[first]), ValueError, "every accepted artifact"),
+        (dict(valid, artifacts=[first, dict(second, sha256="c" * 64)]), ValueError,
+         "every accepted artifact"),
+        (dict(valid, artifacts=[first, first]), ValueError, "every accepted artifact"),
+        (dict(valid, artifacts=[first, dict(second, extra=1)]), ValueError, "relative_path"),
+        (dict(valid, attempt_id="f" * 32), InvalidTransitionError, "accepted attempt"),
+        (dict(valid, outcome="rejected"), ValueError, "outcome"),
+        (dict(valid, outcome="maybe"), ValueError, "outcome"),
+        (dict(valid, validators=[]), ValueError, "validator"),
+        (dict(valid, validators=[{"validator": _PALETTE_V2, "outcome": "fine"}]), ValueError,
+         "validator"),
+        (dict(valid, findings="none"), ValueError, "findings"),
+        (dict(valid, findings=[7]), ValueError, "findings"),
+        ({key: value for key, value in valid.items() if key != "findings"}, ValueError, "keys"),
+        (dict(valid, extra=True), ValueError, "keys"),
+        (dict(valid, operation_id=7), ValueError, "text"),
+        (dict(valid, validators=[{"validator": _PALETTE_V2, "outcome": "passed",
+                                  "reports": float("nan")}]), ValueError, "JSON"),
+        (dict(valid, operation_id="op_missing"), JobNotFoundError, "op_missing"),
+    ):
+        with pytest.raises(error, match=problem):
+            store.record_reevaluation(run_id, [decision], reason="review", lease=lease)
+    for reason in ("", "  ", None, "x" * 2049):
+        with pytest.raises(ValueError, match="reason"):
+            store.record_reevaluation(run_id, [valid], reason=reason, lease=lease)
+    for decisions, problem in (([], "at least one"), ("decision", "at least one"),
+                               ([valid, valid], "once")):
+        with pytest.raises(ValueError, match=problem):
+            store.record_reevaluation(run_id, decisions, reason="review", lease=lease)
+    # One refused decision records none of the others.
+    with pytest.raises(JobNotFoundError):
+        store.record_reevaluation(run_id, [valid, dict(valid, operation_id="op_missing")],
+                                  reason="review", lease=lease)
+    assert store.snapshot(run_id, include_events=True) == before
+
+    # An operation in any other state has no accepted output to recheck.
+    other_run = store.create_run(*_plan(tmp_path, provider="offline"), manifest_root=tmp_path,
+                                 allow_approval_reuse=True)
+    pending = store.pending_operations(other_run)[0]
+    with pytest.raises(InvalidTransitionError, match="state pending"):
+        store.record_reevaluation(other_run, [dict(valid, operation_id=pending["operation_id"])],
+                                  reason="review")
+
+
+def test_a_recheck_is_fenced_by_the_runs_current_lease(tmp_path, store_factory):
+    store, run_id, operation, lease, artifacts = _succeeded(tmp_path, store_factory)
+    decision = _recheck(operation, artifacts)
+    before = store.snapshot(run_id, include_events=True)
+
+    with pytest.raises(RunLeaseError, match="requires a current lease token"):
+        store.record_reevaluation(run_id, [decision], reason="review")
+    store.release_run_lease(run_id, "worker-a", lease=lease)
+    current = store.acquire_run_lease(run_id, "worker-a")
+    with pytest.raises(RunLeaseError, match="superseded"):
+        store.record_reevaluation(run_id, [decision], reason="review", lease=lease)
+    after = store.snapshot(run_id, include_events=True)
+    assert "delivery_acceptance_reevaluated" not in {event["event_type"] for event in after["events"]}
+    assert after["operations"] == before["operations"]
+
+    assert store.record_reevaluation(run_id, [decision], reason="review", lease=current)
+    with SQLiteRunStore(tmp_path / "jobs.db", read_only=True) as reader:
+        with pytest.raises(RunStoreError, match="read-only"):
+            reader.record_reevaluation(run_id, [decision], reason="review", lease=current)

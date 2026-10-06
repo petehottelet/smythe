@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import re
 import time
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 from smythe._publish import _check_path, _integrity, _relative_parts
 from smythe.jobs.artifact_io import MAX_ARTIFACT_BYTES
-from smythe.jobs.delivery import annotate_delivery
+from smythe.jobs.delivery import annotate_delivery, validator_registry
 from smythe.jobs.preflight import operation_input_digest
 from smythe.jobs.store import RunStoreError, SQLiteRunStore
 
@@ -62,6 +63,7 @@ def inspect_job(
     limit: int = 50,
     offset: int = 0,
     events_limit: int = 100,
+    validators: Sequence[Any] | None = None,
 ) -> dict[str, Any]:
     """Read one ledger view, then check a bounded amount of local artifact bytes.
 
@@ -69,16 +71,22 @@ def inspect_job(
     attempt lineage are paged; recent events carry a separate limit. Files can
     change after the SQLite snapshot, so integrity findings are timestamped
     observations and never change recorded acceptance or run status. Each
-    attempt carries its recorded ``delivery_acceptance`` decision, and each
-    operation a projected ``delivery_acceptance`` and a derived
-    ``delivery_eligibility`` (see :func:`smythe.jobs.delivery.operation_delivery`),
-    and its ``adoption``: the reason, attempt, call and kept exposure of bytes
-    adopted for an unknown outcome, whose attempt and call stay unknown, or
-    ``None``. Each operation also carries its ``input_digest``, computed from the stored
+    attempt carries its recorded ``delivery_acceptance`` decision and its
+    rechecks as ``delivery_reevaluations``, and each operation a projected
+    ``delivery_acceptance`` and a derived ``delivery_eligibility`` (see
+    :func:`smythe.jobs.delivery.operation_delivery`), and its ``adoption``:
+    the reason, attempt, call and kept exposure of bytes adopted for an
+    unknown outcome, whose attempt and call stay unknown, or ``None``.
+    Eligibility needs a decision made under the validators the plan names,
+    or, given *validators*, under those registered now with the same names,
+    as ``JobRunner(validators=...)`` registers them. Each operation also
+    carries its ``input_digest``, computed from the stored
     plan (see :func:`smythe.jobs.preflight.operation_input_digest`), or ``None``
     when its stored specification, or the plan's stored attachment
     fingerprints it needs, cannot produce one.
     """
+    registered = {name: identity for name, (identity, _validator)
+                  in validator_registry(validators).items()}
     snapshot = store.inspection_snapshot(
         run_id, operation=operation, limit=limit, offset=offset, events_limit=events_limit
     )
@@ -95,7 +103,9 @@ def inspect_job(
     records = {attempt["attempt_id"]: attempt["delivery_acceptance"]
                for attempt in snapshot.get("attempts", ())
                if attempt.get("delivery_acceptance") is not None}
-    return annotate_delivery(snapshot, records)
+    rechecks = {attempt["attempt_id"]: attempt.get("delivery_reevaluations") or []
+                for attempt in snapshot.get("attempts", ())}
+    return annotate_delivery(snapshot, records, rechecks, registered)
 
 
 def _add_input_digests(store: SQLiteRunStore, run_id: str, operations) -> None:

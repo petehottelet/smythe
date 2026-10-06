@@ -387,7 +387,9 @@ Preflight refuses a name that is not registered, or registered at another
 version, before any run exists. The plan records each resolved identity,
 including its `config_sha256`, so a changed validator changes the plan hash:
 its approval no longer matches, and `resume` and `reroll` of a run approved
-under the old validator are refused before any provider call. A runner that
+under the old validator are refused before any provider call;
+[recheck](#recheck-accepted-outputs) decides that run's accepted outputs again
+under the changed validator without a call. A runner that
 lacks a validator the plan names, or has it with another identity, refuses
 to start the run. Manifests without validators keep their manifest hash, plan
 hash, operation IDs and approval tokens.
@@ -417,17 +419,28 @@ legacy built-in decision whose validator is unrecorded. It is never reported
 as `accepted` or as `not_evaluated`, and it keeps the recorded flag as
 provenance.
 
-`delivery_eligibility` is `{"eligible": true, "reasons": []}` only when the
-recorded decision is `accepted`, the recorded validators are exactly the ones
-the operation's plan requires now, and every accepted artifact is `verified`
-on disk with the recorded SHA-256. Otherwise `reasons` lists codes:
-`no_decision`, `not_accepted`, `validator_unrecorded`, `validator_changed`,
+An accepted attempt's decisions are its call's recorded one and any later
+[rechecks](#recheck-accepted-outputs) of the same bytes, which inspection
+lists, oldest first, as the attempt's `delivery_reevaluations`. Eligibility
+uses the latest of them whose validators are exactly the ones the operation
+requires now: this release's built-in check and the registered validators
+its plan names. `jobs inspect` takes those from the plan;
+`inspect_job(store, run_id, validators=[...])` and a `JobRunner` take, for
+each name, the validator registered now. The projection describes that
+decision, with `source: "reevaluated"` for a recheck; without one, it
+describes the latest decision.
+
+`delivery_eligibility` is `{"eligible": true, "reasons": []}` only when that
+decision is `accepted` and every accepted artifact is `verified` on disk with
+the SHA-256 the decision names. Otherwise `reasons` lists codes:
+`no_decision`, `not_accepted`, `validator_unrecorded`, `validator_changed`
+(no decision used the current validators: a recheck is required),
 `record_invalid`, `record_mismatch`, or `artifact_` followed by the integrity
 status (`artifact_changed`, `artifact_missing`, `artifact_unsafe`,
 `artifact_unreadable`, `artifact_not_checked`). Eligibility is derived on
 every read and never written back; recorded statuses and `accepted` flags are
-unchanged. The HTML report shows it in a Delivery column, with the decision
-and validator results beside each attempt.
+unchanged. The HTML report shows it in a Delivery column, with the decision,
+validator results and rechecks beside each attempt.
 
 `resume` and `reroll` recheck the SHA-256 of every file of each operation's
 accepted attempt after execution, without the 64 MiB inspection limit, and
@@ -770,6 +783,81 @@ like `reroll`. In Python, call `JobRunner.adopt(run_id, operation_key,
 reason=...)`; it records the verified bytes with
 `SQLiteRunStore.adopt_published_attempt`. The Jobs schema stays at version 4.
 
+## Recheck accepted outputs
+
+A changed check never inherits a decision made under the old one. After a
+registered validator gets a new version or configuration, or a release ships
+a new version of the built-in artifact check, each operation decided under
+the old one reports `validator_changed` in its
+[delivery eligibility](#delivery-eligibility): a recheck is required. A
+recheck decides the accepted bytes again, without a provider call:
+
+```bash
+smythe jobs recheck RUN_ID "tile[3]" "tile[4]" --reason "artifact check version 2"
+```
+
+In Python, register the validators as they are now on the runner, such as
+the [`MaxBytes`](#python-api) validator with a lower limit, which is a new
+configuration:
+
+```python
+runner = JobRunner(store, validators=[MaxBytes(1_500_000)])
+result = asyncio.run(runner.recheck(run_id, ["tile[3]"], reason="limit lowered"))
+```
+
+- **What decides.** This release's built-in check and, for each validator
+  the plan names, the one registered under that name now, at any version or
+  configuration. Nothing is dispatched, so the plan's approval is not used,
+  and a recheck works where `resume` and `reroll` are refused under the
+  changed validator. A validator the plan names that the runner has not
+  registered refuses it with exit code 2. The CLI registers none, so
+  `jobs recheck` covers runs whose plans name no registered validators.
+- **What is read.** Only the accepted files of `succeeded` operations. Under
+  the run's lease each is hashed again and must be `verified`; then each
+  operation's files are read once into memory, at most 10 files of 32 MiB,
+  and must still hold the recorded bytes. Every check decides that copy, as
+  it decided the response.
+- **What is recorded.** One `delivery_acceptance_reevaluated` event per
+  operation, all in one transaction under the lease:
+
+  ```json
+  {
+    "version": 1,
+    "attempt_id": "...",
+    "reason": "artifact check version 2",
+    "outcome": "accepted",
+    "validators": [{"validator": {"name": "smythe.jobs.artifact-spec", "version": "2",
+                                  "config_sha256": "..."},
+                    "outcome": "passed", "reports": [{"...": "..."}]}],
+    "findings": [],
+    "artifacts": [{"relative_path": "artifacts/tile_3/attempt-0001/tile.png", "sha256": "..."}]
+  }
+  ```
+
+  `outcome` is decided as for a call: `accepted`, `rejected` or
+  `indeterminate`. `validators` holds each check's identity, outcome and
+  reports, `findings` the finding messages, and `artifacts` each accepted
+  file's path and SHA-256. Earlier decisions are kept. Statuses, the accepted
+  attempt, artifact rows and their `accepted` flags never change, and no
+  budget, attempt or approval is used.
+- **What follows.** Eligibility uses the latest decision made under the
+  current validators. An accepting recheck makes the operation eligible
+  again; a rejecting one leaves it `succeeded` but not eligible
+  (`not_accepted`). Its bytes still verify, so an integrity repair refuses
+  them, and regenerating them takes a new plan and approval.
+- **Refusals.** Another operation state, an unknown operation, an accepted
+  file that is missing, changed, unreadable or unsafe (an
+  [integrity repair](#repair-corrupted-accepted-outputs) regenerates a
+  missing or changed one) and another worker's lease refuse the whole
+  recheck with exit code 6; nothing is recorded.
+
+A recheck holds the run's lease, like a reroll, prints the run and returns
+its exit code like `reroll`. `jobs inspect` lists each attempt's rechecks as
+its `delivery_reevaluations`, with `reevaluated_at_ns`, and the HTML report
+shows them beside the attempt. `JobRunner.recheck` records the decisions
+with `SQLiteRunStore.record_reevaluation`. The Jobs schema stays at
+version 4.
+
 ## Export
 
 Export includes the manifest and plan hashes, operation and attempt lineage,
@@ -814,7 +902,7 @@ and output charge that one request can incur.
 | 3 | provider configuration or optional dependency failure |
 | 4 | approval mismatch, or an already used approval without `--new-run` |
 | 5 | budget admission failure |
-| 6 | unknown run, invalid state transition, or refused adoption or repair |
+| 6 | unknown run, invalid state transition, or refused adoption, repair or recheck |
 | 7 | local SQLite/filesystem failure, detached startup failure, or attachment detects a failed worker or expired lease |
 | 130 | detached startup interrupted, or attachment disconnected with Ctrl+C |
 

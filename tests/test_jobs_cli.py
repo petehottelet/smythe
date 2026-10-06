@@ -446,3 +446,67 @@ def test_reroll_repair_integrity_regenerates_a_deleted_accepted_file(tmp_path, c
         main(["jobs", "reroll", "--help"])
     help_text = " ".join(capsys.readouterr().out.split())
     assert "--repair-integrity rerun succeeded operations whose accepted files are missing or changed" in help_text
+
+
+# ---------------------------------------------------------------------------
+# Rechecks of accepted outputs
+# ---------------------------------------------------------------------------
+
+
+def _completed_run(tmp_path, capsys, manifest=None):
+    manifest = manifest or _manifest(tmp_path)
+    store = tmp_path / "jobs.sqlite3"
+    assert main(["jobs", "plan", str(manifest), "--json"]) == EXIT_OK
+    token = _json_output(capsys)["plan"]["approval"]["token"]
+    assert main(["jobs", "run", str(manifest), "--approve", token, "--store", str(store),
+                 "--json"]) == EXIT_OK
+    return store, _json_output(capsys)["run"]
+
+
+def test_recheck_decides_accepted_files_again_under_a_newer_built_in_check(
+    tmp_path, capsys, monkeypatch,
+):
+    import smythe.jobs.delivery as delivery
+
+    store, run = _completed_run(tmp_path, capsys)
+    inspect = ["jobs", "inspect", run["run_id"], "--store", str(store), "--json"]
+    monkeypatch.setattr(delivery, "ARTIFACT_SPEC_VALIDATOR_VERSION", "2")
+    assert main(inspect) == EXIT_OK
+    [operation] = _json_output(capsys)["inspect"]["operations"]
+    assert operation["delivery_eligibility"] == {"eligible": False, "reasons": ["validator_changed"]}
+
+    command = ["jobs", "recheck", run["run_id"], "glyph[0]", "--reason", "artifact check version 2",
+               "--store", str(store)]
+    assert main([*command, "--json"]) == EXIT_OK
+    rechecked = _json_output(capsys)
+    assert rechecked["ok"] is True and rechecked["command"] == "recheck"
+    assert rechecked["recheck"]["status"] == "completed"
+    [operation] = rechecked["recheck"]["operations"]
+    assert operation["status"] == "succeeded"
+    assert operation["delivery_eligibility"] == {"eligible": True, "reasons": []}
+    assert main(inspect) == EXIT_OK
+    inspected = _json_output(capsys)["inspect"]
+    assert inspected["operations"][0]["delivery_eligibility"] == {"eligible": True, "reasons": []}
+    [attempt] = inspected["attempts"]
+    [recorded] = attempt["delivery_reevaluations"]
+    assert recorded["reason"] == "artifact check version 2" and recorded["outcome"] == "accepted"
+    assert recorded["validators"][0]["validator"]["version"] == "2"
+    assert main(command) == EXIT_OK
+    assert "Status: completed" in capsys.readouterr().out
+
+    [artifact] = run["artifacts"]
+    (tmp_path / "outputs" / run["artifact_directory"] / artifact["relative_path"]).unlink()
+    for arguments, error in (([run["run_id"], "glyph[0]"], "is missing"),
+                             ([run["run_id"], "missing[0]"], "missing[0]"),
+                             (["missing-run", "glyph[0]"], "missing-run")):
+        assert main(["jobs", "recheck", *arguments, "--reason", "check", "--store", str(store),
+                     "--json"]) == EXIT_JOB_STATE
+        refused = _json_output(capsys)
+        assert refused["ok"] is False and refused["command"] == "recheck"
+        assert error in refused["error"]["message"]
+    with pytest.raises(SystemExit) as missing_reason:
+        main(["jobs", "recheck", run["run_id"], "glyph[0]", "--store", str(store)])
+    assert missing_reason.value.code == EXIT_INVALID_INPUT
+    with pytest.raises(SystemExit):
+        main(["jobs", "--help"])
+    assert "recheck" in capsys.readouterr().out

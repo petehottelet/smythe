@@ -374,3 +374,45 @@ def test_empty_page_keeps_nonzero_whole_run_totals():
     assert "Showing 0 of 30 matching operations." in document.content
     assert "$3.750001" in document.content and "27" in document.content
     assert "No operations match this inspection page." in document.content
+
+
+# ---------------------------------------------------------------------------
+# Rechecked decisions
+# ---------------------------------------------------------------------------
+
+
+def _with_recheck(sample, reason="Palette version 2 released"):
+    sample = _with_delivery(sample, eligibility={"eligible": True, "reasons": []})
+    sample["operations"][0]["delivery_acceptance"]["source"] = "reevaluated"
+    sample["attempts"][1]["delivery_reevaluations"] = [{
+        "version": 1, "attempt_id": "attempt-b", "reason": reason, "outcome": "accepted",
+        "validators": [{"validator": {"name": "brand-palette", "version": "2",
+                                      "config_sha256": "e" * 64},
+                        "outcome": "passed", "reports": []}],
+        "findings": [], "artifacts": [{"relative_path": "glyphs/17.svg", "sha256": "c" * 64}],
+        "reevaluated_at_ns": 1_788_796_805_000_000_000,
+    }]
+    return sample
+
+
+def test_a_required_recheck_and_a_rechecked_decision_are_labeled():
+    required = Document(render_job_report(_with_delivery(
+        payload(), eligibility={"eligible": False, "reasons": ["validator_changed"]})))
+    assert "Recheck required" in required.content
+
+    document = Document(render_job_report(_with_recheck(payload())))
+    assert "Accepted</span> after a recheck" in render_job_report(_with_recheck(payload()))
+    for expected in ("after a recheck", "Rechecked decisions",
+                     "Palette version 2 released", "brand-palette"):
+        assert expected in document.content
+    assert sum(tag == "caption" for tag, _ in document.tags) == 6
+    assert "Rechecked decisions" not in Document(render_job_report(payload())).content
+
+
+def test_rechecked_decisions_from_the_ledger_are_inert():
+    # Shown as JSON, so the attack has no quotes for the encoder to escape.
+    attack = "<script>alert(1)</script><img src=x onerror=alert(2)>"
+    html = render_job_report(_with_recheck(payload(), reason=attack))
+    document = Document(html)
+    assert attack in document.content
+    assert not {tag for tag, _ in document.tags} & {"script", "img"}

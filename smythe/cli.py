@@ -275,6 +275,14 @@ def build_parser() -> argparse.ArgumentParser:
     adopt.add_argument("--reason", required=True)
     _add_output_options(adopt, inherited=True)
 
+    recheck = commands.add_parser(
+        "recheck", help="decide succeeded operations' accepted files again under the current checks",
+    )
+    recheck.add_argument("run_id")
+    recheck.add_argument("operation_keys", nargs="+")
+    recheck.add_argument("--reason", required=True)
+    _add_output_options(recheck, inherited=True)
+
     export = commands.add_parser("export", help="export portable run JSON with events")
     export.add_argument("run_id")
     export.add_argument("--out", default=None, help="write atomically to this path")
@@ -996,7 +1004,7 @@ def _emit(args: argparse.Namespace, command: str, value: Any) -> None:
         print(f"Operations: {len(value['plan']['operations'])}")
         print(f"Worst-case cost: ${value['plan']['worst_case_cost_usd']}")
         print(f"Approval token: {value['approval']['token']}")
-    elif command in {"run", "status", "resume", "reroll", "adopt"}:
+    elif command in {"run", "status", "resume", "reroll", "adopt", "recheck"}:
         job = value
         print(f"Run: {_terminal_text(job['run_id'])}")
         print(f"Status: {_terminal_text(job['status'])}")
@@ -1334,6 +1342,10 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
         elif command == "adopt":
             snapshot = asyncio.run(
                 JobRunner(store).adopt(args.run_id, args.operation_key, reason=args.reason)
+            )
+        elif command == "recheck":
+            snapshot = asyncio.run(
+                JobRunner(store).recheck(args.run_id, args.operation_keys, reason=args.reason)
             )
         elif command == "export":
             snapshot = _portable_export(

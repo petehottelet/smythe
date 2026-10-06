@@ -1570,3 +1570,186 @@ def test_resume_reports_a_corrupted_file_a_rejected_repair_left_accepted(tmp_pat
     after = store.snapshot("kept", include_events=True)
     assert after["operations"] == before["operations"] and after["artifacts"] == before["artifacts"]
     assert provider.calls == 2
+
+
+# ---------------------------------------------------------------------------
+# Rechecks of accepted outputs under changed validators
+# ---------------------------------------------------------------------------
+
+
+def _off_palette(validator, subject):
+    from smythe.validation import ValidationReport, hard_finding
+
+    return ValidationReport("tile", (hard_finding("off_palette", "uses #00ff00"),),
+                            validator=validator.identity)
+
+
+def _eligibility(database, run_id, validators=None):
+    from smythe.jobs.inspection import inspect_job
+
+    with SQLiteRunStore(database, read_only=True) as reader:
+        return {item["operation_key"]: item["delivery_eligibility"]
+                for item in inspect_job(reader, run_id, validators=validators)["operations"]}
+
+
+def test_a_validator_version_bump_needs_a_recheck_which_records_a_new_decision(
+    tmp_path, store_factory,
+):
+    store = store_factory(tmp_path / "jobs.db")
+    original = _PaletteValidator()
+    _, first, record = _validated_run(tmp_path, store, original)
+    run_id, [operation] = first["run_id"], first["operations"]
+    key = operation["operation_key"]
+    bumped = _PaletteValidator(version="2")
+    provider = _PricedArtifactProvider([Artifact(PNG_1X1, "image/png")], cost_usd=None)
+    rechecker = JobRunner(store, provider_pool=_FixedPool(provider), validators=[bumped])
+
+    # The call's decision used version 1, so version 2 requires a recheck.
+    assert _eligibility(tmp_path / "jobs.db", run_id, [bumped]) == {
+        key: {"eligible": False, "reasons": ["validator_changed"]}}
+    assert _eligibility(tmp_path / "jobs.db", run_id) == _eligibility(
+        tmp_path / "jobs.db", run_id, [original]) == {key: {"eligible": True, "reasons": []}}
+    # Resuming under the changed validator is still refused.
+    with pytest.raises(PreflightError, match="version '1'"):
+        asyncio.run(rechecker.resume(run_id))
+
+    rechecked = asyncio.run(rechecker.recheck(run_id, [key], reason="palette version 2"))
+
+    assert provider.calls == 0 and rechecked["execution_metrics"]["operations_started"] == 0
+    assert [subject.data for subject in bumped.subjects] == [PNG_1X1]
+    [item] = rechecked["operations"]
+    assert item["status"] == OperationStatus.SUCCEEDED.value
+    assert item["accepted_attempt_id"] == operation["accepted_attempt_id"]
+    assert item["delivery_eligibility"] == {"eligible": True, "reasons": []}
+    acceptance = item["delivery_acceptance"]
+    assert (acceptance["source"], acceptance["decision"], acceptance["accepted"]) == (
+        "reevaluated", "accepted", True)
+    assert [result["validator"]["version"] for result in acceptance["validators"]] == ["1", "2"]
+    assert rechecked["status"] == RunStatus.COMPLETED.value
+    assert _eligibility(tmp_path / "jobs.db", run_id, [bumped]) == {
+        key: {"eligible": True, "reasons": []}}
+    [event] = _events(store, run_id, "delivery_acceptance_reevaluated")
+    [artifact] = first["artifacts"]
+    assert event["payload"]["version"] == 1 and event["payload"]["reason"] == "palette version 2"
+    assert event["payload"]["attempt_id"] == operation["accepted_attempt_id"]
+    assert event["payload"]["outcome"] == "accepted" and event["payload"]["findings"] == []
+    assert event["payload"]["artifacts"] == [
+        {"relative_path": artifact["relative_path"], "sha256": artifact["sha256"]}]
+    assert event["payload"]["validators"][1]["validator"] == bumped.identity.to_dict()
+    # The call's own decision is kept, and the run's lease was released.
+    [completed] = _events(store, run_id, "call_completed")
+    assert completed["payload"]["delivery_acceptance"] == record
+    assert store.get_run_lease(run_id) is None
+
+
+def test_a_newer_built_in_check_needs_a_recheck(tmp_path, store_factory, monkeypatch):
+    import smythe.jobs.delivery as delivery
+
+    plan = preflight_job(_manifest(count=2), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    runner = JobRunner(store)
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path,
+                                     run_id="built-in"))
+    rechecked_key, other_key = (item["operation_key"] for item in first["operations"])
+    monkeypatch.setattr(delivery, "ARTIFACT_SPEC_VALIDATOR_VERSION", "2")
+
+    resumed = asyncio.run(runner.resume("built-in"))
+    assert {item["operation_key"]: item["delivery_eligibility"]["reasons"]
+            for item in resumed["operations"]} == {
+        rechecked_key: ["validator_changed"], other_key: ["validator_changed"]}
+
+    rechecked = asyncio.run(runner.recheck("built-in", [rechecked_key], reason="check version 2"))
+
+    assert {item["operation_key"]: item["delivery_eligibility"]["reasons"]
+            for item in rechecked["operations"]} == {rechecked_key: [], other_key: ["validator_changed"]}
+    [event] = _events(store, "built-in", "delivery_acceptance_reevaluated")
+    [builtin] = event["payload"]["validators"]
+    assert builtin["validator"]["name"] == "smythe.jobs.artifact-spec"
+    assert builtin["validator"]["version"] == "2" and builtin["outcome"] == "passed"
+
+
+def test_a_recheck_that_rejects_leaves_the_operation_succeeded_but_not_eligible(
+    tmp_path, store_factory,
+):
+    store = store_factory(tmp_path / "jobs.db")
+    runner, first, _ = _validated_run(tmp_path, store, _PaletteValidator())
+    run_id, [operation] = first["run_id"], first["operations"]
+    key = operation["operation_key"]
+    before = store.snapshot(run_id)
+    stricter = _PaletteValidator(_off_palette, version="2")
+
+    rechecked = asyncio.run(JobRunner(store, validators=[stricter]).recheck(
+        run_id, [operation["operation_id"]], reason="stricter palette"))
+
+    [item] = rechecked["operations"]
+    assert rechecked["status"] == RunStatus.COMPLETED.value
+    assert item["status"] == OperationStatus.SUCCEEDED.value
+    assert item["accepted_attempt_id"] == operation["accepted_attempt_id"]
+    assert item["delivery_eligibility"] == {"eligible": False, "reasons": ["not_accepted"]}
+    assert item["delivery_acceptance"]["decision"] == "rejected"
+    assert item["delivery_acceptance"]["reasons"] == ["artifact-01.png: brand-palette: uses #00ff00"]
+    after = store.snapshot(run_id)
+    for name in ("operations", "attempts", "artifacts", "cost", "counts"):
+        assert after[name] == before[name]
+    assert [artifact["accepted"] for artifact in after["artifacts"]] == [1]
+    assert _eligibility(tmp_path / "jobs.db", run_id, [stricter]) == {
+        key: {"eligible": False, "reasons": ["not_accepted"]}}
+    # Under the validators its plan names, the call's own decision still holds.
+    assert _eligibility(tmp_path / "jobs.db", run_id) == {key: {"eligible": True, "reasons": []}}
+    # The accepted bytes verify, so an integrity repair cannot regenerate them.
+    with pytest.raises(InvalidTransitionError, match="no missing or changed"):
+        asyncio.run(runner.reroll(run_id, [key], reason="rejected by palette 2",
+                                  repair_integrity=True))
+
+
+def test_a_recheck_is_refused_before_any_validator_decides(tmp_path, store_factory):
+    store = store_factory(tmp_path / "jobs.db")
+    validator = _PaletteValidator()
+    plan = preflight_job(_validated_manifest(count=2), manifest_root=tmp_path, validators=[validator])
+    runner = JobRunner(store, provider_pool=_FixedPool(_ImmediateArtifactProvider()),
+                       validators=[validator])
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path,
+                                     run_id="refused"))
+    keys = [item["operation_key"] for item in first["operations"]]
+    damaged, intact = first["artifacts"]
+    decided = len(validator.subjects)
+
+    def unchanged():
+        assert not _events(store, "refused", "delivery_acceptance_reevaluated")
+        assert len(validator.subjects) == decided
+        assert store.get_run_lease("refused") is None
+
+    _damage(_accepted_file(tmp_path, first, damaged), "flip")
+    with pytest.raises(InvalidTransitionError, match=f"{damaged['relative_path']} is changed"):
+        asyncio.run(runner.recheck("refused", keys, reason="palette check"))
+    unchanged()
+    _accepted_file(tmp_path, first, damaged).unlink()
+    with pytest.raises(InvalidTransitionError, match="is missing"):
+        asyncio.run(runner.recheck("refused", keys, reason="palette check"))
+    unchanged()
+
+    intact_key = _owner(first, intact)["operation_key"]
+    with pytest.raises(PreflightError, match="'brand-palette'.*not registered"):
+        asyncio.run(JobRunner(store).recheck("refused", [intact_key], reason="palette check"))
+    with pytest.raises(JobNotFoundError):
+        asyncio.run(runner.recheck("refused", ["missing[0]"], reason="palette check"))
+    for keys_value, error in (([], ValueError), ("glyph[0]", TypeError)):
+        with pytest.raises(error, match="operation key"):
+            asyncio.run(runner.recheck("refused", keys_value, reason="palette check"))
+    for reason in ("", " ", None, "x" * 2049):
+        with pytest.raises(ValueError, match="reason"):
+            asyncio.run(runner.recheck("refused", [intact_key], reason=reason))
+    lease = store.acquire_run_lease("refused", "other-worker", ttl_s=30)
+    with pytest.raises(RunLeaseError, match="other-worker"):
+        asyncio.run(runner.recheck("refused", [intact_key], reason="palette check"))
+    store.release_run_lease("refused", "other-worker", lease=lease)
+    unchanged()
+
+    # Only a succeeded operation has accepted output to recheck.
+    rejected_plan = preflight_job(_manifest(count=1, attempts=2), manifest_root=tmp_path)
+    rejected = asyncio.run(JobRunner(store, provider_pool=_FixedPool(_SequenceProvider())).start(
+        rejected_plan, make_approval(rejected_plan), manifest_root=tmp_path, run_id="rejected"))
+    with pytest.raises(InvalidTransitionError, match="state rejected has no accepted output"):
+        asyncio.run(JobRunner(store).recheck(
+            "rejected", [rejected["operations"][0]["operation_key"]], reason="check"))
+    assert not _events(store, "rejected", "delivery_acceptance_reevaluated")
