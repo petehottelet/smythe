@@ -239,8 +239,9 @@ obligations in the span's `error`.
 ### Revision log
 
 Spans cover one `execute()` or `resume()` call. The run also keeps a
-revision log of its latest 32 decisions, applied or refused, oldest first:
-an ordinary checkpoint saves it under
+revision log of its latest 32 decisions, applied or refused, oldest first;
+a review that proposed no change, `None` or an empty `Revision`, is not a
+decision and is not logged. An ordinary checkpoint saves the log under
 [`control.revision_log`](checkpoint-format.md#revision-log), resume extends
 it, and [`smythe runs inspect`](runs.md#revision-log) shows it. Each entry is
 the record above with `applied`, the supervisor's `reason` and, for a

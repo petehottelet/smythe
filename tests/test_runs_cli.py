@@ -1186,3 +1186,60 @@ def test_the_durable_revision_log_is_derived_from_supervision_operations():
     log = revision_log(journal, "run")
     assert len(log) == 32 and log[0]["after_node"] == "n8"
     assert {entry["applied"] for entry in log} == {False}
+
+
+def test_a_durable_review_that_proposed_an_empty_revision_is_not_logged():
+    from smythe.workflow import revision_log
+
+    nothing = {"add_nodes": [], "drop_node_ids": [], "rewire": {}, "reason": "nothing to change"}
+    add_x = {"add_nodes": [{"id": "x", "label": "x", "depends_on": ["a"]}], "drop_node_ids": [],
+             "rewire": {}, "reason": "a needs a follow-up"}
+    journal = SupervisionJournal([supervision("a", 2, reviewed("a"), {"revision": nothing})],
+                                 max_revisions=2, revisions_used=0)
+
+    assert revision_log(journal, "run") == []
+
+    # The allowance still steps across the review that changed nothing.
+    journal.operations.append(supervision("b", 2, reviewed("a", "b"), {"revision": add_x}))
+    journal.revisions_used = 1
+    assert [(entry["after_node"], entry["applied"], entry["change"])
+            for entry in revision_log(journal, "run")] == [("b", True, "+1")]
+
+
+class Approves(Supervisor):
+    """Reviews every step and proposes an empty revision, which changes nothing."""
+
+    async def review(self, graph, node, *, task, revisions_remaining):
+        return Revision(reason="looks fine, nothing to change")
+
+
+def test_a_review_that_proposed_an_empty_revision_is_logged_by_neither_kind_of_run(
+    tmp_path, capsys,
+):
+    checkpoints = tmp_path / "checkpoints"
+    swarm = Swarm(model="offline", provider=OfflineProvider(), artifact_dir=None,
+                  checkpoint_store=FileCheckpointStore(checkpoints), supervisor=Approves(),
+                  max_revisions=2)
+    ordinary = swarm.execute(graph())
+    path = tmp_path / "runs.db"
+    with SQLiteWorkflowStore(path) as store:
+        swarm = Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+                      run_store=store, max_budget_usd=1, max_revisions=2,
+                      supervisor=LocalOnly(Approves, "approves", "1", role="supervisor"))
+        durable = swarm.execute(graph())
+        operations = store.list_operations(durable.execution_id, "supervision")
+    with closing(CONNECT(path)) as db:
+        assert db.execute("PRAGMA journal_mode=DELETE").fetchone() == ("delete",)
+
+    # The journal keeps each empty proposal; neither run traced a revision.
+    assert [operation["result"]["revision"] for operation in operations] == [
+        {"add_nodes": [], "drop_node_ids": [], "rewire": {}, "reason": "looks fine, nothing to change"},
+    ] * 2
+    for result in (ordinary, durable):
+        assert [span for span in result.trace if "revision" in span] == []
+    code, value = inspect(capsys, checkpoints, ordinary.execution_id)
+    assert code == EXIT_OK and value["revision_log"] == []
+    code, value = inspect_durable(capsys, path, durable.execution_id)
+    assert code == EXIT_OK and value["revision_log"] == []
+    main(["runs", "--journal", str(path), "inspect", durable.execution_id])
+    assert "Revision" not in capsys.readouterr().out

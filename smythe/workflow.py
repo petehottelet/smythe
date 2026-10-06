@@ -447,9 +447,10 @@ def revision_log(store, run_id):
     decision was applied when the next review, or else the run's checkpoint,
     has one revision fewer left, and refused when it has as many; the journal
     keeps no refusal's reason, so its ``detail`` is None. A review that
-    proposed no change is not listed, and one whose supervisor raised is
-    listed as refused. At most ``REVISION_LOG_LIMIT`` entries, the latest,
-    are returned. Only reads are made, so a store opened read-only will do.
+    proposed no change, None or an empty revision, is not listed, and one
+    whose supervisor raised is listed as refused. At most
+    ``REVISION_LOG_LIMIT`` entries, the latest, are returned. Only reads are
+    made, so a store opened read-only will do.
     """
     operations = [operation for operation in store.list_operations(run_id, "supervision")
                   if operation["applied_revision"] is not None]
@@ -462,7 +463,9 @@ def revision_log(store, run_id):
     for index, operation in enumerate(operations):
         inputs, result = operation["inputs"], operation["result"]
         proposal, error = result.get("revision"), result.get("local_error_type")
-        if proposal is None and error is None:
+        if error is None and (proposal is None or not (
+                proposal["add_nodes"] or proposal["drop_node_ids"] or proposal["rewire"])):
+            # Like Revision.is_empty: the executor neither applies nor refuses it.
             continue
         before, after = remaining[index], remaining[index + 1]
         applied = (before - after == 1 if type(before) is int and type(after) is int
