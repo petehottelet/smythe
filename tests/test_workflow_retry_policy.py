@@ -14,7 +14,7 @@ from types import MappingProxyType
 
 import pytest
 
-from fakes import RATE_LIMITED, Crash, HttpError, ManualClock, NativeTransport, crash_when
+from fakes import RATE_LIMITED, Crash, Gate, HttpError, ManualClock, NativeTransport, crash_when
 from smythe import RetryPolicy, SQLiteWorkflowStore, Swarm, workflow
 from smythe.async_executor import AsyncExecutor
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, Topology
@@ -93,6 +93,32 @@ def test_a_rate_limited_node_is_capped_and_resume_makes_no_call_beyond_the_cap(t
         assert store.load_run(run["run_id"])["blocked_reason"] is None
     assert outcomes(wire) == ["http_429"] * 3
 
+
+
+def test_resume_never_sends_an_attempt_whose_call_was_rejected_again(tmp_path, wire):
+    """An attempt that ends before its request leaves no rejected call to count."""
+    gate = Gate()
+    # Attempt 0 times out while its input tokens are counted, before any request.
+    wire.schedule("execution", 0, gate, operation="input_tokens")
+    # Attempt 1's request is rate limited.
+    wire.schedule("execution", 0, RATE_LIMITED)
+    graph = ExecutionGraph([Topology.SERIAL], [
+        Node(id="draft", label="Draft", failure_policy=FailurePolicy.RETRY, max_retries=1,
+             timeout_s=1),
+    ])
+    try:
+        with SQLiteWorkflowStore(tmp_path / "runs.db") as store:
+            swarm = durable(store, RetryPolicy())
+            with pytest.raises(ProviderRequestRejectedError):
+                swarm.execute(graph)
+            gate.release()
+            (run,) = store.list_runs()
+            # Both attempts were used, so the node fails again without a call.
+            with pytest.raises(RuntimeError, match="already used all 2 attempts"):
+                swarm.resume(run["run_id"])
+    finally:
+        gate.release()
+    assert outcomes(wire) == ["http_429"]
 
 @pytest.mark.parametrize("second", ["delivered", "http_429"])
 def test_a_crash_after_the_first_rejected_attempt_resumes_within_the_cap(

@@ -982,7 +982,10 @@ class WorkflowRuntime:
         reply rejected with its known charge, such as a refusal, its attempt
         is entered again so the journal replays the reply without a call: a
         reply the policy does not retry stops the node again, and one it
-        retries is followed by the next attempt.
+        retries is followed by the next attempt. An attempt that ended before
+        its request leaves no rejected call, so the count is never below one
+        past the latest rejected attempt: an attempt whose call was rejected
+        is never sent again.
         """
         calls = self.store.node_generation_calls(self.run_id, node.id, node_generation(node))
         replies = [call for call in calls if call["key"]["phase"] in ("execution", "verification")]
@@ -992,7 +995,8 @@ class WorkflowRuntime:
             if latest["result_state"] == "rejected" and not _is_http_rejection(
                     self.store.lookup_call(self.run_id, CallKey(**latest["key"]))):
                 return latest["key"]["attempt"]
-        return sum(call["result_state"] == "rejected" for call in calls)
+        rejected = [call for call in calls if call["result_state"] == "rejected"]
+        return max([len(rejected)] + [call["key"]["attempt"] + 1 for call in rejected])
 
     def _read_call(self, node, attempt):
         """Bind a read step's attempt to its journal call, in the ``tool`` phase.
