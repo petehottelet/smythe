@@ -485,6 +485,19 @@ def test_lineage_runs_refuse_blank_ids_before_any_call(store):
     assert durable(store).execute(blank).accepted
 
 
+@pytest.mark.parametrize("node_id", ["step\x7f1", "\x7f"])
+def test_lineage_runs_refuse_node_ids_their_record_cannot_hold_before_any_call(store, node_id):
+    # The journal keys a node by an id with DEL in it, but a record cannot hold one.
+    graph = ExecutionGraph([Topology.SERIAL], [Node(id=node_id, label="Step")])
+    with pytest.raises(WorkflowBindingError, match="control characters"):
+        durable(store, lineage=LineagePolicy()).execute(graph)
+    assert all(store.inspect_run(run["run_id"])["call_count"] == 0 for run in store.list_runs())
+    assert not [operation for run in store.list_runs() for kind in ("synthesis", "lineage")
+                for operation in store.list_operations(run["run_id"], kind)]
+    # Without lineage, such ids are used as before.
+    assert durable(store).execute(graph).accepted
+
+
 def test_checkpoint_save_cost_does_not_grow_with_history_under_lineage(tmp_path, monkeypatch):
     saves = []
     original = WorkflowRuntime._save

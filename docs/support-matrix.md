@@ -338,7 +338,7 @@ argument's name.
 | `read_tools` | `ReadProfile` declarations, named by read steps in graphs and templates you write | Other objects, duplicate names and `read_tools` without `run_store`; read steps naming an undeclared profile, with invalid input or judging another node; read steps on ordinary runs |
 | `checkpoint_store` | `None`; the journal holds checkpoints | Any checkpoint store |
 | `renderer` | `None`, `MarkdownRenderer`, or a renderer declared with `LocalOnly(..., role="renderer")` whose `render()` is synchronous; it [publishes the delivered document](workflow-accounting.md#published-documents) into `artifact_dir` | Other objects and other `LocalOnly` roles; `renderer` without `run_store` or `artifact_dir`; a strict policy without final validators; an `async` `render()` or an invalid `filename` or `media_type`; a run directory that another run owns or that holds files the run does not own |
-| `lineage` | `None`, or a `LineagePolicy` with a strict `acceptance` policy; the completed run [records its lineage](lineage.md#the-record-a-run-writes) | Other objects and `LineagePolicy` subclasses; `lineage` without `run_store` or with no or an advisory `acceptance` policy; blank node or source ids; a new graph whose nodes carry `lineage_reuse` metadata |
+| `lineage` | `None`, or a `LineagePolicy` with a strict `acceptance` policy; the completed run [records its lineage](lineage.md#the-record-a-run-writes) | Other objects and `LineagePolicy` subclasses; `lineage` without `run_store` or with no or an advisory `acceptance` policy; node or source ids a record cannot hold, blank or with DEL (U+007F); a new graph whose nodes carry `lineage_reuse` metadata |
 | `retry_policy` | `None`; the node failure policy decides each retry | Any `RetryPolicy` |
 | `reserve_for_checks` | `False`; the journal admits each call against the run's budget | `True` |
 | Architects and other components | Built-in components and `LocalOnly` factories | Subclasses and unjournaled dependencies |
@@ -411,8 +411,9 @@ Tests:
   `tests/test_lineage_records.py::test_swarm_lineage_needs_a_durable_store_before_any_call`,
   `tests/test_lineage_records.py::test_lineage_needs_a_strict_acceptance_policy`,
   `tests/test_lineage_records.py::test_policy_rejects_subclasses_and_impostors`,
-  `tests/test_lineage_records.py::test_a_new_graph_cannot_carry_reused_results`
-  and `tests/test_workflow_lineage.py::test_lineage_runs_refuse_blank_ids_before_any_call`;
+  `tests/test_lineage_records.py::test_a_new_graph_cannot_carry_reused_results`,
+  `tests/test_workflow_lineage.py::test_lineage_runs_refuse_blank_ids_before_any_call`
+  and `tests/test_workflow_lineage.py::test_lineage_runs_refuse_node_ids_their_record_cannot_hold_before_any_call`;
   recorded `tests/test_workflow_lineage.py::test_lineage_lists_what_each_node_read_and_binds_the_document_and_decision`
   and `tests/test_workflow_lineage.py::test_nodes_without_a_snapshot_are_undeclared_and_the_run_partial`.
 - Plain-text nodes: `tests/test_support_matrix.py::test_durable_run_rejects_image_inputs_on_a_caller_graph_before_any_call`,

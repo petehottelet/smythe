@@ -41,6 +41,7 @@ from smythe.lineage import (
     LINEAGE_OPERATION, LINEAGE_RECORD_VERSION, LINEAGE_REUSE_KEY, ArtifactLineage, build_lineage,
     lineage_key, snapshot_lineage_policy,
 )
+from smythe.lineage import _id as _lineage_id
 from smythe.registry import Registry
 from smythe.provider import ProviderResponseError
 from smythe.task import Task, snapshot_task, task_from_dict, task_to_dict
@@ -187,10 +188,24 @@ def _snapshot_read_tools(read_tools):
     return MappingProxyType(profiles)
 
 
+def _check_lineage_id(value, what):
+    """Refuse a *what* id that a lineage record could not hold, by the record's own rule.
+
+    That rule is stricter than the journal's: a node id that is only
+    whitespace, or holds DEL, keys the node's calls but cannot name it in a
+    record, so the run would make its calls and then fail at completion.
+    """
+    try:
+        _lineage_id(value, f"a lineage {what.lower()} id")
+    except ValueError as error:
+        raise WorkflowBindingError(f"{what} id {value!r} cannot be recorded: {error}") from error
+
+
 def _check_lineage_sources(lineage, sources):
-    """Refuse, under a lineage policy, sources whose blank ids its record could not hold."""
-    if lineage is not None and any(not source.source_id.strip() for source in sources or ()):
-        raise WorkflowBindingError("lineage records sources by id, so a source id cannot be blank")
+    """Refuse, under a lineage policy, sources whose ids its record could not hold."""
+    if lineage is not None:
+        for source in sources or ():
+            _check_lineage_id(source.source_id, "Source")
 
 
 def _hash(value):
@@ -1028,9 +1043,9 @@ class WorkflowRuntime:
                     f"Node id {shown!r} cannot key the workflow journal: node ids must be "
                     f"at most {MAX_NODE_ID_CHARS} characters, with no control characters"
                 ) from error
-            if self.lineage is not None and not node.id.strip():
-                raise WorkflowBindingError(
-                    f"Node id {node.id!r} is blank; lineage records each node by its id")
+            if self.lineage is not None:
+                # The completed run's record names each node by its id.
+                _check_lineage_id(node.id, "Node")
             if fresh and (node.status is not NodeStatus.PENDING or node.result is not None):
                 raise WorkflowBindingError("A new workflow requires pending nodes without prior results")
             if fresh and any(key in node.metadata for key in (

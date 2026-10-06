@@ -799,8 +799,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   snapshot, is `undeclared` and makes the coverage `partial`. A process lost
   before the record commits writes it on resume without a call, one lost
   after it replays it, and resuming a completed run whose record no longer
-  matches its journal gives `indeterminate`. Lineage runs refuse blank node
-  and source ids before any call. See [artifact lineage](docs/lineage.md).
+  matches its journal gives `indeterminate`. Lineage runs refuse, before any
+  call, node and source ids their record cannot hold: blank ids and ids with
+  DEL. See [artifact lineage](docs/lineage.md).
 - `Swarm(reserve_for_checks=True)` holds allowance for a run's verifiers and
   its `LLM_MERGE` synthesis so other nodes cannot spend it. Under
   `max_budget_usd`, before any node runs, the run holds what each pending

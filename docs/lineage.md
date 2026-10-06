@@ -195,8 +195,9 @@ print(lineage.coverage, [(node["id"], node["kind"]) for node in lineage.nodes])
     `+retain_contradictions` when set.
 
   A label longer than 256 characters, or with control characters, is
-  recorded as `sha256:` and the digest of its text. A lineage run refuses
-  blank node ids and source ids, which a record cannot hold, before any call.
+  recorded as `sha256:` and the digest of its text. A lineage run refuses,
+  before any call, node and source ids that a record cannot hold: ids that
+  are only whitespace, and ids with DEL (U+007F), which the journal accepts.
 - **Written once.** The record is assembled from targeted loads of the
   records it names (the synthesis, decision and publication operations, each
   node's snapshot and the read behind each read step), never from the whole
