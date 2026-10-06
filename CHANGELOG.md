@@ -846,6 +846,30 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   defines `SubGraphTemplate` values whose workers each contribute distinct
   evidence, capabilities, responsibilities or checkable outputs, and runs
   offline. See [contribution lint](docs/architecture.md#contribution-lint).
+- Reuse decisions for artifact lineage. `smythe.reuse.evaluate(record,
+  state)` compares an `ArtifactLineage` record, or None, with a
+  `CurrentState` (a developer's zero-cost `SourceCatalog`, the validator
+  identities, the acceptance policy digest, tool, component, context
+  assembly and agent identities, optional task changes, published-document
+  integrity and the `LineagePolicy`) and returns an `ItemDecision`: `reuse`,
+  `recheck`, `rerender`, `regenerate` or `review` for the item and each
+  node, with stable reason codes and the scope, recipe, policy, validator
+  set and source versions any kept result is kept under. A source counts as
+  current only when its id, version and digest all match, so equal bytes
+  under a new version regenerate; an unavailable or withdrawn source needs
+  review; a changed tool, decoder, component, context assembly, agent or
+  task regenerates the node and everything that depends on it, while other
+  branches are reused; a missing or changed document with current inputs is
+  rendered again; a changed validator set or policy calls for a recheck; a
+  decision other than `accepted` needs review; and a missing record or
+  undeclared coverage follows `undeclared_coverage`. Gates and the nodes
+  they judge are never reused in an item that computes anything again,
+  `reuse=False` turns reuse and rendering again into regeneration, and a
+  record in another access scope is invisible before any digest is
+  compared. A catalog that declares itself metered is refused. The
+  evaluator reads no store or file and its output is deterministic JSON
+  data; nothing applies decisions yet. See
+  [reuse decisions](docs/lineage.md#reuse-decisions).
 
 ### Changed
 

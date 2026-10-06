@@ -49,6 +49,7 @@ from smythe.provider import (
 from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.provider_messages import AnthropicMessagesProvider
 from smythe.pricing import NativeReceipt
+from smythe.reuse import CurrentState, ItemDecision, SourceCatalog, SourceStatus
 from smythe.workflow_artifact import MarkdownRenderer, PublishedArtifact
 from smythe.workflow_binding import LocalOnly, WorkflowBindingError
 from smythe.workflow_provider import ProviderRequestRejectedError
@@ -115,6 +116,7 @@ __all__ = [
     "ConstrainedArchitect",
     "ContextSnapshot",
     "ContextSource",
+    "CurrentState",
     "DefaultCapabilityMapper",
     "DeliveryAcceptance",
     "DesignSystem",
@@ -138,6 +140,7 @@ __all__ = [
     "OpenAIProvider",
     "OpenAIResponsesProvider",
     "IncompleteOutputError",
+    "ItemDecision",
     "JSONValidator",
     "OutputRefusedError",
     "OutputTruncatedError",
@@ -169,9 +172,11 @@ __all__ = [
     "SimpleArchitect",
     "SkillProvider",
     "SkillRef",
+    "SourceCatalog",
     "SourceEvidence",
     "SourceEvidenceValidator",
     "SourceRecord",
+    "SourceStatus",
     "SubGraphTemplate",
     "Supervisor",
     "Swarm",
