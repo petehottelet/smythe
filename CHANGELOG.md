@@ -1163,9 +1163,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   own profile's ceiling and, under a capacity policy, takes that provider
   type and model's turn and in-flight slot. Fallbacks can form a chain. A
   retry after any other failure, `unknown_outcome` included, calls the same
-  profile again, so a call without an answer is never sent to another model.
-  Each attempt's span on `Tracer.spans` records its `profile` and, after a
-  fallback, `fallback_from`; `summary()` keeps its keys. A fallback that is
+  profile again. A node timeout that ends a sent, unanswered call is
+  `unknown_outcome` only under `RetryPolicy(retain_uncertain_dispatch=True)`;
+  without it the timeout is `transient`, and its retry calls the fallback
+  while the first call may still run and be charged. Each attempt's span on
+  `Tracer.spans` records its `profile` and, after a fallback,
+  `fallback_from`; `summary()` keeps its keys. A fallback that is
   not one of the run's profiles, requires fewer features than the profile it
   serves or loops back is refused when the Swarm or executor is built, and
   each unfinished node is checked against every profile it may fall back to

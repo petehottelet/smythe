@@ -533,9 +533,14 @@ attempts on all its profiles together therefore stay within
 `1 + max_retries`, and with `persist_attempts` within the allowance that
 resume continues. A fallback's own fallback serves the attempt after it, and
 later retries stay on the last profile of the chain. A retry after any other
-failure calls the same profile again. That includes `unknown_outcome`: a call
-sent without an answer may still run and be charged, so its work is never
-sent to another provider or model.
+failure calls the same profile again. That includes `unknown_outcome`, whose
+call may still run and be charged. A node timeout that ends a call sent and
+not yet answered has that class only under
+`RetryPolicy(retain_uncertain_dispatch=True)` (see [calls without an
+answer](#calls-without-an-answer)). Without that option the timeout is an
+ordinary `transient` one, so the node's retry calls the fallback while the
+first call may still run and be charged; set the option to keep such a
+retry on its profile.
 
 Each attempt's trace span records the profile it called as
 `metadata["profile"]`, and an attempt that fell back records the profile it

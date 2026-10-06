@@ -7,8 +7,10 @@ profile it called and the one it fell back from. The retry still needs the
 node's failure policy, and any retry policy, to allow it, so attempts across
 profiles share one allowance, persisted ones included. After an
 ``unknown_outcome``, whose call may still be charged, the retry stays on its
-profile. A fallback attempt reserves its own profile's ceiling and takes that
-profile's capacity turn and slot.
+profile. A node timeout that ends a sent, unanswered call has that class only
+under ``retain_uncertain_dispatch``; otherwise it is ``transient`` and its
+retry falls back. A fallback attempt reserves its own profile's ceiling and
+takes that profile's capacity turn and slot.
 """
 
 from __future__ import annotations
@@ -257,7 +259,7 @@ def test_after_a_rate_limit_the_next_attempt_calls_the_fallback_profile(mode, po
     pytest.param(HttpError(401, "authentication_error"), "authority_denied", False,
                  id="unauthorized"),
 ])
-def test_only_settled_failures_fall_back_and_others_retry_on_the_same_profile(
+def test_only_fallback_classes_fall_back_and_others_retry_on_the_same_profile(
     mode, outcome, failure_class, falls_back,
 ):
     fast, strong = Script("fast", outcome), Script("strong")
@@ -298,6 +300,31 @@ def test_no_fallback_after_an_unknown_outcome(mode, listed):
     assert strong.calls == []
     # The unanswered call's reservation is kept as its unknown exposure.
     assert budget.cost_is_complete is False and budget.breakdown()["polish"] >= 0.25
+
+
+@pytest.mark.parametrize("mode", MODES)
+@pytest.mark.parametrize("policy", [None, RetryPolicy()], ids=["no-policy", "policy"])
+def test_without_kept_exposure_a_timed_out_call_is_transient_and_its_retry_falls_back(
+    mode, policy,
+):
+    # Without retain_uncertain_dispatch, a node timeout that ends a sent call
+    # is an ordinary transient timeout, so the retry calls the fallback while
+    # the first call may still run and be charged.
+    fast, strong = Script("fast", HANG), Script("strong")
+    tracer = Tracer()
+    budget = Sentinel(5.0)
+    executor = make(mode, ladder(fast, strong), retry_policy=policy, tracer=tracer, budget=budget)
+    graph = run(executor, polish(timeout_s=TIMEOUT))
+
+    (node,) = graph.nodes
+    assert node.status is NodeStatus.COMPLETED and node.result == "strong wrote Polish"
+    assert fast.calls == [("fast-model", "Polish")]
+    assert strong.calls == [("strong-model", "Polish")]
+    assert attempts(tracer) == [(0, "timed_out", "transient", "fast", None),
+                                (1, "completed", None, "strong", "fast")]
+    # The timed-out call's reservation was released, so only the fallback's
+    # charge is recorded.
+    assert budget.breakdown() == {"polish": CALL} and budget.cost_is_complete is True
 
 
 @pytest.mark.parametrize("mode", MODES)

@@ -462,8 +462,9 @@ PROFILE_KEY = "profile"
 PROFILE_REQUIREMENTS = frozenset({"tools", "attachments", "image_output", "exact_accounting"})
 _PROFILE_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{0,63}")
 # The failure classes after which a node's next attempt calls its profile's
-# fallback: the provider answered or refused, so the failed call is settled.
-# Never unknown_outcome, whose call may still run and be charged.
+# fallback. Never unknown_outcome, whose call may still run and be charged; a
+# node timeout of a sent call has that class only under
+# retain_uncertain_dispatch, and is transient otherwise.
 FALLBACK_CLASSES = frozenset({TRANSIENT, PROVIDER_REJECTED, QUALITY_DEFECT})
 
 
@@ -495,7 +496,10 @@ class ModelProfile:
     ``quality_defect``), the node's next attempt, when its failure policy and
     any retry policy make one, calls the fallback instead. Fallbacks may form
     a chain that never returns to a profile it left; a retry after any other
-    failure, such as ``unknown_outcome``, calls the same profile again.
+    failure, such as ``unknown_outcome``, calls the same profile again. A node
+    timeout of a sent, unanswered call is ``unknown_outcome`` only under
+    ``RetryPolicy(retain_uncertain_dispatch=True)``, and ``transient``
+    otherwise.
     """
 
     name: str
