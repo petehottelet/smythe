@@ -9,8 +9,9 @@ protocols, checked only structurally: a caller contract, not a sandbox.
 :func:`prepare_action` records a logical action in the workflow journal, bound
 to a completed run's accepted content; :func:`approve`, :func:`reject` and
 :func:`revoke` record verified approvals and controls; :func:`check_authority`
-checks them again. Only trusted host code calls these functions. Nothing
-dispatches actions yet, and ``import smythe`` does not load this module.
+checks them again; and ``smythe.workflow_actions`` journals each attempt's
+dispatch and outcome. Only trusted host code calls these functions. Smythe
+calls no connector itself yet, and ``import smythe`` does not load this module.
 """
 
 from __future__ import annotations
@@ -723,7 +724,7 @@ def check_authority(store: Any, action_id: str, verifier: Any) -> ActionApproval
     content must still be deliverable (see :func:`prepare_action`). Only
     reads are made; the verifier is called outside any journal transaction.
     """
-    from smythe.workflow_actions import load
+    from smythe.workflow_actions import _authorizing, load
 
     identity = check_verifier(verifier)
     action, approvals = load(store, action_id)
@@ -731,22 +732,9 @@ def check_authority(store: Any, action_id: str, verifier: Any) -> ActionApproval
     def refused(reason: str) -> ActionNotAuthorized:
         return ActionNotAuthorized(f"Action {action_id!r} is not authorized: {reason}")
 
-    if action.state in _CLOSED:
-        raise refused(f"it is {action.state}")
-    approval = next((row for row in approvals if row["verdict"] == "approved"), None)
     now = store._clock_ns()
-    if approval is None:
-        raise refused("it has no approval")
-    if approval["revoked_at_ns"] is not None:
-        raise refused("its approval was revoked")
-    if approval["consumed_by_attempt"] is not None:
-        raise refused("its approval was consumed")
-    if type(approval["expires_at_ns"]) is not int or approval["expires_at_ns"] <= now:
-        raise refused("its approval expired")
-    if approval["intent_sha"] != action.intent.digest():
-        raise refused("its approval binds another intent")
-    if approval["ceiling"] is None or int(approval["ceiling"]) < action.ceiling_nanousd:
-        raise refused("its approval does not cover the action's ceiling")
+    approval = _authorizing(action_id, action.state, action.intent.digest(), action.ceiling_nanousd,
+                            approvals, now)
     if json.loads(approval["verifier_json"]) != {"identity": identity}:
         raise refused("another approval verifier recorded its approval")
     try:

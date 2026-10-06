@@ -4,10 +4,11 @@
 write accepted content to a service outside Smythe, such as publishing a post.
 It [prepares actions](#prepared-actions) in a durable run's
 [journal](workflow-accounting.md#external-action-records), bound to the run's
-accepted content, and records [verified approvals](#approvals) of them. Smythe
-does not yet dispatch actions, and these types and functions may change
-before it does. `import smythe` does not load the module; import
-`smythe.actions` explicitly.
+accepted content, and records [verified approvals](#approvals) of them.
+`smythe.workflow_actions` keeps the [dispatch journal](#dispatch-journal) of
+each attempt that your host code makes. Smythe does not yet call connectors
+itself, and these types and functions may change before it does.
+`import smythe` loads neither module; import them explicitly.
 
 An external action has three parts that this page describes:
 
@@ -174,8 +175,8 @@ synchronous host code that misbehaves.
 
 | State | Meaning |
 |---|---|
-| `not_dispatched` | No attempt is in flight. |
-| `dispatched` | An attempt was sent and its result is not yet known. |
+| `not_dispatched` | No attempt has been sent, or the last one was refused. |
+| `dispatched` | An attempt was sent, and no read has confirmed its result yet. |
 | `outcome_unknown` | An attempt may or may not have taken effect. |
 | `observed` | A read of the target showed the intended result. |
 | `reconciled` | An uncertain outcome was resolved from the service's records. |
@@ -322,3 +323,152 @@ The journal keeps each assertion so that it can be verified again; protect
 the journal accordingly. `inspect_run()` shows each approval's principal,
 verifier identity, ceiling, expiry, consumption and revocation time, and
 never assertions or revocation reasons.
+
+## Dispatch journal
+
+`smythe.workflow_actions` records each attempt of an action in the run's
+journal, so that a worker that stops part way leaves a state that another
+can recover. Your host code dispatches, holding the run's lease, which fences
+dispatch on the completed run:
+
+```python
+from smythe.actions import ConnectorRefused, check_authority
+from smythe.workflow_actions import (
+    begin_attempt, claim_dispatch, record_ambiguous, record_receipt, record_refused,
+    recover_actions,
+)
+
+lease = store.acquire_lease(run_id, worker_id, ttl_s=60)
+recover_actions(store, lease)  # settle what a stopped worker left in flight
+approval = check_authority(store, action.action_id, identity_host)
+attempt = begin_attempt(store, lease, action.action_id, approval.approval_id)
+permit = claim_dispatch(store, lease, attempt["attempt_id"])
+try:
+    receipt = connector.submit(action.action_key, action.intent, document,
+                               action.profile.timeout_s)
+except ConnectorRefused as error:
+    record_refused(store, permit, error)
+except Exception as error:  # anything else may follow a commit
+    record_ambiguous(store, permit, error)
+else:
+    record_receipt(store, permit, receipt)
+store.release_lease(lease)
+```
+
+Attempts are numbered from 1, and every attempt sends the action's one
+[key](#action-keys). An attempt is in one of these states:
+
+| State | Meaning |
+|---|---|
+| `prepared` | Begun under an approval, with its write ceiling reserved. Nothing was sent. |
+| `dispatched` | Its dispatch is claimed: the request may have been sent. |
+| `acknowledged` | The service's receipt names the object it committed. |
+| `refused` | The service definitely committed nothing. |
+| `outcome_unknown` | The write may or may not have taken effect. |
+| `released` | Given up before its dispatch was claimed. Nothing was sent. |
+
+### Attempts and outcomes
+
+`begin_attempt(store, lease, action_id, approval_id)` begins the action's
+next attempt under its approval and reserves the profile's
+`write_ceiling_nanousd`. It checks the content again, as `check_authority()`
+does. Then, in the transaction that makes the reservation, it checks that no
+security stop holds the run, that the run is completed, that the action is
+`not_dispatched`, and that *approval_id* is still the action's newest
+approval, unrevoked, unconsumed and unexpired. Fewer than `max_attempts`
+attempts may have been dispatched; a released attempt does not count. The
+action's confirmed, reserved and unknown nanoUSD plus the write ceiling must
+fit the approval's ceiling, or `WorkflowBudgetError` is raised. It does not
+call the verifier: call `check_authority()` first. It returns the attempt as
+`inspect_run()` shows it. Beginning again under the same approval returns the
+same prepared attempt, and a newer approval releases an attempt prepared
+under an older one.
+
+`claim_dispatch(store, lease, attempt_id)` checks the same conditions again
+and commits the attempt and its action as `dispatched`, with the lease's
+epoch and the time, before anything is sent. It returns an
+`ActionDispatchPermit`, whose secret token the journal keeps only as a
+digest. Each attempt is claimed once. When the approval or the content no
+longer authorizes the attempt, it is released with its reservation and
+`ActionNotAuthorized` is raised.
+
+The permit then records the outcome of the one submission:
+
+- `record_receipt(store, permit, receipt)`: the attempt is `acknowledged`.
+  The receipt must name the action's key, its target's tenant and collection
+  and, when the intent names an object, that object; otherwise
+  `WorkflowValidationError` is raised and the answer should be recorded as
+  ambiguous. The receipt is kept with the external object's identity, and it
+  consumes the approval. Its `cost_nanousd` is confirmed. A receipt without
+  a cost confirms zero only for a profile whose write ceiling is zero;
+  otherwise the reservation becomes unknown exposure. The action stays
+  `dispatched`, because a receipt alone does not show that the target holds
+  the intended result.
+- `record_refused(store, permit, error)`: the attempt is `refused` at zero
+  cost. Its reservation is given back, and the action is `not_dispatched`
+  again with its approval unconsumed, so the same approval can authorize the
+  next attempt. The refusal counts toward `max_attempts`.
+- `record_ambiguous(store, permit, error)`: the attempt and its action are
+  `outcome_unknown`, and the reserved write ceiling becomes unknown exposure.
+  No attempt begins after it, and nothing releases its exposure.
+
+Connector error text is stored with account identifiers redacted, at most
+500 characters. Recording the same outcome again returns it. An approval is
+consumed by the receipt of an effect, never by a refused attempt; a consumed
+approval authorizes nothing further.
+
+### Leases and late receipts
+
+`begin_attempt()`, `claim_dispatch()` and `recover_actions()` need the
+run's current lease and raise `WorkflowLeaseError` for an expired or
+superseded one. A permit records an outcome without the lease while the
+run's lease epoch is still the one it was claimed under, so a worker whose
+lease lapsed can still record the answer it holds until another worker
+acquires the lease. After that, or once the attempt's outcome is recorded or
+recovered, a permit changes nothing: its receipt or error is kept as a
+`late_receipt` record, marked trusted because only the claim's permit can
+write it, and `WorkflowLeaseError` or `ActionStateError` is raised. A late
+receipt carries no cost, because the attempt keeps its exposure.
+
+### Recovery
+
+`recover_actions(store, lease)` settles the attempts that a stopped worker
+left in flight. Call it once after acquiring the lease and before
+dispatching: it treats every attempt in flight as abandoned. A prepared
+attempt was never sent, so it is released with its reservation and does not
+count toward `max_attempts`. A dispatched attempt without an outcome may have
+reached the service, so it and its action become `outcome_unknown` with the
+reason `recovered after dispatch`, and its write ceiling becomes unknown
+exposure. Recovery audits the run's actions first and sends nothing. Neither
+recovery nor a stopped worker ever releases unknown exposure; Smythe does not
+yet resolve an unknown outcome.
+
+### The local transaction boundary
+
+Each step is one local SQLite transaction in the journal. The claim commits
+the `dispatched` record before the request is sent, so the journal always
+knows that a request may have gone out. That commit is not a transaction
+with the service: no local commit can include the remote API. A worker may
+stop after the claim but before the request leaves, while the service
+commits it, or after the service answers but before the outcome is recorded.
+The journal looks the same in each case, `dispatched`, and recovery turns it
+into `outcome_unknown` rather than sending it again. A worker that stops
+before its claim leaves at most a `prepared` attempt, which recovery releases
+safely, because nothing is sent without a claim.
+
+`check_authority()` calls the host's verifier outside any journal
+transaction, and `begin_attempt()` and `claim_dispatch()` read the run's
+decision, sources and published file just before their write transactions.
+Inside those transactions they check again what the journal alone records:
+revocation, expiry, consumption, the newest approval, a security stop and the
+run's completion. A `revoke()` therefore stops every later claim, while a
+revocation known only to the host, or a change to the published file, after
+the last check is seen by the next check. A run's `budget_overrun` and
+`unknown_exposure` latches close admission to its model calls and do not
+block actions, which keep their own accounting scope; a security stop does.
+
+`inspect_run()` shows each attempt's number, approval, state, lease epoch,
+receipt digest and balances, and each late receipt by its digest. It never
+shows dispatch tokens, receipts or error text. Each transition adds an
+`action_attempt` event, and each late receipt an `action_late_receipt`
+event, carrying only identifiers and the new state.

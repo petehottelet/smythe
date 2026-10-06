@@ -243,8 +243,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   awaitables, and async protocol methods: `submit()`, `lookup()` and `read()`
   on a connector, whose `profile` must be a `ConnectorProfile`, and `verify()`
   and `still_authorized()` on a verifier, whose `identity` must be a name
-  without control characters. Other methods are not checked. Nothing
-  dispatches actions yet. See [external actions](docs/actions.md).
+  without control characters. Other methods are not checked. Smythe calls no
+  connector itself yet. See [external actions](docs/actions.md).
 - Version 2 workflow journals have four tables for external actions:
   `workflow_actions`, `workflow_action_attempts`, `workflow_action_approvals`
   and the append-only `workflow_action_records`.
@@ -278,6 +278,28 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   digest and that the run's content is still accepted, intact and not
   unavailable after a source removal. None needs a run lease. See
   [approvals](docs/actions.md#approvals).
+- A durable dispatch journal for external actions in
+  `smythe.workflow_actions`, fenced by the run's lease. `begin_attempt()`
+  reserves the profile's write ceiling after checking the content as
+  `check_authority()` does and, in the same transaction, that no security
+  stop holds the run, the action is not dispatched, the approval is still its
+  newest, unrevoked, unconsumed and unexpired, fewer than `max_attempts`
+  attempts were dispatched and the spend fits the approval's ceiling.
+  `claim_dispatch()` checks again and commits the attempt as dispatched,
+  with the lease epoch, before anything is sent, returning an
+  `ActionDispatchPermit`; an attempt no longer authorized is released.
+  `record_receipt()` keeps the receipt with the external object's identity,
+  confirms its cost or keeps the write ceiling as unknown exposure, and
+  consumes the approval; `record_refused()` gives the reservation back and
+  leaves the approval for the next attempt; `record_ambiguous()` keeps the
+  write ceiling as unknown exposure. Connector error text is stored
+  redacted. A permit from a superseded lease session, or for an attempt
+  already settled, changes nothing and is kept as a `late_receipt` record.
+  `recover_actions()` releases prepared attempts and turns dispatched ones
+  into `outcome_unknown` without resending or releasing exposure. A run's
+  model-call latches do not block actions. The audit also checks that at
+  most one attempt is in flight and that a refused attempt never consumes an
+  approval. See [the dispatch journal](docs/actions.md#dispatch-journal).
 - Jobs operations have a semantic input digest.
   `smythe.jobs.operation_input_digest()` hashes the provider kind and its
   adapter version (`smythe.jobs.providers.ADAPTER_VERSIONS`), the model,

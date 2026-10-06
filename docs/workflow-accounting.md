@@ -829,8 +829,10 @@ digest; and `workflow_action_records` its readbacks, lookups, notices, late
 receipts, findings, decisions and evidence. Records are append-only: SQLite
 refuses to update or delete them. In this release, `smythe.actions` writes
 [prepared actions](actions.md#prepared-actions) and their
-[approvals, rejections and revocations](actions.md#approvals); nothing writes
-attempts or records yet.
+[approvals, rejections and revocations](actions.md#approvals), and
+`smythe.workflow_actions` writes their attempts and late receipts in the
+[dispatch journal](actions.md#dispatch-journal); nothing writes other records
+yet.
 
 Action money is its own accounting scope, `external_actions`, in whole
 nanoUSD. It never enters a run's balances or `workflow_accounting`, which stay
@@ -839,6 +841,8 @@ each intent hashes to its recorded digest and names its profile's connector
 and one of its operations, each key is `action_key(store_id, run_id, slot,
 sequence)`, every state, verdict and record kind is known, approvals bind
 their action's intent digest, attempts are numbered from 1 under an approval,
+at most one attempt is prepared or dispatched and the action's state agrees
+with it, only an attempt that may have taken effect consumes an approval,
 and an action's confirmed, reserved and unknown amounts equal the sums of its
 attempts' costs, reservations and exposure and its records' costs. A
 mismatch raises `WorkflowCorruptionError`.

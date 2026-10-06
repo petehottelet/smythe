@@ -14,22 +14,28 @@ A version 2 journal keeps each run's external actions in four tables:
 Action money is the ``external_actions`` accounting scope: whole nanoUSD kept
 on these rows, never in a run's balances, which stay equal to its call ledger.
 :func:`audit_actions` runs inside a ``SQLiteWorkflowStore`` transaction; the
-other functions open their own, need no run lease and are called by
-``smythe.actions``. ``import smythe`` does not load this module.
+other functions open their own. Preparation, verdicts and revocations need no
+run lease and are called by ``smythe.actions``. The dispatch journal,
+:func:`begin_attempt` to :func:`recover_actions`, is fenced by the run's
+lease. ``import smythe`` does not load this module.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+import secrets
 from uuid import uuid4
 
 from smythe._money import NANOUSD
+from smythe._redact import redact_account_identifiers
 from smythe.actions import (
-    _CLOSED, _FINISHED, ACTION_STATES, ActionIntent, ActionStateError, ApprovalRejected,
-    ConnectorProfile, PreparedAction, Principal, action_key,
+    _CLOSED, _FINISHED, _SECURITY_STOP, ACTION_STATES, ActionIntent, ActionNotAuthorized,
+    ActionStateError, ApprovalRejected, ConnectorProfile, ConnectorReceipt, PreparedAction, Principal,
+    _undeliverable, action_key,
 )
 from smythe.workflow_store import (
-    WorkflowConflictError, WorkflowCorruptionError, WorkflowNotFoundError, _amount, _canonical,
-    _loads, _sha,
+    WorkflowBudgetError, WorkflowConflictError, WorkflowCorruptionError, WorkflowLeaseError,
+    WorkflowNotFoundError, WorkflowValidationError, _amount, _canonical, _loads, _sha,
 )
 
 ACCOUNTING_SCOPE = "external_actions"
@@ -38,6 +44,8 @@ APPROVAL_VERDICTS = ("approved", "rejected")
 RECORD_KINDS = ("readback", "lookup", "notice", "late_receipt", "finding", "decision", "evidence")
 # Attempt states after a dispatch claim, whose request may have reached the service.
 _CLAIMED = frozenset({"dispatched", "acknowledged", "refused", "outcome_unknown"})
+# Attempt states that can consume an approval: a refused attempt never does.
+_EFFECTS = _CLAIMED - {"refused"}
 _BALANCES = ("confirmed_nanousd", "reserved_nanousd", "unknown_nanousd")
 
 
@@ -71,8 +79,11 @@ def audit_actions(store, db, run_id):
     ``action_key(store_id, run_id, slot, sequence)``. Its balances must equal
     its attempts' costs, reservations and unknown exposure plus its records'
     costs. Every state, verdict and record kind must be known; attempts are
-    numbered from 1, each under one of the action's approvals; and approvals
-    bind the action's intent digest. Raises ``WorkflowCorruptionError``.
+    numbered from 1, each under one of the action's approvals; at most one is
+    prepared or dispatched, and its action is then not dispatched or
+    dispatched to match; and approvals bind the action's intent digest and
+    are consumed only by an attempt that may have taken effect. Raises
+    ``WorkflowCorruptionError``.
 
     The projection never includes parameters, assertions, receipts, record
     payloads or error text: only identities, digests, states and balances.
@@ -103,24 +114,27 @@ def _action(store, db, row, run_actions):
     attempts = db.execute("SELECT * FROM workflow_action_attempts WHERE action_id=? ORDER BY number",
                           (action_id,)).fetchall()
     approved = {approval["approval_id"] for approval in approvals if approval["verdict"] == "approved"}
-    sums, attempt_items = [0, 0, 0], []
+    sums, attempt_items, in_flight = [0, 0, 0], [], 0
     for number, attempt in enumerate(attempts, 1):
-        state, claimed, epoch = attempt["state"], attempt["dispatch_token_sha"] is not None, attempt["dispatch_epoch"]
-        cost, held, unknown = _money(attempt["cost"]), _amount(attempt["reserved"]), _amount(attempt["unknown"])
+        item = _attempt_item(attempt)
+        state, claimed, epoch = item["state"], attempt["dispatch_token_sha"] is not None, item["dispatch_epoch"]
+        cost, held, unknown = item["cost_nanousd"], item["reserved_nanousd"], item["unknown_nanousd"]
         receipt = attempt["receipt_json"]
         if receipt is not None:
             _stored(receipt)
+        in_flight += state in ("prepared", "dispatched")
         _check(attempt["number"] == number and state in ATTEMPT_STATES and attempt["approval_id"] in approved
                and claimed == (state in _CLAIMED) == (attempt["dispatched"] is not None)
                and ((type(epoch) is int and epoch > 0) if claimed else epoch is None)
                and (None if receipt is None else _sha(receipt)) == attempt["receipt_sha"]
                and (not held or state in ("prepared", "dispatched"))
-               and (not unknown or state == "outcome_unknown"), "External action attempt is inconsistent")
+               # Exposure stays on an attempt that may have taken effect at an unknown cost.
+               and (not unknown or cost is None and state in ("outcome_unknown", "acknowledged"))
+               and in_flight <= 1 and (state != "prepared" or row["state"] == "not_dispatched")
+               and (state != "dispatched" or row["state"] == "dispatched"),
+               "External action attempt is inconsistent")
         sums = [sums[0] + (cost or 0), sums[1] + held, sums[2] + unknown]
-        attempt_items.append({
-            "attempt_id": attempt["attempt_id"], "number": number, "approval_id": attempt["approval_id"],
-            "state": state, "dispatch_epoch": epoch, "receipt_sha256": attempt["receipt_sha"],
-            "cost_nanousd": cost, "reserved_nanousd": held, "unknown_nanousd": unknown})
+        attempt_items.append(item)
     approval_items = []
     for approval in approvals:
         principal = _stored(approval["principal_json"], Principal.from_dict)
@@ -129,7 +143,7 @@ def _action(store, db, row, run_actions):
                and _sha(approval["assertion"]) == approval["assertion_sha"] and type(verifier) is dict
                and (consumed is None or any(attempt["attempt_id"] == consumed
                                             and attempt["approval_id"] == approval["approval_id"]
-                                            for attempt in attempts))
+                                            and attempt["state"] in _EFFECTS for attempt in attempts))
                and all(approval[name] is None or type(approval[name]) is int
                        for name in ("expires_at_ns", "revoked_at_ns"))
                and (approval["revoked_at_ns"] is None) == (approval["revoked_reason"] is None)
@@ -160,6 +174,15 @@ def _action(store, db, row, run_actions):
             "compensates_action_id": row["compensates_action_id"], "ceiling_nanousd": _amount(row["ceiling"]),
             **dict(zip(_BALANCES, balances)),
             "attempts": attempt_items, "approvals": approval_items, "records": record_items}
+
+
+def _attempt_item(attempt):
+    """An attempt's safe projection: identities, state, receipt digest and balances."""
+    return {"attempt_id": attempt["attempt_id"], "number": attempt["number"],
+            "approval_id": attempt["approval_id"], "state": attempt["state"],
+            "dispatch_epoch": attempt["dispatch_epoch"], "receipt_sha256": attempt["receipt_sha"],
+            "cost_nanousd": _money(attempt["cost"]), "reserved_nanousd": _amount(attempt["reserved"]),
+            "unknown_nanousd": _amount(attempt["unknown"])}
 
 
 def _row(db, action_id):
@@ -264,3 +287,336 @@ def revoke_approvals(store, target_id, reason):
         db.execute(f"UPDATE workflow_action_approvals SET revoked_at_ns=?,revoked_reason=? {where}",
                    (store._clock_ns(), reason, target_id))
         return revoked
+
+
+def _authorizing(action_id, state, intent_sha, ceiling, approvals, now, approval_id=None):
+    """The approval row that authorizes an action now, as its journal rows alone say.
+
+    *approvals* are the action's approval rows, newest first. The action must
+    not be finished or need compensation, and its newest approval, which must
+    be *approval_id* when one is named, must be unrevoked, unconsumed,
+    unexpired at *now*, bind *intent_sha* and cover *ceiling*. Raises
+    ``ActionNotAuthorized``.
+    """
+    approval = next((row for row in approvals if row["verdict"] == "approved"), None)
+    problem = (
+        f"it is {state}" if state in _CLOSED
+        else "it has no approval" if approval is None
+        else f"approval {approval_id!r} is not its newest approval"
+        if approval_id not in (None, approval["approval_id"])
+        else "its approval was revoked" if approval["revoked_at_ns"] is not None
+        else "its approval was consumed" if approval["consumed_by_attempt"] is not None
+        else "its approval expired" if type(approval["expires_at_ns"]) is not int
+        or approval["expires_at_ns"] <= now
+        else "its approval binds another intent" if approval["intent_sha"] != intent_sha
+        else "its approval does not cover the action's ceiling"
+        if approval["ceiling"] is None or _amount(approval["ceiling"]) < ceiling else None)
+    if problem:
+        raise ActionNotAuthorized(f"Action {action_id!r} is not authorized: {problem}")
+    return approval
+
+
+@dataclass(frozen=True, slots=True)
+class ActionDispatchPermit:
+    """The claim on one attempt's dispatch that records its outcome.
+
+    ``epoch`` is the run lease's epoch at the claim. The journal keeps only
+    the SHA-256 of ``token``.
+    """
+
+    attempt_id: str
+    run_id: str
+    token: str = field(repr=False)
+    epoch: int
+
+
+def _attempt(db, attempt_id):
+    row = db.execute("SELECT * FROM workflow_action_attempts WHERE attempt_id=?", (attempt_id,)).fetchone()
+    if row is None:
+        raise WorkflowNotFoundError(attempt_id)
+    return row
+
+
+def _deliverable(store, action_id):
+    """Why the content of *action_id* cannot be delivered now, as ``ActionNotAuthorized``, or None.
+
+    These checks read the run's decision, sources and published file, so
+    they run before the write transaction that checks the journal again.
+    """
+    action = load(store, action_id)[0]
+    problem = _undeliverable(store, action.run_id, action.intent.content)
+    return problem and ActionNotAuthorized(f"Action {action_id!r} is not authorized: {problem}")
+
+
+def _owned(store, db, lease, action_id):
+    """The run and action rows, when *lease* is the current lease of the action's run."""
+    run, action = store._lease(db, lease), _row(db, action_id)
+    if action["run_id"] != lease.run_id:
+        raise WorkflowConflictError("The action belongs to another workflow run")
+    return run, action
+
+
+def _authorized(store, db, run, action, approval_id):
+    """The approval row, once the journal shows that *approval_id* authorizes an attempt.
+
+    Checks a security stop, the run's completion and the approval (see
+    :func:`_authorizing`) inside the caller's write transaction.
+    """
+    stopped = run["blocked_reason"] == _SECURITY_STOP
+    if stopped or run["status"] != "completed":
+        problem = "a security stop holds the run" if stopped else "the run has not completed"
+        raise ActionNotAuthorized(f"Action {action['action_id']!r} is not authorized: {problem}")
+    approvals = db.execute("SELECT * FROM workflow_action_approvals WHERE action_id=? ORDER BY rowid DESC",
+                           (action["action_id"],)).fetchall()
+    return _authorizing(action["action_id"], action["state"], action["intent_sha"], _amount(action["ceiling"]),
+                        approvals, store._clock_ns(), approval_id)
+
+
+def _note(store, db, action, attempt_id, state):
+    store._event(db, action["run_id"], "action_attempt",
+                 payload={"action_id": action["action_id"], "attempt_id": attempt_id, "state": state})
+
+
+def _finish(store, db, attempt, state, *, cost=None, unknown=0, error=None, receipt_json=None,
+            action_state=None):
+    """Move an attempt in flight to *state*, giving back its reservation, and update its action."""
+    held, now, action = _amount(attempt["reserved"]), store._clock_ns(), _row(db, attempt["action_id"])
+    db.execute("""UPDATE workflow_action_attempts SET state=?,cost=?,reserved='0',unknown=?,error=?,
+      receipt_json=?,receipt_sha=?,updated=? WHERE attempt_id=?""",
+               (state, None if cost is None else str(cost), str(unknown), error, receipt_json,
+                None if receipt_json is None else _sha(receipt_json), now, attempt["attempt_id"]))
+    balances = [_amount(action[name]) + change
+                for name, change in (("confirmed", cost or 0), ("reserved", -held), ("unknown", unknown))]
+    db.execute("UPDATE workflow_actions SET confirmed=?,reserved=?,unknown=?,state=?,updated=? WHERE action_id=?",
+               (*map(str, balances), action_state or action["state"], now, action["action_id"]))
+    _note(store, db, action, attempt["attempt_id"], state)
+
+
+def _error(error):
+    """Connector error text as the journal keeps it: account identifiers redacted, bounded."""
+    text = error if isinstance(error, str) else f"{type(error).__name__}: {error}"
+    return redact_account_identifiers(text)[:500]
+
+
+def begin_attempt(store, lease, action_id, approval_id):
+    """Prepare an action's next attempt under its approval and reserve its write ceiling.
+
+    The caller holds the run's lease. The run's content must still be
+    deliverable (see ``smythe.actions.prepare_action``). In the write
+    transaction that makes the reservation, the journal must show no
+    security stop, a completed run, an action that is ``not_dispatched`` and
+    *approval_id* as its newest approval, unrevoked, unconsumed and
+    unexpired. Fewer than ``max_attempts`` attempts may have been
+    dispatched, and the action's confirmed, reserved and unknown nanoUSD plus
+    the write ceiling must fit the approval's ceiling. The verifier is not
+    called: call ``smythe.actions.check_authority`` first.
+
+    Returns the attempt's projection (see :func:`audit_actions`). A prepared
+    attempt under the same approval is returned again, and one under an
+    earlier approval is released. Raises ``ActionNotAuthorized``,
+    ``ActionStateError``, ``WorkflowBudgetError`` or ``WorkflowLeaseError``.
+    """
+    refusal = _deliverable(store, action_id)
+    if refusal:
+        raise refusal
+    with store._transaction() as db:
+        run, action = _owned(store, db, lease, action_id)
+        if action["state"] in ("dispatched", "outcome_unknown"):
+            raise ActionStateError(f"Action {action_id!r} is {action['state']}; an attempt begins only "
+                                   "when the action is not dispatched")
+        approval = _authorized(store, db, run, action, approval_id)
+        attempts = db.execute("SELECT * FROM workflow_action_attempts WHERE action_id=? ORDER BY number",
+                              (action_id,)).fetchall()
+        for attempt in attempts:
+            if attempt["state"] == "prepared":
+                if attempt["approval_id"] == approval_id:
+                    return _attempt_item(attempt)
+                _finish(store, db, attempt, "released", error="a newer approval superseded its own")
+        profile = _stored(action["profile_json"], ConnectorProfile.from_dict)
+        if sum(attempt["state"] in _CLAIMED for attempt in attempts) >= profile.max_attempts:
+            raise ActionStateError(f"Action {action_id!r} has made all {profile.max_attempts} of its attempts")
+        action, ceiling = _row(db, action_id), profile.write_ceiling_nanousd
+        if sum(_amount(action[name]) for name in ("confirmed", "reserved", "unknown")) + ceiling > _amount(
+                approval["ceiling"]):
+            raise WorkflowBudgetError(f"Another attempt of action {action_id!r} could exceed its "
+                                      "approval's ceiling")
+        attempt_id, now = uuid4().hex, store._clock_ns()
+        db.execute("""INSERT INTO workflow_action_attempts(attempt_id,action_id,number,approval_id,state,
+          reserved,unknown,created,updated) VALUES (?,?,?,?,'prepared',?,'0',?,?)""",
+                   (attempt_id, action_id, len(attempts) + 1, approval_id, str(ceiling), now, now))
+        db.execute("UPDATE workflow_actions SET reserved=?,updated=? WHERE action_id=?",
+                   (str(_amount(action["reserved"]) + ceiling), now, action_id))
+        _note(store, db, action, attempt_id, "prepared")
+        return _attempt_item(_attempt(db, attempt_id))
+
+
+def claim_dispatch(store, lease, attempt_id):
+    """Claim the dispatch of a prepared attempt; return the permit that records its outcome.
+
+    The claim commits the attempt and its action as ``dispatched``, with the
+    lease's epoch and the time, before the caller sends anything, so a crash
+    after it leaves an attempt that recovery treats as possibly sent. Each
+    attempt is claimed once. The checks of :func:`begin_attempt` run again;
+    when the approval or the content no longer authorizes the attempt, it is
+    released with its reservation and ``ActionNotAuthorized`` is raised.
+    """
+    if store.store_version < 2:
+        raise WorkflowNotFoundError(attempt_id)  # Version 1 journals have no action tables.
+    with store._transaction(write=False) as db:
+        action_id = _attempt(db, attempt_id)["action_id"]
+    refusal, token = _deliverable(store, action_id), secrets.token_hex(32)
+    with store._transaction() as db:
+        attempt, (run, action) = _attempt(db, attempt_id), _owned(store, db, lease, action_id)
+        if attempt["state"] != "prepared":
+            raise ActionStateError(f"Attempt {attempt_id!r} is {attempt['state']}; only a prepared attempt "
+                                   "can claim dispatch")
+        try:
+            if refusal:
+                raise refusal
+            _authorized(store, db, run, action, attempt["approval_id"])
+        except ActionNotAuthorized as error:
+            _finish(store, db, attempt, "released", error=str(error))
+            refusal = error
+        else:
+            now = store._clock_ns()
+            db.execute("""UPDATE workflow_action_attempts SET state='dispatched',dispatch_token_sha=?,
+              dispatch_epoch=?,dispatched=?,updated=? WHERE attempt_id=?""",
+                       (_sha(token), lease.epoch, now, now, attempt_id))
+            db.execute("UPDATE workflow_actions SET state='dispatched',updated=? WHERE action_id=?",
+                       (now, action_id))
+            _note(store, db, action, attempt_id, "dispatched")
+    if refusal:
+        raise refusal
+    return ActionDispatchPermit(attempt_id, lease.run_id, token, lease.epoch)
+
+
+def _record(store, permit, state, receipt=None, error=None):
+    """Record the outcome of a claimed attempt, or keep it as a late receipt record."""
+    if not isinstance(permit, ActionDispatchPermit):
+        raise WorkflowValidationError("Expected an action dispatch permit")
+    receipt_json, late = None if receipt is None else _canonical(receipt.to_dict()), None
+    with store._transaction() as db:
+        attempt = _attempt(db, permit.attempt_id)
+        action = _row(db, attempt["action_id"])
+        if (action["run_id"], attempt["dispatch_token_sha"], attempt["dispatch_epoch"]) != (
+                permit.run_id, _sha(permit.token), permit.epoch):
+            raise WorkflowConflictError("The permit does not match the attempt's dispatch claim")
+        if receipt is not None:
+            intent = _stored(action["intent_json"], ActionIntent.from_dict)
+            if (receipt.key != action["action_key"] or receipt.target.tenant != intent.target.tenant
+                    or receipt.target.collection != intent.target.collection
+                    or intent.target.object_id not in (None, receipt.target.object_id)):
+                raise WorkflowValidationError("The receipt names another key or target than the action's; "
+                                              "record the attempt as ambiguous")
+        if store._run(db, permit.run_id)["epoch"] != permit.epoch:
+            late = WorkflowLeaseError(f"Attempt {permit.attempt_id!r} was claimed under lease epoch "
+                                      f"{permit.epoch}, since superseded; its outcome is kept as a late "
+                                      "receipt record")
+        elif attempt["state"] != "dispatched":
+            if (attempt["state"], attempt["receipt_json"], attempt["error"]) == (state, receipt_json, error):
+                return _attempt_item(attempt)  # The same outcome again.
+            late = ActionStateError(f"Attempt {permit.attempt_id!r} is {attempt['state']}; its outcome is "
+                                    "kept as a late receipt record")
+        if late:
+            payload = _canonical({"attempt_id": permit.attempt_id, "dispatch_epoch": permit.epoch,
+                                  "outcome": state, "receipt": receipt and receipt.to_dict(), "error": error})
+            record_id = uuid4().hex
+            db.execute("""INSERT INTO workflow_action_records(record_id,action_id,kind,payload_json,payload_sha,
+              trusted,created) VALUES (?,?,'late_receipt',?,?,1,?)""",
+                       (record_id, action["action_id"], payload, _sha(payload), store._clock_ns()))
+            store._event(db, permit.run_id, "action_late_receipt", payload={
+                "action_id": action["action_id"], "attempt_id": permit.attempt_id, "record_id": record_id})
+        elif state == "acknowledged":
+            # Without a reported cost, only a write declared free has a known one.
+            held = _amount(attempt["reserved"])
+            cost = receipt.cost_nanousd if receipt.cost_nanousd is not None else None if held else 0
+            _finish(store, db, attempt, state, cost=cost, unknown=held if cost is None else 0,
+                    receipt_json=receipt_json)
+            db.execute("UPDATE workflow_action_approvals SET consumed_by_attempt=? WHERE approval_id=? "
+                       "AND consumed_by_attempt IS NULL", (permit.attempt_id, attempt["approval_id"]))
+        elif state == "refused":
+            _finish(store, db, attempt, state, cost=0, error=error, action_state="not_dispatched")
+        else:
+            _finish(store, db, attempt, state, unknown=_amount(attempt["reserved"]), error=error,
+                    action_state="outcome_unknown")
+        result = _attempt_item(_attempt(db, permit.attempt_id))
+    if late:
+        raise late
+    return result
+
+
+def record_receipt(store, permit, receipt):
+    """Record the service's receipt for a dispatched attempt, which becomes ``acknowledged``.
+
+    The receipt must name the action's key, its target's tenant and
+    collection and, when the intent names an object, that object; otherwise
+    ``WorkflowValidationError`` is raised and nothing changes. The receipt is
+    kept with the external object's identity and consumes the attempt's
+    approval. Its cost is confirmed; without one, a write whose ceiling is
+    zero is confirmed free, and any other keeps its reservation as unknown
+    exposure. The action stays ``dispatched`` until a read confirms the
+    result. Returns the attempt's projection; the same receipt again returns
+    it.
+
+    No lease is needed, but the permit's lease epoch must still be the run's.
+    A permit from a superseded lease session, or for an attempt whose outcome
+    is already recorded or recovered, changes nothing: its outcome is kept as
+    a ``late_receipt`` record, then ``WorkflowLeaseError`` or
+    ``ActionStateError`` is raised.
+    """
+    if not isinstance(receipt, ConnectorReceipt):
+        raise WorkflowValidationError("Expected a ConnectorReceipt")
+    return _record(store, permit, "acknowledged", receipt=receipt)
+
+
+def record_refused(store, permit, error):
+    """Record that the service definitely did not commit a dispatched attempt.
+
+    The attempt is ``refused`` at zero cost, its reservation is given back
+    and the action is ``not_dispatched`` again, its approval unconsumed. The
+    refusal still counts toward ``max_attempts``. *error* is kept with
+    account identifiers redacted. Permits are fenced as for
+    :func:`record_receipt`.
+    """
+    return _record(store, permit, "refused", error=_error(error))
+
+
+def record_ambiguous(store, permit, error):
+    """Record that a dispatched attempt may or may not have taken effect.
+
+    The attempt and its action become ``outcome_unknown``, and the write
+    ceiling it reserved becomes unknown exposure, which nothing here
+    releases. *error* is kept with account identifiers redacted. Permits are
+    fenced as for :func:`record_receipt`.
+    """
+    return _record(store, permit, "outcome_unknown", error=_error(error))
+
+
+def recover_actions(store, lease):
+    """Settle the attempts a stopped worker left in flight; call it before dispatching.
+
+    The caller holds the run's lease, which a stopped worker's must have
+    expired for. Every attempt in flight is treated as abandoned. A prepared
+    attempt was never sent: it is ``released`` with its reservation and does
+    not count toward ``max_attempts``. A dispatched attempt without an
+    outcome may have reached the service: it and its action become
+    ``outcome_unknown``, with its write ceiling as unknown exposure and the
+    reason ``recovered after dispatch``. Nothing is sent and no exposure is
+    released. Returns the ``released`` and ``outcome_unknown`` attempt IDs.
+    """
+    result = {"released": [], "outcome_unknown": []}
+    with store._transaction() as db:
+        store._lease(db, lease)
+        audit_actions(store, db, lease.run_id)
+        for attempt in db.execute("""SELECT attempt.* FROM workflow_action_attempts AS attempt
+          JOIN workflow_actions AS action USING(action_id) WHERE action.run_id=?
+          AND attempt.state IN ('prepared','dispatched') ORDER BY action.slot,action.sequence""",
+                                  (lease.run_id,)).fetchall():
+            if attempt["state"] == "prepared":
+                _finish(store, db, attempt, "released", error="recovered before dispatch")
+                result["released"].append(attempt["attempt_id"])
+            else:
+                _finish(store, db, attempt, "outcome_unknown", unknown=_amount(attempt["reserved"]),
+                        error="recovered after dispatch", action_state="outcome_unknown")
+                result["outcome_unknown"].append(attempt["attempt_id"])
+    return result

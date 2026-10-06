@@ -106,6 +106,8 @@
     "tests/test_acquisition_demo.py",
     "tests/test_action_approvals.py",
     "tests/test_action_contract.py",
+    "tests/test_action_journal.py",
+    "tests/test_action_process_loss.py",
     "tests/test_agent.py",
     "tests/test_assets.py",
     "tests/test_astra_analysis.py",
