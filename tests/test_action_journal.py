@@ -506,8 +506,10 @@ def test_a_claim_without_a_valid_approval_or_content_releases_the_attempt(
 
 
 def test_a_newer_approval_releases_the_attempt_prepared_under_an_older_one(
-        store, tmp_path, replies, host, clock, connector):  # noqa: F811
-    action, approval, lease = ready(store, tmp_path, replies, host, clock)
+        store, tmp_path, replies, host, clock, service):  # noqa: F811
+    # One attempt is allowed, and the released attempt does not count toward it.
+    connector = FixtureConnector(service, **{**SETTINGS, "max_attempts": 1})
+    action, approval, lease = ready(store, tmp_path, replies, host, clock, profile=connector.profile)
     older = begin_attempt(store, lease, action.action_id, approval.approval_id)
     newer = approved(store, host, action, clock)
 
@@ -687,9 +689,11 @@ BOUNDARIES = {
 
 @pytest.mark.parametrize("boundary", list(BOUNDARIES))
 def test_a_crash_at_each_boundary_recovers_safely(
-        store, tmp_path, replies, host, clock, service, connector, monkeypatch, boundary):  # noqa: F811
+        store, tmp_path, replies, host, clock, service, monkeypatch, boundary):  # noqa: F811
     point, recovered_state, committed = BOUNDARIES[boundary]
-    action, approval, lease = ready(store, tmp_path, replies, host, clock)
+    # One attempt is allowed, so a dispatch after a safe release shows the allowance restored.
+    connector = FixtureConnector(service, **{**SETTINGS, "max_attempts": 1})
+    action, approval, lease = ready(store, tmp_path, replies, host, clock, profile=connector.profile)
     image = tmp_path / "image.db"
     target, name, due = point(store, connector)
     crash = crash_when(monkeypatch, target, name, due, image=image, connection=store._db)
