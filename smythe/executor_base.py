@@ -11,6 +11,7 @@ import random
 import re
 import tempfile
 import time
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
@@ -46,6 +47,7 @@ from smythe.scheduling import (
     PROFILE_KEY, ModelProfile, NoAllowedProfileError, RetryDeadlineError, RetryPolicy,
     UncertainDispatchError, _attempt_records, _retry_after_s, node_profile, profile_map,
 )
+from smythe.scheduling import CapacityPolicy, _CapacityLimiter
 from smythe.task import _prompt_json, render_task, snapshot_task
 from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
 from smythe.tracer import (
@@ -435,6 +437,15 @@ class ExecutorBase:
     While revisions remain, a run refuses with ``NoAllowedProfileError``,
     before any call, an ``LLMSupervisor`` without a model of its own and a
     profile that calls another provider than the supervisor's.
+
+    ``capacity_policy``, a :class:`~smythe.scheduling.CapacityPolicy`, makes
+    every provider call of a node, including tool turns and retries, wait
+    for its provider type and model's turn: ``min_interval_s`` after the
+    previous call's start and after any ``Retry-After`` cooldown, on the
+    tracer's clock, with ``sleep`` replacing the wait. The async executor
+    also admits at most ``max_in_flight`` nodes of a model at once. Each run
+    starts with fresh limits, and every provider hint the run's pending nodes
+    need is read before any node call.
     """
 
     def __init__(
@@ -469,6 +480,7 @@ class ExecutorBase:
         attempts_spent: Callable[[Node], int] | None = None,
         profiles: tuple[ModelProfile, ...] | list[ModelProfile] = (),
         default_model: str | None = None,
+        capacity_policy: CapacityPolicy | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         if context_assembler is not None and not callable(context_assembler):
@@ -529,6 +541,16 @@ class ExecutorBase:
             )
         if self._profiles and self._workflow_managed:
             raise ValueError("profiles are not supported with journal-managed provider calls")
+        if capacity_policy is not None and not isinstance(capacity_policy, CapacityPolicy):
+            raise TypeError(
+                f"capacity_policy must be a CapacityPolicy or None, "
+                f"not {type(capacity_policy).__name__}"
+            )
+        if capacity_policy is not None and self._workflow_managed:
+            raise ValueError("capacity_policy is not supported with journal-managed provider calls")
+        # Each run's limiter, made when the run starts; None without a policy.
+        self._capacity_policy = capacity_policy
+        self._capacity: _CapacityLimiter | None = None
         self._call_attempts: dict[str, int] = {}
         self._reserved_node_ids: set[str] = set()
         self._settled_response_errors: list[tuple[str, Exception]] = []
@@ -1452,6 +1474,16 @@ class ExecutorBase:
             for provider, model in calls:
                 check_provider_support(provider, model, node_id=None, check_model=False,
                                        retry_owner=True)
+        if self._capacity_policy is not None:
+            self._capacity = _CapacityLimiter(
+                self._capacity_policy, self._tracer, self._sleep or asyncio.sleep,
+            )
+            # Read every hint the pending nodes need, so a bad one stops the run before any call.
+            # A profiled node's limit is its profile's provider and model.
+            for node in graph.nodes:
+                if node.status not in (NodeStatus.COMPLETED, NodeStatus.SKIPPED):
+                    provider, model, _ = self._node_route(node)
+                    self._capacity.bucket(provider, str(model))
         self._reserved_node_ids.clear()
         self._dispatched.clear()
         self._call_attempts.clear()
@@ -1771,9 +1803,11 @@ class ExecutorBase:
             if getattr(provider, "workflow_managed", False) is not True:
                 raise WorkflowError("The provider call factory must return a journal-managed provider")
         try:
-            if tools is None:
-                return await self._send(node, provider.chat(system, messages, model))
-            return await self._send(node, provider.chat(system, messages, model, tools=tools))
+            async with self._capacity_call(node, provider, model):
+                if tools is None:
+                    return await self._send(node, provider.chat(system, messages, model))
+                return await self._send(
+                    node, provider.chat(system, messages, model, tools=tools))
         except BaseExceptionGroup as exc:
             if not _native_response_errors(exc):
                 _raise_workflow_error(exc)
@@ -1831,6 +1865,11 @@ class ExecutorBase:
         if kept is not None:
             node.metadata["cost_usd_is_estimate"] = True
         node.metadata["cost_usd"] = self._budget.breakdown()[node.id]
+    def _capacity_call(self, node: Node, provider: Any, model: Any):
+        """Wait for one of *node*'s calls to take its turn; nothing without a capacity policy."""
+        if self._capacity is None:
+            return nullcontext()
+        return self._capacity.call(provider, str(model), node)
 
     def _settle_rejection(self, node, error, phase):
         """Under a retry policy, settle a native plain HTTP rejection at zero cost.

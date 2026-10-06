@@ -86,6 +86,7 @@ from smythe.registry import Registry
 from smythe.scheduling import (
     ModelProfile, RetryPolicy, node_profile, profile_map,
 )
+from smythe.scheduling import CapacityPolicy, _capacity_limit
 from smythe.supervisor import LLMSupervisor, Supervisor
 from smythe.synthesizer import SynthesisStrategy, Synthesizer, deliverable_sources
 from smythe.task import Task, snapshot_task, task_snapshots_equal, task_to_dict
@@ -436,6 +437,15 @@ class Swarm:
     Checkpoints of a run with profiled nodes are version 5, and resume routes
     them to the resuming Swarm's profiles of the same names. Durable runs
     refuse profiles.
+
+    ``capacity_policy``, a :class:`~smythe.scheduling.CapacityPolicy`, limits
+    each provider type and model's calls on an ordinary run: every node call,
+    tool turn and retry, and an ``LLM_MERGE`` synthesis, waits for its turn
+    (``min_interval_s`` and ``Retry-After`` cooldowns), and the async
+    executor runs at most ``max_in_flight`` nodes of a model at once,
+    passing over a ready node that has no free slot instead of stopping the
+    run. Capacity waits are reported under ``timing["waiting_ms"]["capacity"]``.
+    Nothing about it is saved. Durable runs refuse it.
     """
 
     def __init__(
@@ -472,6 +482,7 @@ class Swarm:
         lineage: LineagePolicy | None = None,
         reserve_for_checks: bool = False,
         profiles: Sequence[ModelProfile] = (),
+        capacity_policy: CapacityPolicy | None = None,
     ) -> None:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
         self._profiles = profile_map(profiles)
@@ -484,6 +495,17 @@ class Swarm:
                 f"reserve_for_checks must be True or False, not {type(reserve_for_checks).__name__}"
             )
         self.reserve_for_checks = reserve_for_checks
+        if capacity_policy is not None and not isinstance(capacity_policy, CapacityPolicy):
+            raise TypeError(
+                f"capacity_policy must be a CapacityPolicy or None, "
+                f"not {type(capacity_policy).__name__}"
+            )
+        if capacity_policy is not None and run_store is not None:
+            raise WorkflowBindingError(
+                "capacity_policy is not supported by durable text workflows, whose journal "
+                "admits each call when it is made"
+            )
+        self.capacity_policy = capacity_policy
         if renderer is not None and run_store is None:
             raise WorkflowBindingError("renderer requires a durable run_store")
         if renderer is not None and artifact_dir is None:
@@ -907,6 +929,16 @@ class Swarm:
         check = getattr(self._synthesizer, "check_merge_support", None)
         if check is not None:
             check(provider=self._provider, model=self.model, max_budget_usd=max_budget_usd)
+        if self.capacity_policy is not None:
+            # The run's model, which a merge calls, has its capacity hint read now.
+            _capacity_limit(self.capacity_policy, self._provider, str(self.model))
+
+    def _merge_capacity(self, executor: ExecutorBase) -> dict[str, Any]:
+        """The run's capacity limiter as synthesis arguments, for the built-in Synthesizer."""
+        limiter = getattr(executor, "_capacity", None)
+        if limiter is None or type(self._synthesizer) is not Synthesizer:
+            return {}
+        return {"capacity": limiter}
 
     def _check_planning_support(self, *, executing: bool) -> None:
         """Reject, before routing or planning, a run its provider cannot serve.
@@ -1140,6 +1172,7 @@ class Swarm:
             acceptance=self._acceptance,
             retry_policy=self.retry_policy,
             profiles=tuple(self._profiles.values()), default_model=self.model,
+            capacity_policy=self.capacity_policy,
         )
         self._active_executor = executor
         try:
@@ -1153,6 +1186,7 @@ class Swarm:
                     model=self.model,
                     budget=budget,
                     tracer=tracer,
+                    **self._merge_capacity(executor),
                 )
             acceptance = self._decide(graph, output, task, tracer)
         except BaseException as exc:
@@ -1209,6 +1243,7 @@ class Swarm:
             acceptance=self._acceptance,
             retry_policy=self.retry_policy,
             profiles=tuple(self._profiles.values()), default_model=self.model,
+            capacity_policy=self.capacity_policy,
         )
         self._active_executor = executor
         try:
@@ -1222,6 +1257,7 @@ class Swarm:
                     model=self.model,
                     budget=budget,
                     tracer=tracer,
+                    **self._merge_capacity(executor),
                 )
             acceptance = self._decide(graph, output, task, tracer)
         except BaseException as exc:
@@ -1716,6 +1752,7 @@ class Swarm:
             # Like revisions_used: a crash must not refill a node's attempts.
             attempts_used=allowance[1] if allowance is not None else None,
             profiles=tuple(self._profiles.values()), default_model=self.model,
+            capacity_policy=self.capacity_policy,
         )
         # Informational: decisions after resume extend the log the run saved.
         executor.revision_log = revision_log_from_state(state)
@@ -1733,6 +1770,7 @@ class Swarm:
                     model=self.model,
                     budget=budget,
                     tracer=tracer,
+                    **self._merge_capacity(executor),
                 )
             acceptance = self._decide(graph, output, task, tracer)
         except BaseException as exc:

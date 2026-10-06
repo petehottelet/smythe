@@ -4,16 +4,21 @@
 which failure classes it calls again for, how long it waits first, and the
 deadline that bounds a node's attempts and waits together. ``ModelProfile``
 routes the nodes that name it to a developer-approved provider and model.
-The validators here check every policy's fields the same way.
+``CapacityPolicy`` limits how many calls each provider type and model takes
+at once and how often one starts, and can admit ready work in turn across
+branches. The validators here check every policy's fields the same way.
 """
 
 from __future__ import annotations
 
+import inspect
 import math
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass, fields
-from typing import TYPE_CHECKING
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field, fields
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any
 
 from smythe._failures import (
     AUTHORITY_DENIED, INPUT_ERROR, PROVIDER_REJECTED, QUALITY_DEFECT, TRANSIENT, UNKNOWN_OUTCOME,
@@ -156,6 +161,100 @@ class RetryPolicy:
         object.__setattr__(self, "deadline_s", deadline)
 
 
+@dataclass(frozen=True)
+class CapacityLimit:
+    """How much of one provider type and model a run's calls may take.
+
+    ``max_in_flight`` caps the nodes using the model that the async executor
+    runs at once, and so their calls. ``min_interval_s`` is the least time
+    between the starts of two calls. None leaves a field to the provider's
+    ``capacity_hint()``, and without a hint the field sets no limit.
+    """
+
+    max_in_flight: int | None = None
+    min_interval_s: float | None = None
+
+    def __post_init__(self) -> None:
+        cap = self.max_in_flight
+        if cap is not None and (type(cap) is not int or cap < 1):
+            raise ValueError(f"max_in_flight must be an integer >= 1 or None, got {cap!r}")
+        if self.min_interval_s is not None:
+            object.__setattr__(self, "min_interval_s",
+                               validate_seconds(self.min_interval_s, "min_interval_s"))
+
+
+@dataclass(frozen=True)
+class CapacityPolicy:
+    """Opt-in limits on the calls each provider type and model takes, and fair admission.
+
+    ``limits`` maps a model name, or a ``(provider type name, model)`` pair
+    such as ``("OpenAIResponsesProvider", "gpt-6-astra")``, to a
+    :class:`CapacityLimit`. For each field a pair's value wins, then the
+    model's, then the provider's ``capacity_hint(model)``. A ready node whose
+    model has no free slot is passed over, still ready, and other ready work
+    is admitted instead; its wait is a ``capacity`` wait, never a failure.
+
+    A transient status error whose ``Retry-After`` asks for a wait cools its
+    provider type and model down: no call to them starts for that long, at
+    most ``cooldown_max_s`` (0 turns cooldowns off). With ``round_robin``,
+    the async executor admits ready nodes in turn across branches, a branch
+    being the ready nodes that share a first dependency (nodes without one
+    share a branch), so one wide fan-out cannot hold back another's work.
+    """
+
+    limits: Mapping[str | tuple[str, str], CapacityLimit] = field(default_factory=dict)
+    round_robin: bool = False
+    cooldown_max_s: float = 60.0
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.limits, Mapping):
+            raise ValueError(f"limits must map models to CapacityLimit, got {self.limits!r}")
+        for key, limit in self.limits.items():
+            pair = (isinstance(key, tuple) and len(key) == 2
+                    and all(isinstance(part, str) for part in key))
+            if not isinstance(key, str) and not pair:
+                raise ValueError(
+                    f"A limit's key must be a model or a (provider type name, model) pair, "
+                    f"got {key!r}"
+                )
+            if not isinstance(limit, CapacityLimit):
+                raise ValueError(f"The limit for {key!r} must be a CapacityLimit, got {limit!r}")
+        if type(self.round_robin) is not bool:
+            raise ValueError(f"round_robin must be a bool, got {self.round_robin!r}")
+        object.__setattr__(self, "limits", MappingProxyType(dict(self.limits)))
+        object.__setattr__(self, "cooldown_max_s",
+                           validate_seconds(self.cooldown_max_s, "cooldown_max_s"))
+
+
+def _capacity_limit(policy: CapacityPolicy, provider: Any, model: str) -> CapacityLimit:
+    """The limit *policy* sets for calls to *model* on *provider*, its hint filling gaps.
+
+    Raises ValueError for a hint that is not None or a dict of
+    ``CapacityLimit`` fields with valid values.
+    """
+    name = type(provider).__name__
+    declare = getattr(provider, "capacity_hint", None)
+    hint = None if declare is None else declare(model)
+    if hint is not None:
+        unknown = sorted(map(repr, set(hint) - {"max_in_flight", "min_interval_s"})
+                         if isinstance(hint, dict) else ())
+        if not isinstance(hint, dict) or unknown:
+            raise ValueError(
+                f"{name}.capacity_hint({model!r}) must return None or a dict of "
+                f"max_in_flight and min_interval_s, got {hint!r}"
+            )
+        try:
+            hint = CapacityLimit(**hint)
+        except ValueError as exc:
+            raise ValueError(f"{name}.capacity_hint({model!r}) is not valid: {exc}") from None
+    layers = [policy.limits.get((name, model)), policy.limits.get(model), hint]
+    return CapacityLimit(**{
+        item.name: next((getattr(layer, item.name) for layer in layers
+                         if layer is not None and getattr(layer, item.name) is not None), None)
+        for item in fields(CapacityLimit)
+    })
+
+
 def _retry_after_s(error: BaseException) -> float | None:
     """The wait a transient status error's response asks for, in seconds, or None.
 
@@ -176,6 +275,92 @@ def _retry_after_s(error: BaseException) -> float | None:
         if math.isfinite(wait) and wait >= 0:
             return wait
     return None
+
+
+class _Bucket:
+    """One provider type and model: its limit, the slots in use, and its next call start."""
+
+    __slots__ = ("limit", "in_flight", "not_before", "cooldowns")
+
+    def __init__(self, limit: CapacityLimit) -> None:
+        self.limit = limit
+        self.in_flight = 0
+        # No call starts before this reading of the tracer's clock.
+        self.not_before = -math.inf
+        # Counts cooldowns, so that a call that waited through one waits again.
+        self.cooldowns = 0
+
+
+class _CapacityLimiter:
+    """The capacity that one run's calls take under a :class:`CapacityPolicy`.
+
+    Slots and call starts are kept per provider type and model, on *tracer*'s
+    monotonic clock, and each wait is recorded as its ``capacity`` wait.
+    ``sleep(seconds)`` waits, and is awaited when it returns an awaitable.
+    """
+
+    def __init__(self, policy: CapacityPolicy, tracer: Any, sleep: Any) -> None:
+        self.policy = policy
+        self._tracer = tracer
+        self._sleep = sleep
+        self._buckets: dict[tuple[type, str], _Bucket] = {}
+
+    def bucket(self, provider: Any, model: str) -> _Bucket:
+        """The state of calls to *model* on *provider*'s type, its limit read on first use."""
+        key = (type(provider), model)
+        if key not in self._buckets:
+            self._buckets[key] = _Bucket(_capacity_limit(self.policy, provider, model))
+        return self._buckets[key]
+
+    @staticmethod
+    def try_acquire(bucket: _Bucket) -> bool:
+        """Take one of *bucket*'s slots; False, taking none, when they are all in use."""
+        cap = bucket.limit.max_in_flight
+        if cap is not None and bucket.in_flight >= cap:
+            return False
+        bucket.in_flight += 1
+        return True
+
+    @staticmethod
+    def release(bucket: _Bucket) -> None:
+        bucket.in_flight -= 1
+
+    @asynccontextmanager
+    async def call(self, provider: Any, model: str, node: Any = None):
+        """Make one call to *model* on *provider* once its turn comes.
+
+        The call starts no sooner than ``min_interval_s`` after the previous
+        call's start and after any cooldown. A transient status error it
+        raises whose ``Retry-After`` asks for a wait starts a cooldown of that
+        length, at most the policy's ``cooldown_max_s``.
+        """
+        bucket = self.bucket(provider, model)
+        started, waited = self._tracer.now(), False
+        try:
+            while True:
+                cooldowns, now = bucket.cooldowns, self._tracer.now()
+                start = max(now, bucket.not_before)
+                # Reserve this start, so that a concurrent call takes the next.
+                bucket.not_before = start + (bucket.limit.min_interval_s or 0.0)
+                if start > now:
+                    waited = True
+                    pause = self._sleep(start - now)
+                    if inspect.isawaitable(pause):
+                        await pause
+                if bucket.cooldowns == cooldowns:
+                    break
+        finally:
+            if waited:
+                self._tracer.on_wait("capacity", self._tracer.since(started), node)
+        try:
+            yield
+        except Exception as error:
+            asked = _retry_after_s(error)
+            if asked is not None and self.policy.cooldown_max_s:
+                until = self._tracer.now() + min(asked, self.policy.cooldown_max_s)
+                bucket.not_before = max(bucket.not_before, until)
+                bucket.cooldowns += 1
+            raise
 
 
 def _attempt_records(data: object) -> dict[str, tuple[int, int]]:

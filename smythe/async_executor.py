@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+from bisect import bisect_right
 from collections import deque
-from itertools import islice
+from itertools import islice, zip_longest
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
@@ -30,10 +31,30 @@ from smythe.verifier import VerificationRecoveryError
 if TYPE_CHECKING:
     from smythe.acceptance import AcceptancePolicy
     from smythe.context import ContextSnapshot
-    from smythe.scheduling import ModelProfile, RetryPolicy
+    from smythe.scheduling import CapacityPolicy, ModelProfile, RetryPolicy
     from smythe.supervisor import Supervisor
     from smythe.task import Task
     from smythe.verifier import Verifier
+
+
+def _branch(node: Node, order: dict[str, int]) -> int:
+    """The graph position of *node*'s first dependency, or -1 for a node without one."""
+    return order.get(node.depends_on[0], -1) if node.depends_on else -1
+
+
+def _in_turn(ready: deque[Node], order: dict[str, int], last: int | None) -> deque[Node]:
+    """*ready* ordered by turns across branches, from the branch after *last*.
+
+    A branch is the ready nodes that share a first dependency (see
+    ``_branch``), in their own order; each turn takes one node per branch.
+    """
+    branches: dict[int, list[Node]] = {}
+    for node in ready:
+        branches.setdefault(_branch(node, order), []).append(node)
+    keys = sorted(branches)
+    first = 0 if last is None else bisect_right(keys, last)
+    turns = zip_longest(*(branches[key] for key in keys[first:] + keys[:first]))
+    return deque(node for turn in turns for node in turn if node is not None)
 
 
 class AsyncExecutor(ExecutorBase):
@@ -55,6 +76,10 @@ class AsyncExecutor(ExecutorBase):
     Concurrency safety: ``max_concurrency`` caps in-flight provider
     calls, so a wide broadcast doesn't fire every call
     at once and trip provider rate limits.  None means unlimited.
+    Under a ``capacity_policy``, at most ``max_in_flight`` nodes of each
+    provider type and model run at once: a ready node whose model has no
+    free slot is passed over, still ready, for work behind it, and never
+    stops the run. With ``round_robin``, ready nodes take turns by branch.
     """
 
     DEFAULT_ESTIMATED_TOKENS = 2000
@@ -93,6 +118,7 @@ class AsyncExecutor(ExecutorBase):
         attempts_spent: Callable[[Node], int] | None = None,
         profiles: tuple[ModelProfile, ...] | list[ModelProfile] = (),
         default_model: str | None = None,
+        capacity_policy: CapacityPolicy | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         super().__init__(
@@ -116,6 +142,7 @@ class AsyncExecutor(ExecutorBase):
             attempts_spent=attempts_spent,
             profiles=profiles,
             default_model=default_model,
+            capacity_policy=capacity_policy,
         )
         self._estimated_tokens_per_node = validate_token_count(
             estimated_tokens_per_node, "estimated_tokens_per_node",
@@ -180,18 +207,38 @@ class AsyncExecutor(ExecutorBase):
         # then held it, for its admission wait.
         ready_at = dict.fromkeys((node.id for node in ready), self._tracer.now())
         held_s: dict[str, float] = {}
+        # Under a capacity policy: when a full limit first passed over each
+        # ready node, and the branch last admitted, for round-robin turns.
+        deferred_at: dict[str, float] = {}
+        last_branch: int | None = None
 
         try:
             while ready or active:
                 admission_error: Exception | None = None
+                capacity = self._capacity
+                if capacity is not None and capacity.policy.round_robin:
+                    ready = _in_turn(ready, order, last_branch)
+                passed: list[Node] = []
                 while ready and len(active) < concurrency:
                     node = ready.popleft()
+                    bucket = None
+                    if capacity is not None:
+                        provider, model, _ = self._node_route(node)
+                        bucket = capacity.bucket(provider, str(model))
+                    if bucket is not None and not capacity.try_acquire(bucket):
+                        # Its provider and model have no free slot: it stays
+                        # ready, and work behind it may start instead.
+                        passed.append(node)
+                        deferred_at.setdefault(node.id, self._tracer.now())
+                        continue
                     try:
                         self._reserve_node(node)
                     except Exception as exc:
                         # No provider call has started for this node. Stop
                         # admitting work, settle/cancel what is already in
                         # flight, then surface the admission failure.
+                        if bucket is not None:
+                            capacity.release(bucket)
                         if isinstance(exc, BudgetValidationError):
                             self.mark_accounting_invalid(node, exc)
                             self.notify_update(node)
@@ -203,12 +250,22 @@ class AsyncExecutor(ExecutorBase):
                     waited = self._tracer.since(
                         ready_at.pop(node.id, self._tracer.now()) + held_s.pop(node.id, 0.0),
                     )
-                    self._tracer.on_wait("admission", waited, node)
+                    # Time since a full limit passed it over waited for capacity.
+                    blocked = (min(waited, self._tracer.since(deferred_at.pop(node.id)))
+                               if node.id in deferred_at else 0.0)
+                    self._tracer.on_wait("admission", waited - blocked, node)
+                    if blocked:
+                        self._tracer.on_wait("capacity", blocked, node)
                     task = asyncio.create_task(
                         self._execute_node(node, graph),
                         name=f"smythe-node-{node.id}",
                     )
+                    if bucket is not None:
+                        # However the task ends, even cancelled before it starts.
+                        task.add_done_callback(lambda _, bucket=bucket: capacity.release(bucket))
+                        last_branch = _branch(node, order)
                     active[task] = node
+                ready.extendleft(reversed(passed))
 
                 if admission_error is not None:
                     await self._cancel_and_settle(active)
@@ -263,6 +320,7 @@ class AsyncExecutor(ExecutorBase):
                         for stale in (ready_at.keys() | held_s.keys()) - ready_ids:
                             ready_at.pop(stale, None)
                             held_s.pop(stale, None)
+                            deferred_at.pop(stale, None)
                         now = self._tracer.now()
                         for waiting in ready:
                             ready_at.setdefault(waiting.id, now)

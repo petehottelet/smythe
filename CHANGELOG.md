@@ -984,6 +984,25 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   calling the run's provider, and resume routes the nodes to the resuming
   Swarm's profiles of the same names. Durable runs refuse profiles. See
   [model profiles](docs/execution.md#model-profiles).
+- `Swarm(capacity_policy=CapacityPolicy(...))` limits the calls each provider
+  type and model takes on an ordinary run, and both executors take
+  `capacity_policy=`. `CapacityPolicy.limits` maps a model, or a
+  `(provider type name, model)` pair, to a `CapacityLimit` with
+  `max_in_flight` and `min_interval_s`; a field it leaves unset comes from the
+  new `Provider.capacity_hint(model)`, which returns None by default. The
+  async executor runs at most `max_in_flight` nodes of a model at once and
+  passes over a ready node whose model has no free slot, still ready and with
+  nothing reserved, to admit other ready work, so a full limit never stops the
+  run; a budget reservation that fails still does. Every node call, including
+  tool turns and retries, and an `LLM_MERGE` synthesis start at least
+  `min_interval_s` apart and wait out the cooldown that a transient status
+  error's `Retry-After` starts, at most `cooldown_max_s`.
+  `round_robin=True` admits ready nodes in turn across branches, so one wide
+  fan-out cannot hold back another's work. Timing reports these waits as
+  `waiting_ms["capacity"]`, a key every timing record now has. A hint that is
+  not valid is refused before any call. Durable runs refuse the policy, and
+  checkpoints do not record it. Without a policy, admission and calls are
+  unchanged. See [provider capacity](docs/execution.md#provider-capacity).
 
 ### Changed
 

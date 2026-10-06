@@ -196,8 +196,9 @@ policy](workflow-accounting.md#retry-policy)). On an ordinary run without
 `persist_attempts` a policy is not saved in checkpoints: a resumed run follows
 the policy of the Swarm that resumes it, with a fresh allowance of attempts.
 `Executor` and `AsyncExecutor` also take `sleep`, which replaces the wait
-before a retry and is awaited when it returns an awaitable, and `rng`, which
-draws the jitter, so tests can drive waits from a manual clock.
+before a retry and a [capacity](#provider-capacity) wait and is awaited when
+it returns an awaitable, and `rng`, which draws the jitter, so tests can drive
+waits from a manual clock.
 
 ### Persisted attempts
 
@@ -290,6 +291,78 @@ any routing or planning call. An ordinary Swarm applies the executor's rules
 when it is constructed and raises `ValueError`. A durable Swarm applies the
 durable run's stricter rules, which also require an integer concurrency cap, at
 each `plan`, `execute`, or `resume` call and raises `WorkflowBindingError`.
+
+### Provider capacity
+
+`Swarm(capacity_policy=CapacityPolicy(...))`, or `capacity_policy=` on either
+executor, limits the calls that each provider type and model takes on an
+ordinary run. Without a policy none of this applies, and no provider hint is
+read. A `CapacityLimit` has two fields, both `None` by default:
+
+| Field | Meaning |
+|---|---|
+| `max_in_flight` | How many nodes using the model the async executor runs at once, so at most that many of their calls are in flight |
+| `min_interval_s` | The least time, in seconds, between the starts of two calls to the model |
+
+`CapacityPolicy.limits` maps a model name, or a `(provider type name, model)`
+pair such as `("OpenAIResponsesProvider", "gpt-6-astra")`, to a limit. For each
+field a pair's value wins, then the model's, then the provider's
+`capacity_hint(model)`, which returns `None` (the default) or a dict with
+either field. A field that nothing sets is not limited. A hint that is not
+`None` or such a dict with valid values raises `ValueError`: for the run's
+model before routing or planning, and for every model a pending node uses
+before any node call.
+
+```python
+from smythe import CapacityLimit, CapacityPolicy, OpenAIResponsesProvider, Swarm
+
+swarm = Swarm(
+    model="gpt-6-astra", provider=OpenAIResponsesProvider(),
+    parallel=True, max_concurrency=16,
+    capacity_policy=CapacityPolicy(
+        limits={"gpt-6-astra": CapacityLimit(max_in_flight=4, min_interval_s=0.25)},
+        round_robin=True,
+    ),
+)
+```
+
+When a ready node's model has no free slot, the async executor passes over it:
+the node stays ready, and ready work behind it, such as another model's nodes,
+is admitted instead. It is admitted once a node of its model finishes, and it
+never fails the run. While it waits it takes no slot under `max_concurrency`
+and reserves no budget, so it leaves
+[held allowance](budgets.md#held-allowance-for-checks) alone. A reservation
+that the budget refuses still stops admission and the run, as without a
+policy. The serial executor runs one node at a time, so it has no admission
+limit to apply.
+
+Every provider call of a node waits for its turn in both executors: its
+first call, each tool turn and each retry. A call starts no sooner than
+`min_interval_s` after the previous call to the same provider type and model
+started, and not during a cooldown. A transient status error whose
+`Retry-After` asks for a wait (read as under a [retry policy](#retry-policy))
+starts a cooldown: no call to that provider type and model starts for that
+long, at most `cooldown_max_s` (default 60; 0 turns cooldowns off). A call
+already waiting its turn waits for the cooldown too. The wait is measured on
+the tracer's clock and made with the executor's `sleep` when one is given. It
+happens inside the attempt, so it is part of the attempt's span and counts
+toward the node's `timeout_s` and a retry policy's deadline. An `LLM_MERGE`
+synthesis by the built-in `Synthesizer` takes its turn the same way; it runs
+after every node has settled, so it is the only call in flight. Routing,
+planning and supervisor reviews are not limited.
+
+With `round_robin=True`, the async executor admits ready nodes in turn across
+branches. A branch is the ready nodes that share a first dependency, and
+nodes without dependencies form one branch. Each turn takes one node from
+each branch, starting after the branch admitted last, so a wide fan-out
+cannot hold back another branch's ready work. Without it, ready nodes are
+admitted in the order they became ready.
+
+Capacity waits are reported as `waiting_ms["capacity"]` (see [timing](#timing)).
+Nothing about the policy is saved: a resumed run follows the resuming
+`Swarm`'s policy, and each run starts with fresh limits. Durable `run_store`
+runs refuse `capacity_policy` with `WorkflowBindingError`, and an executor
+whose calls a journal manages refuses it with `ValueError`.
 
 ## Provider checks before any call
 
@@ -459,6 +532,7 @@ by hand, reports planning as not measured.
 | `retry_backoff` | Sleeping before a retry attempt (`retry_backoff_s`) |
 | `admission` | A ready node waiting for a free concurrency slot in the async executor, which runs every parallel run and `execute_async()`, `resume()` and `aresume()`; serial `execute()` has no admission queue. When a regeneration or supervisor revision leaves a ready node waiting on new work, its wait starts again when it is next ready |
 | `supervision` | Ready work that a supervisor review kept from starting: in the async executor, ready nodes with a free slot; in serial execution, the next pending node |
+| `capacity` | Under a [capacity policy](#provider-capacity): a ready node from when a full limit first passed it over until it is admitted (its wait before then is an admission wait), and each call waiting for its turn |
 
 Phases and waits are totals. In a parallel run nodes overlap, and checkpoint
 writes, verification and supervision happen during execution, so the totals

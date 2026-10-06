@@ -479,6 +479,17 @@ class Provider(ABC):
         """Whether a hard-budget call must have an explicit USD ceiling."""
         return False
 
+    def capacity_hint(self, model: str) -> dict | None:
+        """Suggest how many calls to *model* may run at once and how often one may start.
+
+        Return None, the default, or a dict with ``max_in_flight`` (an
+        integer >= 1) and ``min_interval_s`` (seconds between call starts),
+        either of which may be left out. Only a run under a
+        ``CapacityPolicy`` reads it, and a value the policy sets for the
+        model, alone or with this provider type, replaces the hint's.
+        """
+        return None
+
     async def chat(
         self,
         system: str,

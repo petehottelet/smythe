@@ -130,6 +130,7 @@
     "tests/test_budget.py",
     "tests/test_budget_holds.py",
     "tests/test_budget_validation.py",
+    "tests/test_capacity_admission.py",
     "tests/test_checkpoint.py",
     "tests/test_checkpoint_atomic.py",
     "tests/test_checkpoint_mcp_trust.py",

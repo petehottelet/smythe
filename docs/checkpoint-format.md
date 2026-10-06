@@ -111,7 +111,7 @@ and recovery controls.
         "elapsed_ms": 42500.0,
         "summed_node_ms": 61200.0,
         "phases_ms": {"routing": null, "planning": 3100.0, "execution": 52000.0, "…": "…"},
-        "waiting_ms": {"retry_backoff": 0.0, "admission": 900.0, "supervision": 0.0}
+        "waiting_ms": {"retry_backoff": 0.0, "admission": 900.0, "supervision": 0.0, "capacity": 0.0}
       }
     ]
   }

@@ -58,7 +58,8 @@ from smythe.workflow_store import SQLiteWorkflowStore, WorkflowError
 from smythe.workflow_tools import ReadProfile, ReadToolError
 from smythe.router import RoutingDecision, RoutingRule, WhiteRabbit
 from smythe.scheduling import (
-    ModelProfile, NoAllowedProfileError, RetryDeadlineError, RetryPolicy, UncertainDispatchError,
+    CapacityLimit, CapacityPolicy, ModelProfile, NoAllowedProfileError, RetryDeadlineError,
+    RetryPolicy, UncertainDispatchError,
 )
 from smythe.skills import (
     CapabilityHydrationMode,
@@ -110,6 +111,8 @@ __all__ = [
     "CallableVerifier",
     "CapabilityHydrationMode",
     "CapabilityMapper",
+    "CapacityLimit",
+    "CapacityPolicy",
     "ChatMessage",
     "CheckpointStore",
     "ClaimPassage",
