@@ -110,7 +110,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   and an async `validate`, including an object whose `__call__` is async.
   Runs do not evaluate a policy, and `Swarm` takes none. See
   [delivery acceptance records](docs/verifier.md#delivery-acceptance-records).
-  and an async `validate`. See [delivery acceptance records](docs/verifier.md#delivery-acceptance-records).
 - `SwarmResult.acceptance` and `SwarmResult.rejected_output`, appended after
   `timing` so positional construction is unchanged, a read-only
   `SwarmResult.accepted` that is true only for an `accepted` record, and
@@ -173,8 +172,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   recorded statuses and `accepted` flags are unchanged. The HTML report shows
   it in a Delivery column. See
   [delivery eligibility](docs/jobs.md#delivery-eligibility).
-  not accept is returned as `rejected_output` with an empty `output`. See
-  [delivery acceptance](docs/checkpoint-format.md#delivery-acceptance-version-5).
 - Strict delivery acceptance on ordinary runs. `Swarm(acceptance=...)` and
   `Swarm.from_yaml(..., acceptance=...)` take an `AcceptancePolicy`; the
   default `None` and an advisory policy keep current behavior. A strict
@@ -976,10 +973,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   segment per lease session, the call's elapsed time, the wall time since the
   run was created, and whether a session ended without releasing its lease.
   `SQLiteWorkflowStore.lease_sessions()` returns the same session bounds.
-- A durable run's `WorkflowBindingError` names the argument it refuses:
-  `run_store` and `verifier`, with the type that was passed, `memory`,
-  `tool_runtime` or `checkpoint_store`. One message used to cover memory,
-  tools and the checkpoint store. The exception is still a `ValueError`.
 - Trace span durations come from a monotonic clock, so a wall-clock
   adjustment during an attempt no longer distorts a span's `duration_ms` or
   `PlannerMemory`'s summed node time. `start_time` and `end_time` remain
