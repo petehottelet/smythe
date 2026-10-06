@@ -133,7 +133,7 @@ Notes:
 - `task.done_when` carries the acceptance criteria forward. A resumed run that had forgotten them could not hold its own output to them.
 - `timing` records how long each call that worked on the execution took; see [timing segments](#timing-segments).
 - `graph.planning`, present only when a component recorded how the graph was planned, holds informational records keyed by namespace; see [graph planning records](#graph-planning-records).
-- A version 5 checkpoint adds a top-level `requires` list and the state it names, such as a `delivery_acceptance` record or an attempt allowance; see [required state features](#required-state-features-version-5).
+- A version 5 checkpoint adds a top-level `requires` list and the state it names, such as a `delivery_acceptance` record, an attempt allowance or nodes that name model profiles; see [required state features](#required-state-features-version-5).
 - A completed version 5 checkpoint that was [re-evaluated](verifier.md#re-evaluation) adds `delivery_acceptance_history`, the decisions its current record superseded; see [decision history](#decision-history).
 
 ## Timing segments
@@ -295,8 +295,9 @@ the state features its reader must understand:
 "requires": ["delivery_acceptance"]
 ```
 
-This build knows three features: [`delivery_acceptance`](#delivery-acceptance-version-5),
-[`attempt_allowance`](#attempt-allowance-version-5), and `operator_decision`,
+This build knows four features: [`delivery_acceptance`](#delivery-acceptance-version-5),
+[`attempt_allowance`](#attempt-allowance-version-5),
+[`model_profiles`](#model-profiles-version-5), and `operator_decision`,
 which a completed state lists while its record or a kept
 [earlier decision](#decision-history) is an
 [operator's decision](verifier.md#operator-decisions). A state lists those it
@@ -476,12 +477,38 @@ saved without an allowance. Other runs keep writing version 4 with
 returns the recorded `RetryPolicy` and `attempts_used` after these checks, or
 `None` without an allowance.
 
+## Model profiles (version 5)
+
+A run whose graph has a node that names a [model
+profile](execution.md#model-profiles) in `metadata.profile` writes every
+checkpoint as version 5 and lists `model_profiles` in `requires`. The node
+keeps the profile's name and model in its `metadata`:
+
+```json
+"metadata": {"profile": "sol", "model": "gpt-5.6-sol"}
+```
+
+A build that does not route profiles would call the run's provider for that
+node, so builds that read only versions 1 through 4 refuse the checkpoint,
+and so does a version 5 reader that does not know `model_profiles`. A
+version 5 state whose nodes name profiles without listing `model_profiles`,
+or that lists it with no node naming one, is refused with `ValueError`,
+finished or not, before any provider call.
+
+Resume routes each unfinished profiled node to the resuming `Swarm`'s
+profile of the same name, and refuses with `NoAllowedProfileError`, before
+any provider call, a node whose profile that Swarm does not allow or whose
+saved model differs from its profile's. A completed run returns its saved
+result without them. Runs without a profiled node keep writing version 4.
+`smythe.checkpoint.model_profiles_from_state(state)` returns the profile each
+node names, by node ID, after these checks.
+
 ## Resume semantics
 
 `swarm.resume(execution_id)` (or `await swarm.aresume(...)`):
 
 1. Loads the state and rejects unknown ids (`KeyError`) and unreadable versions (`ValueError`).
-2. Restores the complete task, validates saved budget policy, charges, and verification state. Conflicting task copies, unresolved accounting markers, or ambiguous verification decisions stop recovery. A completed snapshot with output and no pending verification work returns its validated stored result and task; a version 5 snapshot returns its checked [delivery acceptance record](#delivery-acceptance-version-5) too. An unfinished version 5 snapshot stops here unless the resuming `Swarm` has the strict policy it began with, and, with an [attempt allowance](#attempt-allowance-version-5), the retry policy it records.
+2. Restores the complete task, validates saved budget policy, charges, and verification state. Conflicting task copies, unresolved accounting markers, or ambiguous verification decisions stop recovery. A completed snapshot with output and no pending verification work returns its validated stored result and task; a version 5 snapshot returns its checked [delivery acceptance record](#delivery-acceptance-version-5) too. An unfinished version 5 snapshot stops here unless the resuming `Swarm` has the strict policy it began with, with an [attempt allowance](#attempt-allowance-version-5) the retry policy it records, and with [profiled nodes](#model-profiles-version-5) the profiles they name.
 3. Otherwise restores the graph, re-registers the recorded agents, and resets `running` / `failed` nodes to `pending`. It finishes saved regeneration intents and consumes pending verdicts before dispatch. A rejected generation invalidates affected `completed` and `skipped` results too; other finished nodes keep their recorded results.
 4. Restores per-node costs into the budget so the resumed run keeps counting against the original cap.
 5. Executes the remaining nodes on the async executor, one at a time unless the resuming Swarm has `parallel=True` (then up to `max_concurrency`), synthesizes over the full graph, decides delivery acceptance under a strict policy, and writes the final checkpoint.
@@ -500,10 +527,11 @@ resume. See [Cost guardrails](budgets.md).
 
 This build writes version `4` and reads versions `1` through `5`. It writes
 version `5` only for a state with a [delivery acceptance
-record](#delivery-acceptance-version-5) or an [attempt
-allowance](#attempt-allowance-version-5), so builds that read only versions 1
-through 4 refuse it instead of delivering output they cannot check or
-refilling attempts the run has spent. A version
+record](#delivery-acceptance-version-5), an [attempt
+allowance](#attempt-allowance-version-5) or a node that names a [model
+profile](#model-profiles-version-5), so builds that read only versions 1
+through 4 refuse it instead of delivering output they cannot check,
+refilling attempts the run has spent or calling the wrong provider. A version
 5 reader also refuses any [required state feature](#required-state-features-version-5)
 it does not know.
 Version 2 added `control` and `task.done_when`; version 1 loads their original

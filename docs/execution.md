@@ -76,7 +76,7 @@ policy decides every other one.
 
 | Class | Exceptions | Terminal |
 |---|---|---|
-| `input_error` | HTTP 404 or 413 `ProviderRequestRejectedError`; any other 4xx status error not listed below; `WorkflowBindingError`, `BudgetEstimateRequired` and `ArtifactIntegrityError` | No |
+| `input_error` | HTTP 404 or 413 `ProviderRequestRejectedError`; any other 4xx status error not listed below; `WorkflowBindingError`, `BudgetEstimateRequired`, `NoAllowedProfileError` and `ArtifactIntegrityError` | No |
 | `authority_denied` | HTTP 401 or 403 `ProviderRequestRejectedError` or status error | No |
 | `transient` | HTTP 429 `ProviderRequestRejectedError`; 408, 409, 429, 499 and 5xx status errors; timeouts other than those below; any exception this table does not list | No |
 | `provider_rejected` | `ProviderResponseError`: the provider answered and the charge is known, but the response cannot be used. Also `OutputTruncatedError`, `OutputRefusedError` and `ReadToolError` | `ProviderResponseError` only |
@@ -169,14 +169,15 @@ tracer's monotonic clock.
 A run under a policy needs every provider call sent once, planning and
 supervision included. Each provider the run can call must declare
 `ProviderFeatures.sdk_retries` as `0` through `feature_support()`: the run's
-own, a `WhiteRabbit` classifier's, that of each `LLMArchitect` or
-`ConstrainedArchitect` that could plan the run (directly, as a router tier,
-or built from `planning_provider`), and an `LLMSupervisor`'s when
-`max_revisions` lets it review. Otherwise the run is refused with
-`ValueError` before routing, planning or any node call. `execute(graph)` and
-`resume()` check the run's provider and the supervisor's before their first
-call, even when only synthesis is left to run, and so do `Executor` and
-`AsyncExecutor` run without a Swarm before their first node call:
+own, each [model profile](#model-profiles)'s, a `WhiteRabbit` classifier's,
+that of each `LLMArchitect` or `ConstrainedArchitect` that could plan the
+run (directly, as a router tier, or built from `planning_provider`), and an
+`LLMSupervisor`'s when `max_revisions` lets it review. Otherwise the run is
+refused with `ValueError` before routing, planning or any node call.
+`execute(graph)` and `resume()` check the run's provider, each profile's and
+the supervisor's before their first call, even when only synthesis is left
+to run, and so do `Executor` and `AsyncExecutor` run without a Swarm before
+their first node call, for the providers their unfinished nodes call:
 
 | Provider | Declared `sdk_retries` |
 |---|---|
@@ -298,8 +299,10 @@ router or architect is called:
 
 - A `tool_runtime` needs a provider that can call tools.
 - A `retry_policy` needs every provider the run can call, including a
-  router classifier's, an architect's and an `LLMSupervisor`'s, to declare
-  `sdk_retries=0` (see [retry policy](#retry-policy)).
+  router classifier's, an architect's, an `LLMSupervisor`'s and each model
+  profile's, to declare `sdk_retries=0` (see [retry policy](#retry-policy)).
+- Each [model profile](#model-profiles) needs a provider that declares the
+  features it requires and supports its model.
 - An `LLM_MERGE` synthesizer, which calls the run's model after every node
   finishes, needs the per-call ceiling a capped call to that model requires
   and a model the provider accepts.
@@ -339,6 +342,66 @@ synthesis was refused, and otherwise the refused node's id. Other
 mismatches raise `ValueError`. Only a feature declared unsupported is
 refused: custom providers declare nothing by default and run as before. See
 the [support matrix](support-matrix.md) for each provider's declaration.
+
+## Model profiles
+
+`Swarm(profiles=...)` lists the providers and models that an ordinary run's
+nodes may be routed to. Each is a `ModelProfile` with a distinct name:
+
+```python
+from smythe import AnthropicProvider, ModelProfile, OpenAIResponsesProvider, Swarm
+
+sol = ModelProfile(
+    "sol", OpenAIResponsesProvider(), "gpt-5.6-sol",
+    max_cost_per_call_usd=0.05, requires={"exact_accounting"},
+)
+swarm = Swarm(model="claude-opus-5-5", provider=AnthropicProvider(),
+              profiles=[sol], max_budget_usd=2)
+```
+
+A node whose `metadata["profile"]` names a profile calls that profile's
+provider with its model, and its `metadata["model"]` is set to that model.
+Before each call it reserves `max_cost_per_call_usd`, unless it sets
+`metadata["estimated_cost_usd"]`; its held check under `reserve_for_checks`
+and its persisted attempts use the same amount. Every other node calls the
+run's provider with its own model or the run's. Nodes a supervisor adds and
+synthesis call the run's provider too, with the run's model.
+
+Only developer code names a profile: caller-built and YAML graphs
+(`Swarm.from_yaml(..., profiles=...)`), architects written in code and
+`ConstrainedArchitect` templates. A generated plan may set no node metadata
+but `role`, so model output cannot choose a profile.
+
+`requires` lists the features that the profile's provider must declare
+`True` for its model through `Provider.feature_support()`: `tools`,
+`attachments`, `image_output` and `exact_accounting`. A feature the provider
+does not declare does not count. A run raises `NoAllowedProfileError`, a
+`ValueError`, before routing, planning or any node call for:
+
+- a profile whose provider does not declare `True` a feature it requires,
+  declares its model unsupported, or prices the model with a table whose
+  retirement date for it has passed (UTC);
+- a profile whose provider declares that it cannot call tools, in a run
+  with a `tool_runtime`;
+- a node that names a profile the run does not allow, including any profile
+  when the Swarm has none, or that sets a `model` other than its profile's.
+
+`execute(graph)` and `resume()` make the same checks before their first
+call, and check each unfinished profiled node's image inputs and ceiling
+against its profile's provider. Under a [retry policy](#retry-policy) each
+profile's provider must declare `sdk_retries=0`. `Executor` and
+`AsyncExecutor` take `profiles` too, and fail a node that names any other
+profile before its call.
+
+A run with a profiled node writes
+[version 5 checkpoints](checkpoint-format.md#model-profiles-version-5) that
+list `model_profiles`, because a build that does not route profiles would
+send those nodes to the run's provider. Resume routes them to the resuming
+Swarm's profiles of the same names, and refuses a node whose profile that
+Swarm does not allow or whose saved model differs from its profile's. A
+completed run returns its saved result without them. Durable `run_store`
+runs refuse `profiles`, and any node that names one, with
+`WorkflowBindingError`.
 
 ## Timing
 

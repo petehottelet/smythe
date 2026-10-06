@@ -50,6 +50,22 @@ provider's `chat()`, so ordinary runs refuse nothing about them in advance.
 Their calls fail as before: a provider without tool support raises
 `NotImplementedError` for a node with tools.
 
+`ProviderFeatures.exact_accounting` says whether each call is priced exactly
+from the usage the provider reports: `True` for `OpenAIResponsesProvider`
+and `AnthropicMessagesProvider`, `False` for the other built-in providers.
+No run refuses a provider for it on its own. A [model
+profile](execution.md#model-profiles) routes the nodes that name it to its
+own provider and model, and needs that provider to declare `True` each
+feature it `requires`: `tools`, `attachments`, `image_output` or
+`exact_accounting`. A feature the provider does not declare does not count.
+`GeminiProvider` declares `image_output` for the requests it asks for images
+in: when `response_modalities` is set, whether it includes `IMAGE`, and
+otherwise whether the model name contains `image` or `banana`, as for its
+automatic image requests. A run refuses a profile that does not
+fit, and a node that names a profile the run does not allow, with
+`NoAllowedProfileError` before any provider call, planning included.
+Durable text workflows refuse profiles.
+
 Tests:
 
 - Declared features: `tests/test_support_matrix.py::test_providers_declare_what_each_model_supports`.
@@ -64,6 +80,14 @@ Tests:
   and `tests/test_support_matrix.py::test_a_plan_refused_before_its_nodes_resumes_without_planning_again`.
 - Providers that declare nothing still run:
   `tests/test_support_matrix.py::test_providers_that_declare_nothing_still_run_with_tools_image_inputs_and_a_budget`.
+- Exact accounting: `tests/test_model_profiles.py::test_providers_declare_whether_they_price_each_call_exactly`.
+- Model profiles: routed `tests/test_model_profiles.py::test_a_profiled_node_calls_its_profiles_provider_and_model`;
+  refused before any provider call, planning included,
+  `tests/test_model_profiles.py::test_a_profile_that_does_not_fit_is_refused_before_any_call`,
+  `tests/test_model_profiles.py::test_a_tool_run_refuses_a_profile_that_cannot_call_tools_before_any_call`,
+  `tests/test_model_profiles.py::test_an_unknown_profile_name_is_refused_before_any_call` and
+  `tests/test_model_profiles.py::test_a_profile_naming_a_retired_model_is_refused_at_admission`;
+  durable runs `tests/test_model_profiles.py::test_durable_runs_refuse_profiles`.
 - `OfflineProvider`: text `tests/test_offline_provider.py::test_full_swarm_pipeline_runs_offline`;
   image inputs `tests/test_provider.py::test_offline_provider_acknowledges_attachments`;
   image output `tests/test_provider.py::test_offline_provider_artifacts_per_call`.
@@ -163,8 +187,8 @@ Who calls again after a failure depends on the path and the provider:
   waits for a transient status error's `Retry-After` or a capped backoff,
   and stops at the policy's deadline. A provider whose SDK may send a failed
   call again is refused before routing, planning or any node call, whether
-  the run's own, a router classifier's, an architect's or an
-  `LLMSupervisor`'s: one that does not declare `sdk_retries=0`, such as
+  the run's own, a model profile's, a router classifier's, an architect's or
+  an `LLMSupervisor`'s: one that does not declare `sdk_retries=0`, such as
   `AnthropicProvider` or `OpenAIProvider` without `max_retries=0`, or a
   custom provider that declares nothing. See
   [retry policy](execution.md#retry-policy).

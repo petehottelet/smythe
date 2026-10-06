@@ -30,7 +30,7 @@ from smythe.verifier import VerificationRecoveryError
 if TYPE_CHECKING:
     from smythe.acceptance import AcceptancePolicy
     from smythe.context import ContextSnapshot
-    from smythe.scheduling import RetryPolicy
+    from smythe.scheduling import ModelProfile, RetryPolicy
     from smythe.supervisor import Supervisor
     from smythe.task import Task
     from smythe.verifier import Verifier
@@ -91,6 +91,8 @@ class AsyncExecutor(ExecutorBase):
         rng: Any = None,
         attempts_used: dict[str, dict[str, int]] | None = None,
         attempts_spent: Callable[[Node], int] | None = None,
+        profiles: tuple[ModelProfile, ...] | list[ModelProfile] = (),
+        default_model: str | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         super().__init__(
@@ -112,6 +114,8 @@ class AsyncExecutor(ExecutorBase):
             rng=rng,
             attempts_used=attempts_used,
             attempts_spent=attempts_spent,
+            profiles=profiles,
+            default_model=default_model,
         )
         self._estimated_tokens_per_node = validate_token_count(
             estimated_tokens_per_node, "estimated_tokens_per_node",

@@ -20,7 +20,8 @@ if TYPE_CHECKING:
     from smythe.workflow_provider import ProviderRequestRejectedError
 
 # The request is wrong: a 4xx status other than those below, invalid read
-# input, a missing cost ceiling or a dependency file that changed.
+# input, a missing cost ceiling, a model profile the run does not allow or a
+# dependency file that changed.
 INPUT_ERROR = "input_error"
 # The credentials or account may not make the request: HTTP 401 or 403.
 AUTHORITY_DENIED = "authority_denied"
@@ -90,7 +91,7 @@ def _rules() -> tuple[tuple[type[BaseException], str | None, bool], ...]:
         IncompleteOutputError, NativeOutputDefectError, ProviderAccountingError,
         ProviderResponseError,
     )
-    from smythe.scheduling import RetryDeadlineError, UncertainDispatchError
+    from smythe.scheduling import NoAllowedProfileError, RetryDeadlineError, UncertainDispatchError
     from smythe.tools import ToolLoopLimitError
     from smythe.verifier import VerificationRecoveryError
     from smythe.workflow_binding import WorkflowBindingError
@@ -117,6 +118,7 @@ def _rules() -> tuple[tuple[type[BaseException], str | None, bool], ...]:
         (ToolLoopLimitError, QUALITY_DEFECT, False),
         (WorkflowBindingError, INPUT_ERROR, False),
         (BudgetEstimateRequired, INPUT_ERROR, False),
+        (NoAllowedProfileError, INPUT_ERROR, False),
         (ArtifactIntegrityError, INPUT_ERROR, False),
         (RetryDeadlineError, DEADLINE, False),
         # A call sent and never answered; its reservation is kept as unknown cost.

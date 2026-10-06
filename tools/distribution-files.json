@@ -189,6 +189,7 @@
     "tests/test_mcp.py",
     "tests/test_memory.py",
     "tests/test_memory_ab.py",
+    "tests/test_model_profiles.py",
     "tests/test_money_units.py",
     "tests/test_native_classification.py",
     "tests/test_native_messages.py",

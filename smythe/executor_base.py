@@ -11,6 +11,7 @@ import random
 import re
 import tempfile
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
@@ -42,7 +43,8 @@ from smythe.provider import (
 from smythe.provider_responses import RawResponseEnvelope
 from smythe.registry import Registry
 from smythe.scheduling import (
-    RetryDeadlineError, RetryPolicy, UncertainDispatchError, _attempt_records, _retry_after_s,
+    PROFILE_KEY, ModelProfile, NoAllowedProfileError, RetryDeadlineError, RetryPolicy,
+    UncertainDispatchError, _attempt_records, _retry_after_s, node_profile, profile_map,
 )
 from smythe.task import _prompt_json, render_task, snapshot_task
 from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
@@ -55,7 +57,7 @@ from smythe.verifier import (
     read_verdict, rejection_reason, verification_integer, validate_verification_receipt,
 )
 from smythe.workflow_provider import ProviderRequestRejectedError
-from smythe.workflow_store import WorkflowError, WorkflowStateError
+from smythe.workflow_store import _PRICED_KINDS, WorkflowError, WorkflowStateError, _price_table
 from smythe.workflow_tools import READ_STEP_KEY
 
 if TYPE_CHECKING:
@@ -154,16 +156,77 @@ def check_provider_support(
 
 def check_pending_nodes(
     provider: Provider, graph: ExecutionGraph, *, max_budget_usd: float | None, tools: bool,
-    retry_owner: bool = False,
+    retry_owner: bool = False, profiles: dict[str, ModelProfile] | None = None,
 ) -> None:
-    """Check every node that has not completed or been skipped, before any of them runs."""
+    """Check every node that has not completed or been skipped, before any of them runs.
+
+    A node that names one of *profiles* is checked against its profile's
+    provider and model, with the profile's ceiling standing in for an
+    estimate of its own; one that names any other profile raises
+    ``NoAllowedProfileError``.
+    """
     for node in graph.nodes:
         if node.status in (NodeStatus.COMPLETED, NodeStatus.SKIPPED):
             continue
+        profile = node_profile(node, profiles or {})
+        estimate = node.metadata.get("estimated_cost_usd")
+        if profile is not None and estimate is None:
+            estimate = profile.max_cost_per_call_usd
         check_provider_support(
-            provider, str(node.metadata.get("model", "")), node_id=node.id,
-            max_budget_usd=max_budget_usd, estimate=node.metadata.get("estimated_cost_usd"),
+            provider if profile is None else profile.provider,
+            str(node.metadata.get("model", "")) if profile is None else profile.model,
+            node_id=node.id, max_budget_usd=max_budget_usd, estimate=estimate,
             tools=tools, attachments=node.attach_dep_artifacts, retry_owner=retry_owner,
+        )
+
+
+def _retired(provider: Provider, model: str) -> bool:
+    """Whether *provider* prices *model* with a versioned table that retires it by today (UTC).
+
+    The table is the current one of the durable provider kind its
+    ``workflow_descriptor()`` names; a provider without one prices nothing.
+    """
+    describe = getattr(provider, "workflow_descriptor", None)
+    try:
+        kind = describe().get("kind") if callable(describe) else None
+    except (AttributeError, TypeError, ValueError):  # Such as a scripted OfflineProvider.
+        return False
+    if type(kind) is not str or kind not in _PRICED_KINDS:
+        return False
+    table = _price_table(kind)
+    return table.prices(model) and not table.admits(model, datetime.now(timezone.utc).date())
+
+
+def check_profile_support(profile: ModelProfile, *, tools: bool = False) -> None:
+    """Raise ``NoAllowedProfileError``, before any call, for a profile that cannot serve its nodes.
+
+    Its provider must not declare its model unsupported, must declare
+    ``True`` every feature the profile requires, and must not price the model
+    with a table that retires it. With *tools*, a run offers tools to every
+    node, so a provider that declares it cannot call them is refused too.
+    """
+    provider, model, name = profile.provider, profile.model, type(profile.provider).__name__
+    features = _declared_features(provider, model)
+    if features.model_supported is False:
+        raise NoAllowedProfileError(
+            f"Model profile {profile.name!r}: {name} does not support model {model!r}"
+        )
+    missing = sorted(feature for feature in profile.requires
+                     if getattr(features, feature) is not True)
+    if missing:
+        raise NoAllowedProfileError(
+            f"Model profile {profile.name!r} requires {missing}, which {name} does not "
+            f"declare for model {model!r}"
+        )
+    if tools and features.tools is False:
+        raise NoAllowedProfileError(
+            f"Model profile {profile.name!r} cannot serve a run with tool_runtime: {name} "
+            f"cannot call tools with model {model!r}"
+        )
+    if _retired(provider, model):
+        raise NoAllowedProfileError(
+            f"Model profile {profile.name!r} names {model!r}, which is retired and admits no "
+            "new calls"
         )
 
 
@@ -335,6 +398,14 @@ class ExecutorBase:
     ``attempts_spent(node)``, which returns the attempts the node's current
     generation has already used each time the node starts; nothing is saved
     through the control hook for an attempt.
+
+    ``profiles``, a sequence of :class:`~smythe.scheduling.ModelProfile`,
+    routes each node that names one in ``metadata["profile"]`` to that
+    profile's provider and model, and reserves the profile's ceiling for it
+    unless the node sets ``estimated_cost_usd``. A node that names any other
+    profile raises ``NoAllowedProfileError`` before its call. Every other node
+    calls *provider* with its own model, and a node a supervisor adds takes
+    the model of the first such node that has one, or else ``default_model``.
     """
 
     def __init__(
@@ -367,10 +438,14 @@ class ExecutorBase:
         rng: Any = None,
         attempts_used: dict[str, dict[str, int]] | None = None,
         attempts_spent: Callable[[Node], int] | None = None,
+        profiles: tuple[ModelProfile, ...] | list[ModelProfile] = (),
+        default_model: str | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         if context_assembler is not None and not callable(context_assembler):
             raise TypeError("context_assembler must be callable or None")
+        self._profiles = profile_map(profiles)
+        self._default_model = default_model
         self._context_assembler = context_assembler
         if retry_policy is not None and not isinstance(retry_policy, RetryPolicy):
             raise TypeError(
@@ -423,6 +498,8 @@ class ExecutorBase:
                 "retry_policy with journal-managed provider calls needs attempts_spent, "
                 "the attempts the journal records"
             )
+        if self._profiles and self._workflow_managed:
+            raise ValueError("profiles are not supported with journal-managed provider calls")
         self._call_attempts: dict[str, int] = {}
         self._reserved_node_ids: set[str] = set()
         self._settled_response_errors: list[tuple[str, Exception]] = []
@@ -968,12 +1045,15 @@ class ExecutorBase:
         Nodes minted mid-run never passed through ``Swarm.plan``, so
         they carry none of the metadata the executor depends on; without
         this a revision would produce nodes that call the provider with
-        an empty model name.
+        an empty model name. They call the run's provider, so a profiled
+        node's model, which belongs to its profile's provider, is not taken.
         """
         if not new_nodes:
             return
         model = next(
-            (n.metadata["model"] for n in graph.nodes if n.metadata.get("model")), None,
+            (n.metadata["model"] for n in graph.nodes
+             if n.metadata.get("model") and PROFILE_KEY not in n.metadata),
+            self._default_model,
         )
         context = next(
             (
@@ -1146,15 +1226,30 @@ class ExecutorBase:
         """Reserve this executor's pre-call estimate for one node."""
         self.reserve_node_budget(node)
 
+    def _node_route(self, node: Node) -> tuple[Provider, Any, ModelProfile | None]:
+        """The provider and model *node* calls, and the profile that chose them, if any.
+
+        Raises ``NoAllowedProfileError`` for a profile this executor was not given.
+        """
+        profile = node_profile(node, self._profiles)
+        if profile is None:
+            return self._provider, node.metadata.get("model", ""), None
+        return profile.provider, profile.model, profile
+
     def _node_estimate(
         self, node: Node, default_estimated_tokens: int | None,
     ) -> tuple[float | None, bool]:
-        """The node's pre-call estimate, and whether its provider requires an explicit one."""
+        """The node's pre-call estimate, and whether its provider requires an explicit one.
+
+        A profiled node's estimate is its profile's ceiling unless it sets its own.
+        """
         estimate = node.metadata.get("estimated_cost_usd")
-        model = str(node.metadata.get("model", ""))
-        requires_explicit = self._provider.requires_explicit_budget_estimate(model)
+        provider, model, profile = self._node_route(node)
+        model = str(model)
+        requires_explicit = provider.requires_explicit_budget_estimate(model)
         if estimate is None:
-            estimate = self._provider.budget_estimate_usd(model)
+            estimate = (provider.budget_estimate_usd(model) if profile is None
+                        else profile.max_cost_per_call_usd)
         if estimate is None and not requires_explicit and default_estimated_tokens is not None:
             tokens = validate_token_count(default_estimated_tokens, "default_estimated_tokens")
             try:
@@ -1297,9 +1392,13 @@ class ExecutorBase:
                         or node.metadata.get("accounting_invalid") and "response_error" not in node.metadata):
                     raise BudgetValidationError("Unjournaled accounting requires reconciliation")
         if self._retry_policy is not None:
+            pending = [node for node in graph.nodes
+                       if node.status not in (NodeStatus.COMPLETED, NodeStatus.SKIPPED)]
+            routes = [self._node_route(node) for node in pending]
             calls = [(self._provider, model) for model in sorted(
-                {str(node.metadata.get("model", "")) for node in graph.nodes
-                 if node.status not in (NodeStatus.COMPLETED, NodeStatus.SKIPPED)})]
+                {str(model) for _, model, profile in routes if profile is None})]
+            calls += [(profile.provider, profile.model) for profile in
+                      {profile.name: profile for _, _, profile in routes if profile}.values()]
             from smythe.supervisor import LLMSupervisor
 
             # A supervisor that may still revise reviews with its own model or
@@ -1493,7 +1592,7 @@ class ExecutorBase:
             prompt = self.build_context_prompt(
                 snapshot, self._task, dep_results, is_terminal=self._is_terminal(node, graph),
             )
-        model = node.metadata.get("model", "")
+        model = self._node_route(node)[1]
         attachments = (
             self.load_dep_image_artifacts(node, graph)
             if node.attach_dep_artifacts
@@ -1625,7 +1724,7 @@ class ExecutorBase:
     async def _provider_chat(self, node, system, messages, model, tools=None, *, turn=0):
         self._raise_unresolved_response(node)
         phase = "verification" if node.verifies else "execution"
-        provider = self._provider
+        provider = self._node_route(node)[0]
         if self._provider_call_factory is not None:
             provider = self._provider_call_factory(node, phase, self._call_attempts.get(node.id, 0), turn)
             if getattr(provider, "workflow_managed", False) is not True:

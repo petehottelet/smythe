@@ -28,7 +28,7 @@ from smythe.acceptance import AcceptanceDecision, DeliveryAcceptance, text_sha25
 from smythe.agent import Agent, AgentProfile
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology, snapshot_run_ref
 from smythe.registry import Registry
-from smythe.scheduling import RetryPolicy, _attempt_records
+from smythe.scheduling import PROFILE_KEY, RetryPolicy, _attempt_records
 from smythe.task import Task, task_from_dict, task_snapshots_equal, task_to_dict
 from smythe.tracer import read_revision_log
 
@@ -48,10 +48,14 @@ STRICT_CHECKPOINT_VERSION = 5
 SUPPORTED_CHECKPOINT_VERSIONS = (1, 2, 3, 4, 5)
 MCP_TRUSTED_CHECKPOINT_VERSION = 4
 # The version 5 state features this build reads. ``operator_decision`` is
-# listed while the record or a kept earlier one is an operator's decision.
+# listed while the record or a kept earlier one is an operator's decision, and
+# ``model_profiles`` while a node names a model profile, which older builds
+# would ignore and send to the run's provider.
 OPERATOR_DECISION_REQUIREMENT = "operator_decision"
+MODEL_PROFILES_REQUIREMENT = "model_profiles"
 KNOWN_CHECKPOINT_REQUIREMENTS = frozenset(
-    {"delivery_acceptance", "attempt_allowance", OPERATOR_DECISION_REQUIREMENT})
+    {"delivery_acceptance", "attempt_allowance", MODEL_PROFILES_REQUIREMENT,
+     OPERATOR_DECISION_REQUIREMENT})
 # The control keys of an attempt allowance (see RetryPolicy.persist_attempts),
 # which older builds would ignore and so refill.
 _ALLOWANCE_KEYS = frozenset({"retry_policy", "attempts_used"})
@@ -344,7 +348,9 @@ def build_state(
     ``requires`` and stores the record under that key. A record that binds an
     output digest needs the matching ``output``, and a completed state's
     record must hold a decision. A ``control`` block with ``retry_policy``
-    and ``attempts_used`` makes it version 5 too, listing ``attempt_allowance``.
+    and ``attempts_used`` makes it version 5 too, listing ``attempt_allowance``,
+    and so does a graph node that names a model profile, listing
+    ``model_profiles``.
     """
     task_data = task_to_dict(task)
     graph_task_data = task_data if graph.task is task else task_to_dict(graph.task)
@@ -386,6 +392,8 @@ def build_state(
         requires.append("delivery_acceptance")
     if _ALLOWANCE_KEYS & state["control"].keys():
         requires.append("attempt_allowance")
+    if any(PROFILE_KEY in node.metadata for node in graph.nodes):
+        requires.append(MODEL_PROFILES_REQUIREMENT)
     if delivery_acceptance is not None and delivery_acceptance.operator is not None:
         requires.append(OPERATOR_DECISION_REQUIREMENT)
     if requires:
@@ -529,6 +537,35 @@ def attempt_allowance_from_state(
         raise ValueError("A checkpoint's attempt allowance must record a policy with persist_attempts")
     _attempt_records(control["attempts_used"])
     return policy, deepcopy(control["attempts_used"])
+
+
+def model_profiles_from_state(state: dict[str, Any]) -> dict[str, Any]:
+    """The model profile each node of a checkpoint's graph names, by node id.
+
+    A version 5 state's nodes name profiles exactly when its ``requires``
+    list names ``model_profiles``. Builds that write versions 1-4 never
+    route a profile, so their states are not checked. Raises ValueError for
+    an unknown requirement, or for profiles that are named but not listed or
+    listed but not named.
+    """
+    requires = checkpoint_requirements(state)
+    graph = state.get("graph")
+    nodes = graph.get("nodes") if isinstance(graph, dict) else None
+    named = {
+        node.get("id"): node["metadata"][PROFILE_KEY] for node in nodes or ()
+        if isinstance(node, dict) and isinstance(node.get("metadata"), dict)
+        and PROFILE_KEY in node["metadata"]
+    }
+    if state["version"] < STRICT_CHECKPOINT_VERSION:
+        return named
+    listed = MODEL_PROFILES_REQUIREMENT in requires
+    if named and not listed:
+        raise ValueError("Checkpoint names model profiles on nodes that its 'requires' list omits")
+    if listed and not named:
+        raise ValueError(
+            "A checkpoint that requires model_profiles must name a profile on one of its nodes"
+        )
+    return named
 
 
 def delivery_acceptance_history(

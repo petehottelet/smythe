@@ -2,19 +2,28 @@
 
 ``RetryPolicy`` makes the executor the only retry owner of a node's calls:
 which failure classes it calls again for, how long it waits first, and the
-deadline that bounds a node's attempts and waits together. The validators
-here check every policy's fields the same way.
+deadline that bounds a node's attempts and waits together. ``ModelProfile``
+routes the nodes that name it to a developer-approved provider and model.
+The validators here check every policy's fields the same way.
 """
 
 from __future__ import annotations
 
 import math
+import re
+from collections.abc import Mapping
 from dataclasses import dataclass, fields
+from typing import TYPE_CHECKING
 
 from smythe._failures import (
     AUTHORITY_DENIED, INPUT_ERROR, PROVIDER_REJECTED, QUALITY_DEFECT, TRANSIENT, UNKNOWN_OUTCOME,
     _http_status, status_failure_class,
 )
+from smythe.budget import _validate_usd
+from smythe.provider import Provider
+
+if TYPE_CHECKING:
+    from smythe.graph import Node
 
 # The classes of a failed call a policy may list. A failure whose exception is
 # terminal stops the run whatever the list says.
@@ -190,3 +199,99 @@ def _attempt_records(data: object) -> dict[str, tuple[int, int]]:
                 raise ValueError(f"{name} in attempts_used of {node_id!r} must be an integer >= 0")
         records[node_id] = values
     return records
+
+
+# The node metadata key that names a node's model profile. Only developer code
+# sets it: a generated plan may set no metadata but ``role`` (smythe.loader).
+PROFILE_KEY = "profile"
+# What a profile may require: each is a ``ProviderFeatures`` field that its
+# provider must declare True for the profile's model.
+PROFILE_REQUIREMENTS = frozenset({"tools", "attachments", "image_output", "exact_accounting"})
+_PROFILE_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{0,63}")
+
+
+class NoAllowedProfileError(ValueError):
+    """No allowed model profile can serve a node; raised before any provider call.
+
+    A node names a profile the run does not allow or sets a model other than
+    its profile's, or a profile's provider does not support its model, does
+    not declare a feature the profile requires, or prices the model with a
+    table that retires it.
+    """
+
+
+@dataclass(frozen=True)
+class ModelProfile:
+    """A developer-approved provider and model that a node can name to be routed to them.
+
+    A node whose ``metadata["profile"]`` is ``name`` calls ``provider`` with
+    ``model``, and reserves ``max_cost_per_call_usd`` for each call unless it
+    sets ``estimated_cost_usd``. ``requires`` lists the features the provider
+    must declare ``True`` for the model through ``Provider.feature_support()``:
+    ``tools``, ``attachments``, ``image_output`` and ``exact_accounting``.
+    """
+
+    name: str
+    provider: Provider
+    model: str
+    max_cost_per_call_usd: float
+    requires: frozenset[str] = frozenset()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or not _PROFILE_NAME.fullmatch(self.name):
+            raise ValueError(
+                f"A model profile name must match {_PROFILE_NAME.pattern!r}, got {self.name!r}"
+            )
+        if not isinstance(self.provider, Provider):
+            raise TypeError(
+                f"Model profile {self.name!r} needs a Provider, not {type(self.provider).__name__}"
+            )
+        if not isinstance(self.model, str) or not self.model.strip():
+            raise ValueError(f"Model profile {self.name!r} needs a model name, got {self.model!r}")
+        requires = self.requires
+        if isinstance(requires, (str, bytes)) or not hasattr(requires, "__iter__"):
+            raise ValueError(f"requires must be a set of features, got {requires!r}")
+        requires = frozenset(requires)
+        unknown = ", ".join(sorted(map(repr, requires - PROFILE_REQUIREMENTS)))
+        if unknown:
+            raise ValueError(
+                f"requires may list only {sorted(PROFILE_REQUIREMENTS)}, not {unknown}"
+            )
+        object.__setattr__(self, "requires", requires)
+        object.__setattr__(self, "max_cost_per_call_usd",
+                           _validate_usd(self.max_cost_per_call_usd, "max_cost_per_call_usd"))
+
+
+def profile_map(profiles: object) -> dict[str, ModelProfile]:
+    """*profiles*, a sequence of ``ModelProfile`` with distinct names, by name."""
+    if profiles is None:
+        return {}
+    if isinstance(profiles, (str, bytes, Mapping)) or not hasattr(profiles, "__iter__"):
+        raise TypeError("profiles must be a sequence of ModelProfile")
+    named: dict[str, ModelProfile] = {}
+    for profile in profiles:
+        if not isinstance(profile, ModelProfile):
+            raise TypeError(f"profiles must hold ModelProfile, not {type(profile).__name__}")
+        if profile.name in named:
+            raise ValueError(f"Model profile names must be distinct; {profile.name!r} repeats")
+        named[profile.name] = profile
+    return named
+
+
+def node_profile(node: Node, profiles: Mapping[str, ModelProfile]) -> ModelProfile | None:
+    """The profile *node* names in ``metadata["profile"]``, or None when it names none.
+
+    Raises ``NoAllowedProfileError`` when the name is not one of *profiles*.
+    """
+    if PROFILE_KEY not in node.metadata:
+        return None
+    name = node.metadata[PROFILE_KEY]
+    profile = profiles.get(name) if isinstance(name, str) else None
+    if profile is None:
+        allowed = (f"its profiles are {sorted(profiles)}" if profiles
+                   else "it has none; pass them as Swarm(profiles=...)")
+        raise NoAllowedProfileError(
+            f"Node {node.id!r} names model profile {name!r}, which this run does not allow: "
+            + allowed
+        )
+    return profile

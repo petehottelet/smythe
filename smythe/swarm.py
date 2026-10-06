@@ -45,6 +45,7 @@ from smythe.checkpoint import (
     drop_untrusted_mcp_servers,
     graph_from_dict,
     graph_to_dict,
+    model_profiles_from_state,
     reset_incomplete_nodes,
     revision_log_from_state,
     supersede_delivery_acceptance,
@@ -56,6 +57,7 @@ from smythe.executor_base import (
     DEFAULT_MAX_TOOL_ITERATIONS,
     ExecutorBase,
     check_pending_nodes,
+    check_profile_support,
     check_provider_support,
     validate_max_concurrency,
     validate_max_revisions,
@@ -80,7 +82,9 @@ from smythe.provider import (
     _response_error_marker,
 )
 from smythe.registry import Registry
-from smythe.scheduling import RetryPolicy
+from smythe.scheduling import (
+    ModelProfile, NoAllowedProfileError, RetryPolicy, node_profile, profile_map,
+)
 from smythe.supervisor import LLMSupervisor, Supervisor
 from smythe.synthesizer import SynthesisStrategy, Synthesizer, deliverable_sources
 from smythe.task import Task, snapshot_task, task_snapshots_equal, task_to_dict
@@ -412,6 +416,21 @@ class Swarm:
     merge converts its own hold, a regeneration holds again for the
     verifiers it resets, and holds are never spend. Holds are not saved;
     resume holds again. Durable runs refuse it.
+
+    ``profiles``, a sequence of :class:`~smythe.scheduling.ModelProfile`
+    with distinct names, are the provider and model routes an ordinary run
+    allows. A node whose ``metadata["profile"]`` names one calls its provider
+    with its model and reserves its ceiling; developer graphs, architects and
+    templates can set the key, and a generated plan cannot. Every other node,
+    supervisor additions and synthesis call the run's provider. Before routing
+    or planning, and before any node call, each profile must fit: its
+    provider declares ``True`` every feature it requires, supports its model,
+    does not price the model as retired, and can call tools in a run with a
+    ``tool_runtime``. A node that names a profile the run does not allow, or
+    sets another model than its profile's, is refused as well, all with
+    ``NoAllowedProfileError``. Checkpoints of a run with profiled nodes are
+    version 5, and resume routes them to the resuming Swarm's profiles of the
+    same names. Durable runs refuse profiles.
     """
 
     def __init__(
@@ -447,8 +466,14 @@ class Swarm:
         retry_policy: RetryPolicy | None = None,
         lineage: LineagePolicy | None = None,
         reserve_for_checks: bool = False,
+        profiles: Sequence[ModelProfile] = (),
     ) -> None:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
+        self._profiles = profile_map(profiles)
+        if self._profiles and run_store is not None:
+            raise WorkflowBindingError(
+                "profiles route ordinary runs only; durable text workflows refuse them"
+            )
         if type(reserve_for_checks) is not bool:
             raise TypeError(
                 f"reserve_for_checks must be True or False, not {type(reserve_for_checks).__name__}"
@@ -819,7 +844,8 @@ class Swarm:
         A tool runtime offers tools to every node, and an ``LLM_MERGE``
         synthesis calls the run's model, so both are known before any plan.
         So is a retry policy, which needs a provider whose SDK sends each
-        call once, as does an ``LLMSupervisor``'s provider.
+        call once, as does an ``LLMSupervisor``'s provider, and so is each
+        model profile a node may name.
         """
         if self._tool_runtime is not None or self.retry_policy is not None:
             check_provider_support(self._provider, str(self.model), node_id=None,
@@ -827,21 +853,29 @@ class Swarm:
                                    retry_owner=self.retry_policy is not None)
         self._check_synthesis_support(self.max_budget_usd)
         self._check_retry_owners()
+        self._admit_profiles()
+
+    def _admit_profiles(self) -> None:
+        """Refuse, with ``NoAllowedProfileError``, a profile that could not serve its nodes."""
+        for profile in self._profiles.values():
+            check_profile_support(profile, tools=self._tool_runtime is not None)
 
     def _check_retry_owners(
         self, graph: ExecutionGraph | None = None, *, planning: bool = False,
     ) -> None:
         """Under a retry policy, refuse every call the run can make that an SDK may send again.
 
-        Nodes and synthesis call the run's provider. An ``LLMSupervisor``
-        that ``max_revisions`` lets review calls its own provider, with its
-        model or else the reviewed node's: the run's model before a plan
-        exists, then each of *graph*'s. With *planning*, so are the calls
-        routing and planning could make (see ``_planning_calls``).
+        Nodes and synthesis call the run's provider, and profiled nodes their
+        profile's. An ``LLMSupervisor`` that ``max_revisions`` lets review
+        calls its own provider, with its model or else the reviewed node's:
+        the run's model before a plan exists, then each of *graph*'s. With
+        *planning*, so are the calls routing and planning could make (see
+        ``_planning_calls``).
         """
         if self.retry_policy is None:
             return
         calls = [(self._provider, self.model)]
+        calls += [(profile.provider, profile.model) for profile in self._profiles.values()]
         if planning:
             calls += _planning_calls(self._router, self._architect)
         supervisor = self.supervisor
@@ -899,11 +933,13 @@ class Swarm:
         """Reject, before any node runs, nodes or a synthesis the provider cannot serve.
 
         Under a retry policy, synthesis and supervision must send each call
-        once too, even when no node is left to run.
+        once too, even when no node is left to run. Each model profile must
+        fit, as before planning.
         """
+        self._admit_profiles()
         check_pending_nodes(self._provider, graph, max_budget_usd=budget.max_budget_usd,
                             tools=self._tool_runtime is not None,
-                            retry_owner=self.retry_policy is not None)
+                            retry_owner=self.retry_policy is not None, profiles=self._profiles)
         self._check_synthesis_support(budget.max_budget_usd)
         self._check_retry_owners(graph)
 
@@ -1092,6 +1128,7 @@ class Swarm:
             ),
             acceptance=self._acceptance,
             retry_policy=self.retry_policy,
+            profiles=tuple(self._profiles.values()), default_model=self.model,
         )
         self._active_executor = executor
         try:
@@ -1160,6 +1197,7 @@ class Swarm:
             ),
             acceptance=self._acceptance,
             retry_policy=self.retry_policy,
+            profiles=tuple(self._profiles.values()), default_model=self.model,
         )
         self._active_executor = executor
         try:
@@ -1368,11 +1406,13 @@ class Swarm:
     ) -> tuple[DeliveryAcceptance | None, ExecutionGraph, Task | None, Sentinel]:
         """A saved state's delivery acceptance record, graph, task and restored costs.
 
-        Refuses a durable run's graph, conflicting task copies and accounting
-        that resume cannot continue: invalid usage, an accounting error or an
-        unresolved native response failure.
+        Refuses a durable run's graph, conflicting task copies, model profiles
+        its ``requires`` list does not match, and accounting that resume
+        cannot continue: invalid usage, an accounting error or an unresolved
+        native response failure.
         """
         acceptance = delivery_acceptance_from_state(state)
+        model_profiles_from_state(state)
 
         graph = graph_from_dict(state["graph"])
         if graph.run_ref is not None:
@@ -1664,6 +1704,7 @@ class Swarm:
             retry_policy=self.retry_policy,
             # Like revisions_used: a crash must not refill a node's attempts.
             attempts_used=allowance[1] if allowance is not None else None,
+            profiles=tuple(self._profiles.values()), default_model=self.model,
         )
         # Informational: decisions after resume extend the log the run saved.
         executor.revision_log = revision_log_from_state(state)
@@ -1724,6 +1765,7 @@ class Swarm:
         acceptance: AcceptancePolicy | None = None,
         read_tools: tuple[ReadProfile, ...] | list[ReadProfile] = (),
         lineage: LineagePolicy | None = None,
+        profiles: Sequence[ModelProfile] = (),
     ) -> Swarm:
         """Create a Swarm pre-loaded with a YAML-defined execution graph.
 
@@ -1731,7 +1773,8 @@ class Swarm:
         defined in the YAML file.  Call execute() with the loaded graph
         to run it.  A delivery acceptance policy comes only from the
         ``acceptance`` argument, never from the file, and so do the read
-        profiles that the file's read steps name and the ``lineage`` policy.
+        profiles that the file's read steps name, the ``lineage`` policy and
+        the model ``profiles`` that its nodes' ``metadata.profile`` names.
         """
         from smythe.loader import load_graph
 
@@ -1748,6 +1791,7 @@ class Swarm:
             acceptance=acceptance,
             read_tools=read_tools,
             lineage=lineage,
+            profiles=profiles,
         )
         if instance._graph_policy is not None:
             instance._graph_policy.validate(graph, default_model=instance.model)
@@ -1756,10 +1800,25 @@ class Swarm:
         return instance
 
     def _stamp_model(self, graph: ExecutionGraph) -> None:
-        """Tag every node with the swarm's model so the executor knows which to call."""
+        """Tag every node with the swarm's model so the executor knows which to call.
+
+        A profiled node gets its profile's model instead. Every node is checked
+        before any is tagged: one that names a profile this Swarm does not
+        allow, or that sets another model than its profile's, raises
+        ``NoAllowedProfileError``.
+        """
+        models = []
         for node in graph.nodes:
+            profile = node_profile(node, self._profiles)
+            if profile is not None and node.metadata.get("model", profile.model) != profile.model:
+                raise NoAllowedProfileError(
+                    f"Node {node.id!r} sets model {node.metadata['model']!r}, but its profile "
+                    f"{profile.name!r} calls {profile.model!r}"
+                )
+            models.append(self.model if profile is None else profile.model)
+        for node, model in zip(graph.nodes, models):
             if "model" not in node.metadata:
-                node.metadata["model"] = self.model
+                node.metadata["model"] = model
 
     @staticmethod
     def _refuse_read_steps(graph: ExecutionGraph) -> None:

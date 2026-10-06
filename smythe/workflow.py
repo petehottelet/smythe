@@ -49,7 +49,7 @@ from smythe.lineage import (
 from smythe.lineage import _id as _lineage_id
 from smythe.registry import Registry
 from smythe.provider import ProviderResponseError
-from smythe.scheduling import RetryPolicy
+from smythe.scheduling import PROFILE_KEY, RetryPolicy
 from smythe.task import Task, snapshot_task, task_from_dict, task_to_dict
 from smythe.tracer import (
     REVISION_LOG_LIMIT, Tracer, revision_context, revision_log_entry, revision_record,
@@ -1225,6 +1225,12 @@ class WorkflowRuntime:
                 )
             if READ_STEP_KEY in node.metadata:
                 self._check_read_step(node)
+            if PROFILE_KEY in node.metadata:
+                # A journaled call binds the run's provider; profiles route ordinary runs only.
+                raise WorkflowBindingError(
+                    f"Node {node.id!r} names model profile {node.metadata[PROFILE_KEY]!r}, but "
+                    "durable text workflows call only the run's provider; run it without run_store"
+                )
             validate_workflow_model(self.execution_provider, node.metadata.get("model", self.model))
             if node.agent_id is not None and self.registry.get(node.agent_id) is None and (
                 registry is None or registry.get(node.agent_id) is None

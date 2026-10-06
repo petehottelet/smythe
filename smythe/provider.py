@@ -359,7 +359,8 @@ class ProviderFeatures:
     declared). An ordinary ``Swarm`` rejects a run before planning, or
     before its first node call, only for a feature declared ``False`` that
     the run needs, so a provider that declares nothing runs as before. A run
-    under a ``RetryPolicy`` also needs ``sdk_retries`` declared ``0``.
+    under a ``RetryPolicy`` also needs ``sdk_retries`` declared ``0``, and a
+    ``ModelProfile`` needs each feature it requires declared ``True``.
     """
 
     model_supported: bool | None = None
@@ -378,6 +379,9 @@ class ProviderFeatures:
     sdk_retries: int | None = None
     """How many more times the provider's SDK client sends a failed request
     on its own, unseen by Smythe; ``0`` when each call is sent once."""
+    exact_accounting: bool | None = None
+    """Whether each call's cost is priced exactly, from the usage the provider
+    reports, by a versioned price table rather than an estimate."""
 
 
 def _sdk_retries(provider: Provider) -> int | None:
@@ -558,9 +562,10 @@ class OfflineProvider(Provider):
 
     def feature_support(self, model: str) -> ProviderFeatures:
         # Attachments are acknowledged in the text; tool calls are not served.
+        # An ordinary run prices its calls at the blended token rate.
         return _builtin_features(self, OfflineProvider, model, text=True, tools=False,
                                  attachments=True, image_output=self._artifacts_per_call > 0,
-                                 sdk_retries=0)
+                                 sdk_retries=0, exact_accounting=False)
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         from smythe.prompts import PLANNING_SYSTEM_PROMPT
@@ -753,7 +758,7 @@ class AnthropicProvider(Provider):
     def feature_support(self, model: str) -> ProviderFeatures:
         return _builtin_features(self, AnthropicProvider, model, text=True, tools=True,
                                  attachments=True, image_output=False,
-                                 sdk_retries=_sdk_retries(self))
+                                 sdk_retries=_sdk_retries(self), exact_accounting=False)
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         return await self.chat(system, [ChatMessage(role="user", content=prompt)], model)
@@ -935,7 +940,7 @@ class OpenAIProvider(Provider):
     def feature_support(self, model: str) -> ProviderFeatures:
         return _builtin_features(self, OpenAIProvider, model, text=True, tools=True,
                                  attachments=True, image_output=False,
-                                 sdk_retries=_sdk_retries(self))
+                                 sdk_retries=_sdk_retries(self), exact_accounting=False)
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         return await self.chat(system, [ChatMessage(role="user", content=prompt)], model)
@@ -1197,7 +1202,7 @@ class OpenAIImageProvider(OpenAIProvider):
         return _builtin_features(
             self, OpenAIImageProvider, model, model_supported=model.lower().startswith("gpt-image-"),
             text=False, tools=False, attachments=False, image_output=True,
-            sdk_retries=_sdk_retries(self),
+            sdk_retries=_sdk_retries(self), exact_accounting=False,
         )
 
     async def chat(
@@ -1371,7 +1376,8 @@ class GeminiProvider(Provider):
         # owned client never is; a caller-owned client declares nothing.
         return _builtin_features(self, GeminiProvider, model, text=True, tools=True,
                                  attachments=True, image_output=self._requests_images(model),
-                                 sdk_retries=0 if getattr(self, "_client", None) is None else None)
+                                 sdk_retries=0 if getattr(self, "_client", None) is None else None,
+                                 exact_accounting=False)
 
     def _new_client(self):
         try:
