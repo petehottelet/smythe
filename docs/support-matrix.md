@@ -81,7 +81,8 @@ Tests:
 - Providers that declare nothing still run:
   `tests/test_support_matrix.py::test_providers_that_declare_nothing_still_run_with_tools_image_inputs_and_a_budget`.
 - Exact accounting: `tests/test_model_profiles.py::test_providers_declare_whether_they_price_each_call_exactly`.
-- Model profiles: routed `tests/test_model_profiles.py::test_a_profiled_node_calls_its_profiles_provider_and_model`;
+- Model profiles: routed `tests/test_model_profiles.py::test_a_profiled_node_calls_its_profiles_provider_and_model`
+  and `tests/test_model_profiles.py::test_a_supervisor_addition_that_names_a_profile_calls_it_and_resumes`;
   refused before any provider call, planning included,
   `tests/test_model_profiles.py::test_a_profile_that_does_not_fit_is_refused_before_any_call`,
   `tests/test_model_profiles.py::test_a_tool_run_refuses_a_profile_that_cannot_call_tools_before_any_call`,

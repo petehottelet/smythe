@@ -963,17 +963,19 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   requires=...)`. A node whose `metadata["profile"]` names one calls that
   provider with that model and reserves the profile's ceiling, unless it
   sets `estimated_cost_usd`; held checks and persisted attempts use the same
-  ceiling. Developer graphs, YAML, architects and templates can name a
-  profile, and a generated plan cannot. Other nodes, supervisor additions
-  and synthesis call the run's provider. Before routing, planning or any
-  node call, a run refuses with `NoAllowedProfileError` (a `ValueError`,
-  failure class `input_error`) a profile whose provider does not declare
-  `True` each feature it `requires` (`tools`, `attachments`, `image_output`,
-  `exact_accounting`), does not support its model or prices the model as
-  retired, or cannot call tools in a run with a `tool_runtime`, and a node
-  that names a profile the run does not allow or sets another model than its
-  profile's. Under a `RetryPolicy` each profile's provider must declare
-  `sdk_retries=0`. `ProviderFeatures.exact_accounting` is new: the native
+  ceiling. Developer graphs, YAML, architects, templates and the nodes a
+  developer `Supervisor` adds can name a profile; a generated plan and an
+  `LLMSupervisor` proposal cannot. Other nodes and synthesis call the run's
+  provider. Before routing, planning or any node call, a run refuses with
+  `NoAllowedProfileError` (a `ValueError`, failure class `input_error`) a
+  profile whose provider does not declare `True` each feature it `requires`
+  (`tools`, `attachments`, `image_output`, `exact_accounting`), does not
+  support its model or prices the model as retired, or cannot call tools in
+  a run with a `tool_runtime`, and a node that names a profile the run does
+  not allow or sets another model than its profile's; a revision that adds
+  such a node is refused before it applies. Under a `RetryPolicy` each
+  profile's provider must declare `sdk_retries=0`.
+  `ProviderFeatures.exact_accounting` is new: the native
   providers declare `True`, the other built-in providers `False`.
   Checkpoints of a run with a profiled node are version 5 and list
   `model_profiles` in `requires`, so older readers refuse them instead of

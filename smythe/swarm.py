@@ -83,7 +83,7 @@ from smythe.provider import (
 )
 from smythe.registry import Registry
 from smythe.scheduling import (
-    ModelProfile, NoAllowedProfileError, RetryPolicy, node_profile, profile_map,
+    ModelProfile, RetryPolicy, node_profile, profile_map,
 )
 from smythe.supervisor import LLMSupervisor, Supervisor
 from smythe.synthesizer import SynthesisStrategy, Synthesizer, deliverable_sources
@@ -420,17 +420,19 @@ class Swarm:
     ``profiles``, a sequence of :class:`~smythe.scheduling.ModelProfile`
     with distinct names, are the provider and model routes an ordinary run
     allows. A node whose ``metadata["profile"]`` names one calls its provider
-    with its model and reserves its ceiling; developer graphs, architects and
-    templates can set the key, and a generated plan cannot. Every other node,
-    supervisor additions and synthesis call the run's provider. Before routing
-    or planning, and before any node call, each profile must fit: its
-    provider declares ``True`` every feature it requires, supports its model,
-    does not price the model as retired, and can call tools in a run with a
-    ``tool_runtime``. A node that names a profile the run does not allow, or
-    sets another model than its profile's, is refused as well, all with
-    ``NoAllowedProfileError``. Checkpoints of a run with profiled nodes are
-    version 5, and resume routes them to the resuming Swarm's profiles of the
-    same names. Durable runs refuse profiles.
+    with its model and reserves its ceiling; developer graphs, architects,
+    templates and supervisors can set the key, and a generated plan or an
+    ``LLMSupervisor`` proposal cannot. Every other node and synthesis call the
+    run's provider. Before routing or planning, and before any node call,
+    each profile must fit: its provider declares ``True`` every feature it
+    requires, supports its model, does not price the model as retired, and
+    can call tools in a run with a ``tool_runtime``. A node that names a
+    profile the run does not allow, or sets another model than its
+    profile's, is refused as well, all with ``NoAllowedProfileError``. A
+    revision that adds such a node is refused before it applies, like any
+    invalid revision. Checkpoints of a run with profiled nodes are version 5,
+    and resume routes them to the resuming Swarm's profiles of the same
+    names. Durable runs refuse profiles.
     """
 
     def __init__(
@@ -1810,11 +1812,6 @@ class Swarm:
         models = []
         for node in graph.nodes:
             profile = node_profile(node, self._profiles)
-            if profile is not None and node.metadata.get("model", profile.model) != profile.model:
-                raise NoAllowedProfileError(
-                    f"Node {node.id!r} sets model {node.metadata['model']!r}, but its profile "
-                    f"{profile.name!r} calls {profile.model!r}"
-                )
             models.append(self.model if profile is None else profile.model)
         for node, model in zip(graph.nodes, models):
             if "model" not in node.metadata:

@@ -177,7 +177,8 @@ refused with `ValueError` before routing, planning or any node call.
 `execute(graph)` and `resume()` check the run's provider, each profile's and
 the supervisor's before their first call, even when only synthesis is left
 to run, and so do `Executor` and `AsyncExecutor` run without a Swarm before
-their first node call, for the providers their unfinished nodes call:
+their first node call, for the providers their unfinished nodes call and
+each profile's, since a supervisor may add a node that names one:
 
 | Provider | Declared `sdk_retries` |
 |---|---|
@@ -364,13 +365,21 @@ provider with its model, and its `metadata["model"]` is set to that model.
 Before each call it reserves `max_cost_per_call_usd`, unless it sets
 `metadata["estimated_cost_usd"]`; its held check under `reserve_for_checks`
 and its persisted attempts use the same amount. Every other node calls the
-run's provider with its own model or the run's. Nodes a supervisor adds and
-synthesis call the run's provider too, with the run's model.
+run's provider with its own model or the run's. Synthesis calls the run's
+provider with the run's model, and so does a node a supervisor adds without
+a profile.
 
 Only developer code names a profile: caller-built and YAML graphs
-(`Swarm.from_yaml(..., profiles=...)`), architects written in code and
-`ConstrainedArchitect` templates. A generated plan may set no node metadata
-but `role`, so model output cannot choose a profile.
+(`Swarm.from_yaml(..., profiles=...)`), architects written in code,
+`ConstrainedArchitect` templates and the nodes a
+[`Supervisor` you write](supervisor.md#writing-your-own) adds. Such an
+addition is routed like any profiled node, and its saved `metadata["model"]`
+is its profile's, so resume routes it the same way. A revision that adds a
+node naming a profile the run does not allow, or setting another model than
+its profile's, is refused before it applies and traced as
+`revision_rejected`, like any invalid revision. A generated plan may set no
+node metadata but `role`, and an `LLMSupervisor` proposes nodes without
+metadata, so model output cannot choose a profile.
 
 `requires` lists the features that the profile's provider must declare
 `True` for its model through `Provider.feature_support()`: `tools`,
@@ -391,7 +400,7 @@ call, and check each unfinished profiled node's image inputs and ceiling
 against its profile's provider. Under a [retry policy](#retry-policy) each
 profile's provider must declare `sdk_retries=0`. `Executor` and
 `AsyncExecutor` take `profiles` too, and fail a node that names any other
-profile before its call.
+profile or sets another model than its profile's before its call.
 
 A run with a profiled node writes
 [version 5 checkpoints](checkpoint-format.md#model-profiles-version-5) that

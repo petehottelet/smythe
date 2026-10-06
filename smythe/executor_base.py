@@ -378,8 +378,8 @@ class ExecutorBase:
     classified retries with ``Retry-After``, a backoff cap and a deadline
     shared by each node's attempts and waits; a run under one refuses,
     before any node call, a provider that does not declare
-    ``sdk_retries=0``, its own or, while revisions remain, an
-    ``LLMSupervisor``'s. ``sleep(seconds)`` replaces the wait before a retry
+    ``sdk_retries=0``, its own, any model profile's or, while revisions
+    remain, an ``LLMSupervisor``'s. ``sleep(seconds)`` replaces the wait before a retry
     (``time.sleep`` in the serial executor, ``asyncio.sleep`` in the async
     one) and is awaited when it returns an awaitable; ``rng`` replaces the
     ``random`` module that draws backoff jitter. Under a policy with
@@ -403,8 +403,10 @@ class ExecutorBase:
     routes each node that names one in ``metadata["profile"]`` to that
     profile's provider and model, and reserves the profile's ceiling for it
     unless the node sets ``estimated_cost_usd``. A node that names any other
-    profile raises ``NoAllowedProfileError`` before its call. Every other node
-    calls *provider* with its own model, and a node a supervisor adds takes
+    profile, or sets another model than its profile's, raises
+    ``NoAllowedProfileError`` before its call, and a revision that adds such
+    a node is refused before it applies. Every other node calls *provider*
+    with its own model, and a node a supervisor adds without a profile takes
     the model of the first such node that has one, or else ``default_model``.
     """
 
@@ -617,8 +619,11 @@ class ExecutorBase:
 
         delivered = _deliverable_ids(graph.nodes)
         try:
+            for added in revision.add_nodes:
+                # An added node is routed like any other: refuse one no profile can serve.
+                node_profile(added, self._profiles)
             self._apply_revision(graph, revision)
-        except RevisionError as exc:
+        except (RevisionError, NoAllowedProfileError) as exc:
             self._trace_revision(node, graph, revision, applied=False, detail=str(exc))
             self.notify_supervision_update(node, False)
             return False
@@ -1045,8 +1050,11 @@ class ExecutorBase:
         Nodes minted mid-run never passed through ``Swarm.plan``, so
         they carry none of the metadata the executor depends on; without
         this a revision would produce nodes that call the provider with
-        an empty model name. They call the run's provider, so a profiled
-        node's model, which belongs to its profile's provider, is not taken.
+        an empty model name. A node that names no profile calls the run's
+        provider, so a profiled node's model, which belongs to its profile's
+        provider, is not taken; one that names a profile takes that
+        profile's model, which it calls. A profile it cannot be routed to
+        raises ``NoAllowedProfileError`` before any node is changed.
         """
         if not new_nodes:
             return
@@ -1063,8 +1071,11 @@ class ExecutorBase:
             ),
             None,
         )
-        for node in new_nodes:
-            if model is not None:
+        profiles = [node_profile(node, self._profiles) for node in new_nodes]
+        for node, profile in zip(new_nodes, profiles):
+            if profile is not None:
+                node.metadata.setdefault("model", profile.model)
+            elif model is not None:
                 node.metadata.setdefault("model", model)
             if self._task is None and context is not None:
                 node.metadata.setdefault("task_context", context)
@@ -1229,7 +1240,8 @@ class ExecutorBase:
     def _node_route(self, node: Node) -> tuple[Provider, Any, ModelProfile | None]:
         """The provider and model *node* calls, and the profile that chose them, if any.
 
-        Raises ``NoAllowedProfileError`` for a profile this executor was not given.
+        Raises ``NoAllowedProfileError`` for a profile this executor was not
+        given, or for a node that sets another model than its profile's.
         """
         profile = node_profile(node, self._profiles)
         if profile is None:
@@ -1397,8 +1409,8 @@ class ExecutorBase:
             routes = [self._node_route(node) for node in pending]
             calls = [(self._provider, model) for model in sorted(
                 {str(model) for _, model, profile in routes if profile is None})]
-            calls += [(profile.provider, profile.model) for profile in
-                      {profile.name: profile for _, _, profile in routes if profile}.values()]
+            # Every profile, not only those pending nodes name: a supervisor may add one.
+            calls += [(profile.provider, profile.model) for profile in self._profiles.values()]
             from smythe.supervisor import LLMSupervisor
 
             # A supervisor that may still revise reviews with its own model or

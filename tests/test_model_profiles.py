@@ -2,11 +2,12 @@
 
 A ``ModelProfile`` pairs a provider with a model, a per-call cost ceiling and
 the features its provider must declare. A node that names one in
-``metadata["profile"]`` calls that provider with that model; every other node,
-supervisor additions and synthesis call the run's provider. Only developer
-code can name a profile: a generated plan cannot. A profile that cannot serve
-its nodes, or a node that names a profile the run does not allow, is refused
-with ``NoAllowedProfileError`` before any provider call, planning included.
+``metadata["profile"]`` calls that provider with that model, whether a graph,
+an architect or a developer supervisor's revision added it; every other node
+and synthesis call the run's provider. Only developer code can name a
+profile: a generated plan cannot. A profile that cannot serve its nodes, or a
+node that names a profile the run does not allow, is refused with
+``NoAllowedProfileError`` before any provider call, planning included.
 Checkpoints of a run with profiled nodes are version 5 and list
 ``model_profiles``, so a reader that would call the run's provider instead
 refuses them.
@@ -302,6 +303,67 @@ def test_supervisor_additions_and_synthesis_call_the_runs_provider(mode):
     assert "profile" not in extra.metadata and extra.metadata["model"] == "default-model"
 
 
+class AddProfiled(Supervisor):
+    """Adds one step after the draft whose metadata names *profile*, once."""
+
+    def __init__(self, profile: str = "fast", **metadata) -> None:
+        self.metadata = {"profile": profile, **metadata}
+
+    async def review(self, graph, node, *, task, revisions_remaining):
+        if node.id != "draft":
+            return None
+        return Revision(add_nodes=(Node(id="extra", label="Extra", depends_on=["draft"],
+                                        metadata=dict(self.metadata)),))
+
+
+def draft_only() -> ExecutionGraph:
+    return ExecutionGraph([Topology.SERIAL], [Node(id="draft", label="Draft")])
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_a_supervisor_addition_that_names_a_profile_calls_it_and_resumes(mode):
+    store = Store()
+    default = Recorder("default")
+    fast = Recorder("fast", SENDS_ONCE, Crash("process lost during the call"))
+    with pytest.raises(Crash):
+        build(default, fast_profile(fast), checkpoint_store=store, supervisor=AddProfiled(),
+              max_revisions=1, parallel=mode == "parallel").execute(draft_only())
+    assert default.calls == [("default-model", "Draft")]
+    assert fast.calls == [("fast-model", "Extra")]
+    execution_id, state = saved(store)
+    extra = next(node for node in state["graph"]["nodes"] if node["id"] == "extra")
+    # The saved node records the model its profile called, not the run's.
+    assert extra["metadata"]["profile"] == "fast" and extra["metadata"]["model"] == "fast-model"
+    assert state["version"] == 5 and state["requires"] == ["model_profiles"]
+
+    default, fast = Recorder("default"), Recorder("fast")
+    result = build(default, fast_profile(fast), checkpoint_store=store, supervisor=AddProfiled(),
+                   max_revisions=1, parallel=mode == "parallel").resume(execution_id)
+    assert default.calls == [] and fast.calls == [("fast-model", "Extra")]
+    assert result.output == "fast wrote Extra"
+    extra = next(node for node in result.graph.nodes if node.id == "extra")
+    assert extra.metadata["model"] == "fast-model"
+
+
+@pytest.mark.parametrize("mode", MODES)
+@pytest.mark.parametrize("supervisor,match", [
+    pytest.param(AddProfiled("slow"), "'slow'", id="not-allowed"),
+    pytest.param(AddProfiled(model="other-model"), "other-model", id="other-model"),
+])
+def test_a_supervisor_addition_whose_profile_cannot_serve_it_is_refused_before_it_applies(
+    mode, supervisor, match,
+):
+    default, fast = Recorder("default"), Recorder("fast")
+    result = build(default, fast_profile(fast), supervisor=supervisor, max_revisions=1,
+                   parallel=mode == "parallel").execute(draft_only())
+
+    (refused,) = [span for span in result.trace if span["status"] == "revision_rejected"]
+    assert match in refused["error"]
+    assert [node.id for node in result.graph.nodes] == ["draft"]
+    assert default.calls == [("default-model", "Draft")] and fast.calls == []
+    assert result.output == "default wrote Draft"
+
+
 def test_a_generated_plan_cannot_name_a_profile():
     assert _MODEL_METADATA_KEYS == frozenset({"role"})
     plan = {"topology": "serial",
@@ -474,6 +536,22 @@ def test_an_executor_with_a_retry_policy_refuses_a_profile_whose_sdk_may_retry(m
                               artifact_dir=None, retry_policy=RetryPolicy(),
                               profiles=[fast_profile(fast)])
     run_graph = graph()
+    run_graph.nodes[0].metadata["model"] = "default-model"
+    with pytest.raises(ValueError, match="sdk_retries"):
+        asyncio.run(executor.run(run_graph)) if mode == "parallel" else executor.run(run_graph)
+    assert default.calls == [] and fast.calls == []
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_an_executor_with_a_retry_policy_checks_profiles_a_supervisor_addition_may_name(mode):
+    # No node names the profile yet, but a revision may add one that does.
+    default, fast = Recorder("default"), Recorder("fast", ProviderFeatures())
+    executor_class = AsyncExecutor if mode == "parallel" else Executor
+    executor = executor_class(provider=default, registry=Registry(), tracer=Tracer(),
+                              artifact_dir=None, retry_policy=RetryPolicy(),
+                              supervisor=AddProfiled(), max_revisions=1,
+                              profiles=[fast_profile(fast)])
+    run_graph = draft_only()
     run_graph.nodes[0].metadata["model"] = "default-model"
     with pytest.raises(ValueError, match="sdk_retries"):
         asyncio.run(executor.run(run_graph)) if mode == "parallel" else executor.run(run_graph)

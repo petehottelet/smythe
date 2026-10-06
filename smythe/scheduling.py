@@ -281,7 +281,9 @@ def profile_map(profiles: object) -> dict[str, ModelProfile]:
 def node_profile(node: Node, profiles: Mapping[str, ModelProfile]) -> ModelProfile | None:
     """The profile *node* names in ``metadata["profile"]``, or None when it names none.
 
-    Raises ``NoAllowedProfileError`` when the name is not one of *profiles*.
+    Raises ``NoAllowedProfileError`` when the name is not one of *profiles*,
+    or when the node sets a ``model`` other than that profile's: the model a
+    node records is the one it calls.
     """
     if PROFILE_KEY not in node.metadata:
         return None
@@ -293,5 +295,10 @@ def node_profile(node: Node, profiles: Mapping[str, ModelProfile]) -> ModelProfi
         raise NoAllowedProfileError(
             f"Node {node.id!r} names model profile {name!r}, which this run does not allow: "
             + allowed
+        )
+    if node.metadata.get("model", profile.model) != profile.model:
+        raise NoAllowedProfileError(
+            f"Node {node.id!r} sets model {node.metadata['model']!r}, but its profile "
+            f"{profile.name!r} calls {profile.model!r}"
         )
     return profile

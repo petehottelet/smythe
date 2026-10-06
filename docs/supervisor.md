@@ -197,6 +197,12 @@ stamps them. Review receives the complete task, including source data and
 acceptance criteria, after an inspected-graph handoff or resume too.
 [Task snapshots](tasks.md).
 
+A node you add can name one of the run's [model
+profiles](execution.md#model-profiles) in `metadata["profile"]`. It then
+takes that profile's model and calls its provider. A revision that adds a
+node naming a profile the run does not allow, or setting another model than
+its profile's, is refused before it applies.
+
 ## Observability
 
 Every review that changes something emits a trace span, and so does
