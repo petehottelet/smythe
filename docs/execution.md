@@ -586,18 +586,21 @@ reservation as unknown cost (see [calls without an answer](#calls-without-an-ans
 ### Draining in-flight work
 
 `Swarm(termination=TerminationPolicy(drain_timeout_s=30))`, or `termination=`
-on `AsyncExecutor`, lets the nodes in flight finish before the run stops.
+on `AsyncExecutor`, lets the calls in flight finish before the run stops.
 After a failure that stops the run, such as a `HALT` node's error, a `RETRY`
 node out of attempts or a terminal failure, and after a ready node's budget
 reservation is refused at admission, the async executor:
 
 1. Starts no queued node, including one admitted in the same pass as a
    refused node, whose work had not begun.
-2. Lets each node in flight run on, retries included, for up to
-   `drain_timeout_s` seconds. A node that finishes keeps its result and cost
-   and is checkpointed as any finished node is. Supervision and regeneration
-   do not run after it, and a failure of its own does not replace the run's
-   error.
+2. Lets each call in flight finish, for up to `drain_timeout_s` seconds, and
+   sends no new one. A node that finishes keeps its result and cost and is
+   checkpointed as any finished node is. Supervision and regeneration do not
+   run after it, and a failure of its own does not replace the run's error.
+   No retry starts: a `RETRY` node whose attempt fails during the drain, or
+   that is waiting out a retry backoff when the drain begins, returns to
+   pending with its unused reservation released, as a cancelled node does,
+   so a resume runs it again.
 3. Cancels the nodes still in flight at the deadline, as without a policy. A
    cancelled native call's unresolved bill stays terminal with its live
    reservation. A cancelled call to any other provider keeps its reservation
@@ -615,15 +618,15 @@ one. A durable `run_store` run refuses a policy with `WorkflowBindingError`
 when the `Swarm` is built.
 
 `AsyncExecutor.drain_record` reports how the last run drained: `settled` names
-the nodes in flight whose work ended during the drain, `cancelled` those still
-in flight when it ended, and `deadline_hit` whether the deadline ended it. It
-is `None` when the run did not drain. A `Swarm` saves it in the failed
-checkpoint as `control.drain`, for information only: the checkpoint stays
-version 4, and resume keeps the nodes the drain completed, runs the failed,
-cancelled and never-started ones, and follows the resuming `Swarm`'s own
-policy. The time spent draining is the `drain` wait in [timing](#timing). The
-executor's `sleep`, when given, times the drain's deadline, so tests can end it
-from a manual clock.
+the nodes in flight whose work ended during the drain, `cancelled` those it
+stopped, still in flight when it ended or before a retry, and `deadline_hit`
+whether the deadline ended it. It is `None` when the run did not drain. A
+`Swarm` saves it in the failed checkpoint as `control.drain`, for information
+only: the checkpoint stays version 4, and resume keeps the nodes the drain
+completed, runs the failed, cancelled and never-started ones, and follows the
+resuming `Swarm`'s own policy. The time spent draining is the `drain` wait in
+[timing](#timing). The executor's `sleep`, when given, times the drain's
+deadline, so tests can end it from a manual clock.
 
 An explicit [resume](checkpoint-format.md#resume-semantics) preserves completed
 nodes and their costs, resets failed or interrupted nodes, and continues the

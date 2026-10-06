@@ -264,14 +264,15 @@ class TerminationPolicy:
 
     Without a policy, a failure cancels every node in flight at once. Under
     one, a failure that stops the run, or a node the budget refuses to admit,
-    stops admission: no queued node starts. The nodes already in flight run
-    on for up to ``drain_timeout_s`` seconds, and each one that finishes
+    stops admission: no queued node starts. The calls already in flight run
+    on for up to ``drain_timeout_s`` seconds, and each node that finishes
     keeps and saves its result and cost as usual, without supervision or
-    regeneration. Those still in flight at the deadline are cancelled, as
-    without a policy, and the run raises its original error. A cancellation,
-    an interrupt such as ``KeyboardInterrupt``, and a failure of class
-    ``security_stop`` never drain. The serial executor has nothing in flight
-    to drain.
+    regeneration. No retry starts: a node whose attempt fails, or that is
+    waiting to retry, returns to pending for a resume. Those still in flight
+    at the deadline are cancelled, as without a policy, and the run raises
+    its original error. A cancellation, an interrupt such as
+    ``KeyboardInterrupt``, and a failure of class ``security_stop`` never
+    drain. The serial executor has nothing in flight to drain.
     """
 
     drain_timeout_s: float

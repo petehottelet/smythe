@@ -2,9 +2,10 @@
 
 Without one, the async executor cancels every in-flight sibling as soon as it
 sees a failure. With ``TerminationPolicy(drain_timeout_s=...)`` it admits no
-further node, lets the nodes already in flight finish until the drain deadline,
-keeping and saving their results, then cancels the rest and raises the original
-error. A cancellation, an interrupt and a security stop never drain.
+further node and sends no retry, lets the calls already in flight finish until
+the drain deadline, keeping and saving their results, then cancels the rest and
+raises the original error. A cancellation, an interrupt and a security stop
+never drain.
 
 The executor's ``sleep`` times the drain deadline here: a sleep that advances a
 ``ManualClock`` reaches the deadline at once, and one that releases a gated
@@ -29,7 +30,7 @@ from smythe._failures import SECURITY_STOP, classify_failure
 from smythe.async_executor import AsyncExecutor
 from smythe.budget import Sentinel, SentinelAlert
 from smythe.checkpoint import CheckpointStore
-from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
+from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
 from smythe.provider import (
     CompletionResult, Provider, ProviderAccountingCancelledError, ProviderFeatures,
 )
@@ -281,6 +282,74 @@ async def test_completions_during_a_drain_are_not_reviewed():
     assert supervisor.reviewed == []
 
 
+class Upper:
+    """Draws the top of every jitter range, so a retry backoff equals its ceiling."""
+
+    def uniform(self, low, high):
+        return high
+
+
+@pytest.mark.asyncio
+async def test_a_node_whose_attempt_fails_during_a_drain_sends_no_retry():
+    gate = Gate()
+
+    async def fail_late():
+        await gate.wait()
+        raise RuntimeError("flaky failure")
+
+    provider = Script(fail=halting(gate), flaky=fail_late)
+    flaky = node("flaky", failure_policy=FailurePolicy.RETRY, max_retries=3)
+    budget, updates = Sentinel(10), []
+    executor = make(provider, sleep=DrainSleep(gate), budget=budget, updates=updates)
+
+    with pytest.raises(RuntimeError, match="stop now"):
+        await executor.run(fork(node("fail"), flaky, node("queued")))
+
+    # The attempt in flight when the drain began ended; its retry was never sent.
+    assert provider.calls == ["fail", "flaky"]
+    # Like a cancelled node, it returns to pending with its reservation released,
+    # so a resume runs it again.
+    assert flaky.status is NodeStatus.PENDING and flaky.result is None
+    assert budget.breakdown() == {} and budget._reservations == {}
+    assert updates == [("fail", NodeStatus.FAILED)]
+    assert executor.drain_record == {"settled": [], "cancelled": ["flaky"],
+                                     "deadline_hit": False}
+
+
+@pytest.mark.asyncio
+async def test_a_node_waiting_to_retry_when_a_drain_begins_is_cancelled_at_once():
+    backing_off = asyncio.Event()
+
+    async def fail():
+        await backing_off.wait()
+        raise RuntimeError("stop now")
+
+    async def fail_at_once():
+        raise RuntimeError("flaky failure")
+
+    waits = []
+
+    async def sleep(seconds):
+        waits.append(seconds)
+        backing_off.set()
+        await asyncio.Event().wait()  # Neither a backoff nor the drain's deadline ends.
+
+    provider = Script(fail=fail, flaky=fail_at_once)
+    flaky = node("flaky", failure_policy=FailurePolicy.RETRY, max_retries=3)
+    budget = Sentinel(10)
+    executor = make(provider, sleep=sleep, budget=budget, retry_backoff_s=1.0, rng=Upper())
+
+    # The backoff has no call in flight to finish, so the drain does not wait for it.
+    with pytest.raises(RuntimeError, match="stop now"):
+        await asyncio.wait_for(executor.run(fork(node("fail"), flaky)), 10)
+
+    assert waits[0] == 1.0 and provider.calls == ["fail", "flaky"]
+    assert flaky.status is NodeStatus.PENDING and flaky.result is None
+    assert budget.breakdown() == {} and budget._reservations == {}
+    assert executor.drain_record == {"settled": [], "cancelled": ["flaky"],
+                                     "deadline_hit": False}
+
+
 @pytest.mark.asyncio
 async def test_an_admission_failure_drains_the_nodes_already_in_flight():
     gate = Gate()
@@ -503,3 +572,53 @@ def test_a_drained_run_saves_its_finished_sibling_and_resume_runs_only_the_rest(
     assert result.total_cost_usd == 4 * CALL
     final = store.load(execution_id)
     assert final["status"] == "completed" and "drain" not in final["control"]
+
+
+def test_a_retry_the_drain_refused_is_saved_pending_and_resume_runs_the_node():
+    """``flaky``'s first attempt fails shortly after ``fail`` raises; a retry would answer."""
+    entered: dict[str, asyncio.Event] = {}
+    failures: list[str] = []
+
+    def event(name):
+        return entered.setdefault(name, asyncio.Event())
+
+    async def fail():
+        await event("flaky").wait()
+        event("failed").set()
+        raise RuntimeError("stop now")
+
+    async def flaky():
+        if failures:
+            return None  # Only the first attempt fails.
+        event("flaky").set()
+        await event("failed").wait()
+        await asyncio.sleep(0.05)
+        failures.append("flaky")
+        raise RuntimeError("flaky failure")
+
+    store = Store()
+    graph = fork(node("fail"), node("flaky", failure_policy=FailurePolicy.RETRY, max_retries=2))
+    first = Script(fail=fail, flaky=flaky)
+    swarm = Swarm(model="test-model", provider=first, checkpoint_store=store, artifact_dir=None,
+                  parallel=True, termination=TerminationPolicy(drain_timeout_s=5))
+
+    with pytest.raises(RuntimeError, match="stop now"):
+        swarm.execute(graph)
+
+    assert first.calls == ["fail", "flaky"]
+    (execution_id,) = store.list_ids()
+    state = store.load(execution_id)
+    assert state["control"]["drain"] == {"settled": [], "cancelled": ["flaky"],
+                                         "deadline_hit": False}
+    nodes = saved_nodes(state)
+    assert nodes["flaky"]["status"] == "pending" and nodes["flaky"]["result"] is None
+    assert state["budget"]["node_costs"] == {}
+
+    second = Script(flaky=flaky)
+    result = Swarm(model="test-model", provider=second, checkpoint_store=store,
+                   artifact_dir=None, parallel=True).resume(execution_id)
+
+    assert sorted(second.calls) == ["fail", "flaky"]
+    assert result.total_cost_usd == 2 * CALL
+    nodes = saved_nodes(store.load(execution_id))
+    assert (nodes["fail"]["status"], nodes["flaky"]["status"]) == ("completed", "completed")
