@@ -46,6 +46,7 @@ its runs and its recorded version do not change.
 | `execution` | `state`, `blocked_reason`, and node counts by status. Ordinary states are `running`, `failed` and `completed`; durable runs add `planned` and `blocked`, with the journal's `run_status` and `checkpoint_status` |
 | `delivery` | The current delivery acceptance decision; see below |
 | `decisions` | The [decision history](#decision-history): the current decision's sequence and the decisions before it |
+| `revision_log` | The run's latest [supervisor decisions](#revision-log), applied or refused; empty without any |
 | `artifact` | A durable run's [published document](#published-documents); null for a run that publishes none and for ordinary runs |
 | `context` | A durable run's [context assembly](#research-runs): versions, current sources, snapshots and tombstones; null without context assembly and for ordinary runs |
 | `tool_calls` | A durable run's [journaled reads](#research-runs), without response bodies or text; null for ordinary runs |
@@ -119,6 +120,29 @@ decisions only when there are any:
 Delivery acceptance: accepted
 Decision history: decision 1 is current; earlier decisions:
   Decision 0: rejected under policy 8a51c0e2d9f4: final validator 'required-section' rejected the output: section_missing: no '## Sources' section
+```
+
+### Revision log
+
+`revision_log` lists up to 32 of a run's latest supervisor decisions, oldest
+first, each with what the revision proposed, whether it was `applied`, and
+what it left: the completed results it `retained`, the delivered results it
+`invalidated`, the gates it preserved, the revisions left and the
+revision-added nodes in the graph
+([what a revision changed](supervisor.md#what-a-revision-changed)). An
+ordinary run's log is the one its checkpoint saves
+([format](checkpoint-format.md#revision-log)). A durable run's journal keeps
+none, so inspection derives it from the run's `supervision` operations; their
+refusals carry no `detail`. The supervisor's `reason` and a refusal's
+`detail` are at most 200 characters and are printed as data:
+
+```text
+Revisions: 2 logged
+Revision after draft: applied (+1); added check; 1 revisions left, 1 added nodes in the graph
+  Reason: the answer needs a check
+Revision after final: refused (-1); dropped draft; 1 revisions left, 1 added nodes in the graph
+  Reason: the draft is done
+  Detail: cannot drop node 'draft' with status completed; only pending work may be revised
 ```
 
 ### Published documents

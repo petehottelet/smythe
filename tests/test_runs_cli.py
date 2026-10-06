@@ -38,8 +38,9 @@ from smythe.cli import (
     EXIT_INVALID_INPUT, EXIT_JOB_STATE, EXIT_LOCAL_ERROR, EXIT_OK, EXIT_RUN_INDETERMINATE,
     EXIT_RUN_NOT_ACCEPTED, build_parser, main,
 )
-from smythe.graph import ExecutionGraph, FailurePolicy, Node, Topology
+from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Revision, Topology
 from smythe.provider import CompletionResult, Provider
+from smythe.supervisor import SUPERVISOR_SYSTEM_PROMPT, LLMSupervisor, Supervisor
 from smythe.validation import hard_finding
 from test_source_evidence import CLAIM, DROPPED, KEPT, STRONG
 from test_source_evidence import SOURCES as EVIDENCE_SOURCES
@@ -992,3 +993,196 @@ def test_ordinary_runs_have_no_durable_research_blocks(tmp_path, capsys):
     assert (value["context"], value["tool_calls"], value["evidence"]) == (None, None, None)
     assert value["issues"] == [{"kind": "validator_rejected", "subject": "fixed-reject",
                                 "detail": value["delivery"]["reasons"][0]}]
+
+
+# ---------------------------------------------------------------------------
+# Supervisor revisions
+# ---------------------------------------------------------------------------
+
+
+class Revises(Supervisor):
+    """Adds a check after the final step, then proposes to drop the finished draft."""
+
+    async def review(self, graph, node, *, task, revisions_remaining):
+        if node.id == "draft":
+            check = Node(id="check", label="Check the answer", depends_on=["final"])
+            return Revision(add_nodes=(check,), reason="the answer needs a check")
+        if node.id == "final":
+            return Revision(drop_node_ids=("draft",), reason="the draft is done")
+        return None
+
+
+# What both kinds of run log for those two reviews, apart from the refusal's detail.
+REVISIONS = [
+    {"after_node": "draft", "applied": True, "change": "+1", "added": ["check"], "dropped": [],
+     "rewired": [], "retained": ["draft"], "invalidated": [], "preserved_gates": [],
+     "revisions_remaining_after": 1, "added_total": 1, "trigger": "node_completed",
+     "reason": "the answer needs a check", "detail": None},
+    {"after_node": "final", "applied": False, "change": "-1", "added": [], "dropped": ["draft"],
+     "rewired": [], "retained": ["draft", "final"], "invalidated": [], "preserved_gates": [],
+     "revisions_remaining_after": 1, "added_total": 1, "trigger": "node_completed",
+     "reason": "the draft is done", "detail": None},
+]
+
+
+def test_inspection_shows_an_ordinary_run_s_revision_log(tmp_path, capsys, monkeypatch):
+    swarm = Swarm(model="offline", provider=OfflineProvider(), artifact_dir=None,
+                  checkpoint_store=FileCheckpointStore(tmp_path), supervisor=Revises(),
+                  max_revisions=2)
+    result = swarm.execute(graph())
+    saved = json.loads((tmp_path / f"{result.execution_id}.json").read_text())
+    no_side_effects(monkeypatch)
+
+    code, value = inspect(capsys, tmp_path, result.execution_id)
+
+    assert code == EXIT_OK
+    assert value["revision_log"] == saved["control"]["revision_log"]
+    applied, refused = value["revision_log"]
+    assert applied == REVISIONS[0]
+    assert refused == REVISIONS[1] | {"detail": refused["detail"]}
+    assert refused["detail"].startswith("cannot drop node 'draft' with status completed")
+    assert main(["runs", "--checkpoints", str(tmp_path), "inspect", result.execution_id]) == EXIT_OK
+    text = capsys.readouterr().out
+    assert "Revisions: 2 logged" in text
+    assert ("Revision after draft: applied (+1); added check; 1 revisions left, "
+            "1 added nodes in the graph") in text
+    assert "  Reason: the answer needs a check" in text
+    assert "Revision after final: refused (-1); dropped draft; 1 revisions left" in text
+    assert "  Detail: cannot drop node 'draft' with status completed" in text
+
+
+def test_a_run_without_revisions_shows_an_empty_revision_log(tmp_path, capsys):
+    result = run(tmp_path)
+    code, value = inspect(capsys, tmp_path, result.execution_id)
+    assert code == EXIT_OK and value["revision_log"] == []
+    main(["runs", "--checkpoints", str(tmp_path), "inspect", result.execution_id])
+    assert "Revision" not in capsys.readouterr().out
+
+
+def test_inspection_derives_a_durable_run_s_revision_log_from_its_supervision_operations(
+    tmp_path, capsys, monkeypatch,
+):
+    proposals = [
+        {"change": True, "reason": "the answer needs a check",
+         "add": [{"id": "check", "label": "Check the answer", "depends_on": ["final"]}]},
+        {"change": True, "reason": "the draft is done", "drop": ["draft"]},
+        {"change": False, "reason": "nothing left to change"},
+    ]
+
+    async def complete(self, system, prompt, model):
+        if system == SUPERVISOR_SYSTEM_PROMPT:
+            return CompletionResult(json.dumps(proposals.pop(0)), cost_usd=0)
+        return CompletionResult("Done", cost_usd=0)
+
+    monkeypatch.setattr(OfflineProvider, "complete", complete)
+    path = tmp_path / "runs.db"
+    with SQLiteWorkflowStore(path) as store:
+        provider = OfflineProvider()
+        swarm = Swarm(model="offline", provider=provider, architect=SimpleArchitect(),
+                      run_store=store, max_budget_usd=1, max_revisions=2,
+                      supervisor=LLMSupervisor(provider, model="offline", only_terminal=False))
+        result = swarm.execute(graph())
+        run_id = result.execution_id
+        operations = store.list_operations(run_id, "supervision")
+        checkpoint = store.get_checkpoint(run_id)["checkpoint"]
+    with closing(CONNECT(path)) as db:
+        assert db.execute("PRAGMA journal_mode=DELETE").fetchone() == ("delete",)
+    before = journal_state(path)
+    no_side_effects(monkeypatch)
+
+    code, value = inspect_durable(capsys, path, run_id)
+
+    assert code == EXIT_OK and journal_state(path) == before
+    # The journal keeps no log: three reviews, the last of which changed nothing.
+    assert [operation["operation_key"] for operation in operations] == [
+        "supervision/draft/0", "supervision/final/0", "supervision/check/0"]
+    assert "revision_log" not in checkpoint
+    assert value["revision_log"] == REVISIONS
+    # The trace of the run that made the decisions records the same effects.
+    traced = [(span["status"], span["revision"]) for span in result.trace if "revision" in span]
+    assert [status for status, _ in traced] == ["revision_applied", "revision_rejected"]
+    for (_, record), entry in zip(traced, value["revision_log"]):
+        assert record == {key: entry[key] for key in record}
+    main(["runs", "--journal", str(path), "inspect", run_id])
+    text = capsys.readouterr().out
+    assert "Revision after draft: applied (+1); added check" in text
+    assert "Revision after final: refused (-1); dropped draft" in text
+
+
+class SupervisionJournal:
+    """The reads the durable revision log makes, over hand-written supervision operations."""
+
+    def __init__(self, operations, *, max_revisions, revisions_used):
+        self.operations, self.max_revisions, self.revisions_used = operations, max_revisions, revisions_used
+
+    def list_operations(self, run_id, kind):
+        assert kind == "supervision"
+        return self.operations
+
+    def get_checkpoint(self, run_id):
+        return {"checkpoint": {"revisions_used": self.revisions_used}}
+
+    def load_run(self, run_id):
+        return {"config": {"max_revisions": self.max_revisions}}
+
+
+def supervision(node_id, remaining, graph, result, *, applied=True):
+    from smythe.checkpoint import graph_to_dict
+
+    return {"operation_key": f"supervision/{node_id}/0", "applied_revision": 1 if applied else None,
+            "inputs": {"graph": graph_to_dict(graph), "node_id": node_id, "task": None,
+                       "revisions_remaining": remaining},
+            "result": result}
+
+
+def reviewed(*completed: str, extra: bool = False) -> ExecutionGraph:
+    """Two independent steps, ``a`` and ``b``, and the added ``x`` when *extra*."""
+    nodes = [Node(id=node_id, label=node_id) for node_id in ("a", "b")]
+    if extra:
+        nodes.append(Node(id="x", label="x", depends_on=["a"], metadata={"added_by_revision": True}))
+    for node in nodes:
+        if node.id in completed:
+            node.status = NodeStatus.COMPLETED
+    return ExecutionGraph([Topology.FORK_JOIN], nodes)
+
+
+def test_the_durable_revision_log_is_derived_from_supervision_operations():
+    from smythe.workflow import revision_log
+
+    add_x = {"add_nodes": [{"id": "x", "label": "x", "depends_on": ["a"]}], "drop_node_ids": [],
+             "rewire": {}, "reason": "a needs a follow-up"}
+    operations = [
+        supervision("a", 2, reviewed("a"), {"revision": add_x}),
+        supervision("b", 1, reviewed("a", "b", extra=True),
+                    {"revision": None, "local_error_type": "RuntimeError"}),
+        supervision("x", 1, reviewed("a", "b", "x", extra=True), {"revision": None}),
+        # Saved but not yet applied by a checkpoint: resume decides it again.
+        supervision("y", 1, reviewed("a", "b", "x", extra=True), {"revision": add_x}, applied=False),
+    ]
+    journal = SupervisionJournal(operations, max_revisions=2, revisions_used=1)
+
+    applied, raised = revision_log(journal, "run")
+
+    assert applied == {
+        "after_node": "a", "applied": True, "change": "+1", "added": ["x"], "dropped": [],
+        "rewired": [], "retained": ["a"], "invalidated": ["a"], "preserved_gates": [],
+        "revisions_remaining_after": 1, "added_total": 1, "trigger": "node_completed",
+        "reason": "a needs a follow-up", "detail": None}
+    assert raised == {
+        "after_node": "b", "applied": False, "change": "unknown", "added": [], "dropped": [],
+        "rewired": [], "retained": ["a", "b"], "invalidated": [], "preserved_gates": [],
+        "revisions_remaining_after": 1, "added_total": 1, "trigger": "node_completed",
+        "reason": None, "detail": "supervisor raised RuntimeError"}
+
+    # An allowance that does not step down by none or one cannot say what happened.
+    operations[2]["inputs"]["revisions_remaining"] = 3
+    assert [entry["applied"] for entry in revision_log(journal, "run")] == [True, None]
+
+    # Only the latest decisions are kept.
+    refused = {"add_nodes": [], "drop_node_ids": ["a"], "rewire": {}, "reason": "again"}
+    journal.operations = [supervision(f"n{index}", 1, reviewed("a"), {"revision": refused})
+                          for index in range(40)]
+    journal.revisions_used = 1
+    log = revision_log(journal, "run")
+    assert len(log) == 32 and log[0]["after_node"] == "n8"
+    assert {entry["applied"] for entry in log} == {False}

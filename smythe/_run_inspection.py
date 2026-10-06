@@ -3,11 +3,12 @@
 ``smythe runs`` reads an ordinary run's checkpoint through a
 :class:`~smythe.checkpoint.FileCheckpointStore`, or a durable run from a
 :class:`~smythe.workflow_store.SQLiteWorkflowStore` opened read-only, and
-reports execution, delivery acceptance and its decision history, a durable
-run's published artifact, cost, timing and the next action as separate JSON
-blocks. For a durable run it also reports its context sources and snapshots,
-its journaled reads, the source evidence its output carried and the issues
-left open, never source text, read bodies or output.
+reports execution, delivery acceptance and its decision history, the
+supervisor's revision log, a durable run's published artifact, cost, timing
+and the next action as separate JSON blocks. For a durable run it also
+reports its context sources and snapshots, its journaled reads, the source
+evidence its output carried and the issues left open, never source text,
+read bodies or output.
 :meth:`smythe.swarm.SwarmResult.to_dict` builds its execution, delivery,
 unknown-exposure and next-action blocks with the same functions. Nothing here
 constructs a provider, migrates a journal or writes a file.
@@ -40,6 +41,7 @@ from smythe.checkpoint import (
     delivery_acceptance_history,
     delivery_acceptance_sequence,
     graph_from_dict,
+    revision_log_from_state,
     task_from_dict,
     timing_segments,
 )
@@ -349,6 +351,7 @@ def _checkpoint_view(execution_id: str, state: Any) -> dict[str, Any]:
         "execution": {"state": status, "blocked_reason": None, "nodes": node_counts(graph)},
         "delivery": delivery,
         "decisions": decisions,
+        "revision_log": revision_log_from_state(state),
         # Only durable runs publish a rendered document, journal reads and
         # record context snapshots and source evidence.
         "artifact": None,
@@ -568,7 +571,7 @@ def issues_view(delivery: dict[str, Any], evidence: dict[str, Any] | None,
 
 
 def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
-    from smythe.workflow import _checkpoint_version
+    from smythe.workflow import _checkpoint_version, revision_log
 
     inspected = store.inspect_run(run_id)
     run = store.load_run(run_id)
@@ -637,6 +640,7 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
                       "run_status": status, "checkpoint_status": checkpoint_status},
         "delivery": delivery,
         "decisions": decisions,
+        "revision_log": revision_log(store, run_id),
         "artifact": None if artifact is None else artifact.to_dict(),
         "context": context_view(store, run_id, run["config"], checkpoint, graph),
         "tool_calls": tool_calls,

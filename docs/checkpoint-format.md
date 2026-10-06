@@ -128,6 +128,7 @@ Notes:
 - `budget.token_estimate_nodes` lists the nodes, including `__synthesis__` for an `LLM_MERGE` synthesis, whose recorded cost prices tokens at the blended `cost_per_token` rate. Resume restores them, so `Sentinel.cost_contains_token_estimates` still reports costs priced before the checkpoint. A value other than a list of node IDs stops resume with `BudgetValidationError`.
 - `control.revisions_used` is how much of the supervisor's `max_revisions` allowance the run has already spent. Resume seeds the executor from it, so the cap bounds the **run**, not each attempt: a crash-resume cycle cannot refill the allowance and revise past the limit the caller set.
 - `control.retry_policy` and `control.attempts_used` appear only for a run whose retry policy persists attempts, which makes the checkpoint version 5; see [attempt allowance](#attempt-allowance-version-5).
+- `control.revision_log`, present once a supervisor made a decision, lists the run's latest supervisor decisions; see [revision log](#revision-log).
 - A node that a revision added carries `"added_by_revision": true` in its `metadata` (from 0.8.2). `LLMSupervisor` counts these nodes against `max_total_added_nodes`, so resume does not reset the count ([what the cap limits](supervisor.md#safety)). Nodes added before 0.8.2 have no marker and are not counted.
 - `task.done_when` carries the acceptance criteria forward. A resumed run that had forgotten them could not hold its own output to them.
 - `timing` records how long each call that worked on the execution took; see [timing segments](#timing-segments).
@@ -190,6 +191,50 @@ parallel siblings in a routed plan that could only repeat each other's work, it
 writes `coordination` beside `routing`, one list of node ids per group:
 `{"version": 1, "duplicate_siblings": [["research-0", "research-1"]]}`. A plan
 it does not flag has no `coordination` key.
+
+## Revision log
+
+Once a [supervisor](supervisor.md#revision-log) has made a decision, applied
+or refused, `control.revision_log` lists the run's latest 32 decisions, oldest
+first:
+
+```json
+"control": {
+  "revisions_used": 1,
+  "revision_log": [
+    {
+      "after_node": "draft",
+      "applied": true,
+      "change": "+1",
+      "added": ["check"],
+      "dropped": [],
+      "rewired": [],
+      "retained": ["draft"],
+      "invalidated": [],
+      "preserved_gates": [],
+      "revisions_remaining_after": 1,
+      "added_total": 1,
+      "trigger": "node_completed",
+      "reason": "the answer needs a check",
+      "detail": null
+    }
+  ]
+}
+```
+
+The keys are those of the trace's [revision record](supervisor.md#what-a-revision-changed)
+with `applied`, the supervisor's `reason` and a refusal's `detail`, each at
+most 200 characters with account identifiers redacted. Entries hold node ids,
+never labels or results; each id list keeps its first 16, and `omitted_ids`,
+present only then, counts the ids left out. Resume continues the saved log, so
+it covers decisions made before a crash although the resumed run's trace does
+not.
+
+The log is informational: it does not change the checkpoint version or what
+resume does, and it is not a [required state feature](#required-state-features-version-5).
+A run without decisions saves no key. Resume and `smythe runs inspect` read a
+missing log, or one whose entries lack a key or hold a value of the wrong type,
+as empty. `smythe.checkpoint.revision_log_from_state(state)` reads it back.
 
 ## Verification state
 
@@ -475,6 +520,11 @@ without it restores no token estimates, as before the key existed, so
 So is `graph.planning`. Earlier builds read a saved graph key by key, so they
 ignore it when they resume and leave it out of the checkpoints they write; a
 graph without it restores `planning` as `None`.
+
+So is `control.revision_log`. Earlier builds read only the `control` keys they
+know, so they ignore the log when they resume and leave it out of the
+checkpoints they write; this build resumes a checkpoint without it with an
+empty log.
 
 Version 4 adds no field. It records that every MCP server listed under
 `agents` came from developer configuration: from 0.8.1 on, a model-generated

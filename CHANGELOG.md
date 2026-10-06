@@ -943,6 +943,20 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   evaluator reads no store or file and its output is deterministic JSON
   data; nothing applies decisions yet. See
   [reuse decisions](docs/lineage.md#reuse-decisions).
+- A supervisor revision records what it changed. Its trace span's `revision`
+  record adds the completed results the run `retained`, the delivered results
+  it `invalidated` because a new step now follows them, the
+  `preserved_gates`, `revisions_remaining_after`, the revision-added nodes in
+  the graph (`added_total`) and the review's `trigger`; the earlier keys and
+  `summary()`'s keys are unchanged. Ordinary checkpoints keep the latest 32
+  decisions, applied or refused, in `control.revision_log`, which resume
+  extends: node ids only, at most 16 per list, and the supervisor's reason
+  and a refusal's detail redacted and cut to 200 characters. The log is
+  informational, so checkpoints stay version 4 and a run without decisions
+  saves no key. A durable run's journal is unchanged; its log is derived
+  when read from its `supervision` operations
+  (`smythe.workflow.revision_log()`). `smythe runs inspect` reports either
+  as `revision_log`. See [revision log](docs/supervisor.md#revision-log).
 
 ### Changed
 

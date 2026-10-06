@@ -212,3 +212,48 @@ for span in result.trace:
 Rejections are recorded deliberately. A supervisor that keeps proposing
 invalid changes is a finding, and silently dropping those attempts would
 hide it.
+
+### What a revision changed
+
+A span's `revision` record names the node the review followed
+(`after_node`), the proposal's `change` summary and the ids it `added`,
+`dropped` and `rewired`; a review whose supervisor raised has `change`
+`"unknown"` and no ids. The executor adds the decision's effect, read from the
+graph after it:
+
+| Key | Meaning |
+|---|---|
+| `retained` | The completed nodes. A revision never changes finished work, so every result is kept |
+| `invalidated` | Completed nodes whose result the run delivered before the revision and no longer does: a step the revision added or rewired depends on them, so `DELIVERABLE` synthesis returns that step's output in their place. Their results stay banked and feed the new step |
+| `preserved_gates` | The verification gates the graph kept. No revision can drop a gate or cut it off from its target; a gate the revision added is listed under `added` |
+| `revisions_remaining_after` | How much of `max_revisions` is left |
+| `added_total` | The revision-added nodes the graph holds, which `max_total_added_nodes` limits |
+| `trigger` | What prompted the review: `node_completed` |
+
+A refused revision leaves the graph as it was, so its record shows the plan
+the run kept: nothing `invalidated` and the allowance unchanged. Under a strict
+acceptance policy, a revision refused because it would break an
+[acceptance obligation](verifier.md#acceptance-obligations) names the
+obligations in the span's `error`.
+
+### Revision log
+
+Spans cover one `execute()` or `resume()` call. The run also keeps a
+revision log of its latest 32 decisions, applied or refused, oldest first:
+an ordinary checkpoint saves it under
+[`control.revision_log`](checkpoint-format.md#revision-log), resume extends
+it, and [`smythe runs inspect`](runs.md#revision-log) shows it. Each entry is
+the record above with `applied`, the supervisor's `reason` and, for a
+refusal, its `detail`. The reason is model text and the detail may quote a
+provider error, so the log keeps each only as data: account identifiers are
+redacted and at most 200 characters are kept. Each id list keeps its first
+16 ids, and `omitted_ids` counts any left out, so the log stays small however
+large the graph is.
+
+A durable run's journal keeps no log. Inspection derives it, with
+`smythe.workflow.revision_log(store, run_id)`, from the `supervision`
+operations the run applied: each holds the graph the supervisor reviewed, the
+revisions it had left and its proposal. A decision was applied when the next
+review, or else the run's checkpoint, has one revision fewer left. The journal
+keeps no refusal's reason, so a durable refusal's `detail` is null, and a
+review whose supervisor raised names only the error's type.

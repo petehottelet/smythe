@@ -30,6 +30,7 @@ from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topolo
 from smythe.registry import Registry
 from smythe.scheduling import RetryPolicy, _attempt_records
 from smythe.task import Task, task_from_dict, task_snapshots_equal, task_to_dict
+from smythe.tracer import read_revision_log
 
 CHECKPOINT_VERSION = 4
 # v3 adds mandatory verification dispositions. Older graphs without an
@@ -410,6 +411,17 @@ def timing_segments(state: dict[str, Any]) -> list[dict[str, Any]]:
         return json.loads(json.dumps(segments, allow_nan=False))
     except (TypeError, ValueError, RecursionError):
         return []
+
+
+def revision_log_from_state(state: dict[str, Any]) -> list[dict[str, Any]]:
+    """The supervisor revision log a checkpoint keeps under ``control.revision_log``.
+
+    The log is informational and additive within version 4: a state without
+    one, as earlier builds wrote, or with one this build cannot read, has an
+    empty log (see :func:`smythe.tracer.read_revision_log`).
+    """
+    control = state.get("control")
+    return read_revision_log(control.get("revision_log") if isinstance(control, dict) else None)
 
 
 def checkpoint_requirements(state: dict[str, Any]) -> tuple[str, ...]:

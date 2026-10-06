@@ -46,6 +46,7 @@ from smythe.checkpoint import (
     graph_from_dict,
     graph_to_dict,
     reset_incomplete_nodes,
+    revision_log_from_state,
     supersede_delivery_acceptance,
     task_from_dict,
     timing_segments,
@@ -1208,6 +1209,8 @@ class Swarm:
         decision, or until there is one an undecided record that binds the
         run's policy and task. So are the states of a run whose retry policy
         persists attempts, which record it and each node's attempts used.
+        A run's supervisor decisions, once there are any, add the bounded
+        ``revision_log`` to ``control``, which keeps the version.
         """
         if self._checkpoint_store is None:
             return
@@ -1218,6 +1221,9 @@ class Swarm:
             if self.retry_policy is not None and self.retry_policy.persist_attempts:
                 control["retry_policy"] = self.retry_policy.to_dict()
                 control["attempts_used"] = getattr(self._active_executor, "attempts_used", {})
+            revision_log = getattr(self._active_executor, "revision_log", None)
+            if revision_log:
+                control["revision_log"] = revision_log
             state = build_state(
                 control=control,
                 execution_id=execution_id,
@@ -1659,6 +1665,8 @@ class Swarm:
             # Like revisions_used: a crash must not refill a node's attempts.
             attempts_used=allowance[1] if allowance is not None else None,
         )
+        # Informational: decisions after resume extend the log the run saved.
+        executor.revision_log = revision_log_from_state(state)
         self._active_executor = executor
         tracer.add_phase("recovery", tracer.since(recovery_started))
         try:

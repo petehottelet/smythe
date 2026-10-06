@@ -38,7 +38,10 @@ from smythe.evidence import (
 from smythe.executor_base import (
     REJECTED_GENERATIONS_KEY, SUPPORTED_PROMPT_ASSEMBLY_VERSIONS, ExecutorBase, check_provider_support,
 )
-from smythe.graph import ExecutionGraph, NodeStatus, Revision, snapshot_run_ref
+from smythe.graph import (
+    REVISION_ADDED_KEY, ExecutionGraph, Node, NodeStatus, Revision, _deliverable_ids,
+    snapshot_run_ref,
+)
 from smythe.lineage import (
     LINEAGE_OPERATION, LINEAGE_RECORD_VERSION, LINEAGE_REUSE_KEY, ArtifactLineage, build_lineage,
     lineage_key, snapshot_lineage_policy,
@@ -48,7 +51,9 @@ from smythe.registry import Registry
 from smythe.provider import ProviderResponseError
 from smythe.scheduling import RetryPolicy
 from smythe.task import Task, snapshot_task, task_from_dict, task_to_dict
-from smythe.tracer import Tracer
+from smythe.tracer import (
+    REVISION_LOG_LIMIT, Tracer, revision_context, revision_log_entry, revision_record,
+)
 from smythe.validation import ValidationOutcome, _json_sha256
 from smythe.validators import SourceEvidenceValidator
 from smythe.verifier import (
@@ -430,6 +435,63 @@ def current_decision(store, run_id):
     """
     history = decision_history(store, run_id)
     return history[-1] if history else None
+
+
+def revision_log(store, run_id):
+    """A durable run's supervisor decisions, oldest first, as ordinary checkpoints log them.
+
+    The journal keeps no log: each entry (see
+    :func:`smythe.tracer.revision_log_entry`) is derived when read from a
+    ``supervision`` operation a checkpoint applied, which holds the graph the
+    supervisor reviewed, the revisions it had left and its proposal. A
+    decision was applied when the next review, or else the run's checkpoint,
+    has one revision fewer left, and refused when it has as many; the journal
+    keeps no refusal's reason, so its ``detail`` is None. A review that
+    proposed no change is not listed, and one whose supervisor raised is
+    listed as refused. At most ``REVISION_LOG_LIMIT`` entries, the latest,
+    are returned. Only reads are made, so a store opened read-only will do.
+    """
+    operations = [operation for operation in store.list_operations(run_id, "supervision")
+                  if operation["applied_revision"] is not None]
+    saved = store.get_checkpoint(run_id)
+    used = None if saved is None else saved["checkpoint"].get("revisions_used")
+    allowed = store.load_run(run_id)["config"].get("max_revisions")
+    remaining = [operation["inputs"].get("revisions_remaining") for operation in operations]
+    remaining.append(allowed - used if type(allowed) is int and type(used) is int else None)
+    entries = []
+    for index, operation in enumerate(operations):
+        inputs, result = operation["inputs"], operation["result"]
+        proposal, error = result.get("revision"), result.get("local_error_type")
+        if proposal is None and error is None:
+            continue
+        before, after = remaining[index], remaining[index + 1]
+        applied = (before - after == 1 if type(before) is int and type(after) is int
+                   and before - after in (0, 1) else None)
+        graph = graph_from_dict(inputs["graph"])
+        delivered = _deliverable_ids(graph.nodes)
+        revision = None if proposal is None else Revision(
+            add_nodes=tuple(node_from_dict(item) for item in proposal["add_nodes"]),
+            drop_node_ids=tuple(proposal["drop_node_ids"]),
+            rewire={key: tuple(value) for key, value in proposal["rewire"].items()},
+        )
+        added = []
+        if applied and revision is not None:
+            # The change apply_revision made to the graph the supervisor reviewed.
+            added = [item.id for item in revision.add_nodes]
+            for item in revision.add_nodes:
+                item.metadata[REVISION_ADDED_KEY] = True
+            graph.nodes = [item for item in graph.nodes if item.id not in revision.drop_node_ids]
+            graph.nodes += revision.add_nodes
+            for item in graph.nodes:
+                item.depends_on = list(revision.rewire.get(item.id, item.depends_on))
+        context = revision_context(graph, revisions_remaining_after=after,
+                                   delivered_before=delivered, added=added)
+        record = revision_record(Node(label="", id=str(inputs["node_id"])), revision, context)
+        entries.append(revision_log_entry(
+            record, applied=applied, reason=None if proposal is None else proposal.get("reason"),
+            detail=None if error is None else f"supervisor raised {error}",
+        ))
+    return entries[-REVISION_LOG_LIMIT:]
 
 
 def _reevaluation_policies(store, run_id):
@@ -2443,8 +2505,8 @@ class _WorkflowSupervisor:
         for call in runtime.store.inspect_run(runtime.run_id)["calls"]:
             call_key = call["key"]
             if call_key["scope_id"] in reused:
-                runtime.trace.on_revision(
-                    node, proposal, applied=False,
+                runtime.executor._trace_revision(
+                    node, graph, proposal, applied=False,
                     detail="Revision adds a node whose id already has calls in the durable journal",
                 )
                 return None
@@ -2452,8 +2514,8 @@ class _WorkflowSupervisor:
             if (call_key["phase"] in {"execution", "verification", "tool"}
                     and call_key["scope_id"].startswith("node/") and target in generations
                     and call_key["generation"] == generations[target]):
-                runtime.trace.on_revision(
-                    node, proposal, applied=False,
+                runtime.executor._trace_revision(
+                    node, graph, proposal, applied=False,
                     detail="Revision targets work already admitted in the durable journal",
                 )
                 return None
@@ -2463,8 +2525,8 @@ class _WorkflowSupervisor:
             runtime.store.load_operation(runtime.run_id, context_key(target, generation)) is not None
             for target, generation in generations.items()
         ):
-            runtime.trace.on_revision(
-                node, proposal, applied=False,
+            runtime.executor._trace_revision(
+                node, graph, proposal, applied=False,
                 detail="Revision targets work already admitted in the durable journal",
             )
             return None
@@ -2482,6 +2544,7 @@ class _WorkflowSupervisor:
                 runtime.executor._inherit_execution_context(additions, candidate)
                 runtime._validate_graph(candidate)
             except (ValueError, TypeError, KeyError) as error:
-                runtime.trace.on_revision(node, proposal, applied=False, detail=str(error))
+                runtime.executor._trace_revision(node, graph, proposal, applied=False,
+                                                 detail=str(error))
                 return None
         return proposal

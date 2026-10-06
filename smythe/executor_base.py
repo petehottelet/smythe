@@ -46,7 +46,10 @@ from smythe.scheduling import (
 )
 from smythe.task import _prompt_json, render_task, snapshot_task
 from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
-from smythe.tracer import Tracer
+from smythe.tracer import (
+    REVISION_LOG_LIMIT, Tracer, read_revision_log, revision_context, revision_log_entry,
+    revision_record,
+)
 from smythe.verifier import (
     ADVISORY_VERDICT_KEY, TokenVerifier, Verifier, VerificationRecoveryError, node_generation,
     read_verdict, rejection_reason, verification_integer, validate_verification_receipt,
@@ -446,12 +449,27 @@ class ExecutorBase:
         # Restored from the checkpoint on resume: the revision cap is a
         # per-run guarantee, so a crash must not refill the allowance.
         self._revisions_used = revisions_used
+        self._revision_log: list[dict[str, Any]] = []
         self._verifier = verifier or TokenVerifier()
 
     @property
     def revisions_used(self) -> int:
         """How many supervisor revisions this executor has applied."""
         return self._revisions_used
+
+    @property
+    def revision_log(self) -> list[dict[str, Any]]:
+        """The run's latest supervisor decisions, applied or refused, oldest first.
+
+        Each entry is a :func:`~smythe.tracer.revision_log_entry`, and at most
+        ``REVISION_LOG_LIMIT`` are kept. Resume sets the log a checkpoint
+        saved, which later decisions extend.
+        """
+        return read_revision_log(self._revision_log)
+
+    @revision_log.setter
+    def revision_log(self, entries: list[dict[str, Any]]) -> None:
+        self._revision_log = read_revision_log(entries)
 
     @property
     def attempts_used(self) -> dict[str, dict[str, int]]:
@@ -469,6 +487,10 @@ class ExecutorBase:
         more while the supervisor's charge remains unresolved. Under a
         strict acceptance policy, a revision that breaks a delivery
         acceptance obligation is an invalid change too.
+
+        Each decision that the trace records, applied or refused, also
+        joins :attr:`revision_log` with its effect on the graph (see
+        :func:`~smythe.tracer.revision_context`).
         """
         if self._supervisor is None or node.status is not NodeStatus.COMPLETED:
             return False
@@ -488,7 +510,7 @@ class ExecutorBase:
                     exc, lambda error: self._record_response_error(node, error, phase="supervision"),
                 )
             _raise_workflow_error(exc)
-            self._tracer.on_revision(node, None, applied=False, detail=str(exc))
+            self._trace_revision(node, graph, None, applied=False, detail=str(exc))
             self.notify_supervision_update(node, False)
             return False
         except WorkflowError:
@@ -499,14 +521,14 @@ class ExecutorBase:
             raise
         except BudgetValidationError as exc:
             self.mark_accounting_invalid(node, exc)
-            self._tracer.on_revision(
-                node, None, applied=False, detail=f"supervisor accounting invalid: {exc}",
+            self._trace_revision(
+                node, graph, None, applied=False, detail=f"supervisor accounting invalid: {exc}",
             )
             self.notify_update(node)
             raise
         except Exception as exc:
-            self._tracer.on_revision(
-                node, None, applied=False, detail=f"supervisor raised: {exc}",
+            self._trace_revision(
+                node, graph, None, applied=False, detail=f"supervisor raised: {exc}",
             )
             self.notify_supervision_update(node, False)
             return False
@@ -516,19 +538,39 @@ class ExecutorBase:
             self.notify_supervision_update(node, False)
             return False
 
+        delivered = _deliverable_ids(graph.nodes)
         try:
             self._apply_revision(graph, revision)
         except RevisionError as exc:
-            self._tracer.on_revision(node, revision, applied=False, detail=str(exc))
+            self._trace_revision(node, graph, revision, applied=False, detail=str(exc))
             self.notify_supervision_update(node, False)
             return False
 
         self._revisions_used += 1
         self._inherit_execution_context(revision.add_nodes, graph)
         self.prepare_graph(graph)
-        self._tracer.on_revision(node, revision, applied=True)
+        self._trace_revision(node, graph, revision, applied=True, delivered=delivered)
         self.notify_supervision_update(node, True)
         return True
+
+    def _trace_revision(
+        self, node: Node, graph: ExecutionGraph, revision: Revision | None, *, applied: bool,
+        detail: str = "", delivered: set[str] | None = None,
+    ) -> None:
+        """Trace a supervisor decision on *graph*, as it stands after it, and log it.
+
+        *delivered* holds the graph's deliverable nodes before an applied
+        *revision*; a refused one left the graph unchanged.
+        """
+        context = revision_context(
+            graph, revisions_remaining_after=self._max_revisions - self._revisions_used,
+            delivered_before=delivered,
+            added=[added.id for added in revision.add_nodes] if applied and revision else (),
+        )
+        self._tracer.on_revision(node, revision, applied=applied, detail=detail, context=context)
+        entry = revision_log_entry(revision_record(node, revision, context), applied=applied,
+                                   reason=getattr(revision, "reason", None), detail=detail)
+        self._revision_log = [*self._revision_log, entry][-REVISION_LOG_LIMIT:]
 
     def _apply_revision(self, graph: ExecutionGraph, revision: Revision) -> None:
         """Apply *revision*; under a strict policy, refuse one that breaks an obligation.

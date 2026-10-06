@@ -829,6 +829,24 @@ def _emit_research(value: dict[str, Any]) -> None:
         print(f"Issue {issue['kind']}{subject}: {_terminal_text(issue['detail'])}")
 
 
+def _emit_revisions(log: list[dict[str, Any]]) -> None:
+    """A run's revision log: one line per decision, then its reason and refusal detail."""
+    if log:
+        print(f"Revisions: {len(log)} logged")
+    for entry in log:
+        state = {True: "applied", False: "refused"}.get(entry["applied"], "undetermined")
+        parts = [f"{verb} {_terminal_text(', '.join(entry[key]))}" for verb, key in (
+            ("added", "added"), ("dropped", "dropped"), ("rewired", "rewired"),
+            ("invalidated", "invalidated")) if entry[key]]
+        parts.append(f"{entry['revisions_remaining_after']} revisions left, "
+                     f"{entry['added_total']} added nodes in the graph")
+        print(f"Revision after {_terminal_text(entry['after_node'])}: {state} "
+              f"({_terminal_text(entry['change'])}); " + "; ".join(parts))
+        for label, key in (("Reason", "reason"), ("Detail", "detail")):
+            if entry[key]:
+                print(f"  {label}: {_terminal_text(entry[key])}")
+
+
 def _emit_run_inspection(value: dict[str, Any]) -> None:
     print(f"Run: {_terminal_text(value['run_id'])}")
     saved = value["format"]
@@ -865,6 +883,7 @@ def _emit_run_inspection(value: dict[str, Any]) -> None:
             reason = f": {_terminal_text(earlier['reasons'][0])}" if earlier["reasons"] else ""
             print(f"  Decision {entry['sequence']}: {earlier['decision']} under policy "
                   f"{earlier['policy_sha256'][:12]}{reason}")
+    _emit_revisions(value.get("revision_log") or [])
     withheld = delivery["rejected_output"]
     if withheld is not None:
         print(f"Withheld output: {withheld['bytes']} bytes in the saved {withheld['field']} field; "
