@@ -244,18 +244,40 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   on a connector, whose `profile` must be a `ConnectorProfile`, and `verify()`
   and `still_authorized()` on a verifier, whose `identity` must be a name
   without control characters. Other methods are not checked. Nothing
-  stores or dispatches actions yet. See [external actions](docs/actions.md).
+  dispatches actions yet. See [external actions](docs/actions.md).
 - Version 2 workflow journals have four tables for external actions:
   `workflow_actions`, `workflow_action_attempts`, `workflow_action_approvals`
-  and the append-only `workflow_action_records`, which nothing writes yet.
+  and the append-only `workflow_action_records`.
   Action money is a separate `external_actions` accounting scope that never
   enters a run's balances. `SQLiteWorkflowStore.audit()` also checks a run's
   actions: intent digests, action keys, states, verdicts and record kinds,
   approvals bound to their action's intent, and balances equal to the sums
   of each action's attempts and records. `inspect_run()` adds an `actions`
   block only for a run that has actions, without parameters, approval
-  assertions, receipts, record payloads or error text. See
+  assertions, revocation reasons, receipts, record payloads or error text. See
   [external action records](docs/workflow-accounting.md#external-action-records).
+- Prepared external actions and host-verified approvals in `smythe.actions`.
+  `prepare_action(store, run_id, *, slot, intent, profile)` records a
+  logical action only for a completed durable run whose current delivery
+  decision is `accepted`, including an operator's, and only for content with
+  the exact SHA-256 and size of the accepted output, or of the published
+  document, whose file must still hold it. Advisory and earlier runs have no
+  recorded decision and are refused with `ActionNotAuthorized`. The same
+  intent again returns the slot's action; another intent raises
+  `WorkflowConflictError` while it is unfinished, and becomes the next
+  sequence with its own key once it is observed, reconciled or canceled.
+  `approve()` records an approval only when the host's verifier accepts the
+  assertion for exactly the action's intent digest, the principal belongs to
+  the intent's tenant, the nanoUSD ceiling covers the action's attempts and
+  readback, and the expiry is later than the journal's clock; an assertion is
+  recorded once per journal, so it never approves a second action.
+  `reject()` cancels an undispatched action for good under a verified
+  principal, `revoke()` is a fail-safe control that needs no principal and
+  stores its reason redacted, and `check_authority()` verifies the newest
+  approval again and checks expiry, revocation, consumption, the intent
+  digest and that the run's content is still accepted, intact and not
+  unavailable after a source removal. None needs a run lease. See
+  [approvals](docs/actions.md#approvals).
 - Jobs operations have a semantic input digest.
   `smythe.jobs.operation_input_digest()` hashes the provider kind and its
   adapter version (`smythe.jobs.providers.ADAPTER_VERSIONS`), the model,

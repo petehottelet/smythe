@@ -2,10 +2,11 @@
 
 **Preview.** `smythe.actions` defines the contract types for actions that
 write accepted content to a service outside Smythe, such as publishing a post.
-Smythe does not yet record, approve or dispatch actions, and these types may
-change before it does. Version 2 workflow journals have
-[tables for actions](workflow-accounting.md#external-action-records), which
-nothing writes yet. `import smythe` does not load the module; import
+It [prepares actions](#prepared-actions) in a durable run's
+[journal](workflow-accounting.md#external-action-records), bound to the run's
+accepted content, and records [verified approvals](#approvals) of them. Smythe
+does not yet dispatch actions, and these types and functions may change
+before it does. `import smythe` does not load the module; import
 `smythe.actions` explicitly.
 
 An external action has three parts that this page describes:
@@ -183,3 +184,141 @@ synchronous host code that misbehaves.
 
 `ActionStateError` reports a transition that an action's recorded state does
 not allow.
+
+## Prepared actions
+
+An action delivers the accepted output of one completed
+[durable run](workflow-accounting.md). `prepare_action()` records it in the
+run's journal before anything is sent:
+
+```python
+from smythe.actions import ActionIntent, ActionTarget, ContentRef, prepare_action
+from smythe.workflow_artifact import current_artifact
+
+document = current_artifact(store, run_id).publication.path.read_bytes()
+action = prepare_action(
+    store, run_id, slot="publish",
+    intent=ActionIntent("publish", ActionTarget("acme", "posts"),
+                        parameters={"title": "Launch notes"},
+                        content=ContentRef.for_bytes(document, "text/markdown"),
+                        connector=profile.name, connector_version=profile.version),
+    profile=profile,
+)
+print(action.action_key, action.ceiling_nanousd)
+```
+
+The run must have completed under a
+[strict acceptance policy](verifier.md#strict-acceptance-in-durable-workflows)
+whose current decision is `accepted`, made by the policy, a re-evaluation or
+an [operator](verifier.md#operator-decisions). An advisory run, or one from an
+earlier release, has no recorded decision and cannot prepare actions; Smythe
+never assumes one. A `rejected`, `needs_review` or `indeterminate` decision is
+refused too. The intent's content must have exactly the SHA-256 and size of
+the accepted output: the
+[published document](workflow-accounting.md#published-documents) for a run
+with a renderer, whose file must still hold those bytes, and the output text
+as UTF-8 otherwise. The intent must name the profile's connector and one of
+its operations. A refusal raises `ActionNotAuthorized` and records nothing.
+
+`prepare_action()` returns a `PreparedAction`: its `action_id`, `run_id`,
+`slot`, `sequence`, `action_key`, `intent`, `profile`, `state` and
+`ceiling_nanousd`, the most its attempts and readback may cost:
+`max_attempts` writes and `readback_reads` reads at the profile's ceilings.
+`load_action(store, action_id)` reads it again.
+
+A slot names one place an action goes in a run. Its first action has
+sequence 1. Preparing the same intent and profile again returns the slot's
+latest action, whatever its state, so a rejected action stays closed. Another
+intent or profile raises `WorkflowConflictError` while that action is
+unfinished: a changed intent is a new action, never a retry. Once it is
+`observed`, `reconciled` or `canceled`, the next intent becomes the slot's
+next sequence, with its own action key.
+
+Preparing needs no run lease. Only your trusted host code calls these
+functions: a generated plan, source text or model output cannot create an
+action or an approval.
+
+## Approvals
+
+Smythe does not authenticate users; your host's
+[approval verifier](#connectors-and-approval-verifiers) does. An approval
+covers one logical action and at most one effect: exactly the action's intent
+digest, up to a nanoUSD ceiling and until an expiry.
+
+```python
+from smythe.actions import approve, check_authority
+
+assertion = identity_host.issue(action.intent.digest(), ...)   # your host's approval flow
+approval = approve(store, action.action_id, assertion, identity_host,
+                   ceiling_nanousd=action.ceiling_nanousd, expires_at_ns=expiry_ns)
+assert check_authority(store, action.action_id, identity_host) == approval
+```
+
+`approve(store, action_id, assertion, verifier, *, ceiling_nanousd,
+expires_at_ns)` returns an `ActionApproval`: the `approval_id`, `action_id`,
+verified `principal`, `ceiling_nanousd` and `expires_at_ns`. It refuses:
+
+- an assertion the verifier does not accept for exactly this action's intent
+  digest: forged, expired, revoked or issued for another intent. The
+  verifier raises `ApprovalRejected`, which propagates;
+- a principal whose tenant is not the intent target's, or whom
+  `still_authorized()` no longer authorizes, with `ApprovalRejected`;
+- a ceiling below the action's `ceiling_nanousd`, and an expiry that is not
+  later than the journal's clock, with `WorkflowValidationError`, before the
+  verifier is called;
+- an action that is `observed`, `reconciled`, `canceled` or
+  `compensation_required`, with `ActionStateError`; and
+- content the run can no longer deliver, with `ActionNotAuthorized`.
+
+An assertion is recorded once in a journal. The same approval again returns
+it; the assertion presented for any other action raises `ApprovalRejected`,
+even one whose intent is identical, as when two runs accepted the same
+document. Issue a new assertion for each approval. The newest approval of an
+action supersedes earlier ones, so a new approval can renew or replace one.
+
+This differs from the Jobs [approval token](jobs.md#validate-plan-and-approve),
+an acknowledgment of a plan and its spend ceiling that anyone with the
+manifest can compute. It names no principal and has no expiry or revocation.
+
+`reject(store, action_id, assertion, verifier)` cancels an action that was
+never dispatched. Its assertion is verified as an approval's is, and the
+rejection is recorded with the principal. The action is `canceled` for good,
+across restarts: preparing the same intent in its slot returns it, and it can
+no longer be approved. Rejecting it again changes nothing.
+
+`revoke(store, action_or_approval_id, reason)` revokes one approval, or every
+approval of an action, and returns the IDs it revoked. It is a fail-safe
+control: it needs no principal and no lease. The reason is stored with
+account identifiers redacted. A revoked approval never authorizes the action
+again, and its assertion cannot be recorded again; only a new approval
+reopens the action.
+
+`check_authority(store, action_id, verifier)` returns the approval that
+authorizes the action now, or raises `ActionNotAuthorized` naming why not. It
+checks that:
+
+- the action is not `observed`, `reconciled`, `canceled` or
+  `compensation_required`;
+- its newest approval is not revoked or consumed, has not expired on the
+  journal's clock, binds the action's intent digest, covers its ceiling and
+  was recorded by this verifier;
+- the verifier accepts the stored assertion again, for the same principal,
+  and still authorizes that principal; and
+- the content is still deliverable, as for `prepare_action()`: the run's
+  current decision is still `accepted`, the published file still holds the
+  bound bytes, and no source the accepted output came from has been
+  [removed](tasks.md#remove-a-source) since, which makes the
+  content unavailable.
+
+An approval row written into the journal by other means never authorizes
+anything: the verifier must vouch for its assertion. `check_authority()` only
+reads, so it works on a store opened read-only. The verifier is called
+outside any journal transaction, so a check describes one moment: a
+revocation made at the host, or with `revoke()`, after a check returns is
+seen by the next check, not that one. Approval and the work it authorizes
+can happen in different processes, so check again immediately before acting.
+
+The journal keeps each assertion so that it can be verified again; protect
+the journal accordingly. `inspect_run()` shows each approval's principal,
+verifier identity, ceiling, expiry, consumption and revocation time, and
+never assertions or revocation reasons.

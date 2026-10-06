@@ -13,15 +13,24 @@ A version 2 journal keeps each run's external actions in four tables:
 
 Action money is the ``external_actions`` accounting scope: whole nanoUSD kept
 on these rows, never in a run's balances, which stay equal to its call ledger.
-These functions run inside a ``SQLiteWorkflowStore`` transaction, and
-``import smythe`` does not load this module.
+:func:`audit_actions` runs inside a ``SQLiteWorkflowStore`` transaction; the
+other functions open their own, need no run lease and are called by
+``smythe.actions``. ``import smythe`` does not load this module.
 """
 
 from __future__ import annotations
 
+from uuid import uuid4
+
 from smythe._money import NANOUSD
-from smythe.actions import ACTION_STATES, ActionIntent, ConnectorProfile, Principal, action_key
-from smythe.workflow_store import WorkflowCorruptionError, _amount, _canonical, _loads, _sha
+from smythe.actions import (
+    _CLOSED, _FINISHED, ACTION_STATES, ActionIntent, ActionStateError, ApprovalRejected,
+    ConnectorProfile, PreparedAction, Principal, action_key,
+)
+from smythe.workflow_store import (
+    WorkflowConflictError, WorkflowCorruptionError, WorkflowNotFoundError, _amount, _canonical,
+    _loads, _sha,
+)
 
 ACCOUNTING_SCOPE = "external_actions"
 ATTEMPT_STATES = ("prepared", "dispatched", "acknowledged", "refused", "outcome_unknown", "released")
@@ -151,3 +160,107 @@ def _action(store, db, row, run_actions):
             "compensates_action_id": row["compensates_action_id"], "ceiling_nanousd": _amount(row["ceiling"]),
             **dict(zip(_BALANCES, balances)),
             "attempts": attempt_items, "approvals": approval_items, "records": record_items}
+
+
+def _row(db, action_id):
+    row = db.execute("SELECT * FROM workflow_actions WHERE action_id=?", (action_id,)).fetchone()
+    if row is None:
+        raise WorkflowNotFoundError(action_id)
+    return row
+
+
+def _prepared(row):
+    return PreparedAction(row["action_id"], row["run_id"], row["slot"], row["sequence"], row["action_key"],
+                          _stored(row["intent_json"], ActionIntent.from_dict),
+                          _stored(row["profile_json"], ConnectorProfile.from_dict), row["state"],
+                          _amount(row["ceiling"]))
+
+
+def load(store, action_id):
+    """An action, after its run's actions pass the audit, and its approval rows, newest first."""
+    if store.store_version < 2:
+        raise WorkflowNotFoundError(action_id)  # Version 1 journals have no action tables.
+    with store._transaction(write=False) as db:
+        row = _row(db, action_id)
+        audit_actions(store, db, row["run_id"])
+        return _prepared(row), db.execute("SELECT * FROM workflow_action_approvals WHERE action_id=? "
+                                          "ORDER BY rowid DESC", (action_id,)).fetchall()
+
+
+def prepare(store, run_id, slot, intent, profile):
+    """Record *intent* as the next action in a run's *slot*, or return the slot's identical one.
+
+    Raises ``WorkflowConflictError`` while the slot's latest action is
+    unfinished and has another intent or profile.
+    """
+    intent_json, profile_json = _canonical(intent.to_dict()), _canonical(profile.to_dict())
+    ceiling = (profile.max_attempts * profile.write_ceiling_nanousd
+               + profile.readback_reads * profile.read_ceiling_nanousd)
+    with store._transaction() as db:
+        store._run(db, run_id)
+        latest = db.execute("SELECT * FROM workflow_actions WHERE run_id=? AND slot=? ORDER BY sequence DESC "
+                            "LIMIT 1", (run_id, slot)).fetchone()
+        if latest is not None and (latest["intent_json"], latest["profile_json"]) == (intent_json, profile_json):
+            return _prepared(latest)
+        if latest is not None and latest["state"] not in _FINISHED:
+            raise WorkflowConflictError(f"Slot {slot!r} holds an unfinished action with another intent or "
+                                        "profile; a changed intent is a new action, never a retry")
+        sequence, action_id, now = 1 if latest is None else latest["sequence"] + 1, uuid4().hex, store._clock_ns()
+        db.execute("""INSERT INTO workflow_actions(action_id,run_id,slot,sequence,action_key,intent_json,intent_sha,
+          profile_json,state,ceiling,confirmed,reserved,unknown,created,updated)
+          VALUES (?,?,?,?,?,?,?,?,'not_dispatched',?,'0','0','0',?,?)""",
+                   (action_id, run_id, slot, sequence, action_key(store.store_id, run_id, slot, sequence),
+                    intent_json, intent.digest(), profile_json, str(ceiling), now, now))
+        return _prepared(_row(db, action_id))
+
+
+def record_verdict(store, action, verdict, principal, identity, assertion, ceiling, expires_at_ns):
+    """Record a verified approval or rejection of *action*; return its row. A rejection cancels it.
+
+    An assertion is recorded once in a journal: the same verdict on the same
+    action again returns its row, and anything else raises ``ApprovalRejected``.
+    """
+    assertion_sha, ceiling = _sha(assertion), None if ceiling is None else str(ceiling)
+    with store._transaction() as db:
+        row = _row(db, action.action_id)
+        if row["intent_sha"] != action.intent.digest():
+            raise WorkflowConflictError("The action's recorded intent changed")
+        if row["state"] in _CLOSED or verdict == "rejected" and row["state"] != "not_dispatched":
+            raise ActionStateError(f"Action {action.action_id!r} is {row['state']}; it cannot be {verdict}")
+        existing = db.execute("SELECT * FROM workflow_action_approvals WHERE assertion_sha=?",
+                              (assertion_sha,)).fetchone()
+        if existing is not None:
+            if ((existing["action_id"], existing["verdict"], existing["ceiling"], existing["expires_at_ns"],
+                 existing["revoked_at_ns"]) != (action.action_id, verdict, ceiling, expires_at_ns, None)):
+                raise ApprovalRejected("This assertion is already recorded in the journal; each approval "
+                                       "needs its own assertion")
+            return existing
+        approval_id, now = uuid4().hex, store._clock_ns()
+        db.execute("""INSERT INTO workflow_action_approvals(approval_id,action_id,intent_sha,verdict,principal_json,
+          verifier_json,assertion,assertion_sha,ceiling,expires_at_ns,created) VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                   (approval_id, action.action_id, row["intent_sha"], verdict, _canonical(principal.to_dict()),
+                    _canonical({"identity": identity}), assertion, assertion_sha, ceiling, expires_at_ns, now))
+        if verdict == "rejected":
+            db.execute("UPDATE workflow_actions SET state='canceled',updated=? WHERE action_id=?",
+                       (now, action.action_id))
+        return db.execute("SELECT * FROM workflow_action_approvals WHERE approval_id=?", (approval_id,)).fetchone()
+
+
+def revoke_approvals(store, target_id, reason):
+    """Revoke the approval *target_id*, or every approval of the action *target_id*.
+
+    Returns the IDs of the approvals this call revoked; an earlier
+    revocation is kept as it was.
+    """
+    with store._transaction() as db:
+        if db.execute("SELECT 1 FROM workflow_action_approvals WHERE approval_id=?", (target_id,)).fetchone():
+            column = "approval_id"
+        else:
+            column = "action_id"
+            _row(db, target_id)
+        where = f"WHERE {column}=? AND verdict='approved' AND revoked_at_ns IS NULL"
+        revoked = tuple(item[0] for item in db.execute(
+            f"SELECT approval_id FROM workflow_action_approvals {where} ORDER BY rowid", (target_id,)))
+        db.execute(f"UPDATE workflow_action_approvals SET revoked_at_ns=?,revoked_reason=? {where}",
+                   (store._clock_ns(), reason, target_id))
+        return revoked

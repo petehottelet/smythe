@@ -779,8 +779,10 @@ profile, state and balances; `workflow_action_attempts` its numbered attempts;
 `workflow_action_approvals` the approvals and rejections bound to its intent
 digest; and `workflow_action_records` its readbacks, lookups, notices, late
 receipts, findings, decisions and evidence. Records are append-only: SQLite
-refuses to update or delete them. Nothing in this release writes these tables
-yet.
+refuses to update or delete them. In this release, `smythe.actions` writes
+[prepared actions](actions.md#prepared-actions) and their
+[approvals, rejections and revocations](actions.md#approvals); nothing writes
+attempts or records yet.
 
 Action money is its own accounting scope, `external_actions`, in whole
 nanoUSD. It never enters a run's balances or `workflow_accounting`, which stay
@@ -798,8 +800,8 @@ other keys: the scope's totals and, for each action, its identity, intent
 digest, operation and target, state and balances, with its attempts,
 approvals (principal, verifier, ceiling, expiry, consumption and revocation
 time) and records by digest. It never includes parameters, approval
-assertions, receipts, record payloads or error text. A run without actions
-inspects exactly as before.
+assertions, revocation reasons, receipts, record payloads or error text. A
+run without actions inspects exactly as before.
 
 ## Journal upgrades
 

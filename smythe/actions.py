@@ -1,12 +1,16 @@
-"""Preview contract types for external actions that write accepted content to a service.
+"""Preview external actions that write a durable run's accepted content to a service.
 
 An :class:`ActionIntent` says what one logical action writes and where, and
 :func:`action_key` names the key every attempt sends. A
 :class:`ConnectorProfile` declares what a connector's service guarantees.
 Connectors and approval verifiers are trusted host code with synchronous
 protocols, checked only structurally: a caller contract, not a sandbox.
-Nothing stores or dispatches actions yet, and ``import smythe`` does not load
-this module.
+
+:func:`prepare_action` records a logical action in the workflow journal, bound
+to a completed run's accepted content; :func:`approve`, :func:`reject` and
+:func:`revoke` record verified approvals and controls; :func:`check_authority`
+checks them again. Only trusted host code calls these functions. Nothing
+dispatches actions yet, and ``import smythe`` does not load this module.
 """
 
 from __future__ import annotations
@@ -19,11 +23,12 @@ from dataclasses import KW_ONLY, MISSING, dataclass, field, fields
 from typing import Any, Protocol, Self
 
 from smythe._canonical import canonical_bytes, sha256_hex
+from smythe._redact import redact_account_identifiers
 from smythe.acceptance import _calls_async, _is_async
 from smythe.provider import Provider
 from smythe.validation import _require_keys, _require_sha256
 from smythe.workflow_binding import WorkflowBindingError, json_snapshot
-from smythe.workflow_store import WorkflowStateError, _text
+from smythe.workflow_store import WorkflowStateError, WorkflowValidationError, _text
 
 ACTION_CONTRACT_VERSION = "smythe.action.v1"
 _CONTRACT_VERSIONS = (ACTION_CONTRACT_VERSION,)
@@ -34,6 +39,12 @@ ACTION_STATES = (
     "not_dispatched", "dispatched", "outcome_unknown", "observed", "reconciled",
     "compensation_required", "canceled",
 )
+# A finished action makes no further effect, so its slot can take a new action.
+_FINISHED = ("observed", "reconciled", "canceled")
+# No approval authorizes an action in these states.
+_CLOSED = (*_FINISHED, "compensation_required")
+# A run blocked for this reason authorizes no action.
+_SECURITY_STOP = "security_stop"
 _COMPENSATION = ("new_action", "unsupported")
 
 
@@ -51,6 +62,10 @@ class ApprovalRejected(Exception):
 
 class ActionStateError(WorkflowStateError):
     """The requested transition is not allowed from the action's recorded state."""
+
+
+class ActionNotAuthorized(ActionStateError):
+    """Nothing authorizes the action now: its approval or its content no longer holds."""
 
 
 def _bool(value: Any, what: str) -> None:
@@ -489,9 +504,269 @@ def check_verifier(verifier: object) -> str:
         raise TypeError(str(exc)) from exc
 
 
+@dataclass(frozen=True)
+class PreparedAction:
+    """A logical action a run's journal records, with the intent and profile it is bound to.
+
+    ``sequence`` counts the actions of ``slot`` in the run from 1.
+    ``ceiling_nanousd`` is the most its attempts and readback may cost:
+    ``max_attempts`` writes and ``readback_reads`` reads at the profile's
+    ceilings. An approval must cover it.
+    """
+
+    action_id: str
+    run_id: str
+    slot: str
+    sequence: int
+    action_key: str
+    intent: ActionIntent
+    profile: ConnectorProfile
+    state: str
+    ceiling_nanousd: int
+
+
+@dataclass(frozen=True)
+class ActionApproval:
+    """A recorded approval: the principal who approved an action, its ceiling and expiry."""
+
+    approval_id: str
+    action_id: str
+    principal: Principal
+    ceiling_nanousd: int
+    expires_at_ns: int
+
+
+def _undeliverable(store: Any, run_id: str, content: ContentRef) -> str | None:
+    """Why *content* is not a completed run's accepted, deliverable output now, or None.
+
+    The run's current delivery decision must be ``accepted``; a run without
+    one, such as an advisory or earlier run, never is, and none is assumed. A
+    source the run delivered from that was removed after the decision makes
+    the content unavailable. The decision must still hold for *content*'s
+    exact SHA-256 and size, and a published document's file must still hold
+    those bytes. Only reads are made.
+    """
+    from smythe.workflow import _removal_problems, current_decision
+    from smythe.workflow_artifact import _current_decision, current_artifact
+
+    run = store.load_run(run_id)
+    if run["blocked_reason"] == _SECURITY_STOP:
+        return "a security stop holds the run"
+    if run["status"] != "completed":
+        return "the run has not completed"
+    latest = current_decision(store, run_id)
+    if latest is None:
+        return "the run has no recorded delivery acceptance"
+    if not latest["record"].accepted:
+        return f"the run's delivery acceptance is {latest['record'].decision.value}"
+    considered = latest["inputs"].get("tombstones", [])
+    if _removal_problems(store, run_id, considered if type(considered) is list else []):
+        return "content unavailable: a source of the accepted output was removed from the run"
+    current = current_artifact(store, run_id)
+    held = _current_decision(store, run_id) if current is None else current.decision
+    if held is None or not held.accepted:
+        return "the run's accepted decision no longer holds"
+    size = (len(store.get_checkpoint(run_id)["checkpoint"]["output"].encode("utf-8"))
+            if current is None else current.publication.size_bytes)
+    if (content.sha256, content.size_bytes) != (held.output_sha256, size):
+        return "the content is not the run's accepted output"
+    if current is not None and not current.eligible:
+        return f"the published document is not eligible for delivery ({', '.join(current.reasons)})"
+    return None
+
+
+def _assertion(assertion: Any) -> str:
+    if type(assertion) is not str or not assertion:
+        raise WorkflowValidationError("assertion must be a non-empty string")
+    return assertion
+
+
+def _verified(verifier: Any, assertion: str, intent: ActionIntent, now_ns: int) -> Principal:
+    """The principal *verifier* says issued *assertion* for *intent*, who may still approve it."""
+    principal = verifier.verify(assertion, intent.digest(), now_ns)
+    if not isinstance(principal, Principal):
+        raise ApprovalRejected("The approval verifier did not return a Principal")
+    if principal.tenant != intent.target.tenant:
+        raise ApprovalRejected(f"A principal of tenant {principal.tenant!r} cannot approve an "
+                               f"action in tenant {intent.target.tenant!r}")
+    if verifier.still_authorized(principal, intent, now_ns) is not True:
+        raise ApprovalRejected("The approval verifier no longer authorizes this principal")
+    return principal
+
+
+def prepare_action(store: Any, run_id: str, *, slot: str, intent: ActionIntent,
+                   profile: ConnectorProfile) -> PreparedAction:
+    """Record the logical action that delivers a completed run's accepted content.
+
+    The intent must name *profile*'s connector and one of its operations, and
+    its content must be the run's accepted output: the published document
+    for a run with a renderer, whose file must still hold it. The run's
+    current delivery decision must be ``accepted``. No lease is needed.
+
+    The slot's first action has sequence 1. The same intent and profile again
+    return the slot's latest action, whatever its state. Another intent or
+    profile raises ``WorkflowConflictError`` while that action is unfinished,
+    and starts the next sequence, with its own key, once it is observed,
+    reconciled or canceled. Raises ``ActionNotAuthorized`` when the content
+    is not deliverable.
+    """
+    from smythe.workflow_actions import prepare
+
+    if not isinstance(intent, ActionIntent) or not isinstance(profile, ConnectorProfile):
+        raise TypeError("prepare_action takes an ActionIntent and a ConnectorProfile")
+    if ((intent.connector, intent.connector_version) != (profile.name, profile.version)
+            or intent.operation not in profile.operations):
+        raise WorkflowValidationError("The intent must name the profile's connector and one of "
+                                      "its operations")
+    if intent.content is None:
+        raise WorkflowValidationError("An action delivers a run's accepted content; the intent "
+                                      "names no content")
+    _text(slot, "slot")
+    problem = _undeliverable(store, run_id, intent.content)
+    if problem:
+        raise ActionNotAuthorized(f"Run {run_id!r} cannot prepare this action: {problem}")
+    return prepare(store, run_id, slot, intent, profile)
+
+
+def load_action(store: Any, action_id: str) -> PreparedAction:
+    """The action *action_id* as the journal records it; only reads are made."""
+    from smythe.workflow_actions import load
+
+    return load(store, action_id)[0]
+
+
+def approve(store: Any, action_id: str, assertion: str, verifier: Any, *, ceiling_nanousd: int,
+            expires_at_ns: int) -> ActionApproval:
+    """Record the verified approval of one action, up to a ceiling and until an expiry.
+
+    *verifier* must verify *assertion* for exactly the action's intent
+    digest, return a principal of the intent's tenant, and still authorize
+    that principal. *ceiling_nanousd* must cover the action's
+    ``ceiling_nanousd`` and *expires_at_ns* must be later than the journal's
+    clock. The run's content must still be deliverable. An assertion is
+    recorded once in a journal: the same approval again returns it, and an
+    assertion recorded for anything else raises ``ApprovalRejected``. The
+    newest approval supersedes earlier ones. The verifier is called outside
+    any journal transaction, and no lease is needed.
+    """
+    from smythe.workflow_actions import load, record_verdict
+
+    identity = check_verifier(verifier)
+    _assertion(assertion)
+    for value, name in ((ceiling_nanousd, "ceiling_nanousd"), (expires_at_ns, "expires_at_ns")):
+        if type(value) is not int or value < 0:
+            raise WorkflowValidationError(f"{name} must be a non-negative integer")
+    action = load(store, action_id)[0]
+    if action.state in _CLOSED:
+        raise ActionStateError(f"Action {action_id!r} is {action.state} and cannot be approved")
+    if ceiling_nanousd < action.ceiling_nanousd:
+        raise WorkflowValidationError(
+            f"ceiling_nanousd must cover the action's ceiling of {action.ceiling_nanousd} nanoUSD")
+    now = store._clock_ns()
+    if expires_at_ns <= now:
+        raise WorkflowValidationError("expires_at_ns must be later than the journal's clock")
+    principal = _verified(verifier, assertion, action.intent, now)
+    problem = _undeliverable(store, action.run_id, action.intent.content)
+    if problem:
+        raise ActionNotAuthorized(f"Action {action_id!r} cannot be approved: {problem}")
+    row = record_verdict(store, action, "approved", principal, identity, assertion,
+                         ceiling_nanousd, expires_at_ns)
+    return ActionApproval(row["approval_id"], action_id, principal, ceiling_nanousd, expires_at_ns)
+
+
+def reject(store: Any, action_id: str, assertion: str, verifier: Any) -> PreparedAction:
+    """Cancel an action that was never dispatched, by a verified principal of its tenant.
+
+    The assertion is verified as for :func:`approve`. The rejection is
+    recorded with the principal and the action is ``canceled`` for good:
+    preparing the same intent in its slot returns it. Rejecting a canceled
+    action again changes nothing. Raises ``ActionStateError`` once the action
+    has been dispatched.
+    """
+    from smythe.workflow_actions import load, record_verdict
+
+    identity = check_verifier(verifier)
+    _assertion(assertion)
+    action = load(store, action_id)[0]
+    if action.state == "canceled":
+        return action
+    if action.state != "not_dispatched":
+        raise ActionStateError(f"Action {action_id!r} is {action.state} and cannot be rejected")
+    principal = _verified(verifier, assertion, action.intent, store._clock_ns())
+    record_verdict(store, action, "rejected", principal, identity, assertion, None, None)
+    return load(store, action_id)[0]
+
+
+def revoke(store: Any, action_or_approval_id: str, reason: str) -> tuple[str, ...]:
+    """Revoke one approval, or every approval of one action; return the newly revoked IDs.
+
+    A fail-safe control: it needs no principal and no lease. *reason* is
+    stored with account identifiers redacted. A revoked approval never
+    authorizes the action again; only a new approval can. Revoking twice
+    keeps the first revocation.
+    """
+    from smythe.workflow_actions import revoke_approvals
+
+    reason = _text(redact_account_identifiers(reason) if isinstance(reason, str) else reason,
+                   "reason")
+    return revoke_approvals(store, _text(action_or_approval_id, "action or approval id"), reason)
+
+
+def check_authority(store: Any, action_id: str, verifier: Any) -> ActionApproval:
+    """The approval that authorizes an action now; raises ``ActionNotAuthorized`` otherwise.
+
+    The action must not be finished or need compensation. Its newest
+    approval must be unrevoked, unconsumed and unexpired on the journal's
+    clock, bind the action's intent digest, cover its ceiling and have been
+    recorded by this verifier. *verifier* must verify the stored assertion
+    again for the same principal and still authorize it, and the run's
+    content must still be deliverable (see :func:`prepare_action`). Only
+    reads are made; the verifier is called outside any journal transaction.
+    """
+    from smythe.workflow_actions import load
+
+    identity = check_verifier(verifier)
+    action, approvals = load(store, action_id)
+
+    def refused(reason: str) -> ActionNotAuthorized:
+        return ActionNotAuthorized(f"Action {action_id!r} is not authorized: {reason}")
+
+    if action.state in _CLOSED:
+        raise refused(f"it is {action.state}")
+    approval = next((row for row in approvals if row["verdict"] == "approved"), None)
+    now = store._clock_ns()
+    if approval is None:
+        raise refused("it has no approval")
+    if approval["revoked_at_ns"] is not None:
+        raise refused("its approval was revoked")
+    if approval["consumed_by_attempt"] is not None:
+        raise refused("its approval was consumed")
+    if type(approval["expires_at_ns"]) is not int or approval["expires_at_ns"] <= now:
+        raise refused("its approval expired")
+    if approval["intent_sha"] != action.intent.digest():
+        raise refused("its approval binds another intent")
+    if approval["ceiling"] is None or int(approval["ceiling"]) < action.ceiling_nanousd:
+        raise refused("its approval does not cover the action's ceiling")
+    if json.loads(approval["verifier_json"]) != {"identity": identity}:
+        raise refused("another approval verifier recorded its approval")
+    try:
+        principal = _verified(verifier, approval["assertion"], action.intent, now)
+    except ApprovalRejected as error:
+        raise refused(f"the approval verifier refuses it: {error}") from error
+    if principal.to_dict() != json.loads(approval["principal_json"]):
+        raise refused("the approval verifier names another principal")
+    problem = _undeliverable(store, action.run_id, action.intent.content)
+    if problem:
+        raise refused(problem)
+    return ActionApproval(approval["approval_id"], action_id, principal, int(approval["ceiling"]),
+                          approval["expires_at_ns"])
+
+
 __all__ = [
-    "ACTION_CONTRACT_VERSION", "ACTION_STATES", "ActionIntent", "ActionStateError",
-    "ActionTarget", "ApprovalRejected", "ApprovalVerifier", "ConnectorAmbiguous",
-    "ConnectorProfile", "ConnectorReceipt", "ConnectorRefused", "ContentRef", "ObservedObject",
-    "Principal", "WriteConnector", "action_key", "check_connector", "check_verifier",
+    "ACTION_CONTRACT_VERSION", "ACTION_STATES", "ActionApproval",
+    "ActionIntent", "ActionNotAuthorized", "ActionStateError", "ActionTarget", "ApprovalRejected",
+    "ApprovalVerifier", "ConnectorAmbiguous", "ConnectorProfile", "ConnectorReceipt",
+    "ConnectorRefused", "ContentRef", "ObservedObject", "PreparedAction", "Principal",
+    "WriteConnector", "action_key", "approve", "check_authority", "check_connector",
+    "check_verifier", "load_action", "prepare_action", "reject", "revoke",
 ]
