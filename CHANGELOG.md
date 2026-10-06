@@ -728,12 +728,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 - `Swarm(termination=TerminationPolicy(drain_timeout_s=...))`, or
   `termination=` on `AsyncExecutor`, drains the nodes in flight when a
   failure stops a run or the budget refuses a ready node at admission: no
-  queued node starts and no retry is sent, the calls already in flight run
-  on for up to `drain_timeout_s`, and each node that finishes keeps and
-  checkpoints its result and cost, without supervision or regeneration. A
-  node whose attempt fails during the drain, or that is waiting to retry,
-  returns to pending with its unused reservation released, so a resume runs
-  it again. Those still in flight are then cancelled as before and the
+  queued node starts and no retry is sent, each node in flight runs its
+  current attempt on, tool turns included, for up to `drain_timeout_s`, and
+  each node that finishes keeps and checkpoints its result and cost, without
+  supervision or regeneration. A node whose attempt fails during the drain,
+  or that is waiting to retry, returns to pending with its unused
+  reservation released, so a resume runs it again. Those still in flight
+  are then cancelled as before and the
   original error is raised. A cancelled call keeps its exposure as without
   a policy: a native provider's unresolved bill stays terminal, and another
   provider's call keeps its reservation as unknown cost only under

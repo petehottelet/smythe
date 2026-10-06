@@ -586,17 +586,19 @@ reservation as unknown cost (see [calls without an answer](#calls-without-an-ans
 ### Draining in-flight work
 
 `Swarm(termination=TerminationPolicy(drain_timeout_s=30))`, or `termination=`
-on `AsyncExecutor`, lets the calls in flight finish before the run stops.
-After a failure that stops the run, such as a `HALT` node's error, a `RETRY`
-node out of attempts or a terminal failure, and after a ready node's budget
-reservation is refused at admission, the async executor:
+on `AsyncExecutor`, lets the nodes in flight finish their current attempts
+before the run stops. After a failure that stops the run, such as a `HALT`
+node's error, a `RETRY` node out of attempts or a terminal failure, and after
+a ready node's budget reservation is refused at admission, the async executor:
 
 1. Starts no queued node, including one admitted in the same pass as a
    refused node, whose work had not begun.
-2. Lets each call in flight finish, for up to `drain_timeout_s` seconds, and
-   sends no new one. A node that finishes keeps its result and cost and is
-   checkpointed as any finished node is. Supervision and regeneration do not
-   run after it, and a failure of its own does not replace the run's error.
+2. Lets each node in flight finish its current attempt, including any further
+   tool turns that attempt takes, for up to `drain_timeout_s` seconds. Each
+   such turn is a new provider call, reserved and charged under the budget as
+   usual. A node that finishes keeps its result and cost and is checkpointed
+   as any finished node is. Supervision and regeneration do not run after
+   it, and a failure of its own does not replace the run's error.
    No retry starts: a `RETRY` node whose attempt fails during the drain, or
    that is waiting out a retry backoff when the drain begins, returns to
    pending with its unused reservation released, as a cancelled node does,

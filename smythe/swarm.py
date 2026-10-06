@@ -407,9 +407,10 @@ class Swarm:
 
     ``termination``, a :class:`~smythe.scheduling.TerminationPolicy`, has the
     async executor drain the nodes in flight when a failure stops the run:
-    no queued node starts and no retry is sent, the calls in flight may finish
-    and save their results until ``drain_timeout_s``, and the rest are
-    cancelled before the original error is raised. The failed checkpoint
+    no queued node starts and no retry is sent, the nodes in flight may finish
+    their current attempts, tool turns included, and save their results
+    until ``drain_timeout_s``, and the rest are cancelled before the
+    original error is raised. The failed checkpoint
     records how the drain ended under ``control["drain"]``, for information
     only. Serial ``execute()`` has nothing in flight to drain, and durable
     runs refuse a policy.

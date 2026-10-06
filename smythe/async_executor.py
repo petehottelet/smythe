@@ -84,9 +84,10 @@ class AsyncExecutor(ExecutorBase):
     Termination: a failure that stops the run, or a node refused at
     admission, cancels the nodes in flight at once. Under ``termination``, a
     :class:`~smythe.scheduling.TerminationPolicy`, the executor first stops
-    admission and lets their calls in flight finish for up to
-    ``drain_timeout_s``, starting no retry, then cancels the rest and raises
-    the original error; :attr:`drain_record` reports how the drain ended.
+    admission and lets their current attempts finish, tool turns included,
+    for up to ``drain_timeout_s``, starting no retry, then cancels the rest
+    and raises the original error; :attr:`drain_record` reports how the
+    drain ended.
     ``sleep``, when given, also times the drain's deadline.
     """
 
@@ -536,8 +537,8 @@ class AsyncExecutor(ExecutorBase):
         # A resumed run continues the allowance its checkpoint recorded.
         for attempt in range(self._attempts_spent(node), attempts):
             if last_exc is not None and self._draining:
-                # A drain lets calls in flight finish but sends no new one: the
-                # node returns to pending, so a resume runs it again.
+                # A drain lets an attempt in flight finish but starts no retry:
+                # the node returns to pending, so a resume runs it again.
                 self._requeue_cancelled(node)
                 return
             self._call_attempts[node.id] = attempt

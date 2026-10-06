@@ -2,10 +2,10 @@
 
 Without one, the async executor cancels every in-flight sibling as soon as it
 sees a failure. With ``TerminationPolicy(drain_timeout_s=...)`` it admits no
-further node and sends no retry, lets the calls already in flight finish until
-the drain deadline, keeping and saving their results, then cancels the rest and
-raises the original error. A cancellation, an interrupt and a security stop
-never drain.
+further node and sends no retry, lets the attempts already in flight finish,
+tool turns included, until the drain deadline, keeping and saving their
+results, then cancels the rest and raises the original error. A cancellation,
+an interrupt and a security stop never drain.
 
 The executor's ``sleep`` times the drain deadline here: a sleep that advances a
 ``ManualClock`` reaches the deadline at once, and one that releases a gated
@@ -17,6 +17,7 @@ every total is exact.
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 from dataclasses import FrozenInstanceError
 import json
 import math
@@ -37,6 +38,7 @@ from smythe.provider import (
 from smythe.registry import Registry
 from smythe.supervisor import Supervisor
 from smythe.swarm import Swarm
+from smythe.tools import ToolCall, ToolResult, ToolRuntime, ToolSession, ToolSpec
 from smythe.tracer import WAIT_REASONS, Tracer
 from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_store import SQLiteWorkflowStore
@@ -280,6 +282,76 @@ async def test_completions_during_a_drain_are_not_reviewed():
 
     assert sibling.status is NodeStatus.COMPLETED
     assert supervisor.reviewed == []
+
+
+class ToolTurns(Script):
+    """``Script`` behind a tool loop: ``tooling``'s first turn asks for a tool, its next answers.
+
+    ``turns`` lists each call's label, its turn, and whether *draining* was
+    set when it was sent.
+    """
+
+    def __init__(self, draining: asyncio.Event, **steps) -> None:
+        super().__init__(**steps)
+        self.draining = draining
+        self.turns: list[tuple[str, int, bool]] = []
+
+    def feature_support(self, model):
+        return ProviderFeatures(sdk_retries=0, tools=True)
+
+    async def chat(self, system, messages, model, tools=None):
+        label = messages[0].content.splitlines()[0]
+        turn = sum(message.role == "assistant" for message in messages)
+        self.turns.append((label, turn, self.draining.is_set()))
+        if turn:
+            return CompletionResult(f"{label} done", cost_usd=CALL)
+        result = await self.complete(system, messages[0].content, model)
+        if label == "tooling":
+            result.text, result.stop_reason = "", "tool_use"
+            result.tool_calls = [ToolCall(id="lookup-1", name="lookup", arguments={})]
+        return result
+
+
+class Lookup(ToolRuntime):
+    """Opens a session whose one tool answers at once."""
+
+    def open(self, agent):
+        @asynccontextmanager
+        async def session():
+            yield LookupSession()
+
+        return session()
+
+
+class LookupSession(ToolSession):
+    @property
+    def tools(self):
+        return [ToolSpec(name="lookup", description="Look it up", input_schema={"type": "object"})]
+
+    async def call(self, tool_call):
+        return ToolResult(tool_call_id=tool_call.id, content="found")
+
+
+@pytest.mark.asyncio
+async def test_a_node_in_a_tool_loop_finishes_its_attempt_with_further_turns_during_a_drain():
+    gate = Gate()
+    sleep = DrainSleep(gate)
+    provider = ToolTurns(sleep.draining, fail=halting(gate), tooling=gate.wait)
+    tooling, queued = node("tooling"), node("queued")
+    budget = Sentinel(10)
+    executor = make(provider, sleep=sleep, budget=budget, tool_runtime=Lookup())
+
+    with pytest.raises(RuntimeError, match="stop now"):
+        await executor.run(fork(node("fail"), tooling, queued))
+
+    # The drain stops admission and retries, not the turns of an attempt in flight:
+    # the tool's result went back to the provider after the drain began.
+    assert provider.turns == [("fail", 0, False), ("tooling", 0, False), ("tooling", 1, True)]
+    assert tooling.status is NodeStatus.COMPLETED and tooling.result == "tooling done"
+    assert budget.breakdown() == {"tooling": 2 * CALL} and budget._reservations == {}
+    assert queued.status is NodeStatus.PENDING
+    assert executor.drain_record == {"settled": ["tooling"], "cancelled": [],
+                                     "deadline_hit": False}
 
 
 class Upper:
