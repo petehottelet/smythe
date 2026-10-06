@@ -1,4 +1,4 @@
-"""Revocation takes precedence over dispatch, and never undoes an effect.
+"""Revocation takes precedence over dispatch, and compensation is a new authorized action.
 
 ``stop_actions`` is a fail-safe control that revokes every approval a run's
 actions hold. A submission already claimed is not recalled: its outcome is
@@ -6,7 +6,9 @@ recorded when it arrives. Every later claim is refused, and nothing a later
 worker does clears the stop; only a new approval reopens an action.
 ``ActionRunner.dispatch_pending`` checks each action's authority again
 before each claim. Revoking never undoes an effect, and inspection shows when
-a revocation came.
+a revocation came. ``prepare_compensation`` records a separate action on the
+object an effect wrote, which needs its own approval and has its own attempts
+and receipt, and a connector without compensation leaves the action as it is.
 """
 
 from __future__ import annotations
@@ -19,22 +21,31 @@ import time
 import pytest
 
 from fakes import Gate, ManualClock
-from fixture_service import Fault, FixtureService
+from fixture_service import Fault, FixtureService, Target
 from smythe import SQLiteWorkflowStore, TerminationPolicy, workflow_actions
 from smythe.actions import (
+    ActionIntent,
     ActionNotAuthorized,
     ActionRunner,
+    ActionStateError,
+    ActionTarget,
+    ApprovalRejected,
+    action_key,
     approve,
     check_authority,
     load_action,
     prepare_action,
+    prepare_compensation,
     revoke,
     stop_actions,
 )
+from smythe.workflow_store import WorkflowConflictError, WorkflowValidationError
 from test_action_approvals import HOUR_NS, ORGANIZATION, Host, completed, delivered, intent, sign, swarm
 from test_action_journal import WRITE, balances, item, rows
-from test_action_runner import Recording, ready, runner
+from test_action_runner import READ, Recording, ready, runner
 from test_workflow_acceptance import replies  # noqa: F401
+
+RETRACT = {"retracted": True}
 
 
 @pytest.fixture
@@ -61,6 +72,14 @@ def service(clock) -> FixtureService:
 @pytest.fixture
 def connector(service) -> Recording:
     return Recording(service)
+
+
+@pytest.fixture
+def undoable(service) -> Recording:
+    """A connector whose profile declares that a separately approved action can undo an effect."""
+    value = Recording(service, compensation="new_action")
+    assert value.profile.compensation == "new_action"
+    return value
 
 
 def approve_now(store, host, clock, action):
@@ -329,6 +348,142 @@ def test_inspection_tells_a_revocation_before_dispatch_from_one_after_an_unknown
 
 
 # ---------------------------------------------------------------------------
+# Compensation is a new authorized action
+# ---------------------------------------------------------------------------
+
+
+class Careless(Host):
+    """A verifier that wrongly accepts an assertion for whatever intent it names."""
+
+    def verify(self, assertion, intent_sha256, now_ns):
+        return super().verify(assertion, self._claims(assertion)["intent_sha256"], now_ns)
+
+
+def test_a_compensation_needs_its_own_approval_and_gets_its_own_attempt_and_receipt(
+        store, tmp_path, replies, host, clock, service, undoable):  # noqa: F811
+    action, approval = ready(store, tmp_path, replies, host, clock, undoable)
+    worker = observed(store, undoable, host, clock, action)
+    (object_id,) = service.snapshot()["objects"]
+    before = item(store, action)
+
+    undo = prepare_compensation(store, action.action_id, operation="update", parameters=RETRACT)
+
+    slot = "publish/1/compensation"
+    assert (undo.run_id, undo.slot, undo.sequence, undo.state, undo.compensates_action_id) == (
+        action.run_id, slot, 1, "not_dispatched", action.action_id)
+    assert undo.action_key == action_key(store.store_id, action.run_id, slot, 1) != action.action_key
+    # It writes the object the action's effect wrote, with no content of the run's.
+    assert undo.intent == ActionIntent("update", ActionTarget("acme", "posts", object_id), parameters=RETRACT,
+                                       connector=undoable.profile.name,
+                                       connector_version=undoable.profile.version)
+    assert (undo.profile, undo.ceiling_nanousd) == (action.profile, action.ceiling_nanousd)
+    assert load_action(store, undo.action_id) == undo
+    assert load_action(store, action.action_id).compensates_action_id is None
+    # The same compensation again is the same action; another one conflicts while it is unfinished.
+    assert prepare_compensation(store, action.action_id, operation="update", parameters=RETRACT) == undo
+    with pytest.raises(WorkflowConflictError, match="unfinished action"):
+        prepare_compensation(store, action.action_id, operation="update", parameters={"retracted": False})
+
+    # Nothing authorizes it yet, and the original approval never can: it binds another intent digest.
+    with pytest.raises(ActionNotAuthorized, match="it has no approval"):
+        worker.dispatch(undo.run_id, undo.action_id)
+    (original,) = rows(store.path, "workflow_action_approvals")
+    for verifier, message in ((host, "approves another intent"), (Careless(key=host.key), "already recorded")):
+        with pytest.raises(ApprovalRejected, match=message):
+            approve(store, undo.action_id, original["assertion"], verifier,
+                    ceiling_nanousd=undo.ceiling_nanousd, expires_at_ns=clock.now_ns + HOUR_NS)
+    lease = store.acquire_lease(action.run_id, "worker-1", ttl_s=60)
+    with pytest.raises(ActionNotAuthorized, match="it has no approval"):
+        workflow_actions.begin_attempt(store, lease, undo.action_id, approval.approval_id)
+    store.release_lease(lease)
+    assert undoable.made("submit") == 1
+
+    own = approve_now(store, host, clock, undo)
+    dispatched = worker.dispatch(undo.run_id, undo.action_id)
+    settled = worker.readback(undo.run_id, undo.action_id)
+
+    assert (dispatched.attempt["number"], dispatched.attempt["state"]) == (1, "acknowledged")
+    assert (settled.state, settled.report.passed) == ("observed", True)
+    assert undoable.calls[-2:] == [("submit", undo.action_key, None),
+                                   ("read", ActionTarget("acme", "posts", object_id))]
+    snapshot = service.snapshot()
+    assert [record["request_key"] for record in snapshot["objects"][object_id]["history"]] == [
+        action.action_key, undo.action_key]
+    assert snapshot["objects"][object_id]["value"]["parameters"] == RETRACT
+    assert snapshot["requests"][undo.action_key]["committed"] == 1
+    shown = item(store, undo)
+    assert shown["compensates_action_id"] == action.action_id
+    assert [attempt["approval_id"] for attempt in shown["attempts"]] == [own.approval_id]
+    assert shown["attempts"][0]["receipt_sha256"] not in {a["receipt_sha256"] for a in before["attempts"]}
+    assert [record["kind"] for record in shown["records"]] == ["readback"]
+    assert shown["approvals"][0]["consumed_by_attempt"] == shown["attempts"][0]["attempt_id"]
+    # The original action's attempts, approval, records and balances are exactly as they were.
+    assert item(store, action) == before
+    assert store.audit(action.run_id)["ok"]
+
+
+def test_an_action_that_requires_compensation_is_compensated_on_the_object_it_wrote(
+        store, tmp_path, replies, host, clock, service, undoable):  # noqa: F811
+    action, _ = ready(store, tmp_path, replies, host, clock, undoable)
+    worker = runner(store, undoable, host, clock)
+    worker.dispatch(action.run_id, action.action_id)
+    (object_id,) = service.snapshot()["objects"]
+    service.submit("another-writer", {"title": "Edited elsewhere"}, object_id=object_id,
+                   target=Target("acme", "posts"))
+    assert worker.readback(action.run_id, action.action_id).state == "compensation_required"
+    before = item(store, action)
+
+    undo = prepare_compensation(store, action.action_id, operation="update", parameters=RETRACT)
+    approve_now(store, host, clock, undo)
+    worker.dispatch(undo.run_id, undo.action_id)
+
+    assert undo.intent.target == ActionTarget("acme", "posts", object_id)
+    assert worker.readback(undo.run_id, undo.action_id).state == "observed"
+    # The original stays as it was, its unknown write cost included.
+    assert item(store, action) == before
+    assert (before["state"], balances(before)) == ("compensation_required", (READ, 0, WRITE))
+
+
+def test_a_connector_without_compensation_leaves_the_action_compensation_required_with_its_exposure(
+        store, tmp_path, replies, host, clock, service, connector):  # noqa: F811
+    assert connector.profile.compensation == "unsupported"
+    action, _ = ready(store, tmp_path, replies, host, clock, connector)
+    worker = runner(store, connector, host, clock)
+    worker.dispatch(action.run_id, action.action_id)
+    (object_id,) = service.snapshot()["objects"]
+    service.submit("another-writer", {"title": "Edited elsewhere"}, object_id=object_id,
+                   target=Target("acme", "posts"))
+    assert worker.readback(action.run_id, action.action_id).state == "compensation_required"
+    before = store.inspect_run(action.run_id)
+
+    with pytest.raises(ActionStateError, match="declares no compensation"):
+        prepare_compensation(store, action.action_id, operation="update", parameters=RETRACT)
+
+    assert store.inspect_run(action.run_id) == before
+    (shown,) = before["actions"]["items"]
+    assert (shown["state"], balances(shown)) == ("compensation_required", (READ, 0, WRITE))
+    assert before["actions"]["unknown_nanousd"] == WRITE
+
+
+def test_only_an_effect_a_read_has_shown_can_be_compensated(
+        store, tmp_path, replies, host, clock, service, undoable):  # noqa: F811
+    action, _ = ready(store, tmp_path, replies, host, clock, undoable)
+    worker = runner(store, undoable, host, clock)
+    with pytest.raises(ActionStateError, match="is not_dispatched"):
+        prepare_compensation(store, action.action_id, operation="update", parameters=RETRACT)
+    worker.dispatch(action.run_id, action.action_id)
+    # A receipt alone does not show the effect.
+    with pytest.raises(ActionStateError, match="is dispatched"):
+        prepare_compensation(store, action.action_id, operation="update", parameters=RETRACT)
+    worker.readback(action.run_id, action.action_id)
+    with pytest.raises(WorkflowValidationError, match="one of its connector's operations"):
+        prepare_compensation(store, action.action_id, operation="delete", parameters=RETRACT)
+    with pytest.raises(ValueError, match="finite, acyclic JSON"):
+        prepare_compensation(store, action.action_id, operation="update", parameters={"at": float("nan")})
+    assert len(store.inspect_run(action.run_id)["actions"]["items"]) == 1
+
+
+# ---------------------------------------------------------------------------
 # A security stop
 # ---------------------------------------------------------------------------
 
@@ -347,3 +502,28 @@ def test_a_security_stop_refuses_dispatch_pending_before_any_claim(
     # A security stop is not an action stop: the approvals stand, and only the run's stop refuses them.
     assert all(row["revoked_at_ns"] is None for row in rows(store.path, "workflow_action_approvals"))
     assert store.audit(first.run_id)["ok"]
+
+
+def test_a_security_stop_refuses_compensation_before_any_claim(
+        store, tmp_path, replies, host, clock, service, undoable):  # noqa: F811
+    action, _ = ready(store, tmp_path, replies, host, clock, undoable)
+    observed(store, undoable, host, clock, action)
+    undo = prepare_compensation(store, action.action_id, operation="update", parameters=RETRACT)
+    approve_now(store, host, clock, undo)
+    attempts = rows(store.path, "workflow_action_attempts")
+
+    store.security_stop(action.run_id, "approver_compromised")
+
+    # A compensation delivers none of the run's content, yet the stop holds it like any action.
+    for compensate in (lambda: prepare_compensation(store, action.action_id, operation="update",
+                                                    parameters={"retracted": "again"}),
+                       lambda: check_authority(store, undo.action_id, host)):
+        with pytest.raises(ActionNotAuthorized, match="a security stop holds the run"):
+            compensate()
+    (progress,) = runner(store, undoable, host, clock).dispatch_pending(action.run_id)
+    assert (progress.action_id, progress.state, progress.next_action) == (undo.action_id, "not_dispatched", None)
+    assert "a security stop holds the run" in progress.refusal
+    assert rows(store.path, "workflow_action_attempts") == attempts
+    assert undoable.made("submit") == 1
+    assert len(store.inspect_run(action.run_id)["actions"]["items"]) == 2
+    assert store.audit(action.run_id)["ok"]

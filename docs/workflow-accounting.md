@@ -891,11 +891,13 @@ profile, state and balances; `workflow_action_attempts` its numbered attempts;
 digest; and `workflow_action_records` its readbacks, lookups, notices, late
 receipts, findings, decisions and evidence. Records are append-only: SQLite
 refuses to update or delete them. In this release, `smythe.actions` writes
-[prepared actions](actions.md#prepared-actions) and their
+[prepared actions](actions.md#prepared-actions), including
+[compensations](actions.md#compensation), whose `compensates_action_id`
+names the action they undo, and their
 [approvals, rejections and revocations](actions.md#approvals), including a
 run's [action stop](actions.md#stopping-a-runs-actions), which also adds an
-`actions_stopped` event; `smythe.workflow_actions` writes their attempts and late receipts in the
-[dispatch journal](actions.md#dispatch-journal); the
+`actions_stopped` event; `smythe.workflow_actions` writes their attempts and
+late receipts in the [dispatch journal](actions.md#dispatch-journal); the
 [action runner](actions.md#readback) writes readback records, each charged
 its read's cost, and its [reconciliation](actions.md#reconciliation) writes
 lookup records, each charged its lookup's cost, and finding records; and

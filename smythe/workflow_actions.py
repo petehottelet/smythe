@@ -32,7 +32,7 @@ from uuid import uuid4
 from smythe._money import NANOUSD
 from smythe._redact import redact_account_identifiers
 from smythe.actions import (
-    _CLOSED, _FINISHED, _SECURITY_STOP, ACTION_STATES, ActionIntent, ActionNotAuthorized,
+    _CLOSED, _FINISHED, _SECURITY_STOP, _SHOWN, ACTION_STATES, ActionIntent, ActionNotAuthorized,
     ActionStateError, ApprovalRejected, ConnectorProfile, ConnectorReceipt, PreparedAction, Principal,
     _receipt_of, _undeliverable, _window_open, action_key,
 )
@@ -218,7 +218,7 @@ def _prepared(row):
     return PreparedAction(row["action_id"], row["run_id"], row["slot"], row["sequence"], row["action_key"],
                           _stored(row["intent_json"], ActionIntent.from_dict),
                           _stored(row["profile_json"], ConnectorProfile.from_dict), row["state"],
-                          _amount(row["ceiling"]))
+                          _amount(row["ceiling"]), row["compensates_action_id"])
 
 
 def load(store, action_id):
@@ -232,31 +232,59 @@ def load(store, action_id):
                                           "ORDER BY rowid DESC", (action_id,)).fetchall()
 
 
-def prepare(store, run_id, slot, intent, profile):
+def prepare(store, run_id, slot, intent, profile, compensates=None):
     """Record *intent* as the next action in a run's *slot*, or return the slot's identical one.
 
     Raises ``WorkflowConflictError`` while the slot's latest action is
-    unfinished and has another intent or profile.
+    unfinished and has another intent or profile. With *compensates*, the
+    action compensates that action of the run, which a read must show took
+    effect, or ``ActionStateError`` is raised.
     """
     intent_json, profile_json = _canonical(intent.to_dict()), _canonical(profile.to_dict())
     ceiling = (profile.max_attempts * profile.write_ceiling_nanousd
                + profile.readback_reads * profile.read_ceiling_nanousd)
     with store._transaction() as db:
         store._run(db, run_id)
+        original = None if compensates is None else _row(db, compensates)
+        if original is not None and (original["run_id"] != run_id or original["state"] not in _SHOWN):
+            raise ActionStateError(f"Action {compensates!r} has no effect of this run that a read has shown")
         latest = db.execute("SELECT * FROM workflow_actions WHERE run_id=? AND slot=? ORDER BY sequence DESC "
                             "LIMIT 1", (run_id, slot)).fetchone()
-        if latest is not None and (latest["intent_json"], latest["profile_json"]) == (intent_json, profile_json):
+        if latest is not None and (latest["intent_json"], latest["profile_json"], latest["compensates_action_id"]) == (
+                intent_json, profile_json, compensates):
             return _prepared(latest)
         if latest is not None and latest["state"] not in _FINISHED:
             raise WorkflowConflictError(f"Slot {slot!r} holds an unfinished action with another intent or "
                                         "profile; a changed intent is a new action, never a retry")
         sequence, action_id, now = 1 if latest is None else latest["sequence"] + 1, uuid4().hex, store._clock_ns()
         db.execute("""INSERT INTO workflow_actions(action_id,run_id,slot,sequence,action_key,intent_json,intent_sha,
-          profile_json,state,ceiling,confirmed,reserved,unknown,created,updated)
-          VALUES (?,?,?,?,?,?,?,?,'not_dispatched',?,'0','0','0',?,?)""",
+          profile_json,state,ceiling,confirmed,reserved,unknown,compensates_action_id,created,updated)
+          VALUES (?,?,?,?,?,?,?,?,'not_dispatched',?,'0','0','0',?,?,?)""",
                    (action_id, run_id, slot, sequence, action_key(store.store_id, run_id, slot, sequence),
-                    intent_json, intent.digest(), profile_json, str(ceiling), now, now))
+                    intent_json, intent.digest(), profile_json, str(ceiling), compensates, now, now))
         return _prepared(_row(db, action_id))
+
+
+def effect_target(store, action_id):
+    """An action, and the object the read that settled it read, or None without such a read.
+
+    The object is the target of the receipt that read checked: its attempt's
+    own, or one a lookup found. Only reads are made, after the audit.
+    """
+    if store.store_version < 2:
+        raise WorkflowNotFoundError(action_id)  # Version 1 journals have no action tables.
+    with store._transaction(write=False) as db:
+        row = _row(db, action_id)
+        audit_actions(store, db, row["run_id"])
+        reads, receipt = _payloads(db, action_id, "readback"), None
+        if reads:
+            attempt_id = reads[-1][1].get("attempt_id")
+            attempt = db.execute("SELECT receipt_json FROM workflow_action_attempts WHERE attempt_id=? "
+                                 "AND action_id=?", (attempt_id, action_id)).fetchone()
+            found = _found(db, action_id).get(attempt_id)
+            text = attempt and attempt["receipt_json"] or found and _canonical(found)
+            receipt = text and _stored(text, ConnectorReceipt.from_dict)
+        return _prepared(row), receipt.target if receipt else None
 
 
 def record_verdict(store, action, verdict, principal, identity, assertion, ceiling, expires_at_ns):

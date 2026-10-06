@@ -10,7 +10,9 @@ each attempt, and the [action runner](#action-runner) makes those attempts
 through your connector, reads their results back,
 [reconciles](#reconciliation) outcomes a dispatch left unknown and keeps the
 service's [notices](#notices) as untrusted records.
-[Revocation](#revocation) takes precedence over dispatch. These types and functions may
+[Revocation](#revocation) takes precedence over dispatch, and a
+[compensation](#compensation) is a new action with its own approval. These
+types and functions may
 change before they leave preview. `import smythe` loads neither module;
 import them explicitly.
 
@@ -112,7 +114,7 @@ profile = ConnectorProfile(
 | `lookup_by_object` | `False` | `read()` returns an object's current bytes. |
 | `visibility_bound_s` | `None` | The longest a commit can stay invisible to lookups and reads; `None` means unbounded. |
 | `cancellation` | `"unsupported"` | A submitted write cannot be canceled; no other value is accepted. |
-| `compensation` | `"unsupported"` | `"new_action"` when a separately approved action can undo an effect. |
+| `compensation` | `"unsupported"` | `"new_action"` when a separately approved action can undo an effect; see [compensation](#compensation). |
 | `write_ceiling_nanousd`, `read_ceiling_nanousd` | `0` | The most one write or one read can cost, in whole nanoUSD. |
 | `max_attempts` | `1` | The most attempts one action may make. |
 | `readback_reads` | `1` | How many reads may check a write's result. |
@@ -228,9 +230,11 @@ whatever its decision. The intent must name the profile's connector and one of
 its operations. A refusal raises `ActionNotAuthorized` and records nothing.
 
 `prepare_action()` returns a `PreparedAction`: its `action_id`, `run_id`,
-`slot`, `sequence`, `action_key`, `intent`, `profile`, `state` and
-`ceiling_nanousd`: the cost of `max_attempts` writes and `readback_reads`
-reads at the profile's ceilings, which an [approval](#approvals) must cover.
+`slot`, `sequence`, `action_key`, `intent`, `profile`, `state`,
+`ceiling_nanousd` and `compensates_action_id`, which is None except for a
+[compensation](#compensation). The ceiling is the cost of `max_attempts`
+writes and `readback_reads` reads at the profile's ceilings, which an
+[approval](#approvals) must cover.
 No attempt, read or [reconciliation](#reconciliation) lookup is made that
 would take the action's confirmed, reserved and unknown nanoUSD past its
 approval's ceiling, so lookups share the budget of the reads.
@@ -737,7 +741,7 @@ last read, or None, the `next_action`, and the `refusal` of an action that
 | `readback` | An acknowledged attempt has reads left that fit under its approval's ceiling. |
 | `reconcile` | The outcome is unknown, or the reads did not settle it. |
 | `operator_review` | Reconciliation found it can do no more: the outcome stays unknown or unverified. |
-| `compensate` | The action is `compensation_required`. |
+| `compensate` | The action is `compensation_required`: a [compensation](#compensation) can undo its effect where the connector supports one. |
 | None | The action is settled, has used every attempt, or `dispatch_pending()` refused it. |
 
 Errors from the journal's checks, such as `ActionNotAuthorized`,
@@ -794,4 +798,52 @@ shows when each revoked approval was revoked, as its `revocation`:
 A claim checks revocation in its own transaction, so an attempt dispatched
 under a revoked approval was always dispatched before the revocation. To
 undo an effect, a connector that supports it takes a new, separately
-approved action.
+approved [compensation](#compensation).
+
+## Compensation
+
+When a connector's profile declares `compensation="new_action"`, a separate
+action can undo the effect of one whose result a read has shown:
+
+```python
+from smythe.actions import approve, prepare_compensation
+
+undo = prepare_compensation(store, action.action_id, operation="update",
+                            parameters={"retracted": True})
+assertion = identity_host.issue(undo.intent.digest(), ...)   # its own approval
+approve(store, undo.action_id, assertion, identity_host,
+        ceiling_nanousd=undo.ceiling_nanousd, expires_at_ns=expiry_ns)
+runner.dispatch(run_id, undo.action_id)
+runner.readback(run_id, undo.action_id)
+```
+
+`prepare_compensation(store, action_id, *, operation, parameters=None)`
+records a new logical action whose `compensates_action_id` names the
+original. The original must be `observed`, `reconciled` or
+`compensation_required`. The compensation's intent writes `operation`, one
+of the profile's operations, with `parameters` and no content, to the object
+that the original's receipt named and its readback read, through the
+original's connector profile. Its slot is `<slot>/<sequence>/compensation`,
+after the original's slot and sequence, so it has its own action key.
+Preparing the same operation and parameters again returns it; others raise
+`WorkflowConflictError` while it is unfinished. It needs no lease.
+
+A compensation is authorized like any other action, and never by the
+original's approval: an approval binds one intent digest, so the verifier
+refuses the original's assertion, and the journal refuses an assertion that
+it recorded for another action. The compensation needs its own approval and
+makes its own attempts, with its own receipt and readback, which checks that
+the object holds the canonical JSON of its parameters. The original's
+attempts, approvals, records, state and balances never change; each
+action's inspection shows the link. Because a compensation delivers none of
+the run's content, a later decision that no longer accepts the run's output
+does not refuse it. A [security stop](workflow-accounting.md#security-stops)
+does, as it refuses every action.
+
+`prepare_compensation()` raises `ActionStateError` for an action whose
+effect no read has shown, and for a profile that declares
+`compensation="unsupported"`: nothing is recorded, and the action stays
+`compensation_required`, or as it was, with its unknown exposure, for an
+operator to resolve. An operation the profile does not declare raises
+`WorkflowValidationError`, and a run that a security stop holds raises
+`ActionNotAuthorized`.

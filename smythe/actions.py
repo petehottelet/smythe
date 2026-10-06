@@ -7,7 +7,8 @@ Connectors and approval verifiers are trusted host code with synchronous
 protocols, checked only structurally: a caller contract, not a sandbox.
 
 :func:`prepare_action` records a logical action in the workflow journal, bound
-to a completed run's accepted content; :func:`approve`, :func:`reject`,
+to a completed run's accepted content, and :func:`prepare_compensation` one
+that undoes an action's effect; :func:`approve`, :func:`reject`,
 :func:`revoke` and :func:`stop_actions` record verified approvals and
 controls; :func:`check_authority` checks them again; and
 ``smythe.workflow_actions`` journals each attempt's
@@ -58,6 +59,8 @@ ACTION_STATES = (
 _FINISHED = ("observed", "reconciled", "canceled")
 # No approval authorizes an action in these states.
 _CLOSED = (*_FINISHED, "compensation_required")
+# A read showed what the action's write did, so a compensation can undo it.
+_SHOWN = ("observed", "reconciled", "compensation_required")
 # A run blocked for this reason authorizes no action.
 _SECURITY_STOP = "security_stop"
 _COMPENSATION = ("new_action", "unsupported")
@@ -575,6 +578,8 @@ class PreparedAction:
     cover it. No attempt, read or reconciliation lookup is made that would
     take the action's confirmed, reserved and unknown nanoUSD past the
     approval's ceiling, so lookups share the budget of the reads.
+    ``compensates_action_id`` names the action a compensation undoes, or is
+    None.
     """
 
     action_id: str
@@ -586,6 +591,7 @@ class PreparedAction:
     profile: ConnectorProfile
     state: str
     ceiling_nanousd: int
+    compensates_action_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -599,15 +605,17 @@ class ActionApproval:
     expires_at_ns: int
 
 
-def _undeliverable(store: Any, run_id: str, content: ContentRef) -> str | None:
+def _undeliverable(store: Any, run_id: str, content: ContentRef | None) -> str | None:
     """Why *content* is not a completed run's accepted, deliverable output now, or None.
 
-    The run's current delivery decision must be ``accepted``; a run without
-    one, such as an advisory or earlier run, never is, and none is assumed. A
-    source the run delivered from that was removed after the decision makes
-    the content unavailable. The decision must still hold for *content*'s
-    exact SHA-256 and size, and a published document's file must still hold
-    those bytes. Only reads are made.
+    No security stop may hold the run. The run's current delivery decision
+    must be ``accepted``; a run without one, such as an advisory or earlier
+    run, never is, and none is assumed. A source the run delivered from that
+    was removed after the decision makes the content unavailable. The
+    decision must still hold for *content*'s exact SHA-256 and size, and a
+    published document's file must still hold those bytes. Without
+    *content*, as for a compensation, which delivers nothing of the run's,
+    only the stop and completion are checked. Only reads are made.
     """
     from smythe.workflow import _removal_problems, current_decision
     from smythe.workflow_artifact import _current_decision, current_artifact
@@ -617,6 +625,8 @@ def _undeliverable(store: Any, run_id: str, content: ContentRef) -> str | None:
         return "a security stop holds the run"
     if run["status"] != "completed":
         return "the run has not completed"
+    if content is None:
+        return None
     latest = current_decision(store, run_id)
     if latest is None:
         return "the run has no recorded delivery acceptance"
@@ -696,6 +706,45 @@ def load_action(store: Any, action_id: str) -> PreparedAction:
     from smythe.workflow_actions import load
 
     return load(store, action_id)[0]
+
+
+def prepare_compensation(store: Any, action_id: str, *, operation: str,
+                         parameters: dict[str, Any] | None = None) -> PreparedAction:
+    """Record a new action that undoes the effect of action *action_id* on the object it wrote.
+
+    The action must be ``observed``, ``reconciled`` or
+    ``compensation_required``, and its profile must declare
+    ``compensation="new_action"``; otherwise ``ActionStateError`` is raised
+    and nothing changes, so an action whose connector cannot compensate keeps
+    its state and exposure. The new action writes *operation*, one of the
+    profile's operations, with *parameters* and no content, to the object the
+    action's receipt named and its readback read, through the same profile.
+    Its slot is ``<slot>/<sequence>/compensation`` and its
+    ``compensates_action_id`` names the action. It needs its own approval,
+    since no approval of the action binds its intent digest, and makes its own
+    attempts with its own receipt; the action's records never change. The
+    same operation and parameters again return it. A run that a security stop
+    holds is refused with ``ActionNotAuthorized``. No lease is needed.
+    """
+    from smythe.workflow_actions import effect_target, prepare
+
+    action, target = effect_target(store, _text(action_id, "action_id"))
+    profile = action.profile
+    if action.state not in _SHOWN or target is None:
+        raise ActionStateError(f"Action {action_id!r} is {action.state}; only an effect that a read has "
+                               "shown can be compensated")
+    if profile.compensation != "new_action":
+        raise ActionStateError(f"Action {action_id!r} cannot be compensated: its connector declares no "
+                               f"compensation, so it stays {action.state}")
+    if operation not in profile.operations:
+        raise WorkflowValidationError("A compensation's operation must be one of its connector's operations")
+    problem = _undeliverable(store, action.run_id, None)
+    if problem:
+        raise ActionNotAuthorized(f"Action {action_id!r} cannot be compensated: {problem}")
+    intent = ActionIntent(operation, target, parameters=parameters, connector=profile.name,
+                          connector_version=profile.version)
+    return prepare(store, action.run_id, f"{action.slot}/{action.sequence}/compensation", intent, profile,
+                   compensates=action.action_id)
 
 
 def approve(store: Any, action_id: str, assertion: str, verifier: Any, *, ceiling_nanousd: int,
@@ -1317,6 +1366,6 @@ __all__ = [
     "ActionTarget", "ApprovalRejected", "ApprovalVerifier", "ConnectorAmbiguous",
     "ConnectorProfile", "ConnectorReceipt", "ConnectorRefused", "ContentRef", "ObservedObject",
     "PreparedAction", "Principal", "WriteConnector", "action_key", "approve", "check_authority",
-    "check_connector", "check_verifier", "load_action", "prepare_action", "record_notice",
-    "reject", "revoke", "stop_actions",
+    "check_connector", "check_verifier", "load_action", "prepare_action", "prepare_compensation",
+    "record_notice", "reject", "revoke", "stop_actions",
 ]

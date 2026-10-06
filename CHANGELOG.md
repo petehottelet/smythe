@@ -354,6 +354,20 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   Revoking never changes an action's state, and `inspect_run()` shows each
   revoked approval's `revocation`: `before_dispatch`, `after_dispatch` or
   `after_effect`. See [revocation](docs/actions.md#revocation).
+- `prepare_compensation(store, action_id, *, operation, parameters=None)` in
+  `smythe.actions` records a compensation as a new logical action. For an
+  action that is `observed`, `reconciled` or `compensation_required`, whose
+  connector profile declares `compensation="new_action"`, it writes the
+  operation and parameters, without content, to the object the action's
+  receipt named and its readback read. `PreparedAction.compensates_action_id`
+  names the action it undoes, and its slot, `<slot>/<sequence>/compensation`,
+  gives it its own key. It needs its own approval, since the original's binds
+  another intent digest, and makes its own attempts with their own receipt
+  and readback; the original's records never change. A connector without
+  compensation refuses it with `ActionStateError`, and the action stays
+  `compensation_required` with its unknown exposure. A security stop refuses
+  it as it refuses every action. See
+  [compensation](docs/actions.md#compensation).
 - Jobs operations have a semantic input digest.
   `smythe.jobs.operation_input_digest()` hashes the provider kind and its
   adapter version (`smythe.jobs.providers.ADAPTER_VERSIONS`), the model,
