@@ -22,7 +22,7 @@ from fixture_service import FixtureService, serve_http
 from smythe import (
     AcceptancePolicy, ContextSource, CurrentState, LineagePolicy, LocalOnly, MarkdownRenderer,
     OfflineProvider, ReadProfile, SimpleArchitect, SourceStatus, SQLiteWorkflowStore, Swarm, Task,
-    TextValidator, WorkflowBindingError,
+    TextValidator, WorkflowBindingError, WorkflowGraphPolicy,
 )
 from smythe._canonical import sha256_hex
 from smythe._run_inspection import inspect_journal
@@ -30,6 +30,7 @@ from smythe.agent import Agent, AgentProfile
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.lineage import LINEAGE_REUSE_KEY, load_lineage
 from smythe.provider import CompletionResult
+from smythe.provider_messages import MODELS, AnthropicMessagesProvider
 from smythe.registry import Registry
 from smythe.reuse import evaluate
 from smythe.workflow_store import WorkflowStateError, _canonical, _sha
@@ -383,6 +384,29 @@ def test_reuse_needs_a_lineage_policy_with_reuse_on_and_no_supervisor(
 def test_a_successor_needs_a_lineage_policy(changed, tmp_path):
     swarm = research(changed.store, changed.endpoint, tmp_path, lineage=None)
     refused(changed, WorkflowBindingError, "needs a lineage policy", swarm=swarm, reuse={})
+
+
+@pytest.mark.parametrize(("options", "error", "match"), [
+    ({"read_tools": []}, WorkflowBindingError,
+     "'read-survey' reads with 'library', which this run's read_tools do not declare"),
+    ({"graph_policy": WorkflowGraphPolicy(max_nodes=2)}, WorkflowBindingError,
+     "max_nodes=2 exceeded by 6 nodes"),
+    ({"model": min(MODELS), "provider": AnthropicMessagesProvider(api_key="test-key")},
+     ValueError, "Model is not supported"),
+])
+def test_a_graph_this_configuration_cannot_run_is_refused_before_its_successor_exists(
+        store, library, tmp_path, replies, options, error, match):
+    service, _, endpoint = library
+    first = research(store, endpoint, tmp_path).execute(research_graph(endpoint)).execution_id
+    reads, labels = source_reads(service), list(replies)
+    # A configuration without the predecessor's read profile, under a graph
+    # policy its graph exceeds, or with a provider that lacks its model.
+    with pytest.raises(error, match=match):
+        successor(research(store, endpoint, tmp_path, **options), first,
+                  {node_id: [] for node_id in KEPT})
+    # No run is left for a later resume to plan from the task instead.
+    assert [run["run_id"] for run in store.list_runs()] == [first]
+    assert source_reads(service) == reads and replies == labels
 
 
 # ---------------------------------------------------------------------------

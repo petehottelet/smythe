@@ -1090,13 +1090,14 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   in the same store and access scope, whose lineage record has the named
   digest, is reused from; a node whose saved result no longer has its
   recorded digest, whose inputs are undeclared or used a removed source, a
-  gate and the nodes it judges or depends on, and a node depending on one
-  that runs again are refused before the successor is created or any call
-  is made. A resumed successor replays its reuse operations without reading
-  the predecessor. Its lineage names its `predecessor` and `repair`, each
-  kept node keeps its recorded inputs with `reused_from`, and inspection
-  never returns kept text. A new durable graph cannot carry a `repair`
-  planning record. No public method starts a successor yet. See
+  gate and the nodes it judges or depends on, a node depending on one that
+  runs again, and a graph the successor's graph policy, read profiles,
+  models or agents cannot run are refused before the successor is created
+  or any call is made. A resumed successor replays its reuse operations
+  without reading the predecessor. Its lineage names its `predecessor` and
+  `repair`, each kept node keeps its recorded inputs with `reused_from`, and
+  inspection never returns kept text. A new durable graph cannot carry a
+  `repair` planning record. No public method starts a successor yet. See
   [reused results](docs/workflow-accounting.md#reused-results).
 
 ### Changed

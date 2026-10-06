@@ -1760,14 +1760,18 @@ class WorkflowRuntime:
         names the predecessor (with *lineage_sha256*), *plan_sha256* and
         *reason*, as the successor's lineage will.
 
-        Everything is checked before the run is created: a lineage policy
+        Everything is checked before the run is created, so a refusal leaves
+        no run that a later resume would plan from its task: a lineage policy
         (with reuse on to reuse anything) and no supervisor; a completed
         predecessor in this store and access scope whose lineage record has
-        *lineage_sha256* (:func:`_predecessor`); and reused nodes that
+        *lineage_sha256* (:func:`_predecessor`); reused nodes that
         :func:`_reused` allows, that depend only on reused nodes, and that are
-        no gate or node a gate judges or depends on. Raises
-        ``WorkflowBindingError`` for a request that breaks these rules and
-        ``WorkflowStateError`` for predecessor records that refuse it.
+        no gate or node a gate judges or depends on; and a graph this
+        runtime's configuration can run (:meth:`_check_successor_graph`).
+        Raises ``WorkflowBindingError`` for a request that breaks these rules,
+        ``WorkflowStateError`` for predecessor records that refuse it, and
+        ``ValueError``, as for any graph, for a node model the provider does
+        not support.
         """
         if self.lineage is None or (reuse and not self.lineage.reuse):
             raise WorkflowBindingError("Reusing results needs a lineage policy with reuse on")
@@ -1800,6 +1804,7 @@ class WorkflowRuntime:
         results = {node_id: _reused(predecessor, node_id) for node_id in reuse}
         _successor_graph(graph)
         self._check_obligations(graph)
+        self._check_successor_graph(graph, registry)
         async with self._session(self._new_run(graph.task)):
             # Agents a plan registered are the predecessor's; configured ones are current.
             for agent in Registry.from_workflow_description(registry).list_agents():
@@ -1817,6 +1822,32 @@ class WorkflowRuntime:
                     }
             self._save("planned")
             return await self._execute(max_concurrency)
+
+    def _check_successor_graph(self, graph, registry):
+        """Refuse a successor's *graph* that this runtime cannot run, before the run exists.
+
+        These are :meth:`_validate_graph`'s checks of the runtime's
+        configuration, which may differ from the predecessor's: the graph
+        policy, each read step's profile and input, each node's model, each
+        node's agent, which the configured registry or the predecessor's
+        saved *registry* description holds, and task context under context
+        assembly. The graph met the others when the predecessor ran it.
+        """
+        self._validate_graph_policy(graph)
+        saved, configured = Registry.from_workflow_description(registry), self.sources["registry"]
+        for node in graph.nodes:
+            if (self.recipe.get("context_assembly", 0) and graph.task is None
+                    and "task_context" in node.metadata):
+                raise WorkflowBindingError(
+                    f"Node {node.id!r} carries task_context metadata without a Task; context "
+                    "assembly renders the run's Task, so give the graph a Task instead"
+                )
+            if READ_STEP_KEY in node.metadata:
+                self._check_read_step(node)
+            validate_workflow_model(self.provider, node.metadata.get("model", self.model))
+            if node.agent_id is not None and saved.get(node.agent_id) is None and (
+                    configured is None or configured.get(node.agent_id) is None):
+                raise WorkflowBindingError(f"Node {node.id!r} names an unknown agent")
 
     async def refresh_context(self, run_id, sources):
         """Give an unfinished run new sources, to be re-evaluated when it resumes.

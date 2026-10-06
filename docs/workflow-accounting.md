@@ -597,7 +597,10 @@ No public method starts a successor yet.
   declared, and no source its record or source evidence names may have been
   [removed](tasks.md#remove-a-source) from the predecessor. Gates, the nodes
   they judge or depend on, and nodes that depend on a node that runs again
-  are never kept. A refusal creates no run and makes no call.
+  are never kept. The graph must also suit the successor's own
+  configuration, which may differ from the predecessor's: its graph policy,
+  the read profiles its read steps name, its node models and its agents. A
+  refusal creates no run, so nothing is left to resume, and makes no call.
 - **Same text, same prompts.** A kept result is the predecessor's text byte
   for byte, so the nodes that run again are given exactly what a full
   recomputation would give them.
