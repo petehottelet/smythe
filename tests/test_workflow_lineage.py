@@ -256,17 +256,24 @@ def test_runs_without_a_lineage_policy_write_no_lineage(store, library, tmp_path
         assert load_lineage(store, result.execution_id) is None
 
 
-def test_inspection_never_returns_the_lineage(store, library, tmp_path):
+def test_inspection_never_returns_the_lineage_record(store, library, tmp_path):
     result = research(store, library, tmp_path).execute(research_graph(library))
     run_id = result.execution_id
     lineage = load_lineage(store, run_id)
     agents = [node["inputs"]["agent_sha256"] for node in lineage.to_dict()["nodes"]
               if "agent_sha256" in node["inputs"]]
-    for view in (store.inspect_run(run_id), inspect_journal(store, run_id),
-                 store.list_runs()):
+    for view in (store.inspect_run(run_id), store.list_runs()):
         text = json.dumps(view)
         assert '"lineage' not in text and lineage.sha256 not in text
         assert not any(agent in text for agent in agents)
+    # Runs inspection names the record by its digest and summarizes it, without
+    # the agents or the model nodes' results.
+    view = inspect_journal(store, run_id)
+    assert view["lineage"]["lineage_sha256"] == lineage.sha256
+    text = json.dumps(view)
+    assert not any(agent in text for agent in agents)
+    assert not any(node["result_sha256"] in text for node in lineage.nodes
+                   if node["kind"] == "model")
 
 
 def read_call(node_id: str, text: str, *, generation: int = 0) -> dict:

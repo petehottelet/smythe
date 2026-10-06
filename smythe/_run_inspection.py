@@ -7,8 +7,8 @@ reports execution, delivery acceptance and its decision history, the
 supervisor's revision log, a durable run's published artifact, cost, timing
 and the next action as separate JSON blocks. For a durable run it also
 reports its context sources and snapshots, its journaled reads, the source
-evidence its output carried and the issues left open, never source text,
-read bodies or output.
+evidence its output carried, the issues left open and a lineage run's
+summary, never source text, read bodies or output.
 :meth:`smythe.swarm.SwarmResult.to_dict` builds its execution, delivery,
 unknown-exposure and next-action blocks with the same functions. Nothing here
 constructs a provider, migrates a journal or writes a file.
@@ -53,6 +53,8 @@ from smythe.context import (
 )
 from smythe.evidence import load_source_evidence, load_source_tombstones
 from smythe.graph import ExecutionGraph
+from smythe.lineage import load_lineage
+from smythe.reuse import _INTEGRITY, _archive, _kinds, derived_status
 from smythe.validation import _json_sha256
 from smythe.workflow_artifact import CurrentArtifact, artifact_problems, current_artifact
 from smythe.workflow_store import (
@@ -353,8 +355,9 @@ def _checkpoint_view(execution_id: str, state: Any) -> dict[str, Any]:
         "decisions": decisions,
         "revision_log": revision_log_from_state(state),
         # Only durable runs publish a rendered document, journal reads and
-        # record context snapshots and source evidence.
+        # record context snapshots, source evidence and lineage.
         "artifact": None,
+        "lineage": None,
         "context": None,
         "tool_calls": None,
         "evidence": None,
@@ -526,6 +529,60 @@ def evidence_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any] | N
                                          "context_sources", "problem", "sources")} | {"claims": claims}
 
 
+def lineage_view(store: SQLiteWorkflowStore, run_id: str, recipe: dict[str, Any], completed: bool,
+                 artifact: CurrentArtifact | None, delivery: dict[str, Any]) -> dict | None:
+    """A lineage run's record summarized, with its links and derived status; None without lineage.
+
+    It names the record's digest, coverage, nodes by kind and undeclared
+    nodes, each source reference the nodes read, by id, version and digest,
+    the published document the record binds and whether the run's current
+    publication still holds its bytes, the predecessor, and each successor in
+    the run's access scope with whether it supersedes the run. ``status`` is
+    :func:`~smythe.reuse.derived_status` of what can be found without a
+    source catalog: supersession, sources removed from the run, the
+    document's integrity and the current decision; it is never ``current``
+    or ``stale``, which only a repair plan can tell. No text is read out.
+    """
+    policy = recipe.get("lineage")
+    if not isinstance(policy, dict):
+        return None
+    record = load_lineage(store, run_id)
+    _, links = _archive(store, policy["access_scope"])
+    successors = [{"run_id": successor, "supersedes": accepted}
+                  for successor, (predecessor, accepted) in links.items() if predecessor == run_id]
+    view: dict[str, Any] = {
+        "access_scope": policy["access_scope"], "recorded": record is not None,
+        "lineage_sha256": None, "coverage": None, "nodes": {}, "undeclared": [], "sources": [],
+        "artifact": None, "predecessor": None, "successors": successors}
+    reasons = set() if completed else {"run_in_progress"}
+    if record is not None:
+        references = {(ref["source_id"], ref["version"] or "", ref["sha256"]): dict(ref)
+                      for node in record.nodes for ref in node["inputs"]["sources"]}
+        removed = {(item.source_id, item.sha256) for item in load_source_tombstones(store, run_id)}
+        if any((ref["source_id"], ref["sha256"]) in removed for ref in references.values()):
+            reasons.add("source_tombstoned")
+        if delivery["decision"] != AcceptanceDecision.ACCEPTED.value:
+            reasons.add("decision_not_accepted")
+        if record.artifact is not None:
+            integrity = "not_checked" if artifact is None else (
+                artifact.integrity["status"]
+                if artifact.publication.sha256 == record.artifact["sha256"] else "changed")
+            reasons.add(_INTEGRITY[integrity])  # None when verified
+            view["artifact"] = {key: record.artifact[key]
+                                for key in ("relative_path", "sha256", "size_bytes")}
+            view["artifact"]["integrity"] = integrity
+        view.update(lineage_sha256=record.sha256, coverage=record.coverage,
+                    nodes=_kinds(record.nodes),
+                    undeclared=[node["id"] for node in record.nodes
+                                if node["coverage"] == "undeclared"],
+                    sources=[references[key] for key in sorted(references)],
+                    predecessor=None if record.predecessor is None else dict(record.predecessor))
+    reasons.discard(None)
+    superseded = any(item["supersedes"] for item in successors)
+    return view | {"status": derived_status(reasons, superseded=superseded, sources_checked=False),
+                   "reasons": sorted(reasons)}
+
+
 def issues_view(delivery: dict[str, Any], evidence: dict[str, Any] | None,
                 tool_calls: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
     """What a run leaves open, one entry each, as ``kind``, ``subject`` and ``detail``.
@@ -570,7 +627,7 @@ def issues_view(delivery: dict[str, Any], evidence: dict[str, Any] | None,
     return issues
 
 
-def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
+def _journal_view(store: SQLiteWorkflowStore, run_id: str, *, lineage: bool = True) -> dict[str, Any]:
     from smythe.workflow import _checkpoint_version, revision_log
 
     inspected = store.inspect_run(run_id)
@@ -642,6 +699,8 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
         "decisions": decisions,
         "revision_log": revision_log(store, run_id),
         "artifact": None if artifact is None else artifact.to_dict(),
+        "lineage": lineage_view(store, run_id, run["config"], state == "completed", artifact,
+                                delivery) if lineage else None,
         "context": context_view(store, run_id, run["config"], checkpoint, graph),
         "tool_calls": tool_calls,
         "evidence": evidence,
@@ -657,20 +716,26 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
     }
 
 
-def inspect_journal(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
-    """Project one durable run from a journal opened read-only."""
+def inspect_journal(store: SQLiteWorkflowStore, run_id: str, *,
+                    lineage: bool = True) -> dict[str, Any]:
+    """Project one durable run from a journal opened read-only.
+
+    The ``lineage`` block reads every run in the run's access scope to find
+    its successors; ``lineage=False`` leaves it null.
+    """
     try:
-        return _journal_view(store, run_id)
+        return _journal_view(store, run_id, lineage=lineage)
     except WorkflowNotFoundError as exc:
         raise RunNotFoundError(f"No durable run {run_id!r} in this journal") from exc
     except (WorkflowError, ValueError, TypeError, KeyError, AttributeError, RecursionError) as exc:
         raise RunInspectionError(f"Durable run {run_id!r} cannot be inspected: {exc}") from exc
 
 
-def inspect_run(store: FileCheckpointStore | SQLiteWorkflowStore, run_id: str) -> dict[str, Any]:
-    """Project one run from either kind of store."""
+def inspect_run(store: FileCheckpointStore | SQLiteWorkflowStore, run_id: str, *,
+                lineage: bool = True) -> dict[str, Any]:
+    """Project one run from either kind of store; *lineage* as for :func:`inspect_journal`."""
     if isinstance(store, SQLiteWorkflowStore):
-        return inspect_journal(store, run_id)
+        return inspect_journal(store, run_id, lineage=lineage)
     return inspect_checkpoint(store, run_id)
 
 
@@ -697,7 +762,8 @@ def list_runs(
     runs = []
     for run_id in page:
         try:
-            view = inspect_run(store, run_id)
+            # A listing needs no lineage, whose successors would read every run again.
+            view = inspect_run(store, run_id, lineage=False)
         except (RunInspectionError, RunNotFoundError, ValueError) as exc:
             runs.append({"run_id": run_id, "state": None, "decision": None, "next_action": None,
                          "error": str(exc)})

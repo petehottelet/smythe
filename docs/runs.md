@@ -48,6 +48,7 @@ its runs and its recorded version do not change.
 | `decisions` | The [decision history](#decision-history): the current decision's sequence and the decisions before it |
 | `revision_log` | The run's latest [supervisor decisions](#revision-log), applied or refused; empty without any |
 | `artifact` | A durable run's [published document](#published-documents); null for a run that publishes none and for ordinary runs |
+| `lineage` | A summary of a durable run's [lineage](#lineage): coverage, source references, predecessor and successors, document integrity and derived status; null without a lineage policy and for ordinary runs |
 | `context` | A durable run's [context assembly](#research-runs): versions, current sources, snapshots and tombstones; null without context assembly and for ordinary runs |
 | `tool_calls` | A durable run's [journaled reads](#research-runs), without response bodies or text; null for ordinary runs |
 | `evidence` | The [source evidence](#research-runs) a completed durable run delivered, summarized; null without any and for ordinary runs |
@@ -162,6 +163,42 @@ accessor resume uses:
 The file is only read. As on resume, a decided record whose published file is
 missing or changed gives `indeterminate` with that reason, and the next action
 is `republish`.
+
+### Lineage
+
+A durable run with a [lineage policy](lineage.md) reports a summary of its
+[lineage record](lineage.md#the-record-a-run-writes) under `lineage`, by
+ids, versions and digests, never source text, node inputs or results:
+
+| Field | Meaning |
+|---|---|
+| `access_scope` | The scope the run's policy declares |
+| `recorded` | Whether the run has written its record, which it does when it completes |
+| `lineage_sha256`, `coverage` | The record's digest, and `complete` or `partial`; null before the record |
+| `nodes`, `undeclared` | The record's nodes counted by kind, and the ids of the nodes whose inputs are undeclared |
+| `sources` | Each source reference the nodes read, once, by `source_id`, `version` and `sha256` |
+| `artifact` | The published document the record binds, by `relative_path`, `sha256` and `size_bytes`, and its `integrity`: the status of the run's current publication when it holds those bytes, `changed` when it holds others, `not_checked` without one; null for a run that publishes none |
+| `predecessor` | The run this run's record names as its predecessor, with that run's record digest; null for none |
+| `successors` | Each run in the same access scope whose record names this run as its predecessor, and whether it `supersedes` it: only a completed successor whose current decision is `accepted` does |
+| `status`, `reasons` | The run's [derived status](lineage.md#derived-status) and the reason codes behind it |
+
+Freshness depends on the sources, which only the application's source
+catalog can describe, so `status` here is `superseded`, `restricted` (a
+source the record names was [removed from the run](tasks.md#remove-a-source)),
+`invalid` (the document no longer holds the decided bytes, or the current
+decision is not `accepted`) or null, never `current` or `stale`; plan a
+repair with [`Swarm.plan_repair`](lineage.md#plan-a-repair) to see those.
+The summary reads every run in the run's access scope to find its
+successors; `list` leaves it out. It adds no exit code.
+
+```text
+Lineage: complete coverage; scope research-team; nodes model 2, read 2, synthesis 1; record sha256 5f0c...
+  Source renewals version 1: sha256 7d1e0f3a9b2c
+  Source survey version 1: sha256 26e6faa9bc6d
+  Artifact 3f9c2d0e8b4a/document.md: sha256 b84c1d2e3f40; integrity changed
+  Predecessor: none; successors: none
+  Derived status: invalid (artifact_changed, decision_not_accepted)
+```
 
 ### Research runs
 

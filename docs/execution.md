@@ -657,7 +657,11 @@ example a later step that no gate or final validator checks
 For a saved run, `smythe runs inspect` reports execution, acceptance and cost
 as separate blocks without changing the checkpoint or journal, and exits with
 10 when a completed run's output was rejected or needs review and 11 when no
-valid decision covers it. See [Inspect saved runs](runs.md).
+valid decision covers it. A durable run with a
+[lineage policy](lineage.md) also gets a [lineage summary](runs.md#lineage):
+coverage, source references, predecessor and successors, the published
+document's integrity and the run's derived status, with no source text and
+no new exit code. See [Inspect saved runs](runs.md).
 
 ## Provider connections
 

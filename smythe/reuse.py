@@ -9,29 +9,39 @@ the stable reason codes in :data:`REASONS` behind them, and the authority any
 kept result is kept under. It is a pure function. It reads no store or file,
 calls nothing but the catalog's ``describe``, and gives equal decisions for
 equal inputs, whatever their order.
+
+:func:`repair_plan` applies it to the runs of a durable journal, by default
+the heads that :func:`archive_heads` finds, and returns a :class:`RepairPlan`
+with each run's decision, derived status and predicted work. Both only read
+the journal: nothing is dispatched or written.
 """
 
 from __future__ import annotations
 
 # Imported at runtime, not only for type checking, so that
 # typing.get_type_hints() can resolve the dataclass field annotations.
+from collections import Counter
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import inspect
 from types import MappingProxyType
 from typing import Any, Protocol
 
-from smythe.acceptance import _calls_async
+from smythe._canonical import sha256_hex
+from smythe.acceptance import AcceptanceDecision, _calls_async
 from smythe.context import CONTEXT_ASSEMBLY_VERSION
 from smythe.lineage import (
-    ArtifactLineage, LineagePolicy, _count, _frozen, _plain, _text, _validator_set,
-    validator_set_sha256,
+    ArtifactLineage, LineagePolicy, _count, _frozen, _label, _plain, _synthesizer, _text,
+    _validator_set, load_lineage, validator_set_sha256,
 )
-from smythe.validation import ValidatorIdentity, _require_keys, _require_sha256
+from smythe.validation import ValidatorIdentity, _json_sha256, _require_keys, _require_sha256
+from smythe.workflow_artifact import current_artifact
 from smythe.workflow_binding import WorkflowBindingError
+from smythe.workflow_store import WorkflowError, WorkflowNotFoundError
 
-__all__ = ["ACTIONS", "REASONS", "CurrentState", "ItemDecision", "NodeDecision",
-           "SourceCatalog", "SourceStatus", "evaluate"]
+__all__ = ["ACTIONS", "REASONS", "REPAIR_PLAN_VERSION", "STATUSES", "CurrentState",
+           "ItemDecision", "NodeDecision", "RepairPlan", "SourceCatalog", "SourceStatus",
+           "archive_heads", "derived_status", "evaluate", "repair_plan"]
 
 # Every action, from least to most conservative. An item or node takes the most
 # conservative action any of its reasons calls for.
@@ -52,6 +62,7 @@ REASONS = MappingProxyType({
     "gate_pair": "regenerate", "reuse_disabled": "regenerate",
     "artifact_missing": "rerender", "artifact_changed": "rerender",
     "validator_set_changed": "recheck", "policy_changed": "recheck",
+    "run_in_progress": "review",
 })
 
 # The reason each published-file integrity status gives, if any.
@@ -61,6 +72,13 @@ _INTEGRITY = {"verified": None, "missing": "artifact_missing", "changed": "artif
 # The lineage node kind of a verification gate; the nodes it depends on are what it judges.
 _GATE = "gate"
 _KEPT = ("reuse", "recheck", "rerender")
+
+REPAIR_PLAN_VERSION = 1
+# A run's lifecycle statuses, derived whenever they are needed and never stored.
+STATUSES = ("current", "stale", "invalid", "restricted", "superseded")
+# The reasons that make a run's accepted artifact invalid as it stands.
+_INVALID = frozenset({"artifact_missing", "artifact_changed", "artifact_unsafe",
+                      "artifact_unreadable", "decision_not_accepted"})
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -383,3 +401,255 @@ def evaluate(lineage: ArtifactLineage | None, state: CurrentState) -> ItemDecisi
         tuple(NodeDecision(node["id"], actions[node["id"]], tuple(sorted(reasons[node["id"]])))
               for node in nodes),
         _frozen(authority))
+
+
+def derived_status(reasons: Iterable[str], *, superseded: bool = False,
+                   sources_checked: bool = True) -> str | None:
+    """A run's lifecycle status, from the reason codes found for it; computed, never stored.
+
+    ``superseded`` when a completed successor whose decision is accepted
+    replaced the run; else ``restricted`` when a source it used was
+    withdrawn (``source_tombstoned``); else ``invalid`` when its published
+    document no longer holds the decided bytes or its decision is not
+    ``accepted``; else ``current`` without any reason and ``stale`` with one.
+    A run that has not completed has no status (None), and neither has one
+    of the last two kinds when its sources were not described
+    (*sources_checked* false), because its freshness is then unknown.
+    """
+    reasons = set(reasons)
+    if superseded:
+        return "superseded"
+    if "run_in_progress" in reasons:
+        return None
+    if "source_tombstoned" in reasons:
+        return "restricted"
+    if reasons & _INVALID:
+        return "invalid"
+    if not sources_checked:
+        return None
+    return "stale" if reasons else "current"
+
+
+def _archive(store: Any, scope: str) -> tuple[dict[str, str], dict[str, tuple[str, bool]]]:
+    """The runs in *scope* with their journal status, in journal order, and their links.
+
+    A run is in a scope when its recipe records a lineage policy with that
+    access scope. Each completed run in the scope whose lineage names a
+    predecessor in the scope is linked to it, with whether its current
+    decision is ``accepted``. A run whose record or decision cannot be read
+    links nothing; reading that run itself reports why.
+    """
+    from smythe.workflow import current_decision
+
+    runs = {}
+    for run in store.list_runs():
+        policy = store.load_run(run["run_id"])["config"].get("lineage")
+        if isinstance(policy, dict) and policy.get("access_scope") == scope:
+            runs[run["run_id"]] = run["status"]
+    links = {}
+    for run_id, status in runs.items():
+        try:
+            record = load_lineage(store, run_id) if status == "completed" else None
+            predecessor = (record.predecessor or {}).get("run_id") if record else None
+            if predecessor in runs:
+                decision = current_decision(store, run_id)
+                links[run_id] = (predecessor, decision is not None
+                                 and decision["record"].decision is AcceptanceDecision.ACCEPTED)
+        except (ValueError, WorkflowError):
+            continue
+    return runs, links
+
+
+def archive_heads(store: Any, scope: str) -> list[str]:
+    """The ids of the durable runs in access *scope* that nothing supersedes, in journal order.
+
+    A run is in a scope when its recipe records a :class:`LineagePolicy`
+    with that ``access_scope``; runs in other scopes and runs without
+    lineage are never listed. Predecessor links come from lineage records:
+    a completed successor whose current decision is ``accepted`` supersedes
+    its predecessor, and a successor whose decision is not supersedes nothing
+    and is not a head itself, so its predecessor stays the head. A run that
+    has not completed has no record yet, so it is a head. Only reads are
+    made, so a store opened read-only will do.
+    """
+    return _heads(*_archive(store, scope))
+
+
+def _heads(runs: Mapping[str, str], links: Mapping[str, tuple[str, bool]]) -> list[str]:
+    superseded = {predecessor for predecessor, accepted in links.values() if accepted}
+    return [run_id for run_id in runs
+            if run_id not in superseded and links.get(run_id, (None, True))[1]]
+
+
+class _Described:
+    """A catalog that describes each source once and keeps what it said, for one plan."""
+
+    metered = False
+
+    def __init__(self, catalog: SourceCatalog) -> None:
+        self.catalog, self.seen = catalog, {}
+
+    def describe(self, source_id: str) -> SourceStatus | None:
+        if source_id not in self.seen:
+            self.seen[source_id] = _describe(self.catalog, source_id)
+        return self.seen[source_id]
+
+
+def _agents(entries: Iterable[Mapping[str, Any]]) -> set[str]:
+    """The digests a lineage record gives the agents of these registry entries."""
+    return {sha256_hex({key: value for key, value in entry.items() if key != "id"})
+            for entry in entries}
+
+
+def _state(recipe: Mapping[str, Any], catalog: SourceCatalog) -> CurrentState:
+    """What a run made with *recipe*, the recipe a new run would record, would use now."""
+    component = _synthesizer(recipe["components"]["synthesizer"])
+    return CurrentState(
+        catalog=catalog,
+        validators=[ValidatorIdentity.from_dict(item)
+                    for item in recipe["acceptance"]["final_validators"]],
+        policy_sha256=_json_sha256(recipe["acceptance"], "acceptance policy"),
+        tools={_label(item["name"]): {"version": _label(item["version"]),
+                                      "decoder_version": _label(item["decoder_version"])}
+               for item in recipe.get("read_tools", ())},
+        components={component["name"]: component["version"]} if component else {},
+        context_assembly_version=recipe.get("context_assembly") or None,
+        agents=_agents(recipe["components"]["registry"].get("agents", ())),
+        lineage=LineagePolicy.from_dict(recipe["lineage"]),
+    )
+
+
+def _kinds(nodes: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    return dict(sorted(Counter(node["kind"] for node in nodes).items()))
+
+
+def _work(record: ArtifactLineage | None, decision: ItemDecision,
+          free_tools: frozenset[str]) -> dict[str, Any]:
+    """What carrying out *decision* would take, predicted from *record*; nothing is called."""
+    action = decision.action
+    pairs = list(zip(record.nodes, decision.nodes)) if record is not None else []
+    runs = int(action == "regenerate")
+    kept = [node for node, item in pairs if action != "review" and item.action in _KEPT]
+    again = [node for node, item in pairs if runs and item.action == "regenerate"]
+    reads = [node for node in again if node["kind"] == "read"]
+    # Gates count as model steps, and so does a synthesis that names no local component.
+    models = sum(node["kind"] in ("model", _GATE)
+                 or node["kind"] == "synthesis" and "component" not in node["inputs"]
+                 for node in again)
+    charged = any(node["inputs"].get("tool", {}).get("name") not in free_tools for node in reads)
+    return {"nodes_reused": _kinds(kept), "nodes_regenerated": _kinds(again),
+            "read_calls": len(reads), "model_steps": models,
+            "publications": int(action == "rerender" or bool(
+                runs and record is not None and record.artifact is not None)),
+            "acceptance_evaluations": int(action in ("recheck", "rerender", "regenerate")),
+            "new_runs": runs,
+            "may_incur_charges": bool(runs) and (record is None or models > 0 or charged),
+            "allowance_required": bool(runs)}
+
+
+@dataclass(frozen=True)
+class RepairPlan:
+    """What each planned durable run's artifact calls for, before anything is dispatched.
+
+    ``items`` hold one entry per run, in the order planned: its ``run_id``,
+    the ``lineage_sha256`` of its record (None without one), its derived
+    ``status`` (:func:`derived_status`), the ``action``, ``reasons``,
+    ``nodes`` and ``authority`` of its :class:`ItemDecision`, and its
+    predicted ``work``. ``sources`` is what the catalog said about each
+    source the records name, described once for the whole plan.
+    :attr:`plan_sha256` is the digest of :meth:`to_dict` without itself,
+    which holds no time: equal states give equal digests, and a changed
+    decision or source description changes it. It guards against applying
+    a stale plan; it authorizes nothing.
+    """
+
+    store_id: str
+    access_scope: str
+    items: tuple[Mapping[str, Any], ...]
+    sources: tuple[Mapping[str, Any], ...] = ()
+    version: int = REPAIR_PLAN_VERSION
+
+    def __post_init__(self) -> None:
+        for name in ("items", "sources"):
+            object.__setattr__(self, name, _frozen(_plain(list(getattr(self, name)))))
+
+    def to_dict(self) -> dict[str, Any]:
+        """The plan as JSON data, ending with its ``plan_sha256``."""
+        data = {"version": self.version, "store_id": self.store_id,
+                "access_scope": self.access_scope, "sources": _plain(self.sources),
+                "items": _plain(self.items)}
+        return {**data, "plan_sha256": sha256_hex(data)}
+
+    @property
+    def plan_sha256(self) -> str:
+        return self.to_dict()["plan_sha256"]
+
+    def __hash__(self) -> int:
+        # The generated hash would hash the read-only mappings, which cannot be hashed.
+        return hash(self.plan_sha256)
+
+
+def _source(source_id: str, status: SourceStatus | None) -> dict[str, Any]:
+    if status is None:
+        return {"source_id": source_id, "version": None, "sha256": None, "available": False,
+                "tombstoned": False}
+    return {"source_id": source_id, "version": status.version, "sha256": status.sha256,
+            "available": status.available, "tombstoned": status.tombstone_reason is not None}
+
+
+def repair_plan(store: Any, recipe: Mapping[str, Any], catalog: SourceCatalog,
+                run_ids: Iterable[str] | None = None) -> RepairPlan:
+    """Plan what durable runs' artifacts call for under *recipe*, without changing anything.
+
+    *recipe* is the recipe a new run would record, and it must hold a
+    lineage policy: its access scope chooses the runs, and its validators,
+    acceptance policy, read profiles, synthesizer, context assembly and
+    agents make the :class:`CurrentState`. An agent a run recorded that the
+    recipe's registry does not define, such as one assigned when the run
+    was planned, stays current. *catalog* describes each source once.
+    *run_ids* defaults to :func:`archive_heads`; named runs are planned
+    once each, in the order given, and a run outside the scope raises
+    :class:`~smythe.workflow_store.WorkflowNotFoundError` as an unknown one
+    does. A run that has not completed needs ``review``
+    (``run_in_progress``). Each completed run's published document is
+    checked through :func:`~smythe.workflow_artifact.current_artifact`.
+    Only reads are made.
+    """
+    if not isinstance(recipe, Mapping) or recipe.get("lineage") is None:
+        raise ValueError("A repair plan needs a lineage policy, whose access scope it plans in")
+    state = _state(recipe, catalog)
+    described = _Described(state.catalog)
+    state = replace(state, catalog=described)
+    configured = {entry["id"] for entry in recipe["components"]["registry"].get("agents", ())}
+    free = frozenset(_label(item["name"]) for item in recipe.get("read_tools", ())
+                     if item["metered"] is False)
+    runs, links = _archive(store, state.access_scope)
+    if run_ids is None:
+        run_ids = _heads(runs, links)
+    elif isinstance(run_ids, (str, bytes)) or not isinstance(run_ids, Iterable):
+        raise TypeError("run_ids must be a sequence of run ids")
+    planned = []
+    for run_id in dict.fromkeys(run_ids):
+        if run_id not in runs:
+            raise WorkflowNotFoundError(
+                f"No durable run {run_id!r} in access scope {state.access_scope!r}")
+        record = None
+        if runs[run_id] != "completed":
+            decision = replace(evaluate(None, state), action="review", reasons=("run_in_progress",))
+        else:
+            record = load_lineage(store, run_id)
+            recorded = store.get_checkpoint(run_id)["checkpoint"]["registry"]["agents"]
+            current = current_artifact(store, run_id)
+            decision = evaluate(record, replace(
+                state, agents=state.agents | _agents(
+                    entry for entry in recorded if entry["id"] not in configured),
+                integrity={} if current is None else {run_id: current.integrity["status"]}))
+        superseded = any(accepted and predecessor == run_id
+                         for predecessor, accepted in links.values())
+        planned.append({"run_id": run_id,
+                        "lineage_sha256": None if record is None else record.sha256,
+                        "status": derived_status(decision.reasons, superseded=superseded),
+                        **decision.to_dict(), "work": _work(record, decision, free)})
+    return RepairPlan(store.store_id, state.access_scope, planned,
+                      [_source(source_id, described.seen[source_id])
+                       for source_id in sorted(described.seen)])

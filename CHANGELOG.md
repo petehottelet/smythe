@@ -854,7 +854,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   rules out dependency cycles. Records hash by their digest. A run with a
   policy writes its record once when it completes, as a `lineage` journal
   operation that the completed checkpoint applies with its decision:
-  `smythe.lineage.load_lineage()` reads it, and inspection never returns it.
+  `smythe.lineage.load_lineage()` reads it, and `inspect_run()` and
+  `list_runs()` never return it.
   Each read step names its read profile and the source version and digest it
   read, each model node or gate the context snapshot and sources it was
   given and its agent's digest, and the synthesis its synthesizer; the
@@ -1053,6 +1054,29 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   mechanics, not claimable, with zero API calls: fixtures rank no arm and
   change no default. See
   [selector comparison](benchmarks/README.md#selector-comparison-offline-mechanics).
+- Read-only repair plans for artifact lineage.
+  `Swarm.plan_repair(execution_ids=None, *, sources)` evaluates each run in
+  the Swarm's access scope, by default the heads of the archive, against
+  what a new run would use now and returns a `RepairPlan`: each run's
+  decision, derived status and predicted work (nodes reused and regenerated
+  by kind, read calls, model steps, publications, acceptance evaluations,
+  new runs, whether charges may be incurred and whether an allowance is
+  required), the catalog's answers, and a timestamp-free `plan_sha256` that
+  a later apply must match. Planning opens the journal again read-only,
+  takes no lease, writes nothing, calls no provider, reads no source and
+  describes each source once; a run that has not completed needs `review`
+  (`run_in_progress`), and a run in another scope is not found.
+  `archive_heads(store, scope)` follows predecessor links: a completed
+  successor whose decision is accepted supersedes its predecessor, and one
+  whose decision is not supersedes nothing and is not a head.
+  `smythe.reuse.derived_status()` computes the lifecycle status `current`,
+  `stale`, `invalid`, `restricted` or `superseded`, which is never stored.
+  `smythe runs inspect` adds a `lineage` block to durable lineage runs, in
+  JSON and text: coverage, source references, predecessor and successors,
+  the published document's integrity and the derived status, with no
+  source text and no new exit code. See
+  [plan a repair](docs/lineage.md#plan-a-repair) and
+  [lineage in runs inspect](docs/runs.md#lineage).
 
 ### Changed
 

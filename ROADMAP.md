@@ -385,7 +385,13 @@ connector or paid run.
 5. **Artifact lineage and selective repair** — accepted artifacts record the
    sources, validators and tools they depend on. A changed source or validator
    invalidates its dependents, and a repair plan shows what will be reused,
-   rechecked or regenerated before dispatch
+   rechecked or regenerated before dispatch. In progress: strict durable runs
+   opt into [lineage records](docs/lineage.md) of ids, versions and digests;
+   a pure evaluator says what each record calls for under the current
+   sources, tools and validators; and a read-only
+   [repair plan](docs/lineage.md#plan-a-repair) lists each run's decision,
+   derived status and predicted work, which `smythe runs inspect`
+   summarizes without a source catalog. Applying a plan is not built yet
 6. **Integrate asset policy with Jobs v1** — manifest-native production brand
    masters, OCR and perceptual brand validators, select-from-N curation, and
    deterministic export bundles built from accepted attempt pointers

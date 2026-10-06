@@ -83,6 +83,7 @@ from smythe.provider import (
     _response_error_marker,
 )
 from smythe.registry import Registry
+from smythe.reuse import RepairPlan, SourceCatalog, repair_plan
 from smythe.scheduling import (
     ModelProfile, RetryPolicy, node_profile, profile_map,
 )
@@ -1459,6 +1460,30 @@ class Swarm:
             raise ValueError("remove_source needs a durable run_store")
         return await self._workflow_runtime().remove_source(
             execution_id, source_id, reason, removed_at=removed_at)
+
+    def plan_repair(self, execution_ids: Sequence[str] | None = None, *,
+                    sources: SourceCatalog) -> RepairPlan:
+        """Plan what durable runs' accepted artifacts call for now, changing nothing.
+
+        Each run in this Swarm's lineage access scope, by default each head
+        of the archive (:func:`~smythe.reuse.archive_heads`), is evaluated
+        (:func:`~smythe.reuse.evaluate`) against what a new run of this
+        Swarm would use: its strict policy's validators, its read profiles,
+        synthesizer, context assembly and agents, and the sources that
+        *sources*, a zero-cost :class:`~smythe.reuse.SourceCatalog`,
+        describes. The journal is opened again read-only, so no lease is
+        taken, nothing is written, no provider is called and no source is
+        read. Returns a :class:`~smythe.reuse.RepairPlan`; its
+        ``plan_sha256`` is a staleness guard, not an authorization. See
+        ``smythe.reuse.repair_plan``.
+        """
+        if self._run_store is None:
+            raise ValueError("plan_repair needs a durable run_store")
+        if self._lineage is None:
+            raise ValueError("plan_repair needs a lineage policy, whose access scope it plans in")
+        recipe = self._workflow_runtime().recipe
+        with SQLiteWorkflowStore(self._run_store.path, read_only=True) as store:
+            return repair_plan(store, recipe, sources, execution_ids)
 
     def _load_checkpoint(self, execution_id: str) -> dict[str, Any]:
         """The saved state of *execution_id*, at a checkpoint version this build reads."""

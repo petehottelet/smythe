@@ -39,13 +39,17 @@ from smythe.cli import (
     EXIT_RUN_NOT_ACCEPTED, build_parser, main,
 )
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Revision, Topology
+from smythe.lineage import load_lineage
 from smythe.provider import CompletionResult, Provider
 from smythe.supervisor import SUPERVISOR_SYSTEM_PROMPT, LLMSupervisor, Supervisor
 from smythe.validation import hard_finding
+from smythe.workflow_artifact import current_artifact
+import test_repair_plan as repair_plans
 from test_source_evidence import CLAIM, DROPPED, KEPT, STRONG
 from test_source_evidence import SOURCES as EVIDENCE_SOURCES
 from test_source_evidence import artifact as evidence_artifact
 from test_workflow_acceptance import rewrite_checkpoint
+import test_workflow_lineage as lineage_runs
 from test_workflow_store_migration import build_journal, dump, mark_version_1
 
 CONNECT = sqlite3.connect
@@ -991,6 +995,7 @@ def test_ordinary_runs_have_no_durable_research_blocks(tmp_path, capsys):
     code, value = inspect(capsys, tmp_path, result.execution_id)
     assert code == EXIT_RUN_NOT_ACCEPTED
     assert (value["context"], value["tool_calls"], value["evidence"]) == (None, None, None)
+    assert value["lineage"] is None
     assert value["issues"] == [{"kind": "validator_rejected", "subject": "fixed-reject",
                                 "detail": value["delivery"]["reasons"][0]}]
 
@@ -1243,3 +1248,96 @@ def test_a_review_that_proposed_an_empty_revision_is_logged_by_neither_kind_of_r
     assert code == EXIT_OK and value["revision_log"] == []
     main(["runs", "--journal", str(path), "inspect", durable.execution_id])
     assert "Revision" not in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# Durable runs with artifact lineage
+# ---------------------------------------------------------------------------
+
+
+def test_a_lineage_run_shows_a_damaged_artifact_and_its_lineage_without_text(
+        tmp_path, capsys, monkeypatch):
+    service = FixtureService()
+    records = {key: service.add_source(key, text) for key, text in lineage_runs.TEXTS.items()}
+    path = tmp_path / "runs.db"
+    with serve_http(service) as endpoint, SQLiteWorkflowStore(path) as store:
+        library = (service, records, endpoint)
+        result = lineage_runs.research(store, library, tmp_path).execute(
+            lineage_runs.research_graph(library))
+        run_id, record = result.execution_id, load_lineage(store, result.execution_id)
+        published = current_artifact(store, run_id).publication.path
+    published.write_bytes(published.read_bytes()[:-1] + b"?")
+    before = journal_state(path)
+    no_side_effects(monkeypatch)
+
+    code, value = inspect_durable(capsys, path, run_id)
+
+    # The damaged document makes the decision indeterminate, with its existing exit code.
+    assert code == EXIT_RUN_INDETERMINATE and journal_state(path) == before
+    served = [{"source_id": key, "version": "1", "sha256": records[key].sha256}
+              for key in sorted(records)]
+    assert value["lineage"] == {
+        "access_scope": "research-team", "recorded": True, "lineage_sha256": record.sha256,
+        "coverage": "complete", "nodes": {"model": 2, "read": 2, "synthesis": 1},
+        "undeclared": [], "sources": served,
+        "artifact": {"relative_path": f"{run_id}/document.md", "sha256": record.artifact["sha256"],
+                     "size_bytes": record.artifact["size_bytes"], "integrity": "changed"},
+        "predecessor": None, "successors": [], "status": "invalid",
+        "reasons": ["artifact_changed", "decision_not_accepted"]}
+    assert main(["runs", "--journal", str(path), "inspect", run_id]) == code
+    text = capsys.readouterr().out
+    assert (f"Lineage: complete coverage; scope research-team; nodes model 2, read 2, "
+            f"synthesis 1; record sha256 {record.sha256}") in text
+    assert f"  Source renewals version 1: sha256 {records['renewals'].sha256[:12]}" in text
+    assert "; integrity changed" in text and "  Predecessor: none; successors: none" in text
+    assert "  Derived status: invalid (artifact_changed, decision_not_accepted)" in text
+    # Ids, versions and digests only: no source text, and no agent or model result digest.
+    hidden = [digest for node in record.nodes if node["kind"] == "model"
+              for digest in (node["inputs"]["agent_sha256"], node["result_sha256"])]
+    for shown in (text, json.dumps(value)):
+        assert all(source not in shown for source in lineage_runs.TEXTS.values())
+        assert len(hidden) == 4 and not any(digest in shown for digest in hidden)
+    # Listing does not read the lineage.
+    assert main(["runs", "--journal", str(path), "--json", "list"]) == EXIT_OK
+    assert output(capsys)["list"]["runs"][0]["decision"] == "indeterminate"
+    assert journal_state(path) == before
+
+
+def test_lineage_names_predecessors_and_the_successors_that_supersede_them(tmp_path, capsys):
+    path = tmp_path / "runs.db"
+    with SQLiteWorkflowStore(path) as store:
+        def lineage_run(**options):
+            return repair_plans.lineage_swarm(store, **options).execute(graph()).execution_id
+
+        replaced, successor = lineage_run(), lineage_run()
+        undecided = lineage_run(acceptance=policy("raise"))
+        plain = lineage_run(lineage=None)
+        repair_plans.link(store, successor, replaced)
+        repair_plans.link(store, undecided, replaced)
+        recorded, store_id = load_lineage(store, replaced).sha256, store.store_id
+
+    code, value = inspect_durable(capsys, path, replaced)
+    assert code == EXIT_OK
+    lineage = value["lineage"]
+    assert lineage["successors"] == [{"run_id": successor, "supersedes": True},
+                                     {"run_id": undecided, "supersedes": False}]
+    assert (lineage["status"], lineage["reasons"]) == ("superseded", [])
+    code, value = inspect_durable(capsys, path, successor)
+    assert code == EXIT_OK
+    assert value["lineage"]["predecessor"] == {"store_id": store_id, "run_id": replaced,
+                                               "lineage_sha256": recorded}
+    # Without a source catalog, a run's freshness is not derived.
+    assert (value["lineage"]["status"], value["lineage"]["coverage"]) == (None, "partial")
+    assert value["lineage"]["undeclared"] == ["draft", "final"]
+    assert main(["runs", "--journal", str(path), "inspect", replaced]) == EXIT_OK
+    text = capsys.readouterr().out
+    assert (f"  Predecessor: none; successors: {successor}, {undecided} (does not supersede)"
+            in text)
+    assert "  Derived status: superseded" in text
+    assert main(["runs", "--journal", str(path), "inspect", successor]) == EXIT_OK
+    text = capsys.readouterr().out
+    assert f"  Predecessor: {replaced}; successors: none" in text
+    assert "  Undeclared nodes: draft, final" in text
+    assert "  Derived status: none; freshness needs a source catalog" in text
+    # A run without lineage has no lineage block.
+    assert inspect_durable(capsys, path, plain)[1]["lineage"] is None

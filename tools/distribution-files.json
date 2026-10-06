@@ -227,6 +227,7 @@
     "tests/test_recovery_chart.py",
     "tests/test_registry.py",
     "tests/test_release_gate.py",
+    "tests/test_repair_plan.py",
     "tests/test_retry_policy.py",
     "tests/test_reuse_decisions.py",
     "tests/test_router.py",

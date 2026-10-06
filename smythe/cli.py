@@ -358,7 +358,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_inspection = runs_commands.add_parser(
         "inspect",
         help="show a run's execution, delivery acceptance, context, reads, evidence, open issues, "
-             "cost, timing and next action",
+             "lineage, cost, timing and next action",
     )
     run_inspection.add_argument("run_id")
     _add_runs_output_options(run_inspection, inherited=True)
@@ -794,6 +794,36 @@ def _emit_run_list(value: dict[str, Any]) -> None:
         print(f"More runs: use --offset {value['offset'] + value['returned']}")
 
 
+def _emit_lineage(lineage: dict[str, Any]) -> None:
+    """A lineage run's record, links, integrity and derived status, by ids and digests only."""
+    scope = _terminal_text(lineage["access_scope"])
+    if not lineage["recorded"]:
+        print(f"Lineage: not recorded yet; scope {scope}")
+    else:
+        nodes = ", ".join(f"{kind} {count}" for kind, count in lineage["nodes"].items())
+        print(f"Lineage: {lineage['coverage']} coverage; scope {scope}; nodes {_terminal_text(nodes)}; "
+              f"record sha256 {lineage['lineage_sha256']}")
+        if lineage["undeclared"]:
+            print(f"  Undeclared nodes: {_terminal_text(', '.join(lineage['undeclared']))}")
+        for source in lineage["sources"]:
+            version = f" version {_terminal_text(source['version'])}" if source["version"] else ""
+            print(f"  Source {_terminal_text(source['source_id'])}{version}: "
+                  f"sha256 {source['sha256'][:12]}")
+        artifact = lineage["artifact"]
+        if artifact is not None:
+            print(f"  Artifact {_terminal_text(artifact['relative_path'])}: sha256 "
+                  f"{artifact['sha256'][:12]}; integrity {artifact['integrity']}")
+    predecessor = lineage["predecessor"]
+    successors = ", ".join(
+        _terminal_text(item["run_id"]) + ("" if item["supersedes"] else " (does not supersede)")
+        for item in lineage["successors"])
+    print(f"  Predecessor: {_terminal_text(predecessor['run_id']) if predecessor else 'none'}; "
+          f"successors: {successors or 'none'}")
+    reasons = f" ({', '.join(lineage['reasons'])})" if lineage["reasons"] else ""
+    status = lineage["status"] or "none; freshness needs a source catalog (Swarm.plan_repair)"
+    print(f"  Derived status: {status}{reasons}")
+
+
 def _emit_research(value: dict[str, Any]) -> None:
     """A durable run's context, reads, source evidence and open issues, without any text."""
     context = value.get("context")
@@ -899,6 +929,8 @@ def _emit_run_inspection(value: dict[str, Any]) -> None:
         eligible = "eligible" if eligibility["eligible"] else (
             "not eligible (" + ", ".join(eligibility["reasons"]) + ")")
         print(f"  Delivery eligibility: {eligible}")
+    if value.get("lineage") is not None:
+        _emit_lineage(value["lineage"])
     _emit_research(value)
     accounting = value["accounting"]
     print(f"Cost: ${accounting['total_cost_usd']:.6f} ({accounting['cost_scope']}); "

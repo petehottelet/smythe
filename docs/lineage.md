@@ -11,8 +11,10 @@ format, `ArtifactLineage`, and the record each opted-in run
 [writes when it completes](#the-record-a-run-writes), with its
 [coverage](#coverage). It also adds [reuse decisions](#reuse-decisions):
 a pure evaluator that says what a record calls for under the current
-sources, tools and validators. Nothing reuses or repairs work from
-records yet.
+sources, tools and validators, and [repair plans](#plan-a-repair), which
+show before anything is dispatched what each run of an archive calls for
+and the work that would take. Nothing applies a plan, or reuses or repairs
+work from records, yet.
 
 ## Opt a run in
 
@@ -214,9 +216,12 @@ print(lineage.coverage, [(node["id"], node["kind"]) for node in lineage.nodes])
   `rejected_output`. Re-evaluating the run or publishing its document again
   leaves the record as it is: it names the decision and publication the run
   completed with.
-- **Not in inspection.** `inspect_run()`, `list_runs()`, journal events and
-  `smythe runs inspect` never return the record. Operation kinds are free
-  text, so lineage needs no journal upgrade.
+- **Summarized in inspection.** `inspect_run()`, `list_runs()` and journal
+  events never return the record. `smythe runs inspect` shows a
+  [summary](runs.md#lineage) by ids, versions and digests: its coverage,
+  source references, predecessor and successors, the published document's
+  integrity and the run's [derived status](#derived-status). Operation kinds
+  are free text, so lineage needs no journal upgrade.
 
 ## Coverage
 
@@ -450,3 +455,143 @@ calls for, or None where the policy's `undeclared_coverage` decides.
 | `artifact_changed` | `rerender` | The published document holds other bytes. |
 | `validator_set_changed` | `recheck` | The validator set differs. |
 | `policy_changed` | `recheck` | The acceptance policy differs. |
+| `run_in_progress` | `review` | The run has not completed, so it has no record yet; only a [repair plan](#plan-a-repair) gives it. |
+
+## Plan a repair
+
+`Swarm.plan_repair(execution_ids=None, *, sources)` shows, before anything
+is dispatched, what each run's accepted artifact calls for now and what
+carrying that out would take. *sources* is a
+[source catalog](#the-source-catalog):
+
+```python
+with SQLiteWorkflowStore("smythe-runs.db") as store:
+    # The configuration a new run would use: its policy, read profiles,
+    # synthesizer and context assembly, under the archive's access scope.
+    swarm = Swarm(
+        model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+        run_store=store, acceptance=acceptance,
+        lineage=LineagePolicy(access_scope="research-team"),
+    )
+    plan = swarm.plan_repair(sources=LocalIndex(entries))
+    for item in plan.to_dict()["items"]:
+        print(item["run_id"], item["status"], item["action"], item["work"]["new_runs"])
+    print(plan.plan_sha256)
+```
+
+- **Read only.** Planning needs a durable `run_store` and a lineage policy,
+  or raises `ValueError`. It opens the journal again read-only, so it takes
+  no lease, writes and migrates nothing, and works on a store opened
+  read-only or while a worker holds a run; the journal's database file is
+  unchanged. It calls no provider and reads no source: the catalog's
+  `describe` is called once per source for the whole plan, and the catalog
+  is checked as the evaluator checks it.
+- **Which runs.** By default, every [head](#archive-heads) in the Swarm's
+  access scope, in journal order. `execution_ids` names runs instead; each
+  is planned once, in the order given, and a run in another scope, a run
+  without lineage and an unknown id each raise `WorkflowNotFoundError`, so
+  another scope's runs stay invisible. A single string is refused with
+  `TypeError`.
+- **The current state.** Each run is [evaluated](#reuse-decisions) against
+  what a new run of this Swarm would use: its strict policy's final
+  validators and digest, its read profiles' names, versions and decoder
+  versions, its synthesizer, its context assembly version and the agents
+  its registry defines. An agent that a run recorded and the registry does
+  not define, such as one assigned when the run was planned, stays
+  current. Each completed run's published document is checked through
+  `current_artifact`, the accessor resume and inspection use.
+- **Runs in progress.** A run that has not completed has no record yet. Its
+  item needs `review` with `run_in_progress`, and has no status, no nodes
+  and no work.
+
+`smythe.reuse.repair_plan(store, recipe, catalog, run_ids=None)` does the
+same for a `WorkflowRuntime`'s `recipe` and a store the caller opened.
+
+### Archive heads
+
+`archive_heads(store, scope)` (exported from `smythe`) returns the ids of
+the runs in access scope `scope` that nothing supersedes, in journal order.
+A run is in a scope when its recipe records a `LineagePolicy` with that
+`access_scope`; runs in other scopes and runs without lineage are never
+listed. Links come from the records: a run's `predecessor` names the run it
+repairs.
+
+- A completed successor whose current decision is `accepted` supersedes its
+  predecessor, which is no longer a head.
+- A successor whose decision is not `accepted` supersedes nothing and is not
+  a head itself, so its predecessor stays the head.
+- A run that has not completed has no record yet, so it supersedes nothing
+  and is a head.
+- A run whose record or decision cannot be read links nothing.
+
+### The plan
+
+`RepairPlan` (exported from `smythe`) is frozen. `to_dict()` returns:
+
+```text
+{
+  "version": 1,
+  "store_id": "...",
+  "access_scope": "research-team",
+  "sources": [{"source_id", "version", "sha256", "available", "tombstoned"}],
+  "items": [{"run_id", "lineage_sha256", "status", "action", "reasons",
+             "nodes": [{"id", "action", "reasons"}], "authority": {...},
+             "work": {"nodes_reused": {kind: count}, "nodes_regenerated": {kind: count},
+                      "read_calls", "model_steps", "publications",
+                      "acceptance_evaluations", "new_runs",
+                      "may_incur_charges", "allowance_required"}}],
+  "plan_sha256": "..."
+}
+```
+
+- **Items.** One per planned run. `action`, `reasons`, `nodes` and
+  `authority` are the evaluator's [decision](#the-decision);
+  `lineage_sha256` names the record it was made from (null without one) and
+  `status` is the run's [derived status](#derived-status).
+- **Sources.** What the catalog said about each source the planned records
+  name, sorted by id. A source the catalog does not know is `available:
+  false` with a null `version` and `sha256`.
+- **The digest.** `plan_sha256` is the SHA-256 of the rest of `to_dict()` as
+  canonical JSON, which holds no time and no text. Planning the same
+  archive under the same state gives the same digest, and any changed
+  decision or catalog answer changes it, including the same bytes under a
+  new version. It is a staleness guard that applying a plan must match; it
+  authorizes nothing.
+
+### Predicted work
+
+`work` predicts what carrying out an item takes, from its record alone;
+nothing is called to predict it.
+
+| Action | Predicted work |
+|---|---|
+| `reuse` | Every node is kept (`nodes_reused`); nothing else |
+| `recheck` | Every node is kept; one acceptance evaluation |
+| `rerender` | Every node is kept; one publication and one acceptance evaluation |
+| `regenerate` | One new run that keeps the nodes marked `reuse` and runs the others (`nodes_regenerated`): a read call for each read step it runs, a model step for each model node and gate and for a synthesis without a local component; one publication when the run published a document; one acceptance evaluation |
+| `review` | Nothing: a person decides |
+
+`may_incur_charges` is true for a new run that makes a model step, a read
+whose profile is not declared `metered=False` now, or whose record is
+missing. `allowance_required` is true for every item that starts a new run,
+which needs admission under an explicit allowance. The counts are what the
+record shows; retries and regenerations within a run can add calls.
+
+### Derived status
+
+A run's lifecycle status is computed from what is found for it each time it
+is needed and is never stored. `smythe.reuse.derived_status(reasons, *,
+superseded=False, sources_checked=True)` gives the first that applies:
+
+| Status | When |
+|---|---|
+| `superseded` | A completed successor whose current decision is `accepted` names the run as its predecessor |
+| `restricted` | A source the run used was withdrawn: the catalog reports it tombstoned, or, in `smythe runs inspect`, it was removed from the run |
+| `invalid` | The published document is missing, changed, unsafe or unreadable, or the decision is not `accepted` |
+| `current` | Nothing calls for work: the item is reused as it is |
+| `stale` | Anything else does: an input, validator or policy changed, coverage is partial or a source is unknown |
+
+A run that has not completed has no status. `smythe runs inspect` has no
+source catalog, which is application code, so it never reports `current`
+or `stale`: without one of the first three statuses, it reports none.
+`smythe.reuse.STATUSES` lists the five.

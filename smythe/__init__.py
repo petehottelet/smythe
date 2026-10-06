@@ -49,7 +49,9 @@ from smythe.provider import (
 from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.provider_messages import AnthropicMessagesProvider
 from smythe.pricing import NativeReceipt
-from smythe.reuse import CurrentState, ItemDecision, SourceCatalog, SourceStatus
+from smythe.reuse import (
+    CurrentState, ItemDecision, RepairPlan, SourceCatalog, SourceStatus, archive_heads,
+)
 from smythe.workflow_artifact import MarkdownRenderer, PublishedArtifact
 from smythe.workflow_binding import LocalOnly, WorkflowBindingError
 from smythe.workflow_provider import ProviderRequestRejectedError
@@ -172,6 +174,7 @@ __all__ = [
     "RetryPolicy",
     "Revision",
     "RevisionError",
+    "RepairPlan",
     "RoutingDecision",
     "RoutingRule",
     "Sentinel",
@@ -211,6 +214,7 @@ __all__ = [
     "Verifier",
     "VerificationRecoveryError",
     "WhiteRabbit",
+    "archive_heads",
     "design_verifier",
     "distill_template",
     "inspect_asset",
