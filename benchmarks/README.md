@@ -29,6 +29,7 @@ publishing benchmark updates.
 | Original self-baselines and pre-correction framework record | Diagnostic | Preserved because they found payload, assembly, and measurement defects; superseded by corrected campaigns |
 | [Retired evidence](archive/README.md) | Superseded, diagnostic, and historical | The first glyph fan-out campaign, the browser renderer timing study (all six sessions missed the pacing target), superseded partitions, and review records, byte for byte in one SHA-256-pinned archive |
 | [Control ablation](control_ablation.md) | Mechanism scope | Objective gates remain valuable; routine LLM supervision and judged-prose gating are not default quality paths |
+| [Selector comparison](#selector-comparison-offline-mechanics) | Offline mechanics; not claimable | Four selection arms and an Autotune campaign with reference arms on fixtures for both task families; ranks no arm and changes no default |
 | [Jobs at 5,000 operations](jobs_scale_5000_20260907_results.md) | **Claimable correctness observation** | One offline schema-v3 campaign: 5,000 accepted identical fixtures after a hard kill, safe resume, and eight explicit rerolls; zero accepted work reissued and zero calls on completed resume. No comparative timing or model-quality claim. |
 | [Astra/Sol amended study](results/astra_20260913_main/README.md) | **Human review complete; claimable within recorded descriptive scope** | All 200 workflows retained, 191 automatically accepted; all eight flagged answers accepted by human review at 4/4. Anonymous judging, graph/phase breakdowns and task-clustered comparisons. One failed call retains its full $0.169645 reserve. Reused synthetic tasks; all earlier diagnostics and charges remain separate. |
 
@@ -423,6 +424,57 @@ they cannot establish whole-workflow cost.
 
 Full writeup, including the two invalidated arms and why they are
 published anyway: [control_ablation.md](control_ablation.md).
+
+## Selector comparison (offline mechanics)
+
+Which graph should a task get: one strong worker, a fixed template, a
+generated plan, or a selector that picks among them per task?
+[run_selector_comparison.py](run_selector_comparison.py) is the harness for
+that comparison, run offline on fixtures. Its model steps answer with fixture
+content and declared usage, so the
+[record](results/selector_comparison_offline.json) establishes mechanics,
+never an arm ranking, and changes no default.
+
+| Arm | What it is |
+|---|---|
+| `single_worker` | One worker receives the whole task; no planning call |
+| `fixed_template` | The research → analyze → write pipeline, identified by its hash |
+| `generated_plan` | The `LLMArchitect` plans a task-specific graph |
+| `adaptive_selection` | A `WhiteRabbit` router applies developer [routing rules](../docs/architecture.md#routing-rules), then a scripted classifier, to pick one of the other three |
+
+- Both evidence sets: the [task-shape suite](tasks_shapes/) and the Astra
+  pack's development (pilot) tasks with their supplied sources, loaded with
+  manifest verification.
+- One strict acceptance policy per family decides every arm's runs, so the
+  validator identities are identical across arms. Astra outputs are also
+  checked against the answer key, apart from acceptance.
+- Arms run in a seeded, counterbalanced (Williams) order with two attempts per
+  cell. One task per family plants a failure in every arm's first attempt, and
+  every failed attempt stays in the record and is charged.
+- Every adaptive attempt is charged its selector cost (zero for a rule, the
+  classifier's declared usage otherwise) and records its routing time from the
+  run's timing.
+- An Autotune campaign compares the incumbent `generated_plan` with the
+  challenger `adaptive_selection`, with `single_worker` and `fixed_template`
+  as [reference arms](../docs/optimize.md#reference-arms), on task-indexed
+  trials. Its evaluator hash comes from an
+  [evaluator manifest](../docs/optimize.md#evaluator-manifests) that binds the
+  split manifests, validator identities and fixture price, and an
+  evaluator-side `no_new_failures` gate checks pinned regression cases. Its
+  thresholds are placeholders.
+- No held-out pack is committed. `--heldout-pack DIR` loads one in the Astra
+  pack format from outside the repository, verified against its manifest, as
+  the supplied-source holdout split, and the record must then be written
+  outside the repository too. Without it, the holdout split reuses the
+  development tasks and the record says so.
+
+```bash
+python benchmarks/run_selector_comparison.py   # writes results/selector_comparison_offline.json
+```
+
+[offline_arms.py](offline_arms.py) is the shared runner for offline arm
+harnesses: fixture providers, strict acceptance, attempt records, the
+counterbalanced schedule and offline record labels.
 
 ## Coming soon
 

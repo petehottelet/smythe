@@ -9,6 +9,11 @@ Baselines:
 - ``smythe_dynamic`` — the LLMArchitect designs a task-specific graph.
   The thing Smythe claims is worth the planning call.
 
+``adaptive_selection`` is not one of ``BASELINES``: a ``WhiteRabbit``
+router picks one of the three for each task, by developer routing rules
+first and then its classifier. Harnesses that compare selection ask for it
+by name.
+
 Offline mode verifies the harness mechanics deterministically (no keys,
 no cost); quality judging only makes sense against real providers.
 """
@@ -24,11 +29,13 @@ import yaml
 from smythe import Swarm, Task
 from smythe.agent import Agent, AgentProfile
 from smythe.graph import ExecutionGraph, Node, Topology
-from smythe.planner import DeterministicArchitect, SimpleArchitect
+from smythe.planner import DeterministicArchitect, LLMArchitect, SimpleArchitect
 from smythe.provider import OfflineProvider, Provider
 from smythe.registry import Registry
+from smythe.router import RoutingRule, WhiteRabbit
 
 BASELINES = ("single_agent", "fixed_pipeline", "smythe_dynamic")
+ADAPTIVE_SELECTION = "adaptive_selection"
 
 
 @dataclass
@@ -133,21 +140,66 @@ OFFLINE_DYNAMIC_PLAN = {
 }
 
 
-def make_swarm(baseline: str, provider: Provider, model: str) -> Swarm:
-    """Build the Swarm variant for a baseline. Same provider and model for all."""
+# Developer routing rules for adaptive_selection, written on development
+# tasks. They read only the submitted task: converting given values goes to
+# one worker, independent parts to a generated plan, and a stepwise analysis
+# to the fixed pipeline. A task no rule matches goes to the classifier.
+SELECTION_RULES = (
+    RoutingRule("stable-transformation", "single",
+                "converting given values needs one worker, not a plan",
+                goal_any=("convert each", "normalize the"), max_constraints=3),
+    RoutingRule("separable-work", "autonomous",
+                "independent parts suit a generated parallel plan",
+                goal_any=("independently",), goal_none=("audit",)),
+    RoutingRule("stepwise-analysis", "deterministic:pipeline",
+                "a stepwise analysis fits the fixed research, analysis and writing pipeline",
+                goal_any=("step 1", "then attack")),
+)
+
+
+def make_swarm(
+    baseline: str,
+    provider: Provider,
+    model: str,
+    *,
+    classifier: Provider | None = None,
+    classifier_model: str | None = None,
+    **options,
+) -> Swarm:
+    """Build the Swarm variant for a baseline. Same provider and model for all.
+
+    ``adaptive_selection`` routes with ``SELECTION_RULES`` between one
+    worker, the fixed pipeline and a generated plan. A task no rule matches
+    goes to *classifier* (on *classifier_model*, default *model*), or
+    without one to a generated plan. *options* are further ``Swarm``
+    arguments, such as an acceptance policy.
+    """
     common = dict(provider=provider, model=model, parallel=True, max_budget_usd=5.00)
+    common.update(options)
     if baseline == "single_agent":
         return Swarm(architect=SimpleArchitect(), **common)
     if baseline == "fixed_pipeline":
         return Swarm(architect=FixedPipelineArchitect(), **common)
     if baseline == "smythe_dynamic":
         return Swarm(**common)  # default LLMArchitect
-    raise ValueError(f"Unknown baseline {baseline!r}; expected one of {BASELINES}")
+    if baseline == ADAPTIVE_SELECTION:
+        router = WhiteRabbit(
+            single=SimpleArchitect(),
+            deterministic={"pipeline": FixedPipelineArchitect()},
+            autonomous=LLMArchitect(provider=provider, planning_model=model),
+            classifier_provider=classifier,
+            classifier_model=classifier_model or model,
+            rules=SELECTION_RULES,
+        )
+        return Swarm(router=router, **common)
+    raise ValueError(
+        f"Unknown baseline {baseline!r}; expected one of {(*BASELINES, ADAPTIVE_SELECTION)}"
+    )
 
 
 def offline_provider(baseline: str) -> OfflineProvider:
     """Deterministic provider per baseline for mechanics-only runs."""
-    if baseline == "smythe_dynamic":
+    if baseline in ("smythe_dynamic", ADAPTIVE_SELECTION):
         return OfflineProvider(plan=OFFLINE_DYNAMIC_PLAN)
     return OfflineProvider()
 

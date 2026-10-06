@@ -1008,6 +1008,26 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 - A module entry in `tests/distribution_profile.json` can be a glob pattern,
   so one entry excludes a family of repository-only test modules from the
   source-archive profile. Every entry must still name an existing module.
+- An offline selector comparison harness,
+  `benchmarks/run_selector_comparison.py`. Four arms (a single worker, the
+  fixed pipeline, a generated plan, and adaptive selection, in which a
+  `WhiteRabbit` router applies developer routing rules and then a scripted
+  classifier) run on the task-shape suite and on the Astra pack's development
+  tasks with their sources. One strict acceptance policy per family decides
+  every arm, arms run in a seeded counterbalanced order with two attempts per
+  cell, every failed attempt is recorded and charged, and every adaptive
+  attempt is charged its selector cost and routing time. An Autotune campaign
+  then compares the generated plan (incumbent) with adaptive selection
+  (challenger), with the other two arms as references, under an evaluator
+  hash from an `EvaluatorManifest` and a `no_new_failures` regression gate. A
+  held-out pack is loaded only by path from outside the repository, verified
+  against its manifest. `benchmarks/offline_arms.py` is the shared runner for
+  offline arm harnesses, and `make_swarm` in `benchmarks/harness.py` builds
+  the `adaptive_selection` arm. The committed record,
+  `benchmarks/results/selector_comparison_offline.json`, is labeled offline
+  mechanics, not claimable, with zero API calls: fixtures rank no arm and
+  change no default. See
+  [selector comparison](benchmarks/README.md#selector-comparison-offline-mechanics).
 
 ### Changed
 

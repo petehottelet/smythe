@@ -230,6 +230,7 @@
     "tests/test_reuse_decisions.py",
     "tests/test_router.py",
     "tests/test_runs_cli.py",
+    "tests/test_selector_comparison.py",
     "tests/test_skills.py",
     "tests/test_skills_registry.py",
     "tests/test_source_evidence.py",

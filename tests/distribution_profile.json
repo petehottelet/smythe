@@ -48,7 +48,8 @@
     "test_svg_glyphs.py": "SVG glyph benchmark implementation",
     "test_svg_v2_benchmark.py": "Revised glyph benchmark runner",
     "test_svg_v2_charts.py": "Revised glyph charts and records",
-    "test_svg_workflow_chart.py": "SVG workflow chart renderer"
+    "test_svg_workflow_chart.py": "SVG workflow chart renderer",
+    "test_*_comparison.py": "Offline arm comparison harnesses on benchmarks/offline_arms.py and their committed records"
   },
   "excluded_cases": {
     "test_contribution_lint.py::test_the_example_templates_pass_and_its_repeated_fan_out_is_flagged": "Repository example templates; the lint and recording cases remain enabled",
