@@ -159,6 +159,7 @@ accessor resume uses:
 | `decision` | The delivery decision that covers it: the run's current decision, a re-evaluation's after one; or null |
 | `integrity` | `status` and `detail` from rechecking the file's size and SHA-256: `verified`, `missing`, `changed`, `unsafe` or `unreadable` |
 | `delivery_eligibility` | `eligible`, and `reasons` for every unmet condition: `no_decision`, `not_accepted`, `record_mismatch`, `artifact_missing`, `artifact_changed`, `artifact_unsafe`, `artifact_unreadable` |
+| `superseded` | The earlier publications a republication superseded, oldest first, each as `sequence`, `name` and `sha256`; empty when the document was published once. The text output lists them on a `Supersedes:` line |
 
 The file is only read. As on resume, a decided record whose published file is
 missing or changed gives `indeterminate` with that reason, and the next action

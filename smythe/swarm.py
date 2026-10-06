@@ -1470,12 +1470,27 @@ class Swarm:
         The saved document's bytes go to a new file in the run's directory,
         which becomes the run's current publication; no file is replaced, no
         provider is called, and the delivery decision, which binds the same
-        bytes, is unchanged. Returns the current record. See
+        bytes, is unchanged. Returns the current record. A run with a lineage
+        policy instead renders its saved synthesis again into a file named for
+        the new publication, decides the new bytes again under this Swarm's
+        policy and supersedes its lineage record; an intact document is then
+        refused, as there is nothing to repair. See
         ``smythe.workflow.WorkflowRuntime.republish``.
         """
         if self._run_store is None:
             raise ValueError("republish needs a durable run_store")
         return await self._workflow_runtime().republish(execution_id)
+
+    async def _arerender(self, execution_id: str, *, plan_sha256: str,
+                         reason: str) -> PublishedArtifact:
+        """Apply a repair plan's ``rerender`` item: republish a lineage run, recording the plan."""
+        return await self._workflow_runtime().republish(
+            execution_id, plan_sha256=plan_sha256, reason=reason)
+
+    async def _arecheck(self, execution_id: str, *, plan_sha256: str, reason: str) -> SwarmResult:
+        """Apply a repair plan's ``recheck`` item: decide a lineage run again under this Swarm's policy."""
+        return await self._workflow_runtime().reevaluate(
+            execution_id, plan_sha256=plan_sha256, reason=reason)
 
     def remove_source(self, execution_id: str, source_id: str, reason: str, *,
                       removed_at: str | None = None) -> SourceRecord:
@@ -1641,7 +1656,9 @@ class Swarm:
 
         A durable ``run_store`` run journals the decision as a new
         ``acceptance`` operation and checkpoint; its recipe may differ from
-        this Swarm's only in its acceptance policy and gate verifier. See
+        this Swarm's only in its acceptance policy and gate verifier. A run
+        with a lineage policy also journals the new decision's lineage record,
+        which supersedes the earlier one. See
         ``smythe.workflow.WorkflowRuntime.reevaluate``.
 
         *operator*, an :class:`~smythe.acceptance.OperatorDecision`, records an

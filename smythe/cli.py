@@ -926,6 +926,10 @@ def _emit_run_inspection(value: dict[str, Any]) -> None:
               f"sha256 {published['sha256']}")
         print(f"  Integrity: {artifact['integrity']['status']}: "
               f"{_terminal_text(artifact['integrity']['detail'])}")
+        if artifact["superseded"]:
+            print("  Supersedes: " + ", ".join(
+                f"publication {item['sequence']} ({_terminal_text(item['name'])})"
+                for item in artifact["superseded"]))
         eligible = "eligible" if eligibility["eligible"] else (
             "not eligible (" + ", ".join(eligibility["reasons"]) + ")")
         print(f"  Delivery eligibility: {eligible}")

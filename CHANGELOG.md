@@ -670,8 +670,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `artifact` block, exits with code 11 and names the next action
   `republish`. `Swarm.republish()` publishes the saved document again under
   a free name, which becomes current, with no provider call and the same
-  decision; re-evaluation needs an intact document, so it is refused until
-  then. See [published documents](docs/workflow-accounting.md#published-documents).
+  decision (a lineage run's is rendered and decided again); re-evaluation
+  needs an intact document, so it is refused until then. See
+  [published documents](docs/workflow-accounting.md#published-documents).
 - An opt-in `RetryPolicy` makes the executor the only retry owner of an
   ordinary run's node calls; `Swarm(retry_policy=...)` and both executors
   take one. A `RETRY` node then calls again only after a failure whose class
@@ -1236,6 +1237,26 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   reusing its results and preparing or approving an external action for it
   are refused, and `smythe runs inspect` shows the stop with the next action
   `rerun`. See [security stops](docs/execution.md#security-stops).
+- In-place repair of completed lineage runs. `Swarm.republish()` on a run
+  with a lineage policy whose published document is missing or changed
+  renders the saved synthesis again, publishes it as a new file named for
+  its publication (`document-p1.md`) without replacing any file, and makes a
+  new decision on those bytes under the Swarm's policy, bound to that
+  publication, so identical bytes are decided again rather than copied. It
+  needs the saved synthesis to have the digest its lineage records and is
+  refused for an intact document, a changed renderer or synthesizer, and a
+  name already holding other bytes. Every new decision on a lineage run,
+  from republication, `Swarm.reevaluate()` or an operator, journals a
+  lineage record keyed `lineage/<sequence>` that names the decision, the
+  current publication and the deciding validators and supersedes the
+  earlier record, applied in the same checkpoint, so a later repair plan
+  finds nothing left to recheck or rerender. No node runs, nothing is read
+  or called, earlier publications, decisions and records stay in the
+  journal, and a process lost before the checkpoint is finished by the same
+  call again. A repair applied from a plan also binds its `plan_sha256` and
+  reason. `smythe runs inspect` lists superseded publications under
+  `artifact.superseded`. See
+  [repair a run in place](docs/lineage.md#repair-a-run-in-place).
 
 ### Changed
 

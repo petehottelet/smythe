@@ -365,14 +365,17 @@ class ArtifactLineage:
         return cls(**data)
 
 
-def lineage_key(synthesis_key: str) -> str:
+def lineage_key(synthesis_key: str, sequence: int = 0) -> str:
     """The journal key of the lineage a run writes when it completes after *synthesis_key*.
 
     ``lineage`` follows the synthesis keyed ``synthesis``, and
     ``lineage/<digest>`` the one keyed ``synthesis/<digest>``, so a run whose
-    nodes ran again never replays the lineage of an earlier graph state.
+    nodes ran again never replays the lineage of an earlier graph state. The
+    record that a later decision, with *sequence* above 0, supersedes it with
+    adds ``/<sequence>``.
     """
-    return LINEAGE_OPERATION + synthesis_key.removeprefix("synthesis")
+    key = LINEAGE_OPERATION + synthesis_key.removeprefix("synthesis")
+    return f"{key}/{sequence}" if sequence else key
 
 
 def load_lineage(store: Any, run_id: str) -> ArtifactLineage | None:
@@ -499,7 +502,8 @@ def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
                   sources: Iterable[ContextSource] = (),
                   reused: Mapping[str, tuple[str, Mapping[str, Any]]] = MappingProxyType({}),
                   predecessor: Mapping[str, Any] | None = None,
-                  repair: Mapping[str, Any] | None = None) -> ArtifactLineage:
+                  repair: Mapping[str, Any] | None = None,
+                  validators: Iterable[ValidatorIdentity] | None = None) -> ArtifactLineage:
     """The lineage of a completed durable run, from that run's own records only.
 
     *graph* is the completed graph, whose ``run_ref`` names the run, and
@@ -507,8 +511,9 @@ def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
     each node was given at its final generation, by node id, and
     *read_calls* the journal call record behind each read step's result.
     *publication* is the run's published document or None, *acceptance* the
-    decision's operation key and record, *registry_description* the run's
-    agents, *synthesis* the synthesis operation's key and output, and
+    decision's operation key and record, *validators* the final validators of
+    the policy that made it (by default the recipe's), *registry_description*
+    the run's agents, *synthesis* the synthesis operation's key and output, and
     *sources* the run's context sources. A successor run gives its
     *predecessor* and *repair* blocks, and in *reused*, by node id, the
     predecessor run and its record of each node whose result it reused: such
@@ -586,8 +591,8 @@ def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
                                  "version": _label(str(renderer.get("version"))),
                                  "spec_sha256": sha256_hex(renderer)}}
     operation_key, record = acceptance
-    validators = [ValidatorIdentity.from_dict(item)
-                  for item in recipe["acceptance"]["final_validators"]]
+    validators = list(validators) if validators is not None else [
+        ValidatorIdentity.from_dict(item) for item in recipe["acceptance"]["final_validators"]]
     return ArtifactLineage(
         run={"store_id": run["store_id"], "run_id": run["run_id"],
              "recipe_sha256": run["recipe_sha256"], "task_sha256": task_sha256(graph.task)},

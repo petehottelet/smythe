@@ -589,8 +589,13 @@ SHA-256, go to the renderer's file name or, when that is taken, the next free
 numbered name, so a changed file keeps its bytes, and the next `publication`
 operation, applied by a new completed checkpoint, becomes current. It calls no
 provider, runs no validator and leaves the decision as it is, since that binds
-the same bytes. A run whose current file is intact is left as it is. Operation
-kinds are free text, so publication needs no journal upgrade.
+the same bytes. A run whose current file is intact is left as it is. A run
+with a [lineage policy](lineage.md#repair-a-run-in-place) is repaired in place
+instead: its saved synthesis is rendered again, published under the new
+publication's own name (`document-p1.md`) and decided again, still without a
+provider call. The accessor's `superseded` lists the earlier publications a
+checkpoint applied, whose files stay where they are. Operation kinds are free
+text, so publication needs no journal upgrade.
 
 ## Lineage records
 
@@ -606,8 +611,12 @@ snapshots it names, so checkpoint saves read what they did before; it holds
 no calls and no cost. `inspect_run()`, `list_runs()` and journal events never
 return it, and `smythe.lineage.load_lineage(store, run_id)` reads it.
 Resuming a completed run assembles it again and gives an `indeterminate`
-decision when the saved record no longer matches. Operation kinds are free
-text, so lineage needs no journal upgrade.
+decision when the saved record no longer matches. Each later decision, by
+re-evaluation or republication, journals a `lineage` operation keyed by its
+decision sequence, `lineage/<sequence>` (or `lineage/<digest>/<sequence>`),
+whose inputs name the record it supersedes; the checkpoint that applies the
+decision applies it too. Operation kinds are free text, so lineage needs no
+journal upgrade.
 
 ## Reused results
 

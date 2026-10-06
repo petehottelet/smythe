@@ -13,10 +13,12 @@ format, `ArtifactLineage`, and the record each opted-in run
 a pure evaluator that says what a record calls for under the current
 sources, tools and validators, [repair plans](#plan-a-repair), which
 show before anything is dispatched what each run of an archive calls for
-and the work that would take, and the records of a
+and the work that would take, [repair in place](#repair-a-run-in-place),
+which decides a run again or publishes its damaged document again without
+running a node, and the records of a
 [successor run](#reuse-in-a-successor-run) that reuses a completed run's
-results. Nothing applies a plan, and no public method starts a successor
-or repairs work, yet.
+results. Nothing applies a whole plan, and no public method starts a
+successor, yet.
 
 ## Opt a run in
 
@@ -212,12 +214,13 @@ print(lineage.coverage, [(node["id"], node["kind"]) for node in lineage.nodes])
   commits writes it on resume, without a provider call or a read; one lost
   after it commits and before the completed checkpoint replays it, never
   assembling it again.
-- **Checked on resume.** Resuming a completed run assembles the record again
-  from the records its operation names; a record that is missing or has
-  another digest makes the decision `indeterminate`, and the output moves to
-  `rejected_output`. Re-evaluating the run or publishing its document again
-  leaves the record as it is: it names the decision and publication the run
-  completed with.
+- **Checked on resume.** Resuming a completed run assembles its current
+  record again from the records its operation names; a record that is
+  missing, has another digest or is not the record of the run's current
+  decision and publication makes the decision `indeterminate`, and the
+  output moves to `rejected_output`. Each later decision, by re-evaluation
+  or republication, journals a record that
+  [supersedes](#repair-a-run-in-place) the one before.
 - **Summarized in inspection.** `inspect_run()`, `list_runs()` and journal
   events never return the record. `smythe runs inspect` shows a
   [summary](runs.md#lineage) by ids, versions and digests: its coverage,
@@ -599,6 +602,68 @@ A run that has not completed has no status. `smythe runs inspect` has no
 source catalog, which is application code, so it never reports `current`
 or `stale`: without one of the first three statuses, it reports none.
 `smythe.reuse.STATUSES` lists the five.
+
+## Repair a run in place
+
+The `recheck` and `rerender` actions repair a completed run where it is. No
+node runs, no source is read and no provider is called; the budget, retry
+and regeneration counters stay as they are; and every earlier publication,
+decision and lineage record stays in the journal.
+
+- **Recheck.** A changed validator never inherits the decision made under
+  the old one. `swarm.reevaluate(run_id, acceptance=policy)`
+  [decides the saved document again](verifier.md#re-evaluation) under the
+  new policy, as a new decision.
+- **Rerender.** When the published document is missing or changed,
+  `swarm.republish(run_id)` renders the run's saved synthesis again with
+  the run's renderer, publishes the bytes as a new file named for the new
+  publication (`document-p1.md`, then `document-p2.md`), and decides those
+  bytes again under the `Swarm`'s policy. The damaged file stays as it is.
+
+```python
+swarm.republish(run_id)                      # the document was deleted or edited
+swarm.reevaluate(run_id, acceptance=policy)  # a validator's version changed
+```
+
+- **Checked first.** Rerendering needs a completed run whose recipe differs
+  from the `Swarm`'s only in its acceptance policy and gate verifier: a
+  changed renderer or synthesizer raises `WorkflowConflictError`, because a
+  document made another way is regenerated in a successor run. The saved
+  decision must still hold, the saved synthesis must have the digest the
+  run's lineage records, and the lineage must match its journal; otherwise
+  `WorkflowStateError` is raised. A document whose file still holds its
+  bytes is refused as having nothing to repair, and one that cannot be
+  checked safely or read is left for review. A refusal writes nothing.
+- **Never replaced.** The new file is published without replacing any file.
+  A file under its name that already holds the same bytes, such as one a
+  lost process published, is reused; one holding other bytes is refused.
+- **Never copied.** The new bytes usually equal the earlier ones, and they
+  are decided again anyway. The decision is a new `acceptance` operation
+  whose inputs bind the new publication's sequence, so it is never the
+  decision made for an earlier publication of the same bytes.
+- **Lineage superseded.** Every new decision on a lineage run, whether a
+  re-evaluation, an [operator's decision](verifier.md#operator-decisions) or
+  a republication, journals a record keyed `lineage/<sequence>` after the
+  decision's sequence (`lineage/<digest>/<sequence>` for a run whose nodes
+  ran again). It names the new decision, the current publication and the
+  validators of the policy that decided; an operator's decision keeps those
+  of the decision it resolved. The operation's inputs name `supersedes`, the
+  digest of the record before it. One completed checkpoint applies the
+  publication, the decision and the record together, and `load_lineage`
+  returns the new record, so a plan made afterwards finds nothing left to
+  recheck or rerender.
+- **The plan's reason.** A repair applied from a [plan](#plan-a-repair)
+  binds `repair`, the plan's `plan_sha256` and its reason, into the inputs of
+  the publication, the decision and the lineage record. A run without a
+  lineage policy records none and republishes as before: the same bytes
+  under a free name, with its decision unchanged.
+- **Recovery.** A process lost before the completed checkpoint leaves the
+  run as it was, its damaged document still current. Calling again with the
+  same arguments finishes the same publication and decision, reusing a file
+  already published, rather than adding others.
+
+[`smythe runs inspect`](runs.md#published-documents) lists the publications
+a republication superseded under `artifact.superseded`.
 
 ## Reuse in a successor run
 
