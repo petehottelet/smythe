@@ -3,8 +3,8 @@
 ``RetryPolicy`` makes the executor the only retry owner of a node's calls:
 which failure classes it calls again for, how long it waits first, and the
 deadline that bounds a node's attempts and waits together. ``ModelProfile``
-routes the nodes that name it to a developer-approved provider and model.
-``CapacityPolicy`` limits how many calls each provider type and model takes
+routes the nodes that name it to a developer-approved provider and model, and
+can name the profile that their retries fall back to. ``CapacityPolicy`` limits how many calls each provider type and model takes
 at once and how often one starts, and can admit ready work in turn across
 branches. ``TerminationPolicy`` lets the async executor drain the nodes in
 flight when a failure stops a run, instead of cancelling them at once. The
@@ -308,7 +308,7 @@ def _retry_after_s(error: BaseException) -> float | None:
 class _Bucket:
     """One provider type and model: its limit, the slots in use, and its next call start."""
 
-    __slots__ = ("limit", "in_flight", "not_before", "turn")
+    __slots__ = ("limit", "in_flight", "not_before", "turn", "freed")
 
     def __init__(self, limit: CapacityLimit) -> None:
         self.limit = limit
@@ -318,6 +318,8 @@ class _Bucket:
         # Held by the one call waiting for its start; the others queue in order.
         # Only calls in one async run's event loop ever queue for it.
         self.turn = asyncio.Lock()
+        # Set when a slot is given back, for a node waiting to move its slot here.
+        self.freed = asyncio.Event()
 
 
 class _CapacityLimiter:
@@ -333,6 +335,9 @@ class _CapacityLimiter:
         self._tracer = tracer
         self._sleep = sleep
         self._buckets: dict[tuple[type, str], _Bucket] = {}
+        # The bucket whose slot each node the async executor admitted holds,
+        # or None while the node waits to move its slot (see call()).
+        self.slots: dict[str, _Bucket | None] = {}
 
     def bucket(self, provider: Any, model: str) -> _Bucket:
         """The state of calls to *model* on *provider*'s type, its limit read on first use."""
@@ -353,6 +358,30 @@ class _CapacityLimiter:
     @staticmethod
     def release(bucket: _Bucket) -> None:
         bucket.in_flight -= 1
+        bucket.freed.set()
+
+    def give_back(self, node_id: str) -> None:
+        """Give back the slot that *node_id* holds, if any, as its task ends."""
+        bucket = self.slots.pop(node_id, None)
+        if bucket is not None:
+            self.release(bucket)
+
+    async def _move(self, node_id: str, bucket: _Bucket) -> bool:
+        """Move *node_id*'s slot to *bucket*, waiting for a free one; whether it waited.
+
+        The slot it holds is given back first, so a node waiting here holds
+        none and cannot keep another node from the slot that one waits for.
+        """
+        held, self.slots[node_id] = self.slots[node_id], None
+        if held is not None:
+            self.release(held)
+        waited = False
+        while not self.try_acquire(bucket):
+            waited = True
+            bucket.freed.clear()
+            await bucket.freed.wait()
+        self.slots[node_id] = bucket
+        return waited
 
     @asynccontextmanager
     async def call(self, provider: Any, model: str, node: Any = None):
@@ -364,11 +393,16 @@ class _CapacityLimiter:
         call cancelled while it waits claims none and the next call's turn is
         spaced from the calls that started. A transient status error it
         raises whose ``Retry-After`` asks for a wait starts a cooldown of that
-        length, at most the policy's ``cooldown_max_s``.
+        length, at most the policy's ``cooldown_max_s``. An admitted *node*
+        whose call goes to another provider type or model than its slot's,
+        as a fallback's does, first moves its slot there.
         """
         bucket = self.bucket(provider, model)
         started, waited = self._tracer.now(), bucket.turn.locked()
         try:
+            node_id = getattr(node, "id", None)
+            if node_id in self.slots and self.slots[node_id] is not bucket:
+                waited = await self._move(node_id, bucket) or waited
             async with bucket.turn:
                 while True:
                     now = self._tracer.now()
@@ -427,6 +461,10 @@ PROFILE_KEY = "profile"
 # provider must declare True for the profile's model.
 PROFILE_REQUIREMENTS = frozenset({"tools", "attachments", "image_output", "exact_accounting"})
 _PROFILE_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{0,63}")
+# The failure classes after which a node's next attempt calls its profile's
+# fallback: the provider answered or refused, so the failed call is settled.
+# Never unknown_outcome, whose call may still run and be charged.
+FALLBACK_CLASSES = frozenset({TRANSIENT, PROVIDER_REJECTED, QUALITY_DEFECT})
 
 
 class NoAllowedProfileError(ValueError):
@@ -450,6 +488,14 @@ class ModelProfile:
     sets ``estimated_cost_usd``. ``requires`` lists the features the provider
     must declare ``True`` for the model through ``Provider.feature_support()``:
     ``tools``, ``attachments``, ``image_output`` and ``exact_accounting``.
+
+    ``fallback`` names another of the run's profiles, which requires at least
+    the same features. After an attempt on this profile fails with a class in
+    ``FALLBACK_CLASSES`` (``transient``, ``provider_rejected`` or
+    ``quality_defect``), the node's next attempt, when its failure policy and
+    any retry policy make one, calls the fallback instead. Fallbacks may form
+    a chain that never returns to a profile it left; a retry after any other
+    failure, such as ``unknown_outcome``, calls the same profile again.
     """
 
     name: str
@@ -457,11 +503,19 @@ class ModelProfile:
     model: str
     max_cost_per_call_usd: float
     requires: frozenset[str] = frozenset()
+    fallback: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.name, str) or not _PROFILE_NAME.fullmatch(self.name):
             raise ValueError(
                 f"A model profile name must match {_PROFILE_NAME.pattern!r}, got {self.name!r}"
+            )
+        fallback = self.fallback
+        if fallback is not None and (not isinstance(fallback, str) or fallback == self.name
+                                     or not _PROFILE_NAME.fullmatch(fallback)):
+            raise ValueError(
+                f"Model profile {self.name!r} needs another profile's name as its fallback, "
+                f"got {fallback!r}"
             )
         if not isinstance(self.provider, Provider):
             raise TypeError(
@@ -484,7 +538,11 @@ class ModelProfile:
 
 
 def profile_map(profiles: object) -> dict[str, ModelProfile]:
-    """*profiles*, a sequence of ``ModelProfile`` with distinct names, by name."""
+    """*profiles*, a sequence of ``ModelProfile`` with distinct names, by name.
+
+    Each fallback must name one of them that requires at least the features
+    the profile it serves requires, and no chain of fallbacks may loop.
+    """
     if profiles is None:
         return {}
     if isinstance(profiles, (str, bytes, Mapping)) or not hasattr(profiles, "__iter__"):
@@ -496,7 +554,40 @@ def profile_map(profiles: object) -> dict[str, ModelProfile]:
         if profile.name in named:
             raise ValueError(f"Model profile names must be distinct; {profile.name!r} repeats")
         named[profile.name] = profile
+    for first in named.values():
+        current, chain = first, [first.name]
+        while current.fallback is not None:
+            following = named.get(current.fallback)
+            if following is None:
+                raise ValueError(
+                    f"Model profile {current.name!r} falls back to {current.fallback!r}, which is "
+                    "not one of the profiles"
+                )
+            missing = sorted(current.requires - following.requires)
+            if missing:
+                raise ValueError(
+                    f"Model profile {current.name!r} falls back to {following.name!r}, which "
+                    f"does not require {missing}"
+                )
+            if following.name in chain:
+                raise ValueError(
+                    f"Model profile fallbacks must not loop: {' -> '.join(chain)} -> "
+                    f"{following.name}"
+                )
+            current = following
+            chain.append(current.name)
     return named
+
+
+def fallback_chain(profile: ModelProfile, profiles: Mapping[str, ModelProfile]) -> list[ModelProfile]:
+    """*profile*, then each profile that its attempts fall back to, in order.
+
+    *profiles* is a :func:`profile_map`, whose fallbacks are known not to loop.
+    """
+    chain = [profile]
+    while chain[-1].fallback is not None:
+        chain.append(profiles[chain[-1].fallback])
+    return chain
 
 
 def node_profile(node: Node, profiles: Mapping[str, ModelProfile]) -> ModelProfile | None:

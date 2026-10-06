@@ -45,8 +45,9 @@ from smythe.provider import (
 from smythe.provider_responses import RawResponseEnvelope
 from smythe.registry import Registry
 from smythe.scheduling import (
-    PROFILE_KEY, ModelProfile, NoAllowedProfileError, RetryDeadlineError, RetryPolicy,
-    UncertainDispatchError, _attempt_records, _retry_after_s, node_profile, profile_map,
+    FALLBACK_CLASSES, PROFILE_KEY, ModelProfile, NoAllowedProfileError, RetryDeadlineError,
+    RetryPolicy, UncertainDispatchError, _attempt_records, _retry_after_s, fallback_chain,
+    node_profile, profile_map,
 )
 from smythe.scheduling import CapacityPolicy, _CapacityLimiter
 from smythe.task import _prompt_json, render_task, snapshot_task
@@ -164,9 +165,9 @@ def check_pending_nodes(
     """Check every node that has not completed or been skipped, before any of them runs.
 
     A node that names one of *profiles* is checked against its profile's
-    provider and model, with the profile's ceiling standing in for an
-    estimate of its own; one that names any other profile raises
-    ``NoAllowedProfileError``.
+    provider and model, and those of each profile it falls back to, with
+    each profile's ceiling standing in for an estimate of its own; one that
+    names any other profile raises ``NoAllowedProfileError``.
     """
     for node in graph.nodes:
         if node.status in (NodeStatus.COMPLETED, NodeStatus.SKIPPED):
@@ -174,14 +175,16 @@ def check_pending_nodes(
         _exchanges_claims(node)
         profile = node_profile(node, profiles or {})
         estimate = node.metadata.get("estimated_cost_usd")
-        if profile is not None and estimate is None:
-            estimate = profile.max_cost_per_call_usd
-        check_provider_support(
-            provider if profile is None else profile.provider,
-            str(node.metadata.get("model", "")) if profile is None else profile.model,
-            node_id=node.id, max_budget_usd=max_budget_usd, estimate=estimate,
-            tools=tools, attachments=node.attach_dep_artifacts, retry_owner=retry_owner,
-        )
+        routes = [(provider, str(node.metadata.get("model", "")), estimate)]
+        if profile is not None:
+            routes = [(item.provider, item.model,
+                       item.max_cost_per_call_usd if estimate is None else estimate)
+                      for item in fallback_chain(profile, profiles)]
+        for routed, model, ceiling in routes:
+            check_provider_support(
+                routed, model, node_id=node.id, max_budget_usd=max_budget_usd, estimate=ceiling,
+                tools=tools, attachments=node.attach_dep_artifacts, retry_owner=retry_owner,
+            )
 
 
 def _retired(provider: Provider, model: str) -> bool:
@@ -456,7 +459,11 @@ class ExecutorBase:
     the model of the first such node that has one, or else ``default_model``.
     While revisions remain, a run refuses with ``NoAllowedProfileError``,
     before any call, an ``LLMSupervisor`` without a model of its own and a
-    profile that calls another provider than the supervisor's.
+    profile that calls another provider than the supervisor's. A retry after
+    a failure in ``FALLBACK_CLASSES`` calls the failed profile's
+    ``fallback``, when it has one, as a new attempt of the node's allowance
+    that reserves and takes capacity for its own profile; each attempt's
+    trace span records its profile (see :meth:`_route_attempt`).
 
     ``capacity_policy``, a :class:`~smythe.scheduling.CapacityPolicy`, makes
     every provider call of a node, including tool turns and retries, wait
@@ -506,6 +513,8 @@ class ExecutorBase:
         if context_assembler is not None and not callable(context_assembler):
             raise TypeError("context_assembler must be callable or None")
         self._profiles = profile_map(profiles)
+        # The profile that each node's running attempt fell back to.
+        self._fallbacks: dict[str, ModelProfile] = {}
         self._default_model = default_model
         self._context_assembler = context_assembler
         if retry_policy is not None and not isinstance(retry_policy, RetryPolicy):
@@ -1333,13 +1342,45 @@ class ExecutorBase:
     def _node_route(self, node: Node) -> tuple[Provider, Any, ModelProfile | None]:
         """The provider and model *node* calls, and the profile that chose them, if any.
 
-        Raises ``NoAllowedProfileError`` for a profile this executor was not
-        given, or for a node that sets another model than its profile's.
+        While an attempt that fell back runs, that is its fallback profile
+        (see :meth:`_route_attempt`). Raises ``NoAllowedProfileError`` for a
+        profile this executor was not given, or for a node that sets another
+        model than its profile's.
         """
         profile = node_profile(node, self._profiles)
         if profile is None:
             return self._provider, node.metadata.get("model", ""), None
+        if node.status is NodeStatus.RUNNING:
+            profile = self._fallbacks.get(node.id, profile)
         return profile.provider, profile.model, profile
+
+    def _route_attempt(self, node: Node, error: Exception | None) -> None:
+        """Choose the profile of *node*'s attempt that has just started, and trace it.
+
+        *error* ended the node's previous attempt in this process. Without
+        one, the attempt calls the profile the node names, as a resumed or
+        requeued node does again. After a failure whose class is in
+        ``FALLBACK_CLASSES`` it calls the failed profile's fallback, when it
+        has one, and the reservation that profile's attempt left is released
+        so that the attempt reserves for its own profile before its call;
+        otherwise it calls the same profile. The attempt's span records the
+        profile and, after a fallback, the profile it fell back from.
+        """
+        if error is None:
+            self._fallbacks.pop(node.id, None)
+        current = self._node_route(node)[2]
+        if current is None:
+            return
+        profile = current
+        if (error is not None and current.fallback is not None
+                and classify_failure(error) in FALLBACK_CLASSES):
+            profile = self._fallbacks[node.id] = self._profiles[current.fallback]
+            if node.id in self._reserved_node_ids:
+                self._budget.release(node.id)
+                self._reserved_node_ids.discard(node.id)
+        self._tracer.on_node_profile(
+            node, profile.name, fallback_from=None if profile is current else current.name,
+        )
 
     def _node_estimate(
         self, node: Node, default_estimated_tokens: int | None,
@@ -1498,6 +1539,7 @@ class ExecutorBase:
                     raise BudgetValidationError("Unjournaled accounting requires reconciliation")
         if self._max_revisions > self._revisions_used:
             check_supervisor_profiles(self._supervisor, self._profiles)
+        self._fallbacks.clear()
         if self._retry_policy is not None:
             pending = [node for node in graph.nodes
                        if node.status not in (NodeStatus.COMPLETED, NodeStatus.SKIPPED)]
@@ -1523,11 +1565,13 @@ class ExecutorBase:
                 self._capacity_policy, self._tracer, self._sleep or asyncio.sleep,
             )
             # Read every hint the pending nodes need, so a bad one stops the run before any call.
-            # A profiled node's limit is its profile's provider and model.
+            # A profiled node's limits are its profile's provider and model and its fallbacks'.
             for node in graph.nodes:
                 if node.status not in (NodeStatus.COMPLETED, NodeStatus.SKIPPED):
-                    provider, model, _ = self._node_route(node)
+                    provider, model, profile = self._node_route(node)
                     self._capacity.bucket(provider, str(model))
+                    for fallback in fallback_chain(profile, self._profiles)[1:] if profile else ():
+                        self._capacity.bucket(fallback.provider, fallback.model)
         self._reserved_node_ids.clear()
         self._dispatched.clear()
         self._call_attempts.clear()

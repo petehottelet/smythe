@@ -300,8 +300,11 @@ class AsyncExecutor(ExecutorBase):
                         name=f"smythe-node-{node.id}",
                     )
                     if bucket is not None:
-                        # However the task ends, even cancelled before it starts.
-                        task.add_done_callback(lambda _, bucket=bucket: capacity.release(bucket))
+                        # However the task ends, even cancelled before it starts,
+                        # it gives back the slot it holds then: a fallback moves it.
+                        capacity.slots[node.id] = bucket
+                        task.add_done_callback(
+                            lambda _, node_id=node.id: capacity.give_back(node_id))
                         last_branch = _branch(node, order)
                     active[task] = node
                 ready.extendleft(reversed(passed))
@@ -564,6 +567,7 @@ class AsyncExecutor(ExecutorBase):
             self._tracer.on_node_start(node, attempt=attempt)
 
             try:
+                self._route_attempt(node, last_exc)
                 # Cost recording happens inside acall_node (per provider call).
                 result = await self.acall_node(node, graph)
                 # Artifact writes are file I/O — keep them off the event

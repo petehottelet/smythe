@@ -102,6 +102,7 @@ class Executor(ExecutorBase):
             self._tracer.on_node_start(node, attempt=attempt)
 
             try:
+                self._route_attempt(node, last_exc)
                 # Cost recording happens inside acall_node (per provider call).
                 result = asyncio.run(self.acall_node(node, graph))
                 try:

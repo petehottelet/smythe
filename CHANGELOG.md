@@ -1155,6 +1155,23 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   wrapped `LLMSupervisor`. A node's tool calls that return errors are counted
   in `metadata["tool_errors"]`. See
   [evidence-triggered review](docs/supervisor.md#evidence-triggered-review).
+- `ModelProfile(fallback=...)` names another of the run's profiles for a
+  node's retries. After an attempt on the profile fails with a `transient`,
+  `provider_rejected` or `quality_defect` failure, the node's next attempt
+  calls the fallback instead: a new attempt within the node's allowance,
+  persisted attempts included, that waits the retry's backoff, reserves its
+  own profile's ceiling and, under a capacity policy, takes that provider
+  type and model's turn and in-flight slot. Fallbacks can form a chain. A
+  retry after any other failure, `unknown_outcome` included, calls the same
+  profile again, so a call without an answer is never sent to another model.
+  Each attempt's span on `Tracer.spans` records its `profile` and, after a
+  fallback, `fallback_from`; `summary()` keeps its keys. A fallback that is
+  not one of the run's profiles, requires fewer features than the profile it
+  serves or loops back is refused when the Swarm or executor is built, and
+  each unfinished node is checked against every profile it may fall back to
+  before any call. Checkpoints are unchanged, and a resumed node's first
+  attempt calls the profile it names. See
+  [profile fallback](docs/execution.md#profile-fallback).
 
 ### Changed
 

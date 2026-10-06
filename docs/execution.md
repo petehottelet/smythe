@@ -502,6 +502,68 @@ completed run returns its saved result without them. Durable `run_store`
 runs refuse `profiles`, and any node that names one, with
 `WorkflowBindingError`.
 
+### Profile fallback
+
+A profile's `fallback` names another of the run's profiles, which a node's
+retry calls in its place:
+
+```python
+from smythe import FailurePolicy, ModelProfile, OpenAIResponsesProvider, RetryPolicy, Swarm
+from smythe.graph import Node
+
+responses = OpenAIResponsesProvider()
+sol = ModelProfile("sol", responses, "gpt-5.6-sol", max_cost_per_call_usd=0.05,
+                   fallback="astra")
+astra = ModelProfile("astra", responses, "gpt-6-astra", max_cost_per_call_usd=0.25)
+swarm = Swarm(model="gpt-6-astra", provider=responses, profiles=[sol, astra],
+              retry_policy=RetryPolicy(retry_classes={"transient", "quality_defect"}),
+              max_budget_usd=2)
+step = Node(id="summary", label="Summarize the findings", metadata={"profile": "sol"},
+            failure_policy=FailurePolicy.RETRY, max_retries=2)
+```
+
+After an attempt on a profile fails with a `transient`, `provider_rejected`
+or `quality_defect` [failure](#failure-classes), such as a rate limit, a
+server error, a truncated reply or a tool loop that ran out, the node's next
+attempt calls that profile's fallback. The fallback is a new attempt, not an
+extra one: it needs a `RETRY` node with attempts left and, under a
+[retry policy](#retry-policy), a listed class and time before the deadline,
+and it waits the backoff or `Retry-After` that any retry waits. A node's
+attempts on all its profiles together therefore stay within
+`1 + max_retries`, and with `persist_attempts` within the allowance that
+resume continues. A fallback's own fallback serves the attempt after it, and
+later retries stay on the last profile of the chain. A retry after any other
+failure calls the same profile again. That includes `unknown_outcome`: a call
+sent without an answer may still run and be charged, so its work is never
+sent to another provider or model.
+
+Each attempt's trace span records the profile it called as
+`metadata["profile"]`, and an attempt that fell back records the profile it
+replaced as `metadata["fallback_from"]`. Both are on `Tracer.spans`; the keys
+of `Tracer.summary()` and `SwarmResult.trace` are unchanged. A fallback
+attempt reserves its own profile's `max_cost_per_call_usd` before its call,
+unless the node sets `estimated_cost_usd`. The reservation that the failed
+attempt left is released first, so a budget that cannot hold the fallback's
+ceiling stops the run with `SentinelAlert` before the call. Under a
+[capacity policy](#provider-capacity), the fallback's calls take its
+provider type and model's turns, and in the async executor the node's slot
+moves to that model: the node gives back the slot it held, then waits until
+the fallback's model has a free one.
+
+The node's `metadata["profile"]` and `metadata["model"]` keep the profile it
+names, and checkpoints save no choice of profile. The first attempt in each
+process, a resumed node's included, calls the profile the node names, as does
+a node that a regeneration or a cancellation runs again.
+
+A fallback must be one of the run's profiles and require at least the
+features of the profile it serves, and a chain must not return to a profile
+it left; otherwise `Swarm`, `Executor` and `AsyncExecutor` raise `ValueError`
+when built. Because a fallback is one of the run's profiles, the checks before
+any call cover it, such as `sdk_retries=0` under a retry policy. Each
+unfinished node is also checked against every profile it may fall back to,
+including its image inputs and, under a capacity policy, each provider's
+capacity hint.
+
 ## Timing
 
 `SwarmResult.timing` reports where a call's time went. Durations come from a

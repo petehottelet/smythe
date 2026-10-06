@@ -171,6 +171,24 @@ class Tracer:
         self._active[node.id] = span
         logger.debug("Node started: %s (%s)", node.id, node.label)
 
+    def on_node_profile(
+        self, node: Node, profile: str, *, fallback_from: str | None = None,
+    ) -> None:
+        """Record the model profile that *node*'s active attempt calls.
+
+        The span's ``metadata["profile"]`` names it, and after a fallback
+        ``metadata["fallback_from"]`` names the profile whose failed attempt
+        this one replaces; ``summary()`` leaves both out, so it keeps its keys.
+        """
+        span = self._active.get(node.id)
+        if span:
+            span.metadata["profile"] = profile
+            if fallback_from is not None:
+                span.metadata["fallback_from"] = fallback_from
+        if fallback_from is not None:
+            logger.info("Node %s falls back from model profile %s to %s",
+                        node.id, fallback_from, profile)
+
     def on_node_end(self, node: Node) -> None:
         span = self._active.pop(node.id, None)
         if span:

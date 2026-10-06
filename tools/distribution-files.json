@@ -220,6 +220,7 @@
     "tests/test_optional_dependency_imports.py",
     "tests/test_planner.py",
     "tests/test_planner_inventory.py",
+    "tests/test_profile_fallback.py",
     "tests/test_provider.py",
     "tests/test_provider_probe.py",
     "tests/test_provider_responses.py",
