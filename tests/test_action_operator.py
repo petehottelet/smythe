@@ -297,6 +297,12 @@ def test_not_executed_needs_a_new_approval_that_accepts_the_duplicate_risk(
     assert view["approvals"][0]["consumed_by_attempt"] is None and view["approvals"][0]["revoked_at_ns"] is None
     with pytest.raises(ActionNotAuthorized, match="does not accept the duplicate risk"):
         check_authority(store, action.action_id, host)
+    # The journal refuses it as well, in the transaction that would begin an attempt.
+    decided_journal, lease = journal(store), store.acquire_lease(action.run_id, "worker-1", ttl_s=60)
+    with pytest.raises(ActionNotAuthorized, match="does not accept the duplicate risk"):
+        workflow_actions.begin_attempt(store, lease, action.action_id, original.approval_id)
+    store.release_lease(lease)
+    assert journal(store) == decided_journal
     worker = runner(store, connector, host, clock)
     with pytest.raises(ActionNotAuthorized, match="does not accept the duplicate risk"):
         worker.dispatch(action.run_id, action.action_id)
