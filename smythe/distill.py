@@ -129,7 +129,8 @@ def distill_template(
             agent_id = None
             profile = entry["profile"]
             if profile is not None:
-                agent = Agent(profile=AgentProfile(**profile))
+                # A copy, so changing one build's agent cannot change the template.
+                agent = Agent(profile=AgentProfile(**deepcopy(profile)))
                 template_registry.register(agent)
                 agent_id = agent.id
             nodes.append(
