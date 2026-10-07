@@ -55,7 +55,8 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
   bytes, including `"type": "text_workflow"`, `"version": 1` and its
   `verifier`, so existing runs resume as before.
 - **Identity, not behavior.** Like `graph_policy`, the policy is compared
-  exactly whenever a run is planned, executed, resumed or re-evaluated. A run
+  exactly whenever a run is planned, executed, resumed or re-evaluated,
+  except that a re-evaluation, which reuses nothing, ignores `reuse`. A run
   never changes its access scope, reuse mode or coverage rule while in
   flight: resuming it with another policy or without its policy, or resuming
   a run without lineage under a policy, raises `WorkflowConflictError` before
@@ -827,8 +828,11 @@ for new work without touching what was recorded. Its plans
 [regenerate](#rules) every item that is not a `recheck` or a `review`, with
 `reuse_disabled`, so applying one computes each such item again in full: no
 `reuse` operation is written, every node of each successor runs, and the
-documents are byte for byte those of a new run. Every lineage record stays
-readable, and turning reuse on again makes later plans keep results again.
+documents are byte for byte those of a new run. A `recheck` item is decided
+again as before, since a decision reuses nothing; rendering a document again
+from its saved synthesis is reuse, so `republish` refuses a run recorded
+under another `reuse`. Every lineage record stays readable, and turning reuse
+on again makes later plans keep results again.
 
 ## Restrict a source
 

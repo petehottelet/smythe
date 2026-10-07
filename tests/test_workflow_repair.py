@@ -972,3 +972,52 @@ def test_a_lost_successor_is_a_repair_in_progress_that_resumes_rather_than_resta
     (item,) = swarm.plan_repair(sources=catalog).to_dict()["items"]
     assert (item["run_id"], item["action"], item["status"]) == (successor, "reuse", "current")
     assert "repairs_in_progress" not in item
+
+
+# ---------------------------------------------------------------------------
+# A recheck under the reuse switch
+# ---------------------------------------------------------------------------
+
+
+def test_with_reuse_off_a_recheck_applies_and_the_items_after_it_still_apply(
+        store, archive_sources, tmp_path, replies):
+    service, endpoint = archive_sources
+    intact = maintained(store, endpoint, tmp_path).execute(survey_only(endpoint)).execution_id
+    full = maintained(store, endpoint, tmp_path).execute(
+        successors.research_graph(endpoint)).execution_id
+    service.change_source("churn", successors.CHANGED)
+    # The rollback switch, with the counted validator's version bumped too.
+    off = LineagePolicy(access_scope=SCOPE, reuse=False)
+    swarm = maintained(store, endpoint, tmp_path, acceptance=policy("2"), lineage=off)
+    catalog = successors.Catalog(service)
+    plan = swarm.plan_repair(sources=catalog)
+    # A changed validator alone still calls for a recheck, which reuses nothing.
+    assert [(item["run_id"], item["action"]) for item in plan.to_dict()["items"]] == [
+        (intact, "recheck"), (full, "regenerate")]
+    Counted.checked = []
+
+    result = repair(swarm, plan, catalog)
+
+    items = result.to_dict()["items"]
+    assert [(item["run_id"], item["action"], item["outcome"]) for item in items] == [
+        (intact, "recheck", "applied"), (full, "regenerate", "applied")]
+    assert items[0]["work"] == IDLE | {"acceptance_evaluations": 1}
+    decision = current_decision(store, intact)
+    assert decision["record"] == result.decisions[intact]
+    assert decision["record"].policy_sha256 == policy("2").sha256
+    assert decision["inputs"]["repair"] == {"plan_sha256": plan.plan_sha256, "reason": REASON}
+    assert load_lineage(store, intact).acceptance["policy_sha256"] == policy("2").sha256
+    # The regenerated item kept nothing.
+    (successor,) = result.successor_run_ids
+    assert store.list_operations(successor, "reuse") == []
+    # The rechecked run keeps the lineage policy it recorded: resuming it
+    # still needs that policy, and rendering its document again, which reuses
+    # its saved synthesis, is refused with reuse off.
+    assert store.load_run(intact)["config"]["lineage"] == LineagePolicy(
+        access_scope=SCOPE).to_dict()
+    with pytest.raises(WorkflowConflictError, match="lineage policy"):
+        maintained(store, endpoint, tmp_path, lineage=off).resume(intact)
+    with pytest.raises(WorkflowConflictError, match="lineage policy"):
+        swarm.republish(intact)
+    resumed = maintained(store, endpoint, tmp_path).resume(intact)
+    assert resumed.accepted and resumed.acceptance == result.decisions[intact]

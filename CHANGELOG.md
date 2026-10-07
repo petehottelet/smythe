@@ -1455,7 +1455,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   (`repair_in_progress`), naming it in `repairs_in_progress`, until
   ordinary resume finishes it. Under `LineagePolicy(reuse=False)` a
   regenerated item keeps no result and runs every node, and its document is
-  byte for byte a new run's. See
+  byte for byte a new run's; a `recheck` item is decided again, as
+  re-evaluation, which reuses nothing, compares a run's lineage policy in
+  all but `reuse`. See
   [apply a repair plan](docs/lineage.md#apply-a-repair-plan).
 
 ### Changed

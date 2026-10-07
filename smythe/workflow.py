@@ -1163,12 +1163,14 @@ class WorkflowRuntime:
                 recipe[name] = value
         return json_snapshot(recipe)
 
-    def _adopt_recipe(self, saved, *, reevaluating=False):
+    def _adopt_recipe(self, saved, *, reevaluating=False, reuse_switch=False):
         """Check a saved recipe against this runtime; bind its behavior versions.
 
         *reevaluating* tolerates a recipe whose acceptance policy and gate
         verifier differ: a re-evaluation decides under this runtime's policy
         and reads the verdicts the run's gates recorded without judging again.
+        *reuse_switch* also tolerates a lineage policy whose ``reuse``
+        differs, as a decision reuses nothing.
         """
         saved, current = dict(saved), dict(self.recipe)
         policy = saved.get("acceptance")
@@ -1178,6 +1180,10 @@ class WorkflowRuntime:
             for name in ("acceptance", "verifier", "validators"):
                 saved.pop(name, None)
                 current.pop(name, None)
+        if reuse_switch:
+            for recipe in (saved, current):
+                if isinstance(recipe.get("lineage"), dict):
+                    recipe["lineage"] = {**recipe["lineage"], "reuse": None}
         behavior = {}
         for name, (absent, _) in RECIPE_BEHAVIOR_FIELDS.items():
             current.pop(name, None)
@@ -1368,11 +1374,11 @@ class WorkflowRuntime:
         return sorted(set(ids))
 
     @asynccontextmanager
-    async def _session(self, run, *, reevaluating=False):
+    async def _session(self, run, *, reevaluating=False, reuse_switch=False):
         self.run, self.run_id = run, run["run_id"]
         if run["budget_nanousd"] != _nanousd(self.max_budget_usd):
             raise WorkflowConflictError("Workflow components or budget differ from the saved recipe")
-        self._adopt_recipe(run["config"], reevaluating=reevaluating)
+        self._adopt_recipe(run["config"], reevaluating=reevaluating, reuse_switch=reuse_switch)
         self.context_revision, self.context_sources, self._snapshot_ids = None, (), {}
         if self.run_policy_sha256 is not None:
             # The record a strict run's unfinished checkpoints carry.
@@ -2193,8 +2199,10 @@ class WorkflowRuntime:
         decides again, since a decision binds the run's tombstones.
 
         The saved recipe may differ from this runtime's only in its acceptance
-        policy and gate verifier. Resuming the run still needs the policy its
-        recipe records, and returns the current decision.
+        policy, its gate verifier and its lineage policy's ``reuse``, since a
+        decision reuses nothing, so a repair under ``LineagePolicy(reuse=False)``
+        can recheck. Resuming the run still needs the policies its recipe
+        records, and returns the current decision.
 
         *operator*, an :class:`~smythe.acceptance.OperatorDecision`, records
         that operator's decision instead, with or without a policy on this
@@ -2240,7 +2248,7 @@ class WorkflowRuntime:
             raise WorkflowStateError("Workflow has no lineage policy, so it records no repair plan")
         # A runtime without a policy writes the checkpoint version the recipe does.
         self.checkpoint_version = _checkpoint_version(run["config"])
-        async with self._session(run, reevaluating=True):
+        async with self._session(run, reevaluating=True, reuse_switch=True):
             state = self._restore()
             if state is None or state["status"] != "completed":
                 raise WorkflowStateError(

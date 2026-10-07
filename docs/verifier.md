@@ -839,7 +839,8 @@ policy, and records the decision in its journal:
   acceptance=policy)`, or `WorkflowRuntime.reevaluate(run_id)`,
   [decides a completed run again](#re-evaluation). The saved recipe may
   differ from the `Swarm`'s only in its acceptance policy and gate verifier,
-  since no gate judges again; anything else raises `WorkflowConflictError`.
+  since no gate judges again, and in its lineage policy's `reuse`, since a
+  decision reuses nothing; anything else raises `WorkflowConflictError`.
   The decision is a new `acceptance` operation keyed
   `acceptance/<sequence>/<digest>`, the digest covering the output, the
   policy and everything else the decision binds, and a new completed

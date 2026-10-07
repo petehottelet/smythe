@@ -1770,7 +1770,8 @@ class Swarm:
 
         A durable ``run_store`` run journals the decision as a new
         ``acceptance`` operation and checkpoint; its recipe may differ from
-        this Swarm's only in its acceptance policy and gate verifier. A run
+        this Swarm's only in its acceptance policy, its gate verifier and its
+        lineage policy's ``reuse``. A run
         with a lineage policy also journals the new decision's lineage record,
         which supersedes the earlier one. See
         ``smythe.workflow.WorkflowRuntime.reevaluate``.

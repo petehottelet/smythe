@@ -638,3 +638,25 @@ def test_yaml_graphs_take_lineage_from_the_argument(store, tmp_path):
     result = asyncio.run(swarm.execute_async())
     assert result.accepted
     assert store.load_run(result.execution_id)["config"]["lineage"] == policy.to_dict()
+
+
+# ---------------------------------------------------------------------------
+# Re-evaluation and the reuse switch
+# ---------------------------------------------------------------------------
+
+
+def test_a_re_evaluation_ignores_only_the_lineage_reuse_switch(store, monkeypatch):
+    run_id = durable(store, acceptance=strict(), lineage=LineagePolicy()).execute(
+        Task("Report")).execution_id
+    no_provider_calls(monkeypatch)
+    for changed in (LineagePolicy(access_scope="tenant-b"),
+                    LineagePolicy(undeclared_coverage="regenerate")):
+        with pytest.raises(WorkflowConflictError, match="lineage"):
+            durable(store, acceptance=strict(), lineage=changed).reevaluate(run_id)
+    # A decision reuses nothing, so the rollback switch does not bind it.
+    again = durable(store, acceptance=strict(), lineage=LineagePolicy(reuse=False)).reevaluate(
+        run_id)
+    assert again.accepted
+    assert store.load_run(run_id)["config"]["lineage"] == LineagePolicy().to_dict()
+    with pytest.raises(WorkflowConflictError, match="lineage"):
+        durable(store, acceptance=strict(), lineage=LineagePolicy(reuse=False)).resume(run_id)
