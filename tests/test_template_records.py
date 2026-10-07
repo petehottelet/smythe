@@ -220,6 +220,7 @@ def test_present_but_empty_sections_are_rejected(key, value):
     (_set(["blueprint", 1, "max_regenerations"], True), "non-negative integer"),
     (_set(["blueprint", 0, "timeout_s"], 0), "positive finite"),
     (_set(["blueprint", 0, "timeout_s"], float("inf")), "positive finite"),
+    (_set(["blueprint", 0, "timeout_s"], 10 ** 400), "positive finite"),
     (_set(["blueprint", 0, "attach_dep_artifacts"], 1), "true or false"),
     (_set(["blueprint", 0, "metadata", "role"], 5), "must be a string"),
     (_set(["name"], " "), "must not be blank"),
@@ -679,6 +680,22 @@ def _repoint(root, record):
 def _reformat(root, record):
     path = root / "records" / f"{record.record_sha256}.json"
     path.write_text(json.dumps(json.loads(path.read_bytes()), indent=1), encoding="utf-8")
+
+
+def test_a_catalog_record_with_an_overlong_timeout_is_a_record_error(tmp_path):
+    catalog = TemplateCatalog(tmp_path)
+    record = full_record()
+    catalog.put(record)
+    path = tmp_path / "records" / f"{record.record_sha256}.json"
+    huge = path.read_bytes().replace(b'"timeout_s":90.0', b'"timeout_s":1' + b"0" * 400, 1)
+    assert huge != path.read_bytes()
+    digest = hashlib.sha256(huge).hexdigest()
+    (tmp_path / "records" / f"{digest}.json").write_bytes(huge)
+    (tmp_path / "versions" / record.template_version).unlink()
+    (tmp_path / "versions" / record.template_version).write_bytes(digest.encode())
+
+    with pytest.raises(TemplateRecordError, match="positive finite"):
+        catalog.get(record.template_version)
 
 
 @pytest.mark.parametrize("tamper", [

@@ -132,7 +132,11 @@ def _flag(value: Any, what: str) -> bool:
 
 
 def _seconds(value: Any, what: str) -> int | float:
-    if type(value) not in (int, float) or not math.isfinite(value) or value <= 0:
+    try:
+        finite = type(value) in (int, float) and math.isfinite(value)
+    except OverflowError:  # An integer too large to be a float.
+        finite = False
+    if not finite or value <= 0:
         raise TemplateRecordError(f"{what} must be a positive finite number")
     return value
 
