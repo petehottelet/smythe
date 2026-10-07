@@ -17,7 +17,9 @@ import pytest
 from fakes import (
     LOST_RESPONSE, HttpError, NativeTransport, kill_and_reap, launch_child, wait_for_barrier,
 )
-from smythe import OfflineProvider, SQLiteWorkflowStore, Swarm, Task
+from smythe import (
+    AcceptancePolicy, OfflineProvider, RunControl, SecurityStop, SQLiteWorkflowStore, Swarm, Task,
+)
 from smythe._money import MICROUSD, NANOUSD, from_units
 from smythe.graph import NodeStatus
 from smythe.optimize.contracts import (
@@ -289,7 +291,8 @@ def test_the_workflow_budget_is_the_trial_ceiling_exactly(tmp_path):
 
 
 @pytest.mark.parametrize("problem", ["no store", "other budget", "unlimited", "not a swarm",
-                                     "not a task", "factory raises", "durable refusal"])
+                                     "not a task", "factory raises", "durable refusal",
+                                     "revoked run control"])
 def test_a_trial_the_adapter_cannot_set_up_creates_no_run(tmp_path, problem):
     with SQLiteWorkflowStore(tmp_path / "runs.db") as store:
 
@@ -303,9 +306,12 @@ def test_a_trial_the_adapter_cannot_set_up_creates_no_run(tmp_path, problem):
             # A scripted OfflineProvider builds a Swarm, but no durable recipe.
             provider = (OfflineProvider(responses=["scripted"]) if problem == "durable refusal"
                         else OfflineProvider(plan=ONE_NODE))
+            control = RunControl()
+            if problem == "revoked run control":
+                control.revoke("trial-stop")
             return Swarm(model="offline", provider=provider,
                          run_store=None if problem == "no store" else store,
-                         max_budget_usd=budget)
+                         max_budget_usd=budget, run_control=control)
 
         def tasks(context):
             return "Write a report" if problem == "not a task" else task_for(context)
@@ -315,6 +321,8 @@ def test_a_trial_the_adapter_cannot_set_up_creates_no_run(tmp_path, problem):
             asyncio.run(evaluate(_context()))
         assert str(caught.value) == REFUSED and caught.value.__cause__ is not None
         assert store.list_runs() == []
+    if problem == "revoked run control":
+        assert isinstance(caught.value.__cause__, SecurityStop)
 
 
 def test_a_ceiling_a_float_budget_cannot_hold_is_refused_before_building(tmp_path):
@@ -354,6 +362,96 @@ def test_spend_left_on_a_returned_workflow_is_unknown(tmp_path, monkeypatch):
         monkeypatch.setattr(SQLiteWorkflowStore, "inspect_run", reserved)
         with pytest.raises(WorkflowTrialError, match=f"^{UNKNOWN}$"):
             asyncio.run(evaluate(_context()))
+
+
+def _chain(error):
+    """*error* and every exception chained behind it, by cause or context."""
+    chain = []
+    while error is not None and error not in chain:
+        chain.append(error)
+        error = error.__cause__ or error.__context__
+    return chain
+
+
+def strict_factory(store):
+    """Durable Swarms whose generated plan no gate could accept under a strict policy."""
+
+    def build(context, max_budget_usd):
+        return Swarm(model="offline", provider=OfflineProvider(plan=ONE_NODE), run_store=store,
+                     max_budget_usd=max_budget_usd, acceptance=AcceptancePolicy(mode="strict"))
+
+    return build
+
+
+def test_a_plan_only_the_run_refuses_leaves_its_run_with_nothing_spent(tmp_path):
+    context = _context()
+    with SQLiteWorkflowStore(tmp_path / "runs.db") as store:
+        evaluate = workflow_trial_evaluator(strict_factory(store), task_for, measure)
+        with pytest.raises(WorkflowTrialError, match=f"^{FAILED}$") as caught:
+            asyncio.run(evaluate(context))
+        (run,) = store.list_runs()
+        state = store.inspect_run(run["run_id"])
+
+    # The run's own planning check refused it once it existed, before any call.
+    assert "architect that generates its gates" in str(caught.value.__cause__)
+    assert run["run_id"] == trial_run_id(context.trial_key) and run["status"] == "running"
+    assert run["confirmed_nanousd"] == run["reserved_nanousd"] == run["unknown_nanousd"] == 0
+    assert state["calls"] == []
+
+
+def test_an_unreadable_state_keeps_the_workflow_failure_in_the_chain(tmp_path, monkeypatch):
+    inspect, aresume = SQLiteWorkflowStore.inspect_run, Swarm.aresume
+    resumed = []
+
+    async def resume(self, run_id):
+        try:
+            return await aresume(self, run_id)
+        finally:
+            resumed.append(run_id)
+
+    def unreadable(self, run_id):
+        # The run reads its own state; only the adapter's read afterwards fails.
+        if resumed:
+            raise sqlite3.OperationalError("database is locked")
+        return inspect(self, run_id)
+
+    monkeypatch.setattr(Swarm, "aresume", resume)
+    monkeypatch.setattr(SQLiteWorkflowStore, "inspect_run", unreadable)
+    with SQLiteWorkflowStore(tmp_path / "runs.db") as store:
+        evaluate = workflow_trial_evaluator(strict_factory(store), task_for, measure)
+        with pytest.raises(WorkflowTrialError, match=f"^{UNKNOWN}$") as caught:
+            asyncio.run(evaluate(_context()))
+
+    # The unreadable state is the direct cause; the workflow's own failure
+    # stays chained behind it.
+    chain = _chain(caught.value)
+    assert isinstance(chain[1], sqlite3.OperationalError)
+    assert any("architect that generates its gates" in str(error) for error in chain[2:])
+
+
+def test_an_outcome_the_runner_rejects_is_recorded_as_an_invalid_outcome(tmp_path):
+    def unscored(context, result):
+        return {"score": 1}, {"delivered": bool(result.output)}
+
+    contract = _contract()
+    incumbent, challenger = _candidates(contract)
+    with (SQLiteWorkflowStore(tmp_path / "runs.db") as store,
+          ExperimentLedger(tmp_path / "autotune.db") as ledger):
+        evaluate = workflow_trial_evaluator(offline_factory(store), task_for, unscored)
+        runner = OptimizationRunner(contract, ledger, evaluate, evaluator_hash=EVALUATOR,
+                                    campaign_id="unscored")
+        with pytest.raises(OptimizationNeedsAttention, match="invalid outcome") as caught:
+            asyncio.run(runner.run(incumbent, [challenger]))
+        (trial,) = ledger.list_trials("unscored")
+        (run,) = store.list_runs()
+
+    # The adapter reported the outcome, and the runner's own check refused it.
+    assert type(caught.value.__cause__) is ValueError
+    assert trial.status is TrialStatus.UNKNOWN
+    assert trial.error == (
+        "evaluator returned an invalid outcome: ValueError: metrics must exactly match "
+        "contract objectives; missing=['quality'], extra=['score']")
+    assert run["run_id"] == trial_run_id(trial.trial_key) and run["status"] == "completed"
 
 
 @pytest.mark.parametrize("name", ["runtime_factory", "task_for", "measure"])

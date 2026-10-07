@@ -9,12 +9,22 @@ under-reported.
 
 A trial whose workflow cannot be reported raises :class:`WorkflowTrialError`
 with one of a few fixed texts: a configuration refused before the run
-exists; a run that already exists for the trial; a workflow that leaves any
-reserved or unknown spend, or any unknown call; one that fails; and a failed
+exists, including a revoked ``run_control``; a run that already exists for
+the trial; a workflow that leaves any reserved or unknown spend, or any
+unknown call, or whose state cannot be read; one that fails; and a failed
 measurement. ``OptimizationRunner`` then records the
 trial as unknown, at its full ceiling, and stops the campaign. The runner
 keeps that error's text in its ledger, so the text is fixed and never a
-provider's. The original error stays chained in the process for diagnosis.
+provider's. The original error stays chained in the process for diagnosis,
+with the workflow's own failure behind it when the run's state then cannot
+be read.
+
+A configuration that only the run's own planning check refuses, such as a
+strict acceptance policy that no gate of the plan could accept, leaves its
+run in the journal with nothing spent and fails with the failed-workflow
+text. An outcome this adapter reports can still break the runner's contract,
+for example with metrics or gates the contract does not declare; the runner
+records that trial as an invalid outcome itself.
 
 Nothing here retries. The runner owns trials and never dispatches one twice;
 the workflow journal owns calls. A trial whose run id already exists in the
@@ -78,7 +88,8 @@ def workflow_trial_evaluator(
     pair of mappings from its :class:`~smythe.swarm.SwarmResult`. The
     outcome's cost is the run's confirmed nanoUSD rounded up to micro-USD.
 
-    Every other case raises :class:`WorkflowTrialError` (see the module).
+    Every other case raises :class:`WorkflowTrialError` (see the module),
+    and the runner still checks a reported outcome against its contract.
     Measurement must be local: whatever it spends is not counted.
     """
     for name, part in (("runtime_factory", runtime_factory), ("task_for", task_for),
@@ -110,6 +121,9 @@ def workflow_trial_evaluator(
             store = swarm._run_store
             # Building the recipe checks the configuration before the run exists.
             recipe = swarm._workflow_runtime().recipe
+            # A revoked run control is refused here too, before the run exists.
+            if swarm.run_control is not None:
+                swarm.run_control.check()
             try:
                 store.load_run(run_id)
                 exists = True
@@ -128,10 +142,11 @@ def workflow_trial_evaluator(
             result = await swarm.aresume(run_id)
         except Exception as error:
             failure = error
-        try:
-            state = store.inspect_run(run_id)
-        except Exception as error:
-            raise WorkflowTrialError(_UNKNOWN) from error
+            # Read while handling the failure, so a state that cannot be
+            # read keeps the workflow's own failure in the exception chain.
+            state = _run_state(store, run_id)
+        else:
+            state = _run_state(store, run_id)
         if state["reserved_nanousd"] or state["unknown_nanousd"] or state["unknown_calls"]:
             raise WorkflowTrialError(_UNKNOWN) from failure
         if failure is not None:
@@ -146,6 +161,14 @@ def workflow_trial_evaluator(
             raise WorkflowTrialError(_MEASURE) from error
 
     return evaluate
+
+
+def _run_state(store: Any, run_id: str) -> dict[str, Any]:
+    """The run's journal summary; one that cannot be read leaves the trial unknown."""
+    try:
+        return store.inspect_run(run_id)
+    except Exception as error:
+        raise WorkflowTrialError(_UNKNOWN) from error
 
 
 __all__ = ["WorkflowTrialError", "trial_run_id", "workflow_trial_evaluator"]

@@ -663,8 +663,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   rounded up to whole micro-USD. A run that leaves reserved or unknown spend,
   or an unknown call, or that fails, already exists or cannot be measured,
   raises `WorkflowTrialError` with fixed text, so the runner records the
-  trial as unknown and stops without storing provider text. Nothing is
-  retried, and a trial's run is never run again. See
+  trial as unknown and stops without storing provider text; the runner
+  records an outcome that breaks its contract as an invalid outcome instead.
+  A revoked `run_control` is refused before the run is created, while a plan
+  that only the run refuses, such as one no gate could accept under a strict
+  acceptance policy, leaves its run in the journal with nothing spent.
+  Nothing is retried, and a trial's run is never run again. See
   [durable workflow trials](docs/optimize.md#durable-workflow-trials).
 - Recorded read steps in durable text workflows. A `ReadProfile` declares one
   versioned read: an HTTP `GET` of a URL whose path or query placeholders take

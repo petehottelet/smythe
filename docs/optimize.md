@@ -717,15 +717,30 @@ For each trial the adapter:
 - reports the run's confirmed nanoUSD as micro-USD rounded up, never down.
   A trial that confirmed 3,002,500 nanoUSD costs 3,003 micro-USD.
 
-Any other outcome raises `WorkflowTrialError`, and the runner records the
+Every other case raises `WorkflowTrialError`, and the runner records the
 trial as [unknown](#unknown-outcomes-stop-the-campaign) at its full ceiling
 and stops the campaign. That covers a run that leaves any reserved or
-unknown spend or any unknown call, such as a step whose response was lost; a
-run that fails, even with its spend confirmed; a configuration the adapter
-refuses before the run exists; a trial whose run id the journal already
-holds; and a failed measurement. The ledger keeps the error's text, so
-every one of these is a fixed sentence and never a provider's message; the
-original error stays chained to it in the process.
+unknown spend or any unknown call, such as a step whose response was lost,
+or whose state the journal cannot report; a run that fails, even with its
+spend confirmed; a configuration the adapter refuses before the run exists,
+including a `run_control` that is already revoked; a trial whose run id the
+journal already holds; and a measurement that raises or does not return two
+mappings. The ledger keeps the error's text, so every one of these is a
+fixed sentence and never a provider's message; the original error stays
+chained to it in the process, and a failed workflow's own error stays in
+that chain even when its run's state then cannot be read.
+
+A configuration that only the run's own planning check refuses, such as a
+strict acceptance policy that no gate of its plan could accept, is refused
+after its run is created: the run stays in the journal with nothing spent,
+and the trial raises the text for a failed workflow.
+
+The runner still checks every outcome the adapter reports against its
+contract. When `measure` returns metrics or gates that do not exactly match
+the contract's objectives and required gates, no `WorkflowTrialError` is
+raised: the runner records the trial as unknown itself, as an invalid
+outcome with its own validation text
+(`evaluator returned an invalid outcome: ...`).
 
 Nothing retries. The runner never dispatches a trial twice, the journal
 owns each call, and the adapter refuses a trial whose run exists rather than
