@@ -23,7 +23,9 @@ import pytest
 from fakes import Gate, ManualClock, kill_and_reap, launch_child, wait_for_barrier, write_barrier
 from fixture_connector import FixtureConnector, HttpFixtureConnector, stored_value
 from fixture_service import FixtureService, Target, serve_http
-from smythe import OfflineProvider, SimpleArchitect, SQLiteWorkflowStore, Swarm, workflow_actions
+from smythe import (
+    FileCheckpointStore, OfflineProvider, SimpleArchitect, SQLiteWorkflowStore, Swarm, workflow_actions,
+)
 from smythe.actions import (
     ActionProgress, ActionRunner, ActionStateError, ActionTarget, ConnectorAmbiguous, ConnectorReceipt,
     ContentRef, approve, prepare_action, record_notice,
@@ -31,7 +33,7 @@ from smythe.actions import (
 from smythe.workflow_actions import record_receipt
 from smythe.workflow_store import WorkflowLeaseError, WorkflowNotFoundError
 from test_action_approvals import (
-    HOUR_NS, PROFILE, Host, approved, completed, delivered, intent, prepare, sign,
+    HOUR_NS, PROFILE, Host, approved, completed, delivered, intent, prepare, sign, swarm,
 )
 from test_action_journal import SETTINGS, item, rows
 from test_action_runner import relay, runner
@@ -63,17 +65,31 @@ def submissions(service, action) -> list[dict]:
 
 def test_an_ordinary_run_has_no_journal_record_an_action_could_bind(tmp_path, replies):  # noqa: F811
     replies[0]["Write"] = ["the report"]
+    folder = tmp_path / "state"
+    checkpoints = FileCheckpointStore(folder)
     ordinary = Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
-                     acceptance=strict(Contains("report")), artifact_dir=None).execute(single())
+                     checkpoint_store=checkpoints, acceptance=strict(Contains("report")),
+                     artifact_dir=None).execute(single())
     assert ordinary.accepted and ordinary.output == "the report"
 
-    # Accepted under the same strict policy, the run still names nothing in a journal.
-    with SQLiteWorkflowStore(tmp_path / "runs.db") as store:
-        with pytest.raises(WorkflowNotFoundError):
-            prepare_action(store, ordinary.execution_id, slot="publish", profile=PROFILE,
+    # What the run leaves is its checkpoint, holding the accepted output, and nothing else.
+    run_id = ordinary.execution_id
+    saved = checkpoints.load(run_id)
+    assert (saved["status"], saved["output"]) == ("completed", "the report")
+    assert [path.name for path in folder.iterdir()] == [f"{run_id}.json"]
+
+    # A journal created beside it has no record of the run: prepare_action refuses its ID, and a
+    # durable Swarm on that journal cannot take the run over by resuming it.
+    journal = folder / "runs.db"
+    with SQLiteWorkflowStore(journal) as store:
+        with pytest.raises(WorkflowNotFoundError, match=run_id):
+            prepare_action(store, run_id, slot="publish", profile=PROFILE,
                            intent=intent(ContentRef.for_bytes(b"the report", "text/plain")))
+        with pytest.raises(WorkflowNotFoundError, match=run_id):
+            swarm(store, tmp_path, renderer=None).resume(run_id)
         assert store.list_runs() == []
-    assert rows(tmp_path / "runs.db", "workflow_actions") == []
+    assert rows(journal, "workflow_runs") == rows(journal, "workflow_actions") == []
+    assert checkpoints.load(run_id) == saved
 
 
 # ---------------------------------------------------------------------------
