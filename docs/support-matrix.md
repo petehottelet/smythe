@@ -601,7 +601,7 @@ the runner does only what the declarations allow:
 |---|---|---|
 | `lookup_by_key` | After a lost answer, looks the key up and reads a found receipt's object back | No lookup |
 | `visibility_bound_s` | An empty lookup shows the write was never made once the bound plus `timeout_s` has passed since the dispatch, while the key's window is open | An empty lookup proves nothing |
-| `deduplicates`, `dedupe_window_s` | One same-key retry per reconciliation while the window is open, within `max_attempts` | No retry |
+| `deduplicates`, `dedupe_window_s` | Without `lookup_by_key`, one same-key retry per reconciliation while the window is open, within `max_attempts`; with it, reconciliation looks the key up instead, since a lookup takes precedence | No retry |
 | `lookup_by_object` | Reads the object a receipt names and checks its bytes, key and version | No read confirms a receipt; an operator decides |
 | `compensation="new_action"` | A separately approved action can undo an effect | The action stays `compensation_required` with its exposure |
 
