@@ -458,8 +458,18 @@ def _authorized(store, db, run, action, approval_id):
         raise ActionNotAuthorized(f"Action {action['action_id']!r} is not authorized: {problem}")
     approvals = db.execute("SELECT * FROM workflow_action_approvals WHERE action_id=? ORDER BY rowid DESC",
                            (action["action_id"],)).fetchall()
-    return _authorizing(action["action_id"], action["state"], action["intent_sha"], _amount(action["ceiling"]),
-                        approvals, store._clock_ns(), approval_id, _risk(db, action["action_id"]))
+    risk = _risk(db, action["action_id"])
+    approval = _authorizing(action["action_id"], action["state"], action["intent_sha"],
+                            _amount(action["ceiling"]), approvals, store._clock_ns(), approval_id, risk)
+    # A duplicate-risk approval accepts the attempts one decision found. One that
+    # an attempt within that count was made under answered an earlier decision.
+    if risk is not None and db.execute(
+            "SELECT 1 FROM workflow_action_attempts WHERE action_id=? AND approval_id=? AND number<=?",
+            (action["action_id"], approval["approval_id"], risk)).fetchone():
+        raise ActionNotAuthorized(
+            f"Action {action['action_id']!r} is not authorized: its approval accepted an earlier "
+            "duplicate risk, not the one the latest not_executed decision left")
+    return approval
 
 
 def _note(store, db, action, attempt_id, state):

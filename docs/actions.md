@@ -949,7 +949,10 @@ approve(store, action.action_id, assertion, identity_host, ceiling_nanousd=actio
 digest and the number of attempts the latest `not_executed` decision found,
 so an approval accepts one decision's risk: after another uncertain attempt
 and decision, it no longer authorizes, and the next dispatch needs a new
-one. The journal keeps the approval's `duplicate_risk` flag. An approval
+one. The journal enforces this on its own as well: `begin_attempt()` and the
+claim refuse a duplicate-risk approval that an attempt within the latest
+decision's count was made under. The journal keeps the approval's
+`duplicate_risk` flag. An approval
 with `duplicate_risk=True` is refused for an action without that risk. A
 `not_executed` finding from [reconciliation](#reconciliation) proves absence
 and leaves no duplicate risk.

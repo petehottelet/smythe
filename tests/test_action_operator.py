@@ -339,6 +339,12 @@ def test_not_executed_needs_a_new_approval_that_accepts_the_duplicate_risk(
     decide(store, host, action, "not_executed", evidence("The retry is missing from the audit log too"))
     with pytest.raises(ActionNotAuthorized, match="the approval verifier refuses it"):
         check_authority(store, action.action_id, host)
+    # The journal refuses it too: an attempt was made under it for the earlier decision.
+    second_decision, lease = journal(store), store.acquire_lease(action.run_id, "worker-1", ttl_s=60)
+    with pytest.raises(ActionNotAuthorized, match="accepted an earlier duplicate risk"):
+        workflow_actions.begin_attempt(store, lease, action.action_id, risky.approval_id)
+    store.release_lease(lease)
+    assert journal(store) == second_decision
     renewed = accept_risk()
     assert check_authority(store, action.action_id, host) == renewed
 
