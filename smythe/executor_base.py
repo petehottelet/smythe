@@ -95,6 +95,15 @@ def _security_stop_in(error: BaseException) -> SecurityStop | None:
     return None
 
 
+async def _settled(task: asyncio.Future) -> None:
+    """Wait until *task* ends; each cancellation of the waiter is passed on to it."""
+    while not task.done():
+        try:
+            await asyncio.wait((task,))
+        except asyncio.CancelledError:
+            task.cancel()
+
+
 def validate_retry_backoff_s(value: float) -> float:
     """Accept a finite, non-negative retry backoff in seconds.
 
@@ -489,8 +498,9 @@ class ExecutorBase:
     ``run_control``, a :class:`~smythe._failures.RunControl`, is checked
     before each node is admitted and before each provider or read call, tool
     turns and supervisor reviews included: once it is revoked, the run raises
-    ``SecurityStop``. A ``SecurityStop`` that a tool runtime raises stops the
-    run the same way, never as a tool result for the model. Either way, a
+    ``SecurityStop``, and a review pending then is cancelled at once (see
+    :meth:`maybe_revise`). A ``SecurityStop`` that a tool runtime raises stops
+    the run the same way, never as a tool result for the model. Either way, a
     call that was sent and not answered keeps its reservation as unknown
     cost, as under ``retain_uncertain_dispatch``, and :attr:`security_stop`
     records the stop.
@@ -704,7 +714,41 @@ class ExecutorBase:
         :func:`~smythe.tracer.revision_context`). For a supervisor with
         evidence triggers, the triggers that fire are traced before its
         review and named as the decision's ``trigger``.
+
+        A revocation of the run control while the review is pending
+        records the stop, cancels the executor's calls in flight and the
+        review at once, and raises ``SecurityStop`` once the review has
+        settled what it may cost.
         """
+        if self._run_control is None:
+            return await self._revise(node, graph)
+        review = asyncio.ensure_future(self._revise(node, graph))
+        revocation = asyncio.ensure_future(self._run_control.wait())
+        try:
+            await asyncio.wait((review, revocation), return_when=asyncio.FIRST_COMPLETED)
+        except BaseException:
+            # The caller was cancelled: so is the review, as if awaited directly.
+            review.cancel()
+            await _settled(review)
+            review.result()
+            raise
+        finally:
+            revocation.cancel()
+        if review.done():
+            return review.result()
+        stop = SecurityStop(self._run_control.reason_code)
+        self._record_security_stop(stop)  # Before any call in flight is cancelled.
+        self._cancel_in_flight()
+        review.cancel()
+        await _settled(review)
+        error = None if review.cancelled() else review.exception()
+        raise stop from error
+
+    def _cancel_in_flight(self) -> None:
+        """Cancel the run's calls in flight at once, for a security stop; none here."""
+
+    async def _revise(self, node: Node, graph: ExecutionGraph) -> bool:
+        """Review after *node* and apply the supervisor's revision (see :meth:`maybe_revise`)."""
         if self._supervisor is None or node.status is not NodeStatus.COMPLETED:
             return False
         remaining = self._max_revisions - self._revisions_used

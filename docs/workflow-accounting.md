@@ -309,8 +309,9 @@ A durable run takes a [run control](execution.md#security-stops) as ordinary
 runs do: `Swarm(run_store=store, run_control=control)`. The control is not
 part of the recipe. Once it is revoked, or a tool runtime raises
 `SecurityStop`, the run admits no node and sends no call, its synthesis is not
-called, and the nodes in flight are cancelled at once. A cancelled call that
-was already sent holds unknown exposure at its quoted ceiling, as after a
+called, and the nodes in flight are cancelled at once, with a supervisor
+review still pending. A cancelled call that was already sent, a review's
+included, holds unknown exposure at its quoted ceiling, as after a
 `HALT`. The run is then blocked in the journal before its failed checkpoint
 is saved: its status becomes `blocked`, its `blocked_reason` becomes
 `security_stop`, and a `security_stop` event records the reason code, never

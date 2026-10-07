@@ -1516,8 +1516,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   control, and a run in progress admits no node and sends no call after it,
   tool turns, supervisor reviews and synthesis included. The async executor
   cancels the nodes in flight at once and never drains; a revocation during
-  a drain ends it without waiting for the deadline. A call that was sent and
-  not answered keeps its reservation as unknown cost, even without
+  a drain ends it without waiting for the deadline, and one during a pending
+  supervisor review cancels the review with the nodes in flight, in ordinary
+  and durable runs alike. A call that was sent and not answered keeps its
+  reservation as unknown cost, even without
   `retain_uncertain_dispatch`. A `SecurityStop` that a tool runtime raises,
   alone or in an exception group, stops the run the same way instead of
   going back to the model. `SecurityStop.reason_code` is a short developer

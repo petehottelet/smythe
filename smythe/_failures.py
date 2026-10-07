@@ -119,7 +119,8 @@ class RunControl:
     on a run under the control admits no node and sends no provider call: the
     executors check it before each admission and each call, and the async
     executor cancels the calls in flight at once, even while a
-    ``TerminationPolicy`` drains, keeping what they may cost. The run raises
+    ``TerminationPolicy`` drains or a supervisor review is pending, keeping
+    what they may cost; the review is cancelled too. The run raises
     ``SecurityStop``, and its checkpoint or journal records the stop, so it
     never resumes. A revoked control stays revoked with its first reason
     code; a new run needs a new control.

@@ -3,7 +3,8 @@
 Only developer code stops a run for security: ``RunControl.revoke(reason_code)``
 or a ``SecurityStop`` raised by a tool runtime. The stop is never delayed: a
 revoked control admits no node and dispatches no call, and the async executor
-cancels the calls in flight at once, even during a drain. A legacy call that
+cancels the calls in flight at once, even during a drain or a pending supervisor
+review, which is cancelled too. A legacy call that
 was sent and never answered keeps its reservation as unknown cost without the
 retention option. An ordinary run saves the stop in a version 5 checkpoint and a
 durable run's journal blocks it with ``security_stop``; resume refuses both.
@@ -25,7 +26,7 @@ import pytest
 
 import smythe.checkpoint as checkpoints
 import smythe.swarm as swarm_module
-from fakes import Gate, ManualClock, NativeTransport
+from fakes import Gate, ManualClock, NativeTransport, phase_of
 from smythe import (
     AcceptancePolicy, OfflineProvider, OpenAIResponsesProvider, RunControl, SecurityStop,
     SimpleArchitect, SQLiteWorkflowStore, Swarm, Task, TerminationPolicy,
@@ -39,6 +40,7 @@ from smythe.executor import Executor
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, Provider, ProviderFeatures
 from smythe.registry import Registry
+from smythe.supervisor import EvidenceTriggeredSupervisor, LLMSupervisor, ReviewTriggers, Supervisor
 from smythe.tools import ToolCall, ToolResult, ToolRuntime, ToolSession, ToolSpec
 from smythe.tracer import Tracer
 from smythe.workflow_store import (
@@ -466,6 +468,119 @@ async def test_without_a_stop_a_cancelled_legacy_call_still_releases_its_reserva
 
 
 # ---------------------------------------------------------------------------
+# A security stop during a supervisor review
+# ---------------------------------------------------------------------------
+
+
+class HeldReview(Supervisor):
+    """Reviews after ``first`` by waiting at *gate*; ``cancelled`` records a review cancelled there."""
+
+    def __init__(self, gate: Gate) -> None:
+        self.gate, self.cancelled = gate, False
+
+    async def review(self, graph, node, *, task, revisions_remaining):
+        if node.id != "first":
+            return None
+        try:
+            await self.gate.wait()
+        except asyncio.CancelledError:
+            self.cancelled = True
+            raise
+        return None
+
+
+class HeldReviewer(Provider):
+    """A reviewer's provider that holds each review call at *gate*, as a slow model review would."""
+
+    def __init__(self, gate: Gate) -> None:
+        self.gate, self.cancelled = gate, False
+
+    async def complete(self, system, prompt, model):
+        try:
+            await self.gate.wait()
+        except asyncio.CancelledError:
+            self.cancelled = True
+            raise
+        return CompletionResult('{"change": false}', cost_usd=CALL)
+
+
+def held_review(kind: str, gate: Gate):
+    """A supervisor whose review after ``first`` waits at *gate*, and what records its cancellation."""
+    if kind == "supervisor":
+        supervisor = HeldReview(gate)
+        return supervisor, supervisor
+    reviewer = HeldReviewer(gate)
+    return EvidenceTriggeredSupervisor(
+        LLMSupervisor(reviewer, model="test-model"), ReviewTriggers(review_after={"first"}),
+    ), reviewer
+
+
+async def ended_before_release(running: asyncio.Future, gate: Gate) -> bool:
+    """Whether *running* ends while *gate* still holds the review; the gate is released after."""
+    try:
+        await asyncio.wait({running}, timeout=5)
+        return running.done() and not gate.released
+    finally:
+        gate.release()
+        await asyncio.wait({running}, timeout=30)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["supervisor", "evidence-triggered"])
+async def test_a_revoke_during_a_supervisor_review_cancels_the_calls_in_flight_at_once(kind):
+    in_flight, review_gate, control = Gate(), Gate(), RunControl()
+    provider = Script(slow=entering(in_flight, hang))
+    supervisor, review = held_review(kind, review_gate)
+    waits: list[float] = []
+
+    async def sleep(seconds):
+        waits.append(seconds)
+        await hang()
+
+    budget = Sentinel(10)
+    slow = node("slow")
+    executor = make(provider, control, budget=budget, sleep=sleep, termination=DRAIN,
+                    supervisor=supervisor, max_revisions=1)
+    running = asyncio.ensure_future(
+        executor.run(fork(node("first"), slow, node("queued", depends_on=["first"]))))
+    assert await in_flight.reached() and await review_gate.reached()
+
+    control.revoke("incident_9")
+
+    # The run ends, its call in flight cancelled, while the review is still held.
+    assert await ended_before_release(running, review_gate)
+    with pytest.raises(SecurityStop, match="incident_9"):
+        running.result()
+    assert provider.cancelled == ["slow"] and review.cancelled is True
+    # No call was sent after the revocation, and nothing drained.
+    assert sorted(provider.calls) == ["first", "slow"]
+    assert waits == [] and executor.drain_record is None
+    # The call in flight was sent and never answered: its reservation is kept.
+    assert budget.breakdown() == {"first": CALL, "slow": ESTIMATE}
+    assert slow.metadata["cost_usd_unknown"] is True
+    assert executor.security_stop == {"reason_code": "incident_9", "at": WALL}
+
+
+@pytest.mark.asyncio
+async def test_a_revoke_during_a_serial_review_stops_the_run_without_waiting_for_it():
+    review_gate, control = Gate(), RunControl()
+    provider = Script()
+    supervisor = HeldReview(review_gate)
+    executor = make(provider, control, mode="serial", supervisor=supervisor, max_revisions=1)
+    running = asyncio.ensure_future(
+        execute(executor, fork(node("first"), node("queued", depends_on=["first"]))))
+    assert await review_gate.reached()
+
+    control.revoke("incident_9")
+
+    assert await ended_before_release(running, review_gate)
+    with pytest.raises(SecurityStop, match="incident_9"):
+        running.result()
+    assert supervisor.cancelled is True and provider.calls == ["first"]
+    assert executor.security_stop == {"reason_code": "incident_9", "at": WALL}
+
+
+# ---------------------------------------------------------------------------
 # Tools
 # ---------------------------------------------------------------------------
 
@@ -766,6 +881,51 @@ def test_a_durable_run_under_a_revoked_control_never_starts(tmp_path, monkeypatc
             durable_swarm(store, control).execute(durable_graph())
         assert store.list_runs() == []
     assert transport.requests == []
+
+
+def test_a_revoke_during_a_durable_review_cancels_the_calls_in_flight_at_once(
+        tmp_path, monkeypatch):
+    transport = NativeTransport().install(monkeypatch)
+    in_flight, review_gate, control = Gate(), Gate(), RunControl()
+    # The first node's call is answered and reviewed; the second's is held in flight.
+    transport.schedule("execution", 1, in_flight)
+    transport.schedule("supervision", None, review_gate)
+    reviewer = LLMSupervisor(OpenAIResponsesProvider(api_key="test-key", max_output_tokens=100),
+                             model="gpt-6-astra", review_after={"draft", "notes"})
+
+    async def run_and_revoke(store):
+        running = asyncio.ensure_future(durable_swarm(
+            store, control, supervisor=reviewer, max_revisions=1,
+        ).execute_async(durable_graph()))
+        # Both nodes' calls and the review's call have reached the provider.
+        for _ in range(1000):
+            if len(transport.requests) == 3 and review_gate.entered.is_set():
+                break
+            await asyncio.sleep(0.01)
+        control.revoke("approver_compromised")
+        try:
+            await asyncio.wait({running}, timeout=5)
+            assert running.done() and not review_gate.released and not in_flight.released
+        finally:
+            review_gate.release()
+            in_flight.release()
+            await asyncio.wait({running}, timeout=30)
+        return running.result()
+
+    with SQLiteWorkflowStore(tmp_path / "runs.db") as store:
+        with pytest.raises(SecurityStop, match="approver_compromised"):
+            asyncio.run(run_and_revoke(store))
+        (run,) = store.list_runs()
+        loaded = store.load_run(run["run_id"])
+        assert (loaded["status"], loaded["blocked_reason"]) == ("blocked", "security_stop")
+        inspected = store.inspect_run(run["run_id"])
+    phases = sorted(phase_of(request["instructions"]) for request in transport.requests)
+    assert phases == ["execution", "execution", "supervision"]
+    # The held node call and the held review call were both sent and cancelled.
+    unknown = sorted(call["key"]["phase"] for call in inspected["calls"]
+                     if call["billing_state"] == "unknown")
+    assert unknown == ["execution", "supervision"]
+    assert inspected["unknown_calls"] == 2 and inspected["reserved_nanousd"] == 0
 
 
 @pytest.fixture
