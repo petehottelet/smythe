@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import FrozenInstanceError
 
 import pytest
@@ -438,6 +439,26 @@ def test_candidate_rejects_empty_unlisted_unsafe_or_non_json_policy(policy):
 def test_candidate_validates_rule_bound_values_before_identity(policy):
     with pytest.raises(ContractValidationError):
         Candidate(_contract(), policy, "Try a bounded change")
+
+
+@pytest.mark.parametrize("path", ["budget", "acceptance.mode", "tools.allowed", "holdout.pack"])
+def test_a_contract_naming_a_reserved_path_still_loads_byte_identically(path):
+    # The runner refuses to run such a contract, but ledgers read stored
+    # contracts back to inspect campaigns and count holdout use.
+    contract = _contract(
+        mutable_fields=("prompt.style", path),
+        mutable_field_rules={
+            "prompt.style": MutableFieldRule("string", choices=("a", "b")),
+            path: MutableFieldRule("integer", minimum=0, maximum=10),
+        },
+    )
+    stored = canonical_json_bytes(contract.to_dict())
+    restored = ExperimentContract.from_dict(json.loads(stored))
+
+    assert canonical_json_bytes(restored.to_dict()) == stored
+    assert restored.contract_hash == contract.contract_hash
+    candidate = Candidate(contract, {path: 10}, "Relax a bound")
+    assert Candidate.from_dict(candidate.to_dict(), contract=restored) == candidate
 
 
 def test_candidate_parent_must_share_the_contract():

@@ -64,6 +64,25 @@ _MAX_RUNNER_CANDIDATES = 1_024
 _MAX_RUNNER_PARALLEL_CANDIDATES = 256
 _MAX_RUNNER_REPETITIONS = 10_000
 _MAX_RUNNER_TRIALS = 100_000
+# A campaign tunes a policy, never how it is judged, what it may spend, or
+# what it may do: no mutable field may equal one of these or lie under it.
+_RESERVED_PATH_ROOTS = frozenset(
+    {
+        "acceptance",
+        "validators",
+        "verifier",
+        "evaluator",
+        "harness",
+        "budget",
+        "spend",
+        "ceilings",
+        "capabilities",
+        "tools",
+        "permissions",
+        "authority",
+        "holdout",
+    }
+)
 
 
 class OptimizationError(RuntimeError):
@@ -836,6 +855,20 @@ class OptimizationRunner:
                 )
 
     def _validate_executable_contract(self) -> None:
+        # Refused here rather than in contract parsing, so a stored contract
+        # still loads for inspection and holdout accounting.  Letter case is
+        # ignored: ``Budget`` names the same setting as ``budget``.
+        reserved = [
+            path
+            for path in self.contract.mutable_fields
+            if path.split(".", 1)[0].lower() in _RESERVED_PATH_ROOTS
+        ]
+        if reserved:
+            raise OptimizationError(
+                "executable optimization contracts must not make reserved "
+                "evaluation, spend or authority paths mutable; reserved="
+                + ", ".join(reserved)
+            )
         if not self.contract.required_gates:
             raise OptimizationError(
                 "executable optimization contracts must declare required_gates"

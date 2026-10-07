@@ -623,6 +623,15 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   identity are unchanged. Earlier releases count reference holdout trials as
   holdout use and refuse to export a report for a decision with references.
   See [reference arms](docs/optimize.md#reference-arms).
+- `OptimizationRunner` refuses a contract whose mutable fields include
+  `acceptance`, `validators`, `verifier`, `evaluator`, `harness`, `budget`,
+  `spend`, `ceilings`, `capabilities`, `tools`, `permissions`, `authority` or
+  `holdout`, or a path under one, in any letter case, with an
+  `OptimizationError` raised before it reads or writes the ledger. Contract
+  parsing is unchanged, so stored contracts still load for inspection and
+  holdout accounting, but a stored campaign that declares such a field no
+  longer runs or resumes. See
+  [experiment contracts and budgets](docs/optimize.md#experiment-contracts-and-budgets).
 - Recorded read steps in durable text workflows. A `ReadProfile` declares one
   versioned read: an HTTP `GET` of a URL whose path or query placeholders take
   a step's checked input, a decoder and its version, whether a read can be

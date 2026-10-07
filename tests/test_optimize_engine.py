@@ -8,6 +8,7 @@ import time
 from collections.abc import Callable
 from collections.abc import Mapping
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -18,6 +19,7 @@ from smythe.optimize.contracts import (
     MetricObjective,
     MutableFieldRule,
     ObjectiveDirection,
+    canonical_json_bytes,
     sha256_prefixed,
 )
 from smythe.optimize.engine import (
@@ -39,6 +41,7 @@ from smythe.optimize.ledger import (
     holdout_identity,
 )
 from smythe.optimize.statistics import PROMOTION_METHOD
+from smythe.validation import ValidatorIdentity
 
 
 EVALUATOR_HASH = "sha256:" + "e" * 64
@@ -221,6 +224,153 @@ async def test_runner_rejects_incomplete_executable_contract_before_mutation(
             await _runner(contract, ledger, evaluate).run(incumbent, (challenger,))
         count = ledger._connection.execute("SELECT COUNT(*) FROM campaigns").fetchone()[0]
         assert count == 0
+
+
+# How a candidate is judged, what it may spend and what it may do.
+RESERVED_ROOTS = (
+    "acceptance",
+    "validators",
+    "verifier",
+    "evaluator",
+    "harness",
+    "budget",
+    "spend",
+    "ceilings",
+    "capabilities",
+    "tools",
+    "permissions",
+    "authority",
+    "holdout",
+)
+
+
+def _policy_contract(*paths: str, **limits: int) -> ExperimentContract:
+    """The engine test contract with an integer rule for each mutable path."""
+
+    return replace(
+        _contract(**limits),
+        mutable_fields=paths,
+        mutable_field_rules={
+            path: MutableFieldRule("integer", minimum=1, maximum=8) for path in paths
+        },
+    )
+
+
+def _ledger_state(ledger: ExperimentLedger, path: Path) -> tuple[list[str], dict[str, bytes]]:
+    """Every row the ledger holds, and the bytes of its database files."""
+
+    files = sorted(path.parent.glob(path.name + "*"))
+    return list(ledger._connection.iterdump()), {item.name: item.read_bytes() for item in files}
+
+
+def _boundaries(
+    contract: ExperimentContract, manifest: EvaluatorManifest, *candidates: Candidate
+) -> bytes:
+    return canonical_json_bytes(
+        {
+            "contract": contract.to_dict(),
+            "contract_hash": contract.contract_hash,
+            "evaluator": manifest.to_dict(),
+            "evaluator_hash": manifest.evaluator_hash,
+            "candidates": [candidate.to_dict() for candidate in candidates],
+        }
+    )
+
+
+async def _never_called(_context: TrialContext) -> TrialOutcome:
+    raise AssertionError("a refused campaign must not invoke the evaluator")
+
+
+@pytest.mark.asyncio
+async def test_runner_refuses_a_mutable_reserved_path_before_any_ledger_write(tmp_path):
+    paths = (
+        *RESERVED_ROOTS,
+        *(f"{root}.limit" for root in RESERVED_ROOTS),
+        "acceptance.policy.mode",
+        "Budget.max_usd",
+        "TOOLS",
+    )
+    manifest = EvaluatorManifest(
+        code_digest=EVALUATOR_HASH,
+        validators=(ValidatorIdentity.for_config("safe", "1"),),
+    )
+    ledger_path = tmp_path / "reserved.sqlite3"
+
+    with ExperimentLedger(ledger_path, durability="normal") as ledger:
+        before = _ledger_state(ledger, ledger_path)
+        for path in paths:
+            contract = _policy_contract("strength", path)
+            incumbent = Candidate(
+                contract=contract, policy={"strength": 1, path: 1}, hypothesis="incumbent"
+            )
+            challenger = Candidate(
+                contract=contract,
+                policy={"strength": 1, path: 8},
+                hypothesis="relax the bound",
+                parent=incumbent,
+            )
+            boundaries = _boundaries(contract, manifest, incumbent, challenger)
+            runner = OptimizationRunner(
+                contract,
+                ledger,
+                _never_called,
+                evaluator_hash=manifest.evaluator_hash,
+                bootstrap_resamples=100,
+            )
+            with pytest.raises(OptimizationError, match="reserved") as refused:
+                await runner.run(incumbent, (challenger,))
+            assert path in str(refused.value)
+            assert _ledger_state(ledger, ledger_path) == before
+            # The contract, evaluator data and candidate inventory are untouched.
+            assert runner.evaluator_hash == manifest.evaluator_hash
+            assert _boundaries(contract, manifest, incumbent, challenger) == boundaries
+
+
+@pytest.mark.asyncio
+async def test_a_path_that_only_starts_like_a_reserved_name_stays_mutable(tmp_path):
+    contract = _policy_contract("strength", "toolbar.layout", "budgeted")
+    incumbent, challenger = _candidates(contract)
+
+    with ExperimentLedger(tmp_path / "lookalike.sqlite3", durability="normal") as ledger:
+        result = await _runner(contract, ledger, _challengers_win).run(incumbent, (challenger,))
+    assert result.promoted is True
+
+
+@pytest.mark.asyncio
+async def test_a_stored_campaign_with_a_reserved_path_loads_but_does_not_resume(
+    tmp_path, monkeypatch
+):
+    from smythe.optimize import engine
+
+    contract = _policy_contract("strength", "budget.max_usd")
+    incumbent, challenger = _candidates(contract)
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+    calls: list[TrialContext] = []
+
+    async def evaluate(context: TrialContext) -> TrialOutcome:
+        calls.append(context)
+        return await _challengers_win(context)
+
+    ledger_path = tmp_path / "stored.sqlite3"
+    with ExperimentLedger(ledger_path, durability="normal") as ledger:
+        with monkeypatch.context() as earlier_release:
+            earlier_release.setattr(engine, "_RESERVED_PATH_ROOTS", frozenset())
+            first = await _runner(contract, ledger, evaluate).run(incumbent, (challenger,))
+        assert first.holdout_assessment is not None
+        evaluated = len(calls)
+
+        # The ledger still reads the stored contract back for inspection and
+        # for holdout accounting.
+        stored = ledger.snapshot(first.campaign_id)["campaign"]["contract"]
+        assert ExperimentContract.from_dict(stored) == contract
+        assert ledger.holdout_uses(identity) == {challenger.policy_hash: (first.campaign_id,)}
+        assert len(ledger.validate_decision_inventory(first.campaign_id)) == 1
+
+        before = _ledger_state(ledger, ledger_path)
+        with pytest.raises(OptimizationError, match="budget.max_usd"):
+            await _runner(contract, ledger, evaluate).run(incumbent, (challenger,))
+        assert _ledger_state(ledger, ledger_path) == before
+        assert len(calls) == evaluated
 
 
 @pytest.mark.asyncio

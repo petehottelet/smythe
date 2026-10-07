@@ -88,6 +88,20 @@ challenger, limiting both cost and repeated testing; declared
 [reference arms](#reference-arms) join those comparisons but are never
 promoted.
 
+A campaign tunes a policy, never how candidates are judged, what they may
+spend, or what they may do. The runner refuses a contract with a mutable field
+named `acceptance`, `validators`, `verifier`, `evaluator`, `harness`,
+`budget`, `spend`, `ceilings`, `capabilities`, `tools`, `permissions`,
+`authority`, or `holdout`, or any path under one, such as `acceptance.mode`,
+in any letter case. It raises `OptimizationError` naming those fields before
+it reads or writes the ledger. Only whole segments match: `toolbar.layout` is
+not under `tools`. Contract parsing does not apply this rule, so a stored
+contract that declares such a field still loads for inspection and holdout
+accounting, but a campaign stored under it no longer runs or resumes. The rule
+reads field names only; the evaluator decides what each policy value controls,
+so it must not apply a differently named field to acceptance, spend, tools, or
+held-out data.
+
 Independent implementation ceilings bound otherwise-valid contracts to 1,024
 candidates, 256 parallel candidate series, 10,000 repetitions per split, and
 100,000 trials. Descriptive bootstrap work is capped at 1,000,000 resamples
@@ -834,6 +848,12 @@ The following pieces remain future work:
 - calibrated sample-size guidance and a multiple-comparison correction across
   development challengers; and
 - cross-campaign comparison and human-approval surfaces.
+
+The runner bounds what a campaign may vary:
+[reserved fields](#experiment-contracts-and-budgets) such as acceptance,
+spend, and tool settings cannot be mutable. It does not sandbox evaluator
+code, which runs in the runner's process and decides what each policy value
+controls.
 
 The installed concurrency campaign is intentionally offline. Custom in-process
 evaluators can use `OptimizationRunner`, but a live evaluator must supply its
