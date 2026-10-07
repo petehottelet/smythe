@@ -75,6 +75,8 @@ EXIT_OPTIMIZE_LIMIT = 9
 # runs inspect: the run completed, but its output was not accepted.
 EXIT_RUN_NOT_ACCEPTED = 10
 EXIT_RUN_INDETERMINATE = 11
+# runs inspect: the output was accepted, but an external action's effect is unresolved.
+EXIT_RUN_ACTION_UNRESOLVED = 12
 EXIT_INTERRUPTED = 130
 
 _FAILED_STATUSES = {"needs_attention", "partial", "failed", "budget_overrun"}
@@ -371,14 +373,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     runs = root_commands.add_parser(
         "runs",
-        help="inspect saved Swarm checkpoints and durable workflow runs without changing them",
+        help="inspect saved Swarm checkpoints and durable workflow runs without changing them, "
+             "and revoke external action approvals",
     )
     _add_runs_output_options(runs, inherited=False)
     runs_commands = runs.add_subparsers(dest="runs_command", required=True)
     run_inspection = runs_commands.add_parser(
         "inspect",
         help="show a run's execution, delivery acceptance, context, reads, evidence, open issues, "
-             "lineage, cost, timing and next action",
+             "lineage, external actions, cost, timing and next action",
     )
     run_inspection.add_argument("run_id")
     _add_runs_output_options(run_inspection, inherited=True)
@@ -386,6 +389,14 @@ def build_parser() -> argparse.ArgumentParser:
     run_listing.add_argument("--limit", type=int, default=50, help="page size (1-500; default: 50)")
     run_listing.add_argument("--offset", type=int, default=0, help="number of runs to skip (default: 0)")
     _add_runs_output_options(run_listing, inherited=True)
+    revocation = runs_commands.add_parser(
+        "revoke-action",
+        help="revoke every approval of an external action, or one approval, without a principal or lease",
+    )
+    revocation.add_argument("target", metavar="ACTION_OR_APPROVAL_ID")
+    revocation.add_argument("--reason", required=True,
+                            help="reason to record, with account identifiers redacted")
+    _add_runs_output_options(revocation, inherited=True)
     return parser
 
 
@@ -904,6 +915,31 @@ def _emit_research(value: dict[str, Any]) -> None:
         print(f"Issue {issue['kind']}{subject}: {_terminal_text(issue['detail'])}")
 
 
+def _emit_actions(actions: dict[str, Any]) -> None:
+    """A durable run's external actions by identity, state, balances, approvals and record kinds."""
+    unit = actions["unit"]
+    print(f"External actions: {len(actions['items'])}; {actions['confirmed_nanousd']} confirmed, "
+          f"{actions['reserved_nanousd']} reserved, {actions['unknown_nanousd']} unknown {unit}; "
+          f"{len(actions['unresolved'])} unresolved")
+    for item in actions["items"]:
+        risk = "; duplicate risk" if item["duplicate_risk"] else ""
+        print(f"  Action {_terminal_text(item['slot'])}/{item['sequence']} ({_terminal_text(item['action_id'])}): "
+              f"{item['state']}; {len(item['attempts'])} attempts; {item['confirmed_nanousd']} confirmed, "
+              f"{item['unknown_nanousd']} unknown {unit}{risk}; next {item['next_action'] or 'none'}")
+        for approval in item["approvals"]:
+            principal, expiry = approval["principal"], approval["expires_at_ns"]
+            standing = (f"revoked {approval['revocation']}" if approval["revoked_at_ns"] is not None
+                        else "consumed" if approval["consumed_by_attempt"] else approval["verdict"])
+            print(f"    Approval {_terminal_text(approval['approval_id'])}: {_terminal_text(principal['subject'])} of "
+                  f"{_terminal_text(principal['tenant'])} ({_terminal_text(principal['issuer'])}); {standing}"
+                  + ("" if expiry is None else f"; expires at {expiry} ns"))
+        kinds: dict[str, int] = {}
+        for record in item["records"]:
+            kinds[record["kind"]] = kinds.get(record["kind"], 0) + 1
+        if kinds:
+            print("    Records: " + ", ".join(f"{kind} {count}" for kind, count in sorted(kinds.items())))
+
+
 def _emit_revisions(log: list[dict[str, Any]]) -> None:
     """A run's revision log: one line per decision, then its reason and refusal detail."""
     if log:
@@ -981,6 +1017,8 @@ def _emit_run_inspection(value: dict[str, Any]) -> None:
     if value.get("lineage") is not None:
         _emit_lineage(value["lineage"])
     _emit_research(value)
+    if value.get("actions") is not None:
+        _emit_actions(value["actions"])
     accounting = value["accounting"]
     print(f"Cost: ${accounting['total_cost_usd']:.6f} ({accounting['cost_scope']}); "
           f"complete: {_yes(accounting['cost_is_complete'])}; "
@@ -1015,6 +1053,10 @@ def _emit(args: argparse.Namespace, command: str, value: Any) -> None:
     if args.root_command == "runs":
         if command == "list":
             _emit_run_list(value)
+        elif command == "revoke-action":
+            revoked = value["revoked"]
+            print(f"Revoked {len(revoked)} approvals of {_terminal_text(value['target'])}"
+                  + (": " + ", ".join(map(_terminal_text, revoked)) if revoked else "; none was in force"))
         else:
             _emit_run_inspection(value)
     elif command == "validate":
@@ -1399,9 +1441,35 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
     return _job_exit(snapshot)
 
 
+def _revoke_action(args: argparse.Namespace) -> int:
+    """Revoke as ``smythe.actions.revoke`` does, opening for writing only a journal that has actions."""
+    from smythe.actions import revoke
+    from smythe.workflow_store import SQLiteWorkflowStore, WorkflowError, WorkflowNotFoundError
+
+    if args.journal is None:
+        raise ValueError("revoke-action needs --journal: only durable runs have external actions")
+    with open_journal(args.journal) as journal:
+        # A version 1 journal has no actions, and opening it for writing would upgrade it.
+        if journal.store_version < 2:
+            raise RunNotFoundError("This workflow journal has no external actions")
+    try:
+        with SQLiteWorkflowStore(args.journal) as store:
+            revoked = revoke(store, args.target, args.reason)
+    except WorkflowNotFoundError as exc:
+        raise RunNotFoundError(f"No external action or approval {args.target!r} in this journal") from exc
+    except WorkflowError as exc:
+        if isinstance(exc, ValueError):
+            raise  # an invalid reason or id is invalid input
+        raise RunInspectionError(f"Cannot revoke in the workflow journal: {exc}") from exc
+    _emit(args, "revoke-action", {"target": args.target, "revoked": list(revoked)})
+    return EXIT_OK
+
+
 def _dispatch_runs(args: argparse.Namespace) -> int:
     if args.journal is not None and args.checkpoints is not None:
         raise ValueError("Choose --checkpoints or --journal, not both")
+    if args.runs_command == "revoke-action":
+        return _revoke_action(args)
     if args.journal is not None:
         store = open_journal(args.journal)
     else:
@@ -1420,6 +1488,8 @@ def _dispatch_runs(args: argparse.Namespace) -> int:
         return EXIT_RUN_NOT_ACCEPTED
     if decision == "indeterminate":
         return EXIT_RUN_INDETERMINATE
+    if decision == "accepted" and value["actions"] is not None and value["actions"]["unresolved"]:
+        return EXIT_RUN_ACTION_UNRESOLVED
     return EXIT_OK
 
 

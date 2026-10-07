@@ -386,8 +386,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   never its bytes. Decisions only append `decision` and `evidence` records:
   no attempt, approval or balance changes, so unknown exposure stays.
   `inspect_actions(store, run_id)` adds each action's duplicate risk and next
-  action and lists the unresolved actions. See
-  [operator decisions](docs/actions.md#operator-decisions).
+  action and lists the unresolved actions. `smythe runs inspect` reports them
+  in an `actions` block and exits with 12 when the decision is `accepted` but
+  an external action is unresolved; codes 10 and 11 take precedence.
+  `smythe runs revoke-action` is the lease-free `revoke()` fail-safe, and
+  never upgrades a version 1 journal. See
+  [operator decisions](docs/actions.md#operator-decisions) and
+  [external actions in runs inspect](docs/runs.md#external-actions).
 - Jobs operations have a semantic input digest.
   `smythe.jobs.operation_input_digest()` hashes the provider kind and its
   adapter version (`smythe.jobs.providers.ADAPTER_VERSIONS`), the model,

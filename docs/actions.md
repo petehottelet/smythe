@@ -970,4 +970,10 @@ them, reading a journal opened read-only:
 `not_dispatched` action that no approval authorizes needs `approve`, or
 `approve_duplicate_risk` while it carries duplicate risk. Assertions,
 parameters, receipts, error text, evidence summaries, notes and record
-payloads are never shown.
+payloads are never shown. From the command line,
+[`smythe runs inspect`](runs.md#external-actions) prints the same block and
+exits with 12 while accepted output has an unresolved action, and
+[`smythe runs revoke-action`](runs.md#revoke-an-actions-approvals) is the
+fail-safe [`revoke()`](#approvals). Decisions and approvals stay in the
+Python API, because only your host can construct the verifier and the
+connector.

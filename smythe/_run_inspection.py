@@ -7,8 +7,9 @@ reports execution, delivery acceptance and its decision history, the
 supervisor's revision log, a durable run's published artifact, cost, timing
 and the next action as separate JSON blocks. For a durable run it also
 reports its context sources and snapshots, its journaled reads, the source
-evidence its output carried, the issues left open and a lineage run's
-summary, never source text, read bodies or output.
+evidence its output carried, the issues left open, a lineage run's summary
+and its external actions, never source text, read bodies, output, approval
+assertions or record payloads.
 :meth:`smythe.swarm.SwarmResult.to_dict` builds its execution, delivery,
 unknown-exposure and next-action blocks with the same functions. Nothing here
 constructs a provider, migrates a journal or writes a file.
@@ -369,6 +370,7 @@ def _checkpoint_view(execution_id: str, state: Any) -> dict[str, Any]:
         "tool_calls": None,
         "evidence": None,
         "issues": issues_view(delivery, None, None),
+        "actions": None,
         "accounting": accounting,
         "timing": checkpoint_timing(state),
         "next_action": next_action(
@@ -704,6 +706,11 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str, *, lineage: bool = Tr
         resume += f", including the strict acceptance policy whose sha256 is {policy_sha256}"
     tool_calls = tool_calls_view(store, run_id, inspected["calls"])
     evidence = evidence_view(store, run_id)
+    actions = None
+    if "actions" in inspected:
+        from smythe.actions import inspect_actions
+
+        actions = inspect_actions(store, run_id)
     # A restricted run's document is never published again, so its decision says why.
     published = None if artifact is None or restricted_sources(store, run_id) else artifact.to_dict()
     return {
@@ -724,6 +731,7 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str, *, lineage: bool = Tr
         "tool_calls": tool_calls,
         "evidence": evidence,
         "issues": issues_view(delivery, evidence, tool_calls),
+        "actions": actions,
         "accounting": accounting,
         "timing": journal_timing(store, run_id),
         "next_action": next_action(

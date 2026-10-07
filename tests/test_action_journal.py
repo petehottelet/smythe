@@ -33,7 +33,7 @@ from smythe.actions import (
     reject,
     revoke,
 )
-from smythe.cli import main
+from smythe.cli import EXIT_RUN_ACTION_UNRESOLVED, main
 from smythe.workflow_actions import (
     ActionDispatchPermit,
     begin_attempt,
@@ -311,7 +311,9 @@ def test_connector_error_text_is_kept_redacted_and_never_inspected(
     assert errors == {attempts[0]: "ConnectorRefused: SECRET-REFUSAL for org-[redacted]",
                       attempts[1]: "SECRET-TIMEOUT for org-[redacted]"}
     shown = [json.dumps(store.inspect_run(action.run_id)), json.dumps(store.list_runs())]
-    assert main(["runs", "--journal", str(store.path), "--json", "inspect", action.run_id]) == 0
+    # The accepted run's action has an unknown outcome, so inspection exits with 12.
+    assert main(["runs", "--journal", str(store.path), "--json", "inspect", action.run_id]) == (
+        EXIT_RUN_ACTION_UNRESOLVED)
     shown.append(capsys.readouterr().out)
     for text in shown:
         assert "SECRET" not in text and ORGANIZATION not in text

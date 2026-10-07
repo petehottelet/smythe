@@ -1,7 +1,9 @@
 # Inspect saved runs
 
 `smythe runs` reports what a saved run did and whether its output may be
-used, without resuming or changing it. It reads ordinary `Swarm` checkpoints
+used, without resuming or changing it; its one control,
+[`revoke-action`](#revoke-an-actions-approvals), revokes an external
+action's approvals. It reads ordinary `Swarm` checkpoints
 from a [`FileCheckpointStore`](checkpoint-format.md) directory, or durable
 text workflows from a [`SQLiteWorkflowStore`](workflow-accounting.md) journal.
 Execution, delivery acceptance and cost are reported separately: a run can
@@ -12,6 +14,7 @@ complete with its cost fully known and still have output that its
 smythe runs list                                   # ~/.smythe/checkpoints
 smythe runs --checkpoints ./checkpoints inspect 3f9c2d0e8b4a
 smythe runs --journal smythe-runs.db --json inspect 3f9c2d0e8b4a
+smythe runs --journal smythe-runs.db revoke-action 7c1e40aa --reason "approver left"
 ```
 
 `--checkpoints DIRECTORY` (default `~/.smythe/checkpoints`) and
@@ -25,7 +28,9 @@ is listed with its error and the listing continues.
 
 ## Read-only
 
-Inspection constructs no provider and needs no API key. A missing directory
+Inspection constructs no provider, connector or action runner and needs no
+API key. Only [`revoke-action`](#revoke-an-actions-approvals) writes, and
+only revocations. A missing directory
 or journal is reported and never created. A journal is opened read-only, so a
 version 1 journal is [never upgraded](workflow-accounting.md#journal-upgrades)
 and inspection works while a worker holds a run. Checkpoint files are only
@@ -53,6 +58,7 @@ its runs and its recorded version do not change.
 | `tool_calls` | A durable run's [journaled reads](#research-runs), without response bodies or text; null for ordinary runs |
 | `evidence` | The [source evidence](#research-runs) a completed durable run delivered, summarized; null without any and for ordinary runs |
 | `issues` | What the run leaves open: unresolved questions, unavailable sources, failed reads and final validators that did not pass |
+| `actions` | A durable run's [external actions](#external-actions): balances, each action's state, attempts, approvals, records by kind and digest and next action, and the unresolved ones; null for a run without actions and for ordinary runs |
 | `accounting` | `cost_scope`, `total_cost_usd`, `max_budget_usd`, `cost_is_complete`, `cost_contains_estimates`, `unknown_cost_nodes`, the durable `workflow_accounting` balances, `unknown_exposure` and `unresolved` accounting that stops resume |
 | `timing` | `elapsed_ms`, `phases_ms` and `waiting_ms` added over the saved [timing segments](checkpoint-format.md#timing-segments), with the segment count, first start and last end; null when none were saved. Durable runs report lease sessions on the journal's wall clock and no phase totals |
 | `next_action` | The first thing the run needs, as an `action` code and a `detail` sentence |
@@ -270,6 +276,33 @@ A source removed after the run's decision makes that decision
 `indeterminate`, with the removal as its reason and exit code 11, until a
 re-evaluation decides again.
 
+### External actions
+
+A durable run that [prepared external actions](actions.md#prepared-actions)
+reports them under `actions`, as
+[`inspect_actions()`](actions.md#inspecting-actions) returns them: the
+`external_actions` scope's nanoUSD balances; `unresolved`, the IDs of the
+actions whose effect is unknown, unverified, wrong or abandoned; and each
+action's identity, state, balances, attempts, approvals by principal,
+verifier, ceiling, expiry, consumption and revocation, records by kind and
+digest, `duplicate_risk` and `next_action`. Assertions, parameters, receipts,
+error text and record payloads are never shown. The text report prints one
+line per action, its approvals and its record kinds:
+
+```text
+External actions: 1; 0 confirmed, 0 reserved, 2000000 unknown nanoUSD; 1 unresolved
+  Action publish/1 (5b2d9e70c4a1): outcome_unknown; 1 attempts; 0 confirmed, 2000000 unknown nanoUSD; next operator_review
+    Approval 0e7f13c2d98b: editor-1 of acme (identity-host); approved; expires at 1791820800000000000 ns
+    Records: finding 1
+```
+
+The run's own `next_action` is unchanged by its actions. While the run's
+decision is `accepted` and an action is unresolved, `inspect` exits with 12.
+An [operator decision](actions.md#operator-decisions), made in Python
+because only the host can construct the approval verifier, settles an
+action: `adopt_observed` or `not_executed` leaves nothing unresolved, while
+an `abandon`ed action stays unresolved.
+
 ### Next actions
 
 | `action` | When |
@@ -282,20 +315,34 @@ re-evaluation decides again.
 | `review_output` | The output was `rejected` or `needs_review` and is withheld |
 | `resolve_indeterminate` | No valid decision covers the output, which is withheld |
 
+## Revoke an action's approvals
+
+`revoke-action ACTION_OR_APPROVAL_ID --reason TEXT` revokes every approval
+of an external action, or one approval, as
+[`revoke()`](actions.md#approvals) does: a fail-safe control that needs no
+principal and no lease, so it works while a worker holds the run. The reason
+is stored with account identifiers redacted, and `--json` prints
+`{"target": ..., "revoked": [...]}`, the IDs this call revoked; revoking
+again revokes none. It needs `--journal`, opens a journal for writing only
+once a read-only open shows that it has action tables, so a version 1
+journal is never upgraded, and changes nothing else. Approvals and operator
+decisions stay in the [Python API](actions.md#operator-decisions).
+
 ## Exit codes
 
 | Code | Meaning |
 |---:|---|
-| 0 | Inspected; the run has no decision that withholds its output. It may still be unfinished: read `execution.state` |
-| 2 | Invalid argument, such as both `--checkpoints` and `--journal`, an invalid run id, or a `list` page out of range |
-| 6 | The store has no run with that id |
+| 0 | Inspected; the run has no decision that withholds its output and no unresolved external action. It may still be unfinished: read `execution.state`. `revoke-action` succeeded |
+| 2 | Invalid argument, such as both `--checkpoints` and `--journal`, an invalid run id, a `list` page out of range, or `revoke-action` without `--journal` or with an empty reason |
+| 6 | The store has no run with that id; for `revoke-action`, no action or approval with that id, or a journal without external actions |
 | 7 | The store or the run cannot be read: missing, foreign, corrupt, written by a newer release, or a durable checkpoint that resume would refuse |
 | 10 | The run completed and its output was `rejected` or `needs_review` |
 | 11 | The decision is `indeterminate` |
+| 12 | The decision is `accepted`, but an [external action](#external-actions) is unresolved |
 
-Codes 10 and 11 follow the run's current decision, after any
-[re-evaluation](#decision-history). `list` returns 0 whatever the runs'
-decisions. Codes 10 and 11 are used only
+Codes 10, 11 and 12 follow the run's current decision, after any
+[re-evaluation](#decision-history), and 10 and 11 take precedence over 12.
+`list` returns 0 whatever the runs' decisions. Codes 10 to 12 are used only
 by `runs inspect`; the [Jobs codes](jobs.md#cli-exit-codes) are unchanged.
 
 ## From Python

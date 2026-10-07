@@ -1,8 +1,10 @@
 """Runs inspection reads saved checkpoints and journals without changing them.
 
 Execution, delivery acceptance and cost are separate blocks. Exit status 10
-means a completed run's output was rejected or needs review, and 11 that no
-valid decision covers it.
+means a completed run's output was rejected or needs review, 11 that no
+valid decision covers it, and 12 that accepted output has an external action
+whose effect is unresolved. ``runs revoke-action`` is the one command that
+writes, and only revocations.
 """
 
 from __future__ import annotations
@@ -12,10 +14,12 @@ import json
 from pathlib import Path
 import shutil
 import sqlite3
+import time
 
 import pytest
 
 from fakes import ManualClock
+from fixture_connector import FixtureConnector
 from fixture_service import FixtureService, serve_http
 from smythe import (
     AcceptanceDecision,
@@ -34,9 +38,10 @@ from smythe import (
 )
 import smythe.cli as cli
 from smythe.acceptance import text_sha256
+from smythe.actions import inspect_actions
 from smythe.cli import (
-    EXIT_INVALID_INPUT, EXIT_JOB_STATE, EXIT_LOCAL_ERROR, EXIT_OK, EXIT_RUN_INDETERMINATE,
-    EXIT_RUN_NOT_ACCEPTED, build_parser, main,
+    EXIT_INVALID_INPUT, EXIT_JOB_STATE, EXIT_LOCAL_ERROR, EXIT_OK, EXIT_RUN_ACTION_UNRESOLVED,
+    EXIT_RUN_INDETERMINATE, EXIT_RUN_NOT_ACCEPTED, build_parser, main,
 )
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Revision, Topology
 from smythe.lineage import load_lineage
@@ -44,11 +49,15 @@ from smythe.provider import CompletionResult, Provider
 from smythe.supervisor import SUPERVISOR_SYSTEM_PROMPT, LLMSupervisor, Supervisor
 from smythe.validation import hard_finding
 from smythe.workflow_artifact import current_artifact
+import test_action_approvals as action_approvals
+from test_action_journal import rows as action_rows
+import test_action_operator as operator_actions
 import test_repair_plan as repair_plans
 from test_source_evidence import CLAIM, DROPPED, KEPT, STRONG
 from test_source_evidence import SOURCES as EVIDENCE_SOURCES
 from test_source_evidence import artifact as evidence_artifact
-from test_workflow_acceptance import rewrite_checkpoint
+from test_workflow_acceptance import Contains, Raises, rewrite_checkpoint, strict
+from test_workflow_acceptance import replies as scripted_replies  # noqa: F401  (a fixture)
 import test_workflow_lineage as lineage_runs
 from test_workflow_store_migration import build_journal, dump, mark_version_1
 
@@ -1341,3 +1350,177 @@ def test_lineage_names_predecessors_and_the_successors_that_supersede_them(tmp_p
     assert "  Derived status: none; freshness needs a source catalog" in text
     # A run without lineage has no lineage block.
     assert inspect_durable(capsys, path, plain)[1]["lineage"] is None
+
+
+# ---------------------------------------------------------------------------
+# Durable runs with external actions
+# ---------------------------------------------------------------------------
+
+
+def action_journal(tmp_path, scripted, *, committed=False):
+    """A journal, without WAL sidecars, whose accepted run has one action with an unknown outcome
+    that reconciliation could not settle; returns the path, the action, its host and clock."""
+    path, clock, host = tmp_path / "runs.db", ManualClock(time.time_ns()), action_approvals.Host()
+    with SQLiteWorkflowStore(path, clock_ns=clock) as store:
+        action = operator_actions.under_review(store, tmp_path, scripted, host, clock, committed=committed)[0]
+    with closing(CONNECT(path)) as db:
+        assert db.execute("PRAGMA journal_mode=DELETE").fetchone() == ("delete",)
+    return path, action, host, clock
+
+
+def secrets_of(path: Path) -> list[str]:
+    """What inspection must never show: assertions, error text, notes and parameters."""
+    return [row["assertion"] for row in action_rows(path, "workflow_action_approvals")] + [
+        "timed out", "nothing can show whether the write took effect", operator_actions.NOTE, "Launch notes"]
+
+
+def test_exit_code_12_is_new():
+    taken = {getattr(cli, name) for name in dir(cli)
+             if name.startswith("EXIT_") and not name.startswith("EXIT_RUN_")}
+    assert EXIT_RUN_ACTION_UNRESOLVED == 12 and EXIT_RUN_ACTION_UNRESOLVED not in taken
+    args = build_parser().parse_args(["runs", "revoke-action", "abc", "--reason", "why", "--journal", "j.db"])
+    assert (args.runs_command, args.target, args.reason, args.journal) == ("revoke-action", "abc", "why", "j.db")
+
+
+def test_inspection_shows_external_actions_read_only_and_exits_12_while_one_is_unresolved(
+        tmp_path, capsys, monkeypatch, scripted_replies):  # noqa: F811
+    path, action, host, _ = action_journal(tmp_path, scripted_replies)
+    before = journal_state(path)
+    statements = []
+
+    def connect(*args, **kwargs):
+        db = CONNECT(*args, **kwargs)
+        db.set_trace_callback(statements.append)
+        return db
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Runs inspection constructed a connector or an action runner")
+
+    no_side_effects(monkeypatch)
+    monkeypatch.setattr(FixtureConnector, "__init__", forbidden)
+    monkeypatch.setattr("smythe.actions.ActionRunner.__init__", forbidden)
+    monkeypatch.setattr(sqlite3, "connect", connect)
+    code = main(["runs", "--journal", str(path), "--json", "inspect", action.run_id])
+    monkeypatch.setattr(sqlite3, "connect", CONNECT)
+    value = output(capsys)["inspect"]
+
+    assert code == EXIT_RUN_ACTION_UNRESOLVED
+    compact = ["".join(sql.upper().split()) for sql in statements]
+    assert statements and "BEGINIMMEDIATE" not in compact
+    assert not any(sql.startswith(("PRAGMAJOURNAL_MODE=", "CREATE", "INSERT", "UPDATE", "DELETE", "ALTER"))
+                   for sql in compact)
+    assert journal_state(path) == before
+    # The output is accepted, and the run itself needs nothing more: only the action does.
+    assert (value["delivery"]["decision"], value["next_action"]["action"]) == ("accepted", "none")
+    actions = value["actions"]
+    assert list(actions) == ["accounting_scope", "unit", "confirmed_nanousd", "reserved_nanousd",
+                             "unknown_nanousd", "unresolved", "items"]
+    write = action.profile.write_ceiling_nanousd
+    assert (actions["accounting_scope"], actions["unit"], actions["unknown_nanousd"], actions["unresolved"]) == (
+        "external_actions", "nanoUSD", write, [action.action_id])
+    (entry,) = actions["items"]
+    assert (entry["action_id"], entry["slot"], entry["state"], entry["duplicate_risk"], entry["next_action"]) == (
+        action.action_id, "publish", "outcome_unknown", False, "operator_review")
+    (approval,) = entry["approvals"]
+    assert approval["principal"] == {"issuer": host.issuer, "subject": "editor-1", "tenant": "acme"}
+    assert set(approval) == {"approval_id", "verdict", "intent_sha256", "principal", "verifier", "ceiling_nanousd",
+                             "expires_at_ns", "consumed_by_attempt", "revoked_at_ns", "duplicate_risk"}
+    assert [(record["kind"], len(record["payload_sha256"])) for record in entry["records"]] == [("finding", 64)]
+    assert all(set(record) == {"record_id", "kind", "payload_sha256", "trusted", "cost_nanousd"}
+               for record in entry["records"])
+    with SQLiteWorkflowStore(path, read_only=True) as reader:
+        assert actions == inspect_actions(reader, action.run_id)
+
+    assert main(["runs", "--journal", str(path), "inspect", action.run_id]) == EXIT_RUN_ACTION_UNRESOLVED
+    text = capsys.readouterr().out
+    assert f"External actions: 1; 0 confirmed, 0 reserved, {write} unknown nanoUSD; 1 unresolved" in text
+    assert (f"  Action publish/1 ({action.action_id}): outcome_unknown; 1 attempts; 0 confirmed, "
+            f"{write} unknown nanoUSD; next operator_review") in text
+    assert (f"    Approval {approval['approval_id']}: editor-1 of acme ({host.issuer}); approved; "
+            f"expires at {approval['expires_at_ns']} ns") in text
+    assert "    Records: finding 1" in text
+    for shown in (text, json.dumps(value)):
+        assert not any(secret in shown for secret in secrets_of(path))
+    # Listing reports the run as before, with no new exit code.
+    assert main(["runs", "--journal", str(path), "--json", "list"]) == EXIT_OK
+    assert output(capsys)["list"]["runs"][0]["decision"] == "accepted"
+    assert journal_state(path) == before
+
+
+def test_exit_codes_10_and_11_take_precedence_and_a_resolved_action_exits_0(
+        tmp_path, capsys, scripted_replies):  # noqa: F811
+    path, action, host, clock = action_journal(tmp_path, scripted_replies, committed=True)
+
+    def decided(acceptance):
+        with SQLiteWorkflowStore(path, clock_ns=clock) as store:
+            action_approvals.swarm(store, tmp_path).reevaluate(action.run_id, acceptance=acceptance)
+        return inspect_durable(capsys, path, action.run_id)
+
+    for acceptance, decision, code in ((strict(Contains("absent")), "rejected", EXIT_RUN_NOT_ACCEPTED),
+                                       (strict(Raises()), "indeterminate", EXIT_RUN_INDETERMINATE),
+                                       (strict(Contains("report")), "accepted", EXIT_RUN_ACTION_UNRESOLVED)):
+        exit_code, value = decided(acceptance)
+        assert (exit_code, value["delivery"]["decision"]) == (code, decision)
+        assert value["actions"]["unresolved"] == [action.action_id]
+
+    with SQLiteWorkflowStore(path, clock_ns=clock) as store:
+        operator_actions.decide(store, host, action, "adopt_observed", operator_actions.evidence())
+    code, value = inspect_durable(capsys, path, action.run_id)
+    assert (code, value["actions"]["unresolved"]) == (EXIT_OK, [])
+    assert value["actions"]["items"][0]["state"] == "reconciled"
+    assert not any(secret in json.dumps(value) for secret in secrets_of(path))
+
+
+def test_revoke_action_is_a_fail_safe_control_and_an_abandoned_action_stays_unresolved(
+        tmp_path, capsys, scripted_replies):  # noqa: F811
+    path, action, host, clock = action_journal(tmp_path, scripted_replies)
+    (approval_id,) = [row["approval_id"] for row in action_rows(path, "workflow_action_approvals")]
+    reason = f"Approver left {action_approvals.ORGANIZATION}"
+    revoke = ["runs", "--journal", str(path), "--json", "revoke-action", action.action_id, "--reason", reason]
+    # Another worker's live lease does not stop the revocation.
+    with SQLiteWorkflowStore(path, clock_ns=clock) as store:
+        store.acquire_lease(action.run_id, "another-worker", ttl_s=3600)
+
+    assert main(revoke) == EXIT_OK
+    assert output(capsys)["revoke-action"] == {"target": action.action_id, "revoked": [approval_id]}
+    (row,) = action_rows(path, "workflow_action_approvals")
+    assert row["revoked_reason"] == "Approver left org-[redacted]" and row["revoked_at_ns"] is not None
+    assert main(revoke) == EXIT_OK
+    assert output(capsys)["revoke-action"]["revoked"] == []
+    assert main(revoke[:3] + revoke[4:]) == EXIT_OK
+    assert capsys.readouterr().out == f"Revoked 0 approvals of {action.action_id}; none was in force\n"
+    code, value = inspect_durable(capsys, path, action.run_id)
+    assert code == EXIT_RUN_ACTION_UNRESOLVED
+    assert value["actions"]["items"][0]["approvals"][0]["revocation"] == "after_dispatch"
+    assert "Approver left" not in json.dumps(value)
+
+    with SQLiteWorkflowStore(path, clock_ns=clock) as store:
+        operator_actions.decide(store, host, action, "abandon")
+    code, value = inspect_durable(capsys, path, action.run_id)
+    assert (code, value["actions"]["unresolved"]) == (EXIT_RUN_ACTION_UNRESOLVED, [action.action_id])
+    assert (value["actions"]["items"][0]["state"], value["actions"]["items"][0]["next_action"]) == (
+        "unresolved", None)
+
+
+def test_revoke_action_refuses_what_it_cannot_revoke_and_never_upgrades_a_journal(tmp_path, capsys):
+    def revoke(*options, target="no-such-action"):
+        return main(["runs", *options, "--json", "revoke-action", target, "--reason", "stop"])
+
+    path, _ = durable_run(tmp_path)
+    before = path.read_bytes()
+    assert revoke("--journal", str(path)) == EXIT_JOB_STATE
+    assert "no external actions" in output(capsys)["error"]["message"]
+    assert path.read_bytes() == before and recorded_version(path) == [(1,)]
+
+    current = tmp_path / "current.db"
+    SQLiteWorkflowStore(current).close()
+    assert revoke("--journal", str(current)) == EXIT_JOB_STATE
+    assert output(capsys)["error"]["type"] == "RunNotFoundError"
+    assert revoke("--checkpoints", str(tmp_path)) == EXIT_INVALID_INPUT
+    assert "needs --journal" in output(capsys)["error"]["message"]
+    assert revoke("--journal", str(tmp_path / "missing.db")) == EXIT_LOCAL_ERROR
+    assert output(capsys)["error"]["type"] == "RunInspectionError"
+    assert not (tmp_path / "missing.db").exists()
+    assert main(["runs", "--journal", str(current), "--json", "revoke-action", "x", "--reason", ""]) == (
+        EXIT_INVALID_INPUT)
+    assert output(capsys)["error"]["type"] == "WorkflowValidationError"
