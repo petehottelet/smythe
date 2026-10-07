@@ -96,11 +96,20 @@ _SCHEMA = """
 def _barrier() -> dict[str, str]:
     """Writer-version guards on inserts; updates and deletes are always refused.
 
-    ``INSERT OR REPLACE`` deletes a conflicting row without firing DELETE
-    triggers, so a review or event must also be new: an event takes its
+    ``INSERT OR REPLACE`` deletes conflicting rows without firing DELETE
+    triggers, so an insert must add a row and remove none. It names no
+    existing rowid, review or target seq, and rowids run 1, 2, 3 without
+    gaps: a row removed through any unique key, including an index a client
+    added, leaves the new rowid above the row count. An event also takes its
     target's next seq.
     """
 
+    refused = "RAISE(ABORT, 'Policy registry rows are append-only')"
+    new_row = {
+        "reviews": "EXISTS (SELECT 1 FROM reviews WHERE review_id = NEW.review_id) OR ",
+        "activations": "NEW.seq IS NOT (SELECT coalesce(max(seq), 0) + 1 "
+                       "FROM activations WHERE target = NEW.target) OR ",
+    }
     triggers = {}
     for table in _TABLES:
         name = f"policy_registry_v1_{table}_"
@@ -112,17 +121,17 @@ def _barrier() -> dict[str, str]:
         for operation in ("UPDATE", "DELETE"):
             triggers[name + operation.lower()] = (
                 f"CREATE TRIGGER {name}{operation.lower()} BEFORE {operation} ON {table} "
-                "BEGIN SELECT RAISE(ABORT, 'Policy registry rows are append-only'); END"
+                f"BEGIN SELECT {refused}; END"
             )
-    for table, refused in (
-        ("reviews", "EXISTS (SELECT 1 FROM reviews WHERE review_id = NEW.review_id)"),
-        ("activations", "NEW.seq IS NOT (SELECT coalesce(max(seq), 0) + 1 "
-                        "FROM activations WHERE target = NEW.target)"),
-    ):
-        name = f"policy_registry_v1_{table}_append"
-        triggers[name] = (
-            f"CREATE TRIGGER {name} BEFORE INSERT ON {table} BEGIN SELECT CASE WHEN {refused} "
-            "THEN RAISE(ABORT, 'Policy registry rows are append-only') END; END"
+        # NEW.rowid is -1 here when SQLite assigns it, which no row has.
+        triggers[name + "append"] = (
+            f"CREATE TRIGGER {name}append BEFORE INSERT ON {table} BEGIN SELECT CASE WHEN "
+            f"{new_row.get(table, '')}EXISTS (SELECT 1 FROM {table} WHERE rowid = NEW.rowid) "
+            f"THEN {refused} END; END"
+        )
+        triggers[name + "count"] = (
+            f"CREATE TRIGGER {name}count AFTER INSERT ON {table} "
+            f"WHEN NEW.rowid IS NOT (SELECT count(*) FROM {table}) BEGIN SELECT {refused}; END"
         )
     return triggers
 

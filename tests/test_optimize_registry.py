@@ -2,10 +2,11 @@
 
 Each target has one active pointer. Changes name the head they expect, so a
 stale view writes nothing; rollback restores only an earlier baseline or
-activate entry; and triggers refuse updates, deletes and inserts from another
-schema version. Reviews of Autotune decisions from a fake-evaluator ledger are
-recorded and activated without writing the ledger. Real child processes race
-for one head and are killed inside a write transaction.
+activate entry; and triggers refuse updates, deletes, inserts that would
+replace a row, and inserts from another schema version. Reviews of Autotune
+decisions from a fake-evaluator ledger are recorded and activated without
+writing the ledger. Real child processes race for one head and are killed
+inside a write transaction.
 """
 
 from __future__ import annotations
@@ -276,7 +277,7 @@ def test_every_change_records_an_actor_and_a_reason(tmp_path, actor, reason):
 
 
 TABLE_INSERTS = {
-    "registry_meta": "INSERT INTO registry_meta VALUES (0, 1)",
+    "registry_meta": "INSERT INTO registry_meta VALUES (2, 1)",
     "reviews": "INSERT INTO reviews VALUES ('review-2', 'c', 'd', 'approve', 'r', '{}', 1)",
     "activations": ("INSERT INTO activations VALUES "
                     "('planner.template.report', 3, 'retire', NULL, NULL, NULL, NULL, 'r', 'a', 1)"),
@@ -303,20 +304,36 @@ def test_raw_update_and_delete_raise_through_the_triggers(tmp_path, table):
     assert _dump(path) == before
 
 
+EVENT_AT_ROWID = ("INSERT OR REPLACE INTO activations "
+                  "(rowid, target, seq, action, reason, actor_ref, created_at_ns) VALUES ({}, '{}', {}, "
+                  "'retire', 'r', 'a', 1)")
+SEQ_2_ROWID = "(SELECT rowid FROM activations WHERE seq = 2)"
+
+
 @pytest.mark.parametrize("statement", [
     # REPLACE deletes the conflicting row without firing DELETE triggers.
     "INSERT OR REPLACE INTO activations VALUES "
     "('planner.template.report', 2, 'retire', NULL, NULL, NULL, NULL, 'r', 'a', 1)",
     "REPLACE INTO reviews VALUES ('review-1', 'c', 'd', 'reject', 'r', '{}', 1)",
+    "INSERT OR REPLACE INTO registry_meta VALUES (1, 2)",
     "INSERT OR IGNORE INTO activations VALUES "
     "('planner.template.report', 1, 'retire', NULL, NULL, NULL, NULL, 'r', 'a', 1)",
+    # A row named by rowid, under a new seq, target or review ID.
+    EVENT_AT_ROWID.format(SEQ_2_ROWID, "planner.template.report", 3),
+    EVENT_AT_ROWID.format(SEQ_2_ROWID, "planner.template.summary", 1),
+    "INSERT OR REPLACE INTO reviews (rowid, review_id, campaign_id, decision_id, verdict, "
+    "reviewer_ref, payload_json, created_at_ns) VALUES ((SELECT rowid FROM reviews "
+    "WHERE review_id = 'review-1'), 'review-2', 'c', 'd', 'reject', 'r', '{}', 1)",
+    # Rowids run 1, 2, 3 without gaps.
+    EVENT_AT_ROWID.format(-1, "planner.template.report", 3),
+    EVENT_AT_ROWID.format(9, "planner.template.report", 3),
     # An event that skips the target's next seq.
     "INSERT INTO activations VALUES "
     "('planner.template.report', 4, 'retire', NULL, NULL, NULL, NULL, 'r', 'a', 1)",
     "INSERT INTO activations VALUES "
     "('planner.template.summary', 2, 'retire', NULL, NULL, NULL, NULL, 'r', 'a', 1)",
 ])
-def test_a_current_writer_cannot_replace_or_skip_an_event(tmp_path, statement):
+def test_a_current_writer_cannot_replace_a_row_or_skip_an_event(tmp_path, statement):
     path = tmp_path / "registry.sqlite3"
     _activated(path)
     before = _dump(path)
@@ -329,6 +346,34 @@ def test_a_current_writer_cannot_replace_or_skip_an_event(tmp_path, statement):
         assert [event.policy for event in registry.history(TARGET)] == [V1, V2]
         with pytest.raises(sqlite3.IntegrityError, match="append-only"):
             registry._connection.execute(statement)
+        # Ordinary appends still pass.
+        _review(registry, "review-2")
+        assert registry.retire(TARGET, expected_seq=2, actor="operator", reason="paused").seq == 3
+
+
+@pytest.mark.parametrize("index, statement", [
+    # Replaces the target's activation (seq 2) with another target's first event.
+    ("activations (reason, action)",
+     "INSERT OR REPLACE INTO activations VALUES ('planner.template.summary', 1, 'activate', "
+     "'sha256:x', '{}', 'review-1', NULL, 'first activation', 'a', 1)"),
+    ("reviews (verdict)",
+     "INSERT OR REPLACE INTO reviews VALUES ('review-2', 'c', 'd', 'approve', 'r', '{}', 1)"),
+])
+def test_a_current_writer_cannot_replace_a_row_through_an_added_unique_index(
+    tmp_path, index, statement,
+):
+    path = tmp_path / "registry.sqlite3"
+    _activated(path)
+    before = _dump(path)
+    with closing(sqlite3.connect(path, isolation_level=None)) as raw:
+        raw.create_function(WRITER, 0, lambda: 1)
+        raw.execute(f"CREATE UNIQUE INDEX added ON {index}")
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            raw.execute(statement)
+        raw.execute("DROP INDEX added")
+    assert _dump(path) == before
+    with PolicyRegistry(path) as registry:
+        assert [event.policy for event in registry.history(TARGET)] == [V1, V2]
 
 
 @pytest.mark.parametrize("table", sorted(TABLE_INSERTS))
