@@ -738,7 +738,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `acceptance/<sequence>/<digest>` and applies it with a new completed
   checkpoint, leaving calls, charges and the recipe unchanged;
   `smythe.workflow.current_decision()` and `decision_history()` read the
-  decisions back. Resume returns the current decision and never makes a new
+  decisions back. Each decision a policy makes, the run's own included,
+  binds the SHA-256 of every gate's final receipt (`gate_receipts_sha256`),
+  so a gate verdict changed in the journal afterwards is refused by
+  re-evaluation, with nothing written, and gives `indeterminate` on resume
+  and inspection. Resume returns the current decision and never makes a new
   one: a strict `Swarm` resuming a completed run without a record, or one
   decided under another policy, behaves as before, and a durable run still
   resumes only under the policy its recipe records. `smythe runs inspect`

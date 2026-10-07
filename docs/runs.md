@@ -96,10 +96,11 @@ one the run's recipe writes, and the record must be undecided until the run
 completes and belong to the policy the recipe records, or to a policy a
 re-evaluation decided under, or the run is reported as unreadable. A decided
 record is checked as resuming the completed run checks it: against the saved
-output, the task and the source generations, and against the journal's
-current decision, so a record changed to match other output also gives
-`indeterminate`. Durable runs without a strict policy, including runs with
-only a gate validator, have no record.
+output, the task and the source generations, against the journal's current
+decision, and its gates' saved receipts against the digest the run's
+decisions bound, so a record changed to match other output, or a gate verdict
+changed after the decision, also gives `indeterminate`. Durable runs without
+a strict policy, including runs with only a gate validator, have no record.
 
 ### Decision history
 

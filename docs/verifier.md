@@ -817,6 +817,10 @@ policy, and records the decision in its journal:
   kind `acceptance`, keyed by the output digest and everything else the
   record binds, runs the final validators and reads the gates, and the
   completed checkpoint consumes it in the same transaction as the output.
+  Its inputs also bind `gate_receipts_sha256`, the SHA-256 of each gate's
+  final receipt: its node id and the target generation, outcome and passed
+  flag of the verdict it recorded. A re-evaluation's decision binds the same
+  receipts, which nothing changes once the run completes.
   A run stopped after synthesis and before the decision is committed decides
   again when it resumes: the validators run on the same saved output, which
   is never accepted for having been synthesized. A committed decision is read
@@ -830,7 +834,8 @@ policy, and records the decision in its journal:
   already refuse their recipes.
 - **Completed runs.** Resuming a completed run checks the saved output
   against the record's digest, the task and source generations against the
-  record, and the record against the journal's current decision. Any
+  record, the record against the journal's current decision, and every
+  gate's final receipt against the digest the run's decisions bound. Any
   mismatch returns an `indeterminate` record with the saved text in
   `rejected_output`, never acceptance. A run without a strict policy returns
   `acceptance=None`. [`smythe runs inspect`](runs.md) makes the same checks
@@ -845,7 +850,10 @@ policy, and records the decision in its journal:
   `acceptance/<sequence>/<digest>`, the digest covering the output, the
   policy and everything else the decision binds, and a new completed
   checkpoint applies it in one transaction. The run's calls, charges,
-  budget, counters and recipe are unchanged. A re-evaluation stopped before
+  budget, counters and recipe are unchanged. Gates do not judge again, so
+  their saved receipts must still match the digest the run's decisions
+  bound; a gate verdict changed in the journal afterwards raises
+  `WorkflowStateError` and nothing is written. A re-evaluation stopped before
   that checkpoint is finished by the next one under the same policy, without
   validating again, unless a source was [removed](tasks.md#remove-a-source)
   from the run after it decided; the next one then decides again.

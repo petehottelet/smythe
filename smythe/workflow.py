@@ -379,7 +379,7 @@ def _synthesis_key(graph, *, scoped):
 
 def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, strategy,
                      sources, used_fallback, sequence=0, tombstones=(), operator=None,
-                     publication=None, repair=None):
+                     publication=None, repair=None, gate_receipts=None):
     """Everything a decision binds; its hash keys the acceptance operation.
 
     A re-evaluation's decision also binds its *sequence*, so deciding the
@@ -391,7 +391,9 @@ def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, s
     :func:`_operator_inputs`). A decision on a lineage run's republished
     document binds that *publication*'s sequence, so it is never one made
     for another publication of the same bytes, and a decision a repair plan
-    asked for binds its *repair* (see :func:`_repair_record`).
+    asked for binds its *repair* (see :func:`_repair_record`). A policy's
+    decision binds the digest of the final receipts of the gates it read
+    (*gate_receipts*, see :func:`_gate_receipts`).
     """
     inputs = {
         "synthesis": synthesis_key, "output_sha256": output_sha256,
@@ -409,7 +411,52 @@ def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, s
         inputs["publication"] = publication
     if repair is not None:
         inputs["repair"] = repair
+    if gate_receipts is not None:
+        inputs["gate_receipts_sha256"] = gate_receipts
     return inputs
+
+
+def _gate_receipts(graph):
+    """The SHA-256 of the final receipt of each gate in *graph*, which a policy's decision binds.
+
+    Each gate is named by its node id with the ``target_generation``,
+    ``outcome`` and ``passed`` of the record its final verdict is read from
+    (see :func:`~smythe.verifier.gate_disposition`), or with None when it
+    has no record. Nothing changes a gate once the run completes, so its
+    saved graph keeps these receipts for as long as the run is kept.
+    """
+    receipts = []
+    for node in sorted(graph.nodes, key=lambda item: item.id):
+        if node.verifies:
+            record = node.metadata.get("verification_receipt" if node.max_regenerations > 0
+                                       else ADVISORY_VERDICT_KEY)
+            receipts.append({"node_id": node.id, "receipt": {
+                key: record.get(key) for key in ("target_generation", "outcome", "passed")
+            } if isinstance(record, dict) else None})
+    return _hash(receipts)
+
+
+def _gate_problems(history, graph):
+    """Why a completed run's saved *graph* no longer holds the gate receipts its decisions bound.
+
+    *history* is the run's :func:`decision_history`. Each decision's key
+    must still be the digest of its inputs, and each that binds gate
+    receipts (:func:`_gate_receipts`) must bind those of *graph*, whichever
+    decision is current. A decision recorded before decisions bound gate
+    receipts binds none. One reason, or none when everything matches.
+    """
+    digest = None
+    for decision in history:
+        bound = decision["inputs"]
+        if decision["operation_key"] != _decision_key(bound):
+            break
+        if "gate_receipts_sha256" in bound:
+            digest = digest or _gate_receipts(graph)
+            if bound["gate_receipts_sha256"] != digest:
+                break
+    else:
+        return []
+    return ["the saved gate verdicts are not those the run's decision bound"]
 
 
 def _repair_record(plan_sha256, reason):
@@ -679,7 +726,9 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
     the source generations must be those it binds, and the record must be
     the journal's :func:`current_decision`, made under the run's policy
     (*policy_sha256*) or, for a re-evaluation, the policy it names, and under
-    tombstones the journal holds. With *removed*, a source the run delivered
+    tombstones the journal holds. The saved *graph*'s gates must hold the
+    final receipts the run's decisions bound (:func:`_gate_problems`),
+    whichever decision is current. With *removed*, a source the run delivered
     from that was removed after the decision
     (:meth:`WorkflowRuntime.remove_source`), and any tombstone that restricts
     a lineage run (:func:`_restriction_problems`), is a problem too. An empty list
@@ -687,7 +736,8 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
     will do.
     """
     problems = _delivery_problems(record, output, graph, task)
-    decision = current_decision(store, run_id)
+    history = decision_history(store, run_id)
+    decision = history[-1] if history else None
     holds = decision is not None and decision["record"].to_dict() == record.to_dict()
     considered = []
     if holds:
@@ -696,11 +746,13 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
         considered = bound.get("tombstones", [])
         if type(considered) is not list or any(type(key) is not str for key in considered):
             considered, holds = [], False
+        # The gate receipts a decision binds are checked below.
         inputs = _decision_inputs(
             _synthesis_key(graph, scoped=True), deciding, task_sha256(task),
             record.output_sha256, record.strategy, record.sources, record.used_fallback,
             sequence=sequence, tombstones=considered, operator=_operator_inputs(record),
             publication=bound.get("publication"), repair=bound.get("repair"),
+            gate_receipts=bound.get("gate_receipts_sha256"),
         )
         # A decision binds each tombstone once, sorted; the journal keeps them all.
         holds = (holds and record.policy_sha256 == deciding and bound == inputs
@@ -711,6 +763,7 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
     if not holds:
         considered = []
         problems.append("the journal holds no applied decision matching the saved record")
+    problems += _gate_problems(history, graph)
     if removed:
         problems += _removal_problems(store, run_id, considered)
     return problems
@@ -2229,9 +2282,10 @@ class WorkflowRuntime:
         with *operator*; ``WorkflowStateError`` for a run whose recipe has no
         strict policy, or no lineage policy when given a plan, an unfinished
         run, unresolved accounting, a saved output, task, source generation,
-        record or lineage that no longer matches the journal, so changed
-        output is never accepted, a lineage run that a source tombstone
-        restricts (:func:`~smythe.lineage.restricted_sources`), a run with a
+        gate receipt, record or lineage that no longer matches the journal,
+        so changed output or verdicts are never accepted, a lineage run that
+        a source tombstone restricts
+        (:func:`~smythe.lineage.restricted_sources`), a run with a
         renderer whose published document is missing or changed
         (:meth:`republish` publishes it again first), or a current decision an
         operator cannot resolve;
@@ -2294,8 +2348,9 @@ class WorkflowRuntime:
 
         The output, task and source generations must be those the record
         binds, the record must be the journal's current decision (see
-        :func:`_decision_problems`), and the saved graph must still deliver
-        the sources it binds. A source removed after the decision is not a
+        :func:`_decision_problems`), the saved graph must still deliver the
+        sources it binds, and its gates must hold the final receipts the
+        run's decisions bound. A source removed after the decision is not a
         problem: it is why a run is decided again. Raises
         ``WorkflowStateError``, saying the run cannot be *action*, otherwise.
         """
@@ -2908,11 +2963,13 @@ class WorkflowRuntime:
         return unusable
 
     def _acceptance_inputs(self, synthesis_key, output_sha256, strategy, sources, used_fallback,
-                           sequence=0, tombstones=(), publication=None, repair=None):
+                           sequence=0, tombstones=(), publication=None, repair=None,
+                           gate_receipts=None):
         """Everything a decision binds; its hash keys the acceptance operation."""
         return _decision_inputs(synthesis_key, self.acceptance.sha256, self.undecided.task_sha256,
                                 output_sha256, strategy, sources, used_fallback, sequence,
-                                tombstones, publication=publication, repair=repair)
+                                tombstones, publication=publication, repair=repair,
+                                gate_receipts=gate_receipts)
 
     def _next_decision_sequence(self, inputs_at):
         """A re-evaluation's decision sequence: one past every decision the journal holds.
@@ -2964,8 +3021,9 @@ class WorkflowRuntime:
         read back and never made again. A *reevaluation* decides under the
         next decision sequence (see :meth:`reevaluate`), binding the
         republished *publication* and the *repair* it was made for, if any.
-        A decision on output delivered from a removed source is
-        ``indeterminate`` unless the policy can decide it
+        The decision binds the final receipts of the gates it reads
+        (:func:`_gate_receipts`). A decision on output delivered from a
+        removed source is ``indeterminate`` unless the policy can decide it
         (:meth:`_unheld_removals`); the validators' outcomes are kept.
         """
         from smythe.swarm import _delivery_sources, _synthesis_strategy
@@ -2976,10 +3034,13 @@ class WorkflowRuntime:
         # The removals the decision is made under; only a run with context
         # assembly can have any.
         tombstones = _tombstone_keys(self.store, self.run_id) if self._context_version else []
+        # The verdicts the decision reads; nothing changes them once the run completes.
+        gates = _gate_receipts(self.graph)
 
         def inputs_at(sequence):
             return self._acceptance_inputs(synthesis_key, text_sha256(output), strategy, bound,
-                                           used_fallback, sequence, tombstones, publication, repair)
+                                           used_fallback, sequence, tombstones, publication, repair,
+                                           gates)
 
         sequence = self._next_decision_sequence(inputs_at) if reevaluation else 0
         inputs = inputs_at(sequence)
@@ -3006,8 +3067,8 @@ class WorkflowRuntime:
                 or record.task_sha256 != self.undecided.task_sha256
                 or record.policy_sha256 != self.acceptance.sha256
                 or self._acceptance_inputs(synthesis_key, record.output_sha256, record.strategy,
-                                           record.sources, record.used_fallback,
-                                           sequence, tombstones, publication, repair) != inputs):
+                                           record.sources, record.used_fallback, sequence,
+                                           tombstones, publication, repair, gates) != inputs):
             raise WorkflowStateError("Saved delivery acceptance does not match its output")
         self.trace.on_acceptance(record)
         return record

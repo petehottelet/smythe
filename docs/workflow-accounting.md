@@ -532,8 +532,10 @@ journals the decision:
   `synthesis/<digest>`, a short digest of every node id and its generation,
   so each graph state has its own synthesis.
 - Resuming a completed run checks the saved output, task, source generations
-  and the journal's current decision against the record; a mismatch gives an
-  `indeterminate` record and moves the text to `rejected_output`.
+  and the journal's current decision against the record, and each gate's
+  saved final receipt against the digest the run's decisions bound; a
+  mismatch gives an `indeterminate` record and moves the text to
+  `rejected_output`.
 - Resuming never decides a completed run again, and resuming under another
   policy is refused. `Swarm(run_store=store).reevaluate(run_id,
   acceptance=policy)` is the explicit way to a new decision, for example
