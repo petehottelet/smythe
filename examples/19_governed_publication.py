@@ -7,7 +7,8 @@ accepts the published document's exact bytes. The run's journal then records
 an external action that delivers exactly those bytes to a publishing service:
 its intent, the one key every attempt sends, and the connector's declared
 guarantees. Nothing is sent until an approval verified by the host's identity
-service binds a principal to that exact intent, with a ceiling and an expiry.
+service binds a principal to that one action and its exact intent, with a
+ceiling and an expiry.
 
 The first submission commits on the service, but its answer is lost, so the
 action's outcome is unknown and `smythe runs inspect` exits with 12. The
@@ -176,11 +177,12 @@ class PostConnector:
 
 
 class ApprovalHost:
-    """A stand-in for your identity service: signed approvals of one intent digest, with expiry.
+    """A stand-in for your identity service: signed approvals of one action's subject digest, with expiry.
 
     ``issue`` signs an assertion that ``subject`` of ``tenant`` approves
-    exactly one digest until ``expires_at_ns``; ``verify`` accepts only this
-    host's signature for that digest before the expiry.
+    exactly one digest, such as ``PreparedAction.approval_sha256``, until
+    ``expires_at_ns``; ``verify`` accepts only this host's signature for that
+    digest before the expiry.
     """
 
     identity = "example-approvals/1"
@@ -192,19 +194,19 @@ class ApprovalHost:
     def _sign(self, claims: str) -> str:
         return hmac.new(self._key, claims.encode("ascii"), hashlib.sha256).hexdigest()
 
-    def issue(self, intent_sha256: str, *, subject: str, tenant: str, expires_at_ns: int) -> str:
+    def issue(self, subject_sha256: str, *, subject: str, tenant: str, expires_at_ns: int) -> str:
         claims = base64.urlsafe_b64encode(json.dumps({
-            "intent_sha256": intent_sha256, "subject": subject, "tenant": tenant,
+            "subject_sha256": subject_sha256, "subject": subject, "tenant": tenant,
             "expires_at_ns": expires_at_ns, "nonce": secrets.token_hex(16)}).encode()).decode("ascii")
         return f"{claims}.{self._sign(claims)}"
 
-    def verify(self, assertion: str, intent_sha256: str, now_ns: int) -> Principal:
+    def verify(self, assertion: str, subject_sha256: str, now_ns: int) -> Principal:
         claims, _, signature = assertion.partition(".")
         if not hmac.compare_digest(signature, self._sign(claims)):
             raise ApprovalRejected("The assertion is not signed by this host")
         data = json.loads(base64.urlsafe_b64decode(claims))
-        if data["intent_sha256"] != intent_sha256:
-            raise ApprovalRejected("The assertion approves another intent")
+        if data["subject_sha256"] != subject_sha256:
+            raise ApprovalRejected("The assertion approves something else")
         if now_ns >= data["expires_at_ns"]:
             raise ApprovalRejected("The assertion has expired")
         return Principal(self.issuer, data["subject"], data["tenant"])
@@ -256,19 +258,20 @@ def main() -> None:
                              connector_version=connector.profile.version)))
             (item,) = inspect_actions(store, run_id)["items"]
             print(f"  action {action.slot}/{action.sequence}: key {action.action_key[:16]}, "
-                  f"intent {action.intent.digest()[:16]}")
+                  f"intent {action.intent.digest()[:16]}, approval subject {action.approval_sha256[:16]}")
             print(f"  ceiling {action.ceiling_nanousd} nanoUSD; state {action.state}; "
                   f"next {item['next_action']}\n")
 
             print("=== 3. Approve ===")
             expires = time.time_ns() + HOUR_NS
-            other = host.issue("0" * 64, subject="editor-1", tenant="acme", expires_at_ns=expires)
+            # The intent digest alone is not an approval subject: it would fit an identical intent elsewhere.
+            other = host.issue(action.intent.digest(), subject="editor-1", tenant="acme", expires_at_ns=expires)
             try:
                 approve(store, action.action_id, other, host, ceiling_nanousd=action.ceiling_nanousd,
                         expires_at_ns=expires)
             except ApprovalRejected as refused:
-                print(f"  an assertion for another intent is refused: {refused}")
-            assertion = host.issue(action.intent.digest(), subject="editor-1", tenant="acme",
+                print(f"  an assertion for the bare intent digest is refused: {refused}")
+            assertion = host.issue(action.approval_sha256, subject="editor-1", tenant="acme",
                                    expires_at_ns=expires)
             approval = approve(store, action.action_id, assertion, host,
                                ceiling_nanousd=action.ceiling_nanousd, expires_at_ns=expires)

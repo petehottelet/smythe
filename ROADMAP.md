@@ -374,7 +374,7 @@ connector or paid run.
    blindly repeated. In progress: a completed durable run whose strict
    delivery acceptance is `accepted` can [deliver that output](docs/actions.md)
    through a host connector. An approval binds a principal your host verifies
-   to the exact intent, with a ceiling and an expiry; it is checked again
+   to one action and its exact intent, with a ceiling and an expiry; it is checked again
    before every dispatch, and rejection, revocation and a run's action stop
    are kept in the journal across restarts. Each action sends one key on
    every attempt and records each receipt, and only a read of the target

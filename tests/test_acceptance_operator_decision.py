@@ -274,11 +274,11 @@ def _revoked(host, run_id, record, other):
 MISBOUND = {
     "forged": (_forged, "signature"),
     "tampered": (_tampered, "signature"),
-    "another-run": (_for_another_run, "another intent"),
-    "another-decision": (_for_another_decision, "another intent"),
-    "other-evidence": (_for_other_evidence, "another intent"),
-    "another-sequence": (_for_another_sequence, "another intent"),
-    "another-record": (_for_another_record, "another intent"),
+    "another-run": (_for_another_run, "approves another digest"),
+    "another-decision": (_for_another_decision, "approves another digest"),
+    "other-evidence": (_for_other_evidence, "approves another digest"),
+    "another-sequence": (_for_another_sequence, "approves another digest"),
+    "another-record": (_for_another_record, "approves another digest"),
     "expired": (_expired, "expired"),
     "revoked": (_revoked, "revoked"),
 }

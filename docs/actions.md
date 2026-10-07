@@ -203,12 +203,17 @@ An empty lookup or read alone does not prove that nothing was written.
 
 An `ApprovalVerifier` authenticates approvals; Smythe ships none and does not
 authenticate users. It has an `identity` string naming the verifier and its
-version. `verify(assertion, intent_sha256, now_ns)` returns the `Principal`
-(issuer, subject and tenant) that issued the assertion for exactly that intent
-digest, or raises `ApprovalRejected`. `still_authorized(principal, intent,
-now_ns)` reports whether that principal may still approve the intent. The
-same `verify()` authenticates an [operator's decision](verifier.md#operator-decisions)
-on output that strict delivery acceptance left for review.
+version. `verify(assertion, subject_sha256, now_ns)` returns the `Principal`
+(issuer, subject and tenant) that issued the assertion for exactly that
+digest, or raises `ApprovalRejected`. For an approval or a rejection the
+digest is the action's [approval subject](#approvals), which binds the
+action's key and intent digest; for an
+[operator decision](#operator-decisions) or a
+[duplicate-risk approval](#duplicate-risk), it is the digest that section
+names. `still_authorized(principal, intent, now_ns)` reports whether that
+principal may still approve the intent. The same `verify()` authenticates an
+[operator's decision](verifier.md#operator-decisions) on output that strict
+delivery acceptance left for review.
 
 `check_connector()` returns the connector's profile and `check_verifier()`
 the verifier's identity. Both refuse a `Provider`, a class, a coroutine
@@ -285,7 +290,8 @@ its operations. A refusal raises `ActionNotAuthorized` and records nothing.
 `prepare_action()` returns a `PreparedAction`: its `action_id`, `run_id`,
 `slot`, `sequence`, `action_key`, `intent`, `profile`, `state`,
 `ceiling_nanousd` and `compensates_action_id`, which is None except for a
-[compensation](#compensation). The ceiling is the cost of `max_attempts`
+[compensation](#compensation), and its `approval_sha256`, the digest an
+[approval](#approvals) signs. The ceiling is the cost of `max_attempts`
 writes and `readback_reads` reads at the profile's ceilings, which an
 [approval](#approvals) must cover.
 No attempt, read or [reconciliation](#reconciliation) lookup is made that
@@ -309,25 +315,38 @@ action or an approval.
 
 Smythe does not authenticate users; your host's
 [approval verifier](#connectors-and-approval-verifiers) does. An approval
-covers one logical action and at most one effect: exactly the action's intent
-digest, up to a nanoUSD ceiling and until an expiry.
+covers one logical action and at most one effect: exactly that action and
+its intent, up to a nanoUSD ceiling and until an expiry.
 
 ```python
 from smythe.actions import approve, check_authority
 
-assertion = identity_host.issue(action.intent.digest(), ...)   # your host's approval flow
+assertion = identity_host.issue(action.approval_sha256, ...)   # your host's approval flow
 approval = approve(store, action.action_id, assertion, identity_host,
                    ceiling_nanousd=action.ceiling_nanousd, expires_at_ns=expiry_ns)
 assert check_authority(store, action.action_id, identity_host) == approval
 ```
 
+**What an approver signs.** `PreparedAction.approval_sha256` is the action's
+approval subject: the SHA-256 of the canonical JSON object
+`{"type": "smythe.action-approval.v1", "action_key": ..., "intent_sha256": ...}`
+with the action's [key](#action-keys) and [intent digest](#intent-identity),
+as plain hex (`APPROVAL_SUBJECT_VERSION` is the type tag). The verifier
+receives it in place of the bare intent digest. Because the key names the
+journal, the run, the slot and the sequence, an assertion for one action
+never approves another action, even one whose intent is identical in
+another journal, as when two journals' runs accepted the same document.
+Show the approver the intent and the action it belongs to, and sign the
+subject.
+
 `approve(store, action_id, assertion, verifier, *, ceiling_nanousd,
 expires_at_ns)` returns an `ActionApproval`: the `approval_id`, `action_id`,
 verified `principal`, `ceiling_nanousd` and `expires_at_ns`. It refuses:
 
-- an assertion the verifier does not accept for exactly this action's intent
-  digest: forged, expired, revoked or issued for another intent. The
-  verifier raises `ApprovalRejected`, which propagates;
+- an assertion the verifier does not accept for exactly this action's
+  approval subject: forged, expired, revoked, or issued for another action
+  or for the bare intent digest. The verifier raises `ApprovalRejected`,
+  which propagates;
 - a principal whose tenant is not the intent target's, or whom
   `still_authorized()` no longer authorizes, with `ApprovalRejected`;
 - a ceiling below the action's `ceiling_nanousd`, and an expiry that is not
@@ -342,17 +361,17 @@ verified `principal`, `ceiling_nanousd` and `expires_at_ns`. It refuses:
 
 An assertion is recorded once in a journal. The same approval again returns
 it; the assertion presented for any other action raises `ApprovalRejected`,
-even one whose intent is identical, as when two runs accepted the same
-document. Issue a new assertion for each approval. The newest approval of an
-action supersedes earlier ones, so a new approval can renew or replace one.
+in this journal or another, even for an identical intent. Issue a new
+assertion for each approval. The newest approval of an action supersedes
+earlier ones, so a new approval can renew or replace one.
 
 This differs from the Jobs [approval token](jobs.md#validate-plan-and-approve),
 an acknowledgment of a plan and its spend ceiling that anyone with the
 manifest can compute. It names no principal and has no expiry or revocation.
 
 `reject(store, action_id, assertion, verifier)` cancels an action that was
-never dispatched. Its assertion is verified as an approval's is, and the
-rejection is recorded with the principal. The action is `canceled` for good,
+never dispatched. Its assertion is verified as an approval's is, for the
+action's approval subject, and the rejection is recorded with the principal. The action is `canceled` for good,
 across restarts: preparing the same intent in its slot returns it, and it can
 no longer be approved. An attempt begun in the
 [dispatch journal](#dispatch-journal) but not yet claimed is released with
@@ -377,8 +396,8 @@ checks that:
   journal's clock, binds the action's intent digest, covers its ceiling,
   accepts any [duplicate risk](#duplicate-risk) and was recorded by this
   verifier;
-- the verifier accepts the stored assertion again, for the same principal,
-  and still authorizes that principal; and
+- the verifier accepts the stored assertion again, for the action's approval
+  subject and the same principal, and still authorizes that principal; and
 - the content is still deliverable, as for `prepare_action()`: no security
   stop holds the run, the run's current decision is still `accepted`, the
   published file still holds the bound bytes, and no source the accepted
@@ -896,7 +915,7 @@ from smythe.actions import approve, prepare_compensation
 
 undo = prepare_compensation(store, action.action_id, operation="update",
                             parameters={"retracted": True})
-assertion = identity_host.issue(undo.intent.digest(), ...)   # its own approval
+assertion = identity_host.issue(undo.approval_sha256, ...)   # its own approval
 approve(store, undo.action_id, assertion, identity_host,
         ceiling_nanousd=undo.ceiling_nanousd, expires_at_ns=expiry_ns)
 runner.dispatch(run_id, undo.action_id)
@@ -915,9 +934,9 @@ Preparing the same operation and parameters again returns it; others raise
 `WorkflowConflictError` while it is unfinished. It needs no lease.
 
 A compensation is authorized like any other action, and never by the
-original's approval: an approval binds one intent digest, so the verifier
-refuses the original's assertion, and the journal refuses an assertion that
-it recorded for another action. The compensation needs its own approval and
+original's approval: an approval binds one action's key and intent, so the
+verifier refuses the original's assertion, and the journal refuses an
+assertion that it recorded for another action. The compensation needs its own approval and
 makes its own attempts, with its own receipt and readback, which checks that
 the object holds the canonical JSON of its parameters. The original's
 attempts, approvals, records, state and balances never change; each
@@ -1075,8 +1094,8 @@ runs the whole path without keys or network access:
    validator accepts the document's exact bytes.
 2. `prepare_action()` binds those bytes to a publishing service's
    connector profile, and inspection names `approve` as the next action.
-3. An assertion from a local HMAC approval host for another intent is
-   refused; one for the action's intent digest approves it, up to its
+3. An assertion from a local HMAC approval host for the bare intent digest
+   is refused; one for the action's approval subject approves it, up to its
    ceiling, for one hour.
 4. The first submission commits on the service, but its answer is lost: the
    action is `outcome_unknown`, and `smythe runs inspect` exits with 12.

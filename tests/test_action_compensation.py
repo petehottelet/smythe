@@ -355,8 +355,8 @@ def test_inspection_tells_a_revocation_before_dispatch_from_one_after_an_unknown
 class Careless(Host):
     """A verifier that wrongly accepts an assertion for whatever intent it names."""
 
-    def verify(self, assertion, intent_sha256, now_ns):
-        return super().verify(assertion, self._claims(assertion)["intent_sha256"], now_ns)
+    def verify(self, assertion, subject_sha256, now_ns):
+        return super().verify(assertion, self._claims(assertion)["subject_sha256"], now_ns)
 
 
 def test_a_compensation_needs_its_own_approval_and_gets_its_own_attempt_and_receipt(
@@ -384,11 +384,11 @@ def test_a_compensation_needs_its_own_approval_and_gets_its_own_attempt_and_rece
     with pytest.raises(WorkflowConflictError, match="unfinished action"):
         prepare_compensation(store, action.action_id, operation="update", parameters={"retracted": False})
 
-    # Nothing authorizes it yet, and the original approval never can: it binds another intent digest.
+    # Nothing authorizes it yet, and the original approval never can: it approves another action.
     with pytest.raises(ActionNotAuthorized, match="it has no approval"):
         worker.dispatch(undo.run_id, undo.action_id)
     (original,) = rows(store.path, "workflow_action_approvals")
-    for verifier, message in ((host, "approves another intent"), (Careless(key=host.key), "already recorded")):
+    for verifier, message in ((host, "approves another digest"), (Careless(key=host.key), "already recorded")):
         with pytest.raises(ApprovalRejected, match=message):
             approve(store, undo.action_id, original["assertion"], verifier,
                     ceiling_nanousd=undo.ceiling_nanousd, expires_at_ns=clock.now_ns + HOUR_NS)

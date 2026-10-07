@@ -203,7 +203,7 @@ def test_a_restricted_runs_completed_resume_never_delivers(
     action = prepare_action(store, run_id, slot="publish", intent=intent(delivered(store, run_id)),
                             profile=PROFILE)
     approval = approve(store, action.action_id,
-                       host.issue(action.intent.digest(), subject="editor-1", tenant="acme",
+                       host.issue(action.approval_sha256, subject="editor-1", tenant="acme",
                                   expires_at_ns=clock.now_ns + HOUR_NS),
                        host, ceiling_nanousd=CEILING, expires_at_ns=clock.now_ns + HOUR_NS)
     assert check_authority(store, action.action_id, host) == approval

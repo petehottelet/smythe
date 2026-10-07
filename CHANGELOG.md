@@ -238,7 +238,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   compensation, nanoUSD ceilings and readback limits with exact types.
   `WriteConnector` and `ApprovalVerifier` are synchronous host protocols with
   `ConnectorReceipt`, `ObservedObject`, `Principal`, `ConnectorRefused`,
-  `ConnectorAmbiguous` and `ApprovalRejected`; `check_connector()` and
+  `ConnectorAmbiguous` and `ApprovalRejected`; a verifier's
+  `verify(assertion, subject_sha256, now_ns)` checks the digest an assertion
+  approves; `check_connector()` and
   `check_verifier()` refuse providers, classes, coroutine functions and
   awaitables, and async protocol methods: `submit()`, `lookup()` and `read()`
   on a connector, whose `profile` must be a `ConnectorProfile`, and `verify()`
@@ -267,10 +269,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `WorkflowConflictError` while it is unfinished, and becomes the next
   sequence with its own key once it is observed, reconciled or canceled.
   `approve()` records an approval only when the host's verifier accepts the
-  assertion for exactly the action's intent digest, the principal belongs to
-  the intent's tenant, the nanoUSD ceiling covers the action's attempts and
-  readback, and the expiry is later than the journal's clock; an assertion is
-  recorded once per journal, so it never approves a second action.
+  assertion for exactly the action's `PreparedAction.approval_sha256`, a
+  versioned digest (`smythe.action-approval.v1`) of its action key and
+  intent digest that approvers sign in place of the bare intent digest, the
+  principal belongs to the intent's tenant, the nanoUSD ceiling covers the
+  action's attempts and readback, and the expiry is later than the journal's
+  clock; an assertion approves one action, never an identical intent in
+  another journal, and is recorded once per journal.
   `reject()` cancels an undispatched action for good under a verified
   principal, `revoke()` is a fail-safe control that needs no principal and
   stores its reason redacted, and `check_authority()` verifies the newest
@@ -370,7 +375,7 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   receipt named and its readback read. `PreparedAction.compensates_action_id`
   names the action it undoes, and its slot, `<slot>/<sequence>/compensation`,
   gives it its own key. It needs its own approval, since the original's binds
-  another intent digest, and makes its own attempts with their own receipt
+  another action, and makes its own attempts with their own receipt
   and readback; the original's records never change. A connector without
   compensation refuses it with `ActionStateError`, and the action stays
   `compensation_required` with its unknown exposure. A security stop refuses
