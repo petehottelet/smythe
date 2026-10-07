@@ -460,8 +460,10 @@ The original-glyph generation benchmark stays in Smythe.
   the local path should not grow into. Both must pass the same acceptance,
   authority and accounting tests as local runs
 - Coordination of external coding harnesses: bounded tasks in separate
-  workspaces, review packets that name the exact decision needed, and launch
-  limits set by review capacity, with no automatic merge rights
+  workspaces, review packets that name the exact decision needed, as
+  [`smythe jobs review`](docs/jobs.md#review-what-needs-attention) already
+  does for Jobs runs, and launch limits set by review capacity, with no
+  automatic merge rights
 - Autonomous Autotune proposal strategies after the bounded runner and
   evidence protocol are calibrated on more than the concurrency workload
 - Recursive subgraph decomposition, with depth limits and shared

@@ -184,6 +184,7 @@
     "tests/test_jobs_pause.py",
     "tests/test_jobs_preflight.py",
     "tests/test_jobs_report.py",
+    "tests/test_jobs_review.py",
     "tests/test_jobs_runner.py",
     "tests/test_jobs_runtime_support.py",
     "tests/test_jobs_scale_archive.py",

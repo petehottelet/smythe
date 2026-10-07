@@ -7,6 +7,7 @@ import asyncio
 import hmac
 import json
 import os
+import shlex
 import sqlite3
 import sys
 import tempfile
@@ -225,6 +226,12 @@ def build_parser() -> argparse.ArgumentParser:
     inspection.add_argument("--events-limit", type=int, default=100, help="maximum recent events (default: 100)")
     inspection.add_argument("--out", default=None, metavar="HTML_PATH", help="write a standalone HTML report")
     _add_output_options(inspection, inherited=True)
+
+    review = commands.add_parser("review", help="list what in a run needs a decision, without changing the store")
+    review.add_argument("run_id")
+    review.add_argument("--limit", type=int, default=50, help="operation page size (1-500; default: 50)")
+    review.add_argument("--offset", type=int, default=0, help="number of operations to skip (default: 0)")
+    _add_output_options(review, inherited=True)
 
     resume = commands.add_parser("resume", help="resume only definitively safe work")
     resume.add_argument("run_id")
@@ -806,6 +813,45 @@ def _emit_job_inspection(value: dict[str, Any]) -> None:
         print(f"HTML report: {_terminal_text(value['report_path'], limit=1000)}")
 
 
+def _emit_job_review(value: dict[str, Any], *, store_given: bool) -> None:
+    """Print a review packet at once, so an interruption leaves no partial output."""
+    page, items = value["page"], value["items"]
+    lines = [f"Run: {_terminal_text(value['run_id'])}", f"Name: {_terminal_text(value['name'])}",
+             f"Status: {_terminal_text(value['status'])}",
+             f"Operations (whole run): {_terminal_text(json.dumps(value['operation_counts'], sort_keys=True))}",
+             f"Needs a decision: {len(items)} on operation page {page['returned']} of {page['total']} "
+             f"(offset {page['offset']}, limit {page['limit']})"]
+    for item in items:
+        subject, observed = item["subject"], item["observed"]
+        label = subject.get("operation_key") or subject.get("launch_id") or value["run_id"]
+        lines.append(f"[{item['blocks']}] {item['kind']}: {_terminal_text(label)} "
+                     f"(item {item['item_id'][:12]})")
+        state = ", ".join(_terminal_text(part) for part in (observed["status"], observed["error_class"])
+                          if part)
+        lines.append(f"  Observed: {state}")
+        if observed["excerpt"]:
+            lines.append(f"  Detail: {_terminal_text(observed['excerpt'])}")
+        if "exposure_microusd" in observed:
+            lines.append(f"  Kept exposure: {_usd(observed['exposure_microusd'])}")
+        lines.append(f"  Decision: {_terminal_text(item['decision_needed'], limit=1000)}")
+        lines.extend(f"  Resolve with: smythe {_terminal_text(shlex.join(argv), limit=1000)}"
+                     for argv in item["resolve_with"])
+    if not items:
+        lines.append("Nothing on this page needs a decision.")
+    if page["has_more"]:
+        lines.append(f"More operations: use --offset {page['offset'] + page['returned']}")
+    unchecked = value["artifact_integrity"]["counts"].get("not_checked", 0)
+    if unchecked:
+        lines.append(f"Accepted files not hashed within the 64 MiB limit: {unchecked}; "
+                     f"smythe jobs reroll {_terminal_text(value['run_id'])} --dry-run hashes them all.")
+    commands = [argv for item in items for argv in item["resolve_with"]]
+    notes = (["add the --store option used here"] if store_given and commands else []) + (
+        ["replace REASON with your own reason"] if any("REASON" in argv for argv in commands) else [])
+    if notes:
+        lines.append(f"To run a command, {' and '.join(notes)}.")
+    print("\n".join(lines))
+
+
 def _emit_repair_preview(value: dict[str, Any]) -> None:
     print(f"Run: {_terminal_text(value['run_id'])}")
     print(f"Status: {_terminal_text(value['status'])}; nothing was changed")
@@ -1098,6 +1144,8 @@ def _emit(args: argparse.Namespace, command: str, value: Any) -> None:
         _emit_job_list(value)
     elif command == "inspect" and args.root_command == "jobs":
         _emit_job_inspection(value)
+    elif command == "review":
+        _emit_job_review(value, store_given=args.store != str(_default_store()))
     else:
         print(json.dumps(value, indent=2, ensure_ascii=False))
 
@@ -1388,6 +1436,19 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
             _write_html(destination, render_job_report(payload))
             payload = dict(payload, report_path=str(destination))
         _emit(args, command, payload)
+        return EXIT_OK
+
+    if command == "review":
+        from smythe.jobs.inspection import review_job
+
+        try:
+            with SQLiteRunStore(args.store, read_only=True) as store:
+                packet = review_job(store, args.run_id, limit=args.limit, offset=args.offset)
+            # Each format is rendered whole before it is written.
+            _emit(args, command, packet)
+        except KeyboardInterrupt:
+            _emit_error(args, command, KeyboardInterrupt("review interrupted"))
+            return EXIT_INTERRUPTED
         return EXIT_OK
 
     if command == "reroll" and args.dry_run:

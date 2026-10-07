@@ -638,6 +638,26 @@ def read_worker_state(store_path, run_id) -> dict | None:
     })
 
 
+def _idle_reason(snapshot: dict, worker: dict | None) -> str | None:
+    """Why no live lease holds an observed run, as attachment reports it.
+
+    None while a lease is live or the latest launch is still starting.
+    ``worker_failed`` and ``lease_expired`` are the states attach exits 7 for.
+    """
+    lease = snapshot["lease"]
+    if lease is not None and lease["expires_at_ns"] > snapshot["observed_at_ns"]:
+        return None
+    if snapshot["status"] in _FINISHED:
+        return "stopped"
+    if worker is not None and worker["state"] in {"failed", "aborted", "startup_expired"}:
+        return "worker_failed"
+    if snapshot["status"] == "running":
+        return "lease_expired"
+    if worker is None or worker["state"] != "starting":
+        return "not_running"
+    return None
+
+
 def attach_job(store_path, run_id, *, timeout_s=DEFAULT_ATTACH_TIMEOUT_S,
                poll_interval_s=1.0, on_update=None) -> dict:
     """Observe a job until it stops or the bounded attachment time expires.
@@ -661,16 +681,7 @@ def attach_job(store_path, run_id, *, timeout_s=DEFAULT_ATTACH_TIMEOUT_S,
             if worker is not None and "lease_owner_id" in worker:
                 launch_matches = bool(live and lease["owner_id"] == worker["lease_owner_id"]
                                       and lease["epoch"] == worker["lease_epoch"])
-            reason = None
-            if not live:
-                if snapshot["status"] in _FINISHED:
-                    reason = "stopped"
-                elif worker is not None and worker["state"] in {"failed", "aborted", "startup_expired"}:
-                    reason = "worker_failed"
-                elif snapshot["status"] == "running":
-                    reason = "lease_expired"
-                elif worker is None or worker["state"] != "starting":
-                    reason = "not_running"
+            reason = _idle_reason(snapshot, worker)
             if reason is None and time.monotonic() >= deadline:
                 reason = "timeout"
             snapshot = dict(snapshot, worker=worker,

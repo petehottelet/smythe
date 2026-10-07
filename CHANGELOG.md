@@ -1493,6 +1493,30 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   experimental and off by default, and its overhead times are
   machine-specific. See
   [policy ablations](benchmarks/README.md#policy-ablations-offline-mechanics).
+- `jobs review RUN_ID [--limit N] [--offset N]` lists only what in a Jobs
+  run needs an operator's decision, and the command that carries each
+  decision out. Items come from states the run already records: a budget
+  overrun, invalid provider accounting, a stop request, a failed detached
+  worker or an expired lease (the states `jobs attach` exits 7 for), an
+  unknown outcome with its kept exposure, a rejected or failed operation
+  with or without an attempt left, a missing, changed, unreadable or unsafe
+  accepted file, and a succeeded operation that is not eligible for
+  delivery. Each item names what it holds back (admission, completion or
+  delivery), its subject, the recorded status, a redacted error excerpt of
+  at most 300 characters without local directories, the decision needed and
+  `resolve_with`: `jobs adopt`, `reroll`, `reroll --acknowledge-unknown`,
+  `reroll --repair-integrity`, `recheck` or `resume` command lines that
+  parse as given, without `--store`. Its `item_id` hashes the item's kind,
+  run, subject and recorded state, so it stays the same across reviews
+  until that state changes. Blocking kinds come first, then operation keys;
+  operations are paged, and accepted files are hashed within the 64 MiB
+  inspection limit. The review opens the database read-only, writes and
+  migrates nothing, constructs no provider and works on schema-2 to
+  schema-4 databases. It exits 0 whether or not anything needs a decision,
+  and 130 without partial output when interrupted. The versioned JSON packet
+  (`review_version: 1`) holds no local paths. In Python,
+  `smythe.jobs.inspection.review_job()` returns it. See
+  [review what needs attention](docs/jobs.md#review-what-needs-attention).
 
 ### Changed
 

@@ -35,6 +35,7 @@ smythe jobs plan examples/12_jobs_manifest.yaml
 smythe jobs run examples/12_jobs_manifest.yaml --approve approve_v1_...
 smythe jobs list
 smythe jobs inspect RUN_ID --out job-report.html
+smythe jobs review RUN_ID
 ```
 
 Each approval token creates one run: repeating `jobs run` with the same token
