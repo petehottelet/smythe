@@ -923,8 +923,9 @@ class WorkflowRuntime:
     journals a record that supersedes it.
 
     ``termination``, a :class:`~smythe.scheduling.TerminationPolicy`, has the
-    executor drain the nodes in flight when a failure stops the run: a call
-    answered before ``drain_timeout_s`` settles its known charge, and the
+    executor drain the nodes in flight when a failure stops the run. No call
+    that was not sent yet is reserved or sent: its node returns to pending. A
+    call answered before ``drain_timeout_s`` settles its known charge, and the
     failed checkpoint consumes its node's result, so resume does not call it
     again. A call still unanswered at the deadline is cancelled and keeps its
     unknown exposure, as without a policy. The recipe records the policy only
@@ -2373,6 +2374,10 @@ class WorkflowRuntime:
             # update, and the failed checkpoint below consumes its calls too.
             termination=termination,
         )
+        executor = self.executor
+        # A drain waits only for the calls already sent: no other call is
+        # reserved or sent while it lasts.
+        self.context.draining = lambda: executor._draining
         self._save()
         try:
             # A crash can follow node acceptance but precede its review.

@@ -1353,10 +1353,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 - Durable runs drain their in-flight calls under
   `Swarm(run_store=store, termination=TerminationPolicy(drain_timeout_s=...))`.
   When a failure stops the run, such as a `HALT` node's zero-cost rejection,
-  nothing more is admitted and the requests already sent may finish until
-  the deadline: a node answered in time settles its known charge and keeps
-  its result, the failed checkpoint consumes its call, and resume never
-  calls it again, so the run is not blocked. A request still unanswered at
+  nothing more is admitted or sent, and the requests already sent may finish
+  until the deadline: a node answered in time settles its known charge and
+  keeps its result, the failed checkpoint consumes its call, and resume never
+  calls it again, so the run is not blocked. A node that had not sent its
+  request, such as one still counting its input tokens or a read step
+  resolving its destination, returns to pending without reserving or sending
+  it, so a drain never adds unknown exposure. A request still unanswered at
   the deadline is cancelled and keeps unknown exposure at its quoted
   ceiling, as without a policy, and a security stop still cancels at once.
   The recipe records the policy under `termination` only when one is

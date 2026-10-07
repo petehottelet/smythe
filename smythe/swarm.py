@@ -416,9 +416,10 @@ class Swarm:
     original error is raised. The failed checkpoint
     records how the drain ended under ``control["drain"]``, for information
     only. Serial ``execute()`` has nothing in flight to drain. A durable run
-    records the policy in its recipe: a call answered within the drain keeps
-    its known charge, one still unanswered at the deadline keeps unknown
-    exposure, and resume keeps the run's policy.
+    records the policy in its recipe and sends no call during the drain: a
+    call already sent and answered within it keeps its known charge, one
+    still unanswered at the deadline keeps unknown exposure, and resume keeps
+    the run's policy.
 
     ``lineage``, a :class:`~smythe.lineage.LineagePolicy`, opts each durable
     run into artifact lineage under a declared access scope. It needs a

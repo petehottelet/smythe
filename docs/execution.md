@@ -686,10 +686,12 @@ A cancellation of the run, an interrupt such as `KeyboardInterrupt`, and a
 the policy, and so does a cancellation or a revocation during a drain. The serial executor
 behind `execute()` with `parallel=False` runs one node at a time, so it has
 nothing in flight to drain, nor does the async executor at a concurrency of
-one. A durable `run_store` run records the policy in its recipe and drains its
-journaled calls the same way: a call answered within the deadline keeps its
-known charge, and one still unanswered holds unknown exposure (see [draining
-in-flight calls](workflow-accounting.md#draining-in-flight-calls)).
+one. A durable `run_store` run records the policy in its recipe and waits
+only for the journaled requests already sent: a node that has not sent its
+request returns to pending without sending it, a call answered within the
+deadline keeps its known charge, and one still unanswered holds unknown
+exposure (see [draining in-flight
+calls](workflow-accounting.md#draining-in-flight-calls)).
 
 `AsyncExecutor.drain_record` reports how the last run drained: `settled` names
 the nodes in flight whose work ended during the drain, `cancelled` those it

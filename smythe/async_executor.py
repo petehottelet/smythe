@@ -27,6 +27,7 @@ from smythe.scheduling import RetryDeadlineError, TerminationPolicy
 from smythe.tools import ToolRuntime
 from smythe.tracer import Tracer
 from smythe.verifier import VerificationRecoveryError
+from smythe.workflow_provider import _DrainRefused
 
 if TYPE_CHECKING:
     from smythe.acceptance import AcceptancePolicy
@@ -496,7 +497,9 @@ class AsyncExecutor(ExecutorBase):
                     except Exception:
                         pass  # The node settled its own failure.
                     if node.status is NodeStatus.PENDING:
-                        stopped.add(node.id)  # Only a refused retry ends a node pending.
+                        # Only a refused retry, or a call a durable drain
+                        # did not send, ends a node pending.
+                        stopped.add(node.id)
                     else:
                         settled.append(node.id)
                 if revocation & done:
@@ -654,6 +657,11 @@ class AsyncExecutor(ExecutorBase):
                 if isinstance(exc, asyncio.CancelledError):
                     self._requeue_cancelled(node)
                     raise
+                if isinstance(exc, _DrainRefused):
+                    # A durable drain sent nothing for this attempt: like a
+                    # cancelled node, the node returns to pending.
+                    self._requeue_cancelled(node)
+                    return
                 last_exc = exc
                 self._tracer.on_node_error(node, exc)
                 self._end_failed_attempt(node)

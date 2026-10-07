@@ -4,12 +4,15 @@ Without a termination policy, a node that fails under ``HALT`` cancels its
 running siblings at once: a sibling whose generation request was already sent
 keeps unknown exposure at its quoted ceiling, and the run is blocked with
 ``unknown_exposure``. Under ``TerminationPolicy(drain_timeout_s=...)``, which
-the run's recipe records, the run admits nothing more and waits for those
-requests until the deadline: a sibling answered in time settles its known
-charge, the failed checkpoint consumes its result, and resume never calls it
-again. A sibling still unanswered at the deadline is cancelled and keeps its
-unknown exposure, a security stop ends the drain at once, and a process lost
-during the drain leaves its sent call to recovery, which marks it unknown.
+the run's recipe records, the run admits nothing more, sends no request a
+sibling had not sent, and waits for those already sent until the deadline: a
+sibling answered in time settles its known charge, the failed checkpoint
+consumes its result, and resume never calls it again. A sibling still
+counting its input tokens, or a read step still resolving its destination,
+reserves and sends nothing, so the drain never adds unknown exposure. A
+sibling still unanswered at the deadline is cancelled and keeps its unknown
+exposure, a security stop ends the drain at once, and a process lost during
+the drain leaves its sent call to recovery, which marks it unknown.
 
 The wire fake holds the sibling's generation request, or its input-token
 count, at a gate, and refuses the halting node's first request with a 401,
@@ -42,7 +45,7 @@ from smythe.async_executor import AsyncExecutor
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.workflow_binding import WorkflowBindingError
-from smythe.workflow_store import CallKey, WorkflowConflictError, WorkflowStateError
+from smythe.workflow_store import WorkflowConflictError, WorkflowStateError
 
 # Each NativeTransport generation bills 1,500,000 nanoUSD; its quote reserves this ceiling.
 CEILING = 6_250_000
@@ -320,6 +323,69 @@ def test_a_sibling_the_deadline_cancels_before_its_reservation_holds_nothing(tmp
     assert result.cost_is_complete
 
 
+class Counting(Wire):
+    """``Wire`` that holds the sibling's input-token count, then its generation request at *sent*."""
+
+    def __init__(self, counted: Gate, sent: Gate) -> None:
+        super().__init__(counted, at="input_tokens")
+        self.sent_gate = sent
+
+    async def _call(self, operation, payload):
+        if operation == "response" and self._prompt(payload).startswith("Sibling"):
+            self.schedule("execution", self._ordinals[operation, "execution"], self.sent_gate)
+        return await super()._call(operation, payload)
+
+
+@pytest.mark.parametrize("termination", [None, DRAIN], ids=["no-policy", "drain"])
+def test_a_sibling_still_counting_its_input_when_the_run_stops_sends_no_request(
+        tmp_path, monkeypatch, termination):
+    counting, sending, path = Gate(), Gate(), tmp_path / "runs.db"
+    first = Counting(counting, sending).install(monkeypatch)
+
+    async def count_answered(self, seconds):
+        # The count is answered within the drain. A generation request the
+        # sibling then sent would wait at its gate until the deadline passed.
+        counting.release()
+        while not sending.entered.is_set():
+            await asyncio.sleep(0.01)
+
+    waits = deadline(monkeypatch, count_answered)
+    try:
+        with SQLiteWorkflowStore(path) as store:
+            with pytest.raises(ProviderRequestRejectedError, match="HTTP 401"):
+                durable(store, termination=termination).execute(graph())
+            (run,) = store.list_runs()
+            run_id = run["run_id"]
+            inspected, saved = store.inspect_run(run_id), store.get_checkpoint(run_id)
+    finally:
+        counting.release()
+        sending.release()
+    # Without a policy the count is cancelled; under one it is answered, and
+    # the sibling then stops before its reservation, so the drain ends early.
+    assert waits == ([] if termination is None else [DRAIN_S])
+    assert (sent(first, "Sibling"), counted(first, "Sibling")) == (0, 1)
+    (sibling,) = calls(inspected, "sibling")
+    assert (sibling["state"], sibling["reserved_nanousd"], sibling["unknown_nanousd"]) == (
+        "prepared" if termination is None else "quoted", 0, 0)
+    assert "call_reserved" not in events(inspected, sibling["call_id"])
+    assert inspected["ok"] and inspected["blocked_reason"] is None
+    assert (inspected["unknown_calls"], inspected["reserved_nanousd"]) == (0, 0)
+    assert saved_nodes(saved)["sibling"]["status"] == "pending"
+
+    second = Wire().install(monkeypatch)
+    with SQLiteWorkflowStore(path) as store:
+        result = durable(store, termination=termination).resume(run_id)
+        after = store.inspect_run(run_id)
+    # Resume sends the sibling once, under the quote a drain already saved.
+    assert (sent(second, "Halt"), sent(second, "Sibling")) == (1, 1)
+    assert counted(second, "Sibling") == (1 if termination is None else 0)
+    assert calls(after, "sibling")[0]["call_id"] == sibling["call_id"]
+    assert after["status"] == "completed" and after["ok"]
+    assert (after["confirmed_nanousd"], after["reserved_nanousd"], after["unknown_nanousd"]) == (
+        2 * CHARGE, 0, 0)
+    assert result.cost_is_complete
+
+
 def test_a_security_stop_during_a_durable_drain_cancels_the_sibling_at_once(tmp_path, monkeypatch):
     held, control, path = Gate(), RunControl(), tmp_path / "runs.db"
     wire = Wire(held).install(monkeypatch)
@@ -454,50 +520,82 @@ def test_a_read_step_cancelled_while_resolving_its_destination_is_sent_on_resume
     assert result.cost_is_complete
 
 
+def test_a_read_step_resolved_during_a_drain_returns_its_reservation_unsent(
+        tmp_path, monkeypatch, service):
+    profile, path = reading(service.port), tmp_path / "runs.db"
+    lookup = resolving(monkeypatch)
+    Wire(lookup).install(monkeypatch)
+    answering(monkeypatch, lookup)
+    with SQLiteWorkflowStore(path) as store:
+        with pytest.raises(ProviderRequestRejectedError, match="HTTP 401"):
+            durable(store, read_tools=[profile]).execute(read_graph(profile))
+        (run,) = store.list_runs()
+        run_id = run["run_id"]
+        inspected, saved = store.inspect_run(run_id), store.get_checkpoint(run_id)
+    # Its destination resolved within the drain, but a drain sends nothing
+    # new: the read returns its reservation before its claim.
+    (released,) = fetched(inspected)
+    assert (released["state"], released["reserved_nanousd"], released["evidence_id"]) == (
+        "released", 0, None)
+    history = events(inspected, released["call_id"])
+    assert history.count("call_reserved") == history.count("call_released") == 1
+    assert "dispatch_claimed" not in history and reads(service) == 0
+    assert inspected["ok"] and inspected["blocked_reason"] is None
+    assert (inspected["unknown_calls"], inspected["reserved_nanousd"]) == (0, 0)
+    assert saved_nodes(saved)["fetch"]["status"] == "pending"
+
+    Wire().install(monkeypatch)
+    with SQLiteWorkflowStore(path) as store:
+        result = durable(store, read_tools=[profile]).resume(run_id)
+        after = store.inspect_run(run_id)
+    (current,) = fetched(after)
+    assert current["call_id"] == released["call_id"]
+    assert (current["state"], current["result_state"]) == ("settled", "applied")
+    assert events(after, current["call_id"]).count("dispatch_claimed") == 1
+    assert reads(service) == 1
+    assert after["status"] == "completed" and after["ok"]
+    assert result.cost_is_complete
+
+
 # ---------------------------------------------------------------------------
 # A process lost during a drain
 # ---------------------------------------------------------------------------
 
 
-def test_a_process_lost_during_a_drain_before_its_dispatch_claim_completes_on_resume(
-        tmp_path, monkeypatch):
-    # The drain lets the sibling count its input and reserve its quote; the
-    # process is lost before it claims the dispatch, so the image holds a
-    # reserved call that was never sent.
-    held, image = Gate(), tmp_path / "killed.db"
-    first = Wire(held, at="input_tokens").install(monkeypatch)
-    answering(monkeypatch, held)
+def test_a_process_lost_during_a_drain_with_a_reserved_read_completes_on_resume(
+        tmp_path, monkeypatch, service):
+    # The read resolves its destination within the drain, and the process is
+    # lost as the read returns its reservation, so the image holds a reserved
+    # read that was never sent.
+    profile, image = reading(service.port), tmp_path / "killed.db"
+    lookup = resolving(monkeypatch)
+    first = Wire(lookup).install(monkeypatch)
+    answering(monkeypatch, lookup)
     with SQLiteWorkflowStore(tmp_path / "live.db") as store:
-        def sibling(lease, call_id, _):
-            record = store.lookup_call(lease.run_id, CallKey("execution", "node/sibling"))
-            return record is not None and record["call_id"] == call_id
-
-        point = crash_when(monkeypatch, store, "claim_dispatch", sibling, image=image,
+        point = crash_when(monkeypatch, store, "release_before_dispatch", image=image,
                            connection=store._db)
         with pytest.raises(Crash):
-            durable(store).execute(graph())
+            durable(store, read_tools=[profile]).execute(read_graph(profile))
         run_id = store.list_runs()[0]["run_id"]
-    assert point.fired
-    assert (sent(first, "Halt"), sent(first, "Sibling"), counted(first, "Sibling")) == (1, 0, 1)
+    assert point.fired and sent(first, "Halt") == 1 and reads(service) == 0
 
     second = Wire().install(monkeypatch)
     with SQLiteWorkflowStore(image, clock_ns=ManualClock.after(120)) as recovered:
-        (orphan,) = calls(recovered.inspect_run(run_id), "sibling")
+        (orphan,) = fetched(recovered.inspect_run(run_id))
         assert (orphan["state"], orphan["reserved_nanousd"], orphan["evidence_id"]) == (
-            "reserved", CEILING, None)
-        result = durable(recovered).resume(run_id)
+            "reserved", READ_CEILING, None)
+        result = durable(recovered, read_tools=[profile]).resume(run_id)
         after = recovered.inspect_run(run_id)
-    # Its node is current, so resume sends it under its saved quote and reservation.
-    (current,) = calls(after, "sibling")
+    # Its node is current, so resume sends it under its saved reservation.
+    (current,) = fetched(after)
     history = events(after, current["call_id"])
     assert current["call_id"] == orphan["call_id"]
     assert (current["state"], current["result_state"]) == ("settled", "applied")
     assert history.count("call_reserved") == history.count("dispatch_claimed") == 1
     assert "call_released" not in history
-    assert (sent(second, "Halt"), sent(second, "Sibling"), counted(second, "Sibling")) == (1, 1, 0)
+    assert (sent(second, "Halt"), reads(service)) == (1, 1)
     assert after["status"] == "completed" and after["ok"]
-    assert (after["confirmed_nanousd"], after["reserved_nanousd"], after["unknown_nanousd"]) == (
-        2 * CHARGE, 0, 0)
+    assert (after["reserved_nanousd"], after["unknown_nanousd"]) == (0, 0)
     assert result.cost_is_complete
 
 

@@ -273,7 +273,8 @@ class TerminationPolicy:
     at the deadline are cancelled, as without a policy, and the run raises
     its original error. A cancellation, an interrupt such as
     ``KeyboardInterrupt``, and a failure of class ``security_stop`` never
-    drain. The serial executor has nothing in flight to drain.
+    drain. The serial executor has nothing in flight to drain. A durable run's
+    journal sends no call during a drain: only the calls already sent settle.
     """
 
     drain_timeout_s: float
