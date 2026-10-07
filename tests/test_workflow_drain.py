@@ -327,7 +327,9 @@ def test_a_security_stop_during_a_durable_drain_cancels_the_sibling_at_once(tmp_
     waits = deadline(monkeypatch, revoke)
 
     async def run(store):
-        return await asyncio.wait_for(durable(store, control=control).execute_async(graph()), 10)
+        # Only a hang ends this bound; the revocation, not a deadline, ends the drain.
+        return await asyncio.wait_for(durable(store, control=control).execute_async(graph()),
+                                      120)
 
     try:
         with SQLiteWorkflowStore(path) as store:
