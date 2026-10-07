@@ -508,6 +508,7 @@ Tests:
 - `AgentSkillsProvider`: hydration `tests/test_agent_skills.py::test_merge_replace_and_static_only_hydration`
   and `tests/test_agent_skills.py::test_discovery_lists_skill_refs_without_paths_or_instructions`;
   refused `tests/test_agent_skills.py::test_invalid_skill_files_are_refused_with_a_clear_message`,
+  `tests/test_agent_skills.py::test_yaml_aliases_are_refused_before_they_expand`,
   `tests/test_agent_skills.py::test_one_skill_name_in_two_roots_is_refused`
   and `tests/test_agent_skills.py::test_a_skill_directory_that_resolves_outside_its_root_is_refused`;
   authority `tests/test_agent_skills.py::test_a_skill_cannot_grant_tools_weaken_acceptance_or_raise_the_budget`

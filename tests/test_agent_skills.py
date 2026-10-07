@@ -107,6 +107,8 @@ INVALID = {
     "invalid-yaml": ("---\nname: release-notes\ndescription: [x\n---\n", "frontmatter is not valid YAML"),
     "long-tag": (skill_text(extra=f"released: !{'x' * 50_000} 1\n"),
                  "frontmatter is not valid YAML: could not determine a constructor for the tag '!xxx"),
+    "long-duplicate-anchor": (skill_text(extra=f"a: &{'x' * 30_000} 1\nb: &{'x' * 30_000} 2\n"),
+                              "frontmatter is not valid YAML: found duplicate anchor 'xxx"),
     "deep-nesting": (skill_text(extra=f"nested: {'[' * 20_000}{']' * 20_000}\n"),
                      "frontmatter nests too deeply to load"),
     "impossible-date": (skill_text(extra="released: 2024-02-30\n"),
@@ -136,17 +138,9 @@ def test_a_non_utf8_file_is_refused():
         parse_skill_md(skill_text().encode() + b"\xff")
 
 
-def nested_aliases(levels):
-    """YAML of a few hundred bytes whose last anchor is a list of 9 ** levels strings."""
-    lines = ['a0: &a0 ["lol", "lol", "lol", "lol", "lol", "lol", "lol", "lol", "lol"]']
-    lines += [f"a{level}: &a{level} [" + ", ".join([f"*a{level - 1}"] * 9) + "]"
-              for level in range(1, levels)]
-    return "\n".join(lines) + f"\nname: *a{levels - 1}\n"
-
-
 def test_a_refused_name_is_described_briefly_however_large_its_value(tmp_path):
     hostile = {
-        "nested-aliases": (f"---\n{nested_aliases(6)}description: Aliases.\n---\n", "got list"),
+        "long-list": (f"---\nname: [{', '.join(['x'] * 20_000)}]\ndescription: A list.\n---\n", "got list"),
         "long-text": (skill_text("a" * 60_000), "got text of 60000 characters"),
         "long-integer": (skill_text("0x" + "f" * 4_000), "got int"),
     }
@@ -159,16 +153,65 @@ def test_a_refused_name_is_described_briefly_however_large_its_value(tmp_path):
 
     # Discovery and refresh() refuse the same file just as briefly.
     root = tmp_path / "skills"
-    write_skill(root, text=hostile["nested-aliases"][0])
+    write_skill(root, text=hostile["long-list"][0])
     with pytest.raises(AgentSkillError, match=NAME_RULE) as raised:
         AgentSkillsProvider({"writer": [root]})
     assert len(str(raised.value)) < 300
     (root / "release-notes" / "SKILL.md").write_bytes(skill_text().encode())
     provider = AgentSkillsProvider({"writer": [root]})
-    (root / "release-notes" / "SKILL.md").write_bytes(hostile["nested-aliases"][0].encode())
+    (root / "release-notes" / "SKILL.md").write_bytes(hostile["long-list"][0].encode())
     with pytest.raises(AgentSkillError, match=NAME_RULE) as raised:
         provider.refresh()
     assert len(str(raised.value)) < 300
+
+
+def nested_aliases(levels):
+    """YAML of a few hundred bytes whose last anchor is a list of 9 ** levels strings."""
+    lines = ['a0: &a0 ["lol", "lol", "lol", "lol", "lol", "lol", "lol", "lol", "lol"]']
+    lines += [f"a{level}: &a{level} [" + ", ".join([f"*a{level - 1}"] * 9) + "]"
+              for level in range(1, levels)]
+    return "\n".join(lines) + f"\nname: *a{levels - 1}\n"
+
+
+def merged_mappings(levels):
+    """YAML of a few hundred bytes whose merge keys copy 9 ** levels key-value pairs as it loads."""
+    lines = ["m0: &m0 {" + ", ".join(f"k{key}: v" for key in range(9)) + "}"]
+    lines += [f"m{level}: &m{level} {{<<: [" + ", ".join([f"*m{level - 1}"] * 9) + "]}"
+              for level in range(1, levels)]
+    return "\n".join(lines) + "\n"
+
+
+def test_yaml_aliases_are_refused_before_they_expand(tmp_path):
+    refusal = "frontmatter may not use YAML aliases"
+    # Cheapest first: each later file takes far longer to load than to refuse.
+    hostile = {
+        "one-alias": skill_text(extra="owner: &owner docs-team\nreviewer: *owner\n"),
+        "nested-aliases": f"---\n{nested_aliases(6)}description: Aliases.\n---\n",
+        # Each level multiplies the pairs merged by nine: loading these nine
+        # levels would take minutes and gigabytes of memory.
+        "merged-mappings": skill_text(extra=merged_mappings(9)),
+    }
+    for label, text in hostile.items():
+        assert len(text.encode()) < 700, label
+        with pytest.raises(AgentSkillError, match=refusal) as raised:
+            parse_skill_md(text.encode(), skill_id="release-notes")
+        assert str(raised.value) == f"Skill 'release-notes': {refusal}", label
+    # An anchor that nothing refers to is ordinary YAML.
+    anchored = parse_skill_md(skill_text(extra="x-owner: &owner docs-team\n").encode())
+    assert anchored.ignored_fields == ("x-owner",)
+
+    # Discovery and refresh() refuse the file before loading it.
+    root = tmp_path / "skills"
+    write_skill(root, text=hostile["merged-mappings"])
+    with pytest.raises(AgentSkillError, match=f"^Skill 'release-notes': {refusal}$"):
+        AgentSkillsProvider({"writer": [root]})
+    (root / "release-notes" / "SKILL.md").write_bytes(skill_text().encode())
+    provider = AgentSkillsProvider({"writer": [root]})
+    before = provider.list_agent_skills("writer")
+    (root / "release-notes" / "SKILL.md").write_bytes(hostile["merged-mappings"].encode())
+    with pytest.raises(AgentSkillError, match=f"^Skill 'release-notes': {refusal}$"):
+        provider.refresh()
+    assert provider.list_agent_skills("writer") == before
 
 
 def test_the_version_changes_with_any_edit_but_not_with_crlf_line_endings():

@@ -21,6 +21,7 @@ from types import MappingProxyType
 from typing import Any
 
 import yaml
+from yaml.events import AliasEvent
 
 from smythe.skills import SkillRef
 
@@ -103,8 +104,7 @@ def _split(data: bytes, where: str) -> tuple[bytes, str, str]:
 def _shown(value: Any) -> str:
     """Describe a refused value briefly; only short text is repeated as it is.
 
-    YAML aliases share one object many times over, so a few hundred bytes can
-    build a list whose ``repr`` runs to gigabytes.
+    A refused value can be text or a list nearly the whole file long.
     """
     if value is None or isinstance(value, str) and len(value) <= 2 * MAX_NAME_CHARS:
         return repr(value)
@@ -113,8 +113,26 @@ def _shown(value: Any) -> str:
     return type(value).__name__
 
 
+class _AliasRefused(Exception):
+    """Frontmatter used a YAML alias."""
+
+
+class _SkillLoader(yaml.SafeLoader):
+    """``yaml.SafeLoader`` that refuses a YAML alias before composing it.
+
+    Through nested lists or merge keys, aliases let a few hundred bytes load
+    as more entries than memory holds. The check runs as each node is
+    composed, so deep nesting still stops at the recursion limit.
+    """
+
+    def compose_node(self, parent: Any, index: Any) -> Any:
+        if self.check_event(AliasEvent):
+            raise _AliasRefused
+        return super().compose_node(parent, index)
+
+
 def _clipped(error: Exception) -> str:
-    """A loader's message, cut short: it can quote a tag or alias the whole file long."""
+    """A loader's message, cut short: it can quote a tag or anchor the whole file long."""
     detail = str(error)
     return detail if len(detail) <= _MAX_DETAIL_CHARS else detail[:_MAX_DETAIL_CHARS] + " ..."
 
@@ -140,20 +158,23 @@ def _text(fields: dict[Any, Any], key: str, where: str, limit: int | None = None
 def parse_skill_md(data: bytes, *, skill_id: str | None = None) -> AgentSkill:
     """Parse one SKILL.md file's bytes into an :class:`AgentSkill`.
 
-    Only the frontmatter is read as YAML, with ``yaml.safe_load``, and it must
-    be a mapping; the file may hold at most 64 KiB. ``name`` must be 1 to 64
-    lowercase letters, digits and single hyphens and equal *skill_id*, the
-    skill's directory name, which defaults to the name. ``description`` is
-    required, at most 1024 characters. ``license`` and ``compatibility`` are
-    text, ``metadata`` maps text to text, ``allowed-tools`` is space-separated
-    text or a list, and ``version`` is recorded as text. Any problem, frontmatter
-    that YAML cannot load included, raises :class:`AgentSkillError` naming the
-    field, with a message kept short.
+    Only the frontmatter is read as YAML, with PyYAML's safe loader, and it
+    must be a mapping that uses no YAML aliases; the file may hold at most
+    64 KiB. ``name`` must be 1 to 64 lowercase letters, digits and single
+    hyphens and equal *skill_id*, the skill's directory name, which defaults
+    to the name. ``description`` is required, at most 1024 characters.
+    ``license`` and ``compatibility`` are text, ``metadata`` maps text to
+    text, ``allowed-tools`` is space-separated text or a list, and ``version``
+    is recorded as text. Any problem, frontmatter that YAML cannot load
+    included, raises :class:`AgentSkillError` naming the field, with a message
+    kept short.
     """
     where = "SKILL.md" if skill_id is None else f"Skill {skill_id!r}"
     normalized, frontmatter, body = _split(data, where)
     try:
-        fields = yaml.safe_load(frontmatter)
+        fields = yaml.load(frontmatter, Loader=_SkillLoader)
+    except _AliasRefused:
+        raise AgentSkillError(f"{where}: frontmatter may not use YAML aliases") from None
     except yaml.YAMLError as error:
         raise AgentSkillError(f"{where}: frontmatter is not valid YAML: {_clipped(error)}") from None
     except RecursionError:

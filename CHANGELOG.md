@@ -1636,11 +1636,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `SkillRef` whose version is the `sha256:` digest of the file with CRLF read
   as LF; its metadata holds the description, directory name and declared
   `allowed-tools` and version, never a path or the instructions. Only the
-  frontmatter is parsed, with `yaml.safe_load`; `parse_skill_md()` refuses an
-  invalid name, a name that differs from its directory, a missing or overlong
-  description, frontmatter that YAML cannot load or that is not a mapping,
-  and files over 64 KiB; the provider refuses one name in two directories
-  and a `SKILL.md` that resolves outside its root. Each refusal is an
+  frontmatter is parsed, with PyYAML's safe loader; `parse_skill_md()` refuses
+  an invalid name, a name that differs from its directory, a missing or
+  overlong description, frontmatter that YAML cannot load, that is not a
+  mapping or that uses YAML aliases (refused before they expand), and files
+  over 64 KiB; the provider refuses one name in two directories and a
+  `SKILL.md` that resolves outside its root. Each refusal is an
   `AgentSkillError` whose message stays short however large the refused
   value. A skill adds only a capability tag: declared tools are never
   granted, and its instructions, which `instructions(name)` returns after
