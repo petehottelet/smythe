@@ -1357,12 +1357,16 @@ def test_lineage_names_predecessors_and_the_successors_that_supersede_them(tmp_p
 # ---------------------------------------------------------------------------
 
 
-def action_journal(tmp_path, scripted, *, committed=False):
-    """A journal, without WAL sidecars, whose accepted run has one action with an unknown outcome
-    that reconciliation could not settle; returns the path, the action, its host and clock."""
+def action_journal(tmp_path, scripted, *, committed=False, setup=None):
+    """A journal, without WAL sidecars, whose accepted run has one action; returns the path, the
+    action, its host and clock. *setup* makes the action; by default its outcome is unknown and
+    reconciliation could not settle it."""
     path, clock, host = tmp_path / "runs.db", ManualClock(time.time_ns()), action_approvals.Host()
     with SQLiteWorkflowStore(path, clock_ns=clock) as store:
-        action = operator_actions.under_review(store, tmp_path, scripted, host, clock, committed=committed)[0]
+        if setup is None:
+            action = operator_actions.under_review(store, tmp_path, scripted, host, clock, committed=committed)[0]
+        else:
+            action = setup(store, tmp_path, scripted, host, clock)[0]
     with closing(CONNECT(path)) as db:
         assert db.execute("PRAGMA journal_mode=DELETE").fetchone() == ("delete",)
     return path, action, host, clock
@@ -1469,6 +1473,25 @@ def test_exit_codes_10_and_11_take_precedence_and_a_resolved_action_exits_0(
     assert (code, value["actions"]["unresolved"]) == (EXIT_OK, [])
     assert value["actions"]["items"][0]["state"] == "reconciled"
     assert not any(secret in json.dumps(value) for secret in secrets_of(path))
+
+
+@pytest.mark.parametrize("setup,state,step,code", [
+    (operator_actions._wrong, "compensation_required", "compensate", EXIT_RUN_ACTION_UNRESOLVED),
+    (operator_actions._unverified, "dispatched", "operator_review", EXIT_RUN_ACTION_UNRESOLVED),
+    (operator_actions.awaiting_readback, "dispatched", "readback", EXIT_OK),
+], ids=["compensation-required", "unverified", "awaiting-readback"])
+def test_a_wrong_or_unverified_effect_exits_12_and_a_pending_readback_does_not(
+        tmp_path, capsys, scripted_replies, setup, state, step, code):  # noqa: F811
+    path, action, _, _ = action_journal(tmp_path, scripted_replies, setup=setup)
+    before = journal_state(path)
+
+    exit_code, value = inspect_durable(capsys, path, action.run_id)
+
+    assert (exit_code, value["delivery"]["decision"]) == (code, "accepted")
+    (entry,) = value["actions"]["items"]
+    assert (entry["state"], entry["next_action"]) == (state, step)
+    assert value["actions"]["unresolved"] == ([] if code == EXIT_OK else [action.action_id])
+    assert journal_state(path) == before
 
 
 def test_revoke_action_is_a_fail_safe_control_and_an_abandoned_action_stays_unresolved(

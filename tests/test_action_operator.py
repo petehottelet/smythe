@@ -80,6 +80,30 @@ class Overwritten(Recording):
         return observed and replace(observed, content=b"someone else's document")
 
 
+class Missing(Recording):
+    """Reads find no object."""
+
+    def read(self, target, timeout_s):
+        super().read(target, timeout_s)
+        return None
+
+
+class Superseded(Recording):
+    """Reads find the version before the write, holding other bytes."""
+
+    def read(self, target, timeout_s):
+        observed = super().read(target, timeout_s)
+        return observed and replace(observed, version=observed.version - 1, content=b"the previous draft")
+
+
+class Rekeyed(Recording):
+    """Reads find the bound bytes at a stale version, written under another key."""
+
+    def read(self, target, timeout_s):
+        observed = super().read(target, timeout_s)
+        return observed and replace(observed, version=observed.version - 1, key="another-writers-key")
+
+
 def opaque(clock, **settings) -> Reconciling:
     """A connector that declares neither lookup by key nor deduplication."""
     return Reconciling(FixtureService(clock_ns=clock, dedupe=False, lookup_by_key=False), **settings)
@@ -111,6 +135,16 @@ def unverified(store, tmp_path, replies, host, clock):  # noqa: F811
         "dispatched", "acknowledged", "operator_review")
     assert [codes(report(record)) for record in records(store, action, "readback")] == [["stale_version"]] * 2
     return action, approval, connector
+
+
+def awaiting_readback(store, tmp_path, replies, host, clock, connector=None):  # noqa: F811
+    """An acknowledged write whose reads have not run yet."""
+    connector = connector or Recording(FixtureService(clock_ns=clock))
+    action, _ = ready(store, tmp_path, replies, host, clock, connector)
+    progress = runner(store, connector, host, clock).dispatch(action.run_id, action.action_id)
+    assert (progress.state, progress.attempt["state"], progress.next_action) == (
+        "dispatched", "acknowledged", "readback")
+    return action, connector
 
 
 def under_review(store, tmp_path, replies, host, clock, *, committed=False, **settings):  # noqa: F811
@@ -205,6 +239,39 @@ def test_adopting_an_unknown_outcome_needs_evidence_when_no_read_showed_the_cont
     assert connector.made("submit") == 1
     # The ambiguous attempt keeps its exposure.
     assert after["attempts"][0]["unknown_nanousd"] == WRITE and balances(after) == (0, 0, WRITE)
+
+
+@pytest.mark.parametrize("reading,code", [(Missing, "not_visible"), (Superseded, "stale_version"),
+                                          (Rekeyed, "stale_version")],
+                         ids=["no-object", "older-other-bytes", "older-under-another-key"])
+def test_adopting_needs_evidence_when_the_reads_did_not_show_the_bound_content(
+        store, tmp_path, replies, host, clock, reading, code):  # noqa: F811
+    action, connector = awaiting_readback(store, tmp_path, replies, host, clock,
+                                          reading(FixtureService(clock_ns=clock)))
+    # An acknowledged write with reads left is in progress, not unresolved.
+    assert inspect_actions(store, action.run_id)["unresolved"] == []
+    worker = runner(store, connector, host, clock)
+    assert worker.readback(action.run_id, action.action_id).next_action == "reconcile"
+    assert [codes(report(record)) for record in records(store, action, "readback")] == [[code]] * 2
+    # With no read left to confirm it, the dispatched action is unresolved.
+    assert inspect_actions(store, action.run_id)["unresolved"] == [action.action_id]
+    assert worker.reconcile(action.run_id, action.action_id).next_action == "operator_review"
+    view = inspect_actions(store, action.run_id)
+    assert (view["unresolved"], view["items"][0]["state"]) == ([action.action_id], "dispatched")
+    before, untouched = item(store, action), journal(store)
+
+    with pytest.raises(WorkflowValidationError, match="needs attached evidence or a readback"):
+        decide(store, host, action, "adopt_observed")
+    assert journal(store) == untouched
+
+    attached = evidence("The service's console shows the post under the action's key")
+    assert decide(store, host, action, "adopt_observed", attached).state == "reconciled"
+    after = appended_only(store, action, before, "reconciled")
+    kept, decision = after["records"][len(before["records"]):]
+    # The decision rests on the evidence alone, never on reads that did not show the content.
+    assert payload(store, decision["record_id"])["evidence"] == [kept["record_id"]]
+    assert connector.made("submit") == 1
+    assert inspect_actions(store, action.run_id)["unresolved"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -321,6 +388,8 @@ def test_abandoning_closes_the_action_as_unresolved_and_keeps_its_exposure(
         store, tmp_path, replies, host, clock, setup):  # noqa: F811
     action, connector = setup(store, tmp_path, replies, host, clock)
     before, calls = item(store, action), list(connector.calls)
+    # An effect that is unknown, unverified or wrong is unresolved before any decision.
+    assert inspect_actions(store, action.run_id)["unresolved"] == [action.action_id]
 
     assert decide(store, host, action, "abandon").state == "unresolved"
 
